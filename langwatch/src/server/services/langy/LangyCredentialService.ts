@@ -1,8 +1,7 @@
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
 import { ProjectRepository } from "~/server/projects/project.repository";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { getLangyApiKeyToken, provisionLangyApiKey } from "./langyApiKey";
 import { getGithubTokenForUser } from "./langyGithubToken";

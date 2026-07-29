@@ -33,12 +33,16 @@ COPY mcp-server ./mcp-server
 COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 
 COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
+# The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
+# are consumed as source, so pnpm install must see their package.json to link them
+# and install their own dependencies (pino, pino-pretty, ...) into
+# packages/*/node_modules. Without this the app bundle build fails to resolve those
+# deps (e.g. "Rolldown failed to resolve import 'pino'"). Same reason mcp-server is
+# copied early above. node_modules is dockerignored, so only source is copied here.
+COPY langwatch/packages ./langwatch/packages
 COPY langwatch/vendor ./langwatch/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN cd langwatch && CI=true pnpm install --frozen-lockfile
-# SDK package files needed by generate-sdk-versions.sh during build
-COPY typescript-sdk/package.json ./typescript-sdk/package.json
-COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY langwatch ./langwatch
 RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
@@ -61,8 +65,6 @@ WORKDIR /app
 # symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
 COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
-COPY --from=builder /app/typescript-sdk/package.json ./typescript-sdk/package.json
-COPY --from=builder /app/python-sdk/pyproject.toml ./python-sdk/pyproject.toml
 COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 
 ENV NODE_ENV=production

@@ -72,7 +72,7 @@ export const sendSlackWebhook = async ({
     }
     // Regular trace link
     if (data.traceId) {
-      return `${env.BASE_HOST}/${projectSlug}/messages/${data.traceId}`;
+      return `${env.BASE_HOST}/${projectSlug}/traces/${data.traceId}`;
     }
     return "#";
   };

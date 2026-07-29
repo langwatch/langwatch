@@ -57,6 +57,15 @@ export interface ReplayRepository {
     runId: string;
     ttlSeconds: number;
   }): Promise<boolean>;
+  /**
+   * Extend the lock's TTL, but only while `runId` still holds it. Long
+   * replays heartbeat this per batch — without it the lock expires mid-run
+   * and progress updates silently stop.
+   */
+  refreshLock(params: {
+    runId: string;
+    ttlSeconds: number;
+  }): Promise<boolean>;
   releaseLock(params: { runId: string }): Promise<void>;
   getLockHolder(): Promise<string | null>;
 
@@ -76,6 +85,10 @@ export class NullReplayRepository implements ReplayRepository {
   async writeStatus(): Promise<void> {}
 
   async acquireLock(): Promise<boolean> {
+    return false;
+  }
+
+  async refreshLock(): Promise<boolean> {
     return false;
   }
 

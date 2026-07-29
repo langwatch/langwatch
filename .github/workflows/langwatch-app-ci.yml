@@ -47,6 +47,7 @@ jobs:
             feature-parity:
               - 'specs/**'
               - 'langwatch/**'
+              - 'tools/**'
               - 'mcp-server/**'
               - 'typescript-sdk/**'
               - 'python-sdk/**'
@@ -77,6 +78,10 @@ jobs:
       - name: Run typecheck
         working-directory: langwatch
         run: pnpm typecheck
+
+      - name: Run typecheck (tests)
+        working-directory: langwatch
+        run: pnpm run typecheck:tests
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -303,6 +308,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: mongolyy/reviewdog-action-biome@c49bee54c1f87e4be32446ae3deca3a186b88a3a # v2

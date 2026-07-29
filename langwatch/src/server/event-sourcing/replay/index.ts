@@ -1,4 +1,5 @@
-export { ReplayService, type ReplayLogWriter } from "./replayService";
+export { ReplayService } from "./replayService";
+export type { ReplayLogWriter } from "./replayLog";
 export { createReplayRuntime, type ReplayRuntime } from "./replayPreset";
 export type {
   RegisteredFoldProjection,

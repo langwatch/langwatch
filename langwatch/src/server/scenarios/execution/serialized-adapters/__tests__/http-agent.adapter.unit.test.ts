@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TemplateRenderError } from "../../http-template-engine";
 import type { HttpAgentData } from "../../types";
@@ -13,15 +13,15 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
 
-vi.mock("../../trace-context-headers", () => ({
+vi.mock("@langwatch/observability/tracing", () => ({
   injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
     headers,
     traceId: undefined,
   })),
 }));
 
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import { injectTraceContextHeaders } from "../../trace-context-headers";
 
 const mockSsrfSafeFetch = vi.mocked(ssrfSafeFetch);
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);

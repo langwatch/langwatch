@@ -15,6 +15,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **async-processing-ui.md** - Poll/banner/read-gate pattern for a processing→ready/failed resource
 - **soft-delete-vs-archive.md** - When to archive vs hard-delete
 - **logging-and-tracing.md** - Logging infrastructure and context propagation
+- **local-observability.md** - Local LGTM stack (Grafana/Loki/Tempo/Prometheus); querying logs/traces as an agent with `gcx`
 - **dependency-age-gates.md** - Dependency release-age gates and emergency security exceptions
 - **typescript.md** - TypeScript patterns
 - **react.md** - React/Next.js patterns

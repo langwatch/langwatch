@@ -102,7 +102,7 @@ export type ResolveOriginCommandData = z.infer<
  * rejects pure-whitespace and over-long names without an extra transform
  * step that defineCommand's `z.ZodObject<z.ZodRawShape>` constraint
  * doesn't accept. Anything that fails this Zod check should bubble up
- * as a `ValidationError` (DomainError) rather than reaching the command
+ * as a `ValidationError` (HandledError) rather than reaching the command
  * pipeline.
  */
 export const changeTraceNameInputSchema = z.object({

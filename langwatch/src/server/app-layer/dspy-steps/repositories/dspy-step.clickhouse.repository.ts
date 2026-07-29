@@ -1,8 +1,8 @@
+import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
-import { createLogger } from "~/utils/logger/server";
 import type {
   DspyExampleData,
   DspyLlmCallData,

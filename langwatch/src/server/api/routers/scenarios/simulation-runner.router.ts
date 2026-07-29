@@ -2,11 +2,12 @@
  * Router for running scenarios against targets.
  */
 
-import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import {
   createDataPrefetcherDependencies,
   prefetchScenarioData,
@@ -14,7 +15,6 @@ import {
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 

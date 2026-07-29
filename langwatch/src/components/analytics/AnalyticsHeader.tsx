@@ -110,15 +110,11 @@ export function AnalyticsHeader({
           <PageLayout.HeaderButton
             variant="ghost"
             onClick={() => {
+              // Trace Explorer keeps its time range in the URL fragment
+              // (#<lens>?from=<ms>&to=<ms>), so carry the analytics period
+              // over as an absolute range.
               void router.push(
-                {
-                  pathname: `/${project?.slug}/messages`,
-                  query: {
-                    ...router.query,
-                  },
-                },
-                undefined,
-                { shallow: true },
+                `/${project?.slug}/traces#all-traces?from=${startDate.getTime()}&to=${endDate.getTime()}`,
               );
             }}
           >

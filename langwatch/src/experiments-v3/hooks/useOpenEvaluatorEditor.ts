@@ -22,20 +22,83 @@ import type {
 } from "~/components/variables";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import type { EvaluatorConfig, TargetConfig } from "../types";
+import { isComparisonEvaluator } from "../types";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
+import { toComparisonConfig } from "../utils/normalizeComparison";
 import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../utils/fieldMappingConverters";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
+/**
+ * Opens the Comparison config form for an existing comparison evaluator.
+ *
+ * A comparison grades no single target — its candidates come from OTHER
+ * targets' outputs, picked once via the form — so unlike every other
+ * evaluator it needs no (target, targetName) pair and no mapping sources.
+ * That is why it is its own entry point: the column header has an evaluator
+ * and nothing else to give.
+ *
+ * A legacy pairwise evaluator lands here too: its config is normalized to
+ * `comparison` on load, so it opens in the same form.
+ */
+export const useOpenComparisonEditor = () => {
+  const { openDrawer } = useDrawer();
+
+  const { datasets, activeDatasetId, targets, updateEvaluator } =
+    useEvaluationsV3Store(
+      useShallow((state) => ({
+        datasets: state.datasets,
+        activeDatasetId: state.activeDatasetId,
+        targets: state.targets,
+        updateEvaluator: state.updateEvaluator,
+      })),
+    );
+
+  return useCallback(
+    (evaluator: EvaluatorConfig) => {
+      const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+      setFlowCallbacks(
+        "evaluatorEditor",
+        createEvaluatorEditorCallbacks({
+          onLocalConfigChange: (localEvaluatorConfig) => {
+            updateEvaluator(evaluator.id, { localEvaluatorConfig });
+          },
+          onComparisonChange: (comparison) => {
+            updateEvaluator(evaluator.id, { comparison });
+          },
+        }),
+      );
+      openDrawer("evaluatorEditor", {
+        evaluatorId: evaluator.dbEvaluatorId,
+        evaluatorType: evaluator.evaluatorType,
+        initialLocalConfig: evaluator.localEvaluatorConfig,
+        // Non-serializable extras consumed by the drawer body.
+        comparisonContext: {
+          initialComparison: toComparisonConfig(evaluator),
+          // Pass full TargetConfig so the picker's `useTargetName` hook can
+          // resolve human-readable handles (it needs `type`, `promptId`,
+          // `dbAgentId`, `targetEvaluatorId` — stripping to `{id}` would
+          // force the dropdown to show raw `target_NNNN` ids).
+          targets,
+          datasetColumns:
+            activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ??
+            [],
+        },
+      });
+    },
+    [openDrawer, datasets, activeDatasetId, targets, updateEvaluator],
+  );
+};
+
 export const useOpenEvaluatorEditor = () => {
   const { openDrawer } = useDrawer();
+  const openComparisonEditor = useOpenComparisonEditor();
 
   const {
     datasets,
     activeDatasetId,
-    targets,
     updateEvaluator,
     setEvaluatorMapping,
     removeEvaluatorMapping,
@@ -43,7 +106,6 @@ export const useOpenEvaluatorEditor = () => {
     useShallow((state) => ({
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
-      targets: state.targets,
       updateEvaluator: state.updateEvaluator,
       setEvaluatorMapping: state.setEvaluatorMapping,
       removeEvaluatorMapping: state.removeEvaluatorMapping,
@@ -140,44 +202,14 @@ export const useOpenEvaluatorEditor = () => {
         return;
       }
 
-      // Pairwise compare evaluators (#5100): bypass the per-row mapping form
-      // and render a target+golden picker instead. The four required input
-      // fields (candidate_a_*/candidate_b_*) have no per-row source — they
-      // come from two OTHER targets' outputs, picked once via the form.
-      // The orchestrator's Phase-2 cell generator reads evaluator.pairwise
-      // to assemble those inputs at run time.
-      if (evaluator.evaluatorType === "langevals/pairwise_compare") {
-        const activeDataset = datasets.find((d) => d.id === activeDatasetId);
-        setFlowCallbacks(
-          "evaluatorEditor",
-          createEvaluatorEditorCallbacks({
-            onLocalConfigChange: (localEvaluatorConfig) => {
-              updateEvaluator(evaluator.id, { localEvaluatorConfig });
-            },
-            onPairwiseChange: (pairwise) => {
-              updateEvaluator(evaluator.id, { pairwise });
-            },
-          }),
-        );
-        openDrawer("evaluatorEditor", {
-          evaluatorId: evaluator.dbEvaluatorId,
-          evaluatorType: evaluator.evaluatorType,
-          initialLocalConfig: evaluator.localEvaluatorConfig,
-          // Non-serializable extras consumed by the drawer body.
-          pairwiseContext: {
-            initialPairwise: evaluator.pairwise,
-            // Pass full TargetConfig so the picker's `useTargetName` hook
-            // can resolve human-readable handles (it needs `type`,
-            // `promptId`, `dbAgentId`, `targetEvaluatorId` — stripping to
-            // `{id}` would force the dropdown to show raw `target_NNNN` ids).
-            targets,
-            datasetColumns:
-              activeDataset?.columns.map((c) => ({
-                id: c.id,
-                name: c.name,
-              })) ?? [],
-          },
-        });
+      // Comparison evaluators: bypass the per-row mapping form and render a
+      // variants+golden picker instead. The required `candidates` input has no
+      // per-row source — it comes from OTHER targets' outputs, picked once via
+      // the form. The orchestrator's `generateComparisonCells` reads
+      // `evaluator.comparison` at run time to assemble the per-row candidates.
+      // Neither the mapping sources nor `target` above are used on this path.
+      if (isComparisonEvaluator(evaluator)) {
+        openComparisonEditor(evaluator);
         return;
       }
 
@@ -204,9 +236,9 @@ export const useOpenEvaluatorEditor = () => {
     },
     [
       openDrawer,
+      openComparisonEditor,
       datasets,
       activeDatasetId,
-      targets,
       updateEvaluator,
       setEvaluatorMapping,
       removeEvaluatorMapping,

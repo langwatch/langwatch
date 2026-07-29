@@ -1,6 +1,9 @@
 import type { MetricRecordStorageRepository } from "~/server/app-layer/traces/repositories/metric-record-storage.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { AppendStore } from "../../../projections/mapProjection.types";
+import type {
+  AppendStore,
+  BulkAppendContext,
+} from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { NormalizedMetricRecord } from "../schemas/metricRecords";
 
@@ -20,7 +23,7 @@ export class MetricRecordAppendStore
 
   async bulkAppend(
     records: NormalizedMetricRecord[],
-    context: ProjectionStoreContext,
+    context: BulkAppendContext,
   ): Promise<void> {
     if (records.length === 0) return;
     const retentionDays =

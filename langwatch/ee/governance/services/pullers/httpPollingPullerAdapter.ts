@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
 /**
  * HttpPollingPullerAdapter — universal HTTP-polling adapter for
  * paginated REST audit-log APIs. Mirrors Airbyte's HTTP-source
@@ -19,15 +20,13 @@
 import { JSONPath } from "jsonpath-plus";
 import type { Response as FetchResponse } from "undici";
 import { z } from "zod";
-
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
-import { createLogger } from "~/utils/logger/server";
 
 import type {
   NormalizedPullEvent,
+  PullerAdapter,
   PullResult,
   PullRunOptions,
-  PullerAdapter,
 } from "./pullerAdapter";
 
 const logger = createLogger("langwatch:puller:http_polling");

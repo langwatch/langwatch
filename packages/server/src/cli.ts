@@ -49,8 +49,7 @@ program
   .option("--port-base <n>", "first port slot to use", String(PORT_BASE_DEFAULT))
   .option("-y, --yes", "skip every confirmation prompt", false)
   .option("--no-open", "do not auto-open the browser when ready")
-  .option("--bullboard", "expose the BullMQ dashboard on the bullboard infra slot", false)
-  .option("--dry-run", "print what would be done and exit (no installs, no env, no services)", false)
+  .option("--dry-run","print what would be done and exit (no installs, no env, no services)", false)
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
@@ -99,7 +98,6 @@ program
       predeps,
       envFile: paths.envFile,
       version: VERSION,
-      bullboard: Boolean(opts.bullboard),
       userEnv: captureUserEnv(),
     };
 
@@ -216,7 +214,6 @@ program
       predeps: {},
       envFile: paths.envFile,
       version: VERSION,
-      bullboard: false,
       userEnv: captureUserEnv(),
     };
     ensureEnvFile(ctx);

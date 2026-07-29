@@ -1,24 +1,44 @@
 /**
- * Guard-clause coverage for the two ADR-034 read repositories.
+ * Guard-clause coverage for the ADR-034 read repositories.
  *
  * `route-table.integration.test.ts` drives ClickHouse directly rather than
- * through these classes, so the two pre-flight throws — missing tenantId, and
- * an unresolvable per-project client — had no coverage at all. Both are pure
- * logic and need nothing but a stubbed resolver.
+ * through these repositories, so the two pre-flight throws — missing tenantId,
+ * and an unresolvable per-project client — had no coverage at all. Both are
+ * pure logic and need nothing but a stubbed resolver.
  *
  * The tenantId guard is a multitenancy boundary: a repository that reached
  * ClickHouse with an empty tenant would emit a query whose
  * `TenantId = {tenantId:String}` predicate matches nothing (or, worse, whose
  * absence would be a cross-tenant read). It must throw before building SQL.
+ *
+ * All four destinations share one implementation, so the guards are asserted
+ * against every factory — a future fifth destination that forgets to route
+ * through the shared class fails here.
  */
 
 import { describe, expect, it, vi } from "vitest";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { AnalyticsClientUnavailableError } from "../errors";
-import { TraceAnalyticsRollupClickHouseReadRepository } from "../repositories/trace-analytics-rollup.clickhouse.repository";
 import {
+  type AnalyticsTimeseriesReadRepository,
+  createEvalRollupReadRepo,
+  createEvalSlimReadRepo,
+  createTraceRollupReadRepo,
+  createTraceSlimReadRepo,
   type RunTimeseriesParams,
-  TraceAnalyticsClickHouseReadRepository,
-} from "../repositories/trace-analytics.clickhouse.repository";
+} from "../repositories/analyticsTimeseriesRead.repository";
+
+const DESTINATIONS: {
+  name: string;
+  create: (
+    resolve: ClickHouseClientResolver,
+  ) => AnalyticsTimeseriesReadRepository;
+}[] = [
+  { name: "trace-analytics-rollup", create: createTraceRollupReadRepo },
+  { name: "trace-analytics", create: createTraceSlimReadRepo },
+  { name: "evaluation-analytics-rollup", create: createEvalRollupReadRepo },
+  { name: "evaluation-analytics", create: createEvalSlimReadRepo },
+];
 
 function params(overrides: Partial<RunTimeseriesParams> = {}) {
   return {
@@ -37,53 +57,29 @@ function params(overrides: Partial<RunTimeseriesParams> = {}) {
 }
 
 describe("ADR-034 read repositories", () => {
-  describe("TraceAnalyticsRollupClickHouseReadRepository.runRollupTimeseries", () => {
-    describe("given an empty tenantId", () => {
-      it("throws before resolving a client", async () => {
-        const resolveClient = vi.fn();
-        const repo = new TraceAnalyticsRollupClickHouseReadRepository(
-          resolveClient,
-        );
-        await expect(
-          repo.runRollupTimeseries(params({ tenantId: "" })),
-        ).rejects.toThrow(/tenantId is required/);
-        expect(resolveClient).not.toHaveBeenCalled();
-      });
-    });
+  for (const { name, create } of DESTINATIONS) {
+    describe(`${name} read repository`, () => {
+      describe("given an empty tenantId", () => {
+        it("throws before resolving a client", async () => {
+          const resolveClient = vi.fn();
+          const repo = create(resolveClient);
 
-    describe("when no ClickHouse client resolves for the project", () => {
-      it("throws AnalyticsClientUnavailableError", async () => {
-        const repo = new TraceAnalyticsRollupClickHouseReadRepository(
-          vi.fn().mockResolvedValue(null),
-        );
-        await expect(repo.runRollupTimeseries(params())).rejects.toBeInstanceOf(
-          AnalyticsClientUnavailableError,
-        );
+          await expect(repo.run(params({ tenantId: "" }))).rejects.toThrow(
+            /tenantId is required/,
+          );
+          expect(resolveClient).not.toHaveBeenCalled();
+        });
       });
-    });
-  });
 
-  describe("TraceAnalyticsClickHouseReadRepository.runSlimTimeseries", () => {
-    describe("given an empty tenantId", () => {
-      it("throws before resolving a client", async () => {
-        const resolveClient = vi.fn();
-        const repo = new TraceAnalyticsClickHouseReadRepository(resolveClient);
-        await expect(
-          repo.runSlimTimeseries(params({ tenantId: "" })),
-        ).rejects.toThrow(/tenantId is required/);
-        expect(resolveClient).not.toHaveBeenCalled();
-      });
-    });
+      describe("when no ClickHouse client resolves for the project", () => {
+        it("throws AnalyticsClientUnavailableError", async () => {
+          const repo = create(vi.fn().mockResolvedValue(null));
 
-    describe("when no ClickHouse client resolves for the project", () => {
-      it("throws AnalyticsClientUnavailableError", async () => {
-        const repo = new TraceAnalyticsClickHouseReadRepository(
-          vi.fn().mockResolvedValue(null),
-        );
-        await expect(repo.runSlimTimeseries(params())).rejects.toBeInstanceOf(
-          AnalyticsClientUnavailableError,
-        );
+          await expect(repo.run(params())).rejects.toBeInstanceOf(
+            AnalyticsClientUnavailableError,
+          );
+        });
       });
     });
-  });
+  }
 });

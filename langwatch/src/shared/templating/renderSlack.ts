@@ -6,7 +6,22 @@ import {
 } from "./defaults";
 import { renderLiquid } from "./engine";
 import { errorMessage, renderWithFallback } from "./renderWithFallback";
-import type { TemplateContext } from "./templateContext";
+import type {
+  GraphAlertTemplateContext,
+  ReportTemplateContext,
+  TemplateContext,
+} from "./templateContext";
+
+/**
+ * Default-template overrides for `renderTriggerSlack` (ADR-034 Phase 8.1).
+ * Lets the graph-alert path render against `ALERT_TRIGGER_DEFAULTS`
+ * without forking the engine; trace callers omit it and keep the
+ * trace defaults (`DEFAULT_SLACK_TEMPLATE` / `DEFAULT_SLACK_BLOCK_KIT_TEMPLATE`).
+ */
+export interface SlackRenderDefaults {
+  slackString: string;
+  slackBlockKit: string;
+}
 
 export type SlackTemplateType = "string" | "block_kit";
 
@@ -27,13 +42,19 @@ async function fallbackToDefaultText({
   testFire,
   error,
   customMissing,
+  defaultSlackString,
 }: {
   context: Record<string, unknown>;
   testFire: boolean;
   error: string;
   customMissing: string[] | undefined;
+  defaultSlackString: string;
 }): Promise<RenderedSlack> {
-  const fallback = await defaultSlackText({ context, testFire });
+  const fallback = await defaultSlackText({
+    context,
+    testFire,
+    defaultSlackString,
+  });
   return {
     payload: { text: fallback.text },
     usedDefault: true,
@@ -45,11 +66,13 @@ async function fallbackToDefaultText({
 function defaultSlackText({
   context,
   testFire,
+  defaultSlackString,
 }: {
   context: Record<string, unknown>;
   testFire: boolean;
+  defaultSlackString: string;
 }): Promise<{ text: string; missingVariables: string[] }> {
-  return renderLiquid({ template: DEFAULT_SLACK_TEMPLATE, context }).then(
+  return renderLiquid({ template: defaultSlackString, context }).then(
     (rendered) => ({
       text: testFire
         ? `${testFireSlackText()}\n\n${rendered.output}`
@@ -72,19 +95,31 @@ export async function renderTriggerSlack({
   templateType,
   template,
   context,
+  defaults,
   testFire = false,
+  allowGatedBlocks = false,
 }: {
   templateType: SlackTemplateType | null;
   template: string | null;
-  context: TemplateContext;
+  context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
+  /** Per-context default overrides (ADR-034 Phase 8.1). When omitted,
+   *  the trace defaults apply — same behaviour as before. */
+  defaults?: SlackRenderDefaults;
   testFire?: boolean;
+  /** Keep the gated Block Kit blocks (chart/table/alert) that only render on
+   *  the Web API surface. Set only for bot-token delivery; a webhook drops
+   *  them (they'd be rejected as `invalid_blocks`). */
+  allowGatedBlocks?: boolean;
 }): Promise<RenderedSlack> {
   const ctx = context as unknown as Record<string, unknown>;
+  const slackString = defaults?.slackString ?? DEFAULT_SLACK_TEMPLATE;
+  const slackBlockKit =
+    defaults?.slackBlockKit ?? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE;
 
   if (templateType !== "block_kit") {
     const rendered = await renderWithFallback({
       template,
-      fallback: DEFAULT_SLACK_TEMPLATE,
+      fallback: slackString,
       context: ctx,
     });
     const text = testFire
@@ -98,7 +133,7 @@ export async function renderTriggerSlack({
     };
   }
 
-  const effectiveTemplate = template ?? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE;
+  const effectiveTemplate = template ?? slackBlockKit;
   const usedDefaultTemplate = template == null;
   // `customMissing` captures the missing-variable diagnostics from the
   // customer's template render. If the JSON.parse / allowlist filter
@@ -117,7 +152,7 @@ export async function renderTriggerSlack({
     const blocksInput = Array.isArray(parsed)
       ? parsed
       : (parsed as { blocks?: unknown })?.blocks;
-    const blocks = filterBlockKit(blocksInput);
+    const blocks = filterBlockKit(blocksInput, { allowGatedBlocks });
     if (blocks.length === 0) {
       // Expected outcome (e.g. every block was filtered by the allowlist),
       // not a render failure — fall back to the plain-text default directly.
@@ -126,6 +161,7 @@ export async function renderTriggerSlack({
         testFire,
         error: "Block Kit template produced no allowed blocks",
         customMissing,
+        defaultSlackString: slackString,
       });
     }
     return {
@@ -142,6 +178,7 @@ export async function renderTriggerSlack({
       testFire,
       error: errorMessage(err),
       customMissing,
+      defaultSlackString: slackString,
     });
   }
 }

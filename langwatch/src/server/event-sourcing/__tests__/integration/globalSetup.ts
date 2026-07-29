@@ -264,16 +264,6 @@ export async function setup(): Promise<void> {
     timer.unref();
   }
 
-  // Generate sdk-versions.json (normally done by start:prepare:files)
-  const sdkVersionsPath = path.join(
-    __dirname,
-    "../../../../server/sdk-radar/sdk-versions.json",
-  );
-  if (!fs.existsSync(sdkVersionsPath)) {
-    console.log("[globalSetup] Generating sdk-versions.json...");
-    execSync("pnpm run generate:sdk-versions", { stdio: "inherit" });
-  }
-
   // Skip if using CI service containers
   if (
     process.env.CI_CLICKHOUSE_URL &&

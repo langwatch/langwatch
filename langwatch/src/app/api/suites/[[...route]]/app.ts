@@ -1,19 +1,19 @@
+import { createLogger } from "@langwatch/observability";
 import type { SimulationSuite } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { ProjectRepository } from "~/server/projects/project.repository";
+import { SuiteDomainError } from "~/server/suites/errors";
+import { SuiteService } from "~/server/suites/suite.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger/server";
 import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
-import { SuiteService } from "~/server/suites/suite.service";
-import { SuiteDomainError } from "~/server/suites/errors";
-import { ProjectRepository } from "~/server/projects/project.repository";
-import { getApp } from "~/server/app-layer/app";
 
 patchZodOpenapi();
 

@@ -93,7 +93,14 @@ function makeNotifyDeps(opts?: { emailCap?: number }) {
     triggers: triggers as any,
     projects: projects as any,
     baseHost: "https://app.example.com",
-    traceSummaryStore: { get: vi.fn().mockResolvedValue(null), store: vi.fn() },
+    // The cadence stage reads the trace's content from the FOLD at dispatch —
+    // it is no longer carried on the payload — so the store must answer for any
+    // trace these flows dispatch. Tests that exercise the missing-fold path
+    // override this with null.
+    traceSummaryStore: {
+      get: vi.fn(async (traceId: string) => makeFoldState(traceId)),
+      store: vi.fn(),
+    },
     evaluationRuns: { findByTraceId: vi.fn().mockResolvedValue([]) } as any,
     deriveEvents: vi.fn().mockResolvedValue([]),
     traceById: vi.fn().mockResolvedValue(undefined),
@@ -116,14 +123,15 @@ function makeNotifyDeps(opts?: { emailCap?: number }) {
     consumeTenantEmailCapSlot: async () => ({ allowed: true, count: 0 }),
     // Suppression isn't the focus here (the cap is) — pass recipients through.
     filterSuppressedEmails: async ({ emails }: { emails: string[] }) => emails,
+    // Graph-eval evaluation runs on a separate stage; these notify-focused
+    // flows never enter the graphEval branch so a no-op stub is enough.
+    evaluateGraphTrigger: vi.fn().mockResolvedValue(undefined),
   };
 }
 
 function cadencePayload(
   triggerId: string,
   traceId: string,
-  input = "what is the weather?",
-  output = "it is sunny",
 ): CadenceStagePayload {
   return {
     stage: "cadence",
@@ -131,7 +139,8 @@ function cadencePayload(
     triggerId,
     reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
     auditDedupKey: auditDedupKey({ projectId, triggerId, traceId }),
-    match: { traceId, input, output },
+    // Identity only. The trace's content comes from the fold at dispatch.
+    match: { traceId },
   };
 }
 
@@ -480,10 +489,6 @@ describe("trigger dispatch — full flow per action type", () => {
           triggerId,
           traceId: "trace-settle-1",
         }),
-        foldSnapshotAtEnqueue: {
-          computedInput: "what is the weather?",
-          computedOutput: "it is sunny",
-        },
       };
 
       // Stage 1 — settle: trace went quiet, re-match, enqueue the digest.

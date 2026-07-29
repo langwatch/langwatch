@@ -19,6 +19,8 @@ import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-project
 export interface SummaryRowOpts {
   /** Override the serialized ts_ComputedOutput JSON string. */
   computedOutput?: string;
+  /** Override ts_OccurredAt (epoch ms) — this maps to `timestamps.started_at`. */
+  occurredAt?: number;
 }
 
 /**
@@ -54,7 +56,7 @@ export function makeSummaryRow(traceId: string, opts?: SummaryRowOpts) {
     ts_AnnotationIds: [],
     ts_Attributes: {},
     ts_TraceName: null,
-    ts_OccurredAt: Date.now(),
+    ts_OccurredAt: opts?.occurredAt ?? Date.now(),
     ts_CreatedAt: Date.now(),
     ts_UpdatedAt: Date.now(),
   };

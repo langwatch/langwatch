@@ -77,6 +77,10 @@ export interface SharedDef {
   readonly label: string;
   /** One-line marketing-ish description shown under the icon in the picker. */
   readonly description: string;
+  /** Alert-flavoured variant of `description`, shown when the draft is a
+   *  graph alert (which fires once when a metric crosses a threshold, not
+   *  per trace). Omit when the trace description reads fine for both. */
+  readonly alertDescription?: string;
   /** Zod schema for the `actionParams` JSON column. Used by the upsert
    *  route to validate input before persisting. */
   readonly actionParamsSchema: ZodTypeAny;
@@ -94,6 +98,11 @@ export interface ConfigFormCtx<TPreview = unknown> {
   projectId: string;
   organizationId: string | undefined;
   teamSlug: string | undefined;
+  /** The saved automation's id when editing an existing row, undefined for a
+   *  new draft. Lets a provider act against the stored (server-side) secret —
+   *  e.g. the Slack channel picker loads channels from the saved bot token
+   *  without the author having to retype it. */
+  automationId?: string;
   /** Variables advertised to the editor (path / type / description). */
   variables: VariableInfo[];
   /** The example data the preview renders against, shown via ExampleData. */
@@ -117,6 +126,19 @@ export interface ConfigFormCtx<TPreview = unknown> {
   /** True when the draft has any evaluations.* filter set — used by the
    *  Slack picker to surface the eval-failure template. */
   hasEvaluationFilter: boolean;
+  /** What the draft is about — trace data, a custom-graph alert, or a scheduled
+   *  report. Notify providers seed their template defaults from this AND filter
+   *  the template gallery by it, so a report never offers the per-trace
+   *  (immediate) layouts. */
+  sourceKind: "trace" | "graphAlert" | "report";
+  /** For a report, the content it sends — a table of matching traces, one
+   *  custom graph, or a whole dashboard. Narrows which report layouts apply. */
+  reportSourceKind?: "traceQuery" | "customGraph" | "dashboard";
+  /** Send a test notification with the current draft, so the author can try it
+   *  from inside the config section. No-op / absent when the draft isn't
+   *  test-fireable yet. `testFireLoading` reflects the in-flight send. */
+  onTestFire?: () => void;
+  testFireLoading?: boolean;
 }
 
 /** Mirrors `editors/liquidMonaco#VariableInfo`. Defined here too so the
@@ -178,9 +200,21 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   /** Webhook for the test-fire mutation. ADR-031: email test fires resolve
    *  their recipient server-side (the requester's own inbox), so no provider
    *  contributes a recipient list here — only Slack contributes its webhook. */
-  testFireTarget(slice: S): { webhook: string | null };
+  testFireTarget(slice: S): {
+    webhook: string | null;
+    /** Slack bot connection: test-fire posts via the Web API instead of the
+     *  webhook. `botToken` is the freshly-typed token, or null to reuse the
+     *  saved automation's stored token. */
+    botDestination?: { channelId: string; botToken: string | null } | null;
+  };
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;
+  /** Render options the PREVIEW must mirror so it shows what will really be
+   *  delivered. Slack only renders the modern blocks (charts, tables, alert
+   *  banners) over a bot connection — without this the preview would show a
+   *  chart that the webhook is going to strip, or hide one the bot will send.
+   *  Omit when the provider's preview needs no delivery-specific options. */
+  previewOptions?(slice: S): { allowGatedBlocks?: boolean };
 }
 
 /** The "server" definition (`server.ts`). Stage A keeps this minimal —

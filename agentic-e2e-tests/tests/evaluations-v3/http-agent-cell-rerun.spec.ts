@@ -31,7 +31,9 @@ import {
  * So that I can test modifications without re-running the entire evaluation
  */
 test.describe("Single Cell Re-execution", () => {
-  // fixme(#1811): flaky — Lambda warmup failures in CI cause timeouts
+  // fixme: blocked on missing testids — spreadsheet-cell, cell-play-button, save-agent-button
+  // are not yet present in the app source. Re-enable when testids are added to the evaluations
+  // workbench spreadsheet component. Tracked in #1811.
   test.fixme();
   /**
    * Scenario: Single cell re-execution for HTTP agent

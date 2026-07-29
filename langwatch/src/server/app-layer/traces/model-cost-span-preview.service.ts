@@ -7,7 +7,7 @@ import {
   matchModelCostWithFallbacks,
 } from "~/server/tracer/collector/cost";
 import { compileSafeRegex } from "~/utils/safeRegex";
-import { ValidationError } from "../domain-error";
+import { ValidationError } from "../handled-error";
 import type { SpanStorageService } from "./span-storage.service";
 
 /**

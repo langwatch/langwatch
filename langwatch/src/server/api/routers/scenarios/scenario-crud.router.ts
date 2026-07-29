@@ -1,13 +1,13 @@
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
+import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
-import { trackServerEvent } from "~/server/posthog";
-import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 

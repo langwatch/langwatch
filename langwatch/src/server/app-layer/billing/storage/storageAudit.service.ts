@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import type { BoundaryMeasurementService } from "./boundaryMeasurement.service";
 import { foldBoundaryEvents } from "./gaugeFold";
 import type { StorageAuditStateRepository } from "./repositories/storage-audit-state.repository";

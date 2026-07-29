@@ -1,4 +1,4 @@
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 
 /**
  * Thrown when a caller supplies BOTH a top-level `prompt` field AND a system
@@ -8,7 +8,7 @@ import { DomainError } from "~/server/app-layer/domain-error";
  * For the distinct "neither prompt nor system message was supplied" case
  * (HTTP 400 Bad Request), use [[SystemPromptRequiredError]].
  */
-export class SystemPromptConflictError extends DomainError {
+export class SystemPromptConflictError extends HandledError {
   constructor(message?: string) {
     super(
       "system_prompt_conflict",

@@ -1,9 +1,10 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
+import { createLogger } from "@langwatch/observability";
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { PrismaClient } from "@prisma/client";
 import { JSONPath } from "jsonpath-plus";
 import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
-import { createLogger } from "~/utils/logger/server";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   AgentRepository,
@@ -14,7 +15,6 @@ import {
   renderBodyTemplate,
   renderUrlTemplate,
 } from "../execution/http-template-engine";
-import { injectTraceContextHeaders } from "../execution/trace-context-headers";
 import { applyAuthentication } from "./auth.strategies";
 
 const logger = createLogger("HttpAgentAdapter");

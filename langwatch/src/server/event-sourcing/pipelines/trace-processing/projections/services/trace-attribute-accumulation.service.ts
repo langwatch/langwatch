@@ -181,7 +181,17 @@ export class TraceAttributeAccumulationService {
     const evaluationRunId = stringAttr(spanAttrs, "evaluation.run_id");
     if (evaluationRunId) result["evaluation.run_id"] = evaluationRunId;
 
-    const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
+    // Labels may arrive on span attrs (OTLP-direct path, where
+    // otelAttributesToNestedAttributes JSON-parses the string to an array)
+    // or on resource attrs (POST /api/collector and
+    // PATCH /api/traces/{id}/metadata, where buildResource writes
+    // JSON.stringify(labels) and parseJsonStringValues later converts it
+    // back to an array). Honor both sources so labels sent via the
+    // documented REST endpoints actually reach the trace's attribute map
+    // and the labels facet SQL. Mirrors the tag.tags handling below.
+    const labels =
+      spanAttrs[ATTR_KEYS.LANGWATCH_LABELS] ??
+      resourceAttrs[ATTR_KEYS.LANGWATCH_LABELS];
     if (typeof labels === "string") result["langwatch.labels"] = labels;
     else if (Array.isArray(labels))
       result["langwatch.labels"] = JSON.stringify(labels);

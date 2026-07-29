@@ -64,8 +64,10 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           paddingY={3}
           gap={3}
           flexWrap="nowrap"
-          bg="bg.subtle/50"
-          backdropFilter="blur(4px)"
+          bg="bg.panel/70"
+          backdropFilter="blur(12px) saturate(140%)"
+          borderWidth="1px"
+          borderColor="border.muted"
           data-testid="run-row-header"
           borderRadius="lg"
           boxShadow="xs"
@@ -152,8 +154,12 @@ function RunRowData({
           className="group"
           aria-expanded={isExpanded}
           aria-label={`Run from ${timeAgo ?? "unknown time"}`}
-          bg="bg.subtle/50"
-          backdropFilter="blur(4px)"
+          bg="bg.panel/70"
+          backdropFilter="blur(12px) saturate(140%)"
+          borderWidth="1px"
+          borderColor="border.muted"
+          transition="border-color 0.15s ease"
+          _hover={{ borderColor: "border.emphasized" }}
           data-testid="run-row-header"
           borderRadius="lg"
           boxShadow="xs"

@@ -31,6 +31,7 @@ jobs:
               - 'services/nlpgo/**'
               - 'pkg/**'
               - 'cmd/**'
+              - 'tools/migrationorder/**'
               - 'go.mod'
               - 'go.sum'
               - '.golangci.yml'
@@ -61,7 +62,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/...
+      - run: go test -count=1 -race ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/...
 
   lint:
     needs: changes
@@ -77,7 +78,7 @@ jobs:
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.11.4
-          args: ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/...
+          args: ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...
 
   vet:
     needs: changes
@@ -90,4 +91,4 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/...
+      - run: go vet ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...

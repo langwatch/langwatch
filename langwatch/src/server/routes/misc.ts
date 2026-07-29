@@ -15,6 +15,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
 import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -32,7 +33,6 @@ import {
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,
@@ -45,6 +45,7 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { getApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
@@ -82,7 +83,6 @@ import {
 } from "~/server/tracer/types";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { encrypt } from "~/utils/encryption";
-import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
@@ -265,13 +265,19 @@ secured
       const project = c.get("project");
 
       let body: unknown;
+      let payloadSize: number;
       try {
-        body = await c.req.json();
+        // Take the size from the wire bytes rather than re-serialising the
+        // parsed body: bodies here run to 20MB, and the old
+        // `JSON.stringify(body).length` both cost a full second pass and
+        // reported UTF-16 code units instead of transferred bytes.
+        const raw = await c.req.text();
+        payloadSize = Buffer.byteLength(raw, "utf8");
+        body = JSON.parse(raw);
       } catch {
         return c.json({ message: "Bad request" }, 400);
       }
 
-      const payloadSize = JSON.stringify(body).length;
       const payloadSizeMB = payloadSize / (1024 * 1024);
       getPayloadSizeHistogram("log_steps").observe(payloadSize);
 
@@ -453,7 +459,7 @@ secured
           }
           return c.json(
             {
-              error: error.kind,
+              error: error.code,
               message,
               limitType: error.limitType,
               current: error.current,

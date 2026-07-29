@@ -124,7 +124,7 @@ describe("parseCustomRolePermissions", () => {
         });
       } catch (err) {
         expect(err).toBeInstanceOf(MalformedCustomRolePermissionsError);
-        expect((err as MalformedCustomRolePermissionsError).kind).toBe(
+        expect((err as MalformedCustomRolePermissionsError).code).toBe(
           "malformed_custom_role_permissions",
         );
         expect((err as MalformedCustomRolePermissionsError).meta).toMatchObject(

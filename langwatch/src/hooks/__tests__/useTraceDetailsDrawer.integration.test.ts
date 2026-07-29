@@ -9,7 +9,7 @@ import { useTraceDetailsDrawer } from "../useTraceDetailsDrawer";
 
 // The hook is a thin convenience wrapper: it always delegates to
 // `openDrawer("traceDetails", …)`. The cross-cutting concerns (EXTERNAL-user
-// restriction, traces-v2 opt-in routing) live centrally in `CurrentDrawer`
+// restriction, Trace Explorer default routing) live centrally in `CurrentDrawer`
 // and `openDrawer` and are covered by their own tests — here we only pin the
 // delegation contract.
 vi.mock("../useDrawer", () => ({

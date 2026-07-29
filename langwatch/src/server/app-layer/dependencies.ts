@@ -20,6 +20,7 @@ import type { EvaluationRunService } from "./evaluations/evaluation-run.service"
 import type { EventExplorerService } from "./ops/event-explorer.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { QueueService } from "./ops/queue.service";
+import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { OrganizationService } from "./organizations/organization.service";
 import type { PresenceService } from "./presence/presence.service";
@@ -40,7 +41,10 @@ import type { TraceRequestCollectionService } from "./traces/trace-request-colle
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { EmailSuppressionService } from "./triggers/emailSuppression.service";
 import type { TriggerService } from "./triggers/trigger.service";
-import type { TriggerTemplateService } from "./triggers/trigger-template.service";
+import type {
+  TestFireResult,
+  TestFireTriggerInput,
+} from "./triggers/trigger-template.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface DataRetentionDependencies {
@@ -61,6 +65,7 @@ export interface StorageBillingDependencies {
 
 export interface OpsDependencies {
   queues: QueueService;
+  scheduler: SchedulerOpsService;
   eventExplorer: EventExplorerService;
   replay: ReplayService;
   metricsCollector: OpsMetricsCollector | null;
@@ -97,7 +102,12 @@ export interface AppDependencies {
   };
   experiments: ExperimentService;
   triggers: TriggerService;
-  triggerTemplates: TriggerTemplateService;
+  /** Wraps `testFireTrigger(deps, input)` with the composition-time
+   *  `{baseHost, notifier}` bag already bound — the router only needs
+   *  to pass the per-call input. */
+  triggerTemplates: {
+    testFire: (input: TestFireTriggerInput) => Promise<TestFireResult>;
+  };
   emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;

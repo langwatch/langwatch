@@ -7,6 +7,8 @@ const SLOW_INTERVAL_MS = 15000;
 const ACTIVE_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set<ScenarioRunStatus>([
   ScenarioRunStatus.IN_PROGRESS,
   ScenarioRunStatus.PENDING,
+  ScenarioRunStatus.QUEUED,
+  ScenarioRunStatus.RUNNING,
 ]);
 
 /**

@@ -258,24 +258,22 @@ export type ExecutionCell = {
   /** Existing trace ID to reuse (for evaluator reruns) */
   traceId?: string;
   /**
-   * Pairwise candidates baked into the cell after Phase 1 target execution.
-   * Set ONLY for synthetic pairwise cells; targetId on those cells points
-   * at variantA so the workflow builder has a real TargetConfig to lean on,
-   * but the target step is skipped via `skipTarget`.
+   * Comparison candidates baked into the cell after Phase 1 target execution,
+   * in the order the config lists its variants. Set ONLY for synthetic
+   * comparison cells; `targetId` on those cells points at a real TargetConfig
+   * so the workflow builder has something to lean on, but the target step
+   * itself is skipped via `skipTarget`.
+   *
+   * Two candidates is not a special case — a pairwise comparison is simply a
+   * `candidates` array of length 2.
    */
-  pairwise?: {
-    candidateA: {
+  comparison?: {
+    candidates: Array<{
       id: string;
       output: unknown;
       cost?: number;
       duration?: number;
-    };
-    candidateB: {
-      id: string;
-      output: unknown;
-      cost?: number;
-      duration?: number;
-    };
+    }>;
   };
 };
 

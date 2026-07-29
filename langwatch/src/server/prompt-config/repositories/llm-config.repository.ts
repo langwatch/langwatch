@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type {
   LlmPromptConfig,
   LlmPromptConfigVersion,
@@ -5,10 +6,9 @@ import type {
   PrismaClient,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { DEFAULT_MODEL } from "~/utils/constants";
-import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
-import { createLogger } from "../../../utils/logger/server";
+import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
+import { DEFAULT_MODEL } from "~/utils/constants";
 import { SchemaVersion } from "../enums";
 import { NotFoundError } from "../errors";
 import {
@@ -821,6 +821,21 @@ export class LlmConfigRepository {
       select: { id: true },
     });
     return config !== null;
+  }
+
+  /**
+   * Records the prompt a copy was made from, so the copy can later be synced
+   * from its source and the source can push updates to its copies.
+   */
+  async setCopiedFromPrompt(params: {
+    id: string;
+    projectId: string;
+    copiedFromPromptId: string;
+  }): Promise<void> {
+    await this.prisma.llmPromptConfig.update({
+      where: { id: params.id, projectId: params.projectId },
+      data: { copiedFromPromptId: params.copiedFromPromptId },
+    });
   }
 
   /**

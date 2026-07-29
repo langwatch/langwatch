@@ -9,7 +9,7 @@ import {
 } from "../server/app-layer/billing/storage/storageSeeding.service";
 import { getClickHouseClientForProject } from "../server/clickhouse/clickhouseClient";
 import { prisma } from "../server/db";
-import { createLogger } from "../utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:tasks:seedStorageBilling");
 

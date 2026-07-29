@@ -18,6 +18,7 @@ import type {
 } from "../types";
 import { isGoldenFieldSatisfied } from "../types";
 import { extractVariablesFromBodyTemplate } from "./httpAgentUtils";
+import { toComparisonConfig } from "./normalizeComparison";
 
 // ============================================================================
 // Types
@@ -170,31 +171,28 @@ export const getTargetMissingMappings = (
   // Evaluator targets use requiredFields/optionalFields from AVAILABLE_EVALUATORS
   const isEvaluatorTarget = target.type === "evaluator";
 
-  // Pairwise column-target (#5100): high-level PairwiseConfigForm replaces the
-  // per-row mappings UI. Validate against the pairwise config (Variant A /
-  // Variant B / Golden) instead of walking the input field list — those rows
-  // are derived from variantA/variantB at save time so the user never has to
-  // fill them in. Strictly additive: only triggered when target.pairwise is
-  // set, which only happens for langevals/pairwise_compare column-targets.
-  if (isEvaluatorTarget && target.pairwise) {
-    const pw = target.pairwise;
-    if (!pw.variantA) {
+  // Comparison column-target: the high-level ComparisonConfigForm replaces the
+  // per-row mappings UI. Validate against the comparison config (Variants /
+  // Golden) instead of walking the input field list — those rows are derived
+  // from the variants at save time, so the user never has to fill them in.
+  const targetComparison = isEvaluatorTarget
+    ? toComparisonConfig(target)
+    : undefined;
+  if (targetComparison) {
+    // Filter empty slots, not just array length: a folded legacy pairwise
+    // config keeps both variantA/variantB positions even when one is unset
+    // (see fromPairwise in normalizeComparison.ts), so an under-filled
+    // config can have variants.length === 2 while one entry is "".
+    if (targetComparison.variants.filter(Boolean).length < 2) {
       missingMappings.push({
-        fieldId: "variantA",
-        fieldName: "Variant A",
-        isRequired: true,
-      });
-    }
-    if (!pw.variantB) {
-      missingMappings.push({
-        fieldId: "variantB",
-        fieldName: "Variant B",
+        fieldId: "variants",
+        fieldName: "Variants",
         isRequired: true,
       });
     }
     // Golden field is only required when the user hasn't opted out of
     // golden-answer comparison (#5378) — see isGoldenFieldSatisfied.
-    if (!isGoldenFieldSatisfied(pw)) {
+    if (!isGoldenFieldSatisfied(targetComparison)) {
       missingMappings.push({
         fieldId: "goldenField",
         fieldName: "Golden field",
@@ -461,6 +459,40 @@ export const getEvaluatorMissingMappings = (
 ): EvaluatorValidationResult => {
   const missingMappings: MissingMapping[] = [];
   const targetMappings = evaluator.mappings[datasetId]?.[targetId] ?? {};
+
+  // Comparison evaluator chips: the high-level ComparisonConfigForm replaces
+  // the per-row mappings UI, writing its config to `evaluator.comparison`
+  // instead of `evaluator.mappings`. Validate against that config directly —
+  // otherwise the evaluator's required field ("candidates") never gets an
+  // `evaluator.mappings` entry and is permanently reported missing, which
+  // forces every Run / Rerun / Run-on-all-rows click to reopen the config
+  // editor instead of executing. Mirrors the analogous target-level exemption
+  // in getTargetMissingMappings.
+  const comparison = toComparisonConfig(evaluator);
+  if (comparison) {
+    // Filter empty slots, not just array length — see the analogous comment
+    // in getTargetMissingMappings.
+    if (comparison.variants.filter(Boolean).length < 2) {
+      missingMappings.push({
+        fieldId: "variants",
+        fieldName: "Variants",
+        isRequired: true,
+      });
+    }
+    // Golden field is only required when the user opted into golden-answer
+    // comparison (#5378).
+    if (!isGoldenFieldSatisfied(comparison)) {
+      missingMappings.push({
+        fieldId: "goldenField",
+        fieldName: "Golden field",
+        isRequired: true,
+      });
+    }
+    return {
+      isValid: missingMappings.length === 0,
+      missingMappings,
+    };
+  }
 
   // Get the evaluator definition to know which fields are required vs optional
   const evaluatorDef =

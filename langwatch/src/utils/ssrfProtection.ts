@@ -26,6 +26,14 @@
  * - Re-validates redirect URLs through SSRF checks
  * - Limits redirect chain to 10 hops to prevent infinite loops
  *
+ * ## Timeouts
+ * Two independent bounds, both opt-in per call:
+ * - `init.signal` (e.g. `AbortSignal.timeout(ms)`) is forwarded to undici AND
+ *   carried across every redirect hop, so one signal bounds the WHOLE chain.
+ * - `init.headersTimeoutMs` / `init.bodyTimeoutMs` are set on the dispatching
+ *   Agent as a socket-level backstop, so a slowloris endpoint is still bounded
+ *   if the signal is ever dropped. Omitted → undici's 300s defaults apply.
+ *
  * ## Behavior matrix
  *
  * | BLOCK_LOCAL_HTTP_CALLS | ALLOWED_PROXY_HOSTS    | Cloud metadata | Private IP / localhost                      |
@@ -64,6 +72,7 @@
  * @module ssrfProtection
  */
 
+import { createLogger } from "@langwatch/observability";
 import dns from "dns/promises";
 import { isIP } from "net";
 import {
@@ -72,7 +81,6 @@ import {
   fetch as undiciFetch,
 } from "undici";
 import { env } from "../env.mjs";
-import { createLogger } from "./logger";
 import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrfConstants";
 
 const logger = createLogger("langwatch:ssrfProtection");
@@ -524,6 +532,37 @@ const MAX_REDIRECTS = 10;
 
 export interface SSRFSafeFetchOptions extends RequestInit {
   _redirectCount?: number;
+  /**
+   * Socket-level bound on how long the endpoint may take to send response
+   * HEADERS, in ms. Defence in depth behind `signal`: undici's own default is
+   * 300s, which is long enough for a slowloris endpoint to pin a worker slot.
+   * Omit to keep undici's default (long-running callers, e.g. LLM agents).
+   */
+  headersTimeoutMs?: number;
+  /**
+   * Socket-level bound on inactivity while streaming the response BODY, in ms.
+   * Same rationale as {@link headersTimeoutMs}.
+   */
+  bodyTimeoutMs?: number;
+}
+
+/** undici Agent options carrying the caller's socket-level bounds, if any. */
+interface AgentTimeoutOptions {
+  headersTimeout?: number;
+  bodyTimeout?: number;
+}
+
+function resolveAgentTimeouts(
+  init: SSRFSafeFetchOptions | undefined,
+): AgentTimeoutOptions {
+  const timeouts: AgentTimeoutOptions = {};
+  if (init?.headersTimeoutMs !== undefined) {
+    timeouts.headersTimeout = init.headersTimeoutMs;
+  }
+  if (init?.bodyTimeoutMs !== undefined) {
+    timeouts.bodyTimeout = init.bodyTimeoutMs;
+  }
+  return timeouts;
 }
 
 /**
@@ -540,8 +579,13 @@ export function createSSRFSafeFetchConfig({ isSaaS }: { isSaaS: boolean }): { re
 
 const defaultFetchConfig = createSSRFSafeFetchConfig({ isSaaS: !!env.IS_SAAS });
 
-function createIpPinningAgent(resolvedIp: string, tlsConfig: { rejectUnauthorized: boolean } = defaultFetchConfig): Agent {
+function createIpPinningAgent(
+  resolvedIp: string,
+  tlsConfig: { rejectUnauthorized: boolean } = defaultFetchConfig,
+  timeouts: AgentTimeoutOptions = {},
+): Agent {
   return new Agent({
+    ...timeouts,
     connect: {
       rejectUnauthorized: tlsConfig.rejectUnauthorized,
       lookup: (_hostname, _options, callback) => {
@@ -587,19 +631,28 @@ export async function fetchWithResolvedIp(
 
   const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
   const resolvedIp = getResolvedIpForPinning(validated);
+  const agentTimeouts = resolveAgentTimeouts(init);
 
   // Use IP pinning dispatcher when we have a resolved IP.
   // Always apply TLS config (e.g. rejectUnauthorized) via a custom Agent.
+  // The caller's socket-level bounds (if any) ride on the Agent so they hold
+  // even when `signal` is absent.
   const dispatcher =
     resolvedIp && isIP(resolvedIp) !== 0
-      ? createIpPinningAgent(resolvedIp, tlsConfig)
-      : new Agent({ connect: { rejectUnauthorized: tlsConfig.rejectUnauthorized } });
+      ? createIpPinningAgent(resolvedIp, tlsConfig, agentTimeouts)
+      : new Agent({
+          ...agentTimeouts,
+          connect: { rejectUnauthorized: tlsConfig.rejectUnauthorized },
+        });
 
   try {
     const response = await undiciFetch(requestUrl, {
       method: init?.method,
       headers,
       body: init?.body as string | undefined,
+      // Without this the caller's AbortSignal.timeout(...) is silently dropped
+      // and undici's 300s default is the only bound — across every redirect hop.
+      signal: init?.signal,
       redirect: "manual",
       dispatcher,
     });
@@ -624,8 +677,14 @@ export async function fetchWithResolvedIp(
 
         const redirectValidated = await validateUrlForSSRF(redirectUrl);
 
+        // `signal` and the socket-level bounds are carried into every hop, so
+        // one caller deadline bounds the WHOLE chain (up to MAX_REDIRECTS),
+        // not each hop independently.
         const redirectInit: SSRFSafeFetchOptions = {
           ...init,
+          signal: init?.signal,
+          headersTimeoutMs: init?.headersTimeoutMs,
+          bodyTimeoutMs: init?.bodyTimeoutMs,
           _redirectCount: redirectCount + 1,
         };
 
@@ -659,10 +718,13 @@ export async function fetchWithResolvedIp(
 /**
  * Combined SSRF validation and fetch in a single atomic operation.
  * This is the recommended way to make SSRF-safe requests.
+ *
+ * Pass `signal` (and optionally `headersTimeoutMs` / `bodyTimeoutMs`) to bound
+ * the request — see the Timeouts section of the module doc.
  */
 export async function ssrfSafeFetch(
   url: string,
-  init?: RequestInit,
+  init?: SSRFSafeFetchOptions,
 ): Promise<FetchResponse> {
   const validated = await validateUrlForSSRF(url);
   return fetchWithResolvedIp(validated, init);

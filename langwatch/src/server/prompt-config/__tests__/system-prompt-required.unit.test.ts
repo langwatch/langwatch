@@ -3,15 +3,15 @@
  *
  * Today, when `prompts.create` is called with neither `prompt` nor a system
  * message in `messages`, the server throws `SystemPromptConflictError` with
- * no `httpStatus` field. The tRPC `domainErrorMiddleware` doesn't recognise
- * it as a `DomainError`, so the call bubbles up as INTERNAL_SERVER_ERROR
+ * no `httpStatus` field. The tRPC `handledErrorMiddleware` doesn't recognise
+ * it as a `HandledError`, so the call bubbles up as INTERNAL_SERVER_ERROR
  * (HTTP 500) and is captured as an "uncaught" bug.
  *
  * After the fix:
- *   - A dedicated `SystemPromptRequiredError` (extends `DomainError`,
+ *   - A dedicated `SystemPromptRequiredError` (extends `HandledError`,
  *     `httpStatus: 400`) is thrown for the missing-system-prompt case.
  *   - The original `SystemPromptConflictError` (both prompt + system
- *     message set) is preserved as a separate, still-409 `DomainError`.
+ *     message set) is preserved as a separate, still-409 `HandledError`.
  *   - The middleware auto-maps both to the correct tRPC codes
  *     (BAD_REQUEST and CONFLICT) — no manual try/catch in the router.
  *
@@ -21,7 +21,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { DomainError } from "~/server/app-layer/domain-error";
+import { HandledError } from "~/server/app-layer/handled-error";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptVersionService } from "~/server/prompt-config/prompt-version.service";
 
@@ -31,7 +31,7 @@ describe("PromptService.createPrompt — missing system prompt (Issue #3196 regr
   describe("given a PromptService", () => {
     describe("when creating a prompt with neither a prompt nor a system message", () => {
       /** @scenario "prompts.create returns 400 BAD_REQUEST when both prompt and system message are missing" */
-      it("throws a DomainError with httpStatus 400 and kind 'system_prompt_required' when no prompt and no system message are supplied", async () => {
+      it("throws a HandledError with httpStatus 400 and code 'system_prompt_required' when no prompt and no system message are supplied", async () => {
         const service = new PromptService({} as any);
         (service as any).repository = {
           createConfigWithInitialVersion: vi.fn(),
@@ -51,9 +51,9 @@ describe("PromptService.createPrompt — missing system prompt (Issue #3196 regr
           }),
         );
 
-        expect(error).toBeInstanceOf(DomainError);
-        expect((error as DomainError).kind).toBe("system_prompt_required");
-        expect((error as DomainError).httpStatus).toBe(400);
+        expect(error).toBeInstanceOf(HandledError);
+        expect((error as HandledError).code).toBe("system_prompt_required");
+        expect((error as HandledError).httpStatus).toBe(400);
         expect((error as Error).message).toMatch(/system prompt is required/i);
         expect((error as Error).message).not.toMatch(
           /SystemPromptConflictError/,
@@ -63,7 +63,7 @@ describe("PromptService.createPrompt — missing system prompt (Issue #3196 regr
 
     describe("when creating a prompt with both a prompt and a system message", () => {
       /** @scenario "prompts.create still rejects when both prompt and a system message are provided (existing conflict preserved)" */
-      it("still throws a DomainError with httpStatus 409 when both prompt and a system message are provided (no regression on AC 5)", async () => {
+      it("still throws a HandledError with httpStatus 409 when both prompt and a system message are provided (no regression on AC 5)", async () => {
         const service = new PromptService({} as any);
         (service as any).repository = {
           createConfigWithInitialVersion: vi.fn(),
@@ -88,9 +88,9 @@ describe("PromptService.createPrompt — missing system prompt (Issue #3196 regr
           }),
         );
 
-        expect(error).toBeInstanceOf(DomainError);
-        expect((error as DomainError).kind).toBe("system_prompt_conflict");
-        expect((error as DomainError).httpStatus).toBe(409);
+        expect(error).toBeInstanceOf(HandledError);
+        expect((error as HandledError).code).toBe("system_prompt_conflict");
+        expect((error as HandledError).httpStatus).toBe(409);
       });
     });
   });

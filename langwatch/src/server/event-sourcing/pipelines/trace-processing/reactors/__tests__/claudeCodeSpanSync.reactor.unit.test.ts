@@ -1,17 +1,33 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CLAUDE_CODE_KIND_ATTR } from "~/server/app-layer/traces/claude-code-log-to-span";
+// Stable singleton logger so a test can spy the SAME `warn` fn the reactor
+// module captured at import time (`const logger = createLogger(...)` runs once).
+const loggerMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => loggerMock,
+}));
+
+import {
+  CLAUDE_CODE_KIND_ATTR,
+  CLAUDE_DROPPED_LOG_COUNT_ATTR,
+  CLAUDE_TRUNCATED_LOGS_ATTR,
+} from "~/server/app-layer/traces/claude-code-log-to-span";
 import type { StoredLogRecordRow } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
+import type { RecordSpanCommandData } from "../../schemas/commands";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "../../schemas/constants";
-import type { OtlpSpan } from "../../schemas/otlp";
-import type { RecordSpanCommandData } from "../../schemas/commands";
 import type {
   LogRecordReceivedEvent,
   SpanReceivedEvent,
 } from "../../schemas/events";
+import type { OtlpSpan } from "../../schemas/otlp";
 import { createClaudeCodeSpanSyncReactor } from "../claudeCodeSpanSync.reactor";
 
 const SCOPE = "com.anthropic.claude_code.events";
@@ -131,18 +147,137 @@ const spanType = (s: OtlpSpan): string | undefined =>
 const strAttr = (s: OtlpSpan, key: string): string | undefined =>
   (s.attributes.find((a) => a.key === key)?.value as { stringValue?: string })
     ?.stringValue;
+const boolAttr = (s: OtlpSpan, key: string): boolean | undefined =>
+  (s.attributes.find((a) => a.key === key)?.value as { boolValue?: boolean })
+    ?.boolValue;
+const intAttr = (s: OtlpSpan, key: string): number | undefined => {
+  const raw = (
+    s.attributes.find((a) => a.key === key)?.value as {
+      intValue?: number | string;
+    }
+  )?.intValue;
+  return raw === undefined ? undefined : Number(raw);
+};
 
-function setup(rows: StoredLogRecordRow[]) {
-  const getMarkedClaudeCodeLogs = vi.fn(async () => rows);
+// One synthetic model call (anchor + request/response bodies) as three marked
+// log rows, so N distinct calls make 3N convertible records for the cap tests.
+const modelCallRows = (i: number): StoredLogRecordRow[] => {
+  const requestId = `req_${i}`;
+  const t = 10_000 + i * 10;
+  return [
+    row(
+      "api_request_body",
+      {
+        "session.id": "s",
+        model: "claude-opus-4-8",
+        query_source: `qs_${i}`,
+        "event.sequence": String(i * 3 + 1),
+        body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }),
+      },
+      t,
+      `bb${i.toString(16).padStart(14, "0")}`,
+    ),
+    row(
+      "api_request",
+      {
+        "session.id": "s",
+        model: "claude-opus-4-8",
+        request_id: requestId,
+        query_source: `qs_${i}`,
+        input_tokens: "1",
+        output_tokens: "1",
+        "event.sequence": String(i * 3 + 2),
+      },
+      t + 1,
+      `cc${i.toString(16).padStart(14, "0")}`,
+    ),
+    row(
+      "api_response_body",
+      {
+        "session.id": "s",
+        model: "claude-opus-4-8",
+        request_id: requestId,
+        query_source: `qs_${i}`,
+        "event.sequence": String(i * 3 + 3),
+        body: JSON.stringify({ content: [{ type: "text", text: "ok" }] }),
+      },
+      t + 1,
+      `dd${i.toString(16).padStart(14, "0")}`,
+    ),
+  ];
+};
+
+// A turn of `calls` model calls preceded by the user_prompt row.
+const manyCallTurnRows = (calls: number): StoredLogRecordRow[] => {
+  const rows: StoredLogRecordRow[] = [
+    row(
+      "user_prompt",
+      { "session.id": "s", "prompt.id": "p", prompt: "Do many things", "event.sequence": "0" },
+      100,
+      "aa00000000000001",
+    ),
+  ];
+  for (let i = 0; i < calls; i++) rows.push(...modelCallRows(i));
+  return rows;
+};
+
+// Cap-aware setup: the marked-log fetch honours the reactor's `cap + 1` limit
+// (turn order), so the reactor sees an overflowing turn exactly as production
+// would. `turnLogCap` is injected so the test can use a small cap. The uncapped
+// count dep is what the reactor queries to stamp the TRUE dropped count when a
+// turn overflows; by default it returns the full row set's size, but a test can
+// override it (a fixed total, or a rejection to exercise the fallback).
+function capSetup(
+  rows: StoredLogRecordRow[],
+  turnLogCap: number,
+  countMarkedClaudeCodeLogs = vi.fn(async () => rows.length),
+) {
+  const getMarkedClaudeCodeLogs = vi.fn(
+    async (
+      _tenantId: string,
+      _traceId: string,
+      _occurredAtMs?: number,
+      limit?: number,
+    ) => (typeof limit === "number" ? rows.slice(0, limit) : rows),
+  );
   const recorded: RecordSpanCommandData[] = [];
   const recordSpan = vi.fn(async (data: RecordSpanCommandData) => {
     recorded.push(data);
   });
   const reactor = createClaudeCodeSpanSyncReactor({
     getMarkedClaudeCodeLogs,
+    countMarkedClaudeCodeLogs,
+    recordSpan,
+    turnLogCap,
+  });
+  return {
+    reactor,
+    getMarkedClaudeCodeLogs,
+    countMarkedClaudeCodeLogs,
+    recordSpan,
+    recorded,
+  };
+}
+
+function setup(rows: StoredLogRecordRow[]) {
+  const getMarkedClaudeCodeLogs = vi.fn(async () => rows);
+  const countMarkedClaudeCodeLogs = vi.fn(async () => rows.length);
+  const recorded: RecordSpanCommandData[] = [];
+  const recordSpan = vi.fn(async (data: RecordSpanCommandData) => {
+    recorded.push(data);
+  });
+  const reactor = createClaudeCodeSpanSyncReactor({
+    getMarkedClaudeCodeLogs,
+    countMarkedClaudeCodeLogs,
     recordSpan,
   });
-  return { reactor, getMarkedClaudeCodeLogs, recordSpan, recorded };
+  return {
+    reactor,
+    getMarkedClaudeCodeLogs,
+    countMarkedClaudeCodeLogs,
+    recordSpan,
+    recorded,
+  };
 }
 
 describe("createClaudeCodeSpanSyncReactor", () => {
@@ -230,6 +365,140 @@ describe("createClaudeCodeSpanSyncReactor", () => {
         foldState: undefined,
       });
       expect(getMarkedClaudeCodeLogs).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("the per-turn conversion cap", () => {
+    afterEach(() => {
+      loggerMock.warn.mockClear();
+      loggerMock.debug.mockClear();
+    });
+
+    const ctx = { tenantId: TENANT, aggregateId: TRACE, foldState: undefined };
+    const rootOf = (recorded: RecordSpanCommandData[]): OtlpSpan =>
+      recorded.map((r) => r.span).find((s) => s.parentSpanId === null)!;
+
+    describe("when a turn's log count exceeds the cap", () => {
+      /** @scenario "a pathological turn's span conversion is bounded" */
+      it("fetches at most cap+1 records and converts only the first cap", async () => {
+        // 4 model calls = 12 convertible records + 1 user_prompt = 13 rows; a
+        // cap of 6 keeps the first 6 (user_prompt + first 5 model records).
+        const turnLogCap = 6;
+        const { reactor, getMarkedClaudeCodeLogs, recorded } = capSetup(
+          manyCallTurnRows(4),
+          turnLogCap,
+        );
+
+        await reactor.handle(logEvent(), ctx);
+
+        // The read is bounded to cap+1 so an overflow is detectable without
+        // materializing the whole turn.
+        expect(getMarkedClaudeCodeLogs).toHaveBeenCalledWith(
+          TENANT,
+          TRACE,
+          expect.any(Number),
+          turnLogCap + 1,
+        );
+        // Only the capped model records became model spans: 6 kept rows minus
+        // the user_prompt = 5 model records, which pair into 2 complete calls
+        // (anchor #1 present) - never all 4.
+        const modelSpans = recorded
+          .map((r) => r.span)
+          .filter((s) => spanType(s) === "llm");
+        expect(modelSpans.length).toBeGreaterThan(0);
+        expect(modelSpans.length).toBeLessThan(4);
+      });
+
+      /** @scenario "a pathological turn's span conversion is bounded" */
+      it("marks the root span truncated with the TRUE dropped log count", async () => {
+        // A pathological turn of 5000 marked logs under a cap of 2000: the fetch
+        // is capped at 2001, so `fetched - cap` would report only 1. The uncapped
+        // count dep returns the real 5000, so the reactor stamps 5000 - 2000.
+        // 667 calls -> 2002 rows (> cap) so the overflow branch fires and queries
+        // the count dep; that dep is the sole source of the true 5000 total.
+        const turnLogCap = 2000;
+        const countMarkedClaudeCodeLogs = vi.fn(async () => 5000);
+        const { reactor, recorded } = capSetup(
+          manyCallTurnRows(667),
+          turnLogCap,
+          countMarkedClaudeCodeLogs,
+        );
+
+        await reactor.handle(logEvent(), ctx);
+
+        expect(countMarkedClaudeCodeLogs).toHaveBeenCalledWith(
+          TENANT,
+          TRACE,
+          expect.any(Number),
+        );
+        const root = rootOf(recorded);
+        expect(boolAttr(root, CLAUDE_TRUNCATED_LOGS_ATTR)).toBe(true);
+        expect(intAttr(root, CLAUDE_DROPPED_LOG_COUNT_ATTR)).toBe(3000);
+      });
+
+      /** @scenario "a pathological turn's span conversion is bounded" */
+      it("falls back to the lower-bound count and still stamps truncated when the count query fails", async () => {
+        const turnLogCap = 6;
+        const countMarkedClaudeCodeLogs = vi.fn(async () => {
+          throw new Error("clickhouse unavailable");
+        });
+        const { reactor, recorded } = capSetup(
+          manyCallTurnRows(4), // 13 rows -> fetch capped at cap+1 (7)
+          turnLogCap,
+          countMarkedClaudeCodeLogs,
+        );
+
+        await reactor.handle(logEvent(), ctx);
+
+        // The truncation marker MUST still stamp, and the dropped count falls back
+        // to the `fetched - cap` lower bound (7 - 6 = 1).
+        const root = rootOf(recorded);
+        expect(boolAttr(root, CLAUDE_TRUNCATED_LOGS_ATTR)).toBe(true);
+        expect(intAttr(root, CLAUDE_DROPPED_LOG_COUNT_ATTR)).toBe(1);
+        // A debug line records the count failure; the warn still fires.
+        expect(loggerMock.debug).toHaveBeenCalled();
+        expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+      });
+
+      it("logs a structured warning naming the tenant and trace", async () => {
+        // Count dep returns the real total (13 rows), cap 6 -> dropped 7.
+        const { reactor } = capSetup(manyCallTurnRows(4), 6);
+
+        await reactor.handle(logEvent(), ctx);
+
+        expect(loggerMock.warn).toHaveBeenCalledTimes(1);
+        const [payload] = loggerMock.warn.mock.calls[0]!;
+        expect(payload).toMatchObject({
+          tenantId: TENANT,
+          traceId: TRACE,
+          turnLogCap: 6,
+          droppedLogCount: 7,
+        });
+      });
+    });
+
+    describe("when a turn's log count is at or under the cap", () => {
+      it("converts the whole turn and marks nothing truncated", async () => {
+        // The full 6-row canonical turn under a generous cap.
+        const { reactor, recorded } = capSetup(turnRows(), 2000);
+
+        await reactor.handle(logEvent(), ctx);
+
+        const root = rootOf(recorded);
+        expect(boolAttr(root, CLAUDE_TRUNCATED_LOGS_ATTR)).toBeUndefined();
+        expect(intAttr(root, CLAUDE_DROPPED_LOG_COUNT_ATTR)).toBeUndefined();
+        // Same shape as the un-capped happy path: root + model + tool spans.
+        const spans = recorded.map((r) => r.span);
+        expect(spans.find((s) => spanType(s) === "agent")).toBeDefined();
+        expect(spans.find((s) => spanType(s) === "llm")).toBeDefined();
+        expect(spans.find((s) => spanType(s) === "tool")).toBeDefined();
+      });
+
+      it("does not warn when the turn fits under the cap", async () => {
+        const { reactor } = capSetup(turnRows(), 2000);
+        await reactor.handle(logEvent(), ctx);
+        expect(loggerMock.warn).not.toHaveBeenCalled();
+      });
     });
   });
 });

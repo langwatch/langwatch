@@ -5,12 +5,12 @@ import type { ProjectService } from "../../../../../app-layer/projects/project.s
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../../schemas/events";
 import {
-  createCustomerIoEvaluationSyncReactor,
   type CustomerIoEvaluationSyncReactorDeps,
+  createCustomerIoEvaluationSyncReactor,
 } from "../customerIoEvaluationSync.reactor";
 
 // Suppress logger output
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),

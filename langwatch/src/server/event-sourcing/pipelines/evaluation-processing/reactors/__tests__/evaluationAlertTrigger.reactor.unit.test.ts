@@ -1,4 +1,4 @@
-import { TriggerAction } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -10,7 +10,7 @@ import {
   type EvaluationAlertTriggerReactorDeps,
 } from "../evaluationAlertTrigger.reactor";
 
-vi.mock("~/utils/logger/server", () => ({
+vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
@@ -116,6 +116,7 @@ function createTrigger(
     projectId: "tenant-1",
     name: "Quality Alert",
     action: TriggerAction.ADD_TO_DATASET,
+    triggerKind: TriggerKind.AUTOMATION,
     actionParams: {
       datasetId: "dataset-1",
       datasetMapping: { mapping: {}, expansions: [] },
@@ -127,6 +128,7 @@ function createTrigger(
     message: "Evaluation passed",
     customGraphId: null,
     notificationCadence: "immediate",
+    filterQuery: null,
     traceDebounceMs: 30000,
     templates: {
       slackTemplateType: null,
@@ -298,18 +300,16 @@ describe("evaluationAlertTrigger reactor (persist outbox)", () => {
           stage: string;
           actionClass: string;
           traceId: string;
-          foldSnapshotAtEnqueue: {
-            computedInput: string;
-            computedOutput: string;
-          };
         };
         expect(payload.stage).toBe("settle");
         expect(payload.actionClass).toBe("persist");
         expect(payload.traceId).toBe("trace-1");
-        expect(payload.foldSnapshotAtEnqueue).toEqual({
-          computedInput: "test input",
-          computedOutput: "test output",
-        });
+        // A settle payload carries an IDENTITY, never trace content: settle
+        // re-reads the fold at fire time, so a copy here would be unread
+        // customer text living in Redis and (via the audit projection) at rest
+        // in Postgres. The trace's input/output must not appear anywhere in it.
+        expect(JSON.stringify(payload)).not.toContain("test input");
+        expect(JSON.stringify(payload)).not.toContain("test output");
       });
     });
 

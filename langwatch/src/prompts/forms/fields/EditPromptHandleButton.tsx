@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
-
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -11,7 +11,6 @@ import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prom
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger(
   "langwatch:prompt-configs:edit-prompt-handle-button",

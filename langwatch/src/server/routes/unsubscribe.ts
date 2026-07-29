@@ -13,6 +13,8 @@
  * malformed/missing token is a 400, non-POST methods get 405, and
  * rate-limited callers get 429.
  */
+
+import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
@@ -20,7 +22,6 @@ import { InvalidUnsubscribeTokenError } from "~/server/app-layer/triggers/emailS
 import { rateLimit } from "~/server/rateLimit";
 import type { NextApiRequest } from "~/types/next-stubs";
 import { getClientIp } from "~/utils/getClientIp";
-import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:unsubscribe:one-click");
 

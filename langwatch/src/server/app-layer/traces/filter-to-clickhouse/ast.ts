@@ -7,7 +7,7 @@ import {
   type UnaryOperatorToken,
 } from "liqe";
 import { FilterFieldUnknownError, FilterParseError } from "../errors";
-import { FIELD_HANDLERS, KNOWN_FIELDS } from "./build-handlers";
+import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./build-handlers";
 import { boundedSubquery } from "./subqueries";
 import {
   EVENT_ATTRIBUTE_PREFIX,
@@ -23,7 +23,7 @@ import {
   wrap,
 } from "./value-helpers";
 
-const MAX_NODE_COUNT = 20;
+export const MAX_NODE_COUNT = 20;
 const MAX_PARAM_COUNT = 50;
 
 /**
@@ -31,7 +31,7 @@ const MAX_PARAM_COUNT = 50;
  * `]`/`)` before a boolean) which its own parser then rejects. Normalise the
  * incoming query so older saved URLs and external callers don't 422.
  */
-function normalizeQuery(s: string): string {
+export function normalizeQuery(s: string): string {
   return s
     .replace(/([\]\)])(?=(?:AND|OR|NOT)\b)/gi, "$1 ")
     .replace(/[ \t]{2,}/g, " ")
@@ -167,13 +167,16 @@ function translateTag(
     return translateEventAttribute(key, tag, negated, ctx);
   }
 
-  const handler = FIELD_HANDLERS[fieldName];
+  // `.get()` — own keys only. A plain-object index would resolve a field named
+  // `constructor` / `toString` / `__proto__` off `Object.prototype`, sail past
+  // this guard, and persist a filter no reader can evaluate.
+  const def = FIELD_DEF_BY_NAME.get(fieldName);
 
-  if (!handler) {
+  if (!def) {
     throw new FilterFieldUnknownError(fieldName, KNOWN_FIELDS);
   }
 
-  return handler(tag, negated, ctx);
+  return def.toClickHouse(tag, negated, ctx);
 }
 
 function translateTraceAttribute(

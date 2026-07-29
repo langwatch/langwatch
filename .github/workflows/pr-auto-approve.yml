@@ -253,18 +253,30 @@ jobs:
         run: |
           gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
           gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
-          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json files --jq '.files[].path' > /tmp/pr_files.txt
-          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/pr_diff.txt
+          gh api --paginate \
+            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[].filename' > /tmp/pr_files.txt
 
-          # Fail closed if diff exceeds model window — large PRs could hide risky changes.
+          # GitHub's PR diff endpoint returns HTTP 406 above 300 changed files.
+          # Such a PR cannot be fully inspected here, so fail closed before
+          # calling that endpoint. The paginated files endpoint supports the
+          # larger listing and remains useful for the audit trail.
+          FILE_LIMIT=300
+          FILE_COUNT=$(wc -l < /tmp/pr_files.txt)
           DIFF_LIMIT=100000
-          DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
-          if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
-            echo "PR diff is ${DIFF_SIZE} chars (> ${DIFF_LIMIT}); too large for automated evaluation."
+          if [ "$FILE_COUNT" -gt "$FILE_LIMIT" ]; then
+            echo "PR changes ${FILE_COUNT} files (> ${FILE_LIMIT}); too large for automated evaluation."
             echo "oversized=true" >> "$GITHUB_OUTPUT"
           else
-            echo "oversized=false" >> "$GITHUB_OUTPUT"
-            cp /tmp/pr_diff.txt /tmp/pr_diff_truncated.txt
+            gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/pr_diff.txt
+            DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
+            if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
+              echo "PR diff is ${DIFF_SIZE} chars (> ${DIFF_LIMIT}); too large for automated evaluation."
+              echo "oversized=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "oversized=false" >> "$GITHUB_OUTPUT"
+              cp /tmp/pr_diff.txt /tmp/pr_diff_truncated.txt
+            fi
           fi
 
       - name: Fail fast for oversized diffs

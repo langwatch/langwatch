@@ -1,4 +1,4 @@
-import { createLogger } from "~/utils/logger/server";
+import { createLogger } from "@langwatch/observability";
 import { BILLABLE_AFTER_DAYS } from "./boundaryCalendar";
 import type { BoundaryMeasurementService } from "./boundaryMeasurement.service";
 import { floorToDay, MS_PER_DAY, partitionStartFor } from "./sealedHour";
