@@ -204,3 +204,45 @@ describe("formatLeaderboardHeadline — the mechanism it names must be the one u
     });
   });
 });
+
+describe("formatLeaderboardHeadline — a saving is never rounded to free", () => {
+  describe("given a variant that costs a tiny fraction of the one it ties with", () => {
+    it("caps the quoted saving at 99%", () => {
+      // $0.00004 against $0.012 is a 99.7% saving, which rounds to 100 and
+      // then reads as "100% cheaper" — free. The cheapest variant in a real
+      // run costs something, and the headline should not say otherwise.
+      const headline = formatLeaderboardHeadline({
+        verdict: { kind: "tie-at-top", leaderId: "a", tiedIds: ["a", "b"] },
+        cheaperAlternative: {
+          variantId: "a",
+          cost: 0.00004,
+          dearestCost: 0.012,
+          savingRatio: 0.9967,
+          isLeader: true,
+        },
+        variantNames: { a: "warm", b: "premium" },
+      });
+
+      expect(headline.heading).toContain("99% cheaper");
+      expect(headline.heading).not.toContain("100% cheaper");
+    });
+  });
+
+  describe("given an ordinary saving", () => {
+    it("reports it unrounded, so the cap is not swallowing real numbers", () => {
+      const headline = formatLeaderboardHeadline({
+        verdict: { kind: "tie-at-top", leaderId: "a", tiedIds: ["a", "b"] },
+        cheaperAlternative: {
+          variantId: "a",
+          cost: 0.002,
+          dearestCost: 0.008,
+          savingRatio: 0.75,
+          isLeader: true,
+        },
+        variantNames: { a: "warm", b: "premium" },
+      });
+
+      expect(headline.heading).toContain("75% cheaper");
+    });
+  });
+});

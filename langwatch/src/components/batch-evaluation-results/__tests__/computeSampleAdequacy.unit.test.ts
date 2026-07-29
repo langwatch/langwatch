@@ -138,3 +138,64 @@ describe("computeSampleAdequacy", () => {
     });
   });
 });
+
+describe("computeSampleAdequacy — when multiplicity is worth raising", () => {
+  const rankable = (ids: string[]) =>
+    ids.map((variantId) => ({
+      variantId,
+      wins: 5,
+      losses: 5,
+      matchups: 10,
+      winRate: 0.5,
+      strength: 1,
+      score: 0,
+      scoreCI: [-10, 10] as [number, number],
+      degenerate: false,
+    }));
+
+  const board = (ids: string[]) =>
+    ({
+      entries: rankable(ids),
+      winMatrix: {},
+      comparisonCount: 60,
+      minMatchups: 60,
+      hasDegenerate: false,
+      didConverge: true,
+      comparability: { identifiable: true, groups: [], dominates: [] },
+      scoreDifferenceCI: null,
+      bootstrapNonConvergence: null,
+    }) as any;
+
+  describe("given only one pair", () => {
+    it("reports no multiplicity, because one test is not several", () => {
+      // The gating lives here, not in the panel: the panel test supplies the
+      // rate directly, so it would keep passing if this returned 5% for a
+      // single pair — which reads as "across 1 pairs there is a 5% chance",
+      // a caveat about nothing.
+      expect(
+        computeSampleAdequacy(board(["a", "b"])).familyWiseFalsePositiveRate,
+      ).toBeNull();
+    });
+  });
+
+  describe("given several pairs", () => {
+    it("reports the chance that at least one separated by luck", () => {
+      const adequacy = computeSampleAdequacy(board(["a", "b", "c"]));
+
+      expect(adequacy.totalPairs).toBe(3);
+      expect(adequacy.familyWiseFalsePositiveRate).toBeCloseTo(
+        1 - Math.pow(0.95, 3),
+        10,
+      );
+    });
+
+    it("grows as more pairs are tested", () => {
+      const three = computeSampleAdequacy(board(["a", "b", "c"]));
+      const four = computeSampleAdequacy(board(["a", "b", "c", "d"]));
+
+      expect(four.familyWiseFalsePositiveRate!).toBeGreaterThan(
+        three.familyWiseFalsePositiveRate!,
+      );
+    });
+  });
+});

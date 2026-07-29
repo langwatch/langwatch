@@ -352,3 +352,64 @@ describe("computeBTLeaderboard bootstrap stability", () => {
     });
   });
 });
+
+describe("computeBTLeaderboard — the Elo scale the UI promises", () => {
+  describe("given one variant with ten-to-one odds over another", () => {
+    it("puts exactly 400 points between them", () => {
+      // Step 1's help text tells the reader "A 400-point gap is roughly 10:1
+      // odds; 0 is a coin flip". That promise rests entirely on the 400 in
+      // `400 * Math.log10(strength)`, and nothing was holding it — halving
+      // the constant rescaled every score in the product while every test
+      // still passed, quietly making the sentence false.
+      const comparisons = [
+        ...Array.from({ length: 100 }, () => ({
+          candidates: ["a", "b"],
+          winner: "a",
+        })),
+        ...Array.from({ length: 10 }, () => ({
+          candidates: ["a", "b"],
+          winner: "b",
+        })),
+      ];
+
+      const leaderboard = computeBTLeaderboard({
+        comparisons,
+        variantIds: ["a", "b"],
+        bootstrapSamples: 0,
+      });
+
+      const a = leaderboard.entries.find((e) => e.variantId === "a")!;
+      const b = leaderboard.entries.find((e) => e.variantId === "b")!;
+
+      // 100:10 wins means the fitted strengths sit at 10:1, and
+      // 400 * log10(10) is 400.
+      expect(a.strength / b.strength).toBeCloseTo(10, 4);
+      expect(a.score - b.score).toBeCloseTo(400, 3);
+    });
+  });
+
+  describe("given two variants that split their matchups evenly", () => {
+    it("puts them both at zero, the coin-flip the same sentence promises", () => {
+      const comparisons = [
+        ...Array.from({ length: 20 }, () => ({
+          candidates: ["a", "b"],
+          winner: "a",
+        })),
+        ...Array.from({ length: 20 }, () => ({
+          candidates: ["a", "b"],
+          winner: "b",
+        })),
+      ];
+
+      const leaderboard = computeBTLeaderboard({
+        comparisons,
+        variantIds: ["a", "b"],
+        bootstrapSamples: 0,
+      });
+
+      for (const entry of leaderboard.entries) {
+        expect(entry.score).toBeCloseTo(0, 6);
+      }
+    });
+  });
+});
