@@ -482,15 +482,29 @@ jobs:
           reviewdog_version: v0.21.0
 
       # The house rules that still carry a baseline are `warn` in biome.jsonc,
-      # so the step above lets them through. This step makes them BLOCKING on
-      # the lines the PR actually adds.
+      # so the step above lets them through. This step makes them BLOCKING for
+      # new violations, and annotates the diff with the rest.
       #
-      # reviewdog maps each diagnostic onto the diff and drops anything outside
-      # the added lines — the line-level filtering Biome cannot do itself.
-      # `biome lint --changed` is not a substitute: it is file-granular, so a
-      # one-line typo fix in a legacy file would inherit every long-function
-      # violation already in it (measured at 902 on this branch alone). A gate
-      # that fires on work you did not do is a gate people switch off.
+      # TWO JOBS, TWO MECHANISMS, because one tool cannot do both well:
+      #
+      #   ANNOTATE — reviewdog maps each diagnostic onto the diff and drops
+      #     anything outside the added lines, which is line-level filtering
+      #     Biome cannot do itself. This pass cannot fail the job.
+      #
+      #   GATE — .github/scripts/biome-new-violations.sh counts violations per
+      #     (file, rule) on both sides of the merge base and fails only on an
+      #     increase. Its header explains why the added-lines filter is the
+      #     wrong thing to GATE on: these rules anchor at a function's
+      #     declaration line, so a formatter rewrapping a signature re-adds
+      #     that line and hands the PR the function's entire pre-existing
+      #     backlog. Measured on this branch: 61 such findings, none of them
+      #     authored here.
+      #
+      # `biome lint --changed` is not a substitute for either: it is
+      # file-granular, so a one-line typo fix in a legacy file would inherit
+      # every long-function violation already in it (measured at 902 on this
+      # branch alone). A gate that fires on work you did not do is a gate
+      # people switch off.
       #
       # reviewdog comes from its own first-party setup action, pinned to the
       # same v0.21.0 the previous wrapper resolved. Biome comes from this
@@ -518,51 +532,51 @@ jobs:
       # reviewdog is what narrows them to the lines this PR actually adds.
       #
       # rdjson carries no severity (verified — Biome omits it even for errors),
-      # so `-level=warning` supplies it and `-fail-level=warning` fails on any
-      # diagnostic landing on an added line. Errors are already caught
-      # full-tree by the blocking step above.
-      - name: Biome house rules — blocking on added lines
+      # so `-level=warning` supplies it for the annotating pass. Errors are
+      # already caught full-tree by the blocking step above.
+      - name: Biome house rules — annotate the diff, gate on new violations
         if: github.event_name == 'pull_request'
         env:
           REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          # Biome exits non-zero whenever it reports anything; the gate is
-          # reviewdog's decision, not this line's, so don't abort here.
-          pnpm --dir langwatch exec biome check --reporter=rdjson \
-            ./src ./ee ./scripts ./e2e ./prisma ./vite ./packages \
-            > biome.raw.json || true
+          # One list, used by the head run, the annotator and the gate's base
+          # run. They must agree: a path linted on one side and not the other
+          # reads as that file's whole backlog appearing or vanishing.
+          BIOME_PATHS=(./src ./ee ./scripts ./e2e ./prisma ./vite ./packages)
 
+          # Biome exits non-zero whenever it reports anything; the gate is the
+          # script's decision, not this line's, so don't abort here.
+          pnpm --dir langwatch exec biome check --reporter=rdjson \
+            "${BIOME_PATHS[@]}" > biome.raw.json || true
+          echo "diagnostics: $(jq '.diagnostics | length' biome.raw.json)"
+
+          # --- ANNOTATE (cannot fail the job) ---
+          #
           # Biome ran with langwatch/ as its cwd, so its paths are relative to
           # that; reviewdog matches against a repo-root diff. Rewriting the
           # paths here rather than running reviewdog from langwatch/ keeps the
           # mapping explicit — a path that silently fails to match the diff
-          # would filter every finding away and read as a clean gate.
+          # would filter every finding away and read as a clean pass.
+          #
+          # The gate below reads biome.raw.json, NOT this file: it compares
+          # against a base tree whose paths are langwatch-relative too.
           jq '.diagnostics |= map(.location.path = "langwatch/" + .location.path)' \
             biome.raw.json > biome.rdjson
-          echo "diagnostics: $(jq '.diagnostics | length' biome.rdjson)"
 
-          # ANNOTATE, then GATE — two passes, because one cannot do both here.
-          #
-          # A single `github-pr-review` pass died on `422 Body is too long
-          # (maximum is 65536 characters)`. GitHub caps a review body, and this
-          # branch reformats the repository, so `filter-mode=added` considers
-          # nearly every line added and the review grew past the limit. Capping
-          # the diagnostics fed to a single pass would have capped the GATE
-          # too: whether the step fails would then depend on whether a real
-          # finding made the cut, which is the kind of quiet pass this whole
-          # branch exists to remove.
-          #
-          # So the posting pass is capped and cannot fail, and the deciding
-          # pass sees everything and posts nothing.
+          # A single un-capped `github-pr-review` pass died on `422 Body is too
+          # long (maximum is 65536 characters)`: GitHub caps a review body, and
+          # a PR that reformats files has a lot of added lines to annotate.
+          # Capping is safe now that posting and deciding are separate — the
+          # cap costs annotations, never enforcement.
           POSTED=200
           jq --argjson n "$POSTED" \
             '.diagnostics |= (sort_by(.location.path, .location.range.start.line) | .[:$n])' \
             biome.rdjson > biome.posted.json
           total=$(jq '.diagnostics | length' biome.rdjson)
           if [ "$total" -gt "$POSTED" ]; then
-            echo "::notice::annotating the first $POSTED of $total diagnostics; the gate below still reads all $total"
+            echo "::notice::annotating the first $POSTED of $total diagnostics; the gate reads all $total"
           fi
 
           reviewdog -f=rdjson -name=Biome \
@@ -572,23 +586,15 @@ jobs:
             -fail-level=none \
             < biome.posted.json || true
 
-          # The gate. `local` prints to the log and never calls the API, so no
-          # size limit applies and every diagnostic is considered.
+          # --- GATE (the only thing that can fail this step) ---
           #
-          # -diff is passed EXPLICITLY. The local reporter has no PR to infer a
-          # diff from, and with nothing to compare against `filter-mode=added`
-          # matches nothing and exits 0 — a gate that passes because it looked
-          # at an empty diff. Naming the range makes that impossible to happen
-          # silently: if the ref is missing the fetch fails and so does the job.
+          # Fetch the base explicitly: the script needs a real merge base, and
+          # a missing ref must fail the fetch rather than quietly leave the
+          # comparison with nothing to compare against.
           BASE="${{ github.base_ref }}"
           git fetch --no-tags origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
-          reviewdog -f=rdjson -name=Biome \
-            -reporter=local \
-            -diff="git diff origin/$BASE...HEAD" \
-            -filter-mode=added \
-            -level=warning \
-            -fail-level=warning \
-            < biome.rdjson
+          bash .github/scripts/biome-new-violations.sh \
+            biome.raw.json "origin/$BASE" "${BIOME_PATHS[@]}"
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
