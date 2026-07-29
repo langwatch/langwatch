@@ -8,7 +8,7 @@
 -- 00026 calls governance_ocsf_events a fold of DERIVED data, and asserts the
 -- rebuild claim TWICE. Its header (00026:37-38): "The fold can be dropped +
 -- rebuilt at any time from event_log without data loss (per ADR-018)." Its Down
--- note (00026:111-114), more weakly: "dropping governance_ocsf_events is
+-- note (00026:112-114), more weakly: "dropping governance_ocsf_events is
 -- supported (the fold is derived data, rebuildable from event_log)". BOTH ARE
 -- FALSE, and acting on EITHER PERMANENTLY DESTROYS SOC2 / ISO27001 audit
 -- evidence:
@@ -28,8 +28,8 @@
 --      representation, so no replay however capable could reconstruct them.
 --
 -- DO NOT drop + rebuild governance_ocsf_events from event_log. It is a durable
--- audit sink, not derived data. See dev/docs/adr/081-drop-to-replay-not-recovery
--- -for-reactors.md for the full decision record.
+-- audit sink, not derived data. Full decision record — ADR-081, at
+-- dev/docs/adr/081-drop-to-replay-not-recovery-for-reactors.md
 -- +goose StatementBegin
 SELECT 1;
 -- +goose StatementEnd
