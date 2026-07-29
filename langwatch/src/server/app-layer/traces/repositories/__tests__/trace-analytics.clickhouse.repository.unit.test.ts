@@ -328,6 +328,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     rootMetadataFromFallback: false,
     traceNameUserOverridden: false,
     lastEventOccurredAt: 1_750_000_000_000,
+    earliestSpanStartMs: 1_750_000_000_000,
   };
 
   describe("given a table that predates the row's columns", () => {

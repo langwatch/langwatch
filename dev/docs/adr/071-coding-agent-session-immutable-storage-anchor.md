@@ -8,6 +8,16 @@
 
 **Scope:** the fix and the freeze are `coding_agent_sessions`. **The anchor finding is systemic** — `trace_analytics` (00039) and `evaluation_analytics` (00041) make the same mistake under the column name `OccurredAt`, and are recorded here as same-class instances so nobody re-derives it. No table is re-plumbed and no migration ships.
 
+> **Amendment (2026-07-29) — sequencing step 3 has landed for `trace_analytics` first.** The scope sentence above, and every statement in this ADR that `trace_analytics` is recorded-but-unchanged (notably *"It re-plumbs nothing and adds no migration"* below, the "recorded, not changed here" list in References, and *"which anchor on a moving column too"*), are **historical for that one table**. `trace_analytics.OccurredAt` now carries a frozen, first-observed anchor (`storageAnchorMs`), its span timing baseline moved to a new `EarliestSpanStartMs` column (migration **00061**), and the fold's projection stamp moved to `2026-07-29`.
+>
+> It went first because it had a consequence `coding_agent_sessions` does not: only spans set that column, so a log-only trace (Claude Code / Codex "Path B") committed at `new Date(0)` — partition `196952`, TTL deadline already past — and was reaped, after which every delivery refolded the aggregate's whole history.
+>
+> **The stamp move is not a refold trigger, and that is load-bearing.** The predecessor stamp (`2026-07-27`) is *decoded*, not refused: on a pre-split row `OccurredAt` is `min(span start)`, which is simultaneously a valid anchor (it is what the row is already partitioned and TTL'd on) and the correct timing baseline (it is what the new column was split out to carry), so both fields are read off that one column and the row heals in place. Refusing it instead would have forced the whole population to rebuild from `event_log`, and a rebuild re-derives the anchor — so the change whose premise is *"an anchor is written once"* would have opened by re-anchoring every trace it touched, reintroducing consequences 1-3 at population scale. For the same reason this does **not** reset ADR-066's `refoldOnStoreMiss` retirement clock: no new refold population is created.
+>
+> Two honest qualifications to that. **Forward only:** during a rolling deploy, pods still on the previous build refuse the new stamp (their gate is a bare equality) and refold each row a new pod wrote. That is the ordinary cost of any stamp bump, bounded by the deploy window rather than by the size of the table, and it is why the decode exists on the forward path where the population is. **One existing row does move:** the anchor is validated on every write, not only when first frozen, so a row whose committed `OccurredAt` is more than a day ahead of fold time fails the new bound and is rewritten at fold time. That is a partition move on an existing row, and it is the intent — such a row was filed in a future partition with a TTL deadline to match, and would have outlived its tenant's retention. It converges after that one write.
+>
+> That is this ADR's rules applied unchanged, not a new decision: the anchor is first-observed rather than `min`, the displayed/derived business value is a separate column, and the target anchor is still platform accept time behind the human sign-off recorded in sequencing item 6. Two deviations are worth naming: the write-time fallback for a state carrying no business time at all is the projection's own `CreatedAt`, which item 6 warns against as re-stampable — accepted here because it applies only where there is nothing else, and validated at every step so the column can never be the epoch; and the anchor is bounded on its future edge (a producer-supplied time more than a day ahead of fold time is refused), because freezing is exactly what would otherwise make one bad producer timestamp permanent. `coding_agent_sessions` step 3 and `evaluation_analytics` are unchanged and still pending. **`trace_summaries` shares the same defect and is NOT covered here** — see the inventory note below.
+
 **Relates to:** [ADR-066](./066-projection-clickhouse-cached-store.md) (the read-back store that writes this row, and its `MetricSeries` step 2), [ADR-068](./068-windowed-clickhouse-reads.md) (windowed reads — the list read here is the counter-example that motivates the rule, and its bound-then-filter shape is how an accept-time anchor still answers business-time questions), [ADR-034](./034-event-sourced-analytics-materialization.md) (the RMT-plus-IN-tuple materialisation shape).
 
 ## Context
@@ -24,7 +34,7 @@ TTL IF(_retention_days > 0, toDateTime(StartedAt) + toIntervalDay(_retention_day
 `StartedAt` is not stable. The fold takes the **minimum** business time it has ever seen for the session:
 
 ```ts
-// codingAgentSession.foldProjection.ts:247-252
+// codingAgentSession.foldProjection.ts:262-267
 // The session starts when its earliest signal does. Spans refine this
 // below with their own start time, which can predate arrival order.
 startedAtMs:
@@ -136,13 +146,26 @@ The obvious reaction to this ADR is that `coding_agent_sessions` picked an idios
 
 | Table | Anchor (partition + sort key + TTL) | How it is derived | Direction it moves |
 |---|---|---|---|
-| `coding_agent_sessions` (00051:192-195) | `StartedAt` | `min(state.startedAtMs, occurredAt)` — `codingAgentSession.foldProjection.ts:247-252` | backwards |
-| `trace_analytics` (00039:189-192) | `OccurredAt` | `min(state.occurredAt, span.startTimeUnixMs)` — `span-timing.service.ts:36-38`, projected at `traceAnalytics.foldProjection.ts:603` | backwards |
+| `coding_agent_sessions` (00051:192-195) | `StartedAt` | `min(state.startedAtMs, occurredAt)` — `codingAgentSession.foldProjection.ts:262-267` | backwards |
+| `trace_analytics` (00039:189-192) | `OccurredAt` | was `min(state.occurredAt, span.startTimeUnixMs)` — `span-timing.service.ts:36-38`; **since the amendment above** it is `storageAnchorMs`, first-observed and frozen, projected at `traceAnalytics.foldProjection.ts:593` | **frozen per row** — see the caveat below |
 | `evaluation_analytics` (00041:135-138) | `OccurredAt` | `LastEventOccurredAt`, i.e. `max(prev, event.occurredAt)` — `abstractFoldProjection.ts:235-238`, projected at `evaluationAnalytics.foldProjection.ts:252` | forwards |
+
+**The `trace_analytics` caveat, stated rather than implied.** "Frozen" is a per-row guarantee, not a per-trace one, and it has exactly two exceptions.
+
+Normally a committed row's anchor does not move: the read-back promotes the column's own value back into the fold, so what was written is what is written again. The **first** exception is the bounded future rewrite — the anchor is validated on every write, not only when first frozen, so a row whose committed anchor sits more than a day ahead of fold time fails the bound and is rewritten at fold time. That is a partition move on a committed row, and it is the intent: the row was filed in a future partition with a TTL deadline to match, and would otherwise outlive its tenant's retention. It converges after that single write.
+
+The **second** is the anchor a *rebuild from `event_log`* derives if the committed row is gone — `refoldOnStoreMiss` re-runs `init()`, and first-observed depends on which contribution the replay reaches first, which need not be the one the live fold saw first. That path is reached only when the row is genuinely absent (reaped, or never written), where there is no prior value to contradict. It is deliberately NOT reached by the split itself: the pre-split projection stamp is decoded rather than refused, precisely so the transition does not rebuild — and therefore re-anchor — the whole population.
 
 `span.startTimeUnixMs` and `event.occurredAt` are **producer-supplied**. Renaming the column fixes nothing.
 
-`trace_analytics` knew about consequence 1 and priced only that one, exactly as ADR-056 did — its own fold docblock says *"OccurredAt can shift when an earlier-starting span arrives late, so superseded rows may persist until TTL"* (`traceAnalytics.foldProjection.ts:105-109`). The partition, TTL and dedup-scope consequences went unpriced there too.
+**Inventory correction (2026-07-29): `trace_summaries` belongs in this table and was missed.** It is the same defect from the same source — `traceSummary.foldProjection.ts` folds its `occurredAt` through the *same shared* `SpanTimingService.accumulateTiming`, with the same `0` sentinel and the same span-seeded-only rule, and its store admits log-only traces through a `hasPersistableSignal` predicate identical to the analytics one (its docblock names Claude Code Path B and Codex Path B outright). `trace_summaries` is `PARTITION BY toYearWeek(OccurredAt)` (00002) and its TTL anchors on `OccurredAt` (`ttlReconciler.ts:149-151`), so a log-only trace lands in `196952` with a deadline already past, exactly as on `trace_analytics`. Two differences change the fix, in opposite directions:
+
+- **Milder:** its sort key is `(TenantId, TraceId)` and does **not** include `OccurredAt`, so the RMT collapses a trace's versions regardless of the anchor moving. Consequence 1 (orphaned versions that can never collapse) does not apply, and the sort-key argument that shapes the `trace_analytics` fix is unnecessary here.
+- **Worse:** it does not set `refoldOnStoreMiss`, which defaults to `false`. When the epoch row is reaped there is no rebuild net at all — `get()` misses, the fold restarts from `init()`, and the row is rewritten from post-reap events only. The failure mode is silent loss of the trace's accumulated cost, tokens and span count, not a refold storm.
+
+Not fixed in this change, and deliberately: it needs its own migration and a decision about the missing refold net. Tracked as [#6312](https://github.com/langwatch/langwatch/issues/6312).
+
+`trace_analytics` knew about consequence 1 and priced only that one, exactly as ADR-056 did — its fold docblock said, before the amendment above replaced it, *"OccurredAt can shift when an earlier-starting span arrives late, so superseded rows may persist until TTL"*. The partition, TTL and dedup-scope consequences went unpriced there too.
 
 Two honest differences, rather than flattening this into "same bug three times":
 
@@ -167,7 +190,7 @@ A partition key, a sort key and a TTL anchor each need all three of **immutable*
 
 #### Scope of this finding
 
-This records the **target anchor** and a **systemic finding across three tables**. It re-plumbs nothing and adds no migration. `trace_analytics` and `evaluation_analytics` are named as same-class instances so nobody re-derives this later; whether either also needs the consequence-4 read fix `coding_agent_sessions` just got belongs to sequencing step 4's audit, not to this change.
+This records the **target anchor** and a **systemic finding across three tables**. *(As originally accepted: it re-plumbed nothing and added no migration. That held until the 2026-07-29 amendment, which ships migration 00061 for `trace_analytics`; the sentence stands as the record of the original decision, not of the current state.)* `trace_analytics` and `evaluation_analytics` are named as same-class instances so nobody re-derives this later; whether either also needs the consequence-4 read fix `coding_agent_sessions` just got belongs to sequencing step 4's audit, not to this change.
 
 Also ruled out, unchanged:
 
@@ -244,5 +267,5 @@ We accept both. Neither is a wrong answer on an ordinary read once this change l
 - [ADR-068](./068-windowed-clickhouse-reads.md) — windowed ClickHouse reads (the list read here is the counter-example; sequencing step 4 extends its discipline to the dedup-scope rule)
 - [ADR-015](./015-projection-replay-coordination.md) — replay coordination (the most likely vehicle for a re-key, if it ever happens)
 - `dev/docs/best_practices/clickhouse-queries.md` — IN-tuple dedup, version-stamp monotonicity, the `ORDER BY <version> DESC LIMIT 1` anti-pattern this tiebreak is not
-- **Same-class instances of the anchor defect** (recorded, not changed here): `00039_create_trace_analytics.sql:189-192` with `span-timing.service.ts:36-38`; `00041_create_evaluation_analytics.sql:135-138` with `evaluationAnalytics.foldProjection.ts:252` and `abstractFoldProjection.ts:235-238`
+- **Same-class instances of the anchor defect.** FIXED since: `00039_create_trace_analytics.sql:189-192` with `span-timing.service.ts:36-38` — see the 2026-07-29 amendment and migration 00061. STILL RECORDED-ONLY, not changed: `00041_create_evaluation_analytics.sql:135-138` with `evaluationAnalytics.foldProjection.ts:252` and `abstractFoldProjection.ts:235-238`; and `trace_summaries` (`00002_create_schema.sql`, `ttlReconciler.ts:149-151`), added by the 2026-07-29 inventory correction and tracked as [#6312](https://github.com/langwatch/langwatch/issues/6312)
 - **Accept time as the codebase already names it:** `foldProjection.types.ts:130-140` (`eventOrdering: "occurredAt" | "acceptedAt"`, the `(createdAt/EventTimestamp, EventId)` log cursor)

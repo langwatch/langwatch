@@ -90,6 +90,7 @@ function makeAnalyticsRow(
     rootMetadataFromFallback: false,
     traceNameUserOverridden: false,
     lastEventOccurredAt: baseMs,
+    earliestSpanStartMs: baseMs,
     attributes: {},
     ...overrides,
   };
@@ -359,6 +360,10 @@ describe("trace_analytics slim fold (integration)", () => {
         subTopicId: state.subTopicId,
         traceName: state.traceName,
         models: state.models,
+        // The trace-summary state has no anchor of its own — the slim fold
+        // freezes it on the first contribution — so mirror the summary's
+        // occurred-at, which for this in-order fixture is the same instant.
+        storageAnchorMs: state.occurredAt,
         occurredAt: state.occurredAt,
         totalDurationMs: state.totalDurationMs,
         totalCost: state.totalCost,

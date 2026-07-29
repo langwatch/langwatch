@@ -36,6 +36,7 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   TenantId: string;
   TraceId: string;
   Version: string;
+  /** The frozen storage anchor (ADR-071 step 3), not the min span start. */
   OccurredAt: Date;
   CreatedAt: Date;
   UpdatedAt: Date;
@@ -76,6 +77,11 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   RootMetadataFromFallback: boolean;
   TraceNameUserOverridden: boolean;
   LastEventOccurredAt: string;
+
+  // ── Span timing baseline (ADR-071 step 3, migration 00061) ─────────────
+  // The earliest span start, split out of OccurredAt when that column became
+  // the frozen storage anchor. Same string-carried UInt64 treatment.
+  EarliestSpanStartMs: string;
 
   // ── Durable dedup watermark (ADR-066, migration 00056) ─────────────────
   AppliedEventIds: string[];
@@ -132,6 +138,9 @@ function toClickHouseRecord(
     RootMetadataFromFallback: row.rootMetadataFromFallback,
     TraceNameUserOverridden: row.traceNameUserOverridden,
     LastEventOccurredAt: String(Math.max(0, Math.round(row.lastEventOccurredAt))),
+    EarliestSpanStartMs: String(
+      Math.max(0, Math.round(row.earliestSpanStartMs)),
+    ),
 
     AppliedEventIds: [...appliedEventIds],
 
@@ -314,10 +323,17 @@ export class TraceAnalyticsClickHouseRepository
    *
    * Dedups with the IN-tuple pattern (max(UpdatedAt) per key), never FINAL: the
    * ReplacingMergeTree only physically collapses rows sharing the full sort key
-   * `(TenantId, OccurredAt, TraceId)`, and OccurredAt shifts when an
-   * earlier-starting span arrives late, so superseded versions persist until
-   * TTL. The inner dedup subquery reads only sort-key columns — no heavy
-   * Attributes map — so it stays a cheap keyed seek.
+   * `(TenantId, OccurredAt, TraceId)`. Freezing the anchor (ADR-071 step 3) is
+   * what lets a trace's versions share that key, but rows written before the
+   * freeze — and a trace whose anchor a post-miss rebuild re-stamped — still
+   * carry more than one OccurredAt, so superseded versions persist until TTL.
+   * The inner dedup subquery reads only three narrow scalar columns —
+   * `TenantId`, `TraceId` and `max(UpdatedAt)`, the last of which is the RMT
+   * version column rather than part of the sort key — and no heavy Attributes
+   * map. It is NOT a keyed seek: `TraceId` is third in the sort key and the
+   * inner scope carries no `OccurredAt` predicate (deliberately — see below), so
+   * it is a tenant-wide scan over the trace's versions. What keeps it cheap is
+   * the narrow column set, not the key prefix.
    *
    * `window` bounds OccurredAt on the OUTER read only, keeping it a
    * partition-pruned point read. The inner dedup is deliberately UNWINDOWED so
@@ -350,19 +366,23 @@ export class TraceAnalyticsClickHouseRepository
    *      that saw the same latest event time, more spans folded = more complete.
    *   3. `length(AppliedEventIds) DESC` — more deliveries absorbed. Last of the
    *      three because the watermark is a bounded ring, so it saturates.
-   *   4. `OccurredAt ASC` — a deterministic last-resort tie-break, and nothing
-   *      more. It is here only to make the ordering TOTAL so the fully-tied case
-   *      resolves the same way on every execution instead of arbitrarily. ASC is
-   *      chosen for stability, NOT because a smaller value is better informed:
-   *      `OccurredAt` is a `min(span start)` only while a live aggregate keeps
-   *      reading its own state back, and a read-back miss re-runs `init()` and
-   *      re-stamps it from the next event, which can be LARGER than the value
-   *      already persisted. It moves in both directions, so its direction says
-   *      nothing about which version folded more (ADR-071 — the same reason no
-   *      bound on it is safe inside a dedup scope).
+   *   4. `OccurredAt ASC` — a last-resort tie-break, and NOT a progress signal:
+   *      since ADR-071 step 3 OccurredAt is the frozen storage anchor, equal
+   *      across a trace's versions except where a rebuild from an absent row
+   *      re-derived it — which can land either side of the original — so no
+   *      direction of it says which version folded further. The three keys above
+   *      it are the progress ranking. Reading the array length costs only its
+   *      offsets column, and every other key is a scalar already in the row.
    *
-   * Reading the array length costs only its offsets column, and every other key
-   * is a scalar already in the row.
+   * This ordering is BEST-EFFORT, not total. All four keys can be equal on two
+   * concurrent versions — same latest event, same span count, same saturated
+   * watermark length, and (precisely because the anchor is now frozen) the same
+   * OccurredAt — in which case `LIMIT 1` still picks arbitrarily and the loser's
+   * contributions and applied-id watermark are dropped. Closing that needs a
+   * unique persisted version/writer identity on the row, which this table does
+   * not have; the ranking narrows the window rather than eliminating it. The
+   * residual case requires two writers to resume from the same committed version
+   * AND land on the same `updatedAt` millisecond AND make identical progress.
    */
   private async queryLatestVersion({
     tenantId,
@@ -425,15 +445,18 @@ export class TraceAnalyticsClickHouseRepository
  * Decode a raw ClickHouse record into a {@link TraceAnalyticsRow}. The inverse
  * of {@link toClickHouseRecord}: DateTime64 columns come back as strings, the
  * UInt64 epoch-ms columns as strings, arrays/maps as themselves. A
- * pre-migration record simply omits the 00056 fields, so the parsers fall back
- * to the documented defaults (0 / empty / false).
+ * pre-migration record simply omits the 00056 / 00061 fields, so the parsers
+ * fall back to the documented defaults (0 / empty / false).
  *
  * DateTime64 columns MUST go through `parseClickHouseDateTimeMs`, never
  * `new Date(str)`: ClickHouse emits them without a zone suffix
  * ("2026-07-24 12:00:00.123") and V8 reads a bare datetime as LOCAL time. On a
- * non-UTC host that skews `occurredAt` by the machine's offset, and because the
- * fold min()s it against each new span the skewed value wins and is written
- * back — so the drift compounds on every cache miss rather than cancelling.
+ * non-UTC host that skews the storage anchor by the machine's offset, and the
+ * fold reads that anchor back as frozen and writes it out again — so the row
+ * moves partition and shifts its TTL deadline by the offset, permanently, on
+ * the first cache miss. (The span timing baseline is immune by construction:
+ * `EarliestSpanStartMs` rides as a UInt64 epoch-ms string, which is exactly why
+ * migration 00056 chose that type for the read-back columns.)
  */
 function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
   return {
@@ -479,5 +502,6 @@ function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
     rootMetadataFromFallback: Boolean(record.RootMetadataFromFallback),
     traceNameUserOverridden: Boolean(record.TraceNameUserOverridden),
     lastEventOccurredAt: asNumber(record.LastEventOccurredAt),
+    earliestSpanStartMs: asNumber(record.EarliestSpanStartMs),
   };
 }

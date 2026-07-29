@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../schemas/constants";
 import {
   applySpanToAnalytics,
   projectAnalyticsStateToRow,
@@ -200,32 +201,36 @@ describe("traceAnalytics fold projection — slim row derivation", () => {
   describe("given a trace whose FIRST signal is a log record", () => {
     const logAtMs = new Date("2026-07-24T12:00:00.000Z").getTime();
 
+    // Through `apply`, not the handler directly: the storage anchor is seeded
+    // by the fold's own dispatch so that EVERY contribution type anchors, which
+    // a handler-only call would bypass.
     const foldLogRecord = (state: TraceAnalyticsData) =>
-      slimProjection.handleTraceLogRecordReceived(
-        {
-          occurredAt: logAtMs,
-          data: {
-            traceId: "trace-log-only",
-            spanId: "span-1",
-            body: "hello",
-            attributes: {},
-            resourceAttributes: {},
-          },
-        } as never,
-        state,
-      );
+      slimProjection.apply(state, {
+        type: LOG_RECORD_RECEIVED_EVENT_TYPE,
+        occurredAt: logAtMs,
+        data: {
+          traceId: "trace-log-only",
+          spanId: "span-1",
+          body: "hello",
+          attributes: {},
+          resourceAttributes: {},
+        },
+      } as never);
 
-    it("leaves the storage anchor at the epoch, the known 197001 defect", () => {
-      // Pins CURRENT behaviour, which is wrong-but-deliberate. OccurredAt is the
-      // partition key AND the TTL anchor, so a log-only trace commits into
-      // partition 197001 with a deadline of 1970 + retention. The fix is a
-      // storage anchor held separately from the timing baseline (ADR-071 step
-      // 3); anchoring `occurredAt` from the log instead breaks the trace's
-      // duration, which the next test pins.
+    it("anchors the row at the log's own time, not the epoch", () => {
+      // The counterpart of the lock this replaces. `OccurredAt` is the
+      // partition key AND the TTL anchor, so anchoring a log-only trace at 0
+      // committed it into partition 196952 with a deadline of 1970 +
+      // retention — expired before it was written. The anchor is now its own
+      // state field (ADR-071 step 3), seeded by ANY contribution.
       const state = foldLogRecord(createInitSlimState());
 
+      expect(state.storageAnchorMs).toBe(logAtMs);
+      expect(projectFromState(state).occurredAtMs).toBe(logAtMs);
+
+      // And the timing baseline is NOT seeded by the log — that separation is
+      // the whole point, and the next test pins what breaks without it.
       expect(state.occurredAt).toBe(0);
-      expect(projectFromState(state).occurredAtMs).toBe(0);
     });
 
     describe("when a span arrives after the log", () => {
