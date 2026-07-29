@@ -26,6 +26,7 @@ import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as webhooksApp } from "../app/api/webhooks/[[...route]]/app";
+import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
@@ -94,6 +95,7 @@ export default async function execute() {
   console.log("Building workflows spec...");
   const workflowsSpec = await generateSpecs(workflowsApp);
   const webhooksSpec = await generateSpecs(webhooksApp);
+  const gatewaySpendSpec = await generateSpecs(gatewaySpendApp);
   console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
     // Merges this way ==>
@@ -121,6 +123,7 @@ export default async function execute() {
       tracesSpec,
       triggersSpec,
       webhooksSpec,
+      gatewaySpendSpec,
       workflowsSpec,
       langwatchSpec,
     ],

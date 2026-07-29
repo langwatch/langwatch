@@ -11,7 +11,7 @@
  * eventual, and this table backs reconciliation reads where a transient
  * duplicate would double-bill downstream.
  *
- * See: migration 00059_create_gateway_spend_events.sql
+ * See: migration 00060_create_gateway_spend_events.sql
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -145,13 +145,7 @@ export class GatewaySpendEventsRepository {
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
-        SELECT
-          TenantId, GatewayRequestId, OrganizationId, TeamId, VirtualKeyId,
-          PrincipalUserId, EndUserId, TraceId, Model, ProviderKey,
-          TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
-          TokensReasoning, toString(CostUSD) AS CostUSD, Status, ErrorClass,
-          HttpStatus, Labels, Metadata, DurationMS,
-          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs
+        SELECT ${ROW_COLUMNS}
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
           AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
@@ -163,30 +157,252 @@ export class GatewaySpendEventsRepository {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Array<Record<string, unknown>>;
-    return raw.map((r) => ({
-      tenantId: String(r.TenantId),
-      gatewayRequestId: String(r.GatewayRequestId),
-      organizationId: String(r.OrganizationId),
-      teamId: String(r.TeamId),
-      virtualKeyId: String(r.VirtualKeyId),
-      principalUserId: String(r.PrincipalUserId),
-      endUserId: String(r.EndUserId),
-      traceId: String(r.TraceId),
-      model: String(r.Model),
-      providerKey: String(r.ProviderKey),
-      tokensInput: Number(r.TokensInput),
-      tokensOutput: Number(r.TokensOutput),
-      tokensCacheRead: Number(r.TokensCacheRead),
-      tokensCacheWrite: Number(r.TokensCacheWrite),
-      tokensReasoning: Number(r.TokensReasoning),
-      costUsd: String(r.CostUSD),
-      status: r.Status === "error" ? "error" : "success",
-      errorClass: String(r.ErrorClass),
-      httpStatus: Number(r.HttpStatus),
-      labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
-      metadata: String(r.Metadata ?? ""),
-      durationMs: Number(r.DurationMS),
-      occurredAt: new Date(Number(r.OccurredAtMs)),
-    }));
+    return raw.map(mapRow);
+  }
+
+  /**
+   * Org-wide cursor page for the reconciliation pull surface
+   * (GET /api/billing/v1/spend-events). Ordered ASCENDING by
+   * (EventTimestamp, GatewayRequestId): EventTimestamp is the insert-time
+   * replacement version, so rows folded late (minutes after their
+   * OccurredAt) still sort AFTER an in-flight cursor and are never skipped;
+   * ordering by OccurredAt would lose exactly those rows. `from`/`to`
+   * remain OccurredAt bounds (billing periods are request-time periods).
+   * One query serves every tenant of the org (rows never leave the org:
+   * the tenant list IS the org's project list, resolved by the caller).
+   */
+  async readSpendEventsPage({
+    tenantIds,
+    fromMs,
+    toMs,
+    cursor,
+    limit,
+    virtualKeyId,
+    endUserId,
+    model,
+    status,
+  }: {
+    tenantIds: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+    virtualKeyId?: string;
+    endUserId?: string;
+    model?: string;
+    status?: "success" | "error";
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
+    if (tenantIds.length === 0) return { rows: [], nextCursor: null };
+    const client = await this.resolveClient(tenantIds[0]!);
+    const decoded = cursor ? decodeSpendEventsCursor(cursor) : null;
+
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = { tenantIds, limit };
+    if (decoded) {
+      clauses.push(
+        "AND (EventTimestamp, GatewayRequestId) > ({cursorEventTs:UInt64}, {cursorRequestId:String})",
+      );
+      params.cursorEventTs = decoded.eventTimestampMs;
+      params.cursorRequestId = decoded.gatewayRequestId;
+    }
+    if (fromMs !== undefined) {
+      clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
+      params.fromMs = fromMs;
+    }
+    if (toMs !== undefined) {
+      clauses.push("AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})");
+      params.toMs = toMs;
+    }
+    if (virtualKeyId !== undefined) {
+      clauses.push("AND VirtualKeyId = {virtualKeyId:String}");
+      params.virtualKeyId = virtualKeyId;
+    }
+    if (endUserId !== undefined) {
+      clauses.push("AND EndUserId = {endUserId:String}");
+      params.endUserId = endUserId;
+    }
+    if (model !== undefined) {
+      clauses.push("AND Model = {model:String}");
+      params.model = model;
+    }
+    if (status !== undefined) {
+      clauses.push("AND Status = {status:String}");
+      params.status = status;
+    }
+
+    const result = await client.query({
+      query: `
+        SELECT ${ROW_COLUMNS}, EventTimestamp
+        FROM ${TABLE} FINAL
+        WHERE TenantId IN {tenantIds:Array(String)}
+          ${clauses.join("\n          ")}
+        ORDER BY EventTimestamp ASC, GatewayRequestId ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: params,
+      format: "JSONEachRow",
+    });
+    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const rows = raw.map(mapRow);
+    const last = raw[raw.length - 1];
+    return {
+      rows,
+      nextCursor:
+        raw.length === limit && last
+          ? encodeSpendEventsCursor({
+              eventTimestampMs: Number(last.EventTimestamp),
+              gatewayRequestId: String(last.GatewayRequestId),
+            })
+          : null,
+    };
+  }
+
+  /**
+   * Windowed rollup for one external end user across the org's tenants
+   * (GET /api/billing/v1/end-users/:id/spend). FINAL for the same reason
+   * as every read here: a transient RMT duplicate would double-bill.
+   */
+  async readEndUserSpend({
+    tenantIds,
+    endUserId,
+    fromMs,
+    toMs,
+    virtualKeyId,
+  }: {
+    tenantIds: string[];
+    endUserId: string;
+    fromMs: number;
+    toMs: number;
+    virtualKeyId?: string;
+  }): Promise<{
+    spendUsd: string;
+    requestCount: number;
+    tokensInput: number;
+    tokensOutput: number;
+    tokensCacheRead: number;
+    tokensCacheWrite: number;
+    tokensReasoning: number;
+  }> {
+    const empty = {
+      spendUsd: "0",
+      requestCount: 0,
+      tokensInput: 0,
+      tokensOutput: 0,
+      tokensCacheRead: 0,
+      tokensCacheWrite: 0,
+      tokensReasoning: 0,
+    };
+    if (tenantIds.length === 0) return empty;
+    const client = await this.resolveClient(tenantIds[0]!);
+    const vkClause =
+      virtualKeyId !== undefined ? "AND VirtualKeyId = {virtualKeyId:String}" : "";
+    const result = await client.query({
+      query: `
+        SELECT
+          toString(sum(CostUSD)) AS SpendUSD,
+          count() AS RequestCount,
+          sum(TokensInput) AS TokensInput,
+          sum(TokensOutput) AS TokensOutput,
+          sum(TokensCacheRead) AS TokensCacheRead,
+          sum(TokensCacheWrite) AS TokensCacheWrite,
+          sum(TokensReasoning) AS TokensReasoning
+        FROM ${TABLE} FINAL
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND EndUserId = {endUserId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
+          ${vkClause}
+      `,
+      query_params: {
+        tenantIds,
+        endUserId,
+        fromMs,
+        toMs,
+        ...(virtualKeyId !== undefined ? { virtualKeyId } : {}),
+      },
+      format: "JSONEachRow",
+    });
+    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    const row = raw[0];
+    if (!row) return empty;
+    return {
+      spendUsd: String(row.SpendUSD ?? "0"),
+      requestCount: Number(row.RequestCount ?? 0),
+      tokensInput: Number(row.TokensInput ?? 0),
+      tokensOutput: Number(row.TokensOutput ?? 0),
+      tokensCacheRead: Number(row.TokensCacheRead ?? 0),
+      tokensCacheWrite: Number(row.TokensCacheWrite ?? 0),
+      tokensReasoning: Number(row.TokensReasoning ?? 0),
+    };
+  }
+}
+
+const ROW_COLUMNS = `TenantId, GatewayRequestId, OrganizationId, TeamId, VirtualKeyId,
+          PrincipalUserId, EndUserId, TraceId, Model, ProviderKey,
+          TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite,
+          TokensReasoning, toString(CostUSD) AS CostUSD, Status, ErrorClass,
+          HttpStatus, Labels, Metadata, DurationMS,
+          toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs`;
+
+function mapRow(r: Record<string, unknown>): SpendEventRow {
+  return {
+    tenantId: String(r.TenantId),
+    gatewayRequestId: String(r.GatewayRequestId),
+    organizationId: String(r.OrganizationId),
+    teamId: String(r.TeamId),
+    virtualKeyId: String(r.VirtualKeyId),
+    principalUserId: String(r.PrincipalUserId),
+    endUserId: String(r.EndUserId),
+    traceId: String(r.TraceId),
+    model: String(r.Model),
+    providerKey: String(r.ProviderKey),
+    tokensInput: Number(r.TokensInput),
+    tokensOutput: Number(r.TokensOutput),
+    tokensCacheRead: Number(r.TokensCacheRead),
+    tokensCacheWrite: Number(r.TokensCacheWrite),
+    tokensReasoning: Number(r.TokensReasoning),
+    costUsd: String(r.CostUSD),
+    status: r.Status === "error" ? "error" : "success",
+    errorClass: String(r.ErrorClass),
+    httpStatus: Number(r.HttpStatus),
+    labels: Array.isArray(r.Labels) ? r.Labels.map(String) : [],
+    metadata: String(r.Metadata ?? ""),
+    durationMs: Number(r.DurationMS),
+    occurredAt: new Date(Number(r.OccurredAtMs)),
+  };
+}
+
+export interface SpendEventsCursor {
+  eventTimestampMs: number;
+  gatewayRequestId: string;
+}
+
+/** Opaque, order-preserving page cursor: base64url "eventTs:requestId". */
+export function encodeSpendEventsCursor(cursor: SpendEventsCursor): string {
+  return Buffer.from(
+    `${cursor.eventTimestampMs}:${cursor.gatewayRequestId}`,
+    "utf8",
+  ).toString("base64url");
+}
+
+export function decodeSpendEventsCursor(
+  encoded: string,
+): SpendEventsCursor | null {
+  try {
+    const raw = Buffer.from(encoded, "base64url").toString("utf8");
+    const sep = raw.indexOf(":");
+    if (sep <= 0) return null;
+    const eventTimestampMs = Number(raw.slice(0, sep));
+    const gatewayRequestId = raw.slice(sep + 1);
+    if (
+      !Number.isFinite(eventTimestampMs) ||
+      eventTimestampMs < 0 ||
+      gatewayRequestId.length === 0
+    ) {
+      return null;
+    }
+    return { eventTimestampMs, gatewayRequestId };
+  } catch {
+    return null;
   }
 }
