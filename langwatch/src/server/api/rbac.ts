@@ -102,6 +102,12 @@ export const Resources = {
   //   - aiTools:manage → org ADMIN only. Catalog editor surface at
   //     /settings/governance/tool-catalog (CRUD + reorder + enable).
   AI_TOOLS: "aiTools",
+  // Outbound webhook endpoints (the webhook platform). Org-tier only:
+  // endpoints are org-anchored, carry signing secrets, and stream every
+  // enabled event family out of the platform, so granting them below the
+  // org tier would let a project-scoped role exfiltrate org-wide data.
+  // Enterprise-gated at the plan layer on top of the permission.
+  WEBHOOK_ENDPOINTS: "webhookEndpoints",
   // The Langy in-product assistant. Its own resource rather than riding on
   // `evaluations:view`, because starting a turn is not a read: it provisions
   // credentials, spawns an OpenCode worker and spends the project's model
@@ -148,6 +154,7 @@ const ORG_EXCLUSIVE_RESOURCES: ReadonlySet<Resource> = new Set<Resource>([
   Resources.COMPLIANCE_EXPORT,
   Resources.ACTIVITY_MONITOR,
   Resources.AI_TOOLS,
+  Resources.WEBHOOK_ENDPOINTS,
 ]);
 
 /** True when the permission targets an organization-tier-only resource. */
@@ -457,6 +464,11 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     // vk-scope-rbac.feature.
     "virtualKeys:manage",
     "virtualKeys:viewOtherPersonal",
+    // Webhook platform — admin-only by default (endpoints carry signing
+    // secrets and stream org-wide events out). Custom roles can delegate
+    // webhookEndpoints:view for read-only delivery-log access.
+    "webhookEndpoints:view",
+    "webhookEndpoints:manage",
   ],
   // MEMBER + EXTERNAL get aiTools:view so the /me portal renders for
   // every org member. Catalog management stays admin-only.

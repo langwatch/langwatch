@@ -32,6 +32,8 @@ import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/p
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
+import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
@@ -762,6 +764,23 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
+  // The webhook delivery process manager scans the spend table, so it
+  // shares the same ClickHouse gate. Registration is global; the per-org
+  // enterprise flag is enforced inside the scan (and at the REST surface).
+  const webhookEndpointService = new WebhookEndpointService({ prisma });
+  const webhookDelivery = clickhouseEnabled
+    ? {
+        prisma,
+        processStore: repositories.processStore,
+        eventsRepository: new WebhookEventsClickHouseRepository(
+          resolveClickHouseClient,
+        ),
+        endpoints: webhookEndpointService,
+        getPlan: (organizationId: string) =>
+          planProvider.getActivePlan({ organizationId }),
+      }
+    : undefined;
+
   const governanceKpisSync = clickhouseEnabled
     ? {
         governanceKpisRepository: new GovernanceKpisClickHouseRepository(
@@ -988,6 +1007,7 @@ export function initializeDefaultApp(options?: {
     usageReportingService,
     gatewayBudgetSync,
     billingExport,
+    webhookDelivery,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.

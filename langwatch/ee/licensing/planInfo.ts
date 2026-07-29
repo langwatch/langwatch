@@ -36,6 +36,12 @@ export type PlanInfo = {
   maxCustomGraphs: number;
   maxAutomations: number;
   canPublish: boolean;
+  /**
+   * Webhook endpoints platform (signed outbound event delivery). Enterprise
+   * feature: absent/false on free, PRO, and GROWTH plans; enterprise
+   * licenses and subscriptions carry true.
+   */
+  webhookEndpoints?: boolean;
   usageUnit?: string;
   userPrice?: {
     USD: number;

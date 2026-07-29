@@ -107,4 +107,23 @@ export class ManagerExplorerService {
       }),
     );
   }
+
+  /**
+   * Dead-letter recovery for one process instance's outbox: dead rows go
+   * back to pending with a fresh attempt budget, due immediately. Narrow
+   * with `messageKeyPrefix` to requeue one target's messages (e.g. a single
+   * webhook endpoint's batches) without resurrecting unrelated failures.
+   */
+  async requeueDeadMessages(params: {
+    processName: string;
+    projectId: string;
+    processKey: string;
+    messageKeyPrefix?: string;
+  }): Promise<{ requeued: number }> {
+    const requeued = await this.store.requeueDeadMessages({
+      ...params,
+      now: Date.now(),
+    });
+    return { requeued };
+  }
 }

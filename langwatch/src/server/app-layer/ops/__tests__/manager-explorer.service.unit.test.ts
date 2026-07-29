@@ -60,6 +60,7 @@ function fakeStore(
     markFailed: vi.fn(),
     findDueWakes: vi.fn(),
     deleteDispatchedBefore: vi.fn(),
+    requeueDeadMessages: vi.fn().mockResolvedValue(0),
     ...overrides,
   } as unknown as ProcessStore;
 }

@@ -11,6 +11,10 @@ import {
   createBillingExportReactor,
 } from "@ee/billing/reactors/billingExport.reactor";
 import {
+  createWebhookDeliveryProcessManager,
+  type WebhookDeliveryProcessDeps,
+} from "@ee/webhooks/process-manager/webhookDelivery.process";
+import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
 } from "@ee/governance/reactors/governanceKpisSync.reactor";
@@ -338,6 +342,7 @@ export interface PipelineRegistryDeps {
   usageReportingService?: UsageReportingService;
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   billingExport?: BillingExportReactorDeps;
+  webhookDelivery?: WebhookDeliveryProcessDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -965,6 +970,10 @@ export class PipelineRegistry {
       ? createBillingExportReactor(this.deps.billingExport)
       : undefined;
 
+    const webhookDeliveryProcessManager = this.deps.webhookDelivery
+      ? createWebhookDeliveryProcessManager(this.deps.webhookDelivery)
+      : undefined;
+
     const governanceKpisSyncReactor = this.deps.governanceKpisSync
       ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
       : undefined;
@@ -1001,6 +1010,7 @@ export class PipelineRegistry {
         spanStorageBroadcastReactor,
         gatewayBudgetSyncReactor,
         billingExportReactor,
+        webhookDeliveryProcessManager,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,

@@ -220,6 +220,7 @@ model Organization {
   slug                   String               @unique
   members                OrganizationUser[]
   teams                  Team[]
+  webhookEndpoints       WebhookEndpoint[]
   createdAt              DateTime             @default(now())
   updatedAt              DateTime             @default(now()) @updatedAt
   OrganizationInvite     OrganizationInvite[]
@@ -877,6 +878,67 @@ enum WebhookDeliveryOutcome {
   retryable
   terminal
   pending
+}
+
+/// Org-anchored outbound webhook endpoint (the webhook platform, enterprise
+/// only). The signing secret is AES-256-GCM encrypted at rest (shared
+/// encrypt/decrypt, CREDENTIALS_SECRET) and returned in plaintext exactly
+/// once, at create or roll time. `enabledEvents` holds registry event types
+/// or family wildcards ("gateway.*", "*"). Failure-streak columns drive the
+/// 72h auto-disable. Spec: specs/webhooks/webhook-endpoints.feature.
+model WebhookEndpoint {
+  id              String                @id
+  organizationId  String
+  organization    Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  url             String
+  secretEncrypted String
+  enabledEvents   String[]              @default([])
+  status          WebhookEndpointStatus @default(ACTIVE)
+  /// Why the endpoint is disabled: "auto_failures_72h" or "manual".
+  disabledReason  String?
+  disabledAt      DateTime?
+  /// Start of the current consecutive-failure streak; cleared on any 2xx.
+  /// 72 hours of unbroken failures from this instant auto-disables.
+  failingSince    DateTime?
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+  archivedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @default(now()) @updatedAt
+
+  deliveries WebhookEndpointDelivery[]
+
+  @@index([organizationId, status])
+}
+
+enum WebhookEndpointStatus {
+  ACTIVE
+  DISABLED
+}
+
+/// Per-attempt delivery log for webhook-endpoint batches, mirroring the
+/// automations WebhookDelivery shape. `dispatchId` groups every attempt of
+/// one batch (== the X-LangWatch-Event-Id header); the receiver's HTTP
+/// status, latency, and truncated response are stored per attempt so their
+/// error codes are visible. Pruned after 30 days.
+model WebhookEndpointDelivery {
+  id             String                 @id @default(nanoid())
+  organizationId String
+  endpointId     String
+  endpoint       WebhookEndpoint        @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  dispatchId     String
+  attempt        Int
+  eventCount     Int
+  responseStatus Int?
+  latencyMs      Int?
+  error          String?
+  response       Json?
+  outcome        WebhookDeliveryOutcome
+  firedAt        DateTime               @default(now())
+  createdAt      DateTime               @default(now())
+
+  @@index([endpointId, firedAt])
+  @@index([organizationId, firedAt])
 }
 
 enum ExperimentType {

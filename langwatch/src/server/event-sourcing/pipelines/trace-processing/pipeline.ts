@@ -2,7 +2,10 @@ import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
-import type { TriggerContext } from "../../pipeline/processManagerDefinition";
+import type {
+  ProcessManagerDefinition,
+  TriggerContext,
+} from "../../pipeline/processManagerDefinition";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
@@ -99,6 +102,13 @@ export interface TraceProcessingPipelineDeps {
     TraceProcessingEvent,
     TraceSummaryData
   >;
+  /**
+   * The webhook platform's delivery process manager (scheduled singleton
+   * scan over the spend-event log plus ladder-retried batch sends). Mounted
+   * here because its source of truth is this pipeline's spend projection;
+   * absent when ClickHouse (and so the spend table) is off.
+   */
+  webhookDeliveryProcessManager?: ProcessManagerDefinition<any, any, any>;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
@@ -241,6 +251,10 @@ export function createTraceProcessingPipeline(
       "billingExport",
       deps.billingExportReactor,
     );
+  }
+
+  if (deps.webhookDeliveryProcessManager) {
+    builder = builder.withProcessManager(deps.webhookDeliveryProcessManager);
   }
 
   if (deps.governanceKpisSyncReactor) {

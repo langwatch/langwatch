@@ -1,0 +1,467 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import { randomBytes } from "node:crypto";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import type {
+  PrismaClient,
+  WebhookDeliveryOutcome,
+  WebhookEndpoint,
+} from "@prisma/client";
+import { KSUID_RESOURCES } from "~/utils/constants";
+import { decrypt, encrypt } from "~/utils/encryption";
+import { isValidEventSelector } from "./eventRegistry";
+
+const logger = createLogger("langwatch:webhooks:endpoint-service");
+
+/** 72 hours of unbroken failures auto-disables an endpoint. */
+export const WEBHOOK_AUTO_DISABLE_AFTER_MS = 72 * 60 * 60 * 1000;
+/** Delivery-log retention, mirroring the automations webhook log. */
+export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export const WEBHOOK_DISABLED_REASON_AUTO = "auto_failures_72h";
+export const WEBHOOK_DISABLED_REASON_MANUAL = "manual";
+
+export class WebhookEndpointValidationError extends Error {}
+export class WebhookEndpointNotFoundError extends Error {
+  constructor() {
+    super("Webhook endpoint not found");
+  }
+}
+
+export interface WebhookEndpointView {
+  id: string;
+  organizationId: string;
+  url: string;
+  enabledEvents: string[];
+  status: "ACTIVE" | "DISABLED";
+  disabledReason: string | null;
+  disabledAt: Date | null;
+  failingSince: Date | null;
+  lastSuccessAt: Date | null;
+  lastFailureAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+function toView(endpoint: WebhookEndpoint): WebhookEndpointView {
+  return {
+    id: endpoint.id,
+    organizationId: endpoint.organizationId,
+    url: endpoint.url,
+    enabledEvents: endpoint.enabledEvents,
+    status: endpoint.status,
+    disabledReason: endpoint.disabledReason,
+    disabledAt: endpoint.disabledAt,
+    failingSince: endpoint.failingSince,
+    lastSuccessAt: endpoint.lastSuccessAt,
+    lastFailureAt: endpoint.lastFailureAt,
+    createdAt: endpoint.createdAt,
+    updatedAt: endpoint.updatedAt,
+  };
+}
+
+function assertValidUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new WebhookEndpointValidationError("url must be a valid URL");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new WebhookEndpointValidationError("url must use https");
+  }
+}
+
+function assertValidEvents(enabledEvents: string[]): void {
+  if (enabledEvents.length === 0) {
+    throw new WebhookEndpointValidationError(
+      "enabled_events must select at least one event type",
+    );
+  }
+  for (const selector of enabledEvents) {
+    if (!isValidEventSelector(selector)) {
+      throw new WebhookEndpointValidationError(
+        `unknown event selector "${selector}"`,
+      );
+    }
+  }
+}
+
+function newSecret(): string {
+  return `whsec_${randomBytes(32).toString("base64url")}`;
+}
+
+export interface WebhookEndpointDeps {
+  prisma: PrismaClient;
+  /**
+   * Called when the 72h streak flips an endpoint to DISABLED. The transport
+   * (email, in-app) is the caller's; the service guarantees the call fires
+   * exactly once per auto-disable transition.
+   */
+  notifyAutoDisabled?: (params: {
+    organizationId: string;
+    endpointId: string;
+    url: string;
+    failingSince: Date;
+  }) => Promise<void>;
+}
+
+/**
+ * Org-anchored webhook endpoint lifecycle: CRUD with registry-validated
+ * subscriptions, the encrypted signing secret (returned in plaintext
+ * exactly once, at create or roll), reversible enable/disable, and the
+ * failure-streak bookkeeping behind the 72-hour auto-disable.
+ */
+export class WebhookEndpointService {
+  constructor(private readonly deps: WebhookEndpointDeps) {}
+
+  async create(params: {
+    organizationId: string;
+    url: string;
+    enabledEvents: string[];
+  }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
+    assertValidUrl(params.url);
+    assertValidEvents(params.enabledEvents);
+    const secret = newSecret();
+    const endpoint = await this.deps.prisma.webhookEndpoint.create({
+      data: {
+        id: generate(KSUID_RESOURCES.WEBHOOK_ENDPOINT).toString(),
+        organizationId: params.organizationId,
+        url: params.url,
+        enabledEvents: params.enabledEvents,
+        secretEncrypted: encrypt(secret),
+      },
+    });
+    return { endpoint: toView(endpoint), secret };
+  }
+
+  async list(params: {
+    organizationId: string;
+  }): Promise<WebhookEndpointView[]> {
+    const endpoints = await this.deps.prisma.webhookEndpoint.findMany({
+      where: { organizationId: params.organizationId, archivedAt: null },
+      orderBy: { createdAt: "asc" },
+    });
+    return endpoints.map(toView);
+  }
+
+  async getById(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView> {
+    return toView(await this.requireEndpoint(params));
+  }
+
+  async update(params: {
+    organizationId: string;
+    endpointId: string;
+    url?: string;
+    enabledEvents?: string[];
+  }): Promise<WebhookEndpointView> {
+    const endpoint = await this.requireEndpoint(params);
+    if (params.url !== undefined) assertValidUrl(params.url);
+    if (params.enabledEvents !== undefined)
+      assertValidEvents(params.enabledEvents);
+    const updated = await this.deps.prisma.webhookEndpoint.update({
+      where: { id: endpoint.id },
+      data: {
+        ...(params.url !== undefined ? { url: params.url } : {}),
+        ...(params.enabledEvents !== undefined
+          ? { enabledEvents: params.enabledEvents }
+          : {}),
+      },
+    });
+    return toView(updated);
+  }
+
+  /** Roll the signing secret; the new value is returned exactly once. */
+  async rollSecret(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
+    const endpoint = await this.requireEndpoint(params);
+    const secret = newSecret();
+    const updated = await this.deps.prisma.webhookEndpoint.update({
+      where: { id: endpoint.id },
+      data: { secretEncrypted: encrypt(secret) },
+    });
+    return { endpoint: toView(updated), secret };
+  }
+
+  /**
+   * Re-enable a disabled endpoint. Clears the failure streak so the 72h
+   * clock restarts from the next failure, not from history. Events that
+   * accrued while disabled are NOT re-sent automatically; the replay
+   * surface covers the gap window.
+   */
+  async enable(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView> {
+    const endpoint = await this.requireEndpoint(params);
+    const updated = await this.deps.prisma.webhookEndpoint.update({
+      where: { id: endpoint.id },
+      data: {
+        status: "ACTIVE",
+        disabledReason: null,
+        disabledAt: null,
+        failingSince: null,
+      },
+    });
+    return toView(updated);
+  }
+
+  async disable(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpointView> {
+    const endpoint = await this.requireEndpoint(params);
+    const updated = await this.deps.prisma.webhookEndpoint.update({
+      where: { id: endpoint.id },
+      data: {
+        status: "DISABLED",
+        disabledReason: WEBHOOK_DISABLED_REASON_MANUAL,
+        disabledAt: new Date(),
+      },
+    });
+    return toView(updated);
+  }
+
+  /** Soft-delete; deliveries cascade on hard delete only. */
+  async archive(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<void> {
+    const endpoint = await this.requireEndpoint(params);
+    await this.deps.prisma.webhookEndpoint.update({
+      where: { id: endpoint.id },
+      data: { archivedAt: new Date(), status: "DISABLED" },
+    });
+  }
+
+  /** Decrypted signing secret for the delivery path and test sends. */
+  async getSigningSecret(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<string> {
+    const endpoint = await this.requireEndpoint(params);
+    return decrypt(endpoint.secretEncrypted);
+  }
+
+  /**
+   * ACTIVE endpoints of the org, for the delivery scan's subscription
+   * matching. Reads are frequent and small; no caching until measured.
+   */
+  async listActiveByOrganization(params: {
+    organizationId: string;
+  }): Promise<WebhookEndpointView[]> {
+    const endpoints = await this.deps.prisma.webhookEndpoint.findMany({
+      where: {
+        organizationId: params.organizationId,
+        status: "ACTIVE",
+        archivedAt: null,
+      },
+    });
+    return endpoints.map(toView);
+  }
+
+  /** Organizations that have at least one ACTIVE endpoint. */
+  async organizationIdsWithActiveEndpoints(): Promise<string[]> {
+    // Cross-tenant by design: this is the delivery sweep's entry point, so
+    // it uses the raw-SQL tenancy opt-out the guard sanctions for
+    // system-owned maintenance scans.
+    const rows = await this.deps.prisma.$queryRaw<
+      Array<{ organizationId: string }>
+    >`
+      SELECT DISTINCT "organizationId"
+      FROM "WebhookEndpoint"
+      WHERE "status" = 'ACTIVE'::"WebhookEndpointStatus"
+        AND "archivedAt" IS NULL
+      -- @tenancy: webhook delivery sweep entry point (system-owned worker)
+    `;
+    return rows.map((r) => r.organizationId);
+  }
+
+  /**
+   * Record one delivery attempt's outcome: the per-attempt log row (their
+   * HTTP status, latency, truncated response) plus the failure-streak
+   * transition, including the 72h auto-disable exactly once.
+   */
+  async recordDeliveryAttempt(params: {
+    organizationId: string;
+    endpointId: string;
+    dispatchId: string;
+    attempt: number;
+    eventCount: number;
+    outcome: WebhookDeliveryOutcome;
+    responseStatus?: number;
+    latencyMs?: number;
+    error?: string;
+    response?: unknown;
+    now?: Date;
+  }): Promise<void> {
+    const now = params.now ?? new Date();
+    await this.deps.prisma.webhookEndpointDelivery.create({
+      data: {
+        organizationId: params.organizationId,
+        endpointId: params.endpointId,
+        dispatchId: params.dispatchId,
+        attempt: params.attempt,
+        eventCount: params.eventCount,
+        outcome: params.outcome,
+        responseStatus: params.responseStatus ?? null,
+        latencyMs: params.latencyMs ?? null,
+        error: params.error ?? null,
+        response:
+          params.response === undefined
+            ? undefined
+            : (params.response as object),
+        firedAt: now,
+      },
+    });
+
+    if (params.outcome === "success") {
+      await this.deps.prisma.webhookEndpoint.update({
+        where: { id: params.endpointId },
+        data: { lastSuccessAt: now, failingSince: null },
+      });
+      return;
+    }
+
+    const endpoint = await this.deps.prisma.webhookEndpoint.findUnique({
+      where: { id: params.endpointId },
+    });
+    if (!endpoint) return;
+
+    const failingSince = endpoint.failingSince ?? now;
+    const shouldAutoDisable =
+      endpoint.status === "ACTIVE" &&
+      now.getTime() - failingSince.getTime() >= WEBHOOK_AUTO_DISABLE_AFTER_MS;
+
+    await this.deps.prisma.webhookEndpoint.update({
+      where: { id: params.endpointId },
+      data: {
+        lastFailureAt: now,
+        failingSince,
+        ...(shouldAutoDisable
+          ? {
+              status: "DISABLED",
+              disabledReason: WEBHOOK_DISABLED_REASON_AUTO,
+              disabledAt: now,
+            }
+          : {}),
+      },
+    });
+
+    if (shouldAutoDisable) {
+      logger.warn(
+        {
+          organizationId: params.organizationId,
+          endpointId: params.endpointId,
+          failingSince: failingSince.toISOString(),
+        },
+        "webhook endpoint auto-disabled after 72h of consecutive failures",
+      );
+      try {
+        await this.deps.notifyAutoDisabled?.({
+          organizationId: params.organizationId,
+          endpointId: params.endpointId,
+          url: endpoint.url,
+          failingSince,
+        });
+      } catch (error) {
+        logger.error(
+          { endpointId: params.endpointId, error },
+          "webhook auto-disable notification failed",
+        );
+      }
+    }
+  }
+
+  async listDeliveries(params: {
+    organizationId: string;
+    endpointId: string;
+    limit?: number;
+  }): Promise<
+    Array<{
+      id: string;
+      dispatchId: string;
+      attempt: number;
+      eventCount: number;
+      outcome: WebhookDeliveryOutcome;
+      responseStatus: number | null;
+      latencyMs: number | null;
+      error: string | null;
+      firedAt: Date;
+    }>
+  > {
+    await this.requireEndpoint(params);
+    const rows = await this.deps.prisma.webhookEndpointDelivery.findMany({
+      where: {
+        organizationId: params.organizationId,
+        endpointId: params.endpointId,
+      },
+      orderBy: { firedAt: "desc" },
+      take: Math.min(params.limit ?? 50, 200),
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      dispatchId: r.dispatchId,
+      attempt: r.attempt,
+      eventCount: r.eventCount,
+      outcome: r.outcome,
+      responseStatus: r.responseStatus,
+      latencyMs: r.latencyMs,
+      error: r.error,
+      firedAt: r.firedAt,
+    }));
+  }
+
+  /** The health strip: streak, last success, disabled state. */
+  async health(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<{
+    status: "ACTIVE" | "DISABLED";
+    disabledReason: string | null;
+    failingSince: Date | null;
+    lastSuccessAt: Date | null;
+    lastFailureAt: Date | null;
+  }> {
+    const endpoint = await this.requireEndpoint(params);
+    return {
+      status: endpoint.status,
+      disabledReason: endpoint.disabledReason,
+      failingSince: endpoint.failingSince,
+      lastSuccessAt: endpoint.lastSuccessAt,
+      lastFailureAt: endpoint.lastFailureAt,
+    };
+  }
+
+  /** 30-day delivery-log prune; returns the deleted count. */
+  async pruneDeliveries(now: Date = new Date()): Promise<number> {
+    const before = new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_MS);
+    const deleted = await this.deps.prisma.$executeRaw`
+      DELETE FROM "WebhookEndpointDelivery"
+      WHERE "firedAt" < ${before}
+      -- @tenancy: webhook delivery-log retention sweep (system-owned maintenance)
+    `;
+    return deleted;
+  }
+
+  private async requireEndpoint(params: {
+    organizationId: string;
+    endpointId: string;
+  }): Promise<WebhookEndpoint> {
+    const endpoint = await this.deps.prisma.webhookEndpoint.findFirst({
+      where: {
+        id: params.endpointId,
+        organizationId: params.organizationId,
+        archivedAt: null,
+      },
+    });
+    if (!endpoint) throw new WebhookEndpointNotFoundError();
+    return endpoint;
+  }
+}

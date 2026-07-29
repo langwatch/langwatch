@@ -227,4 +227,31 @@ export class InMemoryProcessStore implements ProcessStore {
     }
     return deleted;
   }
+
+  async requeueDeadMessages(params: {
+    processName: string;
+    projectId: string;
+    processKey: string;
+    messageKeyPrefix?: string;
+    now: number;
+  }): Promise<number> {
+    let requeued = 0;
+    for (const message of this.messages.values()) {
+      if (message.processName !== params.processName) continue;
+      if (message.projectId !== params.projectId) continue;
+      if (message.processKey !== params.processKey) continue;
+      if (message.status !== "dead") continue;
+      if (
+        params.messageKeyPrefix &&
+        !message.messageKey.startsWith(params.messageKeyPrefix)
+      )
+        continue;
+      message.status = "pending";
+      message.attempts = 0;
+      message.nextAttemptAt = params.now;
+      message.leaseToken = null;
+      requeued++;
+    }
+    return requeued;
+  }
 }

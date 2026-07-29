@@ -9,6 +9,10 @@ import {
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { rateLimit } from "~/server/rateLimit";
 import {
+  signWebhookPayload,
+  WEBHOOK_SIGNATURE_HEADER,
+} from "~/server/webhooks/signature";
+import {
   createSSRFValidator,
   isPrivateOrLocalhostIP,
 } from "~/utils/ssrfProtection";
@@ -64,6 +68,9 @@ export interface WebhookSendInput {
   body: string;
   /** Woven into DispatchError messages and delivery logs. */
   triggerName: string;
+  /** Overrides the default `Webhook for trigger "<name>"` phrasing for
+   *  callers that are not triggers (e.g. webhook-platform endpoints). */
+  contextLabel?: string;
   /** Marks the request as a drawer test fire via a non-suppressible
    *  X-LangWatch-Test-Fire header (ADR-040 §1). Test fires skip the
    *  per-project dispatch cap (they carry the drawer's per-user limit). */
@@ -75,6 +82,14 @@ export interface WebhookSendInput {
    *  §5): every retry of the same logical fire reuses it so a receiver can
    *  dedupe. A fresh UUID is generated when absent (e.g. a test fire). */
   eventId?: string;
+  /** Per-destination signing secret. When present the request carries
+   *  `X-LangWatch-Signature: t=<unix>,v1=<hmac-sha256(secret, "<t>.<body>")>`
+   *  (5-minute receiver tolerance documented) — the signing ADR-040
+   *  specified; any channel that stores a secret inherits it. */
+  signingSecret?: string;
+  /** 1-based delivery attempt, sent as `X-LangWatch-Delivery-Attempt` so
+   *  receivers can distinguish first delivery from ladder retries. */
+  attempt?: number;
 }
 
 export interface WebhookSendResult {
@@ -107,8 +122,11 @@ export async function sendWebhook({
   testFire = false,
   projectId,
   eventId,
+  signingSecret,
+  attempt,
+  contextLabel,
 }: WebhookSendInput): Promise<WebhookSendResult> {
-  const label = `Webhook for trigger "${triggerName}"`;
+  const label = contextLabel ?? `Webhook for trigger "${triggerName}"`;
   const shapeProblem = validateWebhookUrlShape(url);
   if (shapeProblem) {
     throw new DispatchError({
@@ -162,6 +180,18 @@ export async function sendWebhook({
       ...sanitizeWebhookHeaders(resolvedHeaders),
       "Content-Type": "application/json",
       "X-LangWatch-Event-Id": resolvedEventId,
+      ...(signingSecret
+        ? {
+            [WEBHOOK_SIGNATURE_HEADER]: signWebhookPayload({
+              secret: signingSecret,
+              body,
+              timestampSeconds: Math.floor(Date.now() / 1000),
+            }),
+          }
+        : {}),
+      ...(attempt !== undefined
+        ? { "X-LangWatch-Delivery-Attempt": String(attempt) }
+        : {}),
       ...(testFire ? { "X-LangWatch-Test-Fire": "true" } : {}),
     },
     body,

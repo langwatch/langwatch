@@ -82,6 +82,7 @@ export const ENTERPRISE_TEMPLATE: LicensePlanLimits = {
   maxCustomGraphs: 1000,
   maxAutomations: 1000,
   canPublish: true,
+  webhookEndpoints: true,
   usageUnit: "traces",
 };
 
