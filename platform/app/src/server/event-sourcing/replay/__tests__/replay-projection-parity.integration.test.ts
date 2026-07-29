@@ -17,7 +17,7 @@
  * BDD structure: describe("given X") → describe("when Y") → it("…").
  * No "should" in it() names (project convention).
  *
- * @scenario Replay produces byte-identical projection state as live ingestion
+ * @see specs/event-sourcing/large-trace-blob-offload.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -70,9 +70,6 @@ vi.mock("@langwatch/observability", () => ({
 // Suite
 // ---------------------------------------------------------------------------
 
-/**
- * @scenario Replay produces byte-identical projection state as live ingestion
- */
 describe("given a sequence of span events ingested via the live pipeline", () => {
   let tenantId: string;
   let traceId: string;
@@ -103,6 +100,8 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
   });
 
   describe("when the same event sequence is replayed from event_log via replayExecutor", () => {
+    /** @scenario Replay produces byte-identical projection state as live ingestion */
+    /** @scenario "A number someone reads as fact can be rebuilt from the events" */
     it("leanForProjection is invoked on every event at the same logical point in both the live and replay paths, producing byte-identical projection state", async () => {
       // Phase 1: insert a SEQUENCE of synthetic event_log rows representing a
       // completed live ingestion (the scenario is "a sequence of span events").

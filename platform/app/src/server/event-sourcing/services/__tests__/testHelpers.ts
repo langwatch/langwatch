@@ -22,30 +22,21 @@ import type { QueueManager } from "../queues/queueManager";
 
 /**
  * Creates a mock QueueManager. Defaults to the inline (no-queue) configuration
- * so routers process projections/reactors synchronously without Redis/BullMQ.
+ * so routers process projections synchronously without Redis/BullMQ.
  */
-export function createMockQueueManager(overrides?: {
-  hasReactorQueues?: boolean;
-  getReactorQueue?: ReturnType<typeof vi.fn>;
-}): QueueManager<Event> {
+export function createMockQueueManager(): QueueManager<Event> {
   return {
     hasProjectionQueues: vi.fn().mockReturnValue(false),
     hasHandlerQueues: vi.fn().mockReturnValue(false),
     hasSubscriberQueues: vi.fn().mockReturnValue(false),
-    hasReactorQueues: vi
-      .fn()
-      .mockReturnValue(overrides?.hasReactorQueues ?? false),
     getProjectionQueue: vi.fn().mockReturnValue(undefined),
     getHandlerQueue: vi.fn().mockReturnValue(undefined),
     getSubscriberQueue: vi.fn().mockReturnValue(undefined),
-    getReactorQueue:
-      overrides?.getReactorQueue ?? vi.fn().mockReturnValue(undefined),
     close: vi.fn().mockResolvedValue(void 0),
     waitUntilReady: vi.fn().mockResolvedValue(void 0),
     initializeProjectionQueues: vi.fn(),
     initializeHandlerQueues: vi.fn(),
     initializeSubscriberQueues: vi.fn(),
-    initializeReactorQueues: vi.fn(),
   } as unknown as QueueManager<Event>;
 }
 

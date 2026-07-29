@@ -1,12 +1,18 @@
+import type { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service";
+import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import { createGraphTriggerActivitySubscriber } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
-import type { TriggerContext } from "../../pipeline/processManagerDefinition";
+import type { CommandBus } from "../../commands/commandBus";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
+import type {
+  AppendStore,
+  MapProjectionDefinition,
+} from "../../projections/mapProjection.types";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import { ReportUsageForMonthCommand } from "../billing-reporting/commands/reportUsageForMonth.command";
+import { createBillingMeterPokeSubscriber } from "../billing-reporting/subscribers/billingMeterPoke.subscriber";
 import {
   AddAnnotationCommand,
   BulkSyncAnnotationsCommand,
@@ -25,6 +31,44 @@ import {
   clampSpanShardCount,
   spanCommandGroupKey,
 } from "./commands/spanCommandGroupKey";
+import {
+  buildProcessEventView as buildCustomEvaluationSyncEventView,
+  CUSTOM_EVALUATION_SYNC_ENQUEUE,
+  handleSpanReceived as handleCustomEvaluationSpanReceived,
+} from "./process-manager/customEvaluationSync.process";
+import {
+  type CustomEvaluationSyncDispatchDeps,
+  createCustomEvaluationReportHandler,
+} from "./process-manager/customEvaluationSyncIntentHandlers";
+import {
+  CUSTOM_EVALUATION_SYNC_INTENT_TYPES,
+  CUSTOM_EVALUATION_SYNC_LEASE_DURATION_MS,
+  CUSTOM_EVALUATION_SYNC_MAX_ATTEMPTS,
+  CUSTOM_EVALUATION_SYNC_PROCESS_NAME,
+  customEvaluationReportIntentSchema,
+  customEvaluationSyncRetryDelayMs,
+  INITIAL_CUSTOM_EVALUATION_SYNC_STATE,
+} from "./process-manager/customEvaluationSyncProcess.types";
+import {
+  buildProcessEventView as buildEvaluationTriggerEventView,
+  EVALUATION_TRIGGER_ENQUEUE,
+  evaluationTriggerWake,
+  handleTraceActivity as handleEvaluationTriggerActivity,
+} from "./process-manager/evaluationTrigger.process";
+import {
+  createEvaluationTriggerRequestHandler,
+  type EvaluationTriggerDispatchDeps,
+} from "./process-manager/evaluationTriggerIntentHandlers";
+import {
+  EVALUATION_TRIGGER_INTENT_TYPES,
+  EVALUATION_TRIGGER_LEASE_DURATION_MS,
+  EVALUATION_TRIGGER_MAX_ATTEMPTS,
+  EVALUATION_TRIGGER_PROCESS_NAME,
+  evaluationTriggerRequestIntentSchema,
+  INITIAL_EVALUATION_TRIGGER_STATE,
+} from "./process-manager/evaluationTriggerProcess.types";
+import { originGatePM } from "./process-manager/originGate.process";
+import { ORIGIN_GATE_PROCESS_NAME } from "./process-manager/originGateProcess.types";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import {
   type TraceAnalyticsData,
@@ -42,8 +86,19 @@ import {
 } from "./schemas/constants";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedSpan } from "./schemas/spans";
+import { createProjectMetadataSubscriber } from "./subscribers/projectMetadata.subscriber";
+import { createSpanStorageBroadcastSubscriber } from "./subscribers/spanStorageBroadcast.subscriber";
+import { createTopicClusteringBootstrapSubscriber } from "./subscribers/topicClusteringBootstrap.subscriber";
+import { createTraceUpdateBroadcastSubscriber } from "./subscribers/traceUpdateBroadcast.subscriber";
 import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
+/**
+ * ADR-082 Rule 1 — nothing crossing this boundary is a value the builder
+ * registers. The four subscribers, the three process managers and the billing
+ * poke are all constructed here from imported factories, so this file states
+ * the whole topology: what the pipeline folds, what it maps, what it dispatches
+ * and what it defers.
+ */
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
   /** ADR-034 Phase 1: per-span rollup writer (app-side, replaces the MV). */
@@ -51,50 +106,52 @@ export interface TraceProcessingPipelineDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   /** ADR-034 Phase 2: slim per-trace fold writer (silent dual-tap, no read path). */
   traceAnalyticsStore: FoldProjectionStore<TraceAnalyticsData>;
-  originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  evaluationTriggerReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  customEvaluationSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  traceUpdateBroadcastReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  projectMetadataReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  simulationMetricsSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  experimentMetricsSyncReactor: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  /**
+   * ADR-082 §5 — identity-keyed command dispatch. Used here for a *self*
+   * reference: the `originGate` process dispatches `resolveOrigin`, which this
+   * same pipeline registers, and for the billing poke's cross-pipeline hop into
+   * billing-reporting. Binding is eager, resolution is not.
+   */
+  commands: CommandBus;
+  /** SSE fan-out for the trace drawer and the span tree. */
+  broadcast: BroadcastService;
+  /**
+   * Without Redis the worker-to-web pub/sub bridge does not exist, so the two
+   * broadcast subscribers are disabled rather than pushing into nothing.
+   */
+  hasRedis: boolean;
+  /** Read by the onboarding latch and by the clustering liveness check. */
+  projects: ProjectService;
+  /** ADR-051: (re-)arms this project's daily topic-clustering wake. */
+  bootstrapTopicClustering: (projectId: string) => Promise<void>;
+  /** Monitor lookup, trace read-back and evaluation dispatch (ADR-075 Class D). */
+  evaluationTriggerDispatch: EvaluationTriggerDispatchDeps;
+  /** Span read-back and evaluation reporting for SDK-run evaluations. */
+  customEvaluationSyncDispatch: CustomEvaluationSyncDispatchDeps;
+  /** Usage reporting exists only in the SaaS build; the poke is off elsewhere. */
+  isSaas: boolean;
   automations: {
-    triggerMatchHandler: (
-      event: TraceProcessingEvent,
-      context: TriggerContext<TraceSummaryData>,
-    ) => Promise<void>;
+    /**
+     * Matches a trace against the project's automations. An EE-owned
+     * subscriber definition rather than a handler: the OSS pipeline may not
+     * import enterprise code, so the whole definition crosses the boundary.
+     */
+    triggerMatchSubscriber: EventSubscriberDefinition<TraceProcessingEvent>;
     graphActivityHandler: (
       event: TraceProcessingEvent,
       context: { tenantId: string },
     ) => Promise<void>;
   };
-  spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
-  customerIoTraceSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
+  /**
+   * ADR-075 Class C: gateway spend is derived state, so it is a projection and
+   * a replay rebuilds it. Absent when ClickHouse is disabled.
+   */
+  gatewayBudgetDebitsProjection?: MapProjectionDefinition<
+    unknown,
+    TraceProcessingEvent
   >;
-  gatewayBudgetSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
+  /** The best-effort `VirtualKey.lastUsedAt` touch the debit write split from. */
+  virtualKeyLastUsedSubscriber?: EventSubscriberDefinition<TraceProcessingEvent>;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
@@ -109,17 +166,13 @@ export interface TraceProcessingPipelineDeps {
    * spanCommandGroupKey.ts.
    */
   spanCommandShardCount?: number;
-  governanceKpisSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
+  governanceKpisProjection?: MapProjectionDefinition<
+    unknown,
+    TraceProcessingEvent
   >;
-  retentionOrphanSweepReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
-  >;
-  governanceOcsfEventsSyncReactor?: ReactorDefinition<
-    TraceProcessingEvent,
-    TraceSummaryData
+  governanceOcsfEventsProjection?: MapProjectionDefinition<
+    unknown,
+    TraceProcessingEvent
   >;
   /** Cross-pipeline dispatchers (e.g. coding-agent span-facts, ADR-056). */
   subscribers?: EventSubscriberDefinition<TraceProcessingEvent>[];
@@ -162,96 +215,136 @@ export function createTraceProcessingPipeline(
         store: deps.traceAnalyticsRollupAppendStore,
       }),
     )
-    .withReactor("traceSummary", "originGate", deps.originGateReactor)
-    .withReactor(
-      "traceSummary",
-      "evaluationTrigger",
-      deps.evaluationTriggerReactor,
+    // A trace that never said where it came from gets an `application` origin
+    // once its grace period elapses. The wait is a durable deadline on the
+    // process instance, not a delayed job (ADR-073).
+    .withProcessManager(
+      ORIGIN_GATE_PROCESS_NAME,
+      originGatePM({
+        resolveOrigin: deps.commands.port(ResolveOriginCommand),
+      }),
     )
-    .withReactor(
-      "traceSummary",
-      "customEvaluationSync",
-      deps.customEvaluationSyncReactor,
+    // The project's on-message monitors run once the trace has gone quiet for a
+    // full period. The quiet period is re-armed by every message, so a
+    // conversation that resumes pushes its own evaluation out; every fallible
+    // guard lives in the intent handler, where a failure retries the ask
+    // instead of dropping it (ADR-075 Class D).
+    .withProcessManager(EVALUATION_TRIGGER_PROCESS_NAME, (pm) =>
+      pm
+        .state(INITIAL_EVALUATION_TRIGGER_STATE)
+        .intent(
+          EVALUATION_TRIGGER_INTENT_TYPES.REQUEST_EVALUATIONS,
+          evaluationTriggerRequestIntentSchema,
+          createEvaluationTriggerRequestHandler(deps.evaluationTriggerDispatch),
+        )
+        .on(SPAN_RECEIVED_EVENT_TYPE, handleEvaluationTriggerActivity)
+        .on(ORIGIN_RESOLVED_EVENT_TYPE, handleEvaluationTriggerActivity)
+        .onWake(evaluationTriggerWake)
+        .toPayload(buildEvaluationTriggerEventView)
+        .enqueue(EVALUATION_TRIGGER_ENQUEUE)
+        .outbox({
+          maxAttempts: EVALUATION_TRIGGER_MAX_ATTEMPTS,
+          leaseDurationMs: EVALUATION_TRIGGER_LEASE_DURATION_MS,
+        }),
     )
-    .withReactor(
-      "traceSummary",
+    // Evaluations an SDK ran itself arrive stapled to a span. The intent
+    // carries the span's identity alone and reads the verdicts back out of the
+    // span store (ADR-069's claim-check), so the retries are sized for losing
+    // the race against the sibling span write rather than for a failing
+    // command.
+    .withProcessManager(CUSTOM_EVALUATION_SYNC_PROCESS_NAME, (pm) =>
+      pm
+        .state(INITIAL_CUSTOM_EVALUATION_SYNC_STATE)
+        .intent(
+          CUSTOM_EVALUATION_SYNC_INTENT_TYPES.REPORT_EVALUATIONS,
+          customEvaluationReportIntentSchema,
+          createCustomEvaluationReportHandler(
+            deps.customEvaluationSyncDispatch,
+          ),
+        )
+        .on(SPAN_RECEIVED_EVENT_TYPE, handleCustomEvaluationSpanReceived)
+        .toPayload(buildCustomEvaluationSyncEventView)
+        .enqueue(CUSTOM_EVALUATION_SYNC_ENQUEUE)
+        .outbox({
+          maxAttempts: CUSTOM_EVALUATION_SYNC_MAX_ATTEMPTS,
+          leaseDurationMs: CUSTOM_EVALUATION_SYNC_LEASE_DURATION_MS,
+          retryDelayMs: customEvaluationSyncRetryDelayMs,
+        }),
+    )
+    .withEventSubscriber(
       "traceUpdateBroadcast",
-      deps.traceUpdateBroadcastReactor,
+      createTraceUpdateBroadcastSubscriber({
+        broadcast: deps.broadcast,
+        hasRedis: deps.hasRedis,
+      }),
     )
-    .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
-    .withReactor(
-      "traceSummary",
-      "simulationMetricsSync",
-      deps.simulationMetricsSyncReactor,
-    )
-    .withReactor(
-      "traceSummary",
-      "experimentMetricsSync",
-      deps.experimentMetricsSyncReactor,
-    )
-    .withSubscriber("triggerMatch", {
-      fold: "traceSummary",
-      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-      delay: 30_000,
-      ttl: 30_000,
-      handler: (event, context) =>
-        deps.automations.triggerMatchHandler(event, context),
-    })
-    .withSubscriber("graphTriggerActivity", {
-      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-      delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-      dedup: {
-        makeId: (event) => `graph-trigger-activity:${event.tenantId}`,
-        ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-        extend: false,
-        replace: false,
-      },
-      handler: (event, context) =>
-        deps.automations.graphActivityHandler(event, context),
-    })
-    .withReactor(
-      "spanStorage",
+    .withEventSubscriber(
       "spanStorageBroadcast",
-      deps.spanStorageBroadcastReactor,
+      createSpanStorageBroadcastSubscriber({
+        broadcast: deps.broadcast,
+        hasRedis: deps.hasRedis,
+      }),
+    )
+    .withEventSubscriber(
+      "projectMetadata",
+      createProjectMetadataSubscriber({ projects: deps.projects }),
+    )
+    // ADR-051: perpetual liveness re-assertion, split out of `projectMetadata`
+    // so a Prisma blip on the onboarding latch can no longer skip it.
+    .withEventSubscriber(
+      "topicClusteringBootstrap",
+      createTopicClusteringBootstrapSubscriber({
+        projects: deps.projects,
+        bootstrapTopicClustering: deps.bootstrapTopicClustering,
+      }),
+    )
+    // Span events are the busiest billable stream in the product; the poke's
+    // per-project dedup window is what makes a subscriber affordable here.
+    .withEventSubscriber(
+      "billingMeterPoke",
+      createBillingMeterPokeSubscriber<TraceProcessingEvent>({
+        eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+        reportUsageForMonth: deps.commands.port(ReportUsageForMonthCommand),
+        isSaas: deps.isSaas,
+      }),
+    )
+    .withEventSubscriber(
+      "triggerMatch",
+      deps.automations.triggerMatchSubscriber,
+    )
+    .withEventSubscriber(
+      "graphTriggerActivity",
+      createGraphTriggerActivitySubscriber<TraceProcessingEvent>({
+        eventTypes: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
+        handler: deps.automations.graphActivityHandler,
+      }),
     );
 
-  if (deps.customerIoTraceSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "customerIoTraceSync",
-      deps.customerIoTraceSyncReactor,
+  if (deps.gatewayBudgetDebitsProjection) {
+    builder = builder.withMapProjection(
+      "gatewayBudgetDebits",
+      deps.gatewayBudgetDebitsProjection,
     );
   }
 
-  if (deps.gatewayBudgetSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "gatewayBudgetSync",
-      deps.gatewayBudgetSyncReactor,
+  if (deps.virtualKeyLastUsedSubscriber) {
+    builder = builder.withEventSubscriber(
+      "virtualKeyLastUsed",
+      deps.virtualKeyLastUsedSubscriber,
     );
   }
 
-  if (deps.governanceKpisSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "governanceKpisSync",
-      deps.governanceKpisSyncReactor,
+  if (deps.governanceKpisProjection) {
+    builder = builder.withMapProjection(
+      "governanceKpis",
+      deps.governanceKpisProjection,
     );
   }
 
-  if (deps.governanceOcsfEventsSyncReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "governanceOcsfEventsSync",
-      deps.governanceOcsfEventsSyncReactor,
-    );
-  }
-
-  if (deps.retentionOrphanSweepReactor) {
-    builder = builder.withReactor(
-      "traceSummary",
-      "retentionOrphanSweep",
-      deps.retentionOrphanSweepReactor,
+  if (deps.governanceOcsfEventsProjection) {
+    builder = builder.withMapProjection(
+      "governanceOcsfEvents",
+      deps.governanceOcsfEventsProjection,
     );
   }
 

@@ -41,7 +41,8 @@ import {
  *      run-level dim columns (UserId / ConversationId / CustomerId / Origin)
  *      are kept Nullable and emitted as `null` from this projection;
  *      Phase 7 may lift them off the trace fold via a cross-pipeline read
- *      at write time, matching the eval alert reactor's pattern.
+ *      at write time, matching the `evaluationAlertTriggerMatch` subscriber's
+ *      pattern.
  *
  *   2. **Attributes map is TRIMMED** at write time via
  *      `trimAttributesForAnalytics` — the EXACT same trim service the trace
@@ -101,7 +102,7 @@ export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
  * read-back window is ±7 days. Declared once, on the fold; the executor derives
  * `context.readWindow` from it and retries a windowed miss unwindowed.
  */
-export const EVALUATION_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const EVALUATION_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * How many same-evaluation events one load/apply/store cycle may coalesce.
@@ -120,7 +121,7 @@ export const EVALUATION_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * cap; a batch at or above it would break redelivery dedup — the projection
  * router rejects such a config at registration).
  */
-export const EVALUATION_ANALYTICS_COALESCE_MAX_BATCH = 128;
+const EVALUATION_ANALYTICS_COALESCE_MAX_BATCH = 128;
 
 /**
  * The slim row that lands in `evaluation_analytics`. Field names align
@@ -263,8 +264,8 @@ export function projectEvaluationAnalyticsStateToRow({
     model: state.model,
     traceId: state.traceId,
     // Phase 6 leaves the trace-derived dim columns Null; a Phase 7
-    // cross-pipeline hoist (mirroring the eval alert reactor) can fill them
-    // without an additive schema change.
+    // cross-pipeline hoist (mirroring `evaluationAlertTriggerMatch`) can fill
+    // them without an additive schema change.
     userId: null,
     conversationId: null,
     customerId: null,

@@ -226,7 +226,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       },
       async () => {
         try {
-          const records = await this.repository.getEventRecords(
+          const records = await this.repository.findAll(
             context.tenantId,
             aggregateType,
             aggregateId,
@@ -286,23 +286,13 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       },
       async () => {
         try {
-          const records = await this.repository.getEventRecordsUpTo({
-            tenantId: context.tenantId,
+          const records = await this.repository.findAllUpTo(
+            context.tenantId,
             aggregateType,
             aggregateId,
-            upToTimestamp: upToEvent.createdAt,
-            upToEventId: upToEvent.id,
-            // Anchor on the triggering event's own occurred time. For a
-            // time-local aggregate every sibling event falls inside the
-            // aggregate's lifetime — seconds to hours — so a 45-day window
-            // around the anchor cannot exclude one. `rehydrationLowerBoundMs`
-            // returns undefined for long-lived types and for a missing anchor,
-            // leaving those reads unbounded exactly as before.
-            occurredAtFromMs: rehydrationLowerBoundMs(
-              aggregateType,
-              upToEvent.occurredAt,
-            ),
-          });
+            upToEvent.createdAt,
+            upToEvent.id,
+          );
 
           const events = records.map((record) =>
             recordToEvent<EventType>(record, aggregateId),
@@ -351,10 +341,10 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
       return [];
     }
 
-    const pagedRead = this.repository.getEventRecordsUpToPaged;
+    const pagedRead = this.repository.findAllUpToPaged;
     if (!pagedRead) {
       throw new Error(
-        `${this.constructor.name}: the event repository does not implement getEventRecordsUpToPaged; a paginated re-fold cannot be served`,
+        `${this.constructor.name}: the event repository does not implement findAllUpToPaged; a paginated re-fold cannot be served`,
       );
     }
 
@@ -367,7 +357,7 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
    * validation and capability-checking.
    */
   private async readEventsUpToPagedFromRepository(
-    pagedRead: NonNullable<EventRepository["getEventRecordsUpToPaged"]>,
+    pagedRead: NonNullable<EventRepository["findAllUpToPaged"]>,
     request: {
       aggregateId: string;
       context: EventStoreReadContext<EventType>;
@@ -398,13 +388,6 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             upToEventId: upToEvent.id,
             after,
             limit,
-            // Same bound as the unpaged read. It matters MORE here: without it
-            // every page re-opens every partition, so the cost is paid once per
-            // page rather than once per re-fold.
-            occurredAtFromMs: rehydrationLowerBoundMs(
-              aggregateType,
-              upToEvent.occurredAt,
-            ),
           });
 
           const events = records.map((record) =>

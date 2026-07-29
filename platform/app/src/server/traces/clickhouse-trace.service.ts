@@ -2938,8 +2938,27 @@ export class ClickHouseTraceService {
         WHERE t.TenantId = {tenantId:String}
           AND t.TraceId IN ({traceIds:Array(String)})
           ${spanTimeFilterOuter}
-          AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
-            SELECT TenantId, TraceId, SpanId, max(StartTime)
+          -- Elect each span's latest WRITE (max UpdatedAt), matching
+          -- \`dedupInTuple\` in app-layer/traces/repositories/span-storage.
+          -- clickhouse.repository.ts, which every other reader of
+          -- stored_spans uses.
+          --
+          -- This used to elect max(StartTime), which is neither a version
+          -- nor a dedup. StartTime is the span's own business time and is
+          -- unchanged when an emitter re-reports a span, so every version
+          -- of that span TIES on it, every tied row satisfies the IN-tuple,
+          -- and the read returned the span ONCE PER UNMERGED VERSION —
+          -- rendering it repeatedly in the trace, with stale content in all
+          -- but one copy. On the rarer re-report that does move StartTime,
+          -- it elected whichever version claimed the LATEST start rather
+          -- than the latest write, i.e. it preferred the stale row.
+          --
+          -- (The table's engine is \`ReplacingMergeTree(StartTime)\`, so the
+          -- background merge elects on StartTime too and can outlive a
+          -- corrected span. That is a defect in the DDL, not a reason to
+          -- read stale rows; see ADR-083.)
+          AND (t.TenantId, t.TraceId, t.SpanId, t.UpdatedAt) IN (
+            SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
             FROM stored_spans
             WHERE TenantId = {tenantId:String}
               AND TraceId IN ({traceIds:Array(String)})

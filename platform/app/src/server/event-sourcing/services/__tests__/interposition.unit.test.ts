@@ -65,10 +65,8 @@ describe("given EventSourcingService is configured with a map projection", () =>
     vi.restoreAllMocks();
   });
 
-  /**
-   * @scenario leanForProjection is the single source of truth for the lean shape
-   */
   describe("when one SpanReceived event is stored", () => {
+    /** @scenario leanForProjection is the single source of truth for the lean shape */
     it("storeEvents is called with the original (full) event, and router.dispatch is called with the leaned event", async () => {
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("lean-dispatch");
@@ -93,13 +91,13 @@ describe("given EventSourcingService is configured with a map projection", () =>
       const storedArg = (eventStore.storeEvents as ReturnType<typeof vi.fn>)
         .mock.calls[0]?.[0] as Event[];
       expect(
-        (storedArg[0]?.data as Record<string, unknown>)?._leaned,
+        (storedArg[0]?.data as Record<string, unknown>)?.["_leaned"],
       ).toBeUndefined();
 
       // dispatch sees the leaned event (has _leaned marker)
       const dispatchedArg = (mapDef.map as ReturnType<typeof vi.fn>).mock
         .calls[0]?.[0] as Event;
-      expect((dispatchedArg.data as Record<string, unknown>)?._leaned).toBe(
+      expect((dispatchedArg.data as Record<string, unknown>)?.["_leaned"]).toBe(
         true,
       );
     });

@@ -4,6 +4,7 @@ import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { createTenantId } from "../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { createEvaluationProcessingPipeline } from "../pipeline";
 import type { EvaluationAnalyticsData } from "../projections/evaluationAnalytics.foldProjection";
 import {
@@ -41,8 +42,17 @@ function completedEvent(): EvaluationCompletedEvent {
   };
 }
 
-function buildPipeline() {
-  const triggerMatchHandler = vi.fn().mockResolvedValue(undefined);
+function buildPipeline({ isSaas = true }: { isSaas?: boolean } = {}) {
+  const triggerMatchSubscriber: EventSubscriberDefinition<EvaluationProcessingEvent> =
+    {
+      name: "triggerMatch",
+      eventTypes: [
+        EVALUATION_COMPLETED_EVENT_TYPE,
+        EVALUATION_REPORTED_EVENT_TYPE,
+      ],
+      options: { delay: 10_000 },
+      handle: async () => {},
+    };
   const graphActivityHandler = vi.fn().mockResolvedValue(undefined);
   const pipeline = createEvaluationProcessingPipeline({
     evalRunStore: foldStore<EvaluationRunData>(),
@@ -51,63 +61,47 @@ function buildPipeline() {
       append: vi.fn().mockResolvedValue(undefined),
     },
     executeEvaluationCommand: {} as never,
+    commands: { port: () => async () => {} } as never,
+    isSaas,
     automations: {
-      triggerMatchHandler,
+      triggerMatchSubscriber,
       graphActivityHandler,
     },
   });
-  return { pipeline, triggerMatchHandler, graphActivityHandler };
+  return { pipeline, triggerMatchSubscriber, graphActivityHandler };
 }
 
 describe("evaluation processing pipeline subscriber wiring", () => {
   describe("given the triggerMatch subscriber", () => {
-    it("registers as a fold reactor on evaluationRun with a 10s delay and 30s dedup ttl", () => {
-      const { pipeline } = buildPipeline();
+    it("registers the injected definition verbatim, adding no delay or dedup of its own", () => {
+      const { pipeline, triggerMatchSubscriber } = buildPipeline();
 
-      const entry = pipeline.foldReactors.get("triggerMatch");
-      expect(entry?.projectionName).toBe("evaluationRun");
-      expect(entry?.definition.options?.delay).toBe(10_000);
-      expect(entry?.definition.options?.deduplication?.ttlMs).toBe(30_000);
+      // The delay, the dedup key and the enqueue filter belong to the
+      // subscriber now, not to this mount, and are tested where they are
+      // authored. What matters here is that the pipeline registers exactly
+      // what it was handed.
+      expect(pipeline.eventSubscribers.get("triggerMatch")).toBe(
+        triggerMatchSubscriber,
+      );
+    });
+  });
+
+  describe("given the billing poke", () => {
+    it("meters the reported event, the only billable evaluation event", () => {
+      const { pipeline } = buildPipeline();
+      const poke = pipeline.eventSubscribers.get("billingMeterPoke");
+
+      expect(poke).toBeDefined();
+      expect(poke?.eventTypes).toEqual([EVALUATION_REPORTED_EVENT_TYPE]);
+      expect(poke?.options?.disabled).toBe(false);
     });
 
-    it("reacts only to evaluation completed/reported events", () => {
-      const { pipeline } = buildPipeline();
-      const entry = pipeline.foldReactors.get("triggerMatch");
-      const shouldReact = entry?.definition.shouldReact;
+    it("is off outside the SaaS build, where nothing could report the usage", () => {
+      const { pipeline } = buildPipeline({ isSaas: false });
 
-      const context = {} as never;
-      expect(shouldReact?.(completedEvent(), context)).toBe(true);
       expect(
-        shouldReact?.(
-          {
-            ...completedEvent(),
-            type: "lw.evaluation.started",
-          } as unknown as EvaluationProcessingEvent,
-          context,
-        ),
-      ).toBe(false);
-    });
-
-    it("delegates to automations.triggerMatchHandler with the committed fold state", async () => {
-      const { pipeline, triggerMatchHandler } = buildPipeline();
-      const entry = pipeline.foldReactors.get("triggerMatch");
-      const event = completedEvent();
-      const foldState = {
-        evaluationId: "eval-1",
-      } as unknown as EvaluationRunData;
-
-      await entry?.definition.handle(event, {
-        tenantId,
-        aggregateId: "eval-1",
-        foldState,
-      });
-
-      expect(triggerMatchHandler).toHaveBeenCalledTimes(1);
-      expect(triggerMatchHandler).toHaveBeenCalledWith(event, {
-        tenantId,
-        aggregateId: "eval-1",
-        state: foldState,
-      });
+        pipeline.eventSubscribers.get("billingMeterPoke")?.options?.disabled,
+      ).toBe(true);
     });
   });
 
@@ -157,7 +151,6 @@ describe("evaluation processing pipeline subscriber wiring", () => {
       expect(graphActivityHandler).toHaveBeenCalledWith(event, {
         tenantId,
         aggregateId: "eval-1",
-        state: undefined,
       });
     });
   });

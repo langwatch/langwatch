@@ -12,9 +12,6 @@ export const INGESTION_PULL_PROCESSING_EVENT_TYPES = [
   INGESTION_PULL_EVENT_TYPES.RUN_FAILED,
 ] as const;
 
-export type IngestionPullProcessingEventType =
-  (typeof INGESTION_PULL_PROCESSING_EVENT_TYPES)[number];
-
 export const INGESTION_PULL_COMMAND_TYPES = {
   CONFIGURE: "lw.obs.ingestion_pull.configure",
   DISABLE: "lw.obs.ingestion_pull.disable",
@@ -28,9 +25,6 @@ export const INGESTION_PULL_PROCESSING_COMMAND_TYPES = [
   INGESTION_PULL_COMMAND_TYPES.RECORD_RUN_COMPLETED,
   INGESTION_PULL_COMMAND_TYPES.RECORD_RUN_FAILED,
 ] as const;
-
-export type IngestionPullProcessingCommandType =
-  (typeof INGESTION_PULL_PROCESSING_COMMAND_TYPES)[number];
 
 /** Event schema versions using calendar versioning (YYYY-MM-DD). */
 export const INGESTION_PULL_EVENT_VERSIONS = {
@@ -49,5 +43,3 @@ export const INGESTION_PULL_RUN_OUTCOME = {
   COMPLETED: "completed",
   FAILED: "failed",
 } as const;
-export type IngestionPullRunOutcome =
-  (typeof INGESTION_PULL_RUN_OUTCOME)[keyof typeof INGESTION_PULL_RUN_OUTCOME];

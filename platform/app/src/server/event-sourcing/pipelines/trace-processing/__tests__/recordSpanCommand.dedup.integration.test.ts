@@ -56,8 +56,8 @@ import type { OtlpSpan } from "../schemas/otlp";
 // traceProcessing.coalescing.integration.test.ts:25-34.
 //
 // IMPORTANT: the pipeline still registers this as `RecordSpanCommand as any`
-// so `.schema`, `.getAggregateId`, and `.makeJobId` are pulled from the real
-// class via the static inheritance chain, faithfully mirroring production.
+// so `.schema` and `.getAggregateId` are pulled from the real class via the
+// static inheritance chain, faithfully mirroring production.
 // ---------------------------------------------------------------------------
 
 class TestRecordSpanCommand extends RecordSpanCommand {
@@ -197,8 +197,8 @@ function createDeduplicationTestPipeline(): PipelineWithCommandHandlers<
     //
     // TestRecordSpanCommand is a no-op-deps subclass of RecordSpanCommand used to
     // avoid `require("~/server/db")` in integration tests. All static properties
-    // (schema, getAggregateId, makeJobId) inherit unchanged, so GQ group-key and
-    // dedup-ID logic match production exactly.
+    // (schema, getAggregateId) inherit unchanged, so GQ group-key logic matches
+    // production exactly; the dedup ID comes from RECORD_SPAN_DEDUPLICATION.
     .withCommand("recordSpan", TestRecordSpanCommand as any, {
       deduplication: RECORD_SPAN_DEDUPLICATION,
     })

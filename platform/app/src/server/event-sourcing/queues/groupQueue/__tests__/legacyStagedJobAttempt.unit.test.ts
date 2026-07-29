@@ -10,17 +10,27 @@ describe("legacyStagedJobAttempt", () => {
   describe("given a legacy id carrying a retry segment", () => {
     describe("when the attempt is taken from a message that records one", () => {
       /** @scenario A legacy id's retry segment is read only when nothing else can answer */
-      it("believes the message and ignores the id's segment", () => {
-        // The ladder takes the highest of (message, group chain, legacy id), so
-        // a message that can answer always wins over a stale id segment.
+      it("reads a further rung off the message than the id's segment offers", () => {
+        // The ladder that combines these is inlined in
+        // `GroupQueue.handleTransientDecode` —
+        // `Math.max(readJobAttempt(...) ?? 0, await this.readGroupAttempt(...),
+        // legacyStagedJobAttempt(...)) + 1` — a private async method that needs
+        // a live queue, so there is no resolver a unit test can call. Repeating
+        // that `Math.max` here would pin the test to its own arithmetic rather
+        // than to production, so this asserts what the two REAL readers hand
+        // the ladder for one job: the message is further along, so the
+        // last-resort id read cannot be what decides. The composition itself is
+        // driven for real by `stagedJobIdIdentity.integration.test.ts`
+        // ("A job staged under a legacy retry-suffixed id resumes its ladder
+        // rather than restarting it").
         const value = JSON.stringify({ __attempt: 7 });
+        const stagedJobId = `${BASE}/r/3`;
 
-        expect(
-          Math.max(
-            readJobAttempt(value) ?? 0,
-            legacyStagedJobAttempt(`${BASE}/r/3`),
-          ),
-        ).toBe(7);
+        expect(readJobAttempt(value)).toBe(7);
+        expect(legacyStagedJobAttempt(stagedJobId)).toBe(3);
+        expect(legacyStagedJobAttempt(stagedJobId)).toBeLessThan(
+          readJobAttempt(value)!,
+        );
       });
     });
   });

@@ -1,27 +1,23 @@
-import {
-  LANGY_CONVERSATION_EVENT_TYPES,
-  LANGY_TITLE_SOURCE,
-} from "@langwatch/langy";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type {
   EventHandler,
   IntentExecutor,
 } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_TITLE_SOURCE,
+} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+
 import {
   LANGY_PROCESS_INTENT_TYPES,
+  langyGenerateTitleIntentSchema,
+  langyProcessEventViewSchema,
+  langyWorkerDispatchIntentSchema,
   type LangyConversationProcessState,
   type LangyGenerateTitleIntent,
   type LangyProcessEventView,
   type LangyWorkerDispatchIntent,
-  langyGenerateTitleIntentSchema,
-  langyProcessEventViewSchema,
-  langyWorkerDispatchIntentSchema,
 } from "./langyConversationProcess.types";
-import {
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-  type LangyEffectPorts,
-} from "./langyEffectPorts";
 
 /**
  * The content boundary (`toPayload`): narrows a committed Langy pipeline event
@@ -57,7 +53,7 @@ export const INITIAL_LANGY_PROCESS_STATE: LangyConversationProcessState = {
   pendingHandoffTurnId: null,
 };
 
-type LangyIntents = {
+export type LangyIntents = {
   [LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH]: {
     schema: typeof langyWorkerDispatchIntentSchema;
     run: IntentExecutor<LangyWorkerDispatchIntent>;
@@ -88,8 +84,7 @@ type LangyHandler = EventHandler<
  */
 function shouldGenerateTitle(state: LangyConversationProcessState): boolean {
   return (
-    state.titleSource === LANGY_TITLE_SOURCE.DERIVED &&
-    !state.autoTitleRequested
+    state.titleSource === LANGY_TITLE_SOURCE.DERIVED && !state.autoTitleRequested
   );
 }
 
@@ -186,98 +181,4 @@ export const handleHandoffConsumed: LangyHandler = (state) => ({
   state: { ...state, pendingHandoffTurnId: null },
 });
 
-/**
- * Conversation-level or turn-progress activity with no process decision to
- * make.
- *
- * Declared rather than omitted. The runtime derives its subscription from the
- * declared handlers AND throws on an undeclared event, so leaving these out
- * would both stop delivery and turn any other delivery path into a hard
- * failure. The hand-rolled evolve this replaces had a `default:` arm that
- * returned unchanged state; this is that arm, made explicit per event.
- *
- * Tool and plan events land here — they only ever mattered to the liveness
- * window, which the heartbeat-aware subscriber still owns.
- */
-export const handleNoDecision: LangyHandler = (state) => ({ state });
 
-/**
- * The Langy conversation process, as a pipeline declaration (ADR-049 §4,
- * ADR-052).
- *
- * Only the effect ports are injected; the topology — state, intents, the
- * content boundary, every event decision, and the outbox lease — is declared
- * here, so the pipeline is the single place that describes what this process
- * does.
- *
- * The intent names are the pre-existing dotted intent types rather than the
- * short camelCase names newer processes use. That is deliberate: the name IS
- * the persisted `intentType`, and renaming it would leave any in-flight outbox
- * row without a handler, to retry-churn until it died. They can be shortened
- * once the table is known drained.
- */
-export function langyConversationProcess(
-  ports: LangyEffectPorts,
-): ProcessManagerApplier<LangyConversationProcessingEvent> {
-  return (pm) =>
-    pm
-      .state<LangyConversationProcessState>(INITIAL_LANGY_PROCESS_STATE)
-      .intent(
-        LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH,
-        langyWorkerDispatchIntentSchema,
-        (async (payload, context) => {
-          await ports.workerDispatch.dispatchTurn({
-            ...payload,
-            projectId: context.projectId,
-          });
-        }) satisfies IntentExecutor<LangyWorkerDispatchIntent>,
-      )
-      .intent(
-        LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
-        langyGenerateTitleIntentSchema,
-        (async (payload, context) => {
-          await ports.titleGeneration.generateTitle({
-            ...payload,
-            projectId: context.projectId,
-          });
-        }) satisfies IntentExecutor<LangyGenerateTitleIntent>,
-      )
-      .toPayload(buildLangyProcessEventView)
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
-        handleAgentTurnAccepted,
-      )
-      .on(LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED, handleAgentResponded)
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
-        handleAgentResponseFailed,
-      )
-      .on(LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED, handleArchived)
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED,
-        handleMetadataUpdated,
-      )
-      .on(LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED, handleTitleGenerated)
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_PENDING,
-        handleHandoffPending,
-      )
-      .on(
-        LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
-        handleHandoffConsumed,
-      )
-      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED, handleNoDecision)
-      .on(LANGY_CONVERSATION_EVENT_TYPES.PLAN_UPDATED, handleNoDecision)
-      // The lease MUST outlive the slowest accepted dispatch, or a healthy
-      // long-running turn loses its lease mid-flight and a second instance
-      // re-delivers it concurrently (the completing handler is then fenced out
-      // and the message never retires). The generic 30s default is unsafe
-      // against the dispatch budget. Previously set in the registry.
-      .outbox({ leaseDurationMs: LANGY_OUTBOX_LEASE_DURATION_MS });
-}

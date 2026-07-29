@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import {
   createTraceProcessingPipeline,
   type TraceProcessingPipelineDeps,
 } from "../pipeline";
+import { CUSTOM_EVALUATION_SYNC_PROCESS_NAME } from "../process-manager/customEvaluationSyncProcess.types";
+import { EVALUATION_TRIGGER_PROCESS_NAME } from "../process-manager/evaluationTriggerProcess.types";
+import { ORIGIN_GATE_PROCESS_NAME } from "../process-manager/originGateProcess.types";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -11,16 +15,26 @@ import {
 import type { TraceProcessingEvent } from "../schemas/events";
 
 /**
- * Wiring-level unit test: builds the REAL trace-processing pipeline and
- * asserts the `.withSubscriber("triggerMatch", ...)` /
- * `.withSubscriber("graphTriggerActivity", ...)` registrations at
- * pipeline.ts:224-241 carry the intended events/delay/ttl/dedup. These
- * debounce/dedup values previously lived on deleted reactors' options and
- * were tested there (ADR-052) — this locks the replacement wiring in.
- * `build()` only stores references, so no store / reactor is ever invoked.
+ * Wiring-level unit test: builds the REAL trace-processing pipeline and asserts
+ * the composition root mounts what ADR-075/ADR-082 say it should — the three
+ * process managers, the four event subscribers, the billing poke, and the
+ * automations mounts. `build()` only stores references, so no store, process or
+ * subscriber is ever invoked.
+ *
+ * `triggerMatch` is asserted as a MOUNT, not as a shape: its delay, dedup key
+ * and enqueue filter belong to the enterprise subscriber definition now, and
+ * are tested where they are authored. What this file locks in is that the
+ * pipeline registers exactly the definition it was handed and configures
+ * nothing of its own on top.
  */
 
-const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
+const triggerMatchSubscriber: EventSubscriberDefinition<TraceProcessingEvent> =
+  {
+    name: "triggerMatch",
+    eventTypes: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
+    options: { delay: 30_000 },
+    handle: async () => {},
+  };
 
 function buildTraceDeps(
   overrides: Partial<TraceProcessingPipelineDeps> = {},
@@ -31,18 +45,25 @@ function buildTraceDeps(
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
-    originGateReactor: reactorStub("originGate"),
-    evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
-    traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
-    projectMetadataReactor: reactorStub("projectMetadata"),
-    simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
-    experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
+    commands: { port: () => async () => {} } as any,
+    broadcast: {} as any,
+    hasRedis: true,
+    projects: {} as any,
+    bootstrapTopicClustering: async () => {},
+    evaluationTriggerDispatch: {
+      monitors: {} as any,
+      readTraceSummary: async () => null,
+      evaluation: async () => {},
+    },
+    customEvaluationSyncDispatch: {
+      getSpanEvents: async () => [],
+      reportEvaluation: async () => {},
+    },
+    isSaas: true,
     automations: {
-      triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
+      triggerMatchSubscriber,
       graphActivityHandler: vi.fn().mockResolvedValue(undefined),
     },
-    spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
     ...overrides,
   };
 }
@@ -69,62 +90,80 @@ function fakeEvent(
   } as unknown as TraceProcessingEvent;
 }
 
-describe("trace-processing pipeline subscriber wiring", () => {
-  describe("given the triggerMatch subscriber", () => {
+describe("trace-processing pipeline wiring", () => {
+  describe("given the deferred work the pipeline owns", () => {
     const definition = createTraceProcessingPipeline(buildTraceDeps());
-    const triggerMatch = definition.foldReactors.get("triggerMatch");
 
-    it("attaches to the traceSummary fold with a 30s delay and matching dedup ttl", () => {
-      expect(triggerMatch).toBeDefined();
-      expect(triggerMatch!.projectionName).toBe("traceSummary");
-      expect(triggerMatch!.definition.options?.delay).toBe(30_000);
-      expect(triggerMatch!.definition.options?.deduplication?.ttlMs).toBe(
-        30_000,
+    it("mounts the origin gate, the evaluation trigger and the custom-evaluation sync as process managers", () => {
+      expect([...definition.processManagers.keys()].sort()).toEqual(
+        [
+          CUSTOM_EVALUATION_SYNC_PROCESS_NAME,
+          EVALUATION_TRIGGER_PROCESS_NAME,
+          ORIGIN_GATE_PROCESS_NAME,
+        ].sort(),
       );
     });
 
-    it("reacts only to span_received and origin_resolved events", () => {
-      const shouldReact = triggerMatch!.definition.shouldReact!;
-      const context = {} as never;
-      expect(
-        shouldReact(fakeEvent({ type: SPAN_RECEIVED_EVENT_TYPE }), context),
-      ).toBe(true);
-      expect(
-        shouldReact(fakeEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }), context),
-      ).toBe(true);
-      expect(
-        shouldReact(
-          fakeEvent({ type: "lw.obs.trace.something_else" }),
-          context,
-        ),
-      ).toBe(false);
+    it("gives every one of them a gate before a job is staged", () => {
+      // All three are mounted on `span_received`, the busiest stream in the
+      // product. A process mounted there with no enqueue declaration costs a
+      // job, an inbox row and a durable transition per span (ADR-069). What
+      // each declares is tested where it is authored; what this pins is that
+      // the mount declares anything at all.
+      for (const name of [
+        CUSTOM_EVALUATION_SYNC_PROCESS_NAME,
+        EVALUATION_TRIGGER_PROCESS_NAME,
+        ORIGIN_GATE_PROCESS_NAME,
+      ]) {
+        const enqueue = definition.processManagers.get(name)?.config.enqueue;
+        expect(enqueue?.filter ?? enqueue?.deduplication).toBeDefined();
+      }
+    });
+  });
+
+  describe("given the at-most-once side effects", () => {
+    const definition = createTraceProcessingPipeline(buildTraceDeps());
+
+    it("mounts the broadcast, project-metadata and clustering-bootstrap subscribers", () => {
+      for (const name of [
+        "traceUpdateBroadcast",
+        "spanStorageBroadcast",
+        "projectMetadata",
+        "topicClusteringBootstrap",
+      ]) {
+        expect(definition.eventSubscribers.get(name)).toBeDefined();
+      }
+    });
+  });
+
+  describe("given the billing poke", () => {
+    it("meters span_received, the only billable event this pipeline emits", () => {
+      const definition = createTraceProcessingPipeline(buildTraceDeps());
+      const poke = definition.eventSubscribers.get("billingMeterPoke");
+
+      expect(poke).toBeDefined();
+      expect(poke!.eventTypes).toEqual([SPAN_RECEIVED_EVENT_TYPE]);
+      expect(poke!.options?.disabled).toBe(false);
     });
 
-    it("derives the dedup id from tenant + aggregate, scoped to this subscriber", () => {
-      const makeId = triggerMatch!.definition.options?.deduplication?.makeId;
-      expect(makeId).toBeDefined();
-      const event = fakeEvent({ tenantId: "project-9", aggregateId: "t-9" });
-      expect(makeId!({ event, foldState: undefined })).toBe(
-        "subscriber:triggerMatch:project-9:t-9",
+    it("is off outside the SaaS build, where nothing could report the usage", () => {
+      const definition = createTraceProcessingPipeline(
+        buildTraceDeps({ isSaas: false }),
       );
-    });
 
-    it("delegates to automations.triggerMatchHandler with tenant/aggregate/fold state", async () => {
-      const deps = buildTraceDeps();
-      const pipeline = createTraceProcessingPipeline(deps);
-      const reactor = pipeline.foldReactors.get("triggerMatch")!.definition;
-      const event = fakeEvent({ tenantId: "project-2", aggregateId: "t-2" });
-      const foldState = { traceId: "t-2" } as any;
-      await reactor.handle(event, {
-        tenantId: "project-2",
-        aggregateId: "t-2",
-        foldState,
-      });
-      expect(deps.automations.triggerMatchHandler).toHaveBeenCalledWith(event, {
-        tenantId: "project-2",
-        aggregateId: "t-2",
-        state: foldState,
-      });
+      expect(
+        definition.eventSubscribers.get("billingMeterPoke")!.options?.disabled,
+      ).toBe(true);
+    });
+  });
+
+  describe("given the triggerMatch subscriber", () => {
+    it("registers the injected definition verbatim, adding no delay or dedup of its own", () => {
+      const definition = createTraceProcessingPipeline(buildTraceDeps());
+
+      expect(definition.eventSubscribers.get("triggerMatch")).toBe(
+        triggerMatchSubscriber,
+      );
     });
   });
 
@@ -173,7 +212,10 @@ describe("trace-processing pipeline subscriber wiring", () => {
       });
       expect(deps.automations.graphActivityHandler).toHaveBeenCalledWith(
         event,
-        { tenantId: "project-3", aggregateId: "t-3" },
+        {
+          tenantId: "project-3",
+          aggregateId: "t-3",
+        },
       );
     });
   });

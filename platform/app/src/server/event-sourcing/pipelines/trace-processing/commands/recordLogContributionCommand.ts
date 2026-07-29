@@ -66,4 +66,15 @@ export class RecordLogContributionCommand
   static getAggregateId(payload: RecordLogContributionCommandData): string {
     return payload.traceId;
   }
+
+  static getSpanAttributes(
+    payload: RecordLogContributionCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.trace.id": payload.traceId,
+      "payload.span.id": payload.spanId,
+      "payload.record.id": payload.recordId,
+      "payload.correlation_source": payload.correlationSource,
+    };
+  }
 }

@@ -101,6 +101,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
   describe("given a batch that starts before the persisted checkpoint", () => {
     describe("when the projection declares no re-fold policy", () => {
       /** @scenario "An out-of-order batch re-folds from the event log by default" */
+      /** @scenario "A handler that dies does not leave a permanently wrong figure" */
       it("loads the aggregate's full history and replays it from init state", async () => {
         const history = [
           eventAt(1_000),

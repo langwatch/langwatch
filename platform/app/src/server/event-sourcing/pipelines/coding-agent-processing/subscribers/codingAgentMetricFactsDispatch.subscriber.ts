@@ -1,16 +1,14 @@
-import { createLogger } from "@langwatch/observability";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
-import { scalarsFromCanonicalAttributes } from "../../metric-processing/canonical/attributes";
 import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "../../metric-processing/schemas/constants";
 import type { MetricProcessingEvent } from "../../metric-processing/schemas/events";
 import type { ContributeMetricFactsCommandData } from "../schemas/commands";
 import {
   detectCodingAgent,
   isCodingAgentMetricName,
+  nonEmptyString,
+  parseKeyValueCanonicalAttributes,
   resolveConversationKey,
 } from "../services/coding-agent-normalization";
-
-const logger = createLogger("langwatch:coding-agent:metric-facts-dispatch");
 
 /**
  * The metric→session dispatcher (ADR-056 §2): a subscriber on
@@ -51,7 +49,10 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
       // vocabulary maps arrives as one today.
       if (point.valueType === "none") return;
 
-      const attributes = parsePointAttributes(point.pointAttributesJson);
+      const attributes = parseKeyValueCanonicalAttributes({
+        json: point.pointAttributesJson,
+        ref: { kind: "point", id: point.pointId },
+      });
       if (attributes === null) return;
       const sessionKey = resolveConversationKey(attributes);
       if (sessionKey === null) return;
@@ -77,7 +78,10 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
           // from the Claude Code runtime it reuses; without it a session's
           // metric contribution could first-writer-win the fold's agent to
           // claude_code while its log contributions say claude_cowork.
-          serviceName: serviceNameFromResource(point.resourceAttributesJson),
+          serviceName: serviceNameFromResource({
+            json: point.resourceAttributesJson,
+            pointId: point.pointId,
+          }),
         }),
         occurredAt: point.timeUnixMs,
         seriesId: isDelta ? point.pointId : point.seriesId,
@@ -105,30 +109,17 @@ function liftScalarAttributes(
   return lifted;
 }
 
-/**
- * `pointAttributesJson` stores the canonical KeyValue array buildPoint
- * writes (`[{key, value: {type, value}}]`), so parsing means flattening the
- * typed wrappers back to scalars — never treating the JSON as a flat object.
- */
-function parsePointAttributes(
-  json: string,
-): Record<string, string | number | boolean> | null {
-  if (!json) return null;
-  try {
-    return scalarsFromCanonicalAttributes(JSON.parse(json));
-  } catch (error) {
-    // Written by our own preparation — should be unreachable, but a
-    // dispatcher must never poison the queue over one point.
-    logger.warn({ error }, "unparseable metric point attributes; skipping");
-    return null;
-  }
-}
-
 /** Resource-level service.name off the point's canonical KeyValue JSON. */
-function serviceNameFromResource(json: string): string | null {
-  const resource = parsePointAttributes(json);
-  const serviceName = resource?.["service.name"];
-  return typeof serviceName === "string" && serviceName.length > 0
-    ? serviceName
-    : null;
+function serviceNameFromResource({
+  json,
+  pointId,
+}: {
+  json: string;
+  pointId: string;
+}): string | null {
+  const resource = parseKeyValueCanonicalAttributes({
+    json,
+    ref: { kind: "point", id: pointId },
+  });
+  return nonEmptyString(resource?.["service.name"]);
 }

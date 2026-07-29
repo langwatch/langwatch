@@ -231,6 +231,7 @@ type DropReason =
   | "transient_exhausted"
   | "sibling_restage_failed"
   | "retry_encode_failed"
+  | "retry_slot_expired"
   | "unknown";
 
 /**
@@ -1402,7 +1403,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // active key to a NEW id, so a late beat naming the old one no
                 // longer matched. With the id reused that guard is gone.
                 stopHeartbeat();
-                const restaged = await this.scripts.retryRestage({
+                const restageOutcome = await this.scripts.retryRestage({
                   groupId,
                   stagedJobId,
                   newStagedJobId,
@@ -1418,20 +1419,43 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   attempt: attempt + 1,
                   attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
                 });
+                // The slot lapsed under this worker: nothing was re-staged and
+                // the job left staging at claim time, so it is gone. Named and
+                // counted here rather than left to the "re-staged with backoff"
+                // line below, which would otherwise report a retry that never
+                // happened. Same accounting as `handleTransientDecode`.
+                if (restageOutcome === "slot_expired") {
+                  this.recordDrop({
+                    groupId,
+                    stagedJobId,
+                    jobDataJson,
+                    err: error,
+                    reason: "retry_slot_expired",
+                    message: `Job attempt ${attempt} failed and the group's active slot expired before the re-stage; the job left staging at claim time and is lost`,
+                    // The old value's lease is released below, as on every other
+                    // terminal path for this job.
+                    bodyPreserved: false,
+                  });
+                  await this.blobLifecycle.releaseLease({
+                    values: [jobDataJson],
+                    groupId,
+                  });
+                  return;
+                }
                 // Only transfer once the replacement is actually staged.
-                // retryRestage returns false when the active key is stale —
-                // another worker owns this slot now — and nothing was written.
-                // Transferring anyway would take a lease for a value no staged
-                // job references (a phantom holding its blob for the full lease
-                // window) AND release the old one, dropping the live owner's
-                // protection. The publication and the transfer are still two
-                // round trips, so a crash between them leaves the replacement
-                // leaseless; that is survivable because the retry re-encodes to
-                // the SAME content hash, so the not-yet-released old lease keeps
-                // the blob alive until decode renews. Folding the transfer into
-                // the staging Lua is the real fix — tracked separately, it needs
-                // the blocked-restage path too.
-                if (restaged) {
+                // retryRestage reports `slot_taken` when the active key names
+                // another worker's job — nothing was written and the job is no
+                // longer ours. Transferring anyway would take a lease for a
+                // value no staged job references (a phantom holding its blob for
+                // the full lease window) AND release the old one, dropping the
+                // live owner's protection. The publication and the transfer are
+                // still two round trips, so a crash between them leaves the
+                // replacement leaseless; that is survivable because the retry
+                // re-encodes to the SAME content hash, so the not-yet-released
+                // old lease keeps the blob alive until decode renews. Folding
+                // the transfer into the staging Lua is the real fix — tracked
+                // separately, it needs the blocked-restage path too.
+                if (restageOutcome === "restaged") {
                   // For GQ2 the retry re-encodes to the SAME content hash, so one
                   // deadline replaces another in the lease set (the blob stays);
                   // mixed/GQ1 falls back to ordered take+release.
@@ -1577,9 +1601,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * parse failure — the job was already removed from staging, so it is DISCARDED
    * here, mirroring the dispatched job's own parse-failure handling.
    *
-   * This used to say "recoverable via event replay". It is not, for a reactor
-   * job: replay never invokes reactors (see {@link dropStagedJob}). The loss is
-   * counted instead of asserted away.
+   * This used to say "recoverable via event replay". It is not, for a subscriber
+   * or process-manager job: replay never invokes either (see
+   * {@link dropStagedJob}). The loss is counted instead of asserted away.
    */
   private async parseDrainedPayload({
     sibling,
@@ -1824,16 +1848,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * does not — and the proof is structural, not another comment: `ReplayExecutor`
    * calls the fold's pure `projection.apply()` and writes straight to the store
    * via `store.store()`, never constructing a `ProjectionRouter` — which is the
-   * only thing that calls `dispatchToReactors`. Reactors are unreachable from
-   * replay BY CONSTRUCTION. (`replay/` contains no reference to a reactor at all,
-   * except two that exist to *suppress* re-fires.)
+   * only thing that calls `dispatchToEventSubscribers`. Event subscribers and
+   * process managers are unreachable from replay BY CONSTRUCTION; `replay/`
+   * touches folds, map projections and state projections and nothing else.
    *
-   * `governanceOcsfEventsSync` (OCSF audit) and `gatewayBudgetSync` (billing) are
-   * reactors on the `traceSummary` fold — so for them this method IS the terminal
-   * event, and the counter below is the only evidence it ever happened. Scoped
-   * honestly: fold/map drops genuinely ARE replay-covered (`ReplayService.replay`
-   * drives `config.projections` + `config.mapProjections`). The false part is
-   * reactor-specific.
+   * `triggerMatch` (automation alerting) and `billingMeterPoke` (usage
+   * reporting) are subscribers on the trace-processing pipeline — so for them
+   * this method IS the terminal event, and the counter below is the only
+   * evidence it ever happened. Scoped honestly: fold/map drops genuinely ARE
+   * replay-covered (`ReplayService.replay` drives `config.projections` +
+   * `config.mapProjections`). The false part is specific to subscriber and
+   * process-manager jobs.
    *
    * **Why `complete()`** — there are THREE options here, not two, and an earlier
    * draft of this comment argued a false binary:
@@ -2066,7 +2091,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         jobDataJson,
         err,
         reason: "transient_exhausted",
-        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover reactor jobs)`,
+        message: `Blob store unreachable after ${attempt} attempts; discarding job (replay rebuilds projections only — it never re-runs subscriber or process-manager jobs)`,
       });
       return;
     }
@@ -2075,7 +2100,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // byte, so the content hash and the lease identity are untouched — a value
     // whose machinery does not live in the header comes back unchanged, and the
     // chain below is then the only thing keeping the ladder finite.
-    const restaged = await this.scripts.retryRestage({
+    const restageOutcome = await this.scripts.retryRestage({
       groupId,
       stagedJobId,
       newStagedJobId: stagedJobId,
@@ -2085,11 +2110,36 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
     });
+    // The slot EXPIRED rather than being taken, and that is job loss, not a
+    // hand-off. This ladder runs before the heartbeat is armed — precisely when
+    // the blob store is slow enough to be retried — so the active key can lapse
+    // under a worker still waiting on a read. Nobody owns the slot, the job's
+    // staging member was removed when it was claimed, and nothing re-stages it.
+    // The early return used to swallow that: no counter, no metric, and it
+    // skipped the warn below too, so the only trace of a lost job was its
+    // absence. Counted as a drop like every other discard this module makes.
+    if (restageOutcome === "slot_expired") {
+      this.recordDrop({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        err,
+        reason: "retry_slot_expired",
+        message: `Blob store unreachable on attempt ${attempt} and the group's active slot expired before the re-stage; the job left staging at claim time and is lost`,
+        // The lease goes with it: no staged job references this value any more,
+        // and holding the token would pin the blob for the full lease window
+        // for nothing. Release is non-destructive — a blob still referenced by
+        // another job keeps that job's own lease.
+        bodyPreserved: false,
+      });
+      await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
+      return;
+    }
     // The script writes the chain in the same step, so a value whose machinery
     // does not live in the header still advances — that write is what keeps
-    // this ladder finite. It returns false only when another worker owns the
-    // slot, in which case nothing was written and this job is no longer ours.
-    if (!restaged) return;
+    // this ladder finite. `slot_taken` means another worker owns the slot, in
+    // which case nothing was written and this job is no longer ours.
+    if (restageOutcome !== "restaged") return;
     this.logger.warn(
       {
         queueName: this.queueName,

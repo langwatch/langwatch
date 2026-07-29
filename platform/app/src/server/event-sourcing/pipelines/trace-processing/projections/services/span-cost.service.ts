@@ -4,7 +4,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 import type { NormalizedSpan } from "../../schemas/spans";
 
-export const FIRST_TOKEN_EVENTS = new Set([
+const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "llm.content.completion.chunk",
   "first_token",
@@ -13,7 +13,7 @@ export const FIRST_TOKEN_EVENTS = new Set([
   "First Token Stream Event",
 ]);
 
-export const LAST_TOKEN_EVENTS = new Set([
+const LAST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "llm.content.completion.chunk",
   "last_token",

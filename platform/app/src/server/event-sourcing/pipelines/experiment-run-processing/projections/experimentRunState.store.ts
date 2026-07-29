@@ -15,7 +15,51 @@ import type {
 export function createExperimentRunStateFoldStore(
   repository: ExperimentRunStateRepository,
 ): FoldProjectionStore<ExperimentRunStateData> {
+  /**
+   * State together with the ids already folded into it.
+   *
+   * This fold accumulates — `Progress`/`CompletedCount`/`FailedCount` are
+   * `+= 1` per delivered target result, and `TotalScoreSum`/`ScoreCount`/
+   * `PassedCount`/`GradedCount` per evaluator result — so re-applying a
+   * redelivered event double-counts. `CachedFoldStore` normally answers from
+   * its cache entry's applied-set and the executor skips the redelivery; this
+   * is the durable copy it falls through to when that cache is cold, which is
+   * the only window in which the counters could ever drift (ADR-066,
+   * migration 00064).
+   *
+   * No version gate here, unlike the codingAgentSession store: every column
+   * this projection reads back predates the change, so an old row decodes to
+   * exactly what it always did. Only the watermark is new, and its absence
+   * reads as `[]` — the pre-migration behaviour, not a fabricated value.
+   *
+   * Declared as a named function rather than inline so `get` can delegate to it
+   * without reaching through `this` on the returned object literal.
+   */
+  async function getWithApplied(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{
+    state: ExperimentRunStateData | null;
+    appliedEventIds: string[];
+  }> {
+    const { projection, appliedEventIds } =
+      await repository.getProjectionWithApplied(aggregateId, {
+        tenantId: context.tenantId,
+      });
+
+    return {
+      state: (projection?.data as ExperimentRunStateData) ?? null,
+      appliedEventIds,
+    };
+  }
+
   return {
+    /**
+     * Keys the fold cache, so a version bump misses rather than serving state
+     * written in the old shape.
+     */
+    projectionVersion: EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE,
+
     async store(
       state: ExperimentRunStateData,
       context: ProjectionStoreContext,
@@ -43,20 +87,23 @@ export function createExperimentRunStateFoldStore(
         data: stateWithKeys,
       };
 
-      await repository.storeProjection(projection, {
-        tenantId: context.tenantId,
-      });
+      await repository.storeProjection(
+        projection,
+        { tenantId: context.tenantId },
+        // The executor's redelivery-dedup watermark, persisted next to the row
+        // so a retry with a cold cache still recognises a batch it committed.
+        context.appliedEventIds ?? [],
+      );
     },
 
+    getWithApplied,
+
+    /** State only; delegates so the two read paths cannot diverge. */
     async get(
       aggregateId: string,
       context: ProjectionStoreContext,
     ): Promise<ExperimentRunStateData | null> {
-      const projection = await repository.getProjection(aggregateId, {
-        tenantId: context.tenantId,
-      });
-
-      return (projection?.data as ExperimentRunStateData) ?? null;
+      return (await getWithApplied(aggregateId, context)).state;
     },
   };
 }

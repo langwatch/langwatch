@@ -29,7 +29,7 @@ const ZSTD_OPTS = { maxOutputLength: MAX_BLOB_BYTES };
 const packr = new Packr({ useRecords: false, structuredClone: false });
 
 /** How a payload was turned into bytes. */
-export type PayloadCodec = "json" | "msgpack";
+type PayloadCodec = "json" | "msgpack";
 /** How those bytes were compressed. */
 export type CompressionCodec = "none" | "gzip" | "zstd";
 

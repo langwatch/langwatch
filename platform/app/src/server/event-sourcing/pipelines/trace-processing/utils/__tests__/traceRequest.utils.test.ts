@@ -239,10 +239,8 @@ describe("traceRequest.utils", () => {
         ]);
       });
 
-      it("preserves boolean true values", () => {
-        // Note: The scalar() function in the original code has a limitation where
-        // boolValue: false is not captured because it checks `v.boolValue` which is falsy.
-        // This test only covers `true` values as a result.
+      /** @scenario "Both settings of a flag survive a list of reported entries" */
+      it("preserves boolean values in both directions", () => {
         const attributes = [
           {
             key: "flags.0.name",
@@ -254,11 +252,11 @@ describe("traceRequest.utils", () => {
           },
           {
             key: "flags.1.name",
-            value: { stringValue: "also_enabled" },
+            value: { stringValue: "disabled" },
           },
           {
             key: "flags.1.active",
-            value: { boolValue: true },
+            value: { boolValue: false },
           },
         ];
 
@@ -267,7 +265,37 @@ describe("traceRequest.utils", () => {
         expect(result).toHaveProperty("flags");
         expect(result.flags).toEqual([
           { name: "enabled", active: true },
-          { name: "also_enabled", active: true },
+          { name: "disabled", active: false },
+        ]);
+      });
+
+      /** @scenario "Zeros survive a list of reported entries rebuilt from its parts" */
+      it("preserves numeric zeros", () => {
+        const attributes = [
+          {
+            key: "usage.0.name",
+            value: { stringValue: "output_tokens" },
+          },
+          {
+            key: "usage.0.value",
+            value: { intValue: 0 },
+          },
+          {
+            key: "usage.1.name",
+            value: { stringValue: "cost" },
+          },
+          {
+            key: "usage.1.value",
+            value: { doubleValue: 0 },
+          },
+        ];
+
+        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+
+        expect(result).toHaveProperty("usage");
+        expect(result.usage).toEqual([
+          { name: "output_tokens", value: 0 },
+          { name: "cost", value: 0 },
         ]);
       });
     });
@@ -442,9 +470,7 @@ describe("traceRequest.utils", () => {
         expect(result).toEqual({ flag: true });
       });
 
-      it("preserves boolValue false via !== null check", () => {
-        // NOTE: The boolValue check uses `v.boolValue !== null` (not a truthy
-        // check), so false IS correctly returned -- unlike intValue/doubleValue.
+      it("flattens boolValue false", () => {
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
           { boolValue: false },
           "flag",
@@ -471,42 +497,127 @@ describe("traceRequest.utils", () => {
         expect(result).toEqual({ flag: false });
       });
 
-      it("drops intValue 0 due to falsy check", () => {
-        // BUG: scalar() checks `v.intValue` which is falsy for 0,
-        // so intValue: 0 is never captured and returns undefined.
+      it("returns empty object when scalar root has no rootKey", () => {
+        const result = TraceRequestUtils.normalizeOtlpAnyValue({
+          stringValue: "orphan",
+        });
+
+        expect(result).toEqual({});
+      });
+    });
+
+    describe("when the reported scalar is zero", () => {
+      // Every branch of scalar() guards on presence, not truthiness. A
+      // truthiness guard drops the key entirely, and a zero that never reaches
+      // the span is indistinguishable downstream from one that was never
+      // reported -- a zero token count, a zero cost, a zero retry count.
+
+      /** @scenario "A whole numeric attribute of zero is recorded as zero" */
+      it("records an intValue of 0 as zero", () => {
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
           { intValue: 0 },
+          "count",
+        );
+
+        expect(result).toEqual({ count: 0 });
+      });
+
+      /** @scenario "A zero sent in text form is recorded as zero" */
+      it("records an intValue of 0 in string form as zero", () => {
+        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+          { intValue: "0" },
+          "count",
+        );
+
+        expect(result).toEqual({ count: 0 });
+      });
+
+      /** @scenario "A zero sent in the SDK's split 64-bit form is recorded as zero" */
+      it("records an intValue of 0 in high/low form as zero", () => {
+        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+          { intValue: { high: 0, low: 0 } },
+          "count",
+        );
+
+        expect(result).toEqual({ count: 0 });
+      });
+
+      /** @scenario "A fractional numeric attribute of zero is recorded as zero" */
+      it("records a doubleValue of 0 as zero", () => {
+        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+          { doubleValue: 0 },
+          "value",
+        );
+
+        expect(result).toEqual({ value: 0 });
+      });
+
+      it("records a doubleValue written as 0.0 as zero", () => {
+        // 0.0 IS 0 in JavaScript, so spelling it as a float changes nothing.
+        // Covered separately because the float zero is the shape that actually
+        // arrives -- a zero cost, a zero temperature.
+        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+          { doubleValue: 0.0 },
+          "value",
+        );
+
+        expect(result).toEqual({ value: 0 });
+      });
+
+      it("records a doubleValue of 0 in string form as zero", () => {
+        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+          { doubleValue: "0.0" },
+          "value",
+        );
+
+        expect(result).toEqual({ value: 0 });
+      });
+
+      /** @scenario "An attribute reported as false is recorded as false" */
+      it("records a false boolValue rather than dropping it", () => {
+        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+          { boolValue: false },
+          "cached",
+        );
+
+        expect(result).toEqual({ cached: false });
+      });
+
+      /** @scenario "A zero inside a reported list of numbers survives the list" */
+      it("keeps a zero inside an arrayValue of scalars", () => {
+        // scalar() maps array items through `scalar(item) ?? item`, so a
+        // dropped zero used to leave the raw OTLP envelope in the array.
+        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+          {
+            arrayValue: {
+              values: [{ intValue: 0 }, { intValue: 1 }, { doubleValue: 0 }],
+            },
+          },
+          "counts",
+        );
+
+        expect(result).toEqual({ counts: "[0,1,0]" });
+      });
+    });
+
+    describe("when a numeric value is not parseable", () => {
+      /** @scenario "A number that cannot be read stays absent rather than becoming zero" */
+      it("drops an intValue that parses to NaN", () => {
+        // NaN is not a value anyone reported: it serializes to null and reads
+        // downstream as a corrupt number. Absent is the honest answer.
+        const result = TraceRequestUtils.normalizeOtlpAnyValue(
+          { intValue: "not-a-number" },
           "count",
         );
 
         expect(result).toEqual({});
       });
 
-      it("drops doubleValue 0 due to falsy check", () => {
-        // BUG: scalar() checks `v.doubleValue` which is falsy for 0,
-        // so doubleValue: 0 is never captured and returns undefined.
+      it("drops a doubleValue that parses to NaN", () => {
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { doubleValue: 0 },
+          { doubleValue: "" },
           "value",
         );
-
-        expect(result).toEqual({});
-      });
-
-      it("drops doubleValue 0.0 due to falsy check", () => {
-        // BUG: 0.0 === 0 in JavaScript, still falsy.
-        const result = TraceRequestUtils.normalizeOtlpAnyValue(
-          { doubleValue: 0.0 },
-          "value",
-        );
-
-        expect(result).toEqual({});
-      });
-
-      it("returns empty object when scalar root has no rootKey", () => {
-        const result = TraceRequestUtils.normalizeOtlpAnyValue({
-          stringValue: "orphan",
-        });
 
         expect(result).toEqual({});
       });
@@ -632,11 +743,17 @@ describe("traceRequest.utils", () => {
     });
 
     describe("when value is an arrayValue of objects (kvlistValue items)", () => {
-      it("JSON.stringifies instead of flattening to dot-paths", () => {
-        // BUG: scalar() intercepts arrayValue before walk()'s array branch.
-        // scalar() calls itself recursively on each item. For kvlistValue items,
-        // scalar() returns undefined, so the fallback `?? item` returns the raw
-        // OtlpAnyValue object. The whole array is then JSON.stringified.
+      it("keeps the OTLP envelope rather than flattening to dot-paths", () => {
+        // KNOWN LIMITATION, pinned so a change trips this test -- not a
+        // contract worth preserving. `scalar()` intercepts arrayValue before
+        // walk()'s array branch and maps each item through `scalar(item) ??
+        // item`. For a kvlistValue item `scalar()` returns undefined, so the
+        // fallback keeps the RAW OtlpAnyValue and the whole array is
+        // JSON.stringified with the OTLP encoding still inside it.
+        // Unwinding it changes the stored shape of every arrayValue-of-kvlist
+        // attribute, so it is deliberately out of scope here; the zero-drop fix
+        // does repair the scalar half of the same `?? item` fallback (see
+        // "keeps a zero inside an arrayValue of scalars").
         const result = TraceRequestUtils.normalizeOtlpAnyValue(
           {
             arrayValue: {
@@ -711,9 +828,13 @@ describe("traceRequest.utils", () => {
 
     describe("when items have heterogeneous shapes", () => {
       it("keeps flat keys when array items have different key sets", () => {
-        // BUG: isValidArrayPattern() requires all items to have identical key
-        // signatures (same set of remainder keys). Real-world data like OpenAI
-        // messages often have varying shapes (some messages have tool_calls, some don't).
+        // BY DESIGN, and lossless: `isValidArrayPattern()` only rebuilds an
+        // array when every item carries an identical remainder-key signature,
+        // which is how it tells a genuine flattened array from unrelated dotted
+        // keys that merely happen to contain a number. The cost is fidelity,
+        // never data -- every reported key is still present and readable, just
+        // flat. Loosening it is a judgement call about false positives, not a
+        // correctness fix.
         const attributes = [
           {
             key: "messages.0.role",
@@ -751,10 +872,12 @@ describe("traceRequest.utils", () => {
     });
 
     describe("when keys are bare indexed (prefix.N with no remainder)", () => {
-      it("passes through unchanged because regex requires remainder", () => {
-        // BUG: INDEXED_KEY_REGEX = /^(.+?)\.(\d+)\.(.+)$/ requires a remainder
-        // segment after the index. Keys like "items.0" never match, so they are
-        // never considered for array reconstruction.
+      it("keeps bare indexed keys flat", () => {
+        // BY DESIGN, and lossless: INDEXED_KEY_REGEX = /^(.+?)\.(\d+)\.(.+)$/
+        // requires a remainder segment after the index, so only object-shaped
+        // items are candidates for reconstruction. A bare "items.0" is
+        // indistinguishable from a legitimate dotted key that simply ends in a
+        // number, so it is left exactly as reported.
         const attributes = [
           {
             key: "items.0",
@@ -776,11 +899,15 @@ describe("traceRequest.utils", () => {
     });
 
     describe("when remainder contains numeric segments", () => {
-      it("creates objects with string-number keys for inner arrays", () => {
-        // BUG: unflattenObject() always creates {} for intermediate segments,
-        // even when the key is a numeric string that should be an array index.
-        // e.g. "choices.0.tool_calls.0.name" produces
-        //   tool_calls: { "0": { "name": ... } } instead of tool_calls: [{ name: ... }]
+      it("rebuilds an inner array as an object keyed by its index", () => {
+        // KNOWN LIMITATION, pinned so a change trips this test -- not a
+        // contract worth preserving. `unflattenObject()` always creates {} for
+        // an intermediate segment, even when that segment is a numeric string
+        // that is an array index, so an inner array comes back as an object and
+        // a consumer iterating it finds nothing. No value is lost -- every leaf
+        // is still reachable, under a "0" key instead of index 0.
+        // The fix lives in the shared `safeUnflatten` util, used well beyond
+        // this pipeline, so it is deliberately out of scope here.
         const attributes = [
           {
             key: "choices.0.tool_calls.0.name",
@@ -861,9 +988,12 @@ describe("traceRequest.utils", () => {
     });
 
     describe("when receiving OpenAI function calling with tool_calls", () => {
-      it("keeps flat keys due to heterogeneous shape rejection", () => {
-        // BUG: Messages with varying shapes (some have tool_calls, some don't)
-        // are rejected by isValidArrayPattern because key signatures differ.
+      it("leaves an OpenAI tool-calling exchange as flat keys", () => {
+        // The isValidArrayPattern conservatism above, on the shape that
+        // actually arrives from an OpenAI SDK: item 0 carries tool_calls and
+        // item 1 does not, so the key signatures differ and the message array
+        // is not rebuilt. Lossless -- every message field is still present as
+        // its own key, which is what the assertions below check.
         const attributes = [
           {
             key: "llm.output_messages.0.message.role",
@@ -903,6 +1033,72 @@ describe("traceRequest.utils", () => {
         expect(result["llm.output_messages.1.message.content"]).toBe(
           "Result: 69",
         );
+      });
+    });
+
+    describe("when an SDK reports a usage figure of zero", () => {
+      /** @scenario "A usage report made entirely of zeros keeps every figure" */
+      it("records the zero instead of omitting the attribute", () => {
+        // The real casualties of a truthiness guard: a cached completion costs
+        // nothing and emits no output tokens, and "0 output tokens" has to stay
+        // distinguishable from "this SDK never reported output tokens".
+        const attributes = [
+          {
+            key: "gen_ai.usage.output_tokens",
+            value: { intValue: 0 },
+          },
+          {
+            key: "gen_ai.usage.input_tokens",
+            value: { intValue: 512 },
+          },
+          {
+            key: "llm.usage.cost",
+            value: { doubleValue: 0 },
+          },
+          {
+            key: "gen_ai.request.temperature",
+            value: { doubleValue: 0 },
+          },
+          {
+            key: "llm.cache.hit",
+            value: { boolValue: false },
+          },
+        ];
+
+        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+
+        expect(result).toEqual({
+          "gen_ai.usage.output_tokens": 0,
+          "gen_ai.usage.input_tokens": 512,
+          "llm.usage.cost": 0,
+          "gen_ai.request.temperature": 0,
+          "llm.cache.hit": false,
+        });
+      });
+    });
+
+    describe("when an SDK reports empty bytes", () => {
+      it("keeps the attribute as a present, empty value", () => {
+        // Zero-length bytes is a reported value like any other: it survives as
+        // the empty string rather than being dropped, so "sent nothing" stays
+        // distinguishable from "sent no such attribute".
+        const attributes = [
+          {
+            key: "payload.empty",
+            value: { bytesValue: "" } as unknown as OtlpAnyValue,
+          },
+          {
+            key: "payload.full",
+            value: { bytesValue: "3q0=" } as unknown as OtlpAnyValue,
+          },
+        ];
+
+        const result = TraceRequestUtils.normalizeOtlpAttributes(attributes);
+
+        expect(result).toEqual({
+          "payload.empty": "",
+          "payload.full": "dead",
+        });
       });
     });
 
@@ -969,10 +1165,15 @@ describe("traceRequest.utils", () => {
     });
 
     describe("when receiving OTLP arrayValue of objects (e.g. chat messages)", () => {
-      it("stores entire array as JSON string via scalar()", () => {
-        // BUG: scalar() intercepts the arrayValue before walk()'s array branch.
-        // Each kvlistValue item returns undefined from scalar(), falling back to
-        // the raw OtlpAnyValue object. The entire thing is JSON.stringified.
+      it("stores raw OTLP kvlistValue structures for a chat-message array", () => {
+        // KNOWN LIMITATION, pinned so a change trips this test -- the
+        // scalar()-intercepts-arrayValue limitation above, on the shape that
+        // actually arrives. Each kvlistValue item returns undefined from
+        // scalar() and falls back to the raw OtlpAnyValue; the array is
+        // JSON.stringified and then parsed straight back by
+        // parseJsonStringValues, so the stored attribute is a list of OTLP
+        // envelopes rather than a list of messages. Lossless but low-fidelity;
+        // see the arrayValue-of-kvlist note above for why it is out of scope.
         const attributes = [
           {
             key: "llm.messages",

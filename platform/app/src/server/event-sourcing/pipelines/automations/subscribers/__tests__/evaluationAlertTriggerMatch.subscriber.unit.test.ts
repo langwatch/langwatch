@@ -1,13 +1,19 @@
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
-import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
-import { createEvaluationAlertTriggerMatchHandler } from "../evaluationAlertTriggerMatch.subscriber";
+import {
+  EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_TYPE,
+} from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
+import type {
+  EvaluationCompletedEventData,
+  EvaluationProcessingEvent,
+} from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
+import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import { createEvaluationAlertTriggerMatchSubscriber } from "../evaluationAlertTriggerMatch.subscriber";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -18,19 +24,8 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-function evaluation(
-  overrides: Partial<EvaluationRunData> = {},
-): EvaluationRunData {
-  return {
-    evaluationId: "evaluation-1",
-    evaluatorId: "evaluator-1",
-    traceId: "trace-1",
-    status: "processed",
-    ...overrides,
-  } as EvaluationRunData;
-}
-
-function event(
+function completedEvent(
+  data: Partial<EvaluationCompletedEventData> = {},
   overrides: Partial<EvaluationProcessingEvent> = {},
 ): EvaluationProcessingEvent {
   return {
@@ -40,11 +35,27 @@ function event(
     tenantId: "project-1",
     occurredAt: Date.now(),
     createdAt: Date.now(),
-    type: "lw.evaluation.completed",
+    type: EVALUATION_COMPLETED_EVENT_TYPE,
     version: "2025-01-14",
-    data: {},
+    data: {
+      evaluationId: "evaluation-1",
+      traceId: "trace-1",
+      status: "processed",
+      ...data,
+    },
     ...overrides,
   } as EvaluationProcessingEvent;
+}
+
+/**
+ * A `completed` event exactly as every row committed before `traceId` was added
+ * to the schema decodes: the key is not present at all.
+ */
+function completedEventWithoutTraceId(): EvaluationProcessingEvent {
+  const base = completedEvent();
+  const { traceId: _absent, ...data } =
+    base.data as EvaluationCompletedEventData;
+  return { ...base, data } as EvaluationProcessingEvent;
 }
 
 function trigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary {
@@ -72,10 +83,8 @@ function trigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary {
   };
 }
 
-function context(
-  state: EvaluationRunData = evaluation(),
-): TriggerContext<EvaluationRunData> {
-  return { tenantId: "project-1", aggregateId: "evaluation-1", state };
+function context(): EventSubscriberContext {
+  return { tenantId: "project-1", aggregateId: "evaluation-1" };
 }
 
 function deps(triggerRows: TriggerSummary[] = [trigger()]) {
@@ -93,8 +102,16 @@ function deps(triggerRows: TriggerSummary[] = [trigger()]) {
   };
 }
 
+function subscriberFor(dependencies: ReturnType<typeof deps>) {
+  return createEvaluationAlertTriggerMatchSubscriber({
+    ...dependencies,
+    triggers: dependencies.triggers as never,
+    traceSummaryStore: dependencies.traceSummaryStore as never,
+  });
+}
+
 describe("evaluation alert trigger match subscriber", () => {
-  describe("given a terminal evaluation for a trace", () => {
+  describe("given a terminal evaluation carrying its trace id", () => {
     it("records every evaluation-filtered match with its action class", async () => {
       const dependencies = deps([
         trigger(),
@@ -105,11 +122,7 @@ describe("evaluation alert trigger match subscriber", () => {
         }),
       ]);
 
-      await createEvaluationAlertTriggerMatchHandler({
-        ...dependencies,
-        triggers: dependencies.triggers as never,
-        traceSummaryStore: dependencies.traceSummaryStore as never,
-      })(event(), context());
+      await subscriberFor(dependencies).handle(completedEvent(), context());
 
       expect(dependencies.recordTriggerMatch.send).toHaveBeenCalledTimes(2);
       expect(dependencies.recordTriggerMatch.send).toHaveBeenNthCalledWith(
@@ -129,6 +142,41 @@ describe("evaluation alert trigger match subscriber", () => {
         }),
       );
     });
+
+    it("reads the trace from the event, never from a projection of the same stream", async () => {
+      const dependencies = deps();
+
+      await subscriberFor(dependencies).handle(
+        completedEvent({ traceId: "trace-from-the-event" }),
+        context(),
+      );
+
+      expect(dependencies.traceSummaryStore.get).toHaveBeenCalledWith(
+        "trace-from-the-event",
+        expect.objectContaining({ aggregateId: "trace-from-the-event" }),
+      );
+      expect(dependencies.recordTriggerMatch.send).toHaveBeenCalledWith(
+        expect.objectContaining({ traceId: "trace-from-the-event" }),
+      );
+    });
+  });
+
+  describe("given a reported evaluation", () => {
+    it("records the match off the same two fields the completed event carries", async () => {
+      const dependencies = deps();
+
+      await subscriberFor(dependencies).handle(
+        completedEvent(
+          { status: "error", traceId: "trace-9" },
+          { type: EVALUATION_REPORTED_EVENT_TYPE },
+        ),
+        context(),
+      );
+
+      expect(dependencies.recordTriggerMatch.send).toHaveBeenCalledWith(
+        expect.objectContaining({ traceId: "trace-9", triggerId: "trigger-1" }),
+      );
+    });
   });
 
   describe("given at-least-once delivery of a committed event", () => {
@@ -141,19 +189,17 @@ describe("evaluation alert trigger match subscriber", () => {
         vi.useFakeTimers();
         const firstDeliveryAt = 1_750_000_000_000;
         vi.setSystemTime(firstDeliveryAt);
-        const committedEvent = event({ occurredAt: firstDeliveryAt });
-        const deliveryContext = context();
+        const committedEvent = completedEvent(
+          {},
+          { occurredAt: firstDeliveryAt },
+        );
         const dependencies = deps();
-        const handler = createEvaluationAlertTriggerMatchHandler({
-          ...dependencies,
-          triggers: dependencies.triggers as never,
-          traceSummaryStore: dependencies.traceSummaryStore as never,
-        });
+        const subscriber = subscriberFor(dependencies);
 
-        await handler(committedEvent, deliveryContext);
+        await subscriber.handle(committedEvent, context());
         // Queue redelivery lands later in wall-clock time.
         vi.advanceTimersByTime(120_000);
-        await handler(committedEvent, deliveryContext);
+        await subscriber.handle(committedEvent, context());
 
         expect(dependencies.recordTriggerMatch.send).toHaveBeenCalledTimes(2);
         const [firstPayload, secondPayload] =
@@ -187,28 +233,24 @@ describe("evaluation alert trigger match subscriber", () => {
   describe.each([
     [
       "a stale event",
-      event({ occurredAt: Date.now() - 60 * 60 * 1000 - 1 }),
-      context(),
+      completedEvent({}, { occurredAt: Date.now() - 60 * 60 * 1000 - 1 }),
     ],
     [
-      "an in-progress evaluation",
-      event(),
-      context(evaluation({ status: "in_progress" })),
+      "a non-terminal status",
+      completedEvent({ status: "in_progress" as never }),
     ],
+    ["an evaluation naming no trace", completedEvent({ traceId: "" })],
     [
-      "an evaluation without a trace",
-      event(),
-      context(evaluation({ traceId: null })),
+      "a completed event committed before the schema carried a trace id",
+      completedEventWithoutTraceId(),
     ],
-  ])("given %s", (_label, inputEvent, inputContext) => {
-    it("does not read the trace or record a match", async () => {
+  ])("given %s", (_label, inputEvent) => {
+    it("skips without reading the trace, recording a match, or throwing", async () => {
       const dependencies = deps();
 
-      await createEvaluationAlertTriggerMatchHandler({
-        ...dependencies,
-        triggers: dependencies.triggers as never,
-        traceSummaryStore: dependencies.traceSummaryStore as never,
-      })(inputEvent, inputContext);
+      await expect(
+        subscriberFor(dependencies).handle(inputEvent, context()),
+      ).resolves.toBeUndefined();
 
       expect(dependencies.traceSummaryStore.get).not.toHaveBeenCalled();
       expect(dependencies.recordTriggerMatch.send).not.toHaveBeenCalled();
@@ -220,16 +262,70 @@ describe("evaluation alert trigger match subscriber", () => {
       const dependencies = deps();
       dependencies.traceSummaryStore.get.mockResolvedValue(null as never);
 
-      await createEvaluationAlertTriggerMatchHandler({
-        ...dependencies,
-        triggers: dependencies.triggers as never,
-        traceSummaryStore: dependencies.traceSummaryStore as never,
-      })(event(), context());
+      await subscriberFor(dependencies).handle(completedEvent(), context());
 
       expect(
         dependencies.triggers.getActiveTraceTriggersForProject,
       ).not.toHaveBeenCalled();
       expect(dependencies.recordTriggerMatch.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the subscriber contract", () => {
+    it("subscribes to the two terminal evaluation events with no fold bound to it", () => {
+      const subscriber = subscriberFor(deps());
+
+      expect(subscriber.name).toBe("triggerMatch");
+      expect([...subscriber.eventTypes].sort()).toEqual(
+        [
+          EVALUATION_COMPLETED_EVENT_TYPE,
+          EVALUATION_REPORTED_EVENT_TYPE,
+        ].sort(),
+      );
+    });
+
+    it("carries over the 10s debounce and 30s per-evaluation dedup window", () => {
+      const subscriber = subscriberFor(deps());
+      const dedup = subscriber.options?.deduplication;
+
+      expect(subscriber.options?.delay).toBe(10_000);
+      expect(dedup?.ttlMs).toBe(30_000);
+      expect(dedup?.makeId(completedEvent())).toBe(
+        "subscriber:triggerMatch:project-1:evaluation-1",
+      );
+      expect(
+        dedup?.makeId(completedEvent({}, { aggregateId: "evaluation-2" })),
+      ).not.toBe(dedup?.makeId(completedEvent()));
+    });
+  });
+
+  describe("given the enqueue filter", () => {
+    describe("when the event cannot produce a match", () => {
+      it("declines it so no job is ever minted", () => {
+        const filter = subscriberFor(deps()).options?.enqueue?.filter;
+
+        expect(filter?.(completedEvent())).toBe(true);
+        expect(filter?.(completedEventWithoutTraceId())).toBe(false);
+        expect(filter?.(completedEvent({ traceId: "" }))).toBe(false);
+        expect(
+          filter?.(completedEvent({ status: "in_progress" as never })),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the event payload is malformed", () => {
+      it("returns false instead of throwing, because a throw on the routing path loses the job permanently", () => {
+        const filter = subscriberFor(deps()).options?.enqueue?.filter;
+
+        for (const data of [null, undefined, "not-an-object", 7, []]) {
+          const malformed = {
+            ...completedEvent(),
+            data,
+          } as unknown as EvaluationProcessingEvent;
+          expect(() => filter?.(malformed)).not.toThrow();
+          expect(filter?.(malformed)).toBe(false);
+        }
+      });
     });
   });
 });

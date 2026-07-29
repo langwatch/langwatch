@@ -818,6 +818,14 @@ const presentations = {
     title: "No annotator assigned",
     describe: () => "Add at least one annotator to the queue.",
   },
+  invalid_annotator_reference: {
+    // Raised on two surfaces — the bulk "send to queue" dialog and an
+    // automation replaying its saved annotators — so the copy names neither.
+    // The annotator itself stays out of it: the string is unusable precisely
+    // because it identifies nothing a person would recognise.
+    title: "That annotator can't be used",
+    describe: () => "Pick the queue or person again, then try once more.",
+  },
   notification_delivery_error: {
     title: "We couldn't deliver that notification",
     // The one registry entry that prefers the server's words to its own — and

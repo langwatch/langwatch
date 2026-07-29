@@ -23,7 +23,7 @@ export const MARKER_TTL_SECONDS = 7 * 24 * 3600;
  * replay does not retain a marker per aggregate for its whole duration — the
  * cutoff hash stays bounded to in-flight aggregates and done markers self-expire.
  */
-export const DONE_KEY_PREFIX = "projection-replay:done:";
+const DONE_KEY_PREFIX = "projection-replay:done:";
 
 /**
  * TTL for terminal done markers. Long enough to cover a job that was staged

@@ -124,9 +124,6 @@ function makeDeps(): RecordSpanCommandDependencies {
 // Test suite
 // ---------------------------------------------------------------------------
 
-/**
- * @scenario An over-threshold command is spooled to S3 transiently and reconstituted
- */
 describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", () => {
   const SPOOL_REF = `trace-blobs/spool/${TENANT_ID}/${TRACE_ID}/${SPAN_ID}`;
 
@@ -152,6 +149,7 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
   });
 
   describe("when the command worker handles the oversized command", () => {
+    /** @scenario An over-threshold command is spooled to S3 transiently and reconstituted */
     it("calls BlobStore.get exactly once with the spool key and the reconstituted span flows through", async () => {
       // Stub BlobStore with a getSpool that returns the full serialized span
       const blobStore = {
@@ -326,8 +324,8 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
 // ---------------------------------------------------------------------------
 
 /**
- * @scenario A single shared RecordSpanCommand instance processes two concurrent
- * traces — cleanupAfterStore must use each command's own spoolRef, not shared
+ * A single shared RecordSpanCommand instance processes two concurrent traces —
+ * cleanupAfterStore must use each command's own spoolRef, not shared
  * instance state. Under the OLD implementation (storing spoolRef in an instance
  * field `_pendingSpoolRef`), the second handle() call would overwrite the first
  * job's spoolRef, causing cleanupAfterStore(cmdA) to delete cmdB's spool instead.
@@ -451,8 +449,8 @@ describe("given a shared RecordSpanCommand instance processing two concurrent tr
 // ---------------------------------------------------------------------------
 
 /**
- * @scenario A handler built without a blobStore receives a command that
- * carries a spoolRef — the span's attributes have already been cleared by
+ * A handler built without a blobStore receives a command that carries a
+ * spoolRef — the span's attributes have already been cleared by
  * the edge. Without reconstitution, processing would emit a span with empty
  * attributes to event_log (permanent data loss). The guard must throw instead.
  */

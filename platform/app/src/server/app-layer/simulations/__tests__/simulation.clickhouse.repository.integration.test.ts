@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import {
   startTestContainers,
   stopTestContainers,
@@ -10,6 +11,19 @@ import { SimulationClickHouseRepository } from "../repositories/simulation.click
 
 const tenantId = `test-sim-repo-${nanoid()}`;
 const now = Date.now();
+
+/**
+ * Tenants created by tests that read across a whole project (scenario-set
+ * counts, the all-suites poll). They cannot share the module tenant because
+ * every other test's rows would land in the same aggregate. Cleaned up
+ * alongside it.
+ */
+const isolatedTenantIds: string[] = [];
+function isolatedTenant(label: string): string {
+  const id = `test-sim-repo-${label}-${nanoid()}`;
+  isolatedTenantIds.push(id);
+  return id;
+}
 
 function makeInsertRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -74,8 +88,8 @@ beforeAll(async () => {
 afterAll(async () => {
   if (ch) {
     await ch.exec({
-      query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
-      query_params: { tenantId },
+      query: `ALTER TABLE simulation_runs DELETE WHERE TenantId IN ({tenantIds:Array(String)})`,
+      query_params: { tenantIds: [tenantId, ...isolatedTenantIds] },
     });
   }
   await stopTestContainers();
@@ -1216,6 +1230,232 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(previewQuery!.query_params?.minStartedAtMs).toBe(
           String(oldStartedAtMs),
         );
+      });
+    });
+  });
+
+  /**
+   * `simulation_runs` is ORDER BY (TenantId, ScenarioRunId), so that pair is
+   * the only grouping that collapses a run's versions. The dedup subqueries
+   * used to group on (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId) —
+   * wider than the engine key — which splits one run across several groups.
+   *
+   * The split is reachable without any contention: the fold seeds BatchRunId
+   * and ScenarioSetId to "", so a message snapshot that arrives before the
+   * run-started event is persisted with both empty and the started event fills
+   * them in afterwards. Under the wide grouping those are two groups, both
+   * survive dedup, and the run is counted twice by every read that does not
+   * itself filter on the set or the batch.
+   */
+  describe("given a run whose earlier version predates its set and batch ids", () => {
+    /** The two versions the fold writes: pre-started, then started. */
+    async function insertPreStartedThenStarted({
+      tenant,
+      scenarioSetId,
+      batchRunId,
+    }: {
+      tenant: string;
+      scenarioSetId: string;
+      batchRunId: string;
+    }): Promise<string> {
+      const scenarioRunId = `run-split-${nanoid()}`;
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: tenant,
+          ScenarioRunId: scenarioRunId,
+          ScenarioSetId: "",
+          BatchRunId: "",
+          Status: "IN_PROGRESS",
+          UpdatedAt: new Date(now - 10_000),
+        }),
+      );
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: tenant,
+          ScenarioRunId: scenarioRunId,
+          ScenarioSetId: scenarioSetId,
+          BatchRunId: batchRunId,
+          UpdatedAt: new Date(now),
+        }),
+      );
+      return scenarioRunId;
+    }
+
+    describe("when the project's scenario sets are counted", () => {
+      // This count is what the free-plan cap is enforced against, so a run
+      // surviving dedup twice bills the customer twice.
+      it("counts the run once, under the set its latest version names", async () => {
+        const tenant = isolatedTenant("split-sets");
+        const scenarioSetId = `set-split-${nanoid()}`;
+        await insertPreStartedThenStarted({
+          tenant,
+          scenarioSetId,
+          batchRunId: `batch-split-${nanoid()}`,
+        });
+
+        const sets = await repo.getScenarioSetsData({ projectId: tenant });
+
+        expect(sets.map((s) => s.scenarioSetId)).toEqual([scenarioSetId]);
+        expect(sets[0]!.scenarioCount).toBe(1);
+      });
+    });
+
+    describe("when the all-suites listing pages over the project's batches", () => {
+      it("returns one batch, not a phantom batch under the empty id", async () => {
+        const tenant = isolatedTenant("split-suites");
+        const batchRunId = `batch-split-${nanoid()}`;
+        await insertPreStartedThenStarted({
+          tenant,
+          scenarioSetId: `set-split-${nanoid()}`,
+          batchRunId,
+        });
+
+        const result = await repo.getRunDataForAllSuites({ projectId: tenant });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) return;
+        expect(Object.keys(result.scenarioSetIds)).toEqual([batchRunId]);
+        expect(result.runs).toHaveLength(1);
+      });
+    });
+
+    describe("when the project's distinct external set ids are read", () => {
+      it("does not report the run under the default set as well", async () => {
+        const tenant = isolatedTenant("split-distinct");
+        const scenarioSetId = `set-split-${nanoid()}`;
+        await insertPreStartedThenStarted({
+          tenant,
+          scenarioSetId,
+          batchRunId: `batch-split-${nanoid()}`,
+        });
+
+        const setIds = await repo.getDistinctExternalSetIds({
+          projectIds: [tenant],
+        });
+
+        expect(setIds).toEqual(new Set([scenarioSetId]));
+      });
+    });
+
+    describe("when the batch's runs are read", () => {
+      it("returns the run once, at its latest version", async () => {
+        const tenant = isolatedTenant("split-batch");
+        const scenarioSetId = `set-split-${nanoid()}`;
+        const batchRunId = `batch-split-${nanoid()}`;
+        const scenarioRunId = await insertPreStartedThenStarted({
+          tenant,
+          scenarioSetId,
+          batchRunId,
+        });
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenant,
+          scenarioSetId,
+          batchRunId,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) return;
+        expect(result.runs.map((r) => r.scenarioRunId)).toEqual([
+          scenarioRunId,
+        ]);
+        // The started version, not the pre-started one it superseded.
+        expect(result.runs[0]!.status).toBe(ScenarioRunStatus.SUCCESS);
+      });
+    });
+  });
+
+  /**
+   * The freshness probes used to apply `ArchivedAt IS NULL` straight to the
+   * ReplacingMergeTree. An archived latest version then failed the filter and
+   * max(UpdatedAt) fell back to the run's own superseded non-archived version —
+   * a timestamp at or below the caller's `sinceTimestamp`, so the poll reported
+   * `changed: false` and the archived run stayed on screen indefinitely.
+   */
+  describe("given a run archived after the caller last polled", () => {
+    async function insertThenArchive({
+      tenant,
+      scenarioSetId,
+      batchRunId,
+    }: {
+      tenant: string;
+      scenarioSetId: string;
+      batchRunId: string;
+    }): Promise<{ scenarioRunId: string; polledAtMs: number }> {
+      const scenarioRunId = `run-archived-poll-${nanoid()}`;
+      const polledAtMs = now - 10_000;
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: tenant,
+          ScenarioRunId: scenarioRunId,
+          ScenarioSetId: scenarioSetId,
+          BatchRunId: batchRunId,
+          UpdatedAt: new Date(polledAtMs),
+          ArchivedAt: null,
+        }),
+      );
+      await insertRow(
+        ch,
+        makeInsertRow({
+          TenantId: tenant,
+          ScenarioRunId: scenarioRunId,
+          ScenarioSetId: scenarioSetId,
+          BatchRunId: batchRunId,
+          UpdatedAt: new Date(now),
+          ArchivedAt: new Date(now),
+        }),
+      );
+      return { scenarioRunId, polledAtMs };
+    }
+
+    describe("when the batch is polled with the pre-archive timestamp", () => {
+      it("reports the archive as a change and drops the run from the list", async () => {
+        const tenant = isolatedTenant("archived-batch");
+        const scenarioSetId = `set-archived-${nanoid()}`;
+        const batchRunId = `batch-archived-${nanoid()}`;
+        const { polledAtMs } = await insertThenArchive({
+          tenant,
+          scenarioSetId,
+          batchRunId,
+        });
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenant,
+          scenarioSetId,
+          batchRunId,
+          sinceTimestamp: polledAtMs,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) return;
+        expect(result.runs).toEqual([]);
+        // The watermark has to move past the archive, or the next poll reports
+        // the same change again forever.
+        expect(result.lastUpdatedAt).toBe(now);
+      });
+    });
+
+    describe("when the project-wide listing is polled with the pre-archive timestamp", () => {
+      it("reports the archive as a change", async () => {
+        const tenant = isolatedTenant("archived-suites");
+        const { polledAtMs } = await insertThenArchive({
+          tenant,
+          scenarioSetId: `set-archived-${nanoid()}`,
+          batchRunId: `batch-archived-${nanoid()}`,
+        });
+
+        const result = await repo.getRunDataForAllSuites({
+          projectId: tenant,
+          sinceTimestamp: polledAtMs,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) return;
+        expect(result.runs).toEqual([]);
+        expect(result.lastUpdatedAt).toBe(now);
       });
     });
   });

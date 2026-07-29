@@ -182,6 +182,7 @@ describe("ExperimentRunService.getRun (integration)", () => {
   });
 
   describe("when a target item has no cost but its trace has one", () => {
+    /** @scenario An item with no cost of its own is priced from its trace */
     it("enriches the dataset entry with the trace cost (within the run's OccurredAt window)", async () => {
       const experimentId = `exp-cost-${nanoid()}`;
       const runId = `run-cost-${nanoid()}`;

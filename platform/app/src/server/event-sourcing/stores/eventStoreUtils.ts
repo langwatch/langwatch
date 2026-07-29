@@ -83,7 +83,7 @@ export function eventToRecord<EventType extends Event>(
  * Handles: JSON strings, already-parsed objects, empty strings (→ null).
  * Throws StoreError for unexpected types or malformed JSON.
  */
-export function parseEventPayload(rawPayload: unknown): unknown {
+function parseEventPayload(rawPayload: unknown): unknown {
   if (typeof rawPayload === "string") {
     if (rawPayload.length === 0) {
       return null;

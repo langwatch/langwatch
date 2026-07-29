@@ -120,8 +120,9 @@ secured.access(requires("scenarios:create")).post(
     }
 
     // Broadcast START/END directly so the frontend gets them immediately
-    // (the reactor's debounced broadcast is too slow and causes CONTENT
-    // deltas to be dropped). Works regardless of event-sourcing flag.
+    // (the `snapshotUpdateBroadcast` subscriber's debounced broadcast is too
+    // slow and causes CONTENT deltas to be dropped). Works regardless of
+    // event-sourcing flag.
     if (
       event.type === ScenarioEventType.TEXT_MESSAGE_START ||
       event.type === ScenarioEventType.TEXT_MESSAGE_END
@@ -303,12 +304,25 @@ async function dispatchSimulationEvent(
     occurredAt: event.timestamp ?? Date.now(),
   };
 
+  // Where the run sits. Every inbound SDK event carries it
+  // (`baseScenarioEventSchema`), so it is forwarded onto the commands whose
+  // events accept it rather than only onto the run's first. A consumer reading
+  // one of those events alone — with no fold to look the run up in — otherwise
+  // cannot tell which set the update belongs to, and the set-filtered panels
+  // stop matching it. The fields stay optional on the event schemas because
+  // `finishRun` also fires from the failure handler and the cancellation router,
+  // neither of which passes them today, and because every event committed before
+  // they existed still has to parse.
+  const placement = {
+    batchRunId: event.batchRunId,
+    scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
+  };
+
   if (event.type === ScenarioEventType.RUN_STARTED) {
     await getApp().simulations.startRun({
       ...basePayload,
+      ...placement,
       scenarioId: event.scenarioId,
-      batchRunId: event.batchRunId,
-      scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
       name: event.metadata?.name,
       description: event.metadata?.description,
       metadata: event.metadata,
@@ -317,6 +331,7 @@ async function dispatchSimulationEvent(
     const messages = event.messages ?? [];
     await getApp().simulations.messageSnapshot({
       ...basePayload,
+      ...placement,
       messages: messages as Array<{
         trace_id?: string;
         [key: string]: unknown;
@@ -335,6 +350,7 @@ async function dispatchSimulationEvent(
   } else if (event.type === ScenarioEventType.TEXT_MESSAGE_END) {
     await getApp().simulations.textMessageEnd({
       ...basePayload,
+      ...placement,
       messageId: event.messageId,
       role: event.role,
       content: event.content ?? "",
@@ -345,6 +361,7 @@ async function dispatchSimulationEvent(
   } else if (event.type === ScenarioEventType.RUN_FINISHED) {
     await getApp().simulations.finishRun({
       ...basePayload,
+      ...placement,
       results: event.results
         ? {
             verdict: event.results.verdict,
@@ -408,6 +425,11 @@ export async function archiveScenarioSetRuns({
         await getApp().simulations.deleteRun({
           tenantId: projectId,
           scenarioRunId: id,
+          // The set is the whole subject of this request, so the archive push
+          // can say which set emptied. `batchRunId` is genuinely unknown here —
+          // a set spans many batches and the run-id lookup returns ids alone —
+          // so it stays absent rather than being guessed.
+          scenarioSetId,
           occurredAt: now,
         });
         archived++;

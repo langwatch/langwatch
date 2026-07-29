@@ -41,7 +41,7 @@ export const PARK_RECONCILE_MAX_DRAIN = 1000;
  * so it is a named const rather than a bare literal in the dispatch scripts —
  * retuning it keeps those relationships intact. Interpolated into the Lua.
  */
-export const RECONCILE_INTERVAL_MS = 2000;
+const RECONCILE_INTERVAL_MS = 2000;
 
 /**
  * TTL (ms) on the dynamic water-level cap key (= 5x RECONCILE_INTERVAL_MS). The
@@ -51,7 +51,7 @@ export const RECONCILE_INTERVAL_MS = 2000;
  * the static operator cap — fail PROTECTIVE (the low side), never permissive.
  * Interpolated into the Lua so there is a single source of truth.
  */
-export const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
+const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
 
 /**
  * Hard bound on how many tenants the dynamic-cap recompute processes in one
@@ -63,7 +63,7 @@ export const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
  * claimants are the current contention set; older ones have aged out of the
  * window and their in-flight is still enforced directly via tenant_active_z.
  */
-export const MAX_DEMANDING_TENANTS = 1000;
+const MAX_DEMANDING_TENANTS = 1000;
 
 // Lua helper, prepended to every script that writes group keys. Refreshes the
 // safety-net TTL on a group's jobs/data keys, deriving expiry from the LATEST
@@ -636,11 +636,24 @@ if dedupId ~= "" and dedupTtlMs > 0 then
 end
 
 local inserted = redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
-redis.call("HSET", dataKey, stagedJobId, jobDataJson)
-local stagedLease = gqParseLease(jobDataJson)
-if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == parkTenantOf(groupId) then
-  gqTakeLease(parkKeyPrefixOf(readyKey), stagedLease, gqRedisNowMs())
+-- The staged value may DISPLACE one. Since ADR-080 the staged job id is the
+-- source event's id, so an at-least-once re-send of an event whose job is
+-- still staged lands on an existing member (inserted == 0) and this HSET
+-- overwrites the value already there. That value holds a blob lease of its
+-- own, so it is released in the SAME eval as the displacement — exactly as the
+-- dedup squash above does, and for the same reason: a fire-and-forget release
+-- afterwards can reorder against a concurrent stage of the same id. Left
+-- unreleased, every re-send of a parked group's job orphaned a holder token
+-- and pinned its blob for the full lease TTL.
+-- A new member displaces nothing: dispatch and drain remove the ZSET member
+-- and its data field in one eval, so an absent member means an absent value
+-- and the HGET is skipped on the hot path.
+local displacedValue = ""
+if inserted == 0 then
+  displacedValue = redis.call("HGET", dataKey, stagedJobId) or ""
 end
+redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+gqSquashTransferLeases(parkKeyPrefixOf(readyKey), parkTenantOf(groupId), jobDataJson, displacedValue)
 refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
 if dedupId ~= "" and dedupTtlMs > 0 then
@@ -664,7 +677,10 @@ if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
 
--- A genuinely new stage displaces nothing; its lease was taken with the HSET.
+-- The second element reports a value the CALLER handed us and we dropped, which
+-- a stage never does. A value this stage DISPLACED is not that: it was released
+-- above, in this eval, and no caller reads it (production ignores this field
+-- entirely — see stage() in this file).
 return {1, ""}
 `;
 
@@ -765,11 +781,15 @@ for i = 1, count do
     -- the same payload twice in one batch — updates in place and must not
     -- inflate newStagedCount, which feeds the total-pending INCRBY below.
     local inserted = redis.call("ZADD", groupJobsKey, dispatchAfter, stagedJobId)
-    redis.call("HSET", dataKey, stagedJobId, jobDataJson)
-    local stagedLease = gqParseLease(jobDataJson)
-    if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
-      gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+    -- Displacement release, same as STAGE_LUA: a re-sent event id lands on an
+    -- existing member and this HSET overwrites a value whose blob lease must
+    -- be released in this eval, not leaked.
+    local displacedValue = ""
+    if inserted == 0 then
+      displacedValue = redis.call("HGET", dataKey, stagedJobId) or ""
     end
+    redis.call("HSET", dataKey, stagedJobId, jobDataJson)
+    gqSquashTransferLeases(keyPrefix, parkTenantOf(groupId), jobDataJson, displacedValue)
     if dedupId ~= "" and dedupTtlMs > 0 then
       redis.call("SET", dedupKey, stagedJobId, "PX", dedupTtlMs)
     end
@@ -1323,11 +1343,16 @@ redis.call("SADD", blockedKey, groupId)
 -- 2. Re-stage the failed job under the id it was dispatched under (ADR-080).
 --    Its member was ZREMed at claim time, so this insert lands on an absent one.
 local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
-redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
-local stagedLease = gqParseLease(jobDataJson)
-if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
-  gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+-- Usually lands on an absent member, but not always: with the id reused
+-- (ADR-080) a duplicate delivery can have re-staged this same id while the job
+-- was in flight, and then this HSET DISPLACES that value. Release the displaced
+-- lease in the same eval — see STAGE_LUA.
+local displacedValue = ""
+if inserted == 0 then
+  displacedValue = redis.call("HGET", groupDataKey, newStagedJobId) or ""
 end
+redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+gqSquashTransferLeases(keyPrefix, gqTenantOf(groupId), jobDataJson, displacedValue)
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
@@ -1404,9 +1429,18 @@ local nowMs                 = tonumber(ARGV[9])
 local attempt               = ARGV[10]
 local attemptTtlSec         = tonumber(ARGV[11])
 
--- 1. Validate active key matches
+-- 1. Validate active key matches.
+--
+--    Two very different things fail this check and they are reported apart.
+--    A DIFFERENT id means another worker owns the slot: nothing was written and
+--    the job is that worker's problem, which is benign. An ABSENT key means the
+--    slot EXPIRED — nobody owns it, and the caller's job left staging at claim
+--    time, so returning without re-staging loses it outright. Collapsing both
+--    into 0 made that loss indistinguishable from the benign case and therefore
+--    invisible; -1 lets the caller name and count it.
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
+  if currentActive == false then return -1 end
   return 0
 end
 
@@ -1420,11 +1454,16 @@ end
 local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
 local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
 local inserted = redis.call("ZADD", groupJobsKey, dispatchAfterMs, newStagedJobId)
-redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
-local stagedLease = gqParseLease(jobDataJson)
-if stagedLease and stagedLease.kind == "gq2" and stagedLease.projectId == gqTenantOf(groupId) then
-  gqTakeLease(keyPrefix, stagedLease, gqRedisNowMs())
+-- Same displacement case as RESTAGE_AND_BLOCK_LUA: the claim removed this id
+-- from staging, but a duplicate delivery can have re-staged it under the reused
+-- id (ADR-080) while the job was in flight. Release what this HSET displaces,
+-- in the same eval — see STAGE_LUA.
+local displacedValue = ""
+if inserted == 0 then
+  displacedValue = redis.call("HGET", groupDataKey, newStagedJobId) or ""
 end
+redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
+gqSquashTransferLeases(keyPrefix, gqTenantOf(groupId), jobDataJson, displacedValue)
 if inserted == 1 then
   redis.call("INCR", totalPendingKey)
 end
@@ -1469,6 +1508,21 @@ end
 
 return 1
 `;
+
+/**
+ * What a retry re-stage did.
+ *
+ * `slot_taken` and `slot_expired` are both "did not re-stage", and the
+ * temptation to treat them as one boolean is exactly what hid a job-loss path:
+ *
+ * - `slot_taken` — the active key names a DIFFERENT job. Another worker owns
+ *   this slot, nothing was written, and the job is no longer this worker's to
+ *   account for. Benign.
+ * - `slot_expired` — the active key is GONE. Nobody owns the slot, and the job
+ *   was removed from staging when it was claimed, so nothing re-stages it and
+ *   nothing else will notice. The caller MUST record the loss.
+ */
+export type RetryRestageOutcome = "restaged" | "slot_taken" | "slot_expired";
 
 /**
  * Result of a dispatch operation.
@@ -1578,7 +1632,7 @@ export const DEFAULT_CLAIM_STRIKE_THRESHOLD = 3;
  * OOM of a neighbour) can't park a healthy group hours later. Refreshed on
  * every claim, so an actively-crash-looping group never loses its count.
  */
-export const CLAIM_STRIKE_TTL_SECONDS = 60 * 60;
+const CLAIM_STRIKE_TTL_SECONDS = 60 * 60;
 
 /**
  * Read the poison-guard strike threshold from the environment.
@@ -1615,7 +1669,7 @@ export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
  * Refreshed on every failure, so an actively-churning group keeps its count; the
  * group's next success clears it outright.
  */
-export const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
+const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
 
 /**
  * Read the group-quarantine failure-streak threshold from the environment.
@@ -1644,7 +1698,7 @@ export function readGroupQuarantineThreshold(): number {
  *   - env unset / empty / non-numeric / negative -> DEFAULT_GLOBAL_BUDGET (0, off)
  *   - env = positive integer -> that integer (enabled)
  */
-export const DEFAULT_GLOBAL_BUDGET = 0;
+const DEFAULT_GLOBAL_BUDGET = 0;
 
 export function readGlobalBudget(): number {
   const raw = process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET;
@@ -2148,7 +2202,9 @@ export class GroupStagingScripts {
    * naturally. On the next dispatcher poll (≤5s) the retry job is dispatched.
    * This is fully Redis-driven — no Node.js timers, survives restarts.
    *
-   * @returns true if re-staged, false if stale (active key doesn't match)
+   * @returns which of the three {@link RetryRestageOutcome}s happened. The two
+   *   failures are NOT interchangeable: `slot_taken` is benign, `slot_expired`
+   *   is job loss the caller must account for.
    */
   async retryRestage({
     groupId,
@@ -2169,7 +2225,7 @@ export class GroupStagingScripts {
     /** Recorded on the group's retry chain in the same atomic step. */
     attempt: number;
     attemptTtlSec: number;
-  }): Promise<boolean> {
+  }): Promise<RetryRestageOutcome> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
     const attemptKey = `${this.keyPrefix}group:${groupId}:attempt`;
@@ -2195,7 +2251,13 @@ export class GroupStagingScripts {
       String(attemptTtlSec),
     );
 
-    return result === 1;
+    if (result === 1) return "restaged";
+    // A pre-change script still cached on a peer answers 0 for BOTH failures,
+    // which reads as `slot_taken` — the behaviour every caller had before the
+    // outcomes were split. A rolling deploy therefore under-reports the loss
+    // rather than misreporting a success.
+    if (result === -1) return "slot_expired";
+    return "slot_taken";
   }
 
   /**

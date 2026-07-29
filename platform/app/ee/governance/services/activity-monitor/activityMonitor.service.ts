@@ -1063,7 +1063,8 @@ export class ActivityMonitorService {
   }
 
   /**
-   * Recent anomaly alerts produced by the anomaly-detection reactor.
+   * Recent anomaly alerts produced by `SpendSpikeAnomalyEvaluator` on the
+   * spend-spike anomaly worker's tick.
    * Read-only snapshot of `prisma.anomalyAlert` rows for the org,
    * sorted by detectedAt DESC. Returns `[]` for orgs with no alerts
    * - callers render the empty-state in the dashboard.

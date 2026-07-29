@@ -1,4 +1,3 @@
-import { createLogger } from "@langwatch/observability";
 import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import { CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE } from "../../log-processing/schemas/constants";
 import type { LogProcessingEvent } from "../../log-processing/schemas/events";
@@ -6,10 +5,10 @@ import type { ContributeLogFactsCommandData } from "../schemas/commands";
 import {
   detectCodingAgent,
   liftCodingAgentLogFacts,
+  nonEmptyString,
+  parseFlatCanonicalAttributes,
   resolveConversationKey,
 } from "../services/coding-agent-normalization";
-
-const logger = createLogger("langwatch:coding-agent:log-facts-dispatch");
 
 /**
  * The log→session dispatcher (ADR-056 §2): a subscriber on log-processing's
@@ -36,7 +35,10 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
     },
     handle: async (event) => {
       const record = event.data;
-      const attributes = parseFlatAttributes(record.attributesFlatJson);
+      const attributes = parseFlatCanonicalAttributes({
+        json: record.attributesFlatJson,
+        ref: { kind: "record", id: record.recordId },
+      });
       if (attributes === null) return;
       // The canonical preparation extracts `eventName` into its own column
       // and some agents only spell it there.
@@ -56,17 +58,16 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       });
       if (facts === null) return;
 
-      const resourceAttributes = parseFlatAttributes(
-        record.resourceAttributesFlatJson,
-      );
-      const rawServiceName = resourceAttributes?.["service.name"];
-      const serviceName =
-        typeof rawServiceName === "string" && rawServiceName.length > 0
-          ? rawServiceName
-          : null;
+      const resourceAttributes = parseFlatCanonicalAttributes({
+        json: record.resourceAttributesFlatJson,
+        ref: { kind: "record", id: record.recordId },
+      });
+      const serviceName = nonEmptyString(resourceAttributes?.["service.name"]);
 
-      const serviceVersion = resourceAttributes?.["service.version"];
-      if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
+      const serviceVersion = nonEmptyString(
+        resourceAttributes?.["service.version"],
+      );
+      if (serviceVersion !== null) {
         facts["service.version"] = serviceVersion;
       }
 
@@ -110,26 +111,4 @@ export function createCodingAgentLogFactsDispatchSubscriber(deps: {
       });
     },
   };
-}
-
-/** The canonical row stores attributes flattened as JSON — parse or skip. */
-function parseFlatAttributes(json: string): Record<string, unknown> | null {
-  if (!json) return null;
-  try {
-    const parsed: unknown = JSON.parse(json);
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
-      return null;
-    }
-    return parsed as Record<string, unknown>;
-  } catch (error) {
-    // A canonical row's JSON is written by our own preparation, so this
-    // should be unreachable — but a dispatcher must never poison the queue
-    // over one record.
-    logger.warn({ error }, "unparseable canonical log attributes; skipping");
-    return null;
-  }
 }

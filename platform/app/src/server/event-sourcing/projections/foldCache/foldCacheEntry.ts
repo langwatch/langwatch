@@ -1,4 +1,5 @@
 import { safeParseErrText } from "../../parseErrorText";
+
 /**
  * Wire shape of a cached fold state.
  *
@@ -15,7 +16,7 @@ import { safeParseErrText } from "../../parseErrorText";
  * Field names are single letters because this is written on every fold step
  * for every aggregate; for a 40k-span trace the key is rewritten ~80 times.
  */
-export interface FoldCacheEntry<State> {
+interface FoldCacheEntry<State> {
   /** Schema marker. Absent on entries written before the applied-set existed. */
   v: 1;
   /** The fold state. */
@@ -44,7 +45,7 @@ export const MAX_APPLIED_EVENT_IDS = 1_000;
  * redelivery against one is not suppressed — the same behaviour as before the
  * set existed. They age out with the cache TTL.
  */
-export class FoldCacheEntryUnreadableError extends Error {
+class FoldCacheEntryUnreadableError extends Error {
   override readonly name = "FoldCacheEntryUnreadableError";
 }
 

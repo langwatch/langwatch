@@ -216,7 +216,7 @@ export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT =
  * the executor derives `context.readWindow` from it and retries a windowed miss
  * unwindowed, so a signal outside the window is still found.
  */
-export const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * How many same-trace events one load/apply/store cycle may coalesce.
@@ -237,7 +237,7 @@ export const TRACE_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * cap; a batch at or above it would break redelivery dedup — the projection
  * router rejects such a config at registration).
  */
-export const TRACE_ANALYTICS_COALESCE_MAX_BATCH = 128;
+const TRACE_ANALYTICS_COALESCE_MAX_BATCH = 128;
 
 /**
  * The slim row that lands in `trace_analytics`. Field names align with the
@@ -343,7 +343,7 @@ export interface TraceAnalyticsRow {
  * source of truth. These match the `dest` values in
  * trace-attribute-accumulation.service.ts:62-87 / line 167.
  */
-export const TRACE_ANALYTICS_ATTR_KEYS = {
+const TRACE_ANALYTICS_ATTR_KEYS = {
   USER_ID: "langwatch.user_id",
   CONVERSATION_ID: "gen_ai.conversation.id",
   CUSTOMER_ID: "langwatch.customer_id",

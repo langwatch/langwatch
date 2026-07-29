@@ -201,7 +201,7 @@ export interface FoldProjectionOptions {
    *
    * Requires `eventLoaderUpTo` (auto-wired by EventSourcingService) — the
    * executor silently declines to re-fold without it. Pair the store with a
-   * RedisCachedFoldStore so a re-fold can only follow cache
+   * CachedFoldStore so a re-fold can only follow cache
    * expiry/eviction/restart rather than an ordinary event.
    *
    * @default false
@@ -235,6 +235,30 @@ export interface FoldProjectionOptions {
  * Handles persistence and retrieval of fold state.
  */
 export interface FoldProjectionStore<State> {
+  /**
+   * The schema version of the state this store reads and writes — the same
+   * stamp the store's version gate compares a committed row against (ADR-066).
+   *
+   * DECLARED here rather than passed to whatever wraps the store, because the
+   * store is the thing that owns the row shape. A cache tier in front of it
+   * (`CachedFoldStore`) folds this into its key, so a version change misses
+   * instead of serving state written in the previous shape — the cache
+   * otherwise returns before the durable read and the version gate never runs
+   * on that path.
+   *
+   * Taking it from the store rather than from each composition site is what
+   * makes writer and reader agree. The same fold is composed in more than one
+   * place (the trace pipeline writes `trace_summaries`; the automation settle
+   * confirm reads it, deliberately through the same cache tier so it reads what
+   * that writer wrote), and two sites naming the version independently could
+   * drift apart and split the key space in silence. Wrapping the same store
+   * class makes them agree by construction.
+   *
+   * Omit only while a store has no version gate of its own; the cache then
+   * keeps its pre-version key, so nothing changes for it.
+   */
+  readonly projectionVersion?: string;
+
   /** Persists the current fold state for an aggregate. */
   store(state: State, context: ProjectionStoreContext): Promise<void>;
 

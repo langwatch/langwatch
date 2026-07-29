@@ -88,24 +88,31 @@ function emptyPhases(): DashboardData["phases"] {
   return {
     commands: { ...EMPTY_PHASE },
     projections: { ...EMPTY_PHASE },
-    reactions: { ...EMPTY_PHASE },
   };
 }
 
+/**
+ * Buckets a group's `__jobType` into a dashboard phase.
+ *
+ * The QueueManager facade is the only injector of `__jobType`, and it emits
+ * exactly `handler`, `subscriber`, `projection`, `stateProjection`, `command`
+ * and `job`. Everything that is not a fold/map lane is reported under
+ * `commands` by the default branch — including any pre-deploy `reactor` groups
+ * still pending in Redis, which land alongside the subscribers and process
+ * managers that replaced them rather than being dropped.
+ */
 function mapJobTypeToPhase(
   jobType: string | null | undefined,
-): "commands" | "projections" | "reactions" {
+): "commands" | "projections" {
   if (!jobType) return "commands";
   const lower = jobType.toLowerCase();
   if (lower === "projection" || lower === "handler") return "projections";
-  if (lower === "reactor" || lower === "reaction") return "reactions";
   return "commands";
 }
 
 function normalizeJobType(jobType: string): string {
   const lower = jobType.toLowerCase();
   if (lower === "handler" || lower === "projection") return "fold";
-  if (lower === "reaction") return "reactor";
   return jobType;
 }
 
@@ -237,12 +244,6 @@ export class OpsMetricsCollector {
       latencyP99Ms: 0,
     },
     projections: {
-      completedPerSec: 0,
-      failedPerSec: 0,
-      latencyP50Ms: 0,
-      latencyP99Ms: 0,
-    },
-    reactions: {
       completedPerSec: 0,
       failedPerSec: 0,
       latencyP50Ms: 0,
@@ -565,7 +566,7 @@ export class OpsMetricsCollector {
     {
       pending: number;
       active: number;
-      phase: "commands" | "projections" | "reactions";
+      phase: "commands" | "projections";
       pipelineName: string;
     }
   > {
@@ -574,7 +575,7 @@ export class OpsMetricsCollector {
       {
         pending: number;
         active: number;
-        phase: "commands" | "projections" | "reactions";
+        phase: "commands" | "projections";
         pipelineName: string;
       }
     >();
@@ -677,7 +678,7 @@ export class OpsMetricsCollector {
       );
     }
 
-    for (const key of ["commands", "projections", "reactions"] as const) {
+    for (const key of ["commands", "projections"] as const) {
       const pp = this.peakPhases[key]!;
       phases[key].peakCompletedPerSec = pp.completedPerSec;
       phases[key].peakFailedPerSec = pp.failedPerSec;

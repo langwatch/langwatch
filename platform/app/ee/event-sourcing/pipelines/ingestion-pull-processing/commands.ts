@@ -29,11 +29,6 @@ export const ConfigureIngestionPullCommand = defineCommand({
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
   }),
-  makeJobId: (data) =>
-    identity({
-      sourceId: data.sourceId,
-      suffix: `configure:${data.configVersion}`,
-    }),
 });
 
 export const DisableIngestionPullCommand = defineCommand({
@@ -51,11 +46,6 @@ export const DisableIngestionPullCommand = defineCommand({
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
   }),
-  makeJobId: (data) =>
-    identity({
-      sourceId: data.sourceId,
-      suffix: `disable:${data.configVersion}`,
-    }),
 });
 
 export const RecordIngestionPullRunCompletedCommand = defineCommand({
@@ -72,8 +62,6 @@ export const RecordIngestionPullRunCompletedCommand = defineCommand({
     "payload.run_id": data.runId,
     "payload.event_count": data.eventCount,
   }),
-  makeJobId: (data) =>
-    identity({ sourceId: data.sourceId, suffix: `${data.runId}:completed` }),
 });
 
 export const RecordIngestionPullRunFailedCommand = defineCommand({
@@ -89,6 +77,4 @@ export const RecordIngestionPullRunFailedCommand = defineCommand({
     "payload.source_id": data.sourceId,
     "payload.run_id": data.runId,
   }),
-  makeJobId: (data) =>
-    identity({ sourceId: data.sourceId, suffix: `${data.runId}:failed` }),
 });

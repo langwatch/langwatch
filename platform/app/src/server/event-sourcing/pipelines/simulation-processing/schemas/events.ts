@@ -5,7 +5,11 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_EVENT_TYPES,
 } from "./constants";
-import { simulationMessageSchema, simulationResultsSchema } from "./shared";
+import {
+  runPlacementFields,
+  simulationMessageSchema,
+  simulationResultsSchema,
+} from "./shared";
 
 export type { SimulationRunStatus, SimulationVerdict } from "./shared";
 
@@ -27,10 +31,18 @@ export const simulationRunQueuedEventDataSchema = z.object({
       referenceId: z.string(),
     })
     .optional(),
+  /**
+   * How many runs the dispatching batch intends to queue (ADR-072). Carried by
+   * every child so the batch's denominator is known from the first row that
+   * lands, instead of from a separate suite-run stream.
+   *
+   * Optional, and the field is additive rather than a version bump: the event
+   * version is asserted with `z.literal`, so bumping it would stop every
+   * already-committed `queued` event from parsing. Absent (pre-ADR-072 events)
+   * folds to 0, which the read path reads as "count the rows".
+   */
+  batchTotal: z.number().int().nonnegative().optional(),
 });
-export type SimulationRunQueuedEventData = z.infer<
-  typeof simulationRunQueuedEventDataSchema
->;
 
 export const SimulationRunQueuedEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.QUEUED),
@@ -53,9 +65,6 @@ export const simulationRunStartedEventDataSchema = z.object({
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
 });
-export type SimulationRunStartedEventData = z.infer<
-  typeof simulationRunStartedEventDataSchema
->;
 
 export const SimulationRunStartedEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.STARTED),
@@ -71,13 +80,11 @@ export type SimulationRunStartedEvent = z.infer<
  */
 export const simulationMessageSnapshotEventDataSchema = z.object({
   scenarioRunId: z.string(),
+  ...runPlacementFields,
   messages: z.array(simulationMessageSchema),
   traceIds: z.array(z.string()).default([]),
   status: z.string().optional(),
 });
-export type SimulationMessageSnapshotEventData = z.infer<
-  typeof simulationMessageSnapshotEventDataSchema
->;
 
 export const SimulationMessageSnapshotEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT),
@@ -93,13 +100,11 @@ export type SimulationMessageSnapshotEvent = z.infer<
  */
 export const simulationRunFinishedEventDataSchema = z.object({
   scenarioRunId: z.string(),
+  ...runPlacementFields,
   results: simulationResultsSchema.optional(),
   durationMs: z.number().optional(),
   status: z.string().optional(),
 });
-export type SimulationRunFinishedEventData = z.infer<
-  typeof simulationRunFinishedEventDataSchema
->;
 
 export const SimulationRunFinishedEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.FINISHED),
@@ -119,9 +124,6 @@ export const simulationTextMessageStartEventDataSchema = z.object({
   role: z.string(),
   messageIndex: z.number().optional(),
 });
-export type SimulationTextMessageStartEventData = z.infer<
-  typeof simulationTextMessageStartEventDataSchema
->;
 
 export const SimulationTextMessageStartEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_START),
@@ -137,6 +139,7 @@ export type SimulationTextMessageStartEvent = z.infer<
  */
 export const simulationTextMessageEndEventDataSchema = z.object({
   scenarioRunId: z.string(),
+  ...runPlacementFields,
   messageId: z.string(),
   role: z.string(),
   content: z.string(),
@@ -144,9 +147,6 @@ export const simulationTextMessageEndEventDataSchema = z.object({
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
 });
-export type SimulationTextMessageEndEventData = z.infer<
-  typeof simulationTextMessageEndEventDataSchema
->;
 
 export const SimulationTextMessageEndEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END),
@@ -158,8 +158,16 @@ export type SimulationTextMessageEndEvent = z.infer<
 >;
 
 /**
- * MetricsComputed event - emitted when cost/latency metrics are computed from traces.
- * Carries per-trace metrics via ECST (Event-Carried State Transfer).
+ * RETIRED per-trace metrics event. Nothing emits it and no projection folds it;
+ * it survives only so events already in the log still parse. See
+ * {@link SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED}.
+ *
+ * It was emitted once per (run, trace) under an idempotency key that was
+ * constant across recomputes, so the event store's keep-the-first rule froze
+ * whatever the first attempt saw — including the zeroes it emitted while cost
+ * enrichment was still in flight. Its fold also carried an unbounded
+ * `traceId -> metrics` map on the run to re-aggregate from. Superseded by
+ * {@link SimulationRunMetricsRecordedEventSchema}.
  */
 export const simulationRunMetricsComputedEventDataSchema = z.object({
   scenarioRunId: z.string(),
@@ -168,9 +176,6 @@ export const simulationRunMetricsComputedEventDataSchema = z.object({
   roleCosts: z.record(z.string(), z.number()),
   roleLatencies: z.record(z.string(), z.number()),
 });
-export type SimulationRunMetricsComputedEventData = z.infer<
-  typeof simulationRunMetricsComputedEventDataSchema
->;
 
 export const SimulationRunMetricsComputedEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED),
@@ -182,16 +187,53 @@ export type SimulationRunMetricsComputedEvent = z.infer<
 >;
 
 /**
+ * MetricsRecorded event — the whole run's cost and latency, computed once from
+ * every trace it produced, after the run has finished and its spans have
+ * settled.
+ *
+ * The values are carried on the event rather than looked up at read time on
+ * purpose: `stored_spans` and `trace_summaries` live in the `traces` retention
+ * category while `simulation_runs` lives in `scenarios`, and the two are
+ * independently configurable — so spans can expire out from under a run that is
+ * still displayed. Carrying the numbers means a replay reproduces them from the
+ * log alone.
+ *
+ * The fold assigns these fields wholesale, so a later recompute simply replaces
+ * an earlier one: there is no accumulator to keep, and nothing to unwind.
+ */
+export const simulationRunMetricsRecordedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+  /** Traces the values below were aggregated over. */
+  traceIds: z.array(z.string()),
+  /** Summed cost across those traces; null when none of them reported one. */
+  totalCost: z.number().nullable(),
+  /** Per-role cost, one array entry per contributing trace. */
+  roleCosts: z.record(z.string(), z.array(z.number())),
+  /** Per-role latency in ms, one array entry per contributing trace. */
+  roleLatencies: z.record(z.string(), z.array(z.number())),
+});
+export type SimulationRunMetricsRecordedEventData = z.infer<
+  typeof simulationRunMetricsRecordedEventDataSchema
+>;
+
+export const SimulationRunMetricsRecordedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.METRICS_RECORDED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.METRICS_RECORDED),
+  data: simulationRunMetricsRecordedEventDataSchema,
+});
+export type SimulationRunMetricsRecordedEvent = z.infer<
+  typeof SimulationRunMetricsRecordedEventSchema
+>;
+
+/**
  * CancelRequested event - emitted when a user requests cancellation of a run.
  * Sets CancellationRequestedAt in the fold projection without changing Status.
- * A reactor broadcasts this to all worker pods via Redis pub/sub.
+ * The `cancellationBroadcast` subscriber broadcasts it to all worker pods via
+ * Redis pub/sub.
  */
 export const simulationRunCancelRequestedEventDataSchema = z.object({
   scenarioRunId: z.string(),
 });
-export type SimulationRunCancelRequestedEventData = z.infer<
-  typeof simulationRunCancelRequestedEventDataSchema
->;
 
 export const SimulationRunCancelRequestedEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED),
@@ -207,10 +249,8 @@ export type SimulationRunCancelRequestedEvent = z.infer<
  */
 export const simulationRunDeletedEventDataSchema = z.object({
   scenarioRunId: z.string(),
+  ...runPlacementFields,
 });
-export type SimulationRunDeletedEventData = z.infer<
-  typeof simulationRunDeletedEventDataSchema
->;
 
 export const SimulationRunDeletedEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_RUN_EVENT_TYPES.DELETED),
@@ -242,9 +282,6 @@ export const simulationSetArchivedEventDataSchema = z.object({
    */
   scenarioRunIds: z.array(z.string()).min(1),
 });
-export type SimulationSetArchivedEventData = z.infer<
-  typeof simulationSetArchivedEventDataSchema
->;
 
 export const SimulationSetArchivedEventSchema = EventSchema.extend({
   type: z.literal(SIMULATION_SET_EVENT_TYPES.ARCHIVED),
@@ -266,6 +303,7 @@ export type SimulationProcessingEvent =
   | SimulationTextMessageEndEvent
   | SimulationRunFinishedEvent
   | SimulationRunMetricsComputedEvent
+  | SimulationRunMetricsRecordedEvent
   | SimulationRunCancelRequestedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
@@ -275,7 +313,7 @@ export {
   isSimulationRunCancelRequestedEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunFinishedEvent,
-  isSimulationRunMetricsComputedEvent,
+  isSimulationRunMetricsRecordedEvent,
   isSimulationRunQueuedEvent,
   isSimulationRunStartedEvent,
   isSimulationSetArchivedEvent,

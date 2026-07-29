@@ -1,7 +1,7 @@
 import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { retentionDaysFrom } from "../../shared/analyticsStoreBase";
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -47,6 +47,12 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
 export class TraceAnalyticsStore
   implements FoldProjectionStore<TraceAnalyticsData>
 {
+  /**
+   * Keys the fold cache, so a version bump misses rather than serving state in
+   * the old shape past `getWithApplied`'s gate.
+   */
+  readonly projectionVersion = TRACE_ANALYTICS_PROJECTION_VERSION_LATEST;
+
   constructor(private readonly repo: TraceAnalyticsRepository) {}
 
   async store(
@@ -103,8 +109,7 @@ export class TraceAnalyticsStore
         tenantId: String(context.tenantId),
         version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
       }),
-      retentionDays:
-        context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDays: retentionDaysFrom(context, "traces"),
       // The executor's redelivery-dedup watermark, persisted next to the row so
       // a retry with a cold cache still recognises a batch it committed.
       appliedEventIds: context.appliedEventIds

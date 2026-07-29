@@ -8,6 +8,13 @@ import type {
   TriggerSettlementState,
 } from "./triggerSettlementProcess.types";
 
+/**
+ * The pipeline mounts this process WITHOUT a `toPayload`, and that is
+ * deliberate rather than drift: `triggerMatchRecordedEventDataSchema` is
+ * already identities-and-flags with trace/span/message content forbidden, which
+ * is exactly the case `ProcessManagerDefinition.toPayload` carves out as safe
+ * to default. Add one the moment this event's data grows a content field.
+ */
 export const TRIGGER_SETTLEMENT_PROCESS_NAME = "triggerSettlement" as const;
 export const MAX_PENDING_MATCHES = 1_000;
 export type SettlementState = TriggerSettlementState;

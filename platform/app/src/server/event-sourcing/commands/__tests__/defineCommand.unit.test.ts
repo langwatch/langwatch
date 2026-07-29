@@ -10,10 +10,10 @@ const testEventDataSchema = z.object({
 });
 
 const TestCommand = defineCommand({
-  commandType: "lw.suite_run.start" as const,
-  eventType: "lw.suite_run.started" as const,
+  commandType: "test.integration.command" as const,
+  eventType: "test.integration.event" as const,
   eventVersion: "2026-03-01",
-  aggregateType: "suite_run",
+  aggregateType: "test_aggregate",
   schema: testEventDataSchema,
   aggregateId: (d) => d.batchRunId,
   idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}`,
@@ -21,14 +21,13 @@ const TestCommand = defineCommand({
     "payload.batchRun.id": d.batchRunId,
     "payload.suite.id": d.suiteId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.batchRunId}:job`,
 });
 
 function makeTestCommand(tenantId = "tenant-1") {
   return {
     tenantId: tenantId as TenantId,
     aggregateId: "batch-1",
-    type: "lw.suite_run.start" as const,
+    type: "test.integration.command" as const,
     data: {
       tenantId: "tenant-1",
       occurredAt: 1700000000000,
@@ -47,7 +46,7 @@ describe("defineCommand()", () => {
     });
 
     it("exposes a static schema with correct command type", () => {
-      expect(TestCommand.schema.type).toBe("lw.suite_run.start");
+      expect(TestCommand.schema.type).toBe("test.integration.command");
     });
 
     it("exposes static getAggregateId", () => {
@@ -74,17 +73,6 @@ describe("defineCommand()", () => {
         "payload.suite.id": "suite-1",
       });
     });
-
-    it("exposes static makeJobId", () => {
-      const payload = {
-        tenantId: "t-1",
-        occurredAt: 1700000000000,
-        batchRunId: "batch-1",
-        suiteId: "suite-1",
-        total: 3,
-      };
-      expect(TestCommand.makeJobId!(payload)).toBe("t-1:batch-1:job");
-    });
   });
 
   describe("handle()", () => {
@@ -93,7 +81,7 @@ describe("defineCommand()", () => {
       const events = await handler.handle(makeTestCommand());
 
       expect(events).toHaveLength(1);
-      expect(events[0]!.type).toBe("lw.suite_run.started");
+      expect(events[0]!.type).toBe("test.integration.event");
     });
 
     it("strips envelope fields from event data", async () => {
@@ -121,7 +109,7 @@ describe("defineCommand()", () => {
       const events = await handler.handle(makeTestCommand());
 
       const event = events[0]!;
-      expect(event.aggregateType).toBe("suite_run");
+      expect(event.aggregateType).toBe("test_aggregate");
       expect(event.aggregateId).toBe("batch-1");
       expect(event.tenantId).toBe("tenant-1");
     });
@@ -136,10 +124,10 @@ describe("defineCommand()", () => {
 
   describe("when spanAttributes is not provided", () => {
     const MinimalCommand = defineCommand({
-      commandType: "lw.suite_run.start" as const,
-      eventType: "lw.suite_run.started" as const,
+      commandType: "test.integration.command" as const,
+      eventType: "test.integration.event" as const,
       eventVersion: "2026-03-01",
-      aggregateType: "suite_run",
+      aggregateType: "test_aggregate",
       schema: testEventDataSchema,
       aggregateId: (d) => d.batchRunId,
       idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}`,
@@ -148,9 +136,38 @@ describe("defineCommand()", () => {
     it("does not expose getSpanAttributes", () => {
       expect(MinimalCommand.getSpanAttributes).toBeUndefined();
     });
+  });
 
-    it("does not expose makeJobId", () => {
-      expect(MinimalCommand.makeJobId).toBeUndefined();
+  /**
+   * A command declares exactly one key — `idempotencyKey`, which the event
+   * store applies AFTER the handler has run. Enqueue-level deduplication is a
+   * pipeline wiring decision (`deduplication: { makeId, ttlMs }`); nothing a
+   * command declares can suppress a job.
+   *
+   * ~30 commands used to carry a `makeJobId` static that read as a dedup key
+   * and was consulted by nothing. Reinstating one would be silent: it would
+   * look like it deduped and would not. This pins the surface so it cannot
+   * come back by accident.
+   */
+  describe("given the command is asked for a dedup key", () => {
+    it("exposes no job-key or dedup surface beyond the event's idempotencyKey", () => {
+      const keyish = Object.getOwnPropertyNames(TestCommand).filter((name) =>
+        /jobid|dedup/i.test(name),
+      );
+
+      expect(keyish).toEqual([]);
+    });
+
+    describe("when the same command runs twice on identical data", () => {
+      it("mints the same idempotencyKey, which is the only collapse it guarantees", async () => {
+        const handler = new TestCommand();
+
+        const [first] = await handler.handle(makeTestCommand());
+        const [second] = await handler.handle(makeTestCommand());
+
+        expect(first!.idempotencyKey).toBe(second!.idempotencyKey);
+        expect(first!.id).not.toBe(second!.id);
+      });
     });
   });
 

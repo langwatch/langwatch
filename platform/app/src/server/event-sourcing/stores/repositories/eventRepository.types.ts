@@ -37,7 +37,7 @@ export interface EventRepository {
    * `rehydrationLowerBoundMs`. It is purely a partition-pruning optimisation and
    * must never change the result set for a correctly-classified aggregate.
    */
-  getEventRecords(
+  findAll(
     tenantId: string,
     aggregateType: string,
     aggregateId: string,
@@ -50,24 +50,17 @@ export interface EventRepository {
    * Events are filtered where:
    * - timestamp < upToTimestamp, OR
    * - timestamp = upToTimestamp AND eventId <= upToEventId
-   *
-   * `occurredAtFromMs` carries the same meaning and the same caveats as on
-   * {@link EventRepository.getEventRecords}: a partition-pruning lower bound on
-   * `EventOccurredAt`, supplied by `rehydrationLowerBoundMs`. The upper bound
-   * above is on EventTimestamp, which is NOT the partition key, so without this
-   * the read walks every weekly partition ever written.
    */
-  getEventRecordsUpTo(request: {
-    tenantId: string;
-    aggregateType: string;
-    aggregateId: string;
-    upToTimestamp: number;
-    upToEventId: string;
-    occurredAtFromMs?: number;
-  }): Promise<EventRecord[]>;
+  findAllUpTo(
+    tenantId: string,
+    aggregateType: string,
+    aggregateId: string,
+    upToTimestamp: number,
+    upToEventId: string,
+  ): Promise<EventRecord[]>;
 
   /**
-   * Cursor-paginated variant of `getEventRecordsUpTo`: returns at most `limit`
+   * Cursor-paginated variant of `findAllUpTo`: returns at most `limit`
    * records ordered by (EventTimestamp ASC, EventId ASC), starting strictly
    * after the `after` cursor (or from the beginning when `after` is undefined).
    * Bounds the working set so a re-fold of a huge aggregate (e.g. a 100k-span
@@ -75,10 +68,10 @@ export interface EventRepository {
    * EventPayload blob at once — which would blow `max_memory_usage_per_query`
    * and OOM the ClickHouse instance. Optional: an implementation that doesn't
    * support paging should leave this undefined so callers can detect its
-   * absence and use the unbounded `getEventRecordsUpTo` themselves — there is
+   * absence and use the unbounded `findAllUpTo` themselves — there is
    * no automatic fallback once this method is called.
    */
-  getEventRecordsUpToPaged?(request: {
+  findAllUpToPaged?(request: {
     tenantId: string;
     aggregateType: string;
     aggregateId: string;
@@ -86,8 +79,6 @@ export interface EventRepository {
     upToEventId: string;
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
-    /** Partition-pruning lower bound — see {@link EventRepository.getEventRecordsUpTo}. */
-    occurredAtFromMs?: number;
   }): Promise<EventRecord[]>;
 
   /**

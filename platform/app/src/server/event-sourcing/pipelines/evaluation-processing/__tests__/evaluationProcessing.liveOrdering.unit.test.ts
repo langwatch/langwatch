@@ -11,7 +11,7 @@ import {
 } from "../../../services/queues/queueManager";
 import { EventStoreMemory } from "../../../stores/eventStoreMemory";
 import { EventRepositoryMemory } from "../../../stores/repositories/eventRepositoryMemory";
-import { CompleteEvaluationCommand, StartEvaluationCommand } from "../commands";
+import { ReportEvaluationCommand, StartEvaluationCommand } from "../commands";
 import { createEvaluationProcessingPipeline } from "../pipeline";
 import {
   type EvaluationAnalyticsData,
@@ -99,9 +99,11 @@ describe("evaluation processing live FIFO", () => {
       }),
     ).toBe("random-evaluation-id");
     expect(
-      CompleteEvaluationCommand.getAggregateId({
+      ReportEvaluationCommand.getAggregateId({
         tenantId,
         evaluationId: "random-evaluation-id",
+        evaluatorId: "evaluator-1",
+        evaluatorType: "custom",
         status: "processed",
         occurredAt: 2_000,
       }),
@@ -182,8 +184,8 @@ describe("evaluation processing live FIFO", () => {
           options: { serializeByAggregate: true },
         },
         {
-          name: "completeEvaluation",
-          handlerClass: CompleteEvaluationCommand as never,
+          name: "reportEvaluation",
+          handlerClass: ReportEvaluationCommand as never,
           options: { serializeByAggregate: true },
         },
       ],
@@ -195,7 +197,7 @@ describe("evaluation processing live FIFO", () => {
       "evaluation_processing:command:startEvaluation",
     );
     const completeEntry = registry.get(
-      "evaluation_processing:command:completeEvaluation",
+      "evaluation_processing:command:reportEvaluation",
     );
     const commandPayload = (evaluationId: string) => ({
       tenantId,
@@ -237,8 +239,14 @@ describe("evaluation processing live FIFO", () => {
         append: vi.fn().mockResolvedValue(undefined),
       },
       executeEvaluationCommand: {} as never,
+      commands: { port: () => async () => {} } as never,
+      isSaas: false,
       automations: {
-        triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
+        triggerMatchSubscriber: {
+          name: "triggerMatch",
+          eventTypes: [],
+          handle: async () => {},
+        },
         graphActivityHandler: vi.fn().mockResolvedValue(undefined),
       },
     });
@@ -251,7 +259,6 @@ describe("evaluation processing live FIFO", () => {
     ).toEqual([
       ["executeEvaluation", true],
       ["startEvaluation", true],
-      ["completeEvaluation", true],
       ["reportEvaluation", true],
     ]);
   });

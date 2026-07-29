@@ -4,6 +4,25 @@ export const TRIGGER_MATCH_RECORDED_EVENT_TYPE =
   "lw.automation.trigger.match_recorded" as const;
 
 /**
+ * The only version this event has ever carried. It was minted at this value by
+ * `RecordTriggerMatchCommand` from the commit that introduced the type
+ * (ADR-052, #5911) and has not been bumped since, so it is the complete history
+ * of what the log can hold — which is what lets the event schema assert it as a
+ * literal, constraining the mint site at compile time.
+ *
+ * It constrains nothing at READ time: materialisation casts the row rather than
+ * parsing it, so a committed match is reinterpreted as the current shape
+ * whatever version string it carries. Bumping therefore means ADDING a version
+ * alongside this one and widening that assertion to a union, and only for a
+ * change old payloads still read correctly under; an incompatible payload
+ * change needs a NEW EVENT TYPE, not a new version. Replacing this value would
+ * leave the mint site asserting a version the committed history does not have.
+ * See `evaluation-processing/schemas/constants.ts` for the full doctrine.
+ */
+export const TRIGGER_MATCH_RECORDED_EVENT_VERSION_LATEST =
+  "2026-07-18" as const;
+
+/**
  * Append-coalescing bound for recordTriggerMatch (ADR-066 pillar 2). A hot
  * trigger records one match per trace; at high fan-in that is one tiny
  * event_log insert per match, which floods the log with small parts. Folding up

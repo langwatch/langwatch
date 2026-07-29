@@ -284,6 +284,7 @@ describe("PrismaProcessStore", () => {
     expect(leases.flat().map((row) => row.messageKey)).toEqual(["message-1"]);
   });
 
+  /** @scenario "Work that costs money survives the worker that started it" */
   it("rejects a stale acknowledgement after expiry and re-lease", async () => {
     const base = 1_700_000_000_000;
     await store.commit(commit({ now: base }));
@@ -444,6 +445,7 @@ describe("PrismaProcessStore", () => {
     ]);
   });
 
+  /** @scenario "Work scheduled for later survives a restart" */
   it("returns only due wakes with the revision that scheduled them", async () => {
     await store.commit(
       commit({ target: ref("due"), nextWakeAt: 1_500, messages: [] }),

@@ -20,7 +20,7 @@ function createMockClient(payload: unknown) {
   } as unknown as ClickHouseClient;
 }
 
-describe("EventRepositoryClickHouse.getEventRecords", () => {
+describe("EventRepositoryClickHouse.findAll", () => {
   it("converts numeric strings inside parsed objects back to numbers", async () => {
     const client = createMockClient({
       data: {
@@ -30,7 +30,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
     });
 
     const repository = new EventRepositoryClickHouse(async () => client);
-    const rows = await repository.getEventRecords("tenant", "agg", "id");
+    const rows = await repository.findAll("tenant", "agg", "id");
 
     expect(rows[0]?.EventPayload).toEqual({
       data: {
@@ -48,7 +48,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
     );
 
     const repository = new EventRepositoryClickHouse(async () => client);
-    const rows = await repository.getEventRecords("tenant", "agg", "id");
+    const rows = await repository.findAll("tenant", "agg", "id");
 
     expect(rows[0]?.EventPayload).toEqual(
       '{"data":{"value":"123.45","text":"still-string"}}',
@@ -60,7 +60,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       const client = createMockClient({});
       const repository = new EventRepositoryClickHouse(async () => client);
 
-      await repository.getEventRecords("tenant", "trace", "id", 1700000000000);
+      await repository.findAll("tenant", "trace", "id", 1700000000000);
 
       const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
       expect(call.query).toContain(
@@ -77,7 +77,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       const client = createMockClient({});
       const repository = new EventRepositoryClickHouse(async () => client);
 
-      await repository.getEventRecords("tenant", "trace", "id");
+      await repository.findAll("tenant", "trace", "id");
 
       const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
       expect(call.query).not.toContain("EventOccurredAt >=");
@@ -88,7 +88,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
       const client = createMockClient({});
       const repository = new EventRepositoryClickHouse(async () => client);
 
-      await repository.getEventRecords("tenant", "trace", "id", 0);
+      await repository.findAll("tenant", "trace", "id", 0);
 
       const call = (client.query as ReturnType<typeof vi.fn>).mock.calls[0]![0];
       expect(call.query).not.toContain("EventOccurredAt >=");

@@ -12,7 +12,6 @@ import type {
 } from "../projections/mapProjection.types";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
-import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { ProcessManagerDefinition } from "./processManagerDefinition";
 import type { PipelineMetadata } from "./types";
@@ -74,9 +73,16 @@ export interface CommandHandlerOptions<Payload = any>
   extends CommandSerializationOptions {
   getAggregateId?: (payload: Payload) => string;
   getGroupKey?: (payload: Payload) => string;
-  makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
+  /**
+   * Suppress the *enqueue* of a job whose key is already staged. This is the
+   * only mechanism that dedupes a command dispatch — a command's own
+   * `idempotencyKey` is a storage-level guarantee applied after the handler
+   * runs, and never stops a job. Opting in is a per-pipeline decision because
+   * it needs a TTL and, for a key coarser than the command's own
+   * `idempotencyKey`, it silently drops work.
+   */
   deduplication?: DeduplicationStrategy<Payload>;
   spanAttributes?: (
     payload: Payload,
@@ -152,18 +158,6 @@ export interface StaticPipelineDefinition<
     >;
     options?: CommandHandlerOptions;
   }>;
-
-  /** Reactors attached to fold projections (post-fold side-effect handlers) */
-  foldReactors: Map<
-    string,
-    { projectionName: string; definition: ReactorDefinition<EventType> }
-  >;
-
-  /** Reactors attached to map projections (post-map side-effect handlers) */
-  mapReactors: Map<
-    string,
-    { projectionName: string; definition: ReactorDefinition<EventType> }
-  >;
 
   /** Live event consumers that are independent of fold/map projections. */
   eventSubscribers: Map<string, EventSubscriberDefinition<EventType>>;

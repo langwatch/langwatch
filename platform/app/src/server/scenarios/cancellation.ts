@@ -49,21 +49,24 @@ export interface CancelBatchRunResult {
 /** Dependencies injected into the cancellation service. */
 export interface CancellationServiceDeps {
   /** Read run state from CH/ES fold projections. */
-  getRunsForBatch: (params: {
-    projectId: string;
-    scenarioSetId: string;
-    batchRunId: string;
-  }) => Promise<ScenarioRunData[]>;
+  getRunsForBatch: (params: { projectId: string; scenarioSetId: string; batchRunId: string }) => Promise<ScenarioRunData[]>;
   /** Dispatch a cancel_requested event via the event-sourcing pipeline. */
-  dispatchCancelRequested: (params: {
-    tenantId: string;
-    scenarioRunId: string;
-    occurredAt: number;
-  }) => Promise<void>;
-  /** Dispatch a finished event with CANCELLED status. Used for queued jobs that no worker will pick up. */
+  dispatchCancelRequested: (params: { tenantId: string; scenarioRunId: string; occurredAt: number }) => Promise<void>;
+  /**
+   * Dispatch a finished event with CANCELLED status. Used for queued jobs that
+   * no worker will pick up.
+   *
+   * `batchRunId` and `scenarioSetId` ride along because the terminal event is
+   * what the SSE nudge is built from: the broadcast subscriber reads the run's
+   * placement off the event, and a run-history panel filtered to a set drops a
+   * push that does not carry it. Cancelling a queued run without them left the
+   * open panel showing it as queued until the user navigated away.
+   */
   dispatchFinishRun: (params: {
     tenantId: string;
     scenarioRunId: string;
+    batchRunId: string;
+    scenarioSetId: string;
     status: string;
     occurredAt: number;
   }) => Promise<void>;
@@ -102,23 +105,13 @@ export class ScenarioCancellationService {
   async cancelJob(params: CancelJobParams): Promise<CancelJobResult> {
     const { projectId, scenarioRunId, batchRunId, scenarioSetId } = params;
 
-    logger.info(
-      { projectId, scenarioRunId, batchRunId },
-      "Cancelling scenario job",
-    );
+    logger.info({ projectId, scenarioRunId, batchRunId }, "Cancelling scenario job");
 
     // Check current status from fold projection — if already terminal, skip
-    const runs = await this.getRunsForBatch({
-      projectId,
-      scenarioSetId,
-      batchRunId,
-    });
+    const runs = await this.getRunsForBatch({ projectId, scenarioSetId, batchRunId });
     const run = runs.find((r) => r.scenarioRunId === scenarioRunId);
     if (run && !isCancellableStatus(run.status)) {
-      logger.debug(
-        { scenarioRunId, status: run.status },
-        "Run already terminal, nothing to cancel",
-      );
+      logger.debug({ scenarioRunId, status: run.status }, "Run already terminal, nothing to cancel");
       return { cancelled: false };
     }
 
@@ -137,15 +130,14 @@ export class ScenarioCancellationService {
       await this.dispatchFinishRun({
         tenantId: projectId,
         scenarioRunId,
+        batchRunId,
+        scenarioSetId,
         status: ScenarioRunStatus.CANCELLED,
         occurredAt: now + 1, // +1ms to ensure ordering after cancel_requested
       });
     }
 
-    logger.info(
-      { projectId, scenarioRunId, status: run?.status },
-      "Cancellation event dispatched",
-    );
+    logger.info({ projectId, scenarioRunId, status: run?.status }, "Cancellation event dispatched");
     return { cancelled: true };
   }
 
@@ -154,21 +146,12 @@ export class ScenarioCancellationService {
    *
    * Reads run state from fold projections and cancels each cancellable run.
    */
-  async cancelBatchRun(
-    params: CancelBatchRunParams,
-  ): Promise<CancelBatchRunResult> {
+  async cancelBatchRun(params: CancelBatchRunParams): Promise<CancelBatchRunResult> {
     const { projectId, scenarioSetId, batchRunId } = params;
 
-    logger.info(
-      { projectId, scenarioSetId, batchRunId },
-      "Cancelling batch run",
-    );
+    logger.info({ projectId, scenarioSetId, batchRunId }, "Cancelling batch run");
 
-    const runs = await this.getRunsForBatch({
-      projectId,
-      scenarioSetId,
-      batchRunId,
-    });
+    const runs = await this.getRunsForBatch({ projectId, scenarioSetId, batchRunId });
 
     if (runs.length === 0) {
       return { cancelledCount: 0, skippedCount: 0 };

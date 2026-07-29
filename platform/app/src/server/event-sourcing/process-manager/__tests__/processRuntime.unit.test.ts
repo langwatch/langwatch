@@ -90,7 +90,6 @@ describe("ProcessRuntime", () => {
       const context = {
         tenantId,
         aggregateId: "trigger-1",
-        isReplay: false,
       };
 
       await subscriber!.handle(physicalEvent("physical-1"), context);
@@ -134,7 +133,6 @@ describe("ProcessRuntime", () => {
       const context = {
         tenantId,
         aggregateId: "trigger-1",
-        isReplay: false,
       };
 
       await expect(

@@ -22,21 +22,26 @@ import {
   expect,
   it,
 } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+
 import {
   InMemoryProcessStore,
-  OutboxDispatcherService,
+  ProcessManagerService,
   type ProcessRef,
 } from "~/server/event-sourcing/process-manager";
+import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager";
+import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+
 import {
   buildIntentHandlers,
   ProcessRuntime,
 } from "~/server/event-sourcing/process-manager/processRuntime";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
-import { langyConversationProcess } from "../langyConversationProcess";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../langyConversationProcess.types";
-import { createStubLangyEffectPorts } from "../langyEffectPorts";
+
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { buildLangyProcessManager } from "./helpers/langyProcessHarness";
+import {
+  LANGY_CONVERSATION_PROCESS_NAME,
+  type LangyConversationProcessState,
+} from "../langyConversationProcess.types";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,
@@ -45,22 +50,17 @@ import {
 } from "./helpers/langyEventFixtures";
 
 /**
- * The EXACT definition the runtime mounts — built through the pipeline's own
- * `langyConversationProcess` applier and the runtime's
- * `buildProcessDefinition`, so these tests cover the generated evolve
- * (intent-key prefixing, undeclared-event guard, schema-validated intent
- * payloads) rather than a re-implementation. The effect ports are stubs:
- * evolve never dispatches.
+ * The EXACT definition the runtime mounts — built by building the pipeline
+ * itself and taking the process manager it mounts, so these tests cover the
+ * generated evolve (intent-key prefixing, undeclared-event guard,
+ * schema-validated intent payloads) AND the production effect ports behind
+ * it, rather than a re-implementation.
  */
-function buildLangyManager(ports = createStubLangyEffectPorts().ports) {
-  return buildProcessManager<LangyConversationProcessingEvent>({
-    name: LANGY_CONVERSATION_PROCESS_NAME,
-    applier: langyConversationProcess(ports),
-  });
+function buildLangyManager() {
+  return buildLangyProcessManager({ projectId: PROJECT_ID });
 }
 
-const W3C_TRACEPARENT_REGEX =
-  /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
+const W3C_TRACEPARENT_REGEX = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([0-9a-f]{2})$/;
 
 const ref: ProcessRef = {
   processName: LANGY_CONVERSATION_PROCESS_NAME,
@@ -107,24 +107,20 @@ describe("Langy process trace continuity", () => {
    * one. It builds the envelope (including the content boundary) and drives
    * the process itself.
    */
-  function generatedSubscriber(ports = createStubLangyEffectPorts().ports) {
+  function generatedSubscriber(definition = buildLangyManager().definition) {
     const runtime = new ProcessRuntime({ store, consumersEnabled: false });
-    const definition = buildLangyManager(ports);
-    const { subscribers } =
-      runtime.registerPipeline<LangyConversationProcessingEvent>({
-        pipelineName: "langy-conversation-processing",
-        processManagers: new Map([
-          [LANGY_CONVERSATION_PROCESS_NAME, definition],
-        ]),
-      });
+    const { subscribers } = runtime.registerPipeline<LangyConversationProcessingEvent>({
+      pipelineName: "langy-conversation-processing",
+      processManagers: new Map([[LANGY_CONVERSATION_PROCESS_NAME, definition]]),
+    });
     const subscriber = subscribers[0];
     if (!subscriber) throw new Error("runtime generated no subscriber");
     return subscriber;
   }
 
-  async function handleStartedTurnInsideProducerSpan(subscriber: {
-    handle: (event: any, context: any) => Promise<void>;
-  }): Promise<{ producerTraceId: string }> {
+  async function handleStartedTurnInsideProducerSpan(
+    subscriber: { handle: (event: any, context: any) => Promise<void> },
+  ): Promise<{ producerTraceId: string }> {
     const tracer = trace.getTracer("test");
     return await tracer.startActiveSpan(
       "langy.queue.consume",
@@ -164,9 +160,9 @@ describe("Langy process trace continuity", () => {
 
   describe("when the outbox later dispatches the intent in a fresh context", () => {
     it("continues the original trace through the typed Langy handler", async () => {
-      const { ports, calls } = createStubLangyEffectPorts();
+      const { definition, calls } = buildLangyManager();
       const { producerTraceId } = await handleStartedTurnInsideProducerSpan(
-        generatedSubscriber(ports),
+        generatedSubscriber(definition),
       );
       const [message] = await store.findMessagesByRef({ ref });
       const [, , carrierSpanId] = W3C_TRACEPARENT_REGEX.exec(
@@ -177,22 +173,19 @@ describe("Langy process trace continuity", () => {
         store,
         // The builder generates these from the declared intents, schema
         // validation included -- Langy no longer hand-writes them.
-        handlers: buildIntentHandlers(buildLangyManager(ports).config),
+        handlers: buildIntentHandlers(definition.config),
       });
       // The generated subscriber stamps the commit with real `Date.now()` --
       // unlike the hand-rolled one it replaces, it takes no injectable clock --
       // so the dispatch window has to be read against the same clock.
       const report = await dispatcher.runOnce({ now: Date.now() + 1 });
 
-      expect(report.dispatched).toEqual([
-        `process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(report.dispatched).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
       expect(calls.dispatchedTurns).toEqual([
         {
           projectId: PROJECT_ID,
           conversationId: CONVERSATION_ID,
           turnId: "turn_1",
-          resumeFromTurnId: null,
         },
       ]);
 

@@ -804,11 +804,96 @@ describe("GroupStagingScripts", () => {
         });
       });
 
+      // Since ADR-080 the staged job id IS the source event's id, so an
+      // at-least-once re-send of an event whose job is still staged lands on
+      // the SAME member: the stage displaces a value instead of adding one.
+      // Before, these paths took the new lease and left the displaced holder
+      // token behind, pinning its blob for the full lease TTL — worst on a
+      // parked group, where every re-send orphaned another one.
+      describe("when a re-sent event displaces its own staged GQ2 value", () => {
+        it("releases the displaced lease and keeps only the replacement", async () => {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j-resend",
+              groupId: GROUP,
+              jobDataJson: gq2Value({ hash: "h-old", token: "t-old" }),
+            }),
+          );
+          await seedBlobAndLease({ hash: "h-old", token: "t-old" });
+          await redis.set(blobKey({ hash: "h-new" }), "gzipped-bytes");
+
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j-resend",
+              groupId: GROUP,
+              jobDataJson: gq2Value({ hash: "h-new", token: "t-new" }),
+            }),
+          );
+
+          expect(
+            await redis.zrange(leaseKey({ hash: "h-new" }), 0, -1),
+          ).toEqual(["t-new"]);
+          expect(await redis.exists(leaseKey({ hash: "h-old" }))).toBe(0);
+          // Release is never destructive: reclaim stays lazy.
+          expect(await redis.exists(blobKey({ hash: "h-old" }))).toBe(1);
+        });
+
+        it("releases it on the batch path too", async () => {
+          await scripts.stageBatch([
+            makeJob({
+              stagedJobId: "j-batch-resend",
+              groupId: GROUP,
+              jobDataJson: gq2Value({ hash: "h-b-old", token: "t-b-old" }),
+            }),
+          ]);
+          await seedBlobAndLease({ hash: "h-b-old", token: "t-b-old" });
+          await redis.set(blobKey({ hash: "h-b-new" }), "gzipped-bytes");
+
+          await scripts.stageBatch([
+            makeJob({
+              stagedJobId: "j-batch-resend",
+              groupId: GROUP,
+              jobDataJson: gq2Value({ hash: "h-b-new", token: "t-b-new" }),
+            }),
+          ]);
+
+          expect(
+            await redis.zrange(leaseKey({ hash: "h-b-new" }), 0, -1),
+          ).toEqual(["t-b-new"]);
+          expect(await redis.exists(leaseKey({ hash: "h-b-old" }))).toBe(0);
+        });
+
+        it("treats an identical re-send as a renewal rather than a release", async () => {
+          const value = gq2Value({ hash: "h-same", token: "t-same" });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j-same",
+              groupId: GROUP,
+              jobDataJson: value,
+            }),
+          );
+          await seedBlobAndLease({ hash: "h-same", token: "t-same" });
+
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j-same",
+              groupId: GROUP,
+              jobDataJson: value,
+            }),
+          );
+
+          expect(
+            await redis.zrange(leaseKey({ hash: "h-same" }), 0, -1),
+          ).toEqual(["t-same"]);
+          expect(await redis.exists(blobKey({ hash: "h-same" }))).toBe(1);
+        });
+      });
+
       describe("given two sibling jobs staged on one content-addressed blob", () => {
         /**
          * The production incident (missing_blob, ~100-500/hr over 7 days).
          *
-         * Sibling reactors folding the same trace encode identical payloads,
+         * Sibling jobs folding the same trace encode identical payloads,
          * so they hash to ONE blob. Under the holder scheme the refcount
          * member was SADD'd in a round trip AFTER stage() returned, so a
          * sibling completing in that window saw SCARD == 0 and UNLINKed the
@@ -2186,8 +2271,39 @@ describe("GroupStagingScripts", () => {
           attemptTtlSec: 1800,
         });
 
-        expect(restaged).toBe(false);
+        expect(restaged).toBe("slot_taken");
         expect(await redis.get(attemptKey())).toBeNull();
+      });
+
+      // The two failures are NOT the same event. Another worker holding the
+      // slot is a hand-off; an EXPIRED slot means nobody holds it and the job
+      // left staging when it was claimed, so returning without re-staging
+      // loses it. Reported as one boolean, the loss was indistinguishable from
+      // the benign case and therefore invisible.
+      it("reports an expired slot apart from one another worker holds", async () => {
+        await scripts.stage(
+          makeJob({ stagedJobId: "j1", dispatchAfterMs: 100 }),
+        );
+        await scripts.dispatch({ nowMs: 200, activeTtlSec: 300 });
+        // The slot lapses under the worker — what a slow blob read does to a
+        // job whose heartbeat is not armed yet.
+        await redis.del(`${keyPrefix()}group:group-a:active`);
+
+        const restaged = await scripts.retryRestage({
+          groupId: "group-a",
+          stagedJobId: "j1",
+          newStagedJobId: "j1",
+          dispatchAfterMs: 5_000,
+          jobDataJson: JSON.stringify({ v: 1 }),
+          backoffMs: 3_000,
+          attempt: 2,
+          attemptTtlSec: 1800,
+        });
+
+        expect(restaged).toBe("slot_expired");
+        // Still writes nothing — the caller now names the loss instead.
+        expect(await redis.get(attemptKey())).toBeNull();
+        expect(await inspectGroupJobs("group-a")).toEqual([]);
       });
     });
 
@@ -2215,7 +2331,7 @@ describe("GroupStagingScripts", () => {
           attempt: 1,
           attemptTtlSec: 1800,
         });
-        expect(restaged).toBe(true);
+        expect(restaged).toBe("restaged");
 
         // The lock now names the retry id, so the retired id can't refresh it.
         expect(await inspectActiveKey("group-a")).toBe("j1/r/1");
@@ -2563,7 +2679,7 @@ describe("GroupStagingScripts", () => {
             jobDataJson: makePausedJobData(),
           }),
         );
-        await scripts.addPauseKey("ingestion/reactor");
+        await scripts.addPauseKey("ingestion/subscriber");
 
         const result = await scripts.dispatch({ nowMs: 200, activeTtlSec: 60 });
         expect(result).not.toBeNull();
@@ -3527,7 +3643,7 @@ describe("GroupStagingScripts", () => {
           attempt: 1,
           attemptTtlSec: 1800,
         });
-        expect(restaged).toBe(true);
+        expect(restaged).toBe("restaged");
 
         // Active key expires after the short backoff TTL
         await redis.del(`${keyPrefix()}group:g-retry:active`);

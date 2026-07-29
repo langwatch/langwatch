@@ -1,5 +1,4 @@
 import type { createLogger } from "@langwatch/observability";
-import type { ProcessRole } from "../../app-layer/config";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
@@ -11,7 +10,6 @@ import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { EventSourcedQueueProcessor } from "../queues";
-import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { EventStore } from "../stores/eventStore.types";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
@@ -85,20 +83,6 @@ export interface EventSourcingServiceOptions<
     handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions<unknown>;
   }>;
-  /**
-   * Reactors (post-fold side-effect handlers) for this pipeline.
-   */
-  reactors?: Array<{
-    foldName: string;
-    definition: ReactorDefinition<EventType>;
-  }>;
-  /**
-   * Reactors (post-map side-effect handlers) for this pipeline.
-   */
-  mapReactors?: Array<{
-    mapName: string;
-    definition: ReactorDefinition<EventType>;
-  }>;
   /** Live event-only consumers, independent of projection state. */
   subscribers?: EventSubscriberDefinition<EventType>[];
   /**
@@ -107,12 +91,6 @@ export interface EventSourcingServiceOptions<
    * Uses base Event type because the registry receives events from all pipelines.
    */
   globalRegistry?: ProjectionRegistry<Event>;
-  /**
-   * Process role — controls whether queue consumers are started.
-   * "web": skip BullMQ workers (only dispatch to queues)
-   * "worker" | undefined: start all consumers
-   */
-  processRole?: ProcessRole;
   /**
    * Optional replay marker checker for coordinating with projection-replay.
    * When provided, fold projections check for active replay markers before

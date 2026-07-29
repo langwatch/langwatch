@@ -3,7 +3,7 @@ import type { EventRecord } from "../eventRepository.types";
 import { EventRepositoryMemory } from "../eventRepositoryMemory";
 
 /**
- * `getEventRecordsUpToPaged` is the cursor-paginated read the streaming
+ * `findAllUpToPaged` is the cursor-paginated read the streaming
  * store-miss re-fold walks so a huge aggregate's history never lands in memory
  * whole. The ClickHouse repository mirrors this exact cursor + upper-bound +
  * (EventTimestamp, EventId) order, so locking the behaviour here guards both.
@@ -24,7 +24,7 @@ function record({ eventId, ts }: { eventId: string; ts: number }): EventRecord {
   };
 }
 
-describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
+describe("EventRepositoryMemory.findAllUpToPaged", () => {
   // e3a and e3b share a timestamp (tiebreak by EventId); e5 is beyond the bound.
   async function seeded() {
     const repo = new EventRepositoryMemory();
@@ -46,7 +46,7 @@ describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
     it("pages in (timestamp, eventId) order, honouring the after cursor and limit", async () => {
       const repo = await seeded();
 
-      const page1 = await repo.getEventRecordsUpToPaged({
+      const page1 = await repo.findAllUpToPaged({
         tenantId: "tenant",
         aggregateType: "trace",
         aggregateId: "agg",
@@ -58,7 +58,7 @@ describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
       expect(page1.map((r) => r.EventId)).toEqual(["e1", "e2"]);
 
       const c1 = page1[page1.length - 1]!;
-      const page2 = await repo.getEventRecordsUpToPaged({
+      const page2 = await repo.findAllUpToPaged({
         tenantId: "tenant",
         aggregateType: "trace",
         aggregateId: "agg",
@@ -71,7 +71,7 @@ describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
       expect(page2.map((r) => r.EventId)).toEqual(["e3a", "e3b"]);
 
       const c2 = page2[page2.length - 1]!;
-      const page3 = await repo.getEventRecordsUpToPaged({
+      const page3 = await repo.findAllUpToPaged({
         tenantId: "tenant",
         aggregateType: "trace",
         aggregateId: "agg",
@@ -90,7 +90,7 @@ describe("EventRepositoryMemory.getEventRecordsUpToPaged", () => {
       let after: { timestamp: number; eventId: string } | undefined;
 
       for (;;) {
-        const page = await repo.getEventRecordsUpToPaged({
+        const page = await repo.findAllUpToPaged({
           tenantId: "tenant",
           aggregateType: "trace",
           aggregateId: "agg",

@@ -2,20 +2,19 @@ import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import {
-  EXPERIMENT_RUN_EVENT_TYPES,
-  EXPERIMENT_RUN_EVENT_VERSIONS,
+	EXPERIMENT_RUN_EVENT_TYPES,
+	EXPERIMENT_RUN_EVENT_VERSIONS,
 } from "../../schemas/constants";
 import type {
-  EvaluatorResultEvent,
-  ExperimentRunCompletedEvent,
-  ExperimentRunProcessingEvent,
-  ExperimentRunStartedEvent,
-  TargetResultEvent,
-  TraceMetricsComputedEvent,
+	EvaluatorResultEvent,
+	ExperimentRunCompletedEvent,
+	ExperimentRunProcessingEvent,
+	ExperimentRunStartedEvent,
+	TargetResultEvent,
 } from "../../schemas/events";
 import {
-  type ExperimentRunStateData,
-  ExperimentRunStateFoldProjection,
+	ExperimentRunStateFoldProjection,
+	type ExperimentRunStateData,
 } from "../experimentRunState.foldProjection";
 
 // Create a dummy store — only init/apply are tested, not persistence
@@ -23,9 +22,7 @@ const noopStore: FoldProjectionStore<ExperimentRunStateData> = {
   store: async () => {},
   get: async () => null,
 };
-const experimentRunStateFoldProjection = new ExperimentRunStateFoldProjection({
-  store: noopStore,
-});
+const experimentRunStateFoldProjection = new ExperimentRunStateFoldProjection({ store: noopStore });
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
@@ -128,9 +125,7 @@ function createCompletedEvent(
 /**
  * Helper to fold a sequence of events through init() + apply().
  */
-function foldEvents(
-  events: ExperimentRunProcessingEvent[],
-): ExperimentRunStateData {
+function foldEvents(events: ExperimentRunProcessingEvent[]): ExperimentRunStateData {
   let state = experimentRunStateFoldProjection.init();
   for (const event of events) {
     state = experimentRunStateFoldProjection.apply(state, event);
@@ -153,10 +148,7 @@ describe("experimentRunStateFoldProjection", () => {
     const state = foldEvents([
       createStartedEvent(),
       createTargetResultEvent({ index: 0 }),
-      createTargetResultEvent(
-        { index: 1 },
-        { id: "event-2b", createdAt: 2100 },
-      ),
+      createTargetResultEvent({ index: 1 }, { id: "event-2b", createdAt: 2100 }),
     ]);
 
     expect(state.Progress).toBe(2);
@@ -164,6 +156,7 @@ describe("experimentRunStateFoldProjection", () => {
     expect(state.FailedCount).toBe(0);
   });
 
+  /** @scenario Progress and outcomes reflect the run's items */
   it("tracks failed results separately", () => {
     const state = foldEvents([
       createStartedEvent(),
@@ -248,21 +241,11 @@ describe("experimentRunStateFoldProjection", () => {
         { id: "event-3b", createdAt: 3100 },
       ),
       createEvaluatorResultEvent(
-        {
-          status: "skipped",
-          evaluatorId: "eval-3",
-          score: undefined,
-          passed: undefined,
-        },
+        { status: "skipped", evaluatorId: "eval-3", score: undefined, passed: undefined },
         { id: "event-3c", createdAt: 3200 },
       ),
       createEvaluatorResultEvent(
-        {
-          status: "error",
-          evaluatorId: "eval-4",
-          score: undefined,
-          passed: undefined,
-        },
+        { status: "error", evaluatorId: "eval-4", score: undefined, passed: undefined },
         { id: "event-3d", createdAt: 3300 },
       ),
     ]);
@@ -294,112 +277,79 @@ describe("experimentRunStateFoldProjection", () => {
     expect(state.AvgScoreBps).toBe(8333);
   });
 
-  it("accumulates costs from target and evaluator results", () => {
-    const state = foldEvents([
-      createStartedEvent(),
-      createTargetResultEvent({ cost: 0.01 }),
-      createEvaluatorResultEvent({ cost: 0.005 }),
-    ]);
-
-    expect(state.TotalCost).toBeCloseTo(0.015, 5);
-  });
-
-  describe("when trace metrics arrive via ECST", () => {
-    function createTraceMetricsEvent(
-      overrides: Partial<TraceMetricsComputedEvent["data"]> = {},
-      eventOverrides: Partial<TraceMetricsComputedEvent> = {},
-    ): TraceMetricsComputedEvent {
-      return {
-        id: "event-metrics-1",
-        aggregateId: "run-123",
-        aggregateType: "experiment_run",
-        tenantId: TEST_TENANT_ID,
-        createdAt: 5000,
-        occurredAt: 5000,
-        type: EXPERIMENT_RUN_EVENT_TYPES.TRACE_METRICS_COMPUTED,
-        version: EXPERIMENT_RUN_EVENT_VERSIONS.TRACE_METRICS_COMPUTED,
-        data: {
-          runId: "run-123",
-          experimentId: "exp-1",
-          traceId: "trace-abc",
-          totalCost: 0.003,
-          ...overrides,
-        },
-        ...eventOverrides,
-      };
-    }
-
-    /** @scenario Trace cost is accumulated into experiment run TotalCost */
-    it("accumulates trace cost into TotalCost", () => {
-      const state = foldEvents([
-        createStartedEvent(),
-        createTargetResultEvent(),
-        createTraceMetricsEvent({ totalCost: 0.003 }),
-      ]);
-
-      expect(state.TotalCost).toBeCloseTo(0.003, 6);
-    });
-
-    /** @scenario Multiple trace costs accumulate */
-    it("accumulates multiple trace costs", () => {
-      const state = foldEvents([
-        createStartedEvent(),
-        createTargetResultEvent(),
-        createTraceMetricsEvent({ traceId: "trace-1", totalCost: 0.003 }),
-        createTraceMetricsEvent(
-          { traceId: "trace-2", totalCost: 0.002 },
-          { id: "event-metrics-2", createdAt: 5100 },
-        ),
-      ]);
-
-      expect(state.TotalCost).toBeCloseTo(0.005, 6);
-    });
-
-    /** @scenario Per-trace cost breakdown is maintained */
-    it("stores per-trace breakdown in TraceMetrics", () => {
-      const state = foldEvents([
-        createStartedEvent(),
-        createTraceMetricsEvent({ traceId: "trace-1", totalCost: 0.003 }),
-        createTraceMetricsEvent(
-          { traceId: "trace-2", totalCost: 0.002 },
-          { id: "event-metrics-2", createdAt: 5100 },
-        ),
-      ]);
-
-      expect(state.TraceMetrics["trace-1"]!.totalCost).toBe(0.003);
-      expect(state.TraceMetrics["trace-2"]!.totalCost).toBe(0.002);
-    });
-
-    it("replaces existing trace cost on re-delivery (idempotent)", () => {
-      const state = foldEvents([
-        createStartedEvent(),
-        createTraceMetricsEvent({ traceId: "trace-1", totalCost: 0.003 }),
-        createTraceMetricsEvent(
-          { traceId: "trace-1", totalCost: 0.004 },
-          { id: "event-metrics-1b", createdAt: 5200 },
-        ),
-      ]);
-
-      // Should use the latest cost, not double-count
-      expect(state.TotalCost).toBeCloseTo(0.004, 6);
-      expect(state.TraceMetrics["trace-1"]!.totalCost).toBe(0.004);
-    });
-
-    it("combines trace costs with inline target/evaluator costs", () => {
+  describe("when results carry costs", () => {
+    // The fold holds no cost at all. Cost is summed from experiment_run_items
+    // at read time, and an item that reports none is priced from its trace —
+    // see ADR-072 and ExperimentRunService.enrichItemsWithTraceCosts. The
+    // deleted fold added a trace's cost *on top of* its target's inline cost,
+    // which double-counted a traced target; the read path treats them as
+    // alternatives.
+    it("records costs on the items, not on the run", () => {
       const state = foldEvents([
         createStartedEvent(),
         createTargetResultEvent({ cost: 0.01 }),
         createEvaluatorResultEvent({ cost: 0.005 }),
-        createTraceMetricsEvent({ totalCost: 0.003 }),
       ]);
 
-      // 0.01 (target) + 0.005 (evaluator) + 0.003 (trace) = 0.018
-      expect(state.TotalCost).toBeCloseTo(0.018, 5);
+      expect(state).not.toHaveProperty("TotalCost");
+      expect(state).not.toHaveProperty("TraceMetrics");
     });
 
-    it("initializes TraceMetrics as empty", () => {
-      const state = foldEvents([createStartedEvent()]);
-      expect(state.TraceMetrics).toEqual({});
+    it("still counts the results those costs arrived on", () => {
+      const state = foldEvents([
+        createStartedEvent(),
+        createTargetResultEvent({ cost: 0.01 }),
+        createEvaluatorResultEvent({ cost: 0.005 }),
+      ]);
+
+      expect(state.CompletedCount).toBe(1);
+      expect(state.Progress).toBe(1);
+    });
+  });
+
+  describe("given a run stopped before any item completed", () => {
+    describe("when its state is read", () => {
+      /** @scenario Run-level facts survive with no items */
+      it("keeps the experiment, the targets and the expected total", () => {
+        const state = foldEvents([
+          createStartedEvent(),
+          createCompletedEvent({ finishedAt: null, stoppedAt: 5000 }),
+        ]);
+
+        expect(state.ExperimentId).toBe("exp-1");
+        expect(JSON.parse(state.Targets)).toEqual([
+          { id: "target-1", name: "Target 1", type: "llm" },
+        ]);
+        expect(state.Total).toBe(10);
+        expect(state.StoppedAt).toBe(5000);
+        expect(state.Progress).toBe(0);
+      });
+    });
+  });
+
+  describe("given a run already reported as finished", () => {
+    describe("when a further target result arrives", () => {
+      /** @scenario A late item changes the run immediately */
+      it("counts it rather than freezing the totals at the finish", () => {
+        const finished = foldEvents([
+          createStartedEvent(),
+          createTargetResultEvent({ index: 0 }),
+          createCompletedEvent({ finishedAt: 4000 }),
+        ]);
+
+        const afterLateItem = experimentRunStateFoldProjection.apply(
+          finished,
+          createTargetResultEvent(
+            { index: 1 },
+            { id: "event-late", createdAt: 6000, occurredAt: 6000 },
+          ),
+        );
+
+        expect(finished.Progress).toBe(1);
+        expect(afterLateItem.Progress).toBe(2);
+        expect(afterLateItem.CompletedCount).toBe(2);
+        expect(afterLateItem.FinishedAt).toBe(4000);
+      });
     });
   });
 });

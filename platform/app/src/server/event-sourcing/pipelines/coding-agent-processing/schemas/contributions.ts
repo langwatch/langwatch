@@ -18,8 +18,7 @@ const scalarFactSchema = z.union([z.string(), z.number(), z.boolean()]);
  * session derivation reads for spans; preserving the raw names keeps the
  * fold's derivation identical across signals.
  */
-export const contributionFactsSchema = z.record(z.string(), scalarFactSchema);
-export type ContributionFacts = z.infer<typeof contributionFactsSchema>;
+const contributionFactsSchema = z.record(z.string(), scalarFactSchema);
 
 /**
  * How the session key was established. `provider` is the agent's own key
@@ -27,7 +26,7 @@ export type ContributionFacts = z.infer<typeof contributionFactsSchema>;
  * spellings). `trace_fallback` means the telemetry carried no session key, so
  * the trace id stands in and the session is a one-trace session (ADR-056 §1).
  */
-export const sessionKeySourceSchema = z.enum(["provider", "trace_fallback"]);
+const sessionKeySourceSchema = z.enum(["provider", "trace_fallback"]);
 export type SessionKeySource = z.infer<typeof sessionKeySourceSchema>;
 
 const contributionBaseSchema = z.object({
@@ -66,7 +65,6 @@ export const spanFactsContributionSchema = contributionBaseSchema.extend({
   facts: contributionFactsSchema,
   scopeName: z.string().nullable(),
 });
-export type SpanFactsContribution = z.infer<typeof spanFactsContributionSchema>;
 
 /**
  * Facts off one coding-agent LOG record: the facts with no span — the denied
@@ -85,7 +83,6 @@ export const logFactsContributionSchema = contributionBaseSchema.extend({
   /** The lifted scalar vocabulary (`CODING_AGENT_CONTRIBUTION_KEYS`). */
   facts: contributionFactsSchema,
 });
-export type LogFactsContribution = z.infer<typeof logFactsContributionSchema>;
 
 /**
  * Converged totals for one metric SERIES of a session (ADR-056 §5).
@@ -112,6 +109,3 @@ export const metricFactsContributionSchema = contributionBaseSchema.extend({
   /** Wall-clock of the newest point folded in — the LWW version. */
   asOfUnixMs: z.number(),
 });
-export type MetricFactsContribution = z.infer<
-  typeof metricFactsContributionSchema
->;

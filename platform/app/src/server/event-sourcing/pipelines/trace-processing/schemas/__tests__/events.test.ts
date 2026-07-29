@@ -3,10 +3,10 @@ import { createTenantId } from "../../../../domain/tenantId";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
+  TOPIC_ASSIGNED_EVENT_VERSIONS,
 } from "../constants";
 import {
   isSpanReceivedEvent,
-  isTopicAssignedEvent,
   topicAssignedEventDataSchema,
   topicAssignedEventSchema,
 } from "../events";
@@ -129,15 +129,19 @@ describe("events schemas", () => {
     });
   });
 
-  describe("isTopicAssignedEvent type guard", () => {
-    it("returns true for TopicAssignedEvent", () => {
+  describe("given an event whose version is not one this build knows", () => {
+    it("rejects it rather than accepting any date-shaped string", () => {
       const event = {
         id: "event-123",
         aggregateId: "trace-456",
-        aggregateType: "trace" as const,
+        aggregateType: "trace",
         tenantId: createTenantId("project_abc123"),
         type: TOPIC_ASSIGNED_EVENT_TYPE,
-        version: "2025-02-01",
+        // A well-formed date, and a version this pipeline has never minted.
+        // Before the schema asserted its version, the base `z.string().date()`
+        // let this through and the payload was read as if it were the current
+        // shape.
+        version: "2099-01-01",
         createdAt: Date.now(),
         occurredAt: Date.now(),
         data: {
@@ -150,16 +154,34 @@ describe("events schemas", () => {
         metadata: {},
       };
 
-      expect(isTopicAssignedEvent(event)).toBe(true);
+      const result = topicAssignedEventSchema.safeParse(event);
+
+      expect(result.success).toBe(false);
     });
 
-    it("returns false for SpanReceivedEvent type", () => {
-      // We only check the type field, not the full event structure
-      const event = {
-        type: SPAN_RECEIVED_EVENT_TYPE,
-      } as Parameters<typeof isTopicAssignedEvent>[0];
+    it("accepts every version the pipeline has minted", () => {
+      for (const version of TOPIC_ASSIGNED_EVENT_VERSIONS) {
+        const result = topicAssignedEventSchema.safeParse({
+          id: "event-123",
+          aggregateId: "trace-456",
+          aggregateType: "trace",
+          tenantId: createTenantId("project_abc123"),
+          type: TOPIC_ASSIGNED_EVENT_TYPE,
+          version,
+          createdAt: Date.now(),
+          occurredAt: Date.now(),
+          data: {
+            topicId: "topic-123",
+            topicName: "Customer Support",
+            subtopicId: null,
+            subtopicName: null,
+            isIncremental: false,
+          },
+          metadata: {},
+        });
 
-      expect(isTopicAssignedEvent(event)).toBe(false);
+        expect(result.success).toBe(true);
+      }
     });
   });
 

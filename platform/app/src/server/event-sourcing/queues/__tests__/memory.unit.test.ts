@@ -95,24 +95,77 @@ describe("EventSourcedQueueProcessorMemory", () => {
       expect(processFn).toHaveBeenCalledWith({ id: "payload-2" });
       expect(processFn).toHaveBeenCalledWith({ id: "payload-3" });
     });
+  });
 
-    it("silently ignores unsupported options (delay, concurrency)", async () => {
-      const processFn = vi.fn().mockResolvedValue(void 0);
-      const definition: EventSourcedQueueDefinition<{ id: string }> = {
-        name: "test-queue",
-        process: processFn,
-        delay: 10, // Small delay to test it works without timing out
-        options: { concurrency: 1 },
-      };
+  describe("given a delay is configured", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
 
-      const processor = new EventSourcedQueueProcessorMemory(definition);
-      const sendPromise = processor.send({ id: "test-payload" });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-      // Wait for async processing to complete (including delay)
-      await sendPromise;
+    describe("when a payload is sent", () => {
+      it("withholds the payload from the process function until the delay has elapsed", async () => {
+        const delay = 500;
+        const processFn = vi.fn().mockResolvedValue(void 0);
+        const definition: EventSourcedQueueDefinition<{ id: string }> = {
+          name: "test-queue",
+          process: processFn,
+          delay,
+        };
 
-      // Processor works normally - options are accepted but may not all be fully implemented
-      expect(processFn).toHaveBeenCalledWith({ id: "test-payload" });
+        const processor = new EventSourcedQueueProcessorMemory(definition);
+        const sendPromise = processor.send({ id: "delayed-payload" });
+
+        await vi.advanceTimersByTimeAsync(delay - 1);
+        expect(processFn).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(1);
+        await sendPromise;
+
+        expect(processFn).toHaveBeenCalledWith({ id: "delayed-payload" });
+      });
+    });
+  });
+
+  describe("given a concurrency limit of one", () => {
+    describe("when a second payload is sent while the first is still in flight", () => {
+      it("holds the second payload back until the first finishes", async () => {
+        const processedIds: string[] = [];
+        let releaseFirst!: () => void;
+        const firstInFlight = new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        });
+
+        const processFn = vi.fn(async (payload: { id: string }) => {
+          processedIds.push(payload.id);
+          if (payload.id === "first") {
+            await firstInFlight;
+          }
+        });
+
+        const definition: EventSourcedQueueDefinition<{ id: string }> = {
+          name: "test-queue",
+          process: processFn,
+          options: { concurrency: 1 },
+        };
+
+        const processor = new EventSourcedQueueProcessorMemory(definition);
+        const firstSend = processor.send({ id: "first" });
+        const secondSend = processor.send({ id: "second" });
+
+        // Drain the microtask queue: without the concurrency gate the second
+        // job would already have started by now.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(processedIds).toEqual(["first"]);
+
+        releaseFirst();
+        await Promise.all([firstSend, secondSend]);
+
+        expect(processedIds).toEqual(["first", "second"]);
+      });
     });
   });
 

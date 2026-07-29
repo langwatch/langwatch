@@ -4,7 +4,7 @@ import {
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import { z } from "zod";
 
-export const longBitsSchema = z.object({
+const longBitsSchema = z.object({
   low: z.number(),
   high: z.number(),
 });
@@ -24,15 +24,15 @@ export type OtlpKeyValue = {
   value: OtlpAnyValue;
 };
 
-export type OtlpArrayValue = {
+type OtlpArrayValue = {
   values: OtlpAnyValue[];
 };
 
-export type OtlpKeyValueList = {
+type OtlpKeyValueList = {
   values: OtlpKeyValue[];
 };
 
-export const fixed64Schema = z.union([longBitsSchema, z.string(), z.number()]);
+const fixed64Schema = z.union([longBitsSchema, z.string(), z.number()]);
 
 export const bytesSchema = z.instanceof(Uint8Array);
 
@@ -117,26 +117,23 @@ export const anyValueSchema: z.ZodType<OtlpAnyValue, z.ZodTypeDef, any> =
   });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const keyValueSchema: z.ZodType<OtlpKeyValue, z.ZodTypeDef, any> =
-  z.object({
-    key: z.string(),
-    value: anyValueSchema,
-  });
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const arrayValueSchema: z.ZodType<OtlpArrayValue, z.ZodTypeDef, any> =
-  z.object({
-    values: z.array(anyValueSchema),
-  });
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const keyValueListSchema: z.ZodType<
-  OtlpKeyValueList,
-  z.ZodTypeDef,
-  any
-> = z.object({
-  values: z.array(keyValueSchema),
+const keyValueSchema: z.ZodType<OtlpKeyValue, z.ZodTypeDef, any> = z.object({
+  key: z.string(),
+  value: anyValueSchema,
 });
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const arrayValueSchema: z.ZodType<OtlpArrayValue, z.ZodTypeDef, any> = z.object(
+  {
+    values: z.array(anyValueSchema),
+  },
+);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const keyValueListSchema: z.ZodType<OtlpKeyValueList, z.ZodTypeDef, any> =
+  z.object({
+    values: z.array(keyValueSchema),
+  });
 
 export const resourceSchema = z.object({
   attributes: z.array(keyValueSchema),
@@ -158,7 +155,7 @@ const STATUS_CODE_SET = {
 } as const satisfies Record<EStatusCode, true>;
 
 // OTLP span kind can be either numeric (from binary format) or string (from JSON format)
-export const eSpanKindSchema = z.union([
+const eSpanKindSchema = z.union([
   z.nativeEnum(ESpanKind),
   z.enum([
     "SPAN_KIND_UNSPECIFIED",
@@ -170,7 +167,7 @@ export const eSpanKindSchema = z.union([
   ]),
 ]);
 
-export const eStatusCodeSchema = z
+const eStatusCodeSchema = z
   .number()
   .int()
   .refine((v): v is EStatusCode => v in STATUS_CODE_SET, {
@@ -192,7 +189,7 @@ export const eventSchema = z.object({
   droppedAttributesCount: z.number().optional().nullable(),
 });
 
-export const linkSchema = z.object({
+const linkSchema = z.object({
   traceId: idSchema,
   spanId: idSchema,
   traceState: z.string().optional().nullable(),
@@ -222,25 +219,6 @@ export const spanSchema = z.object({
   droppedAttributesCount: z.number().optional().nullable().default(0),
   droppedEventsCount: z.number().optional().nullable().default(0),
   droppedLinksCount: z.number().optional().nullable().default(0),
-});
-
-/**
- * ScopeSpans / ResourceSpans / ExportTraceServiceRequest
- */
-export const scopeSpansSchema = z.object({
-  scope: instrumentationScopeSchema.optional(),
-  spans: z.array(spanSchema).optional(),
-  schemaUrl: z.string().nullable().optional(),
-});
-
-export const resourceSpansSchema = z.object({
-  resource: resourceSchema.optional(),
-  scopeSpans: z.array(scopeSpansSchema),
-  schemaUrl: z.string().optional(),
-});
-
-export const exportTraceServiceRequestSchema = z.object({
-  resourceSpans: z.array(resourceSpansSchema).optional(),
 });
 
 export type OtlpSpan = z.infer<typeof spanSchema>;

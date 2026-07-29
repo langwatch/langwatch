@@ -21,7 +21,7 @@
  *
  * Pairs with:
  *   - specs/ai-gateway/governance/folds.feature §"governance_ocsf_events"
- *   - GovernanceOcsfEventsSyncReactor (the producer)
+ *   - GovernanceOcsfEventsMapProjection (the producer)
  *   - migration 00023_create_governance_ocsf_events.sql
  */
 import type { ClickHouseClient } from "@clickhouse/client";

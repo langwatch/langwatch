@@ -17,7 +17,6 @@ import { SpanAppendStore } from "../spanStorage.store";
 import { TraceSummaryStore } from "../traceSummary.store";
 
 /**
- * @scenario No retention policy defaults to the platform default
  * @see specs/data-retention/ingestion-stamping.feature
  *
  * Regression for the trace-pipeline projection stores stamping `?? 0` instead
@@ -70,6 +69,7 @@ describe("trace-pipeline projection stores retention stamping", () => {
   });
 
   describe("when the projection context carries no resolved policy", () => {
+    /** @scenario No retention policy defaults to the platform default */
     it("stamps stored_spans with the platform default, not indefinite", async () => {
       const insertSpan = vi.fn().mockResolvedValue(undefined);
       const store = new SpanAppendStore({

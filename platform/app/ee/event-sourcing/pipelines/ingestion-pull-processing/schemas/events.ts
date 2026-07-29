@@ -49,7 +49,7 @@ export function isValidPullSchedule(cron: string): boolean {
   return pullScheduleSchema.safeParse(cron).success;
 }
 
-export const ingestionPullConfiguredEventDataSchema = sourceEnvelope.extend({
+const ingestionPullConfiguredEventDataSchema = sourceEnvelope.extend({
   // Deliberately permissive on the read path: a cron that slipped into the
   // log before write-side validation existed must still parse so replays
   // and projections cannot be poisoned by it.
@@ -57,9 +57,6 @@ export const ingestionPullConfiguredEventDataSchema = sourceEnvelope.extend({
   configVersion: z.string().min(1),
   cursor: z.string().nullable(),
 });
-export type IngestionPullConfiguredEventData = z.infer<
-  typeof ingestionPullConfiguredEventDataSchema
->;
 
 /** Command-boundary variant of the configured data: schedule must be valid. */
 export const ingestionPullConfiguredCommandDataSchema =
@@ -70,9 +67,6 @@ export const ingestionPullConfiguredCommandDataSchema =
 export const ingestionPullDisabledEventDataSchema = sourceEnvelope.extend({
   configVersion: z.string().min(1),
 });
-export type IngestionPullDisabledEventData = z.infer<
-  typeof ingestionPullDisabledEventDataSchema
->;
 
 export const ingestionPullRunCompletedEventDataSchema = sourceEnvelope.extend({
   runId: z.string().min(1),
@@ -80,9 +74,6 @@ export const ingestionPullRunCompletedEventDataSchema = sourceEnvelope.extend({
   nextCursor: z.string().nullable(),
   eventCount: z.number().int().nonnegative(),
 });
-export type IngestionPullRunCompletedEventData = z.infer<
-  typeof ingestionPullRunCompletedEventDataSchema
->;
 
 export const ingestionPullRunFailedEventDataSchema = sourceEnvelope.extend({
   runId: z.string().min(1),
@@ -91,9 +82,6 @@ export const ingestionPullRunFailedEventDataSchema = sourceEnvelope.extend({
   errorCode: z.string(),
   retryable: z.boolean(),
 });
-export type IngestionPullRunFailedEventData = z.infer<
-  typeof ingestionPullRunFailedEventDataSchema
->;
 
 export const IngestionPullConfiguredEventSchema = EventSchema.extend({
   type: z.literal(INGESTION_PULL_EVENT_TYPES.CONFIGURED),

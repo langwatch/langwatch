@@ -18,7 +18,7 @@ function record(eventId: string, occurredAt: number | null): EventRecord {
   };
 }
 
-describe("EventRepositoryMemory.getEventRecords lower bound", () => {
+describe("EventRepositoryMemory.findAll lower bound", () => {
   const bound = 1_700_000_000_000;
 
   async function seeded() {
@@ -35,7 +35,7 @@ describe("EventRepositoryMemory.getEventRecords lower bound", () => {
   describe("when no lower bound is passed", () => {
     it("returns every event", async () => {
       const repo = await seeded();
-      const ids = (await repo.getEventRecords("tenant", "trace", "agg")).map(
+      const ids = (await repo.findAll("tenant", "trace", "agg")).map(
         (r) => r.EventId,
       );
       expect(new Set(ids)).toEqual(
@@ -47,9 +47,9 @@ describe("EventRepositoryMemory.getEventRecords lower bound", () => {
   describe("when a lower bound is passed", () => {
     it("keeps events at/after the bound and unknown-time events, drops older ones", async () => {
       const repo = await seeded();
-      const ids = (
-        await repo.getEventRecords("tenant", "trace", "agg", bound)
-      ).map((r) => r.EventId);
+      const ids = (await repo.findAll("tenant", "trace", "agg", bound)).map(
+        (r) => r.EventId,
+      );
 
       expect(new Set(ids)).toEqual(new Set(["at", "after", "unknown-time"]));
       expect(ids).not.toContain("before");

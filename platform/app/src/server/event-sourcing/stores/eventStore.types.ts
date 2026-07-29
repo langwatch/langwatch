@@ -1,10 +1,8 @@
-import { z } from "zod";
 import type { AggregateType } from "../domain/aggregateType";
-import { type TenantId, TenantIdSchema } from "../domain/tenantId";
+import type { TenantId } from "../domain/tenantId";
 import type { Event } from "../domain/types";
 
 /**
- * Zod schema for event store read context.
  * Context for reading events from the event store.
  *
  * **Security Note:** tenantId is REQUIRED for tenant isolation.
@@ -13,24 +11,6 @@ import type { Event } from "../domain/types";
  * **Concurrency Note:** Implementations should return a consistent snapshot of events
  * for a given aggregateId, even under concurrent writes.
  */
-export const EventStoreReadContextSchema = z.object({
-  /**
-   * Tenant identifier for multi-tenant systems.
-   * REQUIRED - all operations must be scoped to a specific tenant for security.
-   */
-  tenantId: TenantIdSchema,
-  /**
-   * Additional metadata for the read operation.
-   * Should not be used to bypass security checks.
-   */
-  metadata: z.record(z.unknown()).optional(),
-  /**
-   * Raw/implementation-specific context.
-   * Use with caution - should not bypass security or validation.
-   */
-  raw: z.record(z.unknown()).optional(),
-});
-
 export interface EventStoreReadContext<_EventType extends Event = Event> {
   /**
    * Tenant identifier for multi-tenant systems.
@@ -66,7 +46,7 @@ export interface EventStoreReadContext<_EventType extends Event = Event> {
  * - SHOULD return events in a consistent order (typically by timestamp)
  * - MUST return readonly array to prevent caller mutations
  */
-export interface ReadOnlyEventStore<EventType extends Event = Event> {
+interface ReadOnlyEventStore<EventType extends Event = Event> {
   /**
    * Retrieves all events for a given aggregate.
    *

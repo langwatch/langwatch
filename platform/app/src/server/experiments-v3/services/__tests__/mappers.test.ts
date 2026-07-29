@@ -25,7 +25,6 @@ const baseClickHouseRun: ClickHouseExperimentRunRow = {
   Progress: 5,
   CompletedCount: 4,
   FailedCount: 1,
-  TotalCost: 0.5,
   TotalDurationMs: 1200,
   AvgScoreBps: 8500,
   PassRateBps: 9000,
@@ -119,6 +118,7 @@ describe("mapClickHouseRunToExperimentRun", () => {
     expect(result.workflowVersion).toBeNull();
   });
 
+  /** @scenario Progress and outcomes reflect the run's items */
   it("aggregates evaluator breakdown into summary evaluations", () => {
     const result = mapClickHouseRunToExperimentRun({
       record: baseClickHouseRun,
@@ -158,6 +158,42 @@ describe("mapClickHouseRunToExperimentRun", () => {
       record: baseClickHouseRun,
     });
     expect(result.summary.evaluations).toEqual({});
+  });
+
+  describe("when a cost summary derived from the run's items is supplied", () => {
+    /** @scenario Progress and outcomes reflect the run's items */
+    it("reports the item-derived costs and durations, not the run row's", () => {
+      const result = mapClickHouseRunToExperimentRun({
+        record: baseClickHouseRun,
+        costSummary: {
+          ExperimentId: "exp-1",
+          RunId: "run-1",
+          datasetCost: 0.03,
+          evaluationsCost: 0.002,
+          datasetAverageCost: 0.01,
+          datasetAverageDuration: 400,
+          evaluationsAverageCost: 0.001,
+          evaluationsAverageDuration: 25,
+        },
+      });
+
+      expect(result.summary.datasetCost).toBe(0.03);
+      expect(result.summary.evaluationsCost).toBe(0.002);
+      expect(result.summary.datasetAverageDuration).toBe(400);
+      expect(result.summary.evaluationsAverageDuration).toBe(25);
+    });
+  });
+
+  describe("when no item-derived cost summary is supplied", () => {
+    it("reports no cost at all rather than a figure carried on the run row", () => {
+      const result = mapClickHouseRunToExperimentRun({
+        record: { ...baseClickHouseRun, TotalDurationMs: 9999 },
+      });
+
+      expect(result.summary.datasetCost).toBeUndefined();
+      expect(result.summary.evaluationsCost).toBeUndefined();
+      expect(result.summary.datasetAverageDuration).toBeUndefined();
+    });
   });
 });
 
@@ -233,6 +269,7 @@ describe("mapClickHouseItemsToRunWithItems", () => {
     expect(result.evaluations).toHaveLength(1);
   });
 
+  /** @scenario An item that reports its own cost keeps that figure */
   it("maps target item fields correctly", () => {
     const result = mapClickHouseItemsToRunWithItems({
       runRecord: baseClickHouseRun,

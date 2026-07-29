@@ -1,10 +1,10 @@
 import type { CanonicalLogRecordRepository } from "~/server/app-layer/logs/repositories/canonical-log-record.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   AppendStore,
   BulkAppendContext,
 } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { retentionDaysFrom } from "../../shared/analyticsStoreBase";
 import type { CanonicalLogRecord } from "../schemas/logRecord";
 
 export class CanonicalLogAppendStore
@@ -18,7 +18,7 @@ export class CanonicalLogAppendStore
   ): Promise<void> {
     await this.repository.ensureLogRecord(
       record,
-      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDaysFrom(context, "traces"),
     );
   }
 
@@ -29,7 +29,7 @@ export class CanonicalLogAppendStore
     if (records.length === 0) return;
     await this.repository.ensureLogRecords(
       records,
-      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDaysFrom(context, "traces"),
     );
   }
 }

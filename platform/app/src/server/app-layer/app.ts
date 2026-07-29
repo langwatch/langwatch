@@ -22,7 +22,8 @@ export class App {
   readonly dspySteps: AppDependencies["dspySteps"];
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];
-  readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
+  /** Service only — suite runs have no pipeline of their own (ADR-072). */
+  readonly suiteRuns: AppDependencies["suiteRuns"];
   readonly topicClustering: AppDependencies["topicClustering"] &
     AppCommands["topicClustering"];
   readonly codingAgents: AppDependencies["codingAgents"] &
@@ -30,6 +31,7 @@ export class App {
   readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
+  readonly annotations: AppDependencies["annotations"];
   readonly triggers: AppDependencies["triggers"];
   readonly triggerTemplates: AppDependencies["triggerTemplates"];
   readonly emailSuppressions: AppDependencies["emailSuppressions"];
@@ -64,6 +66,7 @@ export class App {
   constructor(deps: AppDependencies) {
     this.config = deps.config;
     this.experiments = deps.experiments;
+    this.annotations = deps.annotations;
     this.triggers = deps.triggers;
     this.triggerTemplates = deps.triggerTemplates;
     this.emailSuppressions = deps.emailSuppressions;
@@ -85,7 +88,7 @@ export class App {
     this.experimentRuns = deps.commands.experimentRuns;
     this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
-    this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
+    this.suiteRuns = deps.suiteRuns;
     this.topicClustering = {
       ...deps.topicClustering,
       ...deps.commands.topicClustering,

@@ -9,7 +9,10 @@ import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/aut
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { createTraceAlertTriggerMatchHandler } from "../traceAlertTriggerMatch.subscriber";
+import {
+  createTraceAlertTriggerMatchHandler,
+  createTraceAlertTriggerMatchSubscriber,
+} from "../traceAlertTriggerMatch.subscriber";
 
 function traceState(
   overrides: Partial<TraceSummaryData> = {},
@@ -196,6 +199,63 @@ describe("trace alert trigger match subscriber", () => {
             traceDebounceMs: 45_000,
           })}`,
         );
+      });
+    });
+  });
+
+  describe("given the trace summary has not committed yet", () => {
+    describe("when the subscriber handles the event", () => {
+      it("throws so the queue asks again instead of dropping the alert", async () => {
+        const triggers = {
+          getActiveTraceTriggersForProject: vi
+            .fn()
+            .mockResolvedValue([trigger()]),
+        };
+        const recordTriggerMatch = {
+          send: vi.fn().mockResolvedValue(undefined),
+        };
+        const subscriber = createTraceAlertTriggerMatchSubscriber({
+          triggers: triggers as never,
+          recordTriggerMatch,
+          readTraceSummary: vi.fn().mockResolvedValue(null),
+        });
+
+        await expect(
+          subscriber.handle(event(), {
+            tenantId: "project-1",
+            aggregateId: "trace-1",
+          }),
+        ).rejects.toThrow(/Trace summary not found/);
+
+        expect(recordTriggerMatch.send).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when it commits before a later attempt", () => {
+      it("matches the trace on that attempt", async () => {
+        const triggers = {
+          getActiveTraceTriggersForProject: vi
+            .fn()
+            .mockResolvedValue([trigger()]),
+        };
+        const recordTriggerMatch = {
+          send: vi.fn().mockResolvedValue(undefined),
+        };
+        const readTraceSummary = vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(traceState());
+        const subscriber = createTraceAlertTriggerMatchSubscriber({
+          triggers: triggers as never,
+          recordTriggerMatch,
+          readTraceSummary,
+        });
+        const context = { tenantId: "project-1", aggregateId: "trace-1" };
+
+        await expect(subscriber.handle(event(), context)).rejects.toThrow();
+        await subscriber.handle(event(), context);
+
+        expect(recordTriggerMatch.send).toHaveBeenCalledTimes(1);
       });
     });
   });

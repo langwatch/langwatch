@@ -1,4 +1,5 @@
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
+import { isValidSpanId, isValidTraceId } from "~/server/tracer/utils";
 import type { DeepPartial } from "~/utils/types";
 import { compareOrdinal } from "../../utils/compareOrdinal";
 import {
@@ -41,7 +42,7 @@ export type LogRedactionService = {
   ): Promise<void>;
 };
 
-export interface PreparedCanonicalLogRecord {
+interface PreparedCanonicalLogRecord {
   record: CanonicalLogRecord;
   normalized: {
     body: string;
@@ -52,7 +53,7 @@ export interface PreparedCanonicalLogRecord {
   };
 }
 
-export interface CanonicalLogPreparationResult {
+interface CanonicalLogPreparationResult {
   accepted: PreparedCanonicalLogRecord[];
   rejectedLogRecords: number;
   errors: string[];
@@ -287,14 +288,6 @@ function normalizeId(value: unknown): string {
   ).toLowerCase();
 }
 
-function validTraceId(value: string): boolean {
-  return /^[a-f0-9]{32}$/.test(value) && !/^0+$/.test(value);
-}
-
-function validSpanId(value: string): boolean {
-  return /^[a-f0-9]{16}$/.test(value) && !/^0+$/.test(value);
-}
-
 function synthesizeCorrelation(args: {
   scopeName: string;
   wireTraceId: string;
@@ -315,7 +308,7 @@ function synthesizeCorrelation(args: {
       : eventName.startsWith(CODEX_EVENT_NAME_PREFIX)
         ? "codex"
         : "generic";
-  if (validTraceId(wireTraceId) && validSpanId(wireSpanId)) {
+  if (isValidTraceId(wireTraceId) && isValidSpanId(wireSpanId)) {
     return {
       traceId: wireTraceId,
       spanId: wireSpanId,
@@ -328,10 +321,10 @@ function synthesizeCorrelation(args: {
     if (sessionId) {
       const promptId = attributes["prompt.id"] ?? "";
       const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
-      const traceId = validTraceId(wireTraceId)
+      const traceId = isValidTraceId(wireTraceId)
         ? wireTraceId
         : sha256(turnKey).slice(0, 32);
-      const spanId = validSpanId(wireSpanId)
+      const spanId = isValidSpanId(wireSpanId)
         ? wireSpanId
         : sha256(
             `${sessionId}:${promptId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
@@ -347,10 +340,10 @@ function synthesizeCorrelation(args: {
   if (providerKind === "codex") {
     const conversationId = attributes["conversation.id"] ?? "";
     if (conversationId) {
-      const traceId = validTraceId(wireTraceId)
+      const traceId = isValidTraceId(wireTraceId)
         ? wireTraceId
         : sha256(conversationId).slice(0, 32);
-      const spanId = validSpanId(wireSpanId)
+      const spanId = isValidSpanId(wireSpanId)
         ? wireSpanId
         : sha256(
             `${conversationId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
@@ -629,7 +622,7 @@ export async function prepareCanonicalLogRecords(args: {
   return { accepted, rejectedLogRecords, errors };
 }
 
-export function clampLogCommandShardCount(value: number): number {
+function clampLogCommandShardCount(value: number): number {
   if (!Number.isFinite(value)) return MIN_LOG_COMMAND_SHARDS;
   return Math.min(
     MAX_LOG_COMMAND_SHARDS,

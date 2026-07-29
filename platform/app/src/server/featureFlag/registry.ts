@@ -82,7 +82,7 @@ export const FEATURE_FLAGS = [
     scope: "SYSTEM",
     defaultValue: false,
     description:
-      "Disables the per-event evaluator causality-loop guard in the trace-processing reactor. Emergency only; bypasses the safeguard that stopped the 2026-05 outage.",
+      "Disables the per-event evaluator causality-loop guard in the trace-processing evaluation-trigger process manager. Emergency only; bypasses the safeguard that stopped the 2026-05 outage.",
     family: "Event sourcing",
     legacyEnvVar: "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD",
   },

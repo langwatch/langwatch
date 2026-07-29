@@ -8,9 +8,6 @@ import { AGGREGATE_TYPE_IDENTIFIERS } from "../schemas/typeIdentifiers";
  * Example: In "lw.obs.trace.span_received", the aggregate type is "trace".
  */
 
-export const AggregateTypeTraceSchema = z.literal("trace");
-export type AggregateTypeTrace = z.infer<typeof AggregateTypeTraceSchema>;
-
 /**
  * Zod schema for aggregate type identifiers.
  * Built from type arrays defined in schemas.

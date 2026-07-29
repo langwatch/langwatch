@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "../../pipelines/automations/schemas/constants";
 import type { AutomationEvent } from "../../pipelines/automations/schemas/events";
+import { SIMULATION_RUN_EVENT_TYPES } from "../../pipelines/simulation-processing/schemas/constants";
+import type { SimulationProcessingEvent } from "../../pipelines/simulation-processing/schemas/events";
 import type { ProcessManagerInitialStage } from "../processBuilder";
 import { buildProcessManager } from "../processBuilder";
 import type { IntentSpec, WakeHandler } from "../processManagerDefinition";
@@ -136,6 +138,84 @@ describe("ProcessManagerBuilder", () => {
           }),
         ).toThrow(/already declares intent/);
       });
+    });
+  });
+});
+
+describe("given a process that ignores events", () => {
+  describe("when it also arms a deadline", () => {
+    it("refuses the combination rather than disarming itself silently", () => {
+      // `.ignores()` returns no decision; an omitted nextWakeAt resolves to
+      // null, and null is authoritative — so an ignored event would cancel the
+      // armed wake with nothing failing and no test catching it. The builder
+      // makes that combination unbuildable instead of documenting it.
+      //
+      // Built over the simulation events because the guard needs `.on()` and
+      // `.ignores()` on DIFFERENT types — declaring one type twice trips the
+      // duplicate-handler check first, and would assert the wrong refusal.
+      expect(() =>
+        buildProcessManager<SimulationProcessingEvent>({
+          name: "ignoresAndWakes",
+          applier: (pm) =>
+            pm
+              .state({ seen: 0 })
+              .intent("noop", payloadSchema, async () => {})
+              .on(SIMULATION_RUN_EVENT_TYPES.STARTED, (state) => ({ state }))
+              .ignores(SIMULATION_RUN_EVENT_TYPES.FINISHED)
+              .onWake((state) => ({ state })),
+        }),
+      ).toThrow(/cannot use both \.ignores\(\) and \.onWake\(\)/);
+    });
+
+    it("refuses it in the other order too", () => {
+      expect(() =>
+        buildProcessManager<SimulationProcessingEvent>({
+          name: "wakesAndIgnores",
+          applier: (pm) =>
+            pm
+              .state({ seen: 0 })
+              .intent("noop", payloadSchema, async () => {})
+              .on(SIMULATION_RUN_EVENT_TYPES.STARTED, (state) => ({ state }))
+              .onWake((state) => ({ state }))
+              .ignores(SIMULATION_RUN_EVENT_TYPES.FINISHED),
+        }),
+      ).toThrow(/cannot use \.ignores\(\) after \.onWake\(\)/);
+    });
+  });
+
+  describe("when it also declares a recurring schedule", () => {
+    it("refuses the combination rather than disarming the schedule silently", () => {
+      // A schedule is an armed deadline like any other: the runtime re-arms
+      // `nextWakeAt` on every wake, and an ignored event resolves it to null.
+      // The first ignored event would cancel the recurrence for good, with
+      // nothing failing — so the builder refuses the pair up front.
+      expect(() =>
+        buildProcessManager<SimulationProcessingEvent>({
+          name: "schedulesAndIgnores",
+          applier: (pm) =>
+            pm
+              .state({ seen: 0 })
+              .intent("noop", payloadSchema, async () => {})
+              .on(SIMULATION_RUN_EVENT_TYPES.STARTED, (state) => ({ state }))
+              .schedule({ everyMs: 30_000 })
+              .ignores(SIMULATION_RUN_EVENT_TYPES.FINISHED),
+        }),
+      ).toThrow(/cannot use both \.schedule\(\) and \.ignores\(\)/);
+    });
+
+    it("refuses it in the other order too", () => {
+      expect(() =>
+        buildProcessManager<SimulationProcessingEvent>({
+          name: "ignoresAndSchedules",
+          applier: (pm) =>
+            pm
+              .state({ seen: 0 })
+              .intent("noop", payloadSchema, async () => {})
+              .on(SIMULATION_RUN_EVENT_TYPES.STARTED, (state) => ({ state }))
+              .ignores(SIMULATION_RUN_EVENT_TYPES.FINISHED)
+              .schedule({ everyMs: 30_000 }),
+        }),
+      ).toThrow(/cannot use both \.ignores\(\) and \.schedule\(\)/);
     });
   });
 });

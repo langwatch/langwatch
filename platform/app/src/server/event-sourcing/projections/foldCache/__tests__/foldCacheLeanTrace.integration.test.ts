@@ -13,16 +13,15 @@
  *      Span-count-scaling collections (events[], span costs, scenario role
  *      maps) are deliberately NOT accumulated; they are derived from
  *      stored_spans at read time.
- *   3. `RedisCachedFoldStore` + `encodeFoldCacheEntry` — writes the entry at
+ *   3. `CachedFoldStore` + `encodeFoldCacheEntry` — writes the entry at
  *      `fold:<prefix>:<tenantId>:<traceId>`.
  *
- * Only boundaries are doubled: Redis (a string GET/SET map — the whole of the
- * store's Redis surface) and the durable ClickHouse fold store. Every module
+ * Only boundaries are doubled: the cache tier (the real InMemoryFoldCacheClient)
+ * and the durable ClickHouse fold store. Every module
  * whose behaviour the scenario describes is the real one, so a regression in
  * any of the three turns this red.
  */
 
-import type { Redis } from "ioredis";
 import { describe, expect, it } from "vitest";
 import {
   IO_PREVIEW_BYTES,
@@ -31,14 +30,15 @@ import {
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Event } from "~/server/event-sourcing";
 import { createTenantId } from "~/server/event-sourcing";
-import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import type { FoldProjectionStore } from "../../foldProjection.types";
-import { RedisCachedFoldStore } from "../../redisCachedFoldStore";
+import { CachedFoldStore } from "../../cachedFoldStore";
+import { InMemoryFoldCacheClient } from "../foldCacheClient";
 import { decodeFoldCacheEntry } from "../foldCacheEntry";
 
 const TENANT_ID = createTenantId("tenant-fold-lean");
@@ -123,21 +123,6 @@ function makeSpanReceivedEvent({
   };
 }
 
-/** In-memory stand-in for the only Redis surface the store uses: GET / SET. */
-function createRedisDouble(): { redis: Redis; entries: Map<string, string> } {
-  const entries = new Map<string, string>();
-  const redis = {
-    async get(key: string) {
-      return entries.get(key) ?? null;
-    },
-    async set(key: string, value: string) {
-      entries.set(key, value);
-      return "OK";
-    },
-  } as unknown as Redis;
-  return { redis, entries };
-}
-
 describe("given a trace whose span carries a 1 MB output value", () => {
   describe("when all spans of the trace are folded into the trace summary", () => {
     /** @scenario Folding a trace with a 1 MB output keeps the Redis cache entry lean */
@@ -177,8 +162,8 @@ describe("given a trace whose span carries a 1 MB output value", () => {
           return null;
         },
       };
-      const { redis, entries } = createRedisDouble();
-      const store = new RedisCachedFoldStore<TraceSummaryData>(durable, redis, {
+      const cache = new InMemoryFoldCacheClient();
+      const store = new CachedFoldStore<TraceSummaryData>(durable, cache, {
         keyPrefix: KEY_PREFIX,
       });
       const projection = new TraceSummaryFoldProjection({ store: durable });
@@ -196,7 +181,7 @@ describe("given a trace whose span carries a 1 MB output value", () => {
       });
 
       const key = `fold:${KEY_PREFIX}:${String(TENANT_ID)}:${TRACE_ID}`;
-      const raw = entries.get(key);
+      const raw = cache.entries.get(key)?.value;
       expect(raw).toBeDefined();
       const cached = decodeFoldCacheEntry<TraceSummaryData>(raw!).state;
 
@@ -204,14 +189,12 @@ describe("given a trace whose span carries a 1 MB output value", () => {
       // "…" (3 bytes) at the codepoint boundary, so allow that much slack and
       // nothing more — a raw 1 MB value would miss this by 16x.
       expect(cached.computedOutput).not.toBeNull();
-      expect(
-        Buffer.byteLength(cached.computedOutput!, "utf8"),
-      ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 8);
-      expect(cached.computedOutput).toContain("oooo");
-      // No string anywhere in the entry — attributes included — busts the budget.
-      expect(longestStringBytes(cached)).toBeLessThanOrEqual(
+      expect(Buffer.byteLength(cached.computedOutput!, "utf8")).toBeLessThanOrEqual(
         IO_PREVIEW_BYTES + 8,
       );
+      expect(cached.computedOutput).toContain("oooo");
+      // No string anywhere in the entry — attributes included — busts the budget.
+      expect(longestStringBytes(cached)).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 8);
       expect(Buffer.byteLength(raw!, "utf8")).toBeLessThan(1024 * 1024);
 
       // Then: no events[] payload. The span-count-scaling collections are

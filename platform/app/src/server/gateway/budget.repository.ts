@@ -1,8 +1,8 @@
 /**
- * Data-access for GatewayBudget. The debit path is gone; cost is folded
+ * Data-access for GatewayBudget. The debit path is gone; cost is derived
  * into the ClickHouse `gateway_budget_ledger_events` table by the
- * trace-fold reactor (see budget.clickhouse.repository.ts +
- * gatewayBudgetSync.reactor.ts).
+ * `gatewayBudgetDebits` map projection (see budget.clickhouse.repository.ts +
+ * ee/governance/projections/gatewayBudgetDebits.mapProjection.ts).
  *
  * Selection of "which budgets apply" lives in
  * `budgetResolution.service.ts` and nowhere else: this repository is a

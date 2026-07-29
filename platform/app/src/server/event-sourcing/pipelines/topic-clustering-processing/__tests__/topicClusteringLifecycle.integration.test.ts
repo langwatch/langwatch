@@ -149,15 +149,11 @@ describe.skipIf(!hasTestcontainers)(
           topicClusteringRunHistoryStore:
             new PrismaTopicClusteringRunHistoryProjectionRepository(prisma),
           topicModelStore: new PrismaTopicModelProjectionRepository(prisma),
-          dispatch: {
-            runPort: {
-              runClusteringPage: () =>
-                Promise.reject(new Error("run port unused in this test")),
-            },
-            commands: () => {
-              throw new Error("outcome commands unused in this test");
-            },
+          runPort: {
+            runClusteringPage: () =>
+              Promise.reject(new Error("run port unused in this test")),
           },
+          commands: eventSourcing.commandBus,
         }),
       );
       commands = pipeline.commands;

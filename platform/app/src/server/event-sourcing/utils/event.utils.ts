@@ -25,7 +25,7 @@ function generateEventId(): string {
 /**
  * Parameters for creating an event.
  */
-export interface CreateEventParams<
+interface CreateEventParams<
   TData = unknown,
   TMetadata extends EventMetadataBase = EventMetadataBase,
   TType extends EventType = EventType,
@@ -221,7 +221,7 @@ function isValidEvent(event: unknown): event is Event {
   const result = EventSchema.safeParse(event);
   if (!result.success) return false;
   // Explicitly check that data is not undefined
-  return "data" in event && (event as any).data !== undefined;
+  return result.data.data !== undefined;
 }
 
 /**
@@ -236,7 +236,7 @@ function isValidProjection(projection: unknown): projection is Projection {
   const result = ProjectionSchema.safeParse(projection);
   if (!result.success) return false;
   // Explicitly check that data is not undefined
-  return "data" in projection && (projection as any).data !== undefined;
+  return result.data.data !== undefined;
 }
 
 /**

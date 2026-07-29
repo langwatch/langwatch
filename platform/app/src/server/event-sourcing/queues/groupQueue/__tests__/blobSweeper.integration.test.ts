@@ -3,11 +3,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   BLOB_BACKSTOP_TTL_SECONDS,
+  BLOB_LEASE_SET_TTL_SECONDS,
   BLOB_RECLAIM_TTL_THRESHOLD_SECONDS,
   BLOB_RELEASE_GRACE_TTL_SECONDS,
   LEGACY_HOLDER_LEASE_GUARD,
 } from "../blobConstants";
 import { BlobSweeper } from "../blobSweeper";
+import { BLOB_SWEEP_LUA } from "../blobSweepLua";
 import { GROUP_QUEUE_REGISTRY_KEY } from "../scripts";
 
 const QUEUE_NAME = "{test/sweeper}";
@@ -110,8 +112,23 @@ describe("BlobSweeper", () => {
 
         const tally = await sweepOnce();
 
+        expect(tally.repaired).toBe(1);
         expect(tally.reclaimed).toBe(0);
         expect(await redis.exists(blobKey())).toBe(1);
+
+        // The retention window IS the scenario, so pin both of its ends.
+        // Above: the four-day backstop is gone, so bytes nothing ever stages
+        // cannot pin Redis for days. Below: the deadline is still a safety
+        // margin clear of the reclaim threshold, so the very next sweep reads
+        // "pending" rather than destroying it — that gap is precisely what
+        // makes the put-before-stage window safe.
+        const ttl = await redis.ttl(blobKey());
+        expect(ttl).toBeLessThanOrEqual(BLOB_RELEASE_GRACE_TTL_SECONDS);
+        expect(ttl).toBeGreaterThan(BLOB_RECLAIM_TTL_THRESHOLD_SECONDS);
+
+        // "a producer that stages it later still finds it": the bytes a later
+        // stage would resolve come back intact, not merely present.
+        expect(await redis.get(blobKey())).toBe("body");
       });
     });
   });
@@ -163,19 +180,55 @@ describe("BlobSweeper", () => {
   });
 
   describe("given bookkeeping left behind by an expired blob", () => {
+    /** The state `blobLeases.ts` leaves once the bytes outlive their keys. */
+    const giveOrphanedBookkeeping = async () => {
+      await redis.zadd(leaseKey(), (await redisNowMs()) - 1, "expired-holder");
+      await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD);
+      await redis.expire(leaseKey(), BLOB_LEASE_SET_TTL_SECONDS);
+      await redis.expire(holderKey(), BLOB_LEASE_SET_TTL_SECONDS);
+    };
+
     describe("when the runner sweeps", () => {
-      it("drops the orphaned lease and holder keys", async () => {
-        // The blob itself is gone; only its lease/holder keys remain. The blob
-        // SCAN cannot see it, so drive the decision directly.
-        await redis.sadd(holderKey(), LEGACY_HOLDER_LEASE_GUARD);
-        await redis.set(blobKey(), "body", "EX", 60);
-        await redis.del(blobKey());
+      it("leaves them to their own TTL, because the blob scan cannot see them", async () => {
+        // The bytes are already gone, and the runner walks the BLOB keyspace,
+        // so a hash with nothing left but bookkeeping is invisible to it.
+        await giveOrphanedBookkeeping();
 
-        const tally = await sweeper.sweepQueue({ queueName: QUEUE_NAME });
+        const tally = await sweepOnce();
 
-        // Nothing to scan, so nothing is examined — the keys expire on their own
-        // via BLOB_LEASE_SET_TTL_SECONDS. Asserted so the bound is deliberate.
+        // Nothing examined — and, the half the scanned count alone never said,
+        // nothing dropped either: both keys survive on the lease-set TTL.
         expect(tally.scanned).toBe(0);
+        expect(await redis.exists(leaseKey())).toBe(1);
+        expect(await redis.exists(holderKey())).toBe(1);
+        expect(await redis.ttl(leaseKey())).toBeGreaterThan(0);
+        expect(await redis.ttl(holderKey())).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when the sweep decision runs for that blob anyway", () => {
+      it("drops the orphaned lease and holder keys", async () => {
+        // Production reaches this branch only when the bytes expire between
+        // the SCAN and the EVAL, which no fixture can schedule. Evaluate the
+        // queue's own script over the same three keys instead of asserting a
+        // race, so the branch that does the dropping is genuinely exercised.
+        await giveOrphanedBookkeeping();
+
+        const outcome = await redis.eval(
+          BLOB_SWEEP_LUA,
+          3,
+          leaseKey(),
+          holderKey(),
+          blobKey(),
+          "0",
+        );
+
+        expect(outcome).toBe("bookkeeping");
+        // The holder set is the load-bearing one: its guard sentinel is a live
+        // member, so only the DEL can remove it. The lease set would have been
+        // emptied by the deadline prune regardless.
+        expect(await redis.exists(holderKey())).toBe(0);
+        expect(await redis.exists(leaseKey())).toBe(0);
       });
     });
   });

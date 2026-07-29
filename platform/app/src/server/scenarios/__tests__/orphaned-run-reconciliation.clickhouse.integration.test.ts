@@ -46,7 +46,6 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     TotalCost: null,
     RoleCosts: {},
     RoleLatencies: {},
-    TraceMetricsJson: "",
     StartedAt: minutesAgo(60),
     QueuedAt: null,
     CreatedAt: minutesAgo(60),

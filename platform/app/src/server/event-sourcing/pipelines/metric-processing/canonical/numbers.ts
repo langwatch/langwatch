@@ -119,18 +119,6 @@ export function checkedOptionalDouble({
   return parsed;
 }
 
-export function checkedDouble({
-  value,
-  label,
-}: {
-  value: unknown;
-  label: string;
-}): number {
-  const parsed = checkedOptionalDouble({ value, label });
-  if (parsed === null) throw new Error(`${label} must be a finite number`);
-  return parsed;
-}
-
 export function integerDecimals(values: unknown): string[] {
   return Array.isArray(values)
     ? values.map((value) => integerDecimal(value))

@@ -194,7 +194,7 @@ describe("jobEnvelope body codecs", () => {
     });
   });
 
-  describe("given the same event is fanned out to several reactors", () => {
+  describe("given the same event is fanned out to several subscribers", () => {
     it("collapses them onto one stored blob", async () => {
       // The dedup that makes the codec choice worth anything: one encode, N
       // decodes. Machinery (__jobName et al) is lifted into the header so it
@@ -204,10 +204,10 @@ describe("jobEnvelope body codecs", () => {
       const { tieredBlobs, objectStore, redisBlobs } = makeTiered();
 
       const payload = bigPayload();
-      const reactors = ["reactor-a", "reactor-b", "reactor-c"];
+      const subscribers = ["subscriber-a", "subscriber-b", "subscriber-c"];
 
       const encoded = await Promise.all(
-        reactors.map((jobName) =>
+        subscribers.map((jobName) =>
           encodeJobEnvelope({
             jobData: { ...payload, __jobName: jobName },
             tieredBlobs,
@@ -225,7 +225,7 @@ describe("jobEnvelope body codecs", () => {
       for (const [i, value] of encoded.entries()) {
         expect(await decodeJobEnvelope({ value, tieredBlobs })).toEqual({
           ...payload,
-          __jobName: reactors[i],
+          __jobName: subscribers[i],
         });
       }
     });

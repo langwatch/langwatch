@@ -11,7 +11,8 @@
  * Production constraint (verified from prod data):
  * - started is ALWAYS the first event (lowest createdAt)
  * - finished is ALWAYS after message_snapshot
- * - metrics_computed can arrive at any point after started
+ * - metrics_recorded is emitted after the run settles, but can be delivered at
+ *   any point relative to the rest
  */
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
@@ -25,7 +26,7 @@ import type {
   SimulationMessageSnapshotEvent,
   SimulationProcessingEvent,
   SimulationRunFinishedEvent,
-  SimulationRunMetricsComputedEvent,
+  SimulationRunMetricsRecordedEvent,
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "../../schemas/events";
@@ -156,6 +157,30 @@ function createFinishedEvent(occurredAt = 5200): SimulationRunFinishedEvent {
   };
 }
 
+/**
+ * A cancel reaches the fold as a `finished` event carrying status CANCELLED —
+ * that is what makes the run terminal, and what a late worker finish has to
+ * lose against.
+ */
+function createCancelledFinishedEvent(
+  occurredAt = 3000,
+): SimulationRunFinishedEvent {
+  return {
+    id: "evt-finished-cancelled",
+    aggregateId: "run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: occurredAt + 200,
+    occurredAt,
+    type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+    version: SIMULATION_EVENT_VERSIONS.FINISHED,
+    data: {
+      scenarioRunId: "run-1",
+      status: "CANCELLED",
+    },
+  };
+}
+
 function createErrorFinishedEvent(
   occurredAt = 5200,
 ): SimulationRunFinishedEvent {
@@ -182,12 +207,48 @@ function createErrorFinishedEvent(
   };
 }
 
-function createMetricsComputedEvent(
-  traceId: string,
+/**
+ * The run's measurement. One event per run, carrying the whole aggregate — a
+ * later one replaces an earlier one outright, which is what makes ordering
+ * irrelevant here in a way the per-trace predecessor's accumulator never was.
+ */
+function createMetricsRecordedEvent(
   occurredAt: number,
-): SimulationRunMetricsComputedEvent {
+  totalCost = 0.003,
+): SimulationRunMetricsRecordedEvent {
   return {
-    id: `evt-metrics-${traceId}-${occurredAt}`,
+    id: `evt-metrics-${occurredAt}`,
+    aggregateId: "run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: occurredAt + 50,
+    occurredAt,
+    type: SIMULATION_RUN_EVENT_TYPES.METRICS_RECORDED,
+    version: SIMULATION_EVENT_VERSIONS.METRICS_RECORDED,
+    data: {
+      scenarioRunId: "run-1",
+      traceIds: ["trace-1", "trace-2"],
+      totalCost,
+      roleCosts: { Agent: [0.001, 0.001], User: [0.0005, 0.0005] },
+      roleLatencies: { Agent: [1000, 1000], User: [500, 500] },
+    },
+  };
+}
+
+/**
+ * A run measured under the RETIRED per-trace metrics event.
+ *
+ * Nothing emits `lw.simulation_run.metrics_computed` any more and the fold has
+ * no handler for it, but events committed under it are still in the log and
+ * still inside the `scenarios` retention window. `apply` returns state
+ * unchanged for an event it cannot dispatch, so this exists to prove what a
+ * replay of such a run would rebuild.
+ */
+function createRetiredMetricsComputedEvent(
+  occurredAt: number,
+): SimulationProcessingEvent {
+  return {
+    id: `evt-metrics-computed-${occurredAt}`,
     aggregateId: "run-1",
     aggregateType: "simulation_run",
     tenantId: TEST_TENANT_ID,
@@ -197,15 +258,21 @@ function createMetricsComputedEvent(
     version: SIMULATION_EVENT_VERSIONS.METRICS_COMPUTED,
     data: {
       scenarioRunId: "run-1",
-      traceId,
-      totalCost: 0.003,
-      roleCosts: { Agent: 0.002, User: 0.001 },
-      roleLatencies: { Agent: 2000, User: 1000 },
+      traceId: "trace-1",
+      totalCost: 0.004,
     },
-  };
+  } as unknown as SimulationProcessingEvent;
 }
 
-// --- Simulate incremental fold processing with re-fold on out-of-order ---
+/**
+ * Mirrors `FoldProjectionExecutor`: load, apply, and — only when the projection
+ * has not declined it — replay the aggregate's history from `init()` for an
+ * event that occurred before the checkpoint.
+ *
+ * Honouring `options.refoldOnOutOfOrder` here is the point. A harness that
+ * always re-folds proves the fold is correct under a mechanism production no
+ * longer runs, which is worse than proving nothing.
+ */
 async function processFold(
   events: SimulationProcessingEvent[],
   store: FoldProjectionStore<SimulationRunStateData> & { clear: () => void },
@@ -231,7 +298,12 @@ async function processFold(
 
     // Simulate FoldProjectionExecutor's out-of-order detection
     const eventOccurredAt = event.occurredAt ?? 0;
-    if (eventOccurredAt > 0 && eventOccurredAt < prevLastOccurred) {
+    const mayRefold = projection.options?.refoldOnOutOfOrder !== false;
+    if (
+      mayRefold &&
+      eventOccurredAt > 0 &&
+      eventOccurredAt < prevLastOccurred
+    ) {
       // Re-fold from scratch in occurredAt order
       const sorted = [...allEventsSoFar].sort(
         (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
@@ -265,8 +337,8 @@ function permutations<T>(arr: T[]): T[][] {
 
 function eventLabel(e: SimulationProcessingEvent): string {
   const type = e.type.replace("lw.simulation_run.", "");
-  if (e.type === SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED) {
-    return `${type}(${(e.data as any).traceId})`;
+  if (e.type === SIMULATION_RUN_EVENT_TYPES.METRICS_RECORDED) {
+    return `${type}@${e.occurredAt}`;
   }
   return type;
 }
@@ -313,8 +385,7 @@ describe("simulation run fold — event ordering invariants", () => {
     const afterStarted: SimulationProcessingEvent[] = [
       createMessageSnapshotEvent(5000),
       createFinishedEvent(5200),
-      createMetricsComputedEvent("trace-1", 65000),
-      createMetricsComputedEvent("trace-2", 65100),
+      createMetricsRecordedEvent(65000),
     ];
 
     const allPerms = permutations(afterStarted).map((perm) => [
@@ -343,8 +414,7 @@ describe("simulation run fold — event ordering invariants", () => {
     const afterStarted: SimulationProcessingEvent[] = [
       createMessageSnapshotEvent(SAME_TS),
       createFinishedEvent(SAME_TS),
-      createMetricsComputedEvent("trace-1", 65000),
-      createMetricsComputedEvent("trace-2", 65100),
+      createMetricsRecordedEvent(65000),
     ];
 
     const allPerms = permutations(afterStarted).map((perm) => [
@@ -367,14 +437,13 @@ describe("simulation run fold — event ordering invariants", () => {
 
   // Specific production-observed orderings
   describe("when processing in production-observed orderings", () => {
-    it("started → snapshot → finished → metrics × 2 (happy path)", async () => {
+    it("started → snapshot → finished → metrics (happy path)", async () => {
       const state = await processFold(
         [
           createStartedEvent(1000),
           createMessageSnapshotEvent(5000),
           createFinishedEvent(5000),
-          createMetricsComputedEvent("trace-1", 65000),
-          createMetricsComputedEvent("trace-2", 65100),
+          createMetricsRecordedEvent(65000),
         ],
         store,
         projection,
@@ -382,14 +451,13 @@ describe("simulation run fold — event ordering invariants", () => {
       assertCorrectFinalState(state, "happy path");
     });
 
-    it("started → finished → snapshot → metrics × 2 (finished before snapshot)", async () => {
+    it("started → finished → snapshot → metrics (finished before snapshot)", async () => {
       const state = await processFold(
         [
           createStartedEvent(1000),
           createFinishedEvent(5000),
           createMessageSnapshotEvent(5000),
-          createMetricsComputedEvent("trace-1", 65000),
-          createMetricsComputedEvent("trace-2", 65100),
+          createMetricsRecordedEvent(65000),
         ],
         store,
         projection,
@@ -397,48 +465,65 @@ describe("simulation run fold — event ordering invariants", () => {
       assertCorrectFinalState(state, "finished before snapshot");
     });
 
-    it("started → metrics → snapshot → finished → metrics (metrics interleaved)", async () => {
+    it("started → metrics → snapshot → finished (metrics ahead of the lifecycle)", async () => {
       const state = await processFold(
         [
           createStartedEvent(1000),
-          createMetricsComputedEvent("trace-1", 65000),
+          createMetricsRecordedEvent(65000),
           createMessageSnapshotEvent(5000),
           createFinishedEvent(5000),
-          createMetricsComputedEvent("trace-2", 65100),
         ],
         store,
         projection,
       );
-      assertCorrectFinalState(state, "metrics interleaved");
+      assertCorrectFinalState(state, "metrics ahead of the lifecycle");
     });
   });
 
-  // Test with duplicate 60s-delayed metrics (ECST fires twice)
-  describe("when duplicate delayed metrics arrive after finished", () => {
-    it("preserves SUCCESS with all metrics applied", async () => {
+  // A re-measure carries the whole aggregate, so it replaces rather than
+  // compounds — the property the per-trace accumulator could not offer.
+  describe("when the run is measured a second time", () => {
+    it("takes the later measurement's values", async () => {
       const state = await processFold(
         [
           createStartedEvent(1000),
           createMessageSnapshotEvent(5000),
           createFinishedEvent(5000),
-          createMetricsComputedEvent("trace-1", 65000),
-          createMetricsComputedEvent("trace-2", 65100),
-          // Duplicate ECST fire
-          createMetricsComputedEvent("trace-1", 125000),
-          createMetricsComputedEvent("trace-2", 125100),
+          createMetricsRecordedEvent(65000, 0.003),
+          createMetricsRecordedEvent(125000, 0.008),
         ],
         store,
         projection,
       );
-      assertCorrectFinalState(state, "duplicate delayed metrics");
+
+      assertCorrectFinalState(state, "re-measured run");
+      expect(state.TotalCost, "later measurement wins").toBe(0.008);
+    });
+
+    it("does not compound the earlier measurement's per-role arrays", async () => {
+      const state = await processFold(
+        [
+          createStartedEvent(1000),
+          createMessageSnapshotEvent(5000),
+          createFinishedEvent(5000),
+          createMetricsRecordedEvent(65000),
+          createMetricsRecordedEvent(125000),
+        ],
+        store,
+        projection,
+      );
+
+      expect(
+        state.RoleCosts.Agent,
+        "one entry per trace, not per event",
+      ).toEqual([0.001, 0.001]);
     });
   });
 
-  // Late-arriving lifecycle events trigger re-fold in occurredAt order
+  // Late-arriving lifecycle events are applied on top of the stored state
   describe("when started event arrives after finished (late delivery)", () => {
-    it("re-folds to correct ERROR status", async () => {
+    it("keeps the ERROR the finished event set", async () => {
       // Reproduces: queued processed → finished processed → started arrives late
-      // Re-fold replays in occurredAt order: queued(500) → started(1000) → finished(5200)
       const state = await processFold(
         [
           createQueuedEvent(500),
@@ -449,7 +534,7 @@ describe("simulation run fold — event ordering invariants", () => {
         projection,
       );
 
-      expect(state.Status, "Status must be ERROR after re-fold").toBe("ERROR");
+      expect(state.Status, "Status must remain ERROR").toBe("ERROR");
       expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
       expect(state.Verdict, "Verdict must be failure").toBe("failure");
       expect(
@@ -458,29 +543,27 @@ describe("simulation run fold — event ordering invariants", () => {
       ).not.toBeNull();
     });
 
-    it("re-folds to correct SUCCESS status", async () => {
+    it("keeps the SUCCESS the finished event set", async () => {
       const state = await processFold(
         [
           createQueuedEvent(500),
           createFinishedEvent(5200),
-          createStartedEvent(1000), // late! triggers re-fold
+          createStartedEvent(1000), // late!
         ],
         store,
         projection,
       );
 
-      expect(state.Status, "Status must be SUCCESS after re-fold").toBe(
-        "SUCCESS",
-      );
+      expect(state.Status, "Status must remain SUCCESS").toBe("SUCCESS");
       expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
     });
 
-    it("preserves metadata from all events after re-fold", async () => {
+    it("preserves metadata from all events", async () => {
       const state = await processFold(
         [
           createQueuedEvent(500),
           createErrorFinishedEvent(5200),
-          createStartedEvent(1000), // late! triggers re-fold
+          createStartedEvent(1000), // late!
         ],
         store,
         projection,
@@ -494,8 +577,11 @@ describe("simulation run fold — event ordering invariants", () => {
   });
 
   describe("when queued event arrives after finished (late delivery)", () => {
-    /** @scenario "Late finish does not overwrite cancelled status" */
-    it("preserves terminal status", async () => {
+    // This does NOT cover "Late finish does not overwrite cancelled status" —
+    // it never constructs a cancelled run. That scenario is bound in
+    // simulationRunState.foldProjection.unit.test.ts, where the fold's own
+    // terminal-status tests live.
+    it("keeps the ERROR the finished event set instead of resurrecting QUEUED", async () => {
       const state = await processFold(
         [
           createStartedEvent(1000),
@@ -511,13 +597,130 @@ describe("simulation run fold — event ordering invariants", () => {
     });
   });
 
+  // A cancel lands as a `finished` event carrying status CANCELLED. The worker
+  // it cancelled can still be mid-turn and POST its own `finished`-SUCCESS, and
+  // that success can be DELIVERED first while carrying the later occurredAt.
+  // What puts the two in the right order is the status authority ladder, not
+  // arrival and not a replay: without it a run the user cancelled would read
+  // back SUCCESS to billing, suite rollups and the run list.
+  describe("when a late success is delivered before the cancel that preceded it", () => {
+    it("takes the cancel rather than keeping the success", async () => {
+      const state = await processFold(
+        [
+          createStartedEvent(1000),
+          createFinishedEvent(5200), // delivered first, but happened last
+          createCancelledFinishedEvent(3000), // late!
+        ],
+        store,
+        projection,
+      );
+
+      expect(state.Status, "Status must be CANCELLED").toBe("CANCELLED");
+      expect(state.FinishedAt, "FinishedAt must be the cancel's time").toBe(
+        3000,
+      );
+    });
+  });
+
+  /**
+   * The reason this fold declines the out-of-order replay.
+   *
+   * A replay derives state from the events the fold still HANDLES, and this one
+   * no longer handles every event in its own log: `metrics_computed` is retired,
+   * and a run measured under it has its cost in those events and on its stored
+   * row, nowhere else. `metrics_recorded` cannot recover it — that measurement
+   * is only ever asked for by a deadline armed on a live `finished`, and the
+   * spans it would re-derive from expire on the shorter `traces` retention. So a
+   * replay does not rebuild the cost, it erases it, permanently.
+   */
+  describe("given a run whose cost was measured under the retired per-trace event", () => {
+    const ctx: ProjectionStoreContext = {
+      aggregateId: "run-1",
+      tenantId: TEST_TENANT_ID,
+    };
+
+    /** What the retired handler left on the row before it was removed. */
+    const MEASURED = {
+      TotalCost: 0.004,
+      RoleCosts: { Agent: [0.004] },
+      RoleLatencies: { Agent: [900] },
+    };
+
+    /** The run's committed log, retired measurement included. */
+    const log: SimulationProcessingEvent[] = [
+      createQueuedEvent(500),
+      createStartedEvent(1000),
+      createMessageSnapshotEvent(5000),
+      createFinishedEvent(5200),
+      createRetiredMetricsComputedEvent(65000),
+    ];
+
+    async function deliverBackdated(
+      event: SimulationProcessingEvent,
+    ): Promise<SimulationRunStateData> {
+      store.clear();
+      let measured = projection.init();
+      for (const committed of log) {
+        measured = projection.apply(measured, committed);
+      }
+      await store.store({ ...measured, ...MEASURED }, ctx);
+
+      const current = (await store.get("run-1", ctx))!;
+      const prevLastOccurred = current.LastEventOccurredAt ?? 0;
+      const next = projection.apply(current, event);
+
+      if (
+        projection.options?.refoldOnOutOfOrder !== false &&
+        (event.occurredAt ?? 0) < prevLastOccurred
+      ) {
+        let refolded = projection.init();
+        for (const committed of [...log, event].sort(
+          (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
+        )) {
+          refolded = projection.apply(refolded, committed);
+        }
+        store.clear();
+        await store.store(refolded, ctx);
+      } else {
+        await store.store(next, ctx);
+      }
+
+      return (await store.get("run-1", ctx))!;
+    }
+
+    describe("when an event that occurred before the checkpoint arrives", () => {
+      it("keeps the cost on the row instead of rebuilding it as blank", async () => {
+        const state = await deliverBackdated(createStartedEvent(1000));
+
+        expect(state.TotalCost, "the measured cost must survive").toBe(
+          MEASURED.TotalCost,
+        );
+        expect(state.RoleCosts).toEqual(MEASURED.RoleCosts);
+        expect(state.RoleLatencies).toEqual(MEASURED.RoleLatencies);
+      });
+
+      // Declining the replay is not declining the event: it is applied on top
+      // of the state that was loaded, so a backdated cancel still outranks the
+      // success already stored — and still does not cost the run its metrics.
+      it("still applies the event on top of the state it loaded", async () => {
+        const state = await deliverBackdated(
+          createCancelledFinishedEvent(3000),
+        );
+
+        expect(state.Status).toBe("CANCELLED");
+        expect(state.FinishedAt).toBe(3000);
+        expect(state.TotalCost).toBe(MEASURED.TotalCost);
+      });
+    });
+  });
+
   // Full lifecycle with all events in every possible order
   describe("when all lifecycle events (queued, started, finished, metrics) arrive in any order", () => {
     const events: SimulationProcessingEvent[] = [
       createQueuedEvent(500),
       createStartedEvent(1000),
       createFinishedEvent(5200),
-      createMetricsComputedEvent("trace-1", 65000),
+      createMetricsRecordedEvent(65000),
     ];
 
     const allPerms = permutations(events);

@@ -13,7 +13,7 @@ import type {
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
   SimulationRunFinishedEvent,
-  SimulationRunMetricsComputedEvent,
+  SimulationRunMetricsRecordedEvent,
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
   SimulationTextMessageEndEvent,
@@ -24,7 +24,7 @@ import {
   SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
   SimulationRunFinishedEventSchema,
-  SimulationRunMetricsComputedEventSchema,
+  SimulationRunMetricsRecordedEventSchema,
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
   SimulationTextMessageEndEventSchema,
@@ -108,7 +108,7 @@ function buildMessageRestJson(messageFields: Record<string, unknown>): string {
  * A single message row stored in the Messages parallel arrays.
  * Maps to `Messages.*` Nested columns in ClickHouse.
  */
-export interface SimulationMessageRow {
+interface SimulationMessageRow {
   Id: string; // opaque message ID, empty string if absent
   Role: string; // "user" | "assistant" | "system" | "tool"
   Content: string; // message content, empty string if null
@@ -128,6 +128,14 @@ export interface SimulationRunStateData {
   ScenarioId: string;
   BatchRunId: string;
   ScenarioSetId: string;
+  /**
+   * How many runs the dispatching batch intended to queue (ADR-072). Every
+   * child of a batch carries the same value, so the batch's denominator is
+   * available from whichever row lands first rather than from a separate
+   * suite-run record. 0 means unknown — runs queued before this field existed,
+   * for which the read path counts rows instead.
+   */
+  BatchTotal: number;
   Status: string;
   Name: string | null;
   Description: string | null;
@@ -140,17 +148,15 @@ export interface SimulationRunStateData {
   UnmetCriteria: string[];
   Error: string | null;
   DurationMs: number | null;
+  /**
+   * The run's cost and latency, assigned wholesale from a single
+   * `metrics_recorded` event (see `handleSimulationRunMetricsRecorded`). There is
+   * deliberately no per-trace accumulator behind them: the run is measured once,
+   * from all of its traces at once, so re-measuring replaces rather than merges.
+   */
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
   RoleLatencies: Record<string, number[]>;
-  TraceMetrics: Record<
-    string,
-    {
-      totalCost: number;
-      roleCosts: Record<string, number>;
-      roleLatencies: Record<string, number>;
-    }
-  >;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -186,8 +192,11 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
  *      `queued` event folded after `finished` used to resurrect Status=QUEUED
  *      with FinishedAt still set. If you add a handler that writes a
  *      non-terminal Status, it goes through here too;
- *   2. `handleSimulationRunFinished` returning early once FinishedAt is set, so
- *      a run finishes exactly once;
+ *   2. `handleSimulationRunFinished` returning early once FinishedAt is set,
+ *      unless the incoming finish OUTRANKS the stored one (see
+ *      {@link terminalStatusAuthority}) — so a run finishes once, and the only
+ *      thing that can revise a finished run is another terminal declaration
+ *      with more authority, never a non-terminal one;
  *   3. that same handler refusing a non-terminal explicit status, since the
  *      finished event's `status` is only typed `z.string().optional()` on the
  *      internal event schema — any string can reach the fold.
@@ -221,6 +230,75 @@ function isTerminalStatus(status: string): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
+/**
+ * How much authority a terminal status carries when more than one `finished`
+ * event reaches the same run.
+ *
+ * A run finishes once, but three independent writers can each declare it
+ * finished — the worker reporting its own outcome, the user's cancel, and the
+ * liveness wake that fires when a run goes quiet — and nothing orders them.
+ * Ranking them makes the stored record a function of WHAT was declared rather
+ * than of which declaration happened to be folded first, which is the property
+ * a fold needs: the same event set must produce the same state under a replay
+ * in any order.
+ *
+ * The ranks, and why each status sits where it does:
+ *
+ * - `CANCELLED` (2) — a statement of intent, not an observation. The user
+ *   stopped the run, so the worker's own outcome a moment later describes work
+ *   the user already disowned. Nothing outranks it, so a run the user cancelled
+ *   can never read back as a success, in either arrival order. This is the
+ *   contract in `specs/features/suites/cancel-queued-running-jobs.feature`.
+ * - `SUCCESS` / `FAILURE` / `FAILED` / `ERROR` (1) — the run's observed
+ *   outcome, the ordinary case. They rank EQUAL to each other on purpose: the
+ *   first to land owns the record and a redelivered or late sibling cannot
+ *   rewrite what downstream consumers already acted on, nor split the record
+ *   into an ERROR status carrying a late SUCCESS verdict.
+ * - `STALLED` (0) — provisional. The `scenarioExecution` deadline wake writes
+ *   it (ADR-073 step 2) because the run stopped reporting, which is a guess
+ *   that the run died. A genuine `finished` arriving afterwards is proof the
+ *   guess was wrong — the run was merely slow — so any real outcome supersedes
+ *   it. Treating STALLED as immutable, the way CANCELLED is, would freeze every
+ *   quiet-but-alive run as STALLED for good.
+ * - anything else (-1) — not a terminal status, so it cannot legitimately be
+ *   the status of a run whose FinishedAt is set. Ranking it below everything
+ *   lets a real terminal finish repair such a row rather than be blocked by it.
+ *
+ * `DELETED` is deliberately absent: deletion is not a status here.
+ * `handleSimulationRunDeleted` sets `ArchivedAt` and leaves `Status` alone, so
+ * it never competes for the record.
+ *
+ * Note this ladder governs terminal-vs-terminal only. Non-terminal writers
+ * (queued / started / snapshot / textMessageStart) stay blocked outright by
+ * {@link statusAfter} once FinishedAt is set — including on a STALLED run. A
+ * late snapshot proving the run is alive would otherwise leave Status
+ * non-terminal WITH FinishedAt set, the one state nothing reconciles; only a
+ * real terminal `finished` may take a stalled run back.
+ */
+function terminalStatusAuthority(status: string): number {
+  if (status === "CANCELLED") return 2;
+  if (status === "STALLED") return 0;
+  return isTerminalStatus(status) ? 1 : -1;
+}
+
+/**
+ * Whether an incoming `finished` event's status may take over the record of a
+ * run that is already finished. See {@link terminalStatusAuthority} for why
+ * each status ranks where it does.
+ *
+ * Strictly-greater, so equal authority means the first finish keeps the run
+ * and a duplicate is a no-op.
+ */
+function supersedesFinishedRun({
+  stored,
+  incoming,
+}: {
+  stored: string;
+  incoming: string;
+}): boolean {
+  return terminalStatusAuthority(incoming) > terminalStatusAuthority(stored);
+}
+
 const simulationRunEvents = [
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
@@ -228,7 +306,7 @@ const simulationRunEvents = [
   SimulationTextMessageStartEventSchema,
   SimulationTextMessageEndEventSchema,
   SimulationRunFinishedEventSchema,
-  SimulationRunMetricsComputedEventSchema,
+  SimulationRunMetricsRecordedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
 ] as const;
@@ -252,6 +330,45 @@ export class SimulationRunStateFoldProjection
   readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
   readonly store: FoldProjectionStore<SimulationRunStateData>;
 
+  /**
+   * `refoldOnOutOfOrder: false` — a backdated event is applied on top of the
+   * state already stored, never by replaying the run's history from `init()`.
+   *
+   * **Why it must be off.** A replay derives state from the events the fold
+   * still handles, and this fold no longer handles all of the events in its own
+   * log. `lw.simulation_run.metrics_computed` is RETIRED
+   * (`schemas/constants.ts`): runs measured under it have their cost and
+   * per-role latencies in those events and in no other, because the run-level
+   * `metrics_recorded` that replaced it is only ever emitted by a deadline armed
+   * on a LIVE `finished`. `apply` returns state unchanged for an event it has no
+   * handler for, so a replay of such a run rebuilds `TotalCost: null`,
+   * `RoleCosts: {}` and `RoleLatencies: {}` and stores that over the correct
+   * row. Nothing recovers it — the spans it would be re-derived from are in the
+   * `traces` retention category, which expires ahead of `scenarios`.
+   *
+   * **Why it is safe to turn off.** Every handler decides on what the event
+   * carries rather than on when it arrived, so the fold reaches the same state
+   * whichever order it sees events in and the replay derives nothing:
+   *   - terminal-vs-terminal is settled by {@link terminalStatusAuthority}, so a
+   *     cancel outranks a late success in either arrival order;
+   *   - every non-terminal status writer goes through {@link statusAfter}, so
+   *     nothing reopens a finished run, and each one only advances a run that is
+   *     still `PENDING`;
+   *   - snapshots are guarded by `LastSnapshotOccurredAt`, messages are keyed by
+   *     `messageId`, trace ids are a set, and identity/label fields keep the
+   *     value already established;
+   *   - `metrics_recorded` assigns the whole measurement from one event, so a
+   *     re-measure replaces rather than compounds.
+   * `simulationRunState.ordering.unit.test.ts` folds every permutation of a
+   * run's lifecycle through a harness that mirrors the executor, and that is
+   * what holds this claim honest rather than the paragraph above.
+   *
+   * The replay was also the amplification the trace folds hit: it reads every
+   * event for the aggregate and raises the checkpoint to the highest `occurredAt`
+   * seen, so one backdated event makes every later batch look out of order too.
+   */
+  readonly options = { refoldOnOutOfOrder: false } as const;
+
   protected readonly events = simulationRunEvents;
 
   constructor(deps: { store: FoldProjectionStore<SimulationRunStateData> }) {
@@ -265,6 +382,7 @@ export class SimulationRunStateFoldProjection
       ScenarioId: "",
       BatchRunId: "",
       ScenarioSetId: "",
+      BatchTotal: 0,
       Status: "PENDING",
       Name: null,
       Description: null,
@@ -280,7 +398,6 @@ export class SimulationRunStateFoldProjection
       TotalCost: null,
       RoleCosts: {},
       RoleLatencies: {},
-      TraceMetrics: {},
       StartedAt: null,
       QueuedAt: null,
       FinishedAt: null,
@@ -290,23 +407,51 @@ export class SimulationRunStateFoldProjection
     };
   }
 
+  /**
+   * The run was scheduled.
+   *
+   * Every field prefers what is already established, which is what makes this
+   * handler order-insensitive and therefore what lets the fold decline the
+   * out-of-order replay (see {@link SimulationRunStateFoldProjection.options}).
+   * `queued` is the run's EARLIEST event but not reliably its first DELIVERY:
+   * it can land behind `started` or a snapshot, and overwriting from it then
+   * blanked a name the run already had and dropped Status back to QUEUED on a
+   * run that was demonstrably running.
+   *
+   * There is at most one `queued` per run — `queueRun`'s idempotency key is
+   * `<tenant>:<scenarioRunId>:queueRun` — so preferring the stored value never
+   * loses a second, better one.
+   */
   handleSimulationRunQueued(
     event: SimulationRunQueuedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
     return {
       ...state,
-      ScenarioRunId: event.data.scenarioRunId,
-      ScenarioId: event.data.scenarioId,
-      BatchRunId: event.data.batchRunId,
-      ScenarioSetId: event.data.scenarioSetId,
-      Name: event.data.name ?? null,
-      Status: statusAfter({ state, candidate: "QUEUED" }),
-      Description: event.data.description ?? null,
-      Metadata: event.data.metadata
-        ? JSON.stringify(event.data.metadata)
-        : null,
-      QueuedAt: event.occurredAt,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      ScenarioId: state.ScenarioId || event.data.scenarioId,
+      BatchRunId: state.BatchRunId || event.data.batchRunId,
+      ScenarioSetId: state.ScenarioSetId || event.data.scenarioSetId,
+      // Keep whichever value is known: a `queued` event redelivered without
+      // the field must not erase a denominator an earlier one established.
+      BatchTotal: event.data.batchTotal ?? state.BatchTotal,
+      Name: state.Name ?? event.data.name ?? null,
+      // Only ever advances a run that has not left PENDING. `statusAfter` alone
+      // blocks a resurrection past `finished`; this also blocks the shorter one
+      // past `started`, where FinishedAt is still null.
+      Status: statusAfter({
+        state,
+        candidate: state.Status === "PENDING" ? "QUEUED" : state.Status,
+      }),
+      Description: state.Description ?? event.data.description ?? null,
+      Metadata:
+        state.Metadata ??
+        (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
+      // The earliest queue time, not the last one folded.
+      QueuedAt:
+        state.QueuedAt != null
+          ? Math.min(state.QueuedAt, event.occurredAt)
+          : event.occurredAt,
     };
   }
 
@@ -521,12 +666,6 @@ export class SimulationRunStateFoldProjection
     event: SimulationRunFinishedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
-    // A run finishes exactly once. A second `finished` — a child that outlived
-    // the parent this run's orphan reconciliation already failed — must not
-    // rewrite a terminal record the downstream reactors have already acted on,
-    // nor split it (an ERROR Status carrying the late child's SUCCESS Verdict).
-    if (state.FinishedAt != null) return state;
-
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
 
@@ -549,6 +688,26 @@ export class SimulationRunStateFoldProjection
       status = "FAILURE";
     }
 
+    // A run finishes exactly once, and by default the first `finished` owns the
+    // record: a second one — a child that outlived the parent this run's orphan
+    // reconciliation already failed — must not rewrite what downstream
+    // consumers acted on, nor split it (an ERROR Status carrying the late
+    // child's SUCCESS Verdict).
+    //
+    // The exception is a finish that outranks the stored one
+    // ({@link supersedesFinishedRun}): a user's cancel always wins, and a real
+    // outcome always beats the deadline wake's provisional STALLED. Deciding on
+    // authority rather than on arrival means both hold under a replay in either
+    // order, and the winner owns the WHOLE outcome — Verdict, Reasoning,
+    // criteria, Error, DurationMs, FinishedAt — so the record describes one
+    // declaration rather than a blend of two.
+    if (
+      state.FinishedAt != null &&
+      !supersedesFinishedRun({ stored: state.Status, incoming: status })
+    ) {
+      return state;
+    }
+
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
@@ -563,41 +722,28 @@ export class SimulationRunStateFoldProjection
     };
   }
 
-  handleSimulationRunMetricsComputed(
-    event: SimulationRunMetricsComputedEvent,
+  /**
+   * The run was measured. The event carries the whole answer — every trace
+   * aggregated — so this assigns rather than accumulates.
+   *
+   * That is the entire fix for the metrics that used to be wrong on screen. The
+   * predecessor folded one event per trace and kept a `traceId -> metrics` map on
+   * the run to re-aggregate from, which made the fold state grow with trace
+   * count and, worse, made the answer a function of which per-trace events
+   * happened to land: a first one emitted before cost enrichment finished was
+   * kept by the event store's idempotency rule and no correction could ever
+   * replace it. Assigning from one event means a re-measure simply wins.
+   */
+  handleSimulationRunMetricsRecorded(
+    event: SimulationRunMetricsRecordedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
-    // Store per-trace breakdown, then recompute aggregates
-    const traceMetrics = {
-      ...state.TraceMetrics,
-      [event.data.traceId]: {
-        totalCost: event.data.totalCost,
-        roleCosts: event.data.roleCosts,
-        roleLatencies: event.data.roleLatencies,
-      },
-    };
-
-    // Aggregate across all traces: collect individual values into arrays
-    let totalCost = 0;
-    const roleCosts: Record<string, number[]> = {};
-    const roleLatencies: Record<string, number[]> = {};
-
-    for (const entry of Object.values(traceMetrics)) {
-      totalCost += entry.totalCost;
-      for (const [role, cost] of Object.entries(entry.roleCosts)) {
-        (roleCosts[role] ??= []).push(cost);
-      }
-      for (const [role, latency] of Object.entries(entry.roleLatencies)) {
-        (roleLatencies[role] ??= []).push(latency);
-      }
-    }
-
     return {
       ...state,
-      TraceMetrics: traceMetrics,
-      TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
-      RoleCosts: roleCosts,
-      RoleLatencies: roleLatencies,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      TotalCost: event.data.totalCost,
+      RoleCosts: event.data.roleCosts,
+      RoleLatencies: event.data.roleLatencies,
     };
   }
 

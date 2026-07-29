@@ -36,7 +36,7 @@ export interface ObjectStore {
  * lockstep. The inline tier (≤ a few KiB) is handled by the envelope, not
  * this store.
  */
-export const S3_TIER_THRESHOLD_BYTES = COMMAND_INLINE_THRESHOLD;
+const S3_TIER_THRESHOLD_BYTES = COMMAND_INLINE_THRESHOLD;
 
 /**
  * A content-addressed reference to an offloaded blob; travels inside the job
@@ -345,9 +345,10 @@ export class TieredBlobStore {
     } catch (err) {
       // A genuinely-absent or oversized/corrupt object is a missing blob → null
       // → decode fail-safe, which DISCARDS the job (#5538: replay rebuilds fold
-      // projections and never re-invokes reactors, so for a reactor-bearing fold
-      // this is permanent loss, not "recover via replay" as this once claimed —
-      // see `GroupQueue.dropStagedJob`). Anything else (network/5xx) is
+      // and map projections and never re-runs event subscribers or process
+      // managers, so for one of their jobs this is permanent loss, not "recover
+      // via replay" as this once claimed — see `GroupQueue.dropStagedJob`).
+      // Anything else (network/5xx) is
       // transient and must retry, not drop the job (ADR-030 §2). Oversize is
       // an OBSERVABLE fail-safe — split from "just missing" so oncall can see a
       // real tamper / zip-bomb event distinct from "TTL reclaimed the blob".

@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   getDejaViewProjections,
   getProjectionMetadata,
-} from "~/server/event-sourcing/pipelineRegistry";
+} from "~/server/event-sourcing/introspection";
 import type {
   AggregateSearchResult,
   EventExplorerRepository,

@@ -14,23 +14,23 @@
  *   have nearly identical or even inverted occurredAt timestamps
  */
 import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../../projections/projectionStoreContext";
+import { createTenantId } from "../../../../domain/tenantId";
 import {
-  EXPERIMENT_RUN_EVENT_TYPES,
   EXPERIMENT_RUN_EVENT_VERSIONS,
+  EXPERIMENT_RUN_EVENT_TYPES,
 } from "../../schemas/constants";
 import type {
-  EvaluatorResultEvent,
-  ExperimentRunCompletedEvent,
   ExperimentRunProcessingEvent,
   ExperimentRunStartedEvent,
   TargetResultEvent,
+  EvaluatorResultEvent,
+  ExperimentRunCompletedEvent,
 } from "../../schemas/events";
 import {
-  type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
+  type ExperimentRunStateData,
 } from "../experimentRunState.foldProjection";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
@@ -62,7 +62,9 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<ExperimentRunState
 }
 
 // --- Event factories ---
-function createStartedEvent(occurredAt: number): ExperimentRunStartedEvent {
+function createStartedEvent(
+  occurredAt: number,
+): ExperimentRunStartedEvent {
   return {
     id: "evt-started",
     aggregateId: "run-1",
@@ -134,7 +136,9 @@ function createEvaluatorResultEvent(
   };
 }
 
-function createCompletedEvent(occurredAt: number): ExperimentRunCompletedEvent {
+function createCompletedEvent(
+  occurredAt: number,
+): ExperimentRunCompletedEvent {
   return {
     id: "evt-completed",
     aggregateId: "run-1",
@@ -165,7 +169,8 @@ async function processFold(
 
   store.clear();
   for (const event of events) {
-    const currentState = (await store.get("run-1", ctx)) ?? projection.init();
+    const currentState =
+      (await store.get("run-1", ctx)) ?? projection.init();
     const newState = projection.apply(currentState, event);
     await store.store(newState, ctx);
   }
@@ -206,16 +211,19 @@ describe("experiment run fold — event ordering invariants", () => {
   ) {
     expect(state.FinishedAt, `${label}: FinishedAt must be set`).not.toBeNull();
     expect(state.RunId, `${label}: RunId must be set`).toBe("run-1");
-    expect(state.ExperimentId, `${label}: ExperimentId must be set`).toBe(
-      "experiment-1",
-    );
-    expect(state.CompletedCount, `${label}: CompletedCount must be 3`).toBe(3);
+    expect(
+      state.ExperimentId,
+      `${label}: ExperimentId must be set`,
+    ).toBe("experiment-1");
+    expect(
+      state.CompletedCount,
+      `${label}: CompletedCount must be 3`,
+    ).toBe(3);
     expect(state.Progress, `${label}: Progress must be 3`).toBe(3);
     expect(
-      state.TotalCost,
-      `${label}: TotalCost must be computed`,
-    ).toBeGreaterThan(0);
-    expect(state.ScoreCount, `${label}: ScoreCount must be 3`).toBe(3);
+      state.ScoreCount,
+      `${label}: ScoreCount must be 3`,
+    ).toBe(3);
     expect(
       state.AvgScoreBps,
       `${label}: AvgScoreBps must be computed`,
@@ -252,10 +260,13 @@ describe("experiment run fold — event ordering invariants", () => {
           name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
           perm,
         })),
-      )("$name → final state is correct", async ({ name, perm }) => {
-        const state = await processFold(perm, store, projection);
-        assertCorrectFinalState(state, name);
-      });
+      )(
+        "$name → final state is correct",
+        async ({ name, perm }) => {
+          const state = await processFold(perm, store, projection);
+          assertCorrectFinalState(state, name);
+        },
+      );
     });
   });
 

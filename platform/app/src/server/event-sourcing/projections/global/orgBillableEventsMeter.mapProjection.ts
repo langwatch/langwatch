@@ -1,7 +1,7 @@
 import type { Event } from "../../domain/types";
 import { EVALUATION_EVENT_TYPES } from "../../pipelines/evaluation-processing/schemas/constants";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "../../pipelines/experiment-run-processing/schemas/constants";
-import { SIMULATION_RUN_EVENT_TYPES } from "../../pipelines/simulation-processing";
+import { SIMULATION_RUN_EVENT_TYPES } from "../../pipelines/simulation-processing/schemas/constants";
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
 import type { MapProjectionDefinition } from "../mapProjection.types";
 import {

@@ -233,7 +233,7 @@ export const gqGroupsPoisonParkedTotal = new Counter({
  */
 export const gqRetryEncodeFailuresTotal = new Counter({
   name: "gq_retry_encode_failures_total",
-  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay does not recover reactor jobs; see gq_jobs_dropped_total)",
+  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay rebuilds projections only; see gq_jobs_dropped_total)",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
@@ -265,17 +265,22 @@ export const gqRetryEncodeFailuresTotal = new Counter({
  * - `retry_encode_failed` — a retry's re-encode failed, so the retry never went
  *   back. Also counted by `gq_retry_encode_failures_total`, which stays as the
  *   specific diagnostic; this counter is the complete ledger of discards.
+ * - `retry_slot_expired` — a retry re-stage found the group's active key GONE
+ *   rather than held by another worker. Nothing was re-staged and the job left
+ *   staging when it was claimed, so it is lost. Distinct from the benign
+ *   hand-off (another worker owns the slot), which is not counted at all.
  * - `unknown` — an unclassified throw. Non-zero here means a decode failure mode
  *   exists that we have not named; that is a bug in the enum, not a shrug.
  *
- * ⚠️ A non-zero rate on a reactor pipeline is PERMANENT DATA LOSS, not a blip.
- * Replay rebuilds fold projections and never invokes reactors
- * (`projections/projectionRouter.ts:61-71`), so nothing re-fires a dropped
- * reactor job. This counter is the ONLY signal that it happened.
+ * ⚠️ A non-zero rate is PERMANENT DATA LOSS for anything whose effect does not
+ * live in a projection, not a blip. Replay rebuilds fold and map projections and
+ * touches nothing else — no event subscribers, no process managers, no outbox
+ * (`replay/replayStatePath.ts`) — so nothing re-fires a dropped job's side
+ * effects. This counter is the ONLY signal that it happened.
  */
 export const gqJobsDroppedTotal = new Counter({
   name: "gq_jobs_dropped_total",
-  help: "Staged jobs discarded because they could not be decoded — for reactor pipelines this is permanent data loss (replay does not re-invoke reactors)",
+  help: "Staged jobs the queue discarded — permanent loss for any side effect that does not live in a projection (replay rebuilds projections only)",
   labelNames: [
     "queue_name",
     "pipeline_name",

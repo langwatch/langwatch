@@ -1,7 +1,10 @@
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
-import { EXPERIMENT_RUN_EVENT_TYPES } from "./constants";
+import {
+  EXPERIMENT_RUN_EVENT_TYPES,
+  EXPERIMENT_RUN_EVENT_VERSIONS,
+} from "./constants";
 import { targetSchema } from "./shared";
 
 /**
@@ -26,13 +29,11 @@ export const experimentRunStartedEventDataSchema = z.object({
 
 export const experimentRunStartedEventSchema = EventSchema.extend({
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.STARTED),
+  version: z.literal(EXPERIMENT_RUN_EVENT_VERSIONS.STARTED),
   data: experimentRunStartedEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
 });
 
-export type ExperimentRunStartedEventData = z.infer<
-  typeof experimentRunStartedEventDataSchema
->;
 export type ExperimentRunStartedEvent = z.infer<
   typeof experimentRunStartedEventSchema
 >;
@@ -75,11 +76,11 @@ export const targetResultEventDataSchema = z.object({
 
 export const targetResultEventSchema = EventSchema.extend({
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT),
+  version: z.literal(EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT),
   data: targetResultEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
 });
 
-export type TargetResultEventData = z.infer<typeof targetResultEventDataSchema>;
 export type TargetResultEvent = z.infer<typeof targetResultEventSchema>;
 
 /**
@@ -104,38 +105,12 @@ export const evaluatorResultEventDataSchema = z.object({
 
 export const evaluatorResultEventSchema = EventSchema.extend({
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT),
+  version: z.literal(EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT),
   data: evaluatorResultEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
 });
 
-export type EvaluatorResultEventData = z.infer<
-  typeof evaluatorResultEventDataSchema
->;
 export type EvaluatorResultEvent = z.infer<typeof evaluatorResultEventSchema>;
-
-/**
- * Trace metrics computed event - emitted when trace cost data is synced
- * from the trace processing pipeline (ECST pattern).
- */
-export const traceMetricsComputedEventDataSchema = z.object({
-  runId: z.string(),
-  experimentId: z.string(),
-  traceId: z.string(),
-  totalCost: z.number(),
-});
-
-export const traceMetricsComputedEventSchema = EventSchema.extend({
-  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.TRACE_METRICS_COMPUTED),
-  data: traceMetricsComputedEventDataSchema,
-  metadata: experimentRunEventMetadataSchema.optional(),
-});
-
-export type TraceMetricsComputedEventData = z.infer<
-  typeof traceMetricsComputedEventDataSchema
->;
-export type TraceMetricsComputedEvent = z.infer<
-  typeof traceMetricsComputedEventSchema
->;
 
 /**
  * Experiment run completed event - emitted when an experiment run finishes.
@@ -149,13 +124,11 @@ export const experimentRunCompletedEventDataSchema = z.object({
 
 export const experimentRunCompletedEventSchema = EventSchema.extend({
   type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.COMPLETED),
+  version: z.literal(EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED),
   data: experimentRunCompletedEventDataSchema,
   metadata: experimentRunEventMetadataSchema.optional(),
 });
 
-export type ExperimentRunCompletedEventData = z.infer<
-  typeof experimentRunCompletedEventDataSchema
->;
 export type ExperimentRunCompletedEvent = z.infer<
   typeof experimentRunCompletedEventSchema
 >;
@@ -167,7 +140,6 @@ export type ExperimentRunProcessingEvent =
   | ExperimentRunStartedEvent
   | TargetResultEvent
   | EvaluatorResultEvent
-  | TraceMetricsComputedEvent
   | ExperimentRunCompletedEvent;
 
 export {
@@ -175,5 +147,4 @@ export {
   isExperimentRunCompletedEvent,
   isExperimentRunStartedEvent,
   isTargetResultEvent,
-  isTraceMetricsComputedEvent,
 } from "./typeGuards";

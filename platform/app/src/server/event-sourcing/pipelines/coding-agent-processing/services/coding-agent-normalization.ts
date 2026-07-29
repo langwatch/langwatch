@@ -18,6 +18,8 @@
  * evidence that forced it.
  */
 
+import { createLogger } from "@langwatch/observability";
+import { scalarsFromCanonicalAttributes } from "../../metric-processing/canonical/attributes";
 import { CODING_AGENT_REGISTRY } from "../agents";
 import type {
   CodingAgent,
@@ -26,6 +28,8 @@ import type {
   CodingAgentSignal,
   TokenType,
 } from "../agents/_types";
+
+const logger = createLogger("langwatch:coding-agent:normalization");
 
 /**
  * Which agent produced this record.
@@ -484,4 +488,109 @@ function firstString(
     if (typeof value === "string" && value.length > 0) return value;
   }
   return null;
+}
+
+/**
+ * Which canonical row a parse failure belongs to, for the log line.
+ *
+ * The id, never the blob: the row is still there to read, and it is the only
+ * pointer a reader needs.
+ */
+interface CanonicalAttributesRef {
+  kind: "record" | "point";
+  id: string;
+}
+
+/**
+ * Parse a canonical row's attributes blob, or skip the row.
+ *
+ * The blob is written by our own canonical preparation, so a parse failure
+ * should be unreachable — but a dispatcher must never poison the queue over
+ * one row, so this reports null and the caller drops it.
+ *
+ * **Only the error's NAME reaches the log line.** V8 builds
+ * `SyntaxError.message` by quoting roughly ten characters of the input it
+ * choked on, so serialising the error would copy a slice of the customer's
+ * attributes into our logs. The ref is the better pointer anyway.
+ *
+ * `decode` is where the two canonical shapes differ — flat object vs the
+ * typed KeyValue array — and is the only thing a caller varies.
+ */
+function parseCanonicalAttributes<T>({
+  json,
+  ref,
+  decode,
+}: {
+  json: string;
+  ref: CanonicalAttributesRef;
+  decode: (parsed: unknown) => T | null;
+}): T | null {
+  if (!json) return null;
+  try {
+    return decode(JSON.parse(json));
+  } catch (error) {
+    logger.warn(
+      {
+        errorName: error instanceof Error ? error.name : typeof error,
+        refKind: ref.kind,
+        refId: ref.id,
+      },
+      "unparseable canonical attributes; skipping",
+    );
+    return null;
+  }
+}
+
+/**
+ * The flat-object canonical shape (`attributesFlatJson`,
+ * `resourceAttributesFlatJson`): a plain map of scalars.
+ *
+ * An array parses as an object in JavaScript but is never a valid attribute
+ * map, so it is rejected rather than indexed into.
+ */
+export function parseFlatCanonicalAttributes({
+  json,
+  ref,
+}: {
+  json: string;
+  ref: CanonicalAttributesRef;
+}): Record<string, unknown> | null {
+  return parseCanonicalAttributes({
+    json,
+    ref,
+    decode: (parsed) =>
+      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null,
+  });
+}
+
+/**
+ * The KeyValue canonical shape (`pointAttributesJson`,
+ * `resourceAttributesJson`): the `[{key, value: {type, value}}]` array
+ * `buildPoint` writes, flattened back to scalars.
+ */
+export function parseKeyValueCanonicalAttributes({
+  json,
+  ref,
+}: {
+  json: string;
+  ref: CanonicalAttributesRef;
+}): Record<string, string | number | boolean> | null {
+  return parseCanonicalAttributes({
+    json,
+    ref,
+    decode: scalarsFromCanonicalAttributes,
+  });
+}
+
+/**
+ * A present, non-empty string, or null.
+ *
+ * Every resource read wants this: an attribute that is absent, wrongly typed,
+ * or an empty string all mean "no signal", and passing `""` on as if it were
+ * one invites a downstream match against the empty prefix.
+ */
+export function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }

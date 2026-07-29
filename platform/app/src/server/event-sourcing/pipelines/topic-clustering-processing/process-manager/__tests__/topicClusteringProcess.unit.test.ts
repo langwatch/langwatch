@@ -6,6 +6,7 @@ import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pip
 import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
 import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
 
+import { outcomeCommandsThatMustNotRun } from "./helpers/outcomeCommands";
 import {
   buildProcessEventView,
   nextDailySlot,
@@ -32,9 +33,7 @@ const definition = buildProcessDefinition(
     name: TOPIC_CLUSTERING_PROCESS_NAME,
     applier: topicClusteringPM({
       runPort: { runClusteringPage: () => Promise.reject(new Error("unused")) },
-      commands: () => {
-        throw new Error("unused in evolve tests");
-      },
+      commands: outcomeCommandsThatMustNotRun("unused in evolve tests"),
     }),
   }).config,
 ) as ProcessDefinition<TopicClusteringProcessState>;

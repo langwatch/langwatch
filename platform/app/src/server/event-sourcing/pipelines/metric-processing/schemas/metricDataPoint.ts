@@ -9,7 +9,7 @@ export const metricKindSchema = z.enum([
 ]);
 export type MetricKind = z.infer<typeof metricKindSchema>;
 
-export const aggregationTemporalitySchema = z.enum([
+const aggregationTemporalitySchema = z.enum([
   "unspecified",
   "delta",
   "cumulative",

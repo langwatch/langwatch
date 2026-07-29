@@ -1,7 +1,7 @@
 import type { EvaluationAnalyticsRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { retentionDaysFrom } from "../../shared/analyticsStoreBase";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
@@ -36,6 +36,12 @@ import {
 export class EvaluationAnalyticsStore
   implements FoldProjectionStore<EvaluationAnalyticsData>
 {
+  /**
+   * Keys the fold cache, so a version bump misses rather than serving state in
+   * the old shape past `getWithApplied`'s gate.
+   */
+  readonly projectionVersion = EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST;
+
   constructor(private readonly repo: EvaluationAnalyticsRepository) {}
 
   async store(
@@ -92,8 +98,7 @@ export class EvaluationAnalyticsStore
         tenantId: String(context.tenantId),
         version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
       }),
-      retentionDays:
-        context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDays: retentionDaysFrom(context, "traces"),
       appliedEventIds: context.appliedEventIds
         ? [...context.appliedEventIds]
         : [],

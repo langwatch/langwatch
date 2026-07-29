@@ -5,6 +5,7 @@ import type {
   BulkAppendContext,
 } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { retentionDaysFrom } from "../../shared/analyticsStoreBase";
 import type { LangyAnalyticsEventProjectionRecord } from "./langyAnalyticsEvent.mapProjection";
 
 /** App-layer adapter for the analytics-only ClickHouse event sink. */
@@ -19,7 +20,7 @@ export class LangyAnalyticsEventAppendStore
   ): Promise<void> {
     await this.repository.insert(
       { tenantId: String(context.tenantId), ...record },
-      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDaysFrom(context, "traces"),
     );
   }
 
@@ -31,7 +32,7 @@ export class LangyAnalyticsEventAppendStore
     const tenantId = String(context.tenantId);
     await this.repository.insertBatch(
       records.map((record) => ({ tenantId, ...record })),
-      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDaysFrom(context, "traces"),
     );
   }
 }

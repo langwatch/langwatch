@@ -1,11 +1,6 @@
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
-import {
-  EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_REPORTED_EVENT_TYPE,
-  EVALUATION_SCHEDULED_EVENT_TYPE,
-  EVALUATION_STARTED_EVENT_TYPE,
-} from "./constants";
+import { EVALUATION_EVENT_TYPES, EVALUATION_EVENT_VERSIONS } from "./constants";
 
 /**
  * Base metadata for evaluation events.
@@ -17,9 +12,13 @@ const evaluationEventMetadataSchema = z
   .passthrough();
 
 /**
- * Evaluation scheduled event - emitted when an evaluation job is added to the queue.
+ * Evaluation scheduled event.
+ *
+ * RETIRED — nothing emits this any more. The schema is load-bearing for replay:
+ * both evaluation folds still handle the type, so events already committed to
+ * the log must keep parsing. See `EVALUATION_EVENT_TYPES.SCHEDULED`.
  */
-export const evaluationScheduledEventDataSchema = z.object({
+const evaluationScheduledEventDataSchema = z.object({
   evaluationId: z.string(),
   evaluatorId: z.string(),
   evaluatorType: z.string(),
@@ -29,20 +28,22 @@ export const evaluationScheduledEventDataSchema = z.object({
 });
 
 export const evaluationScheduledEventSchema = EventSchema.extend({
-  type: z.literal(EVALUATION_SCHEDULED_EVENT_TYPE),
+  type: z.literal(EVALUATION_EVENT_TYPES.SCHEDULED),
+  version: z.literal(EVALUATION_EVENT_VERSIONS.SCHEDULED),
   data: evaluationScheduledEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
 });
 
-export type EvaluationScheduledEventData = z.infer<
-  typeof evaluationScheduledEventDataSchema
->;
 export type EvaluationScheduledEvent = z.infer<
   typeof evaluationScheduledEventSchema
 >;
 
 /**
- * Evaluation started event - emitted when an evaluation execution begins.
+ * Evaluation started event.
+ *
+ * RETIRED — nothing emits this any more. The schema is load-bearing for replay:
+ * both evaluation folds still handle the type, so events already committed to
+ * the log must keep parsing. See `EVALUATION_EVENT_TYPES.STARTED`.
  */
 export const evaluationStartedEventDataSchema = z.object({
   evaluationId: z.string(),
@@ -54,23 +55,42 @@ export const evaluationStartedEventDataSchema = z.object({
 });
 
 export const evaluationStartedEventSchema = EventSchema.extend({
-  type: z.literal(EVALUATION_STARTED_EVENT_TYPE),
+  type: z.literal(EVALUATION_EVENT_TYPES.STARTED),
+  version: z.literal(EVALUATION_EVENT_VERSIONS.STARTED),
   data: evaluationStartedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
 });
 
-export type EvaluationStartedEventData = z.infer<
-  typeof evaluationStartedEventDataSchema
->;
 export type EvaluationStartedEvent = z.infer<
   typeof evaluationStartedEventSchema
 >;
 
 /**
- * Evaluation completed event - emitted when an evaluation execution finishes.
+ * Evaluation completed event.
+ *
+ * RETIRED as an emitted event — nothing produces one any more. The schema is
+ * load-bearing on the read side: both evaluation folds handle the type and
+ * `evaluationAlertTriggerMatch.subscriber` subscribes to it, so events already
+ * committed to the log must keep parsing. See
+ * `EVALUATION_EVENT_TYPES.COMPLETED`.
  */
 export const evaluationCompletedEventDataSchema = z.object({
   evaluationId: z.string(),
+  /**
+   * The trace this evaluation ran against — event-carried state transfer.
+   * Without it an "evaluation completed" fact cannot say what it completed
+   * against, and every consumer that needs the trace has to read it back off
+   * the fold this same event feeds, which has no ordering guarantee against
+   * its own stream.
+   *
+   * Optional and additive rather than a version bump, matching the `batchTotal`
+   * precedent on `simulation_run.queued`: event versions are asserted with
+   * `z.literal` in this repo, so a bump stops every already-committed event
+   * from parsing. Every `completed` event written before this field exists
+   * decodes with `traceId` absent, and absence means exactly "this event
+   * cannot name a trace" — consumers skip, they never throw.
+   */
+  traceId: z.string().optional(),
   status: z.enum(["processed", "error", "skipped"]),
   score: z.number().nullable().optional(),
   passed: z.boolean().nullable().optional(),
@@ -83,7 +103,8 @@ export const evaluationCompletedEventDataSchema = z.object({
 });
 
 export const evaluationCompletedEventSchema = EventSchema.extend({
-  type: z.literal(EVALUATION_COMPLETED_EVENT_TYPE),
+  type: z.literal(EVALUATION_EVENT_TYPES.COMPLETED),
+  version: z.literal(EVALUATION_EVENT_VERSIONS.COMPLETED),
   data: evaluationCompletedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
 });
@@ -119,14 +140,12 @@ export const evaluationReportedEventDataSchema = z.object({
 });
 
 export const evaluationReportedEventSchema = EventSchema.extend({
-  type: z.literal(EVALUATION_REPORTED_EVENT_TYPE),
+  type: z.literal(EVALUATION_EVENT_TYPES.REPORTED),
+  version: z.literal(EVALUATION_EVENT_VERSIONS.REPORTED),
   data: evaluationReportedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
 });
 
-export type EvaluationReportedEventData = z.infer<
-  typeof evaluationReportedEventDataSchema
->;
 export type EvaluationReportedEvent = z.infer<
   typeof evaluationReportedEventSchema
 >;

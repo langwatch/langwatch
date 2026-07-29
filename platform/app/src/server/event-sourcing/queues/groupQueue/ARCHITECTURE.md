@@ -86,7 +86,7 @@ Tenant rate tracking ([`TenantRateTracker`](../../../observability/tenantRateTra
 
 ## Where Job Bodies Actually Live: The Tiered Envelope
 
-A job's payload can range from "a 200-byte status update" to "a 30 MiB trace dump." Inlining all of it in the staged value works for the small case but bloats the Redis-side hash, blows past the Lua script's reply-size budget, and replicates the same bytes 30× when an event fans out to 30 reactors. So the envelope **tiers** the body across four progressively-more-durable storage targets, picked at encode time based on the body's serialized size.
+A job's payload can range from "a 200-byte status update" to "a 30 MiB trace dump." Inlining all of it in the staged value works for the small case but bloats the Redis-side hash, blows past the Lua script's reply-size budget, and replicates the same bytes 30× when an event fans out to 30 consumers. So the envelope **tiers** the body across four progressively-more-durable storage targets, picked at encode time based on the body's serialized size.
 
 ```
 serialized payload size
@@ -111,7 +111,7 @@ serialized payload size
 ### Why these tiers?
 
 - **Inline raw (≤ 1 KiB)** — gzip+base64 of sub-kilobyte JSON is usually *larger* than the input. Skip compression entirely.
-- **Inline gzip (1–4 KiB)** — gzip wins for most real payloads in this range; the encoder verifies (`gzip+base64 < raw`) and falls back to raw if not. The inline ceiling (`INLINE_CEILING_BYTES = 4 KiB`) is set low so ordinary fan-out events cross into the dedup tier rather than inlining N× across reactors. Tighter than the GQ1 32 KiB threshold (`BLOB_OFFLOAD_THRESHOLD_BYTES`), which only offloaded for the very-large case.
+- **Inline gzip (1–4 KiB)** — gzip wins for most real payloads in this range; the encoder verifies (`gzip+base64 < raw`) and falls back to raw if not. The inline ceiling (`INLINE_CEILING_BYTES = 4 KiB`) is set low so ordinary fan-out events cross into the dedup tier rather than inlining N× across consumers. Tighter than the GQ1 32 KiB threshold (`BLOB_OFFLOAD_THRESHOLD_BYTES`), which only offloaded for the very-large case.
 - **Redis blob (4–256 KiB)** — bigger than we want repeated in the staged value (every fan-out copy would replicate), but small enough that round-trip latency through a standalone Redis key is fine. It has a 4-day backstop refreshed on every read (`GETEX`) and is reclaimed lazily by Redis expiry.
 - **S3 / object-store (> 256 KiB)** — large bodies are the worst-case for Redis: memory pressure, replication lag, eviction risk. Push them to the durable object store the rest of the platform already runs on (`StorageRegistry`, projectId-scoped so each tenant's BYOC bucket is honored). Application releases never delete shared objects; the configured durable-store lifecycle sweep is the reclaim path.
 
@@ -121,14 +121,14 @@ All thresholds live in [`jobEnvelope.ts`](./jobEnvelope.ts) and [`tieredBlobStor
 
 A Redis-tier or S3-tier blob is keyed by `{projectId}/{sha256(payload-bytes)}` — content-addressed, tenant-namespaced. The two consequences:
 
-- **Identical bytes → one stored blob.** A 30-reactor fan-out of the same event stages 30 envelopes, each carrying a distinct lease-holder identity, but the underlying blob is a single stored copy. PUTs are idempotent — racing or retrying just overwrites the same key with the same content.
+- **Identical bytes → one stored blob.** A 30-way fan-out of the same event stages 30 envelopes, each carrying a distinct lease-holder identity, but the underlying blob is a single stored copy. PUTs are idempotent — racing or retrying just overwrites the same key with the same content.
 - **Tenant isolation.** Two tenants with byte-identical user payloads still get distinct blobs (different `projectId` prefix). A project purge is a delete-by-prefix.
 
 The hash is taken over the **raw** payload bytes, not the gzipped output, so the dedup key doesn't depend on gzip determinism (zlib version / compression level).
 
-### Routing-exclusion: keeping the hash stable across reactors
+### Routing-exclusion: keeping the hash stable across the fan-out
 
-The same event fanned out to reactor A (`__jobName: "rollup-by-day"`) and reactor B (`__jobName: "rollup-by-hour"`) would naively hash to different blobs because the per-reactor routing fields perturb the body bytes. To prevent this, the GQ2 encoder splits `jobData` into:
+One committed event is staged once per consumer, and each staged copy carries its own routing fields — a map projection gets `__jobType: "handler"`, `__jobName: "metricTimeRollup"`; a subscriber on the same event gets `__jobType: "subscriber"`, `__jobName: "billingMeterPoke"`. Hashing the staged value as-is would give every copy a different blob, precisely defeating the dedup. To prevent this, the GQ2 encoder splits `jobData` into:
 
 - **Body** — every key not starting with `__`. This is what the hash is computed over.
 - **Header machinery** — every `__*` key (routing names, attempt counter, async context, staged-job id, dispatch score). These live in `header.m` and `header.p/t/n`; the routing trio is also surfaced as a read-fast-path for the dispatcher Lua and the ops dashboard.

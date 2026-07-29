@@ -460,8 +460,34 @@ export class TraceSummaryFoldProjection
    * from the folded event's occurredAt is clock skew, not aggregate lifetime.
    * The executor retries a windowed miss without the window, so correctness
    * never depends on the width.
+   *
+   * `refoldOnStoreMiss: true` — a version-gated TRANSITIONAL net, not the old
+   * continuity mechanism, and it is what makes the store's version gate safe to
+   * have at all. The store reads back only rows stamped with the CURRENT
+   * projection version; a row stamped older predates columns whose ClickHouse
+   * defaults cannot be told apart from real values, so the store reports a miss
+   * and this option rebuilds that aggregate from `event_log` — once. The rebuild
+   * is rewritten at the current stamp, so the row hits from then on and the
+   * population self-heals with no backfill migration.
+   *
+   * The pairing is not optional in either direction. Gate WITHOUT this and a
+   * refused row folds from `init()`, committing a partial state at the current
+   * stamp that the gate would then accept forever — strictly worse than having
+   * no gate; `FoldProjectionExecutor.assertUndecodableIsRecoverable` refuses to
+   * run in that configuration and throws instead of corrupting. This WITHOUT the
+   * gate is the pre-ADR-066 behaviour the 2026-07-23 `TOO_MANY_PARTS` outage
+   * came from — every cache miss paying for the whole history.
+   *
+   * ONE CLASS DOES NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot reach
+   * zero for this adopter either: a dimension-only trace (a topic assignment or
+   * an annotation, no span and no log record) folds a state
+   * `hasPersistableSignal` refuses to write, so there is no row, and the refold's
+   * result is refused by the same predicate. It recurs rather than corrupting —
+   * and it is the reason the option must not be deleted on the "it went quiet"
+   * rule alone. Same class, same open product question, as `traceAnalytics`.
    */
   readonly options = {
+    refoldOnStoreMiss: true,
     refoldOnOutOfOrder: false,
     readWindow: { widthMs: DEFAULT_PARTITION_WINDOW_MS },
   } as const;

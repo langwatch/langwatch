@@ -1,8 +1,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { TenantId } from "../domain/tenantId";
 import { compareOrdinal } from "../utils/compareOrdinal";
 
 /** ClickHouse event_log row shape. */
-export interface ClickHouseEventRow {
+interface ClickHouseEventRow {
   TenantId: string;
   AggregateType: string;
   AggregateId: string;
@@ -21,7 +22,12 @@ export interface ReplayEvent {
   id: string;
   aggregateId: string;
   aggregateType: string;
-  tenantId: string;
+  /**
+   * Branded like the domain `Event.tenantId`, so a replayed event can build a
+   * `ProjectionStoreContext` without a cast — the tenant-isolation checks the
+   * brand exists to guard read the same value on both paths.
+   */
+  tenantId: TenantId;
   /** Alias of `timestamp`; matches the canonical domain `Event.createdAt`. */
   createdAt: number;
   /** Retained for backwards-compat with replay-internal call sites. */
@@ -42,7 +48,7 @@ export interface DiscoveredAggregate {
 }
 
 /** Discovered aggregate plus the distinct event types found on it. */
-export interface DiscoveredAggregateWithEventTypes extends DiscoveredAggregate {
+interface DiscoveredAggregateWithEventTypes extends DiscoveredAggregate {
   eventTypes: string[];
 }
 
@@ -61,7 +67,11 @@ function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
     id: row.EventId,
     aggregateId: row.AggregateId,
     aggregateType: row.AggregateType,
-    tenantId: row.TenantId,
+    // The one place a raw `event_log` TenantId is branded: every row was
+    // written through `createTenantId` on the live path, and the loaders only
+    // ever query within a single tenant scope. Asserting rather than
+    // re-parsing keeps a multi-million-row replay off a per-row zod parse.
+    tenantId: row.TenantId as TenantId,
     createdAt: row.EventTimestamp,
     timestamp: row.EventTimestamp,
     occurredAt,
@@ -165,10 +175,7 @@ export interface CutoffInfo {
 }
 
 /** Compare canonical event-log positions. Aggregate IDs never define order. */
-export function compareEventPositions(
-  left: CutoffInfo,
-  right: CutoffInfo,
-): number {
+function compareEventPositions(left: CutoffInfo, right: CutoffInfo): number {
   if (left.timestamp !== right.timestamp) {
     return left.timestamp - right.timestamp;
   }

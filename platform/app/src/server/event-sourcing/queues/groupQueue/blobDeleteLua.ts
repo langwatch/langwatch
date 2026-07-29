@@ -5,7 +5,7 @@
  * expired or been reclaimed, and the stale lease and holder keys were dropped
  * anyway. Only `leased` is a refusal.
  */
-export const BLOB_DELETE_OUTCOMES = ["leased", "deleted", "missing"] as const;
+const BLOB_DELETE_OUTCOMES = ["leased", "deleted", "missing"] as const;
 
 export type BlobDeleteOutcome = (typeof BLOB_DELETE_OUTCOMES)[number];
 

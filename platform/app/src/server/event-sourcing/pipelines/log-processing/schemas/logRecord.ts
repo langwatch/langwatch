@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const logCorrelationSourceSchema = z.enum([
+const logCorrelationSourceSchema = z.enum([
   "none",
   "wire",
   "claude_synthesized",
@@ -8,11 +8,7 @@ export const logCorrelationSourceSchema = z.enum([
 ]);
 export type LogCorrelationSource = z.infer<typeof logCorrelationSourceSchema>;
 
-export const logProviderKindSchema = z.enum([
-  "generic",
-  "claude_code",
-  "codex",
-]);
+const logProviderKindSchema = z.enum(["generic", "claude_code", "codex"]);
 export type LogProviderKind = z.infer<typeof logProviderKindSchema>;
 
 export const canonicalLogRecordSchema = z.object({

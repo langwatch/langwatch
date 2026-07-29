@@ -8,7 +8,7 @@ import type { NormalizedSpan } from "../../schemas/spans";
 import type { TraceOriginService } from "./trace-origin.service";
 import { parseJsonStringArray, stringAttr } from "./trace-summary.utils";
 
-export const RESOURCE_ATTR_MAPPINGS = [
+const RESOURCE_ATTR_MAPPINGS = [
   ["telemetry.sdk.name", "sdk.name"],
   ["telemetry.sdk.version", "sdk.version"],
   ["telemetry.sdk.language", "sdk.language"],
@@ -32,11 +32,15 @@ export const SPAN_ATTR_MAPPINGS = [
   ],
   [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
   // AI Gateway markers — stamped on every gateway-emitted customer span by
-  // services/aigateway/adapters/customertracebridge/emitter.go so the
-  // downstream gatewayBudgetSync reactor can tell which VK / request fold
-  // into which budget. Without this allowlist entry the keys are dropped
-  // at accumulation time, the reactor early-returns, and CH
-  // gateway_budget_ledger_events stays empty.
+  // services/aigateway/adapters/customertracebridge/emitter.go. Hoisted onto
+  // the trace attribute map because `GatewayVirtualKeySpendRepository` answers
+  // "what did this key cost" by reading the VK attribute straight off
+  // `trace_summaries`; drop the allowlist entry and per-key spend reads empty
+  // for every key. The retired reactor that wrote gateway_budget_ledger_events
+  // read them off the accumulated fold state too, which is why the entry was
+  // originally added; the `gatewayBudgetDebits` map projection took that job
+  // over and reads both off the raw span, one level earlier, so the ledger no
+  // longer depends on this hoist.
   ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
   ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
   // The provider the request was actually dispatched to (a ModelProvider
@@ -117,7 +121,7 @@ const NON_HOISTED_RESOURCE_KEYS: ReadonlySet<string> = new Set([
   "langwatch.cost.non_billable",
 ]);
 
-export const STANDARD_RESOURCE_PREFIXES = [
+const STANDARD_RESOURCE_PREFIXES = [
   "host.",
   "process.",
   "telemetry.",

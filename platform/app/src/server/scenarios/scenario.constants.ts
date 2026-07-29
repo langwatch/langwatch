@@ -4,32 +4,18 @@
  * All magic values extracted to named constants for clarity and maintainability.
  */
 
-import { makeQueueName } from "../queues/makeQueueName";
-
-/** Queue configuration */
-export const SCENARIO_QUEUE = {
-  /** Queue name for BullMQ - scoped under simulations domain */
-  NAME: makeQueueName("simulations/scenarios/executions"),
-  /** Job name for queue.add() */
-  JOB: "scenario",
-  /** How long to keep completed jobs (seconds) */
-  COMPLETED_JOB_RETENTION_SECONDS: 60 * 60, // 1 hour
-  /** How long to keep failed jobs (seconds) */
-  FAILED_JOB_RETENTION_SECONDS: 60 * 60 * 24 * 3, // 3 days
-  /** Initial delay for exponential backoff (ms) */
-  BACKOFF_DELAY_MS: 1000,
-  /** Number of retry attempts (1 = no retries, immediate fail after stall detection) */
-  MAX_ATTEMPTS: 1,
-} as const;
-
-/** Worker configuration */
+/**
+ * Worker configuration.
+ *
+ * The BullMQ queue this file used to describe has had no producer and no
+ * consumer for some time; dispatch is the `scenarioExecution` process
+ * manager's leased outbox (ADR-073). What survives is the one number that
+ * still decides something: how many scenario children a worker holds at once,
+ * which the outbox reads as its dispatch concurrency.
+ */
 export const SCENARIO_WORKER = {
-  /** Number of concurrent scenario executions */
+  /** Number of concurrent scenario executions per worker. */
   CONCURRENCY: 3,
-  /** Interval to check for stalled jobs (ms) */
-  STALLED_INTERVAL_MS: 30 * 1000, // 30 seconds
-  /** How long to wait when queue is empty before checking again (ms) */
-  DRAIN_DELAY_MS: 300, // Fast pickup when new jobs arrive
 } as const;
 
 /** Child process configuration */

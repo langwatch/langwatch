@@ -102,19 +102,6 @@ const getEnrichedItems = <T extends { id: string }>(
     .filter((item): item is NonNullable<typeof item> => item !== undefined);
 };
 
-const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
-  if (annotator.startsWith("queue-") && annotator.length > 6) {
-    return { type: "queue" as const, id: annotator.slice(6) };
-  }
-  if (annotator.startsWith("user-") && annotator.length > 5) {
-    return { type: "user" as const, id: annotator.slice(5) };
-  }
-  ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid annotator" });
-  return z.NEVER;
-});
-
-type AnnotatorReference = z.infer<typeof annotatorReferenceSchema>;
-
 const queueItemReferenceFilter = ({
   projectId,
   organizationId,
@@ -612,19 +599,22 @@ export const annotationRouter = createTRPCRouter({
   createQueueItem: protectedProcedure
     .input(
       z.object({
-        traceIds: z.array(z.string()),
+        // Selection is per-page and the largest page a reviewer can pick is
+        // 250 (`NavigationFooter`), so this is four times the widest honest
+        // request — a ceiling on a scripted caller, not on the UI. The writes
+        // it authorises are still bounded per-request by the service.
+        traceIds: z.array(z.string()).max(1000),
         projectId: z.string(),
         annotators: z.array(z.string()),
       }),
     )
     .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
-      await createOrUpdateQueueItems({
+      await getApp().annotations.enqueueTracesForAnnotators({
         traceIds: input.traceIds,
         projectId: input.projectId,
         annotators: input.annotators,
         userId: ctx.session.user.id,
-        prisma: ctx.prisma,
       });
     }),
   markQueueItemDone: protectedProcedure
@@ -886,85 +876,3 @@ export const annotationRouter = createTRPCRouter({
       };
     }),
 });
-
-export async function createOrUpdateQueueItems({
-  traceIds,
-  projectId,
-  annotators,
-  userId,
-  prisma,
-}: {
-  traceIds: string[];
-  projectId: string;
-  annotators: string[];
-  userId: string;
-  prisma: PrismaClient;
-}) {
-  const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {
-    const parsed = annotatorReferenceSchema.safeParse(annotator);
-    if (!parsed.success) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Invalid annotator",
-      });
-    }
-    return parsed.data;
-  });
-  const queueIds = parsedAnnotators
-    .filter((annotator) => annotator.type === "queue")
-    .map((annotator) => annotator.id);
-  const userIds = parsedAnnotators
-    .filter((annotator) => annotator.type === "user")
-    .map((annotator) => annotator.id);
-
-  const service = AnnotationService.create({ prisma });
-  await service.assertAnnotatorReferences({ projectId, queueIds, userIds });
-
-  for (const traceId of traceIds) {
-    for (const annotator of parsedAnnotators) {
-      if (annotator.type === "queue") {
-        await prisma.annotationQueueItem.upsert({
-          where: {
-            projectId: projectId,
-            traceId_annotationQueueId_projectId: {
-              traceId: traceId,
-              annotationQueueId: annotator.id,
-              projectId: projectId,
-            },
-          },
-          create: {
-            annotationQueueId: annotator.id,
-            traceId: traceId,
-            projectId: projectId,
-            createdByUserId: userId,
-          },
-          update: {
-            annotationQueueId: annotator.id,
-            doneAt: null,
-          },
-        });
-      } else {
-        await prisma.annotationQueueItem.upsert({
-          where: {
-            projectId: projectId,
-            traceId_userId_projectId: {
-              traceId: traceId,
-              userId: annotator.id,
-              projectId: projectId,
-            },
-          },
-          create: {
-            userId: annotator.id,
-            traceId: traceId,
-            projectId: projectId,
-            createdByUserId: userId,
-          },
-          update: {
-            userId: annotator.id,
-            doneAt: null,
-          },
-        });
-      }
-    }
-  }
-}

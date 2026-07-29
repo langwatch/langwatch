@@ -313,12 +313,10 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
 });
 
 // ============================================================================
-// Event Sourcing Pipeline Metrics (command, fold, map, reactor)
+// Event Sourcing Pipeline Metrics (command, fold, map)
 // ============================================================================
 
 type ESStatus = "completed" | "failed";
-/** Reactors additionally skip pre-enqueue when shouldReact returns false. */
-type ReactorStatus = ESStatus | "skipped";
 
 // --- Unified projection metrics ---
 // Keep the existing kind-specific metrics below for backwards compatibility,
@@ -519,25 +517,6 @@ export const incrementEsFoldReadWindowFallbackTotal = (
   outcome: "recovered" | "absent",
 ) => esFoldReadWindowFallbackTotal.labels(projectionName, outcome).inc();
 
-register.removeSingleMetric("es_reactor_collapsed_total");
-const esReactorCollapsedTotal = new Counter({
-  name: "es_reactor_collapsed_total",
-  help: "Reactor dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
-  labelNames: ["pipeline_name", "reactor_name"] as const,
-});
-
-/**
- * Counts the sends a coalesced batch did NOT make. Each one would have
- * serialized, gzipped and blobbed `{event, foldState}` only for the queue's
- * dedup to discard it, so this is the direct measure of the churn the collapse
- * removes (2026-07-09 incident).
- */
-export const incrementEsReactorCollapsedTotal = (
-  pipelineName: string,
-  reactorName: string,
-  skipped: number,
-) => esReactorCollapsedTotal.labels(pipelineName, reactorName).inc(skipped);
-
 // --- Map projection metrics ---
 register.removeSingleMetric("es_map_projection_total");
 const esMapProjectionTotal = new Counter({
@@ -591,34 +570,6 @@ export const observeEsMapProjectionDuration = ({
     durationMs,
   });
 };
-
-// --- Reactor metrics ---
-register.removeSingleMetric("es_reactor_total");
-const esReactorTotal = new Counter({
-  name: "es_reactor_total",
-  help: "Total number of reactor executions",
-  labelNames: ["pipeline_name", "reactor_name", "status"] as const,
-});
-
-export const incrementEsReactorTotal = (
-  pipelineName: string,
-  reactorName: string,
-  status: ReactorStatus,
-) => esReactorTotal.labels(pipelineName, reactorName, status).inc();
-
-register.removeSingleMetric("es_reactor_duration_milliseconds");
-const esReactorDuration = new Histogram({
-  name: "es_reactor_duration_milliseconds",
-  help: "Duration of reactor execution in milliseconds",
-  labelNames: ["pipeline_name", "reactor_name"] as const,
-  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000],
-});
-
-export const observeEsReactorDuration = (
-  pipelineName: string,
-  reactorName: string,
-  durationMs: number,
-) => esReactorDuration.labels(pipelineName, reactorName).observe(durationMs);
 
 // --- Event subscriber metrics ---
 register.removeSingleMetric("es_subscriber_total");
@@ -1147,42 +1098,6 @@ const langyBlocksTotal = new Counter({
 export const getLangyBlocksCounter = (
   outcome: "stamped" | "unsalvageable" | "invalid",
 ) => langyBlocksTotal.labels(outcome);
-
-// ============================================================================
-// Fold redelivery
-// ============================================================================
-
-register.removeSingleMetric("es_fold_post_store_failure_total");
-const esFoldPostStoreFailure = new Counter({
-  name: "es_fold_post_store_failure_total",
-  help: "Fold deliveries that threw after their state was durably stored, by stage",
-  labelNames: ["projection_name", "stage"] as const,
-});
-
-/**
- * A fold threw *after* its state was already written durably.
- *
- * Queue delivery is at-least-once and the fold's state is stored before
- * reactors are dispatched, so anything that throws from that point fails the
- * job without un-writing it: the queue re-delivers events the store already
- * holds. Folds accumulate rather than being idempotent (trace summary does
- * `spanCount + 1` and sums cost), so the re-apply double-counts.
- *
- * Every other fold signal reports this as a plain failure, which is
- * indistinguishable from one that threw *before* the write and is therefore
- * harmless to retry. The two need opposite responses, so they need separate
- * counters.
- *
- * Rate against `es_fold_projection_total{status="failed"}` for the share of
- * fold failures that land in the dangerous half.
- */
-export const incrementEsFoldPostStoreFailure = ({
-  projectionName,
-  stage,
-}: {
-  projectionName: string;
-  stage: "reactor_dispatch";
-}) => esFoldPostStoreFailure.labels(projectionName, stage).inc();
 
 // ============================================================================
 // Stored Objects Metrics

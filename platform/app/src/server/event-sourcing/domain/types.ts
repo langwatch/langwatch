@@ -137,7 +137,7 @@ export type Projection<Data = unknown> = Omit<ProjectionType, "data"> & {
  * Zod schema for projection metadata.
  * Metadata describing the events that produced a projection.
  */
-export const ProjectionMetadataSchema = z.object({
+const ProjectionMetadataSchema = z.object({
   /** Number of events processed */
   eventCount: z.number().int().nonnegative(),
   /** Timestamp of the earliest event in the stream */
@@ -153,37 +153,12 @@ export type ProjectionMetadata = z.infer<typeof ProjectionMetadataSchema>;
 /**
  * Zod schema for projection envelope.
  * Wrapper returned by the projection pipeline to include metadata.
- * Uses the base ProjectionSchema. For custom projection schemas, use createProjectionEnvelopeSchema.
+ * Uses the base ProjectionSchema.
  */
 export const ProjectionEnvelopeSchema = z.object({
   projection: ProjectionSchema,
   metadata: ProjectionMetadataSchema,
 });
-
-/**
- * Factory function to create a projection envelope schema for a custom projection schema.
- * Use this when you have a specific projection schema that extends the base ProjectionSchema.
- *
- * @param projectionSchema - The custom projection schema to use
- * @returns A Zod schema for the projection envelope
- */
-export function createProjectionEnvelopeSchema<
-  TProjection extends ProjectionType,
->(projectionSchema: z.ZodType<TProjection>) {
-  return z.object({
-    projection: projectionSchema,
-    metadata: ProjectionMetadataSchema,
-  });
-}
-
-/**
- * Projection envelope with type-safe projection.
- * Extends the base envelope type from the schema while allowing generic projection types.
- */
-export type ProjectionEnvelope<TProjection extends Projection = Projection> = {
-  projection: TProjection;
-  metadata: ProjectionMetadata;
-};
 
 /**
  * Strategy for ordering events prior to processing.

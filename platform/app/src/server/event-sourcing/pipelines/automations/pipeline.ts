@@ -119,7 +119,13 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
           createLogOverflowHandler(),
         )
         .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
-          const { state: nextState, flushed } = addPending(state, data, ctx.at);
+          // Schedule from max(at, now), never `at` alone — see `now`'s docblock
+          // on EventContext. A lagged match otherwise settles on a boundary
+          // already in the past, and `computeScheduledFor` returns a due time
+          // behind the present, so every trace flushes as its own digest during
+          // exactly the backlog the coalescing exists for.
+          const handledAt = Math.max(ctx.at, ctx.now);
+          const { state: nextState, flushed } = addPending(state, data, handledAt);
           return {
             state: nextState,
             // Cap hit: the oldest matches dispatch NOW instead of being
@@ -156,7 +162,9 @@ export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
           };
         })
         .onWake((state, ctx) => {
-          const due = drainDue(state, ctx.at);
+          // Same clamp as the match path: a wake delivered late must drain what
+          // is due NOW, not what was due when the wake was written.
+          const due = drainDue(state, Math.max(ctx.at, ctx.now));
           return {
             state: due.state,
             intents: [

@@ -11,7 +11,7 @@ For the technical overview (how the staging Lua, the dispatcher, the tiered stor
 Reach for GroupQueue when **any** of these is true:
 
 - You need **per-aggregate FIFO**: event N for an aggregate must finish before event N+1 starts. This is the canonical fold-projection requirement.
-- You want **content-sharing across fan-out**: the same event dispatched to many reactors should not pay N× the Redis memory cost.
+- You want **content-sharing across fan-out**: the same event dispatched to many projections and subscribers should not pay N× the Redis memory cost.
 - You expect **payloads up to ~50 MiB**: small payloads inline, big ones offload to S3 — no separate code path per size.
 - You want a **predictable retry path** that preserves FIFO within a group.
 
@@ -35,11 +35,12 @@ const pipeline = definePipeline<TraceEvent>()
   .withName("trace_processing")
   .withAggregateType("trace")
   .withFoldProjection("summary", traceSummaryFoldProjection)
-  .withReactor("summary", "syncToSearch", searchSyncReactor)
+  .withMapProjection("spanStorage", spanStorageMapProjection)
+  .withEventSubscriber("traceUpdateBroadcast", traceUpdateBroadcastSubscriber)
   .build();
 ```
 
-The fold projection's events flow through a GroupQueue keyed by `aggregateId`, so events for the same trace process in order. Different traces parallelise across the worker fleet.
+The fold projection's events flow through a GroupQueue keyed by `aggregateId`, so events for the same trace process in order. Different traces parallelise across the worker fleet. The map projection and the subscriber ride the same queue infrastructure under different group keys.
 
 See the parent [`event-sourcing/README.md`](../../README.md) for the full builder API.
 
@@ -165,7 +166,7 @@ Payloads of different sizes land in different places, picked at encode time. You
 | **> 256 KiB, ≤ 50 MiB** | Object store (S3 / file / azure-blob — projectId-scoped to the BYOC bucket) | Object-store request rate and lifecycle-sweep health |
 | **> 50 MiB** | Rejected at encode — `PayloadTooLargeError` | Hit by a product bug or a runaway loop — fix upstream rather than raise the cap |
 
-**Content-addressed sharing** means the storage cost of a payload is paid **once** per `(projectId, content-hash)`, regardless of how many jobs reference it. A 30-reactor fan-out of the same event stages 30 envelopes — 30 renewable lease members in one sorted set, one stored blob. Completion drops a member but never deletes the shared blob; Redis expiry or the durable-store lifecycle sweep reclaims it lazily.
+**Content-addressed sharing** means the storage cost of a payload is paid **once** per `(projectId, content-hash)`, regardless of how many jobs reference it. A 30-way fan-out of the same event stages 30 envelopes — 30 renewable lease members in one sorted set, one stored blob. Completion drops a member but never deletes the shared blob; Redis expiry or the durable-store lifecycle sweep reclaims it lazily.
 
 ### Configuring writes
 

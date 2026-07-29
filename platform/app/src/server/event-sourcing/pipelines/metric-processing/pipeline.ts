@@ -1,61 +1,77 @@
+import type { MetricDataPointRepository } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
 import { definePipeline } from "../..";
-import type { AppendStore } from "../../projections/mapProjection.types";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import type { CommandBus } from "../../commands/commandBus";
+import { ContributeMetricFactsCommand } from "../coding-agent-processing/commands/contributeMetricFactsCommand";
+import { createCodingAgentMetricFactsDispatchSubscriber } from "../coding-agent-processing/subscribers/codingAgentMetricFactsDispatch.subscriber";
 import { metricCommandGroupKey } from "./canonical/shards";
 import { RecordMetricDataPointCommand } from "./commands/recordMetricDataPointCommand";
 import { MetricDataPointStorageMapProjection } from "./projections/metricDataPointStorage.mapProjection";
 import { MetricSeriesCatalogMapProjection } from "./projections/metricSeriesCatalog.mapProjection";
 import { MetricTimeRollupMapProjection } from "./projections/metricTimeRollup.mapProjection";
+import {
+  MetricDataPointAppendStore,
+  MetricSeriesCatalogAppendStore,
+  MetricTimeRollupAppendStore,
+} from "./projections/stores";
 import type { MetricProcessingEvent } from "./schemas/events";
-import type { CanonicalMetricDataPoint } from "./schemas/metricDataPoint";
 
+/**
+ * ADR-082 Rule 1 — nothing here is a value the builder registers. The three
+ * append stores are constructed from the one repository they all wrap, and the
+ * coding-agent dispatch subscriber is constructed from its imported factory
+ * over a command-bus port, so this file states the whole topology.
+ */
 export interface MetricProcessingPipelineDeps {
-  metricDataPointAppendStore: AppendStore<CanonicalMetricDataPoint>;
-  metricSeriesCatalogAppendStore: AppendStore<CanonicalMetricDataPoint>;
-  metricTimeRollupAppendStore: AppendStore<CanonicalMetricDataPoint>;
+  metricDataPointRepository: MetricDataPointRepository;
   metricCommandShardCount: number;
-  /** Cross-pipeline dispatchers (e.g. coding-agent metric-facts, ADR-056). */
-  subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
+  /** ADR-082 §5 — identity-keyed dispatch into other pipelines' commands. */
+  commands: CommandBus;
 }
 
 export function createMetricProcessingPipeline(
   deps: MetricProcessingPipelineDeps,
 ) {
-  let builder = definePipeline<MetricProcessingEvent>()
+  const shardCount = deps.metricCommandShardCount;
+  const repository = deps.metricDataPointRepository;
+
+  return definePipeline<MetricProcessingEvent>()
     .withName("metric_processing")
     .withAggregateType("metric")
     .withMapProjection(
       "metricDataPointStorage",
       new MetricDataPointStorageMapProjection({
-        store: deps.metricDataPointAppendStore,
-        shardCount: deps.metricCommandShardCount,
+        store: new MetricDataPointAppendStore(repository),
+        shardCount,
       }),
     )
     .withMapProjection(
       "metricSeriesCatalog",
       new MetricSeriesCatalogMapProjection({
-        store: deps.metricSeriesCatalogAppendStore,
-        shardCount: deps.metricCommandShardCount,
+        store: new MetricSeriesCatalogAppendStore(repository),
+        shardCount,
       }),
     )
     .withMapProjection(
       "metricTimeRollup",
       new MetricTimeRollupMapProjection({
-        store: deps.metricTimeRollupAppendStore,
-        shardCount: deps.metricCommandShardCount,
+        store: new MetricTimeRollupAppendStore(repository),
+        shardCount,
       }),
-    );
-
-  for (const subscriber of deps.subscribers ?? []) {
-    builder = builder.withEventSubscriber(subscriber.name, subscriber);
-  }
-
-  return builder
+    )
+    // Cross-pipeline dispatch (ADR-056 §2): coding-agent metric facts. The
+    // port binds now and resolves on first dispatch, so coding-agent
+    // registration order relative to this pipeline carries no meaning.
+    .withEventSubscriber(
+      "codingAgentMetricFactsDispatch",
+      createCodingAgentMetricFactsDispatchSubscriber({
+        contributeMetricFacts: deps.commands.port(ContributeMetricFactsCommand),
+      }),
+    )
     .withCommand("recordDataPoint", RecordMetricDataPointCommand, {
       getGroupKey: (payload) =>
         metricCommandGroupKey({
           pointId: payload.pointId,
-          shardCount: deps.metricCommandShardCount,
+          shardCount,
         }),
     })
     .build();

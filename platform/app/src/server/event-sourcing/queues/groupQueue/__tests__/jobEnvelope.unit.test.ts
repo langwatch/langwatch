@@ -532,7 +532,7 @@ describe("jobEnvelope", () => {
         const { tieredBlobs, redisBlobs } = makeTiered();
         const payload = { evt: "x".repeat(8 * 1024) }; // > 4 KiB → offloads
 
-        // Same user payload, two distinct fan-out reactors over the same event.
+        // Same user payload, two distinct fan-out consumers over the same event.
         const v1 = await encodeJobEnvelope({
           jobData: {
             ...payload,

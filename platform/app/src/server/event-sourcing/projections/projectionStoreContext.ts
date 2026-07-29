@@ -6,7 +6,7 @@ import type { TenantId } from "../domain/tenantId";
  * so a time-partitioned table can prune partitions instead of scanning them
  * all (including the cold S3 tier).
  */
-export interface ReadTimeWindow {
+interface ReadTimeWindow {
   fromMs: number;
   toMs: number;
 }

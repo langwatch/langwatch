@@ -32,10 +32,6 @@ export const RequestTopicClusteringCommand = defineCommand({
   spanAttributes: (d) => ({
     "payload.trigger": d.trigger,
   }),
-  makeJobId: (d) =>
-    d.trigger === "bootstrap"
-      ? `${String(d.tenantId)}:topic_clustering:bootstrap`
-      : `${String(d.tenantId)}:topic_clustering:request:${d.occurredAt}`,
 });
 
 export const RecordClusteringRunStartedCommand = defineCommand({
@@ -53,8 +49,6 @@ export const RecordClusteringRunStartedCommand = defineCommand({
     "payload.run_id": d.runId,
     "payload.page": d.page,
   }),
-  makeJobId: (d) =>
-    `${String(d.tenantId)}:topic_clustering:${d.runId}:page-${d.page}:started`,
 });
 
 export const RecordClusteringRunCompletedCommand = defineCommand({
@@ -72,8 +66,6 @@ export const RecordClusteringRunCompletedCommand = defineCommand({
     "payload.mode": d.mode,
     "payload.traces_processed": d.tracesProcessed,
   }),
-  makeJobId: (d) =>
-    `${String(d.tenantId)}:topic_clustering:${d.runId}:page-${d.page}:completed`,
 });
 
 export const RecordClusteringRunFailedCommand = defineCommand({
@@ -89,8 +81,6 @@ export const RecordClusteringRunFailedCommand = defineCommand({
     "payload.run_id": d.runId,
     "payload.page": d.page,
   }),
-  makeJobId: (d) =>
-    `${String(d.tenantId)}:topic_clustering:${d.runId}:page-${d.page}:failed`,
 });
 
 /**
@@ -117,5 +107,4 @@ export const RecordTopicsCommand = defineCommand({
     "payload.source": d.source,
     "payload.topics_count": d.topics.length,
   }),
-  makeJobId: recordTopicsDedupeId,
 });

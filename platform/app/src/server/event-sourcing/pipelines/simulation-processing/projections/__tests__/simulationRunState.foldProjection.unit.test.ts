@@ -228,6 +228,42 @@ function foldEvents(
 
 const FAKE_NOW = 99999;
 
+describe("batch denominator", () => {
+  describe("given a run queued as part of a batch", () => {
+    describe("when the queued event is folded", () => {
+      it("records the size the batch set out to queue", () => {
+        const state = foldEvents([createRunQueuedEvent({ batchTotal: 6 })]);
+
+        expect(state.BatchTotal).toBe(6);
+      });
+    });
+  });
+
+  describe("given a run queued before the denominator was carried", () => {
+    describe("when the queued event is folded", () => {
+      it("records an unknown size rather than guessing one", () => {
+        const state = foldEvents([createRunQueuedEvent()]);
+
+        expect(state.BatchTotal).toBe(0);
+      });
+    });
+  });
+
+  describe("when a queued event is redelivered without the denominator", () => {
+    // Delivery is at-least-once, and an older producer can redeliver the same
+    // run. Overwriting from the redelivery would erase a denominator an
+    // earlier one established and drop the batch back to counting rows.
+    it("keeps the size already established", () => {
+      const state = foldEvents([
+        createRunQueuedEvent({ batchTotal: 6 }),
+        createRunQueuedEvent(),
+      ]);
+
+      expect(state.BatchTotal).toBe(6);
+    });
+  });
+});
+
 describe("simulationRunStateFoldProjection", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -1031,7 +1067,7 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
     });
 
     // A late child that outlived the parent this run's reconciliation already
-    // failed must not rewrite the terminal record the downstream reactors have
+    // failed must not rewrite the terminal record downstream consumers have
     // already acted on -- nor split it into an ERROR status carrying the late
     // child's SUCCESS verdict.
     describe("when a second finished event arrives", () => {
@@ -1055,6 +1091,235 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
         expect(state.Status).toBe("ERROR");
         expect(state.Verdict).toBeNull();
         expect(state.FinishedAt).toBe(3000);
+      });
+    });
+  });
+
+  // A cancel lands as a `finished` event carrying status CANCELLED, so the run
+  // is terminal from that moment. The worker it cancelled can still be mid-turn
+  // and POST its own `finished`-SUCCESS a moment later. If that late event won,
+  // a run the user cancelled would read back as a success — the cancel would
+  // look like it silently failed, and every downstream consumer of the terminal
+  // record (billing, suite rollups, the run list) would count it as a pass.
+  describe("given a run that finished as CANCELLED", () => {
+    describe("when a late finished event arrives with status SUCCESS", () => {
+      /** @scenario "Late finish does not overwrite cancelled status" */
+      it("keeps CANCELLED and refuses the late success", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent({ status: "CANCELLED" }, { occurredAt: 3000 }),
+          createRunFinishedEvent(
+            {
+              status: "SUCCESS",
+              results: {
+                verdict: "success",
+                reasoning: "worker finished its turn after the cancel landed",
+                metCriteria: [],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 5000, id: "event-late-success" },
+          ),
+        ]);
+
+        expect(state.Status).toBe("CANCELLED");
+        expect(state.Verdict).toBeNull();
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // The reverse arrival order, folded RAW. The executor's re-fold normally
+    // puts the two back in occurredAt order (pinned in
+    // simulationRunState.ordering.unit.test.ts), but the fold must not depend
+    // on it: the re-fold needs an eventLoader and a rehydration window that
+    // still reaches back to the cancel, and a fold whose answer depends on
+    // which of two events was applied first is not a fold. The rule that keeps
+    // this green is authority, not arrival — see `terminalStatusAuthority`.
+    describe("when the late success is folded before the cancel", () => {
+      it("still keeps CANCELLED once both events are applied", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent(
+            {
+              status: "SUCCESS",
+              results: {
+                verdict: "success",
+                reasoning: "worker finished its turn after the cancel landed",
+                metCriteria: [],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 5000, id: "event-late-success" },
+          ),
+          createRunFinishedEvent({ status: "CANCELLED" }, { occurredAt: 3000 }),
+        ]);
+
+        expect(state.Status).toBe("CANCELLED");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // Redelivery is at-least-once, so the same cancel can arrive twice. Equal
+    // authority means the first one keeps the record — otherwise a duplicate
+    // would walk FinishedAt forward and make the terminal timestamp a function
+    // of delivery.
+    describe("when the cancel itself is redelivered", () => {
+      it("keeps the first cancel's terminal timestamp", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent({ status: "CANCELLED" }, { occurredAt: 3000 }),
+          createRunFinishedEvent(
+            { status: "CANCELLED" },
+            { occurredAt: 5000, id: "event-cancel-redelivered" },
+          ),
+        ]);
+
+        expect(state.Status).toBe("CANCELLED");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+  });
+
+  // STALLED is the deliberate exception to "the first finish owns the run".
+  // The `scenarioExecution` deadline wake writes it (ADR-073 step 2) when a run
+  // stops reporting — a guess that the run died. A genuine `finished` arriving
+  // afterwards is proof the guess was wrong: the run was slow, not dead.
+  // Blanket-blocking every terminal overwrite would freeze those runs as
+  // STALLED for good, with the real outcome discarded.
+  describe("given a run the deadline wake marked STALLED", () => {
+    describe("when the worker's real finished event arrives afterwards", () => {
+      it("takes the real outcome instead of freezing the run as STALLED", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent({ status: "STALLED" }, { occurredAt: 3000 }),
+          createRunFinishedEvent(
+            {
+              status: "SUCCESS",
+              results: {
+                verdict: "success",
+                reasoning: "the run was quiet, not dead",
+                metCriteria: ["criterion-1"],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 5000, id: "event-real-finish" },
+          ),
+        ]);
+
+        expect(state.Status).toBe("SUCCESS");
+        expect(state.Verdict).toBe("success");
+        expect(state.FinishedAt).toBe(5000);
+      });
+    });
+
+    // Same two events, opposite fold order, same answer — the point of ranking
+    // by authority rather than by arrival.
+    describe("when the stall is folded after the real finish", () => {
+      it("still reports the real outcome once both events are applied", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent(
+            {
+              status: "SUCCESS",
+              results: {
+                verdict: "success",
+                reasoning: "the run was quiet, not dead",
+                metCriteria: ["criterion-1"],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 5000, id: "event-real-finish" },
+          ),
+          createRunFinishedEvent({ status: "STALLED" }, { occurredAt: 3000 }),
+        ]);
+
+        expect(state.Status).toBe("SUCCESS");
+        expect(state.Verdict).toBe("success");
+        expect(state.FinishedAt).toBe(5000);
+      });
+    });
+
+    // A stall is superseded by a real OUTCOME, never by a sign of life. A
+    // snapshot proving the worker is alive would leave Status non-terminal with
+    // FinishedAt still set — the one state neither the orphan reconciler nor
+    // read-time stall detection can rescue.
+    describe("when a later snapshot shows the worker is still alive", () => {
+      it("keeps STALLED rather than reopening a finished run", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent({ status: "STALLED" }, { occurredAt: 3000 }),
+          createMessageSnapshotEvent(
+            { status: "IN_PROGRESS" },
+            { occurredAt: 5000 },
+          ),
+        ]);
+
+        expect(state.Status).toBe("STALLED");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    // A cancel outranks everything, including a stall. Both orders, because a
+    // user's stop must not depend on whether the wake fired first.
+    describe("when the user's cancel lands after the stall", () => {
+      it("reports the cancel", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "STALLED" }, { occurredAt: 3000 }),
+          createRunFinishedEvent(
+            { status: "CANCELLED" },
+            { occurredAt: 5000, id: "event-cancel-after-stall" },
+          ),
+        ]);
+
+        expect(state.Status).toBe("CANCELLED");
+        expect(state.FinishedAt).toBe(5000);
+      });
+    });
+
+    describe("when the stall is folded after the user's cancel", () => {
+      it("still reports the cancel", () => {
+        const state = foldEvents([
+          createRunFinishedEvent(
+            { status: "CANCELLED" },
+            { occurredAt: 5000, id: "event-cancel-after-stall" },
+          ),
+          createRunFinishedEvent({ status: "STALLED" }, { occurredAt: 3000 }),
+        ]);
+
+        expect(state.Status).toBe("CANCELLED");
+        expect(state.FinishedAt).toBe(5000);
+      });
+    });
+  });
+
+  // The other handlers that reach a finished run. Neither writes Status at all
+  // — deletion is ArchivedAt, cancellation intent is CancellationRequestedAt —
+  // so neither needs the authority ladder. Pinned so a handler that starts
+  // writing Status has to come past these. (`metrics_recorded` is the third
+  // such handler; it only assigns the cost/latency columns.)
+  describe("given a cancelled run reached by the handlers that never write Status", () => {
+    describe("when a cancel_requested event arrives afterwards", () => {
+      /** @scenario "Cancellation does not overwrite terminal results" */
+      it("records the request without touching the terminal status", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "CANCELLED" }, { occurredAt: 3000 }),
+          createCancelRequestedEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.CancellationRequestedAt).toBe(5000);
+        expect(state.Status).toBe("CANCELLED");
+      });
+    });
+
+    describe("when the run is deleted", () => {
+      it("archives it without touching the terminal status", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "CANCELLED" }, { occurredAt: 3000 }),
+          createRunDeletedEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.ArchivedAt).toBe(5000);
+        expect(state.Status).toBe("CANCELLED");
       });
     });
   });

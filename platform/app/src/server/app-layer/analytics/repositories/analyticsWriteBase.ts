@@ -5,15 +5,14 @@ import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 
 /**
- * Shared base classes for the ADR-034 write-side ClickHouse analytics
- * repositories. Every concrete repo (evaluation / experiment / simulation /
- * suite × slim + rollup) does the same insert dance — validate the tenant,
- * resolve the tenant-scoped client, serialize rows to JSONEachRow, log +
- * rethrow on failure. Only the table name, the log context id fields, and
- * the per-aggregate `toRecord` mapper differ.
+ * Shared base class for the ADR-034 write-side ClickHouse analytics rollup
+ * repositories: validate the tenant, resolve the tenant-scoped client,
+ * serialize rows to JSONEachRow, log + rethrow on failure. Only the table
+ * name, the log context id fields, and the per-aggregate `toRecord` mapper
+ * differ.
  *
- * Consolidating here s5014-001 (~950 LOC saved across 8 files) — same
- * shape via one base per pattern instead of copy-paste per aggregate.
+ * The slim-side counterpart (`BaseAnalyticsSlimClickHouseRepository`) lived
+ * here too and was deleted when it ran out of adopters.
  */
 
 interface AnalyticsRepoConfig<TRow extends { tenantId: string }, TRecord> {
@@ -44,98 +43,6 @@ function assertSingleTenant<TRow extends { tenantId: string }>(
         tenantId,
         { mismatchedTenantId: row.tenantId },
       );
-    }
-  }
-}
-
-/**
- * Slim-projection base — `upsert` on a single row, `upsertBatch` on N.
- *
- * Single-row `wait_for_async_insert: 0` (fire-and-forget latency), batch
- * `wait_for_async_insert: 1` (correctness — the caller batched for a reason).
- */
-export abstract class BaseAnalyticsSlimClickHouseRepository<
-  TRow extends { tenantId: string },
-  TRecord,
-> {
-  protected readonly logger: Logger;
-  protected readonly resolveClient: ClickHouseClientResolver;
-  protected readonly config: AnalyticsRepoConfig<TRow, TRecord>;
-
-  constructor(
-    resolveClient: ClickHouseClientResolver,
-    config: AnalyticsRepoConfig<TRow, TRecord>,
-  ) {
-    this.resolveClient = resolveClient;
-    this.config = config;
-    this.logger = createLogger(config.loggerName);
-  }
-
-  async upsert(
-    row: TRow,
-    retentionDays: number = PLATFORM_DEFAULT_RETENTION_DAYS,
-  ): Promise<void> {
-    const scope = `${this.config.tableName}.upsert`;
-    EventUtils.validateTenantId({ tenantId: row.tenantId }, scope);
-
-    try {
-      const client = await this.resolveClient(row.tenantId);
-      await client.insert({
-        table: this.config.tableName,
-        values: [this.config.toRecord(row, retentionDays)],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
-      });
-    } catch (error) {
-      this.logger.error(
-        {
-          tenantId: row.tenantId,
-          ...this.config.entityIdOf(row),
-          error: formatError(error),
-        },
-        `Failed to upsert ${this.config.tableName} row into ClickHouse`,
-      );
-      throw error;
-    }
-  }
-
-  async upsertBatch(
-    entries: Array<{ row: TRow; retentionDays?: number }>,
-  ): Promise<void> {
-    if (entries.length === 0) return;
-
-    const scope = `${this.config.tableName}.upsertBatch`;
-    const tenantId = entries[0]!.row.tenantId;
-    EventUtils.validateTenantId({ tenantId }, scope);
-    assertSingleTenant(
-      entries.map((e) => e.row),
-      tenantId,
-      scope,
-    );
-
-    try {
-      const client = await this.resolveClient(tenantId);
-      await client.insert({
-        table: this.config.tableName,
-        values: entries.map(({ row, retentionDays }) =>
-          this.config.toRecord(
-            row,
-            retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
-          ),
-        ),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      this.logger.error(
-        {
-          tenantId,
-          count: entries.length,
-          error: formatError(error),
-        },
-        `Failed to batch upsert ${this.config.tableName} rows into ClickHouse`,
-      );
-      throw error;
     }
   }
 }

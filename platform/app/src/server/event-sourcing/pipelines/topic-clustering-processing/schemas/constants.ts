@@ -22,10 +22,7 @@ export const TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES = [
   TOPIC_CLUSTERING_EVENT_TYPES.TOPICS_RECORDED,
 ] as const;
 
-export type TopicClusteringProcessingEventType =
-  (typeof TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES)[number];
-
-export const TOPIC_CLUSTERING_COMMAND_TYPES = {
+const TOPIC_CLUSTERING_COMMAND_TYPES = {
   REQUEST: "lw.obs.topic_clustering.request",
   RECORD_RUN_STARTED: "lw.obs.topic_clustering.record_run_started",
   RECORD_RUN_COMPLETED: "lw.obs.topic_clustering.record_run_completed",
@@ -41,10 +38,16 @@ export const TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES = [
   TOPIC_CLUSTERING_COMMAND_TYPES.RECORD_TOPICS,
 ] as const;
 
-export type TopicClusteringProcessingCommandType =
-  (typeof TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES)[number];
-
-/** Event schema versions using calendar versioning (YYYY-MM-DD). */
+/**
+ * Event schema versions using calendar versioning (YYYY-MM-DD).
+ *
+ * These constrain the MINT SITE at compile time — each event schema asserts its
+ * version as a literal and the event type is `z.infer`'d from it — and record
+ * when each shape was introduced. They constrain nothing at read time: the read
+ * path casts rather than parses, and never branches on `version`. So an
+ * incompatible payload change needs a NEW EVENT TYPE, not a version bump. See
+ * `evaluation-processing/schemas/constants.ts` for the full doctrine.
+ */
 export const TOPIC_CLUSTERING_EVENT_VERSIONS = {
   REQUESTED: "2026-07-17",
   RUN_STARTED: "2026-07-19",
@@ -67,8 +70,6 @@ export const TOPIC_MODEL_RECORD_MODE = {
   /** Upsert the event's topics into the existing model. */
   MERGE: "merge",
 } as const;
-export type TopicModelRecordMode =
-  (typeof TOPIC_MODEL_RECORD_MODE)[keyof typeof TOPIC_MODEL_RECORD_MODE];
 
 /** Who recorded the topics. */
 export const TOPIC_MODEL_RECORD_SOURCE = {
@@ -76,8 +77,6 @@ export const TOPIC_MODEL_RECORD_SOURCE = {
   /** One-time boot seed of topics that predate event-sourced ownership. */
   SEED: "seed",
 } as const;
-export type TopicModelRecordSource =
-  (typeof TOPIC_MODEL_RECORD_SOURCE)[keyof typeof TOPIC_MODEL_RECORD_SOURCE];
 
 /** How many finished runs the history read model keeps per project. */
 export const TOPIC_CLUSTERING_RUN_HISTORY_LIMIT = 50;
@@ -89,8 +88,6 @@ export const TOPIC_CLUSTERING_TRIGGER = {
   /** The project became eligible (first trace) or was backfilled. */
   BOOTSTRAP: "bootstrap",
 } as const;
-export type TopicClusteringTrigger =
-  (typeof TOPIC_CLUSTERING_TRIGGER)[keyof typeof TOPIC_CLUSTERING_TRIGGER];
 
 export const TOPIC_CLUSTERING_RUN_MODE = {
   BATCH: "batch",
@@ -129,5 +126,3 @@ export const TOPIC_CLUSTERING_RUN_OUTCOME = {
    */
   ABANDONED: "abandoned",
 } as const;
-export type TopicClusteringRunOutcome =
-  (typeof TOPIC_CLUSTERING_RUN_OUTCOME)[keyof typeof TOPIC_CLUSTERING_RUN_OUTCOME];

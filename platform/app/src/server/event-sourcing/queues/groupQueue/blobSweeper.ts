@@ -31,7 +31,7 @@ const SCAN_COUNT = 256;
  */
 const DEFAULT_MAX_KEYS_PER_QUEUE = 50_000;
 
-export interface BlobSweepTally extends Record<BlobSweepOutcome, number> {
+interface BlobSweepTally extends Record<BlobSweepOutcome, number> {
   /** Blobs examined, i.e. the sum of every outcome. */
   scanned: number;
   /** True when the per-queue ceiling stopped the walk before the keyspace ended. */

@@ -1,3 +1,4 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
@@ -9,6 +10,11 @@ import type { RetentionPolicyResolver } from "~/server/data-retention/retentionP
 import { makeQueueName } from "~/server/queues/makeQueueName";
 import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
 import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
+import {
+  type AnyCommandClass,
+  type CommandBusRuntime,
+  createCommandBus,
+} from "./commands/commandBus";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
 import type {
@@ -20,15 +26,16 @@ import type {
   PipelineWithCommandHandlers,
   RegisteredPipeline,
 } from "./pipeline/types";
-import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { ProcessRuntime } from "./process-manager/processRuntime";
 import { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore";
 import type { ProcessStore } from "./process-manager/stores/processStore.types";
-import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
 import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
-import type { EventSourcedQueueProcessor } from "./queues";
+import type {
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
+} from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
 import { EventSourcingPipeline } from "./runtimePipeline";
@@ -98,6 +105,16 @@ export class EventSourcing {
     PipelineWithCommandHandlers<any, any>
   >();
   private readonly _definitions: StaticPipelineDefinition<any, any, any>[] = [];
+  /**
+   * ADR-082 §5 — the command bus' identity index. Keyed on the command class
+   * object itself, populated as each pipeline registers, read lazily at
+   * dispatch time so registration order carries no meaning.
+   */
+  private readonly byCommandClass = new Map<
+    AnyCommandClass,
+    { pipeline: string; dispatcher: EventSourcedQueueProcessor<any> }
+  >();
+  private _commandBus?: CommandBusRuntime;
   private readonly projectionRegistry: ProjectionRegistry<Event>;
 
   // Infrastructure — lazily initialized
@@ -129,15 +146,6 @@ export class EventSourcing {
     if (options.isSaas) {
       this.projectionRegistry.registerMapProjection(
         orgBillableEventsMeterProjection,
-      );
-      this.projectionRegistry.registerMapReactor(
-        "orgBillableEventsMeter",
-        createBillingMeterDispatchReactor({
-          getDispatch: () => {
-            const pipeline = this.getPipeline(BILLING_REPORTING_PIPELINE_NAME);
-            return (data) => pipeline.commands.reportUsageForMonth.send(data);
-          },
-        }),
       );
     }
   }
@@ -205,6 +213,22 @@ export class EventSourcing {
   }
 
   /**
+   * Cross-pipeline command dispatch keyed on the imported command class
+   * (ADR-082 §5). Replaces `getPipeline(name).commands.x.send(...)`, which is
+   * two string keys and an `any`.
+   */
+  get commandBus(): CommandBusRuntime {
+    this._commandBus ??= createCommandBus({
+      resolve: (command) => this.byCommandClass.get(command)?.dispatcher,
+      registered: () =>
+        Array.from(this.byCommandClass.keys(), (command) =>
+          command.dispatcherName ? command.dispatcherName : command.schema.type,
+        ),
+    });
+    return this._commandBus;
+  }
+
+  /**
    * Registers a static pipeline definition with the runtime infrastructure.
    * Takes a static definition (created with `definePipeline()`) and connects it
    * to ClickHouse, Redis, and other runtime dependencies.
@@ -258,6 +282,10 @@ export class EventSourcing {
             definition.metadata,
           ) as ReturnType;
           this.pipelines.set(definition.metadata.name, disabled);
+          // Index the disabled dispatchers too, so a bus send under a disabled
+          // runtime logs "command DROPPED" like every other path instead of
+          // throwing an unregistered-command error.
+          this.indexCommandClasses(definition, disabled.commands);
           return disabled;
         }
 
@@ -289,7 +317,6 @@ export class EventSourcing {
           this.projectionRegistry.initialize(
             this._globalQueue,
             this._globalJobRegistry,
-            this._processRole,
           );
         }
 
@@ -304,7 +331,6 @@ export class EventSourcing {
           metadata: definition.metadata,
           featureFlagService: definition.featureFlagService,
           globalRegistry: this.projectionRegistry,
-          processRole: this._processRole,
           replayMarkerChecker: this._redis
             ? new RedisReplayMarkerChecker(this._redis)
             : undefined,
@@ -323,6 +349,7 @@ export class EventSourcing {
         }) as ReturnType;
 
         this.pipelines.set(definition.metadata.name, result);
+        this.indexCommandClasses(definition, dispatchers);
         return result;
       },
     );
@@ -354,6 +381,41 @@ export class EventSourcing {
       await this._globalQueue.close();
     }
     this.pipelines.clear();
+    this.byCommandClass.clear();
+  }
+
+  /**
+   * Adds this definition's command classes to the bus' identity index.
+   *
+   * `definition.commands` carries the handler class for both registration
+   * paths — `withCommand` stores it directly and `withCommandInstance` stores
+   * it alongside the instance — so one loop covers every command.
+   */
+  private indexCommandClasses(
+    definition: StaticPipelineDefinition<any, any, any>,
+    dispatchers: Record<string, EventSourcedQueueProcessor<any>>,
+  ): void {
+    for (const command of definition.commands) {
+      const dispatcher = dispatchers[command.name];
+      if (!dispatcher) continue;
+      const existing = this.byCommandClass.get(command.handlerClass);
+      if (existing && existing.pipeline !== definition.metadata.name) {
+        // One class, two pipelines: the last registration would silently win
+        // and every bus dispatch would land on the wrong queue.
+        logger.warn(
+          {
+            command: command.name,
+            registeredBy: existing.pipeline,
+            alsoRegisteredBy: definition.metadata.name,
+          },
+          "Command class registered on more than one pipeline — bus dispatch resolves to the last one",
+        );
+      }
+      this.byCommandClass.set(command.handlerClass, {
+        pipeline: definition.metadata.name,
+        dispatcher,
+      });
+    }
   }
 
   private ensureInitialized(): void {
@@ -649,22 +711,6 @@ function buildServiceOptions<
         }))
       : undefined;
 
-  const foldReactorList = Array.from(definition.foldReactors.values()).map(
-    (entry) => ({
-      foldName: entry.projectionName as string,
-      definition: entry.definition,
-    }),
-  );
-
-  const mapReactorList = Array.from(definition.mapReactors.values()).map(
-    (entry) => ({
-      mapName: entry.projectionName as string,
-      definition: entry.definition,
-    }),
-  );
-
-  const reactors = foldReactorList.length > 0 ? foldReactorList : undefined;
-  const mapReactors = mapReactorList.length > 0 ? mapReactorList : undefined;
   const subscribers =
     definition.eventSubscribers.size > 0
       ? Array.from(definition.eventSubscribers.values())
@@ -676,8 +722,6 @@ function buildServiceOptions<
       stateProjections.length > 0 ? stateProjections : undefined,
     mapProjections: mapProjections.length > 0 ? mapProjections : undefined,
     commandRegistrations,
-    reactors,
-    mapReactors,
     subscribers,
   };
 }

@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Command, CommandHandler } from "../../../";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import type { SimulationRunStateData } from "../projections/simulationRunState.foldProjection";
 import type { ComputeRunMetricsCommandData } from "../schemas/commands";
 import { computeRunMetricsCommandDataSchema } from "../schemas/commands";
 import {
@@ -12,25 +14,36 @@ import {
 } from "../schemas/constants";
 import type {
   SimulationProcessingEvent,
-  SimulationRunMetricsComputedEvent,
-  SimulationRunMetricsComputedEventData,
+  SimulationRunMetricsRecordedEvent,
+  SimulationRunMetricsRecordedEventData,
 } from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:simulation-processing:compute-run-metrics",
 );
 
-const MAX_RETRIES = 3;
-export const COMPUTE_METRICS_RETRY_DELAY_MS = 10_000;
+/**
+ * Cost is summed across traces before being written, so it is rounded once,
+ * here, rather than repeatedly by whoever reads it. Six places is below a
+ * hundredth of a cent — finer than any price we bill at, coarse enough to keep
+ * float noise out of the stored value.
+ */
+const COST_DECIMAL_PLACES = 6;
 
 export interface ComputeRunMetricsDeps {
-  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-  scheduleRetry: (payload: ComputeRunMetricsCommandData) => Promise<void>;
   /**
-   * Derives per-role cost/latency for a trace from stored_spans. Replaces the
-   * old per-span fold accumulation: role costs are no longer carried on the
-   * trace summary, so they are computed here (once per trace, when its metrics
-   * are needed) instead of on the hot fold path for every span of every trace.
+   * The run's own fold, read for the traces to aggregate over. Read here rather
+   * than carried on the payload so nothing upstream has to accumulate trace ids,
+   * and so a trace that landed after the run finished is still measured.
+   */
+  simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
+  /** The trace pipeline's summary fold — read for each trace's `totalCost`. */
+  traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  /**
+   * Derives per-role cost/latency for a trace from its stored spans. Role cost
+   * and latency are not carried on the trace summary — they would grow the hot
+   * fold path with span count — so they are derived once here, when the run's
+   * metrics are computed.
    */
   deriveScenarioRoleMetrics: (params: {
     tenantId: string;
@@ -46,17 +59,60 @@ export interface ComputeRunMetricsDeps {
 const SCHEMA = defineCommandSchema(
   SIMULATION_RUN_COMMAND_TYPES.COMPUTE_METRICS,
   computeRunMetricsCommandDataSchema,
-  "Command to compute simulation run cost/latency metrics from trace data",
+  "Command to compute a simulation run's cost/latency from all of its traces",
 );
 
+/** One trace's contribution to the run, in the shape the aggregate needs. */
+interface TraceContribution {
+  totalCost: number | null;
+  roleCosts: Record<string, number>;
+  roleLatencies: Record<string, number>;
+}
+
 /**
- * Command handler for computing simulation run metrics.
+ * Fingerprint of the computed values, used to key the emitted event.
  *
- * Supports two modes:
- * 1. ECST mode: metrics provided in payload (from trace-side reactor) - emits event directly
- * 2. Pull mode: no metrics in payload (from simulation-side reactor) - reads trace summary
+ * The point is convergence. A key that ignores the values — as the per-trace
+ * predecessor's did — means the event store's keep-the-first rule discards every
+ * later, better answer, so a run measured before its spans landed stays wrong
+ * forever. Keyed on the values instead, a repeat of the SAME answer still
+ * collapses (the property idempotency is for) while a DIFFERENT answer is a
+ * different event and lands.
  *
- * When a trace summary is not yet available, schedules a deferred retry.
+ * Keys are sorted so two objects that differ only in insertion order fingerprint
+ * alike.
+ */
+function fingerprintMetrics(
+  data: SimulationRunMetricsRecordedEventData,
+): string {
+  const canonicalRoles = (roles: Record<string, number[]>) =>
+    Object.keys(roles)
+      .sort()
+      .map((role) => [role, roles[role]] as const);
+
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        [...data.traceIds].sort(),
+        data.totalCost,
+        canonicalRoles(data.roleCosts),
+        canonicalRoles(data.roleLatencies),
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/**
+ * Computes a finished simulation run's cost and latency from every trace it
+ * produced, and emits ONE event carrying the result.
+ *
+ * Why an event carrying values rather than a read-time join: `stored_spans` and
+ * `trace_summaries` are in the `traces` retention category while
+ * `simulation_runs` is in `scenarios`, and the two are configured
+ * independently. Deriving at read time would blank a still-visible run's metrics
+ * the moment its spans aged out. An event carrying the numbers replays without
+ * spans.
  *
  * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
  */
@@ -76,126 +132,146 @@ export class ComputeRunMetricsCommand
   ): Promise<SimulationProcessingEvent[]> {
     const { tenantId: tenantIdStr, data } = command;
     const tenantId = createTenantId(tenantIdStr);
-    const { scenarioRunId, traceId } = data;
+    const { scenarioRunId } = data;
+
+    const run = await this.deps.simulationRunStore.get(scenarioRunId, {
+      tenantId,
+      aggregateId: scenarioRunId,
+    });
+
+    if (!run) {
+      logger.warn(
+        { tenantId, scenarioRunId },
+        "No stored run to measure — nothing has been folded for it",
+      );
+      return [];
+    }
+
+    // Re-checked here rather than only where the measurement was asked for: the
+    // settle period gives a user a full minute to delete the run, and measuring
+    // it would spend reads and write cost onto a row nobody can open.
+    if (run.ArchivedAt != null) {
+      logger.debug(
+        { tenantId, scenarioRunId },
+        "Run was deleted before it could be measured",
+      );
+      return [];
+    }
+
+    const traceIds = run.TraceIds;
+    if (traceIds.length === 0) {
+      logger.debug(
+        { tenantId, scenarioRunId },
+        "Run has no traces, nothing to measure",
+      );
+      return [];
+    }
+
+    // Reads run concurrently and the results stay positionally aligned with
+    // `traceIds`, so the aggregate below is order-deterministic regardless of
+    // which read finishes first. A read that throws fails the command, so the
+    // queue retries it — the predecessor logged and dropped, which is how a
+    // finished run silently ended up with no cost at all.
+    const contributions = await Promise.all(
+      traceIds.map((traceId) => this.measureTrace({ tenantIdStr, traceId })),
+    );
+
+    let costTotal = 0;
+    const roleCosts: Record<string, number[]> = {};
+    const roleLatencies: Record<string, number[]> = {};
+
+    for (const contribution of contributions) {
+      costTotal += contribution.totalCost ?? 0;
+      for (const [role, cost] of Object.entries(contribution.roleCosts)) {
+        (roleCosts[role] ??= []).push(cost);
+      }
+      for (const [role, latency] of Object.entries(
+        contribution.roleLatencies,
+      )) {
+        (roleLatencies[role] ??= []).push(latency);
+      }
+    }
+
+    const hasRoleMetrics =
+      Object.keys(roleCosts).length > 0 ||
+      Object.keys(roleLatencies).length > 0;
+
+    // Nothing measurable came back: no trace reported a cost and no span carried
+    // a scenario role. Writing that would overwrite whatever the run already
+    // shows with a row of blanks, so it is left alone and logged instead.
+    if (costTotal <= 0 && !hasRoleMetrics) {
+      logger.warn(
+        { tenantId, scenarioRunId, traceCount: traceIds.length },
+        "No cost or role metrics found for the run's traces, leaving metrics unchanged",
+      );
+      return [];
+    }
+
+    const eventData: SimulationRunMetricsRecordedEventData = {
+      scenarioRunId,
+      traceIds,
+      // Zero collapses to null, as it did when the fold aggregated per trace: a
+      // run that cost nothing measurable and one that was never priced are the
+      // same "no cost to show" to every reader downstream.
+      totalCost:
+        costTotal > 0 ? Number(costTotal.toFixed(COST_DECIMAL_PLACES)) : null,
+      roleCosts,
+      roleLatencies,
+    };
+
+    const event = EventUtils.createEvent<SimulationRunMetricsRecordedEvent>({
+      aggregateType: "simulation_run",
+      aggregateId: scenarioRunId,
+      tenantId,
+      type: SIMULATION_RUN_EVENT_TYPES.METRICS_RECORDED,
+      version: SIMULATION_EVENT_VERSIONS.METRICS_RECORDED,
+      data: eventData,
+      occurredAt: data.occurredAt,
+      idempotencyKey: `${tenantIdStr}:${scenarioRunId}:runMetrics:${fingerprintMetrics(eventData)}`,
+    });
 
     logger.debug(
       {
         tenantId,
         scenarioRunId,
-        traceId,
-        hasMetrics: !!data.metrics,
-        retryCount: data.retryCount,
+        eventId: event.id,
+        traceCount: traceIds.length,
+        totalCost: eventData.totalCost,
       },
-      "Handling compute run metrics command",
-    );
-
-    // ECST path: metrics provided in payload
-    let metrics = data.metrics;
-
-    // Pull fallback: read from trace summary store
-    if (!metrics) {
-      const traceSummary = await this.deps.traceSummaryStore.get(traceId, {
-        tenantId,
-        aggregateId: traceId,
-      });
-
-      if (!traceSummary) {
-        logger.debug(
-          { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
-          "Trace summary not available yet",
-        );
-
-        if (data.retryCount < MAX_RETRIES) {
-          await this.deps.scheduleRetry({
-            ...data,
-            retryCount: data.retryCount + 1,
-            occurredAt: Date.now(),
-          });
-        } else {
-          logger.warn(
-            { tenantId, scenarioRunId, traceId },
-            "Max retries reached for trace metrics computation, giving up",
-          );
-        }
-
-        return [];
-      }
-
-      // Role cost/latency are derived from stored_spans (not carried on the
-      // summary anymore); totalCost is still a summary scalar.
-      const {
-        scenarioRoleCosts: roleCosts,
-        scenarioRoleLatencies: roleLatencies,
-      } = await this.deps.deriveScenarioRoleMetrics({
-        tenantId: tenantIdStr,
-        traceId,
-        occurredAtMs: traceSummary.occurredAt,
-        foldVersion: traceSummary.spanCount,
-      });
-
-      // Summary exists but not yet populated (cost enrichment still in progress).
-      // Treat like missing summary — schedule retry so we pick it up later.
-      // Role latency is enough on its own: a scenario trace can have
-      // role-bearing spans with latency but no cost (totalCost null, roleCosts
-      // empty), and those metrics are still worth emitting.
-      if (
-        Object.keys(roleCosts).length === 0 &&
-        Object.keys(roleLatencies).length === 0 &&
-        traceSummary.totalCost === null
-      ) {
-        logger.debug(
-          { tenantId, scenarioRunId, traceId, retryCount: data.retryCount },
-          "Trace summary exists but has no metrics yet",
-        );
-
-        if (data.retryCount < MAX_RETRIES) {
-          await this.deps.scheduleRetry({
-            ...data,
-            retryCount: data.retryCount + 1,
-            occurredAt: Date.now(),
-          });
-        } else {
-          logger.warn(
-            { tenantId, scenarioRunId, traceId },
-            "Max retries reached for trace metrics (summary empty), giving up",
-          );
-        }
-
-        return [];
-      }
-
-      metrics = {
-        totalCost: traceSummary.totalCost ?? 0,
-        roleCosts,
-        roleLatencies,
-      };
-    }
-
-    const eventData: SimulationRunMetricsComputedEventData = {
-      scenarioRunId,
-      traceId,
-      totalCost: metrics.totalCost,
-      roleCosts: metrics.roleCosts,
-      roleLatencies: metrics.roleLatencies,
-    };
-
-    const event = EventUtils.createEvent<SimulationRunMetricsComputedEvent>({
-      aggregateType: "simulation_run",
-      aggregateId: scenarioRunId,
-      tenantId,
-      type: SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED,
-      version: SIMULATION_EVENT_VERSIONS.METRICS_COMPUTED,
-      data: eventData,
-      occurredAt: data.occurredAt,
-      idempotencyKey: `${tenantIdStr}:${scenarioRunId}:${traceId}:computeRunMetrics`,
-    });
-
-    logger.debug(
-      { tenantId, scenarioRunId, traceId, eventId: event.id },
-      "Emitting simulation run metrics computed event",
+      "Emitting simulation run metrics recorded event",
     );
 
     return [event];
+  }
+
+  private async measureTrace({
+    tenantIdStr,
+    traceId,
+  }: {
+    tenantIdStr: string;
+    traceId: string;
+  }): Promise<TraceContribution> {
+    const summary = await this.deps.traceSummaryStore.get(traceId, {
+      tenantId: createTenantId(tenantIdStr),
+      aggregateId: traceId,
+    });
+
+    // `occurredAtMs` prunes ClickHouse partitions and `foldVersion` keys the
+    // derivation memo; both are hints, so a trace with no summary yet is still
+    // read — its spans may be stored even when its summary fold has not landed.
+    const { scenarioRoleCosts, scenarioRoleLatencies } =
+      await this.deps.deriveScenarioRoleMetrics({
+        tenantId: tenantIdStr,
+        traceId,
+        occurredAtMs: summary?.occurredAt,
+        foldVersion: summary?.spanCount,
+      });
+
+    return {
+      totalCost: summary?.totalCost ?? null,
+      roleCosts: scenarioRoleCosts,
+      roleLatencies: scenarioRoleLatencies,
+    };
   }
 
   static getAggregateId(payload: ComputeRunMetricsCommandData): string {
@@ -207,13 +283,6 @@ export class ComputeRunMetricsCommand
   ): Record<string, string | number | boolean> {
     return {
       "payload.scenarioRun.id": payload.scenarioRunId,
-      "payload.traceId": payload.traceId,
-      "payload.hasMetrics": !!payload.metrics,
-      "payload.retryCount": payload.retryCount,
     };
-  }
-
-  static makeJobId(payload: ComputeRunMetricsCommandData): string {
-    return `${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}:compute-run-metrics`;
   }
 }

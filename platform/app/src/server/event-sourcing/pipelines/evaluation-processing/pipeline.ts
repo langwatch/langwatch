@@ -1,15 +1,13 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import { GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
+import { createGraphTriggerActivitySubscriber } from "~/server/event-sourcing/pipelines/automations/subscribers/graphTriggerActivity.subscriber";
 import { definePipeline } from "../../";
-import type { TriggerContext } from "../../pipeline/processManagerDefinition";
+import type { CommandBus } from "../../commands/commandBus";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
-import {
-  CompleteEvaluationCommand,
-  ReportEvaluationCommand,
-  StartEvaluationCommand,
-} from "./commands";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
+import { ReportUsageForMonthCommand } from "../billing-reporting/commands/reportUsageForMonth.command";
+import { createBillingMeterPokeSubscriber } from "../billing-reporting/subscribers/billingMeterPoke.subscriber";
+import { ReportEvaluationCommand, StartEvaluationCommand } from "./commands";
 import { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
 import {
   type EvaluationAnalyticsData,
@@ -35,20 +33,22 @@ export interface EvaluationProcessingPipelineDeps {
    *  `traceAnalyticsRollupAppendStore`). */
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
+  /** ADR-082 §5 — the cross-pipeline port the billing poke dispatches through. */
+  commands: CommandBus;
+  /** Usage reporting is SaaS-only; the poke is off everywhere else. */
+  isSaas: boolean;
   automations: {
-    triggerMatchHandler: (
-      event: EvaluationProcessingEvent,
-      context: TriggerContext<EvaluationRunData>,
-    ) => Promise<void>;
+    /**
+     * Matches a finished evaluation against the project's automations. A
+     * subscriber definition rather than a handler: the delay, the dedup key and
+     * the enqueue filter belong to the subscriber now, not to this mount.
+     */
+    triggerMatchSubscriber: EventSubscriberDefinition<EvaluationProcessingEvent>;
     graphActivityHandler: (
       event: EvaluationProcessingEvent,
       context: { tenantId: string },
     ) => Promise<void>;
   };
-  customerIoEvaluationSyncReactor?: ReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
 }
 
 /**
@@ -59,14 +59,19 @@ export interface EvaluationProcessingPipelineDeps {
  * and enables detection of stuck evaluations.
  *
  * Commands:
- * - executeEvaluation: Preconditions + sampling + run eval + emit events (reactor path)
+ * - executeEvaluation: Preconditions + sampling + run eval + emit events
  * - startEvaluation: Records eval start to CH (API handler path)
- * - completeEvaluation: Records eval result to CH (API handler path)
+ * - reportEvaluation: Records one finished evaluation atomically
+ *
+ * `lw.evaluation.completed` has no command any more — nothing dispatched one.
+ * The event type, its schema, its type guard and the fold's handling of it all
+ * stay: historical `completed` events are in `event_log` and replay must keep
+ * parsing them.
  */
 export function createEvaluationProcessingPipeline(
   deps: EvaluationProcessingPipelineDeps,
 ) {
-  let builder = definePipeline<EvaluationProcessingEvent>()
+  const builder = definePipeline<EvaluationProcessingEvent>()
     .withName("evaluation_processing")
     .withAggregateType("evaluation")
     .withFoldProjection(
@@ -87,34 +92,31 @@ export function createEvaluationProcessingPipeline(
         store: deps.evaluationAnalyticsRollupAppendStore,
       }),
     )
-    .withSubscriber("triggerMatch", {
-      fold: "evaluationRun",
-      events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
-      delay: 10_000,
-      ttl: 30_000,
-      handler: (event, context) =>
-        deps.automations.triggerMatchHandler(event, context),
-    })
-    .withSubscriber("graphTriggerActivity", {
-      events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
-      delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-      dedup: {
-        makeId: (event) => `graph-trigger-activity:${event.tenantId}`,
-        ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-        extend: false,
-        replace: false,
-      },
-      handler: (event, context) =>
-        deps.automations.graphActivityHandler(event, context),
-    });
-
-  if (deps.customerIoEvaluationSyncReactor) {
-    builder = builder.withReactor(
-      "evaluationRun",
-      "customerIoEvaluationSync",
-      deps.customerIoEvaluationSyncReactor,
+    .withEventSubscriber(
+      "triggerMatch",
+      deps.automations.triggerMatchSubscriber,
+    )
+    // `reported` is the only evaluation event `orgBillableEventsMeter` records,
+    // so it is the only one worth poking on — a `completed` event bills nothing
+    // and would mint a job that changes no total.
+    .withEventSubscriber(
+      "billingMeterPoke",
+      createBillingMeterPokeSubscriber<EvaluationProcessingEvent>({
+        eventTypes: [EVALUATION_REPORTED_EVENT_TYPE],
+        reportUsageForMonth: deps.commands.port(ReportUsageForMonthCommand),
+        isSaas: deps.isSaas,
+      }),
+    )
+    .withEventSubscriber(
+      "graphTriggerActivity",
+      createGraphTriggerActivitySubscriber<EvaluationProcessingEvent>({
+        eventTypes: [
+          EVALUATION_COMPLETED_EVENT_TYPE,
+          EVALUATION_REPORTED_EVENT_TYPE,
+        ],
+        handler: deps.automations.graphActivityHandler,
+      }),
     );
-  }
 
   return builder
     .withCommandInstance(
@@ -131,9 +133,6 @@ export function createEvaluationProcessingPipeline(
       },
     )
     .withCommand("startEvaluation", StartEvaluationCommand, {
-      serializeByAggregate: true,
-    })
-    .withCommand("completeEvaluation", CompleteEvaluationCommand, {
       serializeByAggregate: true,
     })
     .withCommand("reportEvaluation", ReportEvaluationCommand, {

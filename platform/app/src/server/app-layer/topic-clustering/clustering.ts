@@ -2,20 +2,26 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import { env } from "../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
+import { getApp } from "../app";
+import { seedProjectTopicModel } from "./seedTopicModel";
+import {
+  CLUSTERING_ERROR_CODES,
+  ClusteringError,
+} from "./clustering-error";
+import { clusteringErrorExcerpt } from "./clustering-error-excerpt";
 import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { getProjectEmbeddingsModel } from "../../embeddings";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import { getPayloadSizeHistogram } from "../../metrics";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
-import { getApp } from "../app";
+import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -24,8 +30,6 @@ import type {
   TopicClusteringTopic,
   TopicClusteringTrace,
 } from "./clustering.types";
-import { CLUSTERING_ERROR_CODES, ClusteringError } from "./clustering-error";
-import { seedProjectTopicModel } from "./seedTopicModel";
 
 const logger = createLogger("langwatch:topicClustering");
 
@@ -224,7 +228,8 @@ export const clusterTopicsForProject = async (
   // of empty-input (or already-clustered) traces, and stopping on the
   // usable count would strand them. Worst case of the loose threshold is
   // one extra near-empty page before the walk ends.
-  const nextSearchAfter = returnedCount > 10 && lastSort ? lastSort : undefined;
+  const nextSearchAfter =
+    returnedCount > 10 && lastSort ? lastSort : undefined;
 
   if (traces.length < minimumTraces) {
     logger.info(
@@ -735,7 +740,12 @@ export const storeResults = async (
     return null;
   }
 
-  const { topics, subtopics, traces: tracesToAssign, cost } = clusteringResult;
+  const {
+    topics,
+    subtopics,
+    traces: tracesToAssign,
+    cost,
+  } = clusteringResult;
 
   logger.info(
     {
@@ -866,7 +876,7 @@ export const storeResults = async (
 
 /**
  * Topic clustering runs on langevals (the workspace member at
- * services/langevals/evaluators/topic_clustering — see contract.md §11). Returns
+ * langevals/evaluators/topic_clustering — see contract.md §11). Returns
  * the base URL, or `null` if LANGEVALS_ENDPOINT is unset, in which case
  * the caller warns and skips.
  */
@@ -974,15 +984,12 @@ const postToTopicClustering = async (opts: {
     });
 
     if (!response.ok) {
-      let body = await response.text();
-      try {
-        body = JSON.stringify(JSON.parse(body), null, 2)
-          .split("\n")
-          .slice(0, 10)
-          .join("\n");
-      } catch {
-        /* this is just a safe json parse fallback */
-      }
+      // Bounded in BYTES and with the request echo stripped, because this
+      // message is logged AND recorded on the run's failure event. A pydantic
+      // 422 quotes the value it rejected — which for us is a trace's own
+      // text — and the previous line-bound let a single long line through
+      // whole. See clustering-error-excerpt.ts.
+      const body = clusteringErrorExcerpt(await response.text());
       // Ours by default. The body often quotes an upstream provider error,
       // but quoting is not evidence — attributing a 5xx to the customer's
       // credentials on the strength of the text inside it is how this used to

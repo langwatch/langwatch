@@ -440,6 +440,7 @@ describe("subscriber enqueue-time contract", () => {
         vi.spyOn(queueManager, "hasSubscriberQueues").mockReturnValue(true);
         vi.spyOn(queueManager, "getSubscriberQueue").mockReturnValue({
           send: vi.fn().mockRejectedValue(new Error("queue unavailable")),
+          sendBatch: vi.fn().mockRejectedValue(new Error("queue unavailable")),
         } as never);
 
         const router = new ProjectionRouter<Event>(

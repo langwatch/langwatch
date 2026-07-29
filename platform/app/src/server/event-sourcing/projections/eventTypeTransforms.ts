@@ -25,7 +25,7 @@ export type StripPrefix<S extends string> = S extends `lw.obs.${infer R}`
     : S;
 
 /** `"foo_bar"` → `"FooBar"` */
-export type SnakeToPascal<S extends string> = S extends `${infer H}_${infer T}`
+type SnakeToPascal<S extends string> = S extends `${infer H}_${infer T}`
   ? `${Capitalize<H>}${SnakeToPascal<T>}`
   : Capitalize<S>;
 
@@ -55,7 +55,7 @@ export type UnionToIntersection<U> = (
  * Converts a dot.snake_case event type to PascalCase, stripping the lw./lw.obs. prefix.
  * Example: "lw.suite_run.started" → "SuiteRunStarted"
  */
-export function eventTypeToPascalSuffix(eventType: string): string {
+function eventTypeToPascalSuffix(eventType: string): string {
   const stripped = eventType.startsWith("lw.obs.")
     ? eventType.slice(7)
     : eventType.startsWith("lw.")

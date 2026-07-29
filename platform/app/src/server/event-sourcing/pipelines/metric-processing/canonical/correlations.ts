@@ -1,18 +1,14 @@
-import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
+import {
+  decodeBase64OpenTelemetryId,
+  isValidSpanId,
+  isValidTraceId,
+} from "~/server/tracer/utils";
 import type {
   MetricKind,
   MetricTraceCorrelation,
 } from "../schemas/metricDataPoint";
 import { finiteNumber, timestampDecimal, timestampMs } from "./numbers";
 import { isRecord } from "./serialization";
-
-function validTraceId(value: string): boolean {
-  return /^[a-f0-9]{32}$/i.test(value) && !/^0+$/.test(value);
-}
-
-function validSpanId(value: string): boolean {
-  return /^[a-f0-9]{16}$/i.test(value) && !/^0+$/.test(value);
-}
 
 /**
  * Exemplars that name a real trace and span become trace-scoped correlations.
@@ -39,7 +35,7 @@ export function correlations(args: {
     const spanId = (
       decodeBase64OpenTelemetryId(raw.spanId) ?? ""
     ).toLowerCase();
-    if (!validTraceId(traceId) || !validSpanId(spanId)) continue;
+    if (!isValidTraceId(traceId) || !isValidSpanId(spanId)) continue;
     const exemplarTime = timestampDecimal(raw.timeUnixNano);
     const exemplarValue = finiteNumber(raw.asDouble ?? raw.asInt);
     const correlationKey = `${traceId}:${spanId}`;

@@ -72,31 +72,6 @@ function createMockProjectionDefinition(
 }
 
 /**
- * Creates a mock reactor definition in the shape expected by QueueManager.initializeReactorQueues.
- */
-function createMockReactorDefinition(
-  name: string,
-  options?: {
-    delay?: number;
-    deduplication?: DeduplicationStrategy<{ event: Event; foldState: unknown }>;
-  },
-  parent?: {
-    parentProjection: string;
-    parentType: "fold" | "map";
-  },
-) {
-  return {
-    name,
-    parentProjection: parent?.parentProjection ?? "defaultFold",
-    parentType: parent?.parentType ?? ("fold" as const),
-    handler: {
-      handle: vi.fn().mockResolvedValue(void 0),
-    },
-    options,
-  };
-}
-
-/**
  * Creates a mock command handler class for testing.
  */
 function createMockCommandHandlerClass(
@@ -178,22 +153,16 @@ describe("QueueManager", () => {
         vi.fn(),
         "test-pipeline",
       );
-      manager.initializeReactorQueues(
-        { r1: createMockReactorDefinition("r1") },
-        vi.fn(),
-      );
 
       // Registry entries exist for each job type
       expect(globalJobRegistry.has("test-pipeline:handler:h1")).toBe(true);
       expect(globalJobRegistry.has("test-pipeline:projection:p1")).toBe(true);
       expect(globalJobRegistry.has("test-pipeline:command:c1")).toBe(true);
-      expect(globalJobRegistry.has("test-pipeline:reactor:r1")).toBe(true);
 
       // Facades exist for each
       expect(manager.getHandlerQueue("h1")).toBeDefined();
       expect(manager.getProjectionQueue("p1")).toBeDefined();
       expect(manager.getCommandQueue("c1")).toBeDefined();
-      expect(manager.getReactorQueue("r1")).toBeDefined();
     });
 
     it("global job registry entries have groupKeyFn and scoreFn", () => {
@@ -993,189 +962,6 @@ describe("QueueManager", () => {
         );
       }).toThrow(
         'Command handler with name "command1" already exists. Command handler names must be unique within a pipeline.',
-      );
-    });
-  });
-
-  describe("initializeReactorQueues", () => {
-    it("does nothing when global queue is not provided", () => {
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-      });
-
-      manager.initializeReactorQueues(
-        { reactor1: createMockReactorDefinition("reactor1") },
-        vi.fn(),
-      );
-
-      expect(manager.hasReactorQueues()).toBe(false);
-    });
-
-    it("creates facades for all reactors", () => {
-      const mockQueueProcessor = createMockSharedQueue();
-      const globalJobRegistry = new Map<string, JobRegistryEntry>();
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        globalQueue: mockQueueProcessor,
-        globalJobRegistry,
-      });
-
-      manager.initializeReactorQueues(
-        {
-          reactor1: createMockReactorDefinition("reactor1"),
-          reactor2: createMockReactorDefinition("reactor2"),
-        },
-        vi.fn(),
-      );
-
-      expect(globalJobRegistry.has("test-pipeline:reactor:reactor1")).toBe(
-        true,
-      );
-      expect(globalJobRegistry.has("test-pipeline:reactor:reactor2")).toBe(
-        true,
-      );
-      expect(manager.getReactorQueue("reactor1")).toBeDefined();
-      expect(manager.getReactorQueue("reactor2")).toBeDefined();
-      expect(manager.hasReactorQueues()).toBe(true);
-    });
-
-    it("facade injects __pipelineName, __jobType and __jobName on send", async () => {
-      const mockQueueProcessor = createMockSharedQueue();
-      const globalJobRegistry = new Map<string, JobRegistryEntry>();
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        globalQueue: mockQueueProcessor,
-        globalJobRegistry,
-      });
-
-      manager.initializeReactorQueues(
-        { reactor1: createMockReactorDefinition("reactor1") },
-        vi.fn(),
-      );
-
-      const facade = manager.getReactorQueue("reactor1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
-      await facade.send({ event, foldState: { count: 1 } });
-
-      expect(mockQueueProcessor.send).toHaveBeenCalledWith(
-        expect.objectContaining({
-          __pipelineName: "test-pipeline",
-          __jobType: "reactor",
-          __jobName: "reactor1",
-          event: expect.objectContaining({
-            aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-          }),
-          foldState: { count: 1 },
-        }),
-        expect.any(Object),
-      );
-    });
-
-    it("reactor groupKey uses hierarchical format with parent projection", () => {
-      const mockQueueProcessor = createMockSharedQueue();
-      const globalJobRegistry = new Map<string, JobRegistryEntry>();
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        globalQueue: mockQueueProcessor,
-        globalJobRegistry,
-      });
-
-      manager.initializeReactorQueues(
-        {
-          reactor1: createMockReactorDefinition("reactor1", undefined, {
-            parentProjection: "traceSummary",
-            parentType: "fold",
-          }),
-        },
-        vi.fn(),
-      );
-
-      const entry = globalJobRegistry.get("test-pipeline:reactor:reactor1");
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
-
-      const groupKey = entry?.groupKeyFn({
-        event,
-        foldState: {},
-      });
-      expect(groupKey).toBe(
-        `${tenantId}/fold/traceSummary/reactor/reactor1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
-      );
-    });
-
-    it("reactor score uses event timestamp", () => {
-      const mockQueueProcessor = createMockSharedQueue();
-      const globalJobRegistry = new Map<string, JobRegistryEntry>();
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        globalQueue: mockQueueProcessor,
-        globalJobRegistry,
-      });
-
-      manager.initializeReactorQueues(
-        { reactor1: createMockReactorDefinition("reactor1") },
-        vi.fn(),
-      );
-
-      const entry = globalJobRegistry.get("test-pipeline:reactor:reactor1");
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-        undefined,
-        55000,
-      );
-
-      const score = entry?.scoreFn({
-        event,
-        foldState: {},
-      });
-      expect(score).toBe(55000);
-    });
-
-    it("passes reactor delay as per-send option", async () => {
-      const mockQueueProcessor = createMockSharedQueue();
-      const globalJobRegistry = new Map<string, JobRegistryEntry>();
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        globalQueue: mockQueueProcessor,
-        globalJobRegistry,
-      });
-
-      manager.initializeReactorQueues(
-        { reactor1: createMockReactorDefinition("reactor1", { delay: 3000 }) },
-        vi.fn(),
-      );
-
-      const facade = manager.getReactorQueue("reactor1")!;
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
-      await facade.send({ event, foldState: {} });
-
-      expect(mockQueueProcessor.send).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({ delay: 3000 }),
       );
     });
   });

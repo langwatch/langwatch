@@ -2,7 +2,7 @@
  * Integration tests for event-sourcing based scenario cancellation.
  *
  * Uses real Redis (via testContainers) to verify the full pub/sub flow:
- * - Publishing cancel signals from the reactor
+ * - Publishing cancel signals from the subscriber
  * - Workers subscribing and receiving targeted cancellations
  * - Multiple workers only killing their own children
  * - Batch cancellation reaching all workers
@@ -46,7 +46,10 @@ import {
 } from "../cancellation-channel";
 import { ScenarioExecutionPool } from "../execution/execution-pool";
 import type { ProcessorDependencies } from "../scenario.processor";
-import { startScenarioProcessor } from "../scenario.processor";
+import {
+  executeScenarioRun,
+  startScenarioProcessor,
+} from "../scenario.processor";
 
 /** Poll until condition is true, or throw on timeout. */
 async function waitFor(
@@ -127,7 +130,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
   });
 
   describe("when a single worker is running a scenario", () => {
-    /** @scenario "Cancel reactor broadcasts to Redis on cancel_requested event" */
+    /** @scenario "Cancel subscriber broadcasts to Redis on cancel_requested event" */
     /** @scenario "Worker kills its own child process on cancel broadcast" */
     it("kills the child process on cancel broadcast", async () => {
       const worker = createMockWorker(redis);
@@ -141,9 +144,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await publishCancellation({
         publisher: redis,
         message: {
-          projectId: "proj-1",
           scenarioRunId: "run-1",
-          batchRunId: "batch-1",
         },
       });
 
@@ -172,9 +173,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await publishCancellation({
         publisher: redis,
         message: {
-          projectId: "proj-1",
           scenarioRunId: "run-A1",
-          batchRunId: "batch-1",
         },
       });
 
@@ -209,25 +208,19 @@ describe("Event-sourcing cancellation (real Redis)", () => {
         publishCancellation({
           publisher: redis,
           message: {
-            projectId: "proj-1",
             scenarioRunId: "run-1",
-            batchRunId: "batch-1",
           },
         }),
         publishCancellation({
           publisher: redis,
           message: {
-            projectId: "proj-1",
             scenarioRunId: "run-2",
-            batchRunId: "batch-1",
           },
         }),
         publishCancellation({
           publisher: redis,
           message: {
-            projectId: "proj-1",
             scenarioRunId: "run-3",
-            batchRunId: "batch-1",
           },
         }),
       ]);
@@ -257,9 +250,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await publishCancellation({
         publisher: redis,
         message: {
-          projectId: "proj-1",
           scenarioRunId: "run-nonexistent",
-          batchRunId: "batch-1",
         },
       });
 
@@ -284,9 +275,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await publishCancellation({
         publisher: redis,
         message: {
-          projectId: "proj-1",
           scenarioRunId: "run-1",
-          batchRunId: "batch-1",
         },
       });
 
@@ -297,9 +286,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await publishCancellation({
         publisher: redis,
         message: {
-          projectId: "proj-1",
           scenarioRunId: "run-1",
-          batchRunId: "batch-1",
         },
       });
 
@@ -316,9 +303,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await publishCancellation({
         publisher: redis,
         message: {
-          projectId: "proj-1",
           scenarioRunId: "run-late",
-          batchRunId: "batch-1",
         },
       });
 
@@ -338,19 +323,19 @@ describe("Event-sourcing cancellation (real Redis)", () => {
     });
   });
 
-  describe("when cancel arrives before execution pool picks up the job", () => {
+  describe("when cancel arrives before the dispatch is leased", () => {
     /** @scenario "Worker skips execution if cancel was already requested" */
-    it("startScenarioProcessor wiring dispatches finished(CANCELLED) for skipped jobs", async () => {
-      // This tests the REAL wiring: startScenarioProcessor → pool → cancel
-      // broadcast → pool.markCancelled → pool.submit skips → onSkipCancelled
-      // → handleCancelledJobResult → deps.failureEmitter.ensureFailureEventsEmitted
+    it("dispatches finished(CANCELLED) instead of spawning a child", async () => {
+      // The REAL wiring: startScenarioProcessor → cancel broadcast →
+      // pool.markCancelled → executeScenarioRun sees it before prefetch →
+      // handleCancelledJobResult → deps.failureEmitter.ensureFailureEventsEmitted
 
-      const pool = new ScenarioExecutionPool({ concurrency: 3 });
+      const pool = new ScenarioExecutionPool();
 
       // Track what the failure emitter receives
       const emittedFailures: Array<{
         scenarioRunId?: string;
-        cancelled?: boolean;
+        outcome?: string;
       }> = [];
       const mockDeps: ProcessorDependencies = {
         scenarioLookup: {
@@ -360,7 +345,7 @@ describe("Event-sourcing cancellation (real Redis)", () => {
           ensureFailureEventsEmitted: async (params) => {
             emittedFailures.push({
               scenarioRunId: params.scenarioRunId,
-              cancelled: params.cancelled,
+              outcome: params.outcome,
             });
           },
         },
@@ -382,19 +367,6 @@ describe("Event-sourcing cancellation (real Redis)", () => {
           },
         });
         cleanupFns.push(unsubscribe);
-
-        pool.setSpawnFunction(async () => {});
-        pool.setOnSkipCancelled((jobData) => {
-          void mockDeps.failureEmitter.ensureFailureEventsEmitted({
-            projectId: jobData.projectId,
-            scenarioId: jobData.scenarioId,
-            setId: jobData.setId,
-            batchRunId: jobData.batchRunId,
-            scenarioRunId: jobData.scenarioRunId,
-            error: "Cancelled before execution started",
-            cancelled: true,
-          });
-        });
       } else {
         // Real path: startScenarioProcessor wires everything
         const handle = await startScenarioProcessor(pool, mockDeps);
@@ -407,35 +379,38 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await publishCancellation({
         publisher: redis,
         message: {
-          projectId: "proj-1",
           scenarioRunId: "run-pre-cancel",
-          batchRunId: "batch-1",
         },
       });
 
       await waitFor(() => pool.wasCancelled("run-pre-cancel"));
 
-      // Step 2: Execution reactor submits the job
-      pool.submit({
-        projectId: "proj-1",
-        scenarioId: "scen-1",
-        scenarioRunId: "run-pre-cancel",
-        batchRunId: "batch-1",
-        setId: "set-1",
-        target: { type: "http", referenceId: "agent-1" },
-      });
+      // Step 2: the process outbox leases the dispatch and runs it
+      await executeScenarioRun(
+        {
+          projectId: "proj-1",
+          scenarioId: "scen-1",
+          scenarioRunId: "run-pre-cancel",
+          batchRunId: "batch-1",
+          setId: "set-1",
+          target: { type: "http", referenceId: "agent-1" },
+        },
+        pool,
+        mockDeps,
+      );
 
       // Step 3: Wait for async failure emission
       await waitFor(() => emittedFailures.length > 0);
 
-      // Step 4: Verify the failure emitter was called with cancelled: true
+      // Step 4: it was recorded as cancelled, and nothing was spawned
       expect(emittedFailures).toHaveLength(1);
       expect(emittedFailures[0]).toEqual(
         expect.objectContaining({
           scenarioRunId: "run-pre-cancel",
-          cancelled: true,
+          outcome: "cancelled",
         }),
       );
+      expect(pool.activeCount).toBe(0);
     });
   });
 });

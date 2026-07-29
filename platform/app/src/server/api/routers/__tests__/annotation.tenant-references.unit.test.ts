@@ -1,7 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
-import { annotationRouter, createOrUpdateQueueItems } from "../annotation";
+import { AnnotationService } from "../../../annotations/annotation.service";
+import { annotationRouter } from "../annotation";
 
 vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -105,12 +106,11 @@ describe("annotation queue references", () => {
     annotationQueueCount.mockResolvedValue(0);
 
     await expect(
-      createOrUpdateQueueItems({
+      AnnotationService.create({ prisma }).enqueueTracesForAnnotators({
         traceIds: ["trace_1"],
         projectId: "project_1",
         annotators: ["queue-foreign-queue"],
         userId: "creator_1",
-        prisma,
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
@@ -124,12 +124,11 @@ describe("annotation queue references", () => {
     organizationUserCount.mockResolvedValue(0);
 
     await expect(
-      createOrUpdateQueueItems({
+      AnnotationService.create({ prisma }).enqueueTracesForAnnotators({
         traceIds: ["trace_1"],
         projectId: "project_1",
         annotators: ["user-foreign-user"],
         userId: "creator_1",
-        prisma,
       }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
@@ -140,12 +139,11 @@ describe("annotation queue references", () => {
   });
 
   it("keeps hyphens in validated annotator IDs", async () => {
-    await createOrUpdateQueueItems({
+    await AnnotationService.create({ prisma }).enqueueTracesForAnnotators({
       traceIds: ["trace_1"],
       projectId: "project_1",
       annotators: ["queue-queue-with-hyphens", "user-user-with-hyphens"],
       userId: "creator_1",
-      prisma,
     });
 
     expect(queueItemUpsert).toHaveBeenCalledWith(

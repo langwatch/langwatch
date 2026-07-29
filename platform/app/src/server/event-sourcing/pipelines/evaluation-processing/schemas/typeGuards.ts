@@ -1,9 +1,4 @@
-import {
-  EVALUATION_COMPLETED_EVENT_TYPE,
-  EVALUATION_REPORTED_EVENT_TYPE,
-  EVALUATION_SCHEDULED_EVENT_TYPE,
-  EVALUATION_STARTED_EVENT_TYPE,
-} from "./constants";
+import { EVALUATION_EVENT_TYPES } from "./constants";
 import type {
   EvaluationCompletedEvent,
   EvaluationProcessingEvent,
@@ -18,7 +13,7 @@ import type {
 export function isEvaluationScheduledEvent(
   event: EvaluationProcessingEvent,
 ): event is EvaluationScheduledEvent {
-  return event.type === EVALUATION_SCHEDULED_EVENT_TYPE;
+  return event.type === EVALUATION_EVENT_TYPES.SCHEDULED;
 }
 
 /**
@@ -27,7 +22,7 @@ export function isEvaluationScheduledEvent(
 export function isEvaluationStartedEvent(
   event: EvaluationProcessingEvent,
 ): event is EvaluationStartedEvent {
-  return event.type === EVALUATION_STARTED_EVENT_TYPE;
+  return event.type === EVALUATION_EVENT_TYPES.STARTED;
 }
 
 /**
@@ -36,7 +31,7 @@ export function isEvaluationStartedEvent(
 export function isEvaluationCompletedEvent(
   event: EvaluationProcessingEvent,
 ): event is EvaluationCompletedEvent {
-  return event.type === EVALUATION_COMPLETED_EVENT_TYPE;
+  return event.type === EVALUATION_EVENT_TYPES.COMPLETED;
 }
 
 /**
@@ -45,5 +40,5 @@ export function isEvaluationCompletedEvent(
 export function isEvaluationReportedEvent(
   event: EvaluationProcessingEvent,
 ): event is EvaluationReportedEvent {
-  return event.type === EVALUATION_REPORTED_EVENT_TYPE;
+  return event.type === EVALUATION_EVENT_TYPES.REPORTED;
 }

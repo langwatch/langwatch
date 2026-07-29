@@ -155,4 +155,27 @@ describe("TraceAttributeAccumulationService.extractAttributes", () => {
       expect(result["langwatch.labels"]).toBeUndefined();
     });
   });
+
+  describe("when the resource reports a numeric attribute of zero", () => {
+    // A figure an application reports once for the whole service (a retry
+    // budget of 0, a sampling ratio of 0) has to reach the trace with its
+    // value. Dropped, it reads as though the service never reported it --
+    // the same loss the span-level truthiness guard used to cause.
+    /** @scenario "A zero reported once for the whole service reaches the trace" */
+    it("hoists the zero rather than omitting the key", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          resourceAttributes: {
+            "app.retry_budget": 0,
+            "app.sampling_ratio": 0,
+            "app.cache_enabled": false,
+          },
+        }),
+      );
+
+      expect(result["app.retry_budget"]).toBe("0");
+      expect(result["app.sampling_ratio"]).toBe("0");
+      expect(result["app.cache_enabled"]).toBe("false");
+    });
+  });
 });

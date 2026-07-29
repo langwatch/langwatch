@@ -1,4 +1,5 @@
 import { definePipeline } from "~/server/event-sourcing";
+import type { CommandBus } from "~/server/event-sourcing/commands/commandBus";
 import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 
@@ -23,6 +24,7 @@ import {
   INGESTION_PULL_LEASE_DURATION_MS,
   INGESTION_PULL_MAX_ATTEMPTS,
   type IngestionPullDispatchDeps,
+  type IngestionPullRunPort,
 } from "./process-manager/ingestionPullEffects";
 import {
   INGESTION_PULL_PROCESS_INTENT_TYPES,
@@ -38,11 +40,18 @@ import type { IngestionPullProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
- *  inline below, ADR-052 "Approved builder API", like the core domains. */
+ *  inline below, ADR-052 "Approved builder API", like the core domains.
+ *
+ *  ADR-082 Rule 1: the executor's dispatch bundle is built here, from the run
+ *  port and this pipeline's own commands, so nothing in this interface is a
+ *  value the builder registers and nothing has to be resolved after `.build()`. */
 export interface IngestionPullProcessingPipelineDeps {
   /** Rebuildable per-source cursor and operator-facing run status. */
   runStatusStore: StateProjectionStore<IngestionPullRunStatusData>;
-  dispatch: IngestionPullDispatchDeps;
+  /** Runs one pull attempt from the durable cursor — the effect's domain function. */
+  runPort: IngestionPullRunPort;
+  /** ADR-082 §5 — identity-keyed dispatch into this pipeline's own commands. */
+  commands: CommandBus;
 }
 
 /**
@@ -103,7 +112,20 @@ export function createIngestionPullProcessingPipeline(
     .withCommand("recordRunFailed", RecordIngestionPullRunFailedCommand)
     .withProcessManager(
       INGESTION_PULL_PROCESS_NAME,
-      ingestionPullPM(deps.dispatch),
+      ingestionPullPM({
+        runPort: deps.runPort,
+        // The run outcomes are this pipeline's own commands. The bus binds now
+        // and resolves by class identity at send time, so naming them here —
+        // mid-`.build()`, before the builder has registered them — is sound.
+        commands: {
+          recordRunCompleted: deps.commands.port(
+            RecordIngestionPullRunCompletedCommand,
+          ),
+          recordRunFailed: deps.commands.port(
+            RecordIngestionPullRunFailedCommand,
+          ),
+        },
+      }),
     )
     .build();
 }

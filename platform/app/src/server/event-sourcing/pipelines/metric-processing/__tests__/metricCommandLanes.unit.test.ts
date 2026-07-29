@@ -1,10 +1,26 @@
 import { describe, expect, it } from "vitest";
+import type { MetricDataPointRepository } from "~/server/app-layer/metrics/repositories/metric-data-point.repository";
+import { createCommandBus } from "../../../commands/commandBus";
 import {
   metricCommandGroupKey,
   metricMapGroupKey,
   resolveMetricCommandShardCount,
 } from "../canonical/shards";
 import { createMetricProcessingPipeline } from "../pipeline";
+
+/**
+ * Nothing here dispatches, so an empty bus is the honest double: a port binds
+ * fine and throws by name if anything ever calls it.
+ */
+const unregisteredBus = () =>
+  createCommandBus({ resolve: () => undefined, registered: () => [] });
+
+const buildPipeline = (repository: MetricDataPointRepository) =>
+  createMetricProcessingPipeline({
+    metricDataPointRepository: repository,
+    metricCommandShardCount: 8,
+    commands: unregisteredBus(),
+  });
 
 describe("metric command lanes", () => {
   describe("when the shard count comes from configuration", () => {
@@ -24,13 +40,7 @@ describe("metric command lanes", () => {
 
   describe("when map projections route points", () => {
     it("uses point lanes for storage and series lanes for mutable derivatives", () => {
-      const store = {} as never;
-      const pipeline = createMetricProcessingPipeline({
-        metricDataPointAppendStore: store,
-        metricSeriesCatalogAppendStore: store,
-        metricTimeRollupAppendStore: store,
-        metricCommandShardCount: 8,
-      });
+      const pipeline = buildPipeline({} as MetricDataPointRepository);
       const event = {
         data: {
           pointId: "a".repeat(64),
@@ -58,13 +68,7 @@ describe("metric command lanes", () => {
 
   describe("when commands are registered on the real pipeline", () => {
     it("installs bounded lane routing", () => {
-      const store = {} as never;
-      const pipeline = createMetricProcessingPipeline({
-        metricDataPointAppendStore: store,
-        metricSeriesCatalogAppendStore: store,
-        metricTimeRollupAppendStore: store,
-        metricCommandShardCount: 8,
-      });
+      const pipeline = buildPipeline({} as MetricDataPointRepository);
       const command = pipeline.commands.find(
         (candidate) => candidate.name === "recordDataPoint",
       );

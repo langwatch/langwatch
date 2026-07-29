@@ -3,8 +3,8 @@
 import { createLogger } from "@langwatch/observability";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
- * `governance_ocsf_events` fold projection. Each call inserts ONE
- * OCSF row keyed by (TenantId, EventId) so reactor replays of the
+ * `governance_ocsf_events` map projection. Each call inserts ONE
+ * OCSF row keyed by (TenantId, EventId) so re-derivations of the
  * same event collapse at merge time.
  *
  * Read side is the SIEM export tRPC procedure (3f) which cursor-
@@ -18,6 +18,7 @@ import { createLogger } from "@langwatch/observability";
  * Migration: 00023_create_governance_ocsf_events.sql
  */
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { assertSingleTenantBatch } from "./singleTenantBatch";
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 
@@ -95,42 +96,57 @@ export interface GovernanceOcsfEventInput {
   rawOcsfJson: string;
 }
 
+/**
+ * Row shape on the wire; field names match the ClickHouse columns exactly.
+ *
+ * `LastUpdatedAt` is deliberately NOT sent: the column's `DEFAULT now64(3)`
+ * is the ReplacingMergeTree version, so a row written later — a re-report,
+ * or a rebuild re-deriving an entry — supersedes the one under the same
+ * `(TenantId, EventId)` key. That is what makes a rebuild converge instead
+ * of accumulating (ADR-075 Class C).
+ */
+function toRow(row: GovernanceOcsfEventInput) {
+  return {
+    TenantId: row.tenantId,
+    OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
+    EventId: row.eventId,
+    TraceId: row.traceId,
+    SourceId: row.sourceId,
+    SourceType: row.sourceType,
+    ClassUid: OCSF_CLASS_API_ACTIVITY,
+    CategoryUid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
+    ActivityId: row.activityId,
+    TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
+    SeverityId: row.severityId,
+    EventTime: row.eventTime,
+    ActorUserId: row.actorUserId,
+    ActorEmail: row.actorEmail,
+    ActorEnduserId: row.actorEnduserId,
+    ActionName: row.actionName,
+    TargetName: row.targetName,
+    AnomalyAlertId: row.anomalyAlertId,
+    RawOcsfJson: row.rawOcsfJson,
+  };
+}
+
+function assertInsertable(row: GovernanceOcsfEventInput, method: string): void {
+  if (!row.tenantId || !row.eventId) {
+    throw new Error(
+      `GovernanceOcsfEventsClickHouseRepository.${method}: tenantId / eventId are required`,
+    );
+  }
+}
+
 export class GovernanceOcsfEventsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertEvent(row: GovernanceOcsfEventInput): Promise<void> {
-    if (!row.tenantId || !row.eventId) {
-      throw new Error(
-        "GovernanceOcsfEventsClickHouseRepository.insertEvent: tenantId / eventId are required",
-      );
-    }
+    assertInsertable(row, "insertEvent");
     try {
       const client = await this.resolveClient(row.tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: [
-          {
-            TenantId: row.tenantId,
-            OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
-            EventId: row.eventId,
-            TraceId: row.traceId,
-            SourceId: row.sourceId,
-            SourceType: row.sourceType,
-            ClassUid: OCSF_CLASS_API_ACTIVITY,
-            CategoryUid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
-            ActivityId: row.activityId,
-            TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
-            SeverityId: row.severityId,
-            EventTime: row.eventTime,
-            ActorUserId: row.actorUserId,
-            ActorEmail: row.actorEmail,
-            ActorEnduserId: row.actorEnduserId,
-            ActionName: row.actionName,
-            TargetName: row.targetName,
-            AnomalyAlertId: row.anomalyAlertId,
-            RawOcsfJson: row.rawOcsfJson,
-          },
-        ],
+        values: [toRow(row)],
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
@@ -145,6 +161,44 @@ export class GovernanceOcsfEventsClickHouseRepository {
           error: errorMessage,
         },
         "Failed to insert governance_ocsf_events row",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Batch form of {@link insertEvent}, used by the projection's
+   * `bulkAppend` so rebuilding an audit window does not issue one INSERT
+   * per event.
+   *
+   * Single-tenant by contract — the projection executor only batches
+   * within one tenant, and writing another tenant's audit rows through a
+   * tenant's client is exactly the mistake this rejects rather than
+   * guesses at.
+   */
+  async insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void> {
+    if (rows.length === 0) return;
+    for (const row of rows) assertInsertable(row, "insertEvents");
+
+    const tenantId = assertSingleTenantBatch(
+      rows,
+      "GovernanceOcsfEventsClickHouseRepository.insertEvents",
+    );
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      await client.insert({
+        table: TABLE_NAME,
+        values: rows.map(toRow),
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, rowCount: rows.length, error: errorMessage },
+        "Failed to insert governance_ocsf_events batch",
       );
       throw error;
     }

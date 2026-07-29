@@ -14,8 +14,9 @@ import {
 /**
  * All pure simulation-processing commands defined from event data schemas.
  *
- * computeRunMetrics is NOT here — it's a complex command with DI (TraceSummaryStore,
- * scheduleRetry) and stays as a manual class.
+ * computeRunMetrics is NOT here — it reads the run's own fold and each trace's
+ * summary before it can emit anything, so it takes constructor DI and stays a
+ * manual class.
  */
 
 export const QueueRunCommand = defineCommand({
@@ -31,7 +32,6 @@ export const QueueRunCommand = defineCommand({
     "payload.scenario.id": d.scenarioId,
     "payload.batchRun.id": d.batchRunId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:queue-run`,
 });
 
 export const StartRunCommand = defineCommand({
@@ -47,7 +47,6 @@ export const StartRunCommand = defineCommand({
     "payload.scenario.id": d.scenarioId,
     "payload.batchRun.id": d.batchRunId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:start-run`,
 });
 
 export const MessageSnapshotCommand = defineCommand({
@@ -63,7 +62,6 @@ export const MessageSnapshotCommand = defineCommand({
     "payload.scenarioRun.id": d.scenarioRunId,
     "payload.messages.count": d.messages.length,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:message-snapshot`,
 });
 
 export const TextMessageStartCommand = defineCommand({
@@ -80,8 +78,6 @@ export const TextMessageStartCommand = defineCommand({
     "payload.message.id": d.messageId,
     "payload.role": d.role,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.scenarioRunId}:text-message-start:${d.messageId}`,
 });
 
 export const TextMessageEndCommand = defineCommand({
@@ -98,8 +94,6 @@ export const TextMessageEndCommand = defineCommand({
     "payload.message.id": d.messageId,
     "payload.role": d.role,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.scenarioRunId}:text-message-end:${d.messageId}`,
 });
 
 export const FinishRunCommand = defineCommand({
@@ -113,7 +107,6 @@ export const FinishRunCommand = defineCommand({
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:finish-run`,
 });
 
 export const CancelRunCommand = defineCommand({
@@ -127,7 +120,6 @@ export const CancelRunCommand = defineCommand({
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:cancel-run`,
 });
 
 export const DeleteRunCommand = defineCommand({
@@ -141,7 +133,6 @@ export const DeleteRunCommand = defineCommand({
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:delete-run`,
 });
 
 /**
@@ -168,5 +159,4 @@ export const ArchiveSetCommand = defineCommand({
     "payload.scenarioSet.id": d.scenarioSetId,
     "payload.scenarioRun.count": d.scenarioRunIds.length,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioSetId}:archive-set`,
 });

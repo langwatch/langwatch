@@ -3,9 +3,12 @@ import { TriggerAction } from "@prisma/client";
 import { z } from "zod";
 
 import { EventSchema } from "../../../domain/types";
-import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "./constants";
+import {
+  TRIGGER_MATCH_RECORDED_EVENT_TYPE,
+  TRIGGER_MATCH_RECORDED_EVENT_VERSION_LATEST,
+} from "./constants";
 
-export const triggerActionClassSchema = z.enum(["notify", "persist"]);
+const triggerActionClassSchema = z.enum(["notify", "persist"]);
 export type TriggerActionClass = z.infer<typeof triggerActionClassSchema>;
 
 /** Identity and timing config only. Trace/span/message content is forbidden. */
@@ -20,13 +23,14 @@ export const triggerMatchRecordedEventDataSchema = z.object({
 
 export const triggerMatchRecordedEventSchema = EventSchema.extend({
   type: z.literal(TRIGGER_MATCH_RECORDED_EVENT_TYPE),
+  version: z.literal(TRIGGER_MATCH_RECORDED_EVENT_VERSION_LATEST),
   data: triggerMatchRecordedEventDataSchema,
 });
 
 export type TriggerMatchRecordedEventData = z.infer<
   typeof triggerMatchRecordedEventDataSchema
 >;
-export type TriggerMatchRecordedEvent = z.infer<
+type TriggerMatchRecordedEvent = z.infer<
   typeof triggerMatchRecordedEventSchema
 >;
 export type AutomationEvent = TriggerMatchRecordedEvent;

@@ -1,10 +1,10 @@
 import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
-import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import { runIngestionPull } from "@ee/governance/services/pullers/pullerWorker";
 import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
+import type { CommandBus } from "~/server/event-sourcing/commands/commandBus";
 import type { EventSourcing } from "~/server/event-sourcing/eventSourcing";
 import { mapCommands } from "~/server/event-sourcing/mapCommands";
 
@@ -14,6 +14,8 @@ const logger = createLogger("langwatch:enterprise:event-sourcing");
 export interface EnterprisePipelineSetConfig {
   prisma: PrismaClient;
   runsWorkers: boolean;
+  /** ADR-082 §5 — identity-keyed dispatch, handed to the pipelines below. */
+  commands: CommandBus;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
@@ -21,34 +23,18 @@ type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
 };
 
 function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
-  // Late-bind the outcome commands: they are this same pipeline's own write
-  // surface and exist only after `.build()`; dispatch happens long after that.
-  let outcomeCommands: IngestionPullOutcomeCommands | null = null;
   const pipeline = deps.eventSourcing.register(
     createIngestionPullProcessingPipeline({
       runStatusStore: new PrismaIngestionPullRunProjectionRepository(
         deps.prisma,
       ),
-      dispatch: {
-        runPort: { run: runIngestionPull },
-        commands: () => {
-          if (!outcomeCommands) {
-            throw new Error(
-              "Ingestion pull outcome commands used before the pipeline was built",
-            );
-          }
-          return outcomeCommands;
-        },
-      },
+      runPort: { run: runIngestionPull },
+      // The pipeline binds its own outcome commands through the bus, so
+      // nothing here is resolved after `.build()` (ADR-082 §5).
+      commands: deps.commands,
     }),
   );
   const ingestionPullCommands = mapCommands(pipeline.commands);
-  outcomeCommands = {
-    recordRunCompleted: (args) =>
-      ingestionPullCommands.recordRunCompleted(args as never),
-    recordRunFailed: (args) =>
-      ingestionPullCommands.recordRunFailed(args as never),
-  };
 
   if (deps.runsWorkers) {
     void reconcileIngestionPullProcesses({
@@ -91,7 +77,7 @@ export function registerEnterprisePipelineSet(
   };
 }
 
-export type EnterprisePipelineCommands = ReturnType<
+type EnterprisePipelineCommands = ReturnType<
   typeof registerEnterprisePipelineSet
 >["commands"];
 

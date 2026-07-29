@@ -14,6 +14,7 @@ import type { ContributeSpanFactsCommandData } from "../schemas/commands";
 import {
   CODING_AGENT_CONTRIBUTION_KEYS,
   detectCodingAgent,
+  nonEmptyString,
   resolveConversationKey,
 } from "../services/coding-agent-normalization";
 import { CODING_AGENT_SPAN_NAMES } from "../services/coding-agent-session.derivation";
@@ -28,8 +29,8 @@ import { CODING_AGENT_SPAN_NAMES } from "../services/coding-agent-session.deriva
  *   - `enqueue.filter` runs the RAW span-name gate at the fan-out seam, so a
  *     span from any other trace never mints a job. Every span in the project
  *     flows past that predicate; one set lookup keeps an ordinary chat trace's
- *     cost at zero. Origin gating is exactly this predicate — no gate reactor
- *     (ADR-056 §3).
+ *     cost at zero. Origin gating is exactly this predicate, inside the
+ *     subscriber rather than a stage of its own (ADR-056 §3).
  *   - A freshly staged job is a `span_referenced` claim-check: the span's
  *     identity, not its payload. The handler reads the canonical span back
  *     from the span store — where spanStorage already normalized it once —
@@ -168,8 +169,9 @@ function liftContribution({
   const sessionKey = resolveConversationKey(span.spanAttributes);
   const facts = liftSpanFacts(span.spanAttributes);
   const serviceVersion = span.resourceAttributes["service.version"];
-  if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
-    facts["service.version"] = serviceVersion;
+  const serviceVersionText = nonEmptyString(serviceVersion);
+  if (serviceVersionText !== null) {
+    facts["service.version"] = serviceVersionText;
   } else if (
     // The store read-back deserializes numeric-looking versions ("1.0",
     // "2024") as numbers — keep the fact instead of silently dropping it on
@@ -191,10 +193,7 @@ function liftContribution({
       // emits Claude Code's event vocabulary, so the resource service name is
       // the only signal separating them — omit it and every Cowork session is
       // misidentified as Claude Code.
-      serviceName:
-        typeof span.resourceAttributes["service.name"] === "string"
-          ? (span.resourceAttributes["service.name"] as string)
-          : null,
+      serviceName: nonEmptyString(span.resourceAttributes["service.name"]),
     }),
     occurredAt,
     traceId: span.traceId,

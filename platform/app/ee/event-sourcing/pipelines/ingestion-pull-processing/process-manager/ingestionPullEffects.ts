@@ -62,12 +62,12 @@ export interface IngestionPullOutcomeCommands {
 export interface IngestionPullDispatchDeps {
   runPort: IngestionPullRunPort;
   /**
-   * Late-bound on purpose: the executor is declared while the pipeline is
-   * being built, and these are the SAME pipeline's commands — they only
-   * exist after `.build()`. The composition root supplies a getter it
-   * resolves post-build; dispatch happens long after that.
+   * This same pipeline's write surface. No longer late-bound: the pipeline
+   * builds these from command-bus ports (ADR-082 §5), which resolve by class
+   * identity at send time, so an executor declared mid-`.build()` can name
+   * commands the builder has not registered yet.
    */
-  commands: () => IngestionPullOutcomeCommands;
+  commands: IngestionPullOutcomeCommands;
   maxAttempts?: number;
   clock?: () => number;
 }
@@ -90,7 +90,7 @@ export function createIngestionPullRunHandler(
     payload: IngestionPullRunIntent,
     intentContext: IntentContext,
   ) => {
-    const commands = deps.commands();
+    const commands = deps.commands;
     const pullStartedAtMs = clock();
     let result: Awaited<ReturnType<IngestionPullRunPort["run"]>>;
     try {

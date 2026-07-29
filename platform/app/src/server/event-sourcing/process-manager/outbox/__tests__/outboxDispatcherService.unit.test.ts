@@ -83,6 +83,7 @@ describe("OutboxDispatcherService", () => {
     });
 
     describe("when the handler fails on the first attempt", () => {
+      /** @scenario "Work is retried until it succeeds" */
       it("redelivers the same logical message after the retry delay (at-least-once)", async () => {
         const handler = vi
           .fn()

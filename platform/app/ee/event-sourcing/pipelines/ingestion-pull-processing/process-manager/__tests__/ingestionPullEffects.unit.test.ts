@@ -61,7 +61,7 @@ describe("ingestion pull outbox effect", () => {
           .fn()
           .mockResolvedValue({ nextCursor: "cursor-2", eventCount: 3 }),
       },
-      commands: () => commandsStub({ recordRunCompleted }),
+      commands: commandsStub({ recordRunCompleted }),
       clock: () => 200,
     });
     await handler(intent, context(1));
@@ -79,7 +79,7 @@ describe("ingestion pull outbox effect", () => {
   it("rethrows before the final attempt so the outbox retries", async () => {
     const handler = createIngestionPullRunHandler({
       runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
-      commands: () => commandsStub(),
+      commands: commandsStub(),
     });
     await expect(handler(intent, context(1))).rejects.toThrow("provider down");
   });
@@ -88,7 +88,7 @@ describe("ingestion pull outbox effect", () => {
     const recordRunFailed = vi.fn();
     const handler = createIngestionPullRunHandler({
       runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
-      commands: () => commandsStub({ recordRunFailed }),
+      commands: commandsStub({ recordRunFailed }),
       clock: () => 200,
     });
     await handler(intent, context(3));
@@ -111,13 +111,12 @@ describe("ingestion pull outbox effect", () => {
       runPort: {
         run: vi.fn().mockResolvedValue({ nextCursor: null, eventCount: 1 }),
       },
-      commands: () =>
-        commandsStub({
-          recordRunCompleted: vi
-            .fn()
-            .mockRejectedValue(new Error("event log unavailable")),
-          recordRunFailed,
-        }),
+      commands: commandsStub({
+        recordRunCompleted: vi
+          .fn()
+          .mockRejectedValue(new Error("event log unavailable")),
+        recordRunFailed,
+      }),
     });
 
     await expect(handler(intent, context(3))).rejects.toThrow(
@@ -138,7 +137,7 @@ describe("pull outcome metrics (ADR-054)", () => {
       });
       const handler = createIngestionPullRunHandler({
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
-        commands: () => commandsStub(),
+        commands: commandsStub(),
         clock: () => 200,
       });
 
@@ -170,7 +169,7 @@ describe("pull outcome metrics (ADR-054)", () => {
       });
       const handler = createIngestionPullRunHandler({
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
-        commands: () => commandsStub(),
+        commands: commandsStub(),
         clock: () => 200,
       });
 

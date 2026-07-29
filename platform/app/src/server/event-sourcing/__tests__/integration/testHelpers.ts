@@ -20,23 +20,6 @@ import {
 } from "./testPipelines";
 
 /**
- * Gracefully closes a pipeline and waits for cleanup to complete.
- * This ensures all BullMQ workers finish processing before the next test starts.
- */
-export async function closePipelineGracefully(pipeline: {
-  service: { close: () => Promise<void> };
-  eventSourcing?: { close: () => Promise<void> };
-}): Promise<void> {
-  if (pipeline.eventSourcing) {
-    await pipeline.eventSourcing.close();
-  } else {
-    await pipeline.service.close();
-  }
-  // Wait for queue workers to fully shut down and release Redis connections
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-}
-
-/**
  * Generates a unique aggregate ID to avoid collisions in parallel tests.
  */
 export function generateTestAggregateId(prefix = "test-aggregate"): string {

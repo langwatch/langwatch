@@ -18,9 +18,6 @@ export const topicClusteringSearchAfterSchema = z.tuple([
   z.number(),
   z.string(),
 ]);
-export type TopicClusteringSearchAfter = z.infer<
-  typeof topicClusteringSearchAfterSchema
->;
 
 /**
  * TopicClusteringRequested — a manual or bootstrap ask for clustering.
@@ -35,9 +32,6 @@ export const topicClusteringRequestedEventDataSchema = z.object({
   /** User who asked, for manual triggers. */
   requestedByUserId: z.string().optional(),
 });
-export type TopicClusteringRequestedEventData = z.infer<
-  typeof topicClusteringRequestedEventDataSchema
->;
 
 export const TopicClusteringRequestedEventSchema = EventSchema.extend({
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.REQUESTED),
@@ -63,9 +57,6 @@ export const topicClusteringRunStartedEventDataSchema = z.object({
   /** 1-based page number within the run. */
   page: z.number(),
 });
-export type TopicClusteringRunStartedEventData = z.infer<
-  typeof topicClusteringRunStartedEventDataSchema
->;
 
 export const TopicClusteringRunStartedEventSchema = EventSchema.extend({
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.RUN_STARTED),
@@ -130,9 +121,6 @@ export const topicClusteringRunFailedEventDataSchema = z.object({
   /** True when the customer can resolve it (credentials, quota, config). */
   isUserActionable: z.boolean().optional(),
 });
-export type TopicClusteringRunFailedEventData = z.infer<
-  typeof topicClusteringRunFailedEventDataSchema
->;
 
 export const TopicClusteringRunFailedEventSchema = EventSchema.extend({
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.RUN_FAILED),
@@ -150,7 +138,7 @@ export type TopicClusteringRunFailedEvent = z.infer<
  * working state incremental runs need; carrying them makes the model fully
  * rebuildable by replay.
  */
-export const topicModelEntrySchema = z.object({
+const topicModelEntrySchema = z.object({
   id: z.string(),
   name: z.string(),
   /** Parent topic id for subtopics; null for top-level topics. */
@@ -188,9 +176,6 @@ export const topicClusteringTopicsRecordedEventDataSchema = z.object({
   dedupeKey: z.string(),
   topics: z.array(topicModelEntrySchema),
 });
-export type TopicClusteringTopicsRecordedEventData = z.infer<
-  typeof topicClusteringTopicsRecordedEventDataSchema
->;
 
 export const TopicClusteringTopicsRecordedEventSchema = EventSchema.extend({
   type: z.literal(TOPIC_CLUSTERING_EVENT_TYPES.TOPICS_RECORDED),

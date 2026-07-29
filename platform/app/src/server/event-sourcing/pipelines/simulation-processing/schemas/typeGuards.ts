@@ -8,7 +8,7 @@ import type {
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
   SimulationRunFinishedEvent,
-  SimulationRunMetricsComputedEvent,
+  SimulationRunMetricsRecordedEvent,
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
   SimulationSetArchivedEvent,
@@ -52,10 +52,10 @@ export function isSimulationTextMessageEndEvent(
   return event.type === SIMULATION_RUN_EVENT_TYPES.TEXT_MESSAGE_END;
 }
 
-export function isSimulationRunMetricsComputedEvent(
+export function isSimulationRunMetricsRecordedEvent(
   event: SimulationProcessingEvent,
-): event is SimulationRunMetricsComputedEvent {
-  return event.type === SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED;
+): event is SimulationRunMetricsRecordedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.METRICS_RECORDED;
 }
 
 export function isSimulationRunCancelRequestedEvent(

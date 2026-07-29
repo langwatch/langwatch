@@ -71,7 +71,7 @@ export interface PhaseMetrics {
 export interface JobNameMetrics {
   jobName: string;
   pipelineName: string;
-  phase: "commands" | "projections" | "reactions";
+  phase: "commands" | "projections";
   pending: number;
   active: number;
   completedPerSec: number;
@@ -152,7 +152,6 @@ export interface DashboardData {
   phases: {
     commands: PhaseMetrics;
     projections: PhaseMetrics;
-    reactions: PhaseMetrics;
   };
   jobNameMetrics: JobNameMetrics[];
   pausedKeys: string[];

@@ -2,6 +2,17 @@ import { createHash } from "node:crypto";
 
 export type UnknownRecord = Record<string, unknown>;
 
+/**
+ * Accepts arrays as records (`typeof [] === "object"`) — deliberately. The
+ * metric canonicalisers only ever ask "can I index into this?" before reading
+ * named fields off an OTLP node, and an array answers that honestly: a missing
+ * key just reads as undefined and the caller rejects the node.
+ *
+ * The log path needs the opposite answer and keeps its own array-excluding
+ * copy (`canonicalLog.ts`), because an OTLP log body is an AnyValue union
+ * where arrayValue and kvlistValue are distinct cases and conflating them
+ * would change a RecordId. Do not "unify" the two.
+ */
 export const isRecord = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === "object";
 

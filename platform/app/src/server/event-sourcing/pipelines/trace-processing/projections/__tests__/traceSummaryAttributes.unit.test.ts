@@ -189,11 +189,14 @@ describe("applySpanToSummary attribute forwarding", () => {
   });
 
   // Regression for iter-110 Sergey finding: `gateway_budget_ledger_events`
-  // CH table count=0 despite the gatewayBudgetSync reactor firing. Root
-  // cause: the attribute accumulator's SPAN_ATTR_MAPPINGS allowlist didn't
-  // include the two AI Gateway markers that the reactor reads, so they
-  // never reached foldState.attributes and the reactor early-returned on
-  // `!virtualKeyId || !gatewayRequestId` for every trace.
+  // CH table count=0 despite gateway spans arriving. Root cause: the attribute
+  // accumulator's SPAN_ATTR_MAPPINGS allowlist didn't include the two AI
+  // Gateway markers, so they never reached foldState.attributes and the
+  // budget writer — which read them off the fold at the time — early-returned
+  // on `!virtualKeyId || !gatewayRequestId` for every trace. Budget debits are
+  // now derived per span by `gatewayBudgetDebits.mapProjection.ts`, straight
+  // off `span.spanAttributes`, so that particular starvation can't recur; the
+  // allowlist is still the only thing that puts these markers on the trace.
   describe("when span has AI Gateway markers", () => {
     it("forwards langwatch.virtual_key_id to trace attributes", () => {
       const span = createTestSpan({
@@ -223,7 +226,7 @@ describe("applySpanToSummary attribute forwarding", () => {
       );
     });
 
-    it("forwards both markers together so the gatewayBudgetSync reactor can fold", () => {
+    it("forwards both markers together, so neither is missing from the trace", () => {
       const span = createTestSpan({
         spanAttributes: {
           "langwatch.virtual_key_id": "vk_live_matrix_openai",
@@ -233,7 +236,8 @@ describe("applySpanToSummary attribute forwarding", () => {
 
       const state = applySpanToSummary({ state: createInitState(), span });
 
-      // Shape the reactor's early-return check expects.
+      // The pair is load-bearing: a consumer needing gateway attribution off
+      // the trace early-returns the moment either one is absent.
       expect(state.attributes["langwatch.virtual_key_id"]).toBeTruthy();
       expect(state.attributes["langwatch.gateway_request_id"]).toBeTruthy();
     });

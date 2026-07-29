@@ -31,6 +31,7 @@ import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/p
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
+import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import {
@@ -61,6 +62,7 @@ import {
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
+import { AnnotationService } from "../annotations/annotation.service";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
@@ -74,29 +76,30 @@ import {
   type AppCommands,
   PipelineRegistry,
 } from "../event-sourcing/pipelineRegistry";
-import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
+import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.adapter";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import type { ScenarioExecutionReactorHandle } from "../event-sourcing/pipelines/simulation-processing/reactors/scenarioExecution.reactor";
 import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/simulation-processing/repositories";
 import {
-  SuiteRunStateRepositoryClickHouse,
-  SuiteRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/suite-run-processing/repositories";
-import {
   InMemoryProcessStore,
   PrismaProcessStore,
 } from "../event-sourcing/process-manager";
+import {
+  type FoldCacheClient,
+  InMemoryFoldCacheClient,
+  RedisFoldCacheClient,
+} from "../event-sourcing/projections/foldCache/foldCacheClient";
 import { ExperimentService } from "../experiments/experiment.service";
 import { InviteService } from "../invites/invite.service";
 import { OrganizationRepository } from "../repositories/organization.repository";
+import type { ScenarioExecutionDispatcherHandle } from "../scenarios/execution/execution-dispatcher";
 import { getLicenseHandler } from "../subscriptionHandler";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
@@ -104,6 +107,7 @@ import { TraceUsageService } from "../traces/trace-usage.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { getAnalyticsService } from "./analytics";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { createAutomationDispatchCollaborators } from "./automations/automation-dispatch.composition";
 import { EmailSuppressionService } from "./automations/emailSuppression.service";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./automations/report.builder";
 import {
@@ -276,10 +280,11 @@ import { traced } from "./tracing";
 import { UsageService } from "./usage/usage.service";
 
 /**
- * Late-bound handle for the scenario execution reactor.
+ * Late-bound handle the worker binds its scenario execution pool into, and
+ * that the `scenarioExecution` process outbox dispatches through (ADR-073).
  * Stored on globalForApp to survive hot-reload in dev (same as the App instance).
  */
-export function getScenarioExecutionHandle(): ScenarioExecutionReactorHandle | null {
+export function getScenarioExecutionHandle(): ScenarioExecutionDispatcherHandle | null {
   return (globalForApp as any).__scenarioExecutionHandle ?? null;
 }
 
@@ -329,6 +334,26 @@ export function initializeDefaultApp(options?: {
         clusterEndpoints: config.redisClusterEndpoints,
         db: config.redisDbIndex,
       });
+
+  // ADR-082 §3: which tier backs the fold cache is decided HERE and nowhere
+  // else. Every fold store downstream is composed over this one client, so the
+  // two sites that used to disagree about whether trace_summaries is cached
+  // cannot, and no pipeline or adapter can re-open the question.
+  //
+  // `RedisFoldCacheClient` takes `Redis | Cluster` and does not discriminate:
+  // the fold cache issues only single-key reads and writes, which a Cluster
+  // client routes to the owning slot. Topology therefore does not decide
+  // whether folds are cached, and that is deliberate — ADR-066 §5 makes this
+  // cache the read-your-write consistency layer rather than an accelerator, so
+  // the fold writers must keep it in every Redis topology.
+  //
+  // Without Redis there is no fleet to share a tier with — the event-sourcing
+  // queues are Redis — so the in-process map IS the shared tier, and it keeps
+  // read-your-write instead of reading through to a ClickHouse replica that may
+  // not have caught up.
+  const foldCacheClient: FoldCacheClient = redis
+    ? new RedisFoldCacheClient(redis)
+    : new InMemoryFoldCacheClient();
 
   const broadcast = new BroadcastService(redis);
   const projects = traced(
@@ -478,7 +503,7 @@ export function initializeDefaultApp(options?: {
   const simulationReads = SimulationRunService.create(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
+  // SuiteRunService is created after pipeline registration (needs queueRun command)
 
   const evaluations = {
     runs: evaluationRuns,
@@ -574,6 +599,7 @@ export function initializeDefaultApp(options?: {
     new PrismaScheduledJobRepository(prisma),
     redis,
   );
+  const annotations = AnnotationService.create({ prisma });
   const emailSuppressions = new EmailSuppressionService(
     new PrismaEmailSuppressionRepository(prisma),
     new PrismaEmailSuppressionNameLookupRepository(prisma),
@@ -669,9 +695,6 @@ export function initializeDefaultApp(options?: {
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
-    suiteRunState: clickhouseEnabled
-      ? new SuiteRunStateRepositoryClickHouse(resolveClickHouseClient)
-      : new SuiteRunStateRepositoryMemory(),
     simulationRunState: clickhouseEnabled
       ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory(),
@@ -744,6 +767,10 @@ export function initializeDefaultApp(options?: {
         budgetCHRepository: new GatewayBudgetClickHouseRepository(
           resolveClickHouseClient,
         ),
+        // The debit store emits BUDGET_UPDATED so the Go gateway evicts its
+        // cached bundles. The reactor built this inline; passing the repository
+        // keeps the store's dependencies visible and testable.
+        changeEvents: new ChangeEventRepository(prisma),
       }
     : undefined;
 
@@ -778,16 +805,19 @@ export function initializeDefaultApp(options?: {
   // registry composes (triggerSettlement + graphAlertSweep). Built on every
   // role — registration is passive shape; the outbox/wake worker loops
   // start only where roleRunsWorkers() is true.
-  const automationPorts = buildAutomationDispatchPorts({
-    prisma,
-    redis: redis ?? null,
-    triggers,
-    emailSuppressions,
-    projects,
-    evaluations: { runs: evaluations.runs },
-    traces: { spans: spanStorage },
-    traceSummaryRepository: repositories.traceSummaryFold,
-  });
+  const automationPorts = buildAutomationDispatchPorts(
+    createAutomationDispatchCollaborators({
+      prisma,
+      foldCacheClient,
+      triggers,
+      annotations,
+      emailSuppressions,
+      projects,
+      evaluationRuns: evaluations.runs,
+      spanStorage,
+      traceSummaryRepository: repositories.traceSummaryFold,
+    }),
+  );
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
   // worker-only in-process loop that sleeps until the soonest due
@@ -938,6 +968,7 @@ export function initializeDefaultApp(options?: {
     eventSourcing: es,
     repositories,
     redis: redis!,
+    foldCacheClient,
     broadcast,
     langy: {
       buffer: langyTokenBuffer,
@@ -960,6 +991,7 @@ export function initializeDefaultApp(options?: {
     enterprisePipelines: {
       prisma,
       runsWorkers: roleRunsWorkers(config.processRole),
+      commands: es.commandBus,
     },
     projects,
     monitors,
@@ -970,6 +1002,7 @@ export function initializeDefaultApp(options?: {
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
     costRecorder: new PrismaEvaluationCostRecorder(prisma),
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
+    isSaas: config.isSaas,
     usageReportingService,
     gatewayBudgetSync,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
@@ -1074,8 +1107,6 @@ export function initializeDefaultApp(options?: {
   });
 
   const suiteRunService = SuiteRunService.create({
-    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
-    startSuiteRun: commands.suiteRuns.startSuiteRun,
     queueSimulationRun: commands.simulations.queueRun,
   });
 
@@ -1260,6 +1291,7 @@ export function initializeDefaultApp(options?: {
     traces,
     evaluations,
     experiments,
+    annotations,
     triggers,
     triggerTemplates,
     emailSuppressions,
@@ -1442,6 +1474,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
+    annotations: AnnotationService.create({ prisma: testPrisma }),
     triggers: new TriggerService(new NullTriggerRepository()),
     emailSuppressions: new EmailSuppressionService(
       new NullEmailSuppressionRepository(),
@@ -1471,8 +1504,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: {
       runs: SuiteRunService.create({
-        resolveClickHouseClient: null,
-        startSuiteRun: noop,
         queueSimulationRun: noop,
       }),
     },
@@ -1601,14 +1632,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,
-        completeEvaluation: noop,
         reportEvaluation: noop,
       } as AppCommands["evaluations"],
       experimentRuns: {
         startExperimentRun: noop,
         recordTargetResult: noop,
         recordEvaluatorResult: noop,
-        computeExperimentRunMetrics: noop,
         completeExperimentRun: noop,
       } as AppCommands["experimentRuns"],
       simulations: {
@@ -1622,11 +1651,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         deleteRun: noop,
         computeRunMetrics: noop,
       } as AppCommands["simulations"],
-      suiteRuns: {
-        startSuiteRun: noop,
-        recordSuiteRunItemStarted: noop,
-        completeSuiteRunItem: noop,
-      } as AppCommands["suiteRuns"],
       langy: {
         createConversation: noop,
         forkConversation: noop,
@@ -1660,14 +1684,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordTriggerMatch: noop,
       } as AppCommands["automations"],
       scenarioExecutionHandle: {
-        reactor: {
-          name: "scenarioExecution",
-          options: { runIn: ["worker"] },
-          handle: async () => {
-            /* noop */
-          },
-        },
         setPool: () => {
+          /* noop */
+        },
+        execute: async () => {
           /* noop */
         },
       },

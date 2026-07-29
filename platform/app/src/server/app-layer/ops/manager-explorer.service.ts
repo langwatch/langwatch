@@ -1,4 +1,4 @@
-import { getProcessManagerMetadata } from "~/server/event-sourcing/pipelineRegistry";
+import { getProcessManagerMetadata } from "~/server/event-sourcing/introspection";
 import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
 import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 

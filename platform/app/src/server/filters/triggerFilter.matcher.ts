@@ -41,8 +41,9 @@ const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
 
 /**
  * Event filter fields that ARE matched in-memory and therefore need the
- * trace-level events list. Reactors gate event derivation on this set, so any
- * field matched against `traceData.events` must be listed here.
+ * trace-level events list. `confirmSettledMatch` gates event derivation on
+ * this set, so any field matched against `traceData.events` must be listed
+ * here.
  */
 const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
   "events.event_type",
@@ -53,8 +54,9 @@ const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
 
 /**
  * Whether any of these filters match on event fields that need the trace-level
- * events list. Reactors use this to derive events from stored_spans only when a
- * trigger actually filters on them, keeping the common path off the read.
+ * events list. The settle-time re-check (`confirmSettledMatch`) uses this to
+ * derive events from stored_spans only when a trigger actually filters on
+ * them, keeping the common path off the read.
  */
 export function triggerFiltersReferenceEvents(
   filters: TriggerFilters,
@@ -96,7 +98,9 @@ export function classifyTriggerFilters(filters: TriggerFilters): {
 /**
  * Converts TraceSummaryData (fold state) into PreconditionTraceData for
  * in-memory filter matching. Extracts structured fields from the flat
- * attributes map, mirroring the logic in evaluationTrigger.reactor.ts.
+ * attributes map, mirroring the logic in the `evaluationTrigger` process
+ * manager's dispatch handlers (`evaluationTriggerIntentHandlers.ts` in
+ * `event-sourcing/pipelines/trace-processing/process-manager/`).
  *
  * The trace-level events list is no longer carried on the fold state; callers
  * that match event filters pass it in (derived from stored_spans, gated by
@@ -519,7 +523,7 @@ function matchEvaluationValues(
 }
 
 // ---------------------------------------------------------------------------
-// Helpers (mirrored from evaluationTrigger.reactor.ts)
+// Helpers (mirrored from evaluationTriggerIntentHandlers.ts)
 // ---------------------------------------------------------------------------
 
 function parseJsonArray(raw: string | undefined): string[] | null {

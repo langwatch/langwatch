@@ -5,7 +5,10 @@ import {
   buildIntentFactories,
   type ProcessManagerDefinition,
 } from "../pipeline/processManagerDefinition";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
+import type {
+  EventSubscriberDefinition,
+  EventSubscriberOptions,
+} from "../subscribers/eventSubscriber.types";
 import {
   type IntentHandler,
   OutboxDispatcherService,
@@ -59,6 +62,32 @@ export function buildIntentHandlers(
     };
   }
   return handlers;
+}
+
+/**
+ * The generated subscriber's options: the process's own enqueue declaration,
+ * mapped onto the event-subscriber contract.
+ *
+ * Without this the generated subscriber carried no options at all, so a
+ * trace-keyed process paid a GroupQueue job and a `ProcessManagerInbox` row per
+ * span and did its narrowing only after dequeue — the amplification ADR-069
+ * exists to prevent. `filter` moves onto `enqueue`, where the router evaluates
+ * it before staging; `delay` and `deduplication` are queue-level and pass
+ * through unchanged.
+ *
+ * Exported so a wiring test can assert what a definition actually declares
+ * without standing up a runtime.
+ */
+export function buildSubscriberOptions(
+  config: ProcessManagerDefinition["config"],
+): EventSubscriberOptions | undefined {
+  const enqueue = config.enqueue;
+  if (!enqueue) return undefined;
+  return {
+    delay: enqueue.delay,
+    deduplication: enqueue.deduplication,
+    enqueue: enqueue.filter ? { filter: enqueue.filter } : undefined,
+  };
 }
 
 /**
@@ -167,6 +196,9 @@ export class ProcessRuntime {
       subscribers.push({
         name: `pm:${definition.config.name}`,
         eventTypes: definition.config.eventTypes,
+        options: buildSubscriberOptions(
+          definition.config,
+        ) as EventSubscriberOptions<E>,
         handle: async (event, context) => {
           const envelope: ProcessEventEnvelope = {
             // The event log can briefly expose two physical rows before its

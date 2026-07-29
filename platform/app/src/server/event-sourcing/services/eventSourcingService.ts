@@ -26,6 +26,10 @@ import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
 } from "./eventSourcingService.types";
+import type {
+  JobRegistryEntry,
+  StandaloneJobPayload,
+} from "./queues/queueManager";
 import { QueueManager } from "./queues/queueManager";
 
 /**
@@ -62,8 +66,6 @@ export class EventSourcingService<
     foldProjections,
     stateProjections,
     mapProjections,
-    reactors,
-    mapReactors,
     subscribers,
     serviceOptions,
     logger,
@@ -72,7 +74,6 @@ export class EventSourcingService<
     featureFlagService,
     commandRegistrations,
     globalRegistry,
-    processRole,
     replayMarkerChecker,
     retentionPolicyResolver,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes>) {
@@ -115,7 +116,6 @@ export class EventSourcingService<
       pipelineName,
       this.queueManager,
       featureFlagService,
-      processRole,
       replayMarkerChecker,
       retentionPolicyResolver,
     );
@@ -238,20 +238,6 @@ export class EventSourcingService<
       }
     }
 
-    // Register reactors on their fold projections
-    if (reactors) {
-      for (const { foldName, definition } of reactors) {
-        this.router.registerReactor(foldName, definition);
-      }
-    }
-
-    // Register reactors on their map projections
-    if (mapReactors) {
-      for (const { mapName, definition } of mapReactors) {
-        this.router.registerMapReactor(mapName, definition);
-      }
-    }
-
     if (subscribers) {
       for (const subscriber of subscribers) {
         this.router.registerEventSubscriber(subscriber);
@@ -274,14 +260,6 @@ export class EventSourcingService<
 
     if (globalQueue && subscribers && subscribers.length > 0) {
       this.router.initializeSubscriberQueues();
-    }
-
-    if (
-      globalQueue &&
-      ((reactors && reactors.length > 0) ||
-        (mapReactors && mapReactors.length > 0))
-    ) {
-      this.router.initializeReactorQueues();
     }
 
     // Command queues always initialize — they're needed for dispatching
@@ -361,9 +339,7 @@ export class EventSourcingService<
         // ADR-022: Derive lean shapes for projection dispatch.
         // storeEvents has already persisted the FULL events to event_log.
         // Map to new array — do NOT mutate enrichedEvents in place.
-        const leanedEvents = enrichedEvents.map(
-          (e) => leanForProjection(e) as EventType,
-        );
+        const leanedEvents = enrichedEvents.map((e) => leanForProjection(e));
 
         // Dispatch events to all projections (fold + map) via unified router
         if (
@@ -497,7 +473,7 @@ export class EventSourcingService<
    *
    * Returns `null` when the global queue is not available (event sourcing disabled).
    */
-  registerJob<P extends Record<string, unknown>>(config: {
+  registerJob<P extends StandaloneJobPayload>(config: {
     name: string;
     process: (payload: P) => Promise<void>;
     delay?: number;

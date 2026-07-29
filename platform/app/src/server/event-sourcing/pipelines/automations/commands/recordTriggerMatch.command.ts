@@ -2,6 +2,7 @@ import { defineCommand } from "../../../commands/defineCommand";
 import {
   RECORD_TRIGGER_MATCH_COMMAND_TYPE,
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
+  TRIGGER_MATCH_RECORDED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import { triggerMatchRecordedEventDataSchema } from "../schemas/events";
 import { settleWindowBucket } from "../settleWindow";
@@ -9,7 +10,7 @@ import { settleWindowBucket } from "../settleWindow";
 export const RecordTriggerMatchCommand = defineCommand({
   commandType: RECORD_TRIGGER_MATCH_COMMAND_TYPE,
   eventType: TRIGGER_MATCH_RECORDED_EVENT_TYPE,
-  eventVersion: "2026-07-18",
+  eventVersion: TRIGGER_MATCH_RECORDED_EVENT_VERSION_LATEST,
   aggregateType: "trigger",
   schema: triggerMatchRecordedEventDataSchema,
   aggregateId: ({ triggerId }) => triggerId,

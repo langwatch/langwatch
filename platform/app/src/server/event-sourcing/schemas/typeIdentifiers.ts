@@ -43,10 +43,6 @@ import {
   SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
 } from "../pipelines/simulation-processing/schemas/constants";
 import {
-  SUITE_RUN_PROCESSING_COMMAND_TYPES,
-  SUITE_RUN_PROCESSING_EVENT_TYPES,
-} from "../pipelines/suite-run-processing/schemas/constants";
-import {
   TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
   TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
 } from "../pipelines/topic-clustering-processing/schemas/constants";
@@ -65,6 +61,14 @@ import {
 const TEST_EVENT_TYPES = ["test.integration.event", "test.referenced"] as const;
 
 /**
+ * Test command type identifiers, the command-side counterpart to
+ * {@link TEST_EVENT_TYPES}. Tests that exercise the command machinery itself
+ * use these so they do not borrow a production pipeline's identifiers and then
+ * break when that pipeline is retired.
+ */
+const TEST_COMMAND_TYPES = ["test.integration.command"] as const;
+
+/**
  * All event type identifiers defined in schemas.
  */
 export const EVENT_TYPE_IDENTIFIERS = [
@@ -79,7 +83,6 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...EVALUATION_PROCESSING_EVENT_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
   ...SIMULATION_PROCESSING_EVENT_TYPES,
-  ...SUITE_RUN_PROCESSING_EVENT_TYPES,
   ...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   ...TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES,
   ...ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
@@ -98,11 +101,11 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...EVALUATION_PROCESSING_COMMAND_TYPES,
   ...EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
-  ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
   ...LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   ...TOPIC_CLUSTERING_PROCESSING_COMMAND_TYPES,
   ...ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
   ...BILLING_REPORTING_COMMAND_TYPES,
+  ...TEST_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -126,7 +129,6 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "experiment_run",
   "simulation_run",
   "simulation_set",
-  "suite_run",
   "langy_conversation",
   "topic_clustering",
   ...ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,

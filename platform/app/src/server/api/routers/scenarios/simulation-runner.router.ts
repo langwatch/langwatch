@@ -108,10 +108,7 @@ export const simulationRunnerRouter = createTRPCRouter({
           batchRunId,
           scenarioSetId: setId,
           name: prefetchResult.data.scenario.name,
-          target: {
-            type: input.target.type,
-            referenceId: input.target.referenceId,
-          },
+          target: { type: input.target.type, referenceId: input.target.referenceId },
           occurredAt: Date.now(),
         });
       } catch (error) {
@@ -126,12 +123,10 @@ export const simulationRunnerRouter = createTRPCRouter({
         });
       }
 
-      // No explicit job scheduling — the execution reactor picks up the queued
-      // event via the GroupQueue and spawns the child process.
-      logger.info(
-        { batchRunId, scenarioRunId },
-        "Scenario queued via event-sourcing",
-      );
+      // No explicit job scheduling — the `scenarioExecution` process manager
+      // sees the queued event and enqueues an `executeRun` outbox message;
+      // whichever worker leases it spawns the child process.
+      logger.info({ batchRunId, scenarioRunId }, "Scenario queued via event-sourcing");
 
       return {
         scheduled: true,

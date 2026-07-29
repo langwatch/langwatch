@@ -41,7 +41,6 @@ interface ClickHouseExperimentRunRecord {
   Progress: number;
   CompletedCount: number;
   FailedCount: number;
-  TotalCost: number | null;
   TotalDurationMs: string | null;
   AvgScoreBps: number | null;
   PassRateBps: number | null;
@@ -57,6 +56,12 @@ interface ClickHouseExperimentRunRecord {
   PassedCount: number;
   GradedCount: number;
   LastEventOccurredAt: number;
+  /**
+   * The executor's redelivery-dedup watermark (migration 00064). Reads back as
+   * `[]` on rows written before the column existed — see
+   * `ExperimentRunStateRepository.getProjectionWithApplied`.
+   */
+  AppliedEventIds: string[];
   _retention_days: number;
 }
 
@@ -87,7 +92,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       Progress: record.Progress,
       CompletedCount: record.CompletedCount,
       FailedCount: record.FailedCount,
-      TotalCost: record.TotalCost,
       TotalDurationMs: record.TotalDurationMs
         ? parseInt(record.TotalDurationMs, 10)
         : null,
@@ -104,7 +108,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       PassedCount: record.PassedCount ?? 0,
       GradedCount: record.GradedCount ?? 0,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
-      TraceMetrics: {},
     };
   }
 
@@ -115,6 +118,7 @@ export class ExperimentRunStateRepositoryClickHouse<
     projectionVersion: string,
     lastProcessedEventId: string,
     runId: string,
+    appliedEventIds: readonly string[],
   ): ClickHouseExperimentRunWriteRecord {
     return {
       ProjectionId: projectionId,
@@ -127,7 +131,6 @@ export class ExperimentRunStateRepositoryClickHouse<
       Progress: data.Progress,
       CompletedCount: data.CompletedCount,
       FailedCount: data.FailedCount,
-      TotalCost: data.TotalCost,
       TotalDurationMs: data.TotalDurationMs?.toString() ?? null,
       AvgScoreBps: data.AvgScoreBps,
       PassRateBps: data.PassRateBps,
@@ -145,16 +148,26 @@ export class ExperimentRunStateRepositoryClickHouse<
       LastEventOccurredAt: data.LastEventOccurredAt
         ? new Date(data.LastEventOccurredAt)
         : new Date(0),
+      AppliedEventIds: [...appliedEventIds],
       // Placeholder; storeProjection / storeProjectionBatch overwrite this with
       // the resolved retention (platform default when the tenant has none).
       _retention_days: PLATFORM_DEFAULT_RETENTION_DAYS,
     };
   }
 
+  /** State only; delegates so the two read paths cannot diverge. */
   async getProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
+    return (await this.getProjectionWithApplied(aggregateId, context))
+      .projection;
+  }
+
+  async getProjectionWithApplied(
+    aggregateId: string,
+    context: ProjectionStoreReadContext,
+  ): Promise<{ projection: ProjectionType | null; appliedEventIds: string[] }> {
     EventUtils.validateTenantId(
       context,
       "ExperimentRunStateRepositoryClickHouse.getProjection",
@@ -179,7 +192,6 @@ export class ExperimentRunStateRepositoryClickHouse<
             t.WorkflowVersionId AS WorkflowVersionId, t.Version AS Version,
             t.Total AS Total, t.Progress AS Progress,
             t.CompletedCount AS CompletedCount, t.FailedCount AS FailedCount,
-            t.TotalCost AS TotalCost,
             toString(t.TotalDurationMs) AS TotalDurationMs,
             t.AvgScoreBps AS AvgScoreBps, t.PassRateBps AS PassRateBps,
             t.Targets AS Targets,
@@ -191,7 +203,8 @@ export class ExperimentRunStateRepositoryClickHouse<
             t.LastProcessedEventId AS LastProcessedEventId,
             t.TotalScoreSum AS TotalScoreSum, t.ScoreCount AS ScoreCount,
             t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,
-            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
+            toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt,
+            t.AppliedEventIds AS AppliedEventIds
           FROM ${TABLE_NAME} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.RunId = {runId:String}
@@ -212,7 +225,7 @@ export class ExperimentRunStateRepositoryClickHouse<
 
       const rows = await result.json<ClickHouseExperimentRunRecord>();
       const row = rows[0];
-      if (!row) return null;
+      if (!row) return { projection: null, appliedEventIds: [] };
 
       const projection: ExperimentRunState = {
         id: row.ProjectionId,
@@ -222,7 +235,11 @@ export class ExperimentRunStateRepositoryClickHouse<
         data: this.mapClickHouseRecordToProjectionData(row),
       };
 
-      return projection as ProjectionType;
+      return {
+        projection: projection as ProjectionType,
+        // `?? []` covers a row written before migration 00064 added the column.
+        appliedEventIds: row.AppliedEventIds ?? [],
+      };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -244,6 +261,7 @@ export class ExperimentRunStateRepositoryClickHouse<
   async storeProjection(
     projection: ProjectionType,
     context: ProjectionStoreWriteContext,
+    appliedEventIds: readonly string[] = [],
   ): Promise<void> {
     EventUtils.validateTenantId(
       context,
@@ -277,6 +295,7 @@ export class ExperimentRunStateRepositoryClickHouse<
         projection.version,
         projection.id,
         runId,
+        appliedEventIds,
       );
 
       const retentionPolicy = context.metadata?.retentionPolicy as
@@ -317,6 +336,7 @@ export class ExperimentRunStateRepositoryClickHouse<
   async storeProjectionBatch(
     projections: ProjectionType[],
     context: ProjectionStoreWriteContext,
+    appliedEventIds: readonly string[] = [],
   ): Promise<void> {
     if (projections.length === 0) return;
 
@@ -351,6 +371,7 @@ export class ExperimentRunStateRepositoryClickHouse<
           projection.version,
           projection.id,
           runId,
+          appliedEventIds,
         );
         record._retention_days = retentionDays;
         return record;

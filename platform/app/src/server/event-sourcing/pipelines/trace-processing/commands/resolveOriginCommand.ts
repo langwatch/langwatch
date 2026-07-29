@@ -83,8 +83,4 @@ export class ResolveOriginCommand
       "payload.reason": payload.reason,
     };
   }
-
-  static makeJobId(payload: ResolveOriginCommandData): string {
-    return `${payload.tenantId}:${payload.traceId}:resolve-origin`;
-  }
 }

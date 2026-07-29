@@ -1,6 +1,9 @@
+import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
+import type { CodingAgentTraceSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
+import type { SessionMetricSeriesRepository } from "~/server/app-layer/coding-agent/repositories/session-metric-series.repository";
 import { definePipeline } from "../..";
-import type { FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore } from "../../projections/mapProjection.types";
+import { CachedFoldStore } from "../../projections/cachedFoldStore";
+import type { FoldCacheClient } from "../../projections/foldCache/foldCacheClient";
 import { ContributeLogFactsCommand } from "./commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "./commands/contributeMetricFactsCommand";
 import { ContributeSpanFactsCommand } from "./commands/contributeSpanFactsCommand";
@@ -8,21 +11,27 @@ import {
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
 } from "./projections/codingAgentSession.foldProjection";
+import { CodingAgentSessionStore } from "./projections/codingAgentSession.store";
+import { CodingAgentTraceSessionsMapProjection } from "./projections/codingAgentTraceSessions.mapProjection";
+import { SessionMetricSeriesMapProjection } from "./projections/sessionMetricSeries.mapProjection";
 import {
-  type CodingAgentTraceSessionRecord,
-  CodingAgentTraceSessionsMapProjection,
-} from "./projections/codingAgentTraceSessions.mapProjection";
-import {
-  SessionMetricSeriesMapProjection,
-  type SessionMetricSeriesRecord,
-} from "./projections/sessionMetricSeries.mapProjection";
+  CodingAgentTraceSessionAppendStore,
+  SessionMetricSeriesAppendStore,
+} from "./projections/stores";
 import type { CodingAgentProcessingEvent } from "./schemas/events";
 
+/**
+ * ADR-082 Rule 1 — the three store adapters are constructed here, from the
+ * three repositories they wrap. A repository crosses `Deps`; the store adapter
+ * that adapts it to a projection contract does not, because it is part of what
+ * this pipeline *is*.
+ */
 export interface CodingAgentProcessingPipelineDeps {
-  /** Redis-cached at registration — see the fold store's no-read-back note. */
-  codingAgentSessionStore: FoldProjectionStore<CodingAgentSessionState>;
-  codingAgentTraceSessionAppendStore: AppendStore<CodingAgentTraceSessionRecord>;
-  sessionMetricSeriesAppendStore: AppendStore<SessionMetricSeriesRecord>;
+  codingAgentSessionRepository: CodingAgentSessionRepository;
+  codingAgentTraceSessionRepository: CodingAgentTraceSessionRepository;
+  sessionMetricSeriesRepository: SessionMetricSeriesRepository;
+  /** ADR-082 §3 — the resolved cache tier, never a redis client. */
+  foldCacheClient: FoldCacheClient;
 }
 
 /**
@@ -46,9 +55,9 @@ export interface CodingAgentProcessingPipelineDeps {
  * - sessionMetricSeries (map) → `session_metric_series`, the converged
  *   per-series totals (replace, never increment — ADR-056 §5)
  *
- * Consumption is subscribers + projections + one process manager — no
- * reactors (ADR-056 §3). Commands default to per-aggregate grouping, so one
- * session's contributions apply in order.
+ * Consumption is subscribers + projections + one process manager (ADR-056 §3).
+ * Commands default to per-aggregate grouping, so one session's contributions
+ * apply in order.
  */
 export function createCodingAgentProcessingPipeline(
   deps: CodingAgentProcessingPipelineDeps,
@@ -59,19 +68,32 @@ export function createCodingAgentProcessingPipeline(
     .withFoldProjection(
       "codingAgentSession",
       new CodingAgentSessionFoldProjection({
-        store: deps.codingAgentSessionStore,
+        // Read-through store (ADR-066): the cache tier is the warm read path;
+        // on a miss the store reads its own last committed state back from
+        // coding_agent_sessions (store.get() → findBySessionId → decode row).
+        // The delivery path never reads event_log. Same wiring as
+        // trace_summaries.
+        store: new CachedFoldStore<CodingAgentSessionState>(
+          new CodingAgentSessionStore(deps.codingAgentSessionRepository),
+          deps.foldCacheClient,
+          { keyPrefix: "coding_agent_sessions" },
+        ),
       }),
     )
     .withMapProjection(
       "codingAgentTraceSessions",
       new CodingAgentTraceSessionsMapProjection({
-        store: deps.codingAgentTraceSessionAppendStore,
+        store: new CodingAgentTraceSessionAppendStore(
+          deps.codingAgentTraceSessionRepository,
+        ),
       }),
     )
     .withMapProjection(
       "sessionMetricSeries",
       new SessionMetricSeriesMapProjection({
-        store: deps.sessionMetricSeriesAppendStore,
+        store: new SessionMetricSeriesAppendStore(
+          deps.sessionMetricSeriesRepository,
+        ),
       }),
     )
     .withCommand("contributeSpanFacts", ContributeSpanFactsCommand)

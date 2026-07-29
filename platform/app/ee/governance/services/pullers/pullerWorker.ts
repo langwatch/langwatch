@@ -201,8 +201,8 @@ export async function runIngestionPull(params: {
   // shape for pull-mode: each audit-log entry is a single event, not
   // a multi-span trace.
   //
-  // TenantId convention: every governance write path (the trace fold
-  // reactor, the OCSF export service) keys on the org's hidden
+  // TenantId convention: every governance write path (the governance map
+  // projections, the OCSF export service) keys on the org's hidden
   // internal_governance Project ID. Pull events MUST follow the same
   // convention or they're invisible to SIEM export reads. Resolve
   // (and lazy-mint) that project once per job; the `governance_ocsf_events`
@@ -266,7 +266,7 @@ export async function runIngestionPull(params: {
  * EventId includes the source id so two same-type sources cannot collide.
  *
  * `tenantId` MUST be the hidden internal_governance Project ID for the
- * org — same key the trace-fold reactor and OCSF export service use.
+ * org — same key the governance map projections and OCSF export service use.
  * Resolved by the worker before this is called.
  */
 function mapToOcsfRow({

@@ -39,7 +39,7 @@ const orgCache = new TtlCache<CachedOrgData>(
   "ttlcache:billing:orgData:",
 );
 
-export interface ReportUsageForMonthCommandDeps {
+interface ReportUsageForMonthCommandDeps {
   organizations: OrganizationService;
   billingCheckpoints: BillingCheckpointService;
   getUsageReportingService: () => UsageReportingService | undefined;
@@ -306,7 +306,7 @@ export class ReportUsageForMonthCommand
 
       const result = results[0];
 
-      if (!result?.reported) {
+      if (!result || !result.reported) {
         // Permanent Stripe rejection: do NOT update checkpoint.
         logger.error(
           {

@@ -27,23 +27,42 @@ import { ConfigurationError, ValidationError } from "../errorHandling";
 const logger = createLogger("langwatch:event-sourcing:queue-manager");
 
 /**
+ * Minimum shape every standalone job payload must satisfy.
+ *
+ * `tenantId` is load-bearing rather than decorative: the group key, the score
+ * and the default dedup id are all derived from it, so a payload without one
+ * would funnel every job of that type into a single `undefined/job/<name>`
+ * group and silently serialize the whole tenant fleet behind it.
+ */
+export type StandaloneJobPayload = { tenantId: string } & Record<
+  string,
+  unknown
+>;
+
+/**
  * Metadata stored per job type in the global job registry.
  * Used by the global queue's process/groupKey/score callbacks to dispatch to the right handler.
+ *
+ * The registry itself is heterogeneous (one map, many payload shapes), so the
+ * parameter defaults to `any` for storage; `registerJob` instantiates it with
+ * the concrete payload so the callbacks it builds stay type-checked.
  */
-export interface JobRegistryEntry {
-  process: (payload: any, delivery?: JobDelivery) => Promise<void>;
-  groupKeyFn: (payload: any) => string;
-  scoreFn: (payload: any) => number;
+export interface JobRegistryEntry<Payload = any> {
+  process: (payload: Payload, delivery?: JobDelivery) => Promise<void>;
+  groupKeyFn: (payload: Payload) => string;
+  scoreFn: (payload: Payload) => number;
   delay?: number;
-  deduplication?: DeduplicationConfig<any>;
-  spanAttributes?: (payload: any) => Record<string, string | number | boolean>;
+  deduplication?: DeduplicationConfig<Payload>;
+  spanAttributes?: (
+    payload: Payload,
+  ) => Record<string, string | number | boolean>;
   /**
    * Optional batch processor for group coalescing. When set together with
    * `coalesceMaxBatch > 1`, the global queue may fold several same-group jobs
    * into one call (the dispatched job plus drained siblings, in occurredAt
    * order). The first payload is always the dispatched job.
    */
-  processBatch?: (payloads: any[], delivery?: JobDelivery) => Promise<void>;
+  processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
   /**
    * Max number of same-group jobs to coalesce into one `processBatch` call
    * (including the dispatched job). Defaults to 1 (no coalescing).
@@ -73,7 +92,7 @@ interface QueuedEventConsumerDefinition<E extends Event> {
 }
 
 /**
- * Manages queue facades for event handlers, projections, commands, and reactors.
+ * Manages queue facades for event handlers, projections, and commands.
  *
  * Creates per-job-type facades that inject routing metadata (__pipelineName, __jobType, __jobName)
  * into a global shared queue. The global queue and job registry are owned by EventSourcing
@@ -95,7 +114,6 @@ export class QueueManager<EventType extends Event = Event> {
   private subscriberCount = 0;
   private stateProjectionCount = 0;
   private projectionCount = 0;
-  private reactorCount = 0;
 
   constructor({
     aggregateType,
@@ -124,7 +142,7 @@ export class QueueManager<EventType extends Event = Event> {
   /**
    * Builds a hierarchical group key function: `${tenantId}/${jobPath}/${domainKey}`.
    *
-   * - jobPath reflects the pipeline topology (e.g. `fold/traceSummary/reactor/evaluationTrigger`)
+   * - jobPath reflects the pipeline topology (e.g. `fold/traceSummary`)
    * - domainKey defaults to `${aggregateType}:${aggregateId}`, overridable via custom fn
    */
   private buildGroupKey({
@@ -147,7 +165,6 @@ export class QueueManager<EventType extends Event = Event> {
       | "stateProjection"
       | "projection"
       | "command"
-      | "reactor"
       | "job",
     name: string,
   ): string {
@@ -695,86 +712,6 @@ export class QueueManager<EventType extends Event = Event> {
     }
   }
 
-  initializeReactorQueues(
-    reactors: Record<
-      string,
-      {
-        name: string;
-        parentProjection: string;
-        parentType: "fold" | "map";
-        handler: {
-          handle: (payload: {
-            event: EventType;
-            foldState: unknown;
-          }) => Promise<void>;
-        };
-        groupKeyFn?: (payload: {
-          event: EventType;
-          foldState: unknown;
-        }) => string;
-        options?: {
-          killSwitch?: KillSwitchOptions;
-          disabled?: boolean;
-          delay?: number;
-          deduplication?: DeduplicationStrategy<{
-            event: EventType;
-            foldState: unknown;
-          }>;
-        };
-      }
-    >,
-    onEvent: (
-      reactorName: string,
-      payload: { event: EventType; foldState: unknown },
-      context: EventStoreReadContext<EventType>,
-    ) => Promise<void>,
-  ): void {
-    if (!this.globalQueue) {
-      return;
-    }
-
-    for (const [reactorName, reactorDef] of Object.entries(reactors)) {
-      const customGroupKeyFn = reactorDef.groupKeyFn;
-      const reactorGroupKeyFn = this.buildGroupKey({
-        jobPath: `${reactorDef.parentType}/${reactorDef.parentProjection}/reactor/${reactorName}`,
-        getTenantId: (payload: any) => String(payload.event.tenantId),
-        domainKeyFn: customGroupKeyFn
-          ? (payload: any) => customGroupKeyFn(payload)
-          : (payload: any) =>
-              `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
-      });
-      const entry: JobRegistryEntry = {
-        groupKeyFn: reactorGroupKeyFn,
-        scoreFn: (payload: any) => payload.event.createdAt,
-        process: async (payload: any) => {
-          await onEvent(reactorName, payload, {
-            tenantId: payload.event.tenantId,
-          });
-        },
-        delay: reactorDef.options?.delay,
-        deduplication: reactorDef.options?.deduplication
-          ? resolveDeduplicationStrategy(
-              reactorDef.options.deduplication,
-              (payload) => this.createDefaultDeduplicationId(payload.event),
-            )
-          : undefined,
-        spanAttributes: (payload: any) => ({
-          "reactor.name": reactorName,
-          "event.type": payload.event.type,
-          "event.id": payload.event.id,
-          "event.aggregate_id": String(payload.event.aggregateId),
-        }),
-      };
-
-      const facade = this.createFacade<{
-        event: EventType;
-        foldState: unknown;
-      }>("reactor", reactorName, entry);
-      this.queues.set(this.key("reactor", reactorName), facade);
-      this.reactorCount++;
-    }
-  }
-
   hasHandlerQueues(): boolean {
     return this.handlerCount > 0;
   }
@@ -789,10 +726,6 @@ export class QueueManager<EventType extends Event = Event> {
 
   hasStateProjectionQueues(): boolean {
     return this.stateProjectionCount > 0;
-  }
-
-  hasReactorQueues(): boolean {
-    return this.reactorCount > 0;
   }
 
   getHandlerQueue(
@@ -824,16 +757,6 @@ export class QueueManager<EventType extends Event = Event> {
   ): EventSourcedQueueProcessor<EventType> | undefined {
     return this.queues.get(this.key("stateProjection", projectionName)) as
       | EventSourcedQueueProcessor<EventType>
-      | undefined;
-  }
-
-  getReactorQueue(
-    reactorName: string,
-  ):
-    | EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
-    | undefined {
-    return this.queues.get(this.key("reactor", reactorName)) as
-      | EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
       | undefined;
   }
 
@@ -873,12 +796,12 @@ export class QueueManager<EventType extends Event = Event> {
   /**
    * Registers a standalone job in the global queue.
    *
-   * Unlike handler/projection/reactor queues that are tied to event processing,
+   * Unlike handler/projection queues that are tied to event processing,
    * standalone jobs are independent work items (e.g. deferred evaluation checks).
    *
    * Returns `null` when the global queue is not available (event sourcing disabled).
    */
-  registerJob<P extends Record<string, unknown>>({
+  registerJob<P extends StandaloneJobPayload>({
     name,
     process,
     delay,
@@ -899,26 +822,24 @@ export class QueueManager<EventType extends Event = Event> {
       return null;
     }
 
-    const entry: JobRegistryEntry = {
+    const entry: JobRegistryEntry<P> = {
       groupKeyFn: groupKeyFn
         ? this.buildGroupKey({
             jobPath: `job/${name}`,
-            getTenantId: (payload: any) => String(payload.tenantId),
-            domainKeyFn: groupKeyFn as any,
+            getTenantId: (payload: P) => payload.tenantId,
+            domainKeyFn: groupKeyFn,
           })
-        : (payload: any) => `${String(payload.tenantId)}/job/${name}`,
-      scoreFn: scoreFn
-        ? (scoreFn as any)
-        : (payload: any) => (payload.occurredAt as number) ?? 0,
-      process: process as any,
+        : (payload: P) => `${payload.tenantId}/job/${name}`,
+      scoreFn: scoreFn ?? ((payload: P) => (payload.occurredAt as number) ?? 0),
+      process,
       delay,
       deduplication: deduplication
-        ? resolveDeduplicationStrategy(
-            deduplication as any,
-            (payload: any) => `${String(payload.tenantId)}:${name}`,
+        ? resolveDeduplicationStrategy<P>(
+            deduplication,
+            (payload) => `${payload.tenantId}:${name}`,
           )
         : undefined,
-      spanAttributes: spanAttributes as any,
+      spanAttributes,
     };
 
     const facade = this.createFacade<P>("job", name, entry);

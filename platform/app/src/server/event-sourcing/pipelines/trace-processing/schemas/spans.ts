@@ -86,7 +86,6 @@ const normalizedSpanSchema = z.object({
 });
 
 export type NormalizedEvent = z.infer<typeof normalizedEventSchema>;
-export type NormalizedLink = z.infer<typeof normalizedLinkSchema>;
 export type NormalizedSpan = z.infer<typeof normalizedSpanSchema>;
 
 export type NormalizedAttributes = z.infer<typeof normalizedAttributesSchema>;

@@ -1,10 +1,10 @@
 import { defineCommand } from "../../commands/defineCommand";
+import { EXPERIMENT_RUN_EVENT_VERSIONS } from "./schemas/constants";
 import {
   evaluatorResultEventDataSchema,
   experimentRunCompletedEventDataSchema,
   experimentRunStartedEventDataSchema,
   targetResultEventDataSchema,
-  traceMetricsComputedEventDataSchema,
 } from "./schemas/events";
 import { makeExperimentRunKey } from "./utils/compositeKey";
 
@@ -18,7 +18,7 @@ import { makeExperimentRunKey } from "./utils/compositeKey";
 export const StartExperimentRunCommand = defineCommand({
   commandType: "lw.experiment_run.start",
   eventType: "lw.experiment_run.started",
-  eventVersion: "2025-02-01",
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.STARTED,
   aggregateType: "experiment_run",
   schema: experimentRunStartedEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
@@ -28,13 +28,12 @@ export const StartExperimentRunCommand = defineCommand({
     "payload.experiment.id": d.experimentId,
     "payload.total": d.total,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.runId}:start`,
 });
 
 export const RecordTargetResultCommand = defineCommand({
   commandType: "lw.experiment_run.record_target_result",
   eventType: "lw.experiment_run.target_result",
-  eventVersion: "2025-02-01",
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.TARGET_RESULT,
   aggregateType: "experiment_run",
   schema: targetResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
@@ -47,13 +46,12 @@ export const RecordTargetResultCommand = defineCommand({
     "payload.target.id": d.targetId,
     "payload.index": d.index,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.runId}:target:${d.targetId}:${d.index}`,
 });
 
 export const RecordEvaluatorResultCommand = defineCommand({
   commandType: "lw.experiment_run.record_evaluator_result",
   eventType: "lw.experiment_run.evaluator_result",
-  eventVersion: "2025-02-01",
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.EVALUATOR_RESULT,
   aggregateType: "experiment_run",
   schema: evaluatorResultEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
@@ -66,31 +64,12 @@ export const RecordEvaluatorResultCommand = defineCommand({
     "payload.evaluator.id": d.evaluatorId,
     "payload.index": d.index,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.runId}:evaluator:${d.evaluatorId}:${d.index}`,
-});
-
-export const ComputeExperimentRunMetricsCommand = defineCommand({
-  commandType: "lw.experiment_run.compute_trace_metrics",
-  eventType: "lw.experiment_run.trace_metrics_computed",
-  eventVersion: "2026-04-15",
-  aggregateType: "experiment_run",
-  schema: traceMetricsComputedEventDataSchema,
-  aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
-  idempotencyKey: (d) => `${d.tenantId}:${d.runId}:trace-metrics:${d.traceId}`,
-  spanAttributes: (d) => ({
-    "payload.run.id": d.runId,
-    "payload.experiment.id": d.experimentId,
-    "payload.trace.id": d.traceId,
-    "payload.total_cost": d.totalCost,
-  }),
-  makeJobId: (d) => `${d.tenantId}:${d.runId}:trace-metrics:${d.traceId}`,
 });
 
 export const CompleteExperimentRunCommand = defineCommand({
   commandType: "lw.experiment_run.complete",
   eventType: "lw.experiment_run.completed",
-  eventVersion: "2025-02-01",
+  eventVersion: EXPERIMENT_RUN_EVENT_VERSIONS.COMPLETED,
   aggregateType: "experiment_run",
   schema: experimentRunCompletedEventDataSchema,
   aggregateId: (d) => makeExperimentRunKey(d.experimentId, d.runId),
@@ -99,5 +78,4 @@ export const CompleteExperimentRunCommand = defineCommand({
     "payload.run.id": d.runId,
     "payload.experiment.id": d.experimentId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.runId}:complete`,
 });

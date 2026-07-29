@@ -56,13 +56,24 @@ export class RecordMetricCorrelationCommand
         },
         metadata: {},
         occurredAt: data.occurredAt,
-        idempotencyKey: RecordMetricCorrelationCommand.makeJobId(data),
+        idempotencyKey: RecordMetricCorrelationCommand.makeIdempotencyKey(data),
       }),
     ];
   }
 
   static getAggregateId(payload: RecordMetricCorrelationCommandData): string {
     return payload.traceId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordMetricCorrelationCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.trace.id": payload.traceId,
+      "payload.span.id": payload.spanId,
+      "payload.metric.name": payload.metricName,
+      "payload.metric.kind": payload.metricKind,
+    };
   }
 
   /**
@@ -72,7 +83,9 @@ export class RecordMetricCorrelationCommand
    * that silently depends on it would suppress another tenant's work the day
    * it changes.
    */
-  static makeJobId(payload: RecordMetricCorrelationCommandData): string {
+  static makeIdempotencyKey(
+    payload: RecordMetricCorrelationCommandData,
+  ): string {
     return `${payload.tenantId}:${payload.traceId}:metric_correlation:${payload.pointId}:${payload.spanId}`;
   }
 }

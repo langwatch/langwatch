@@ -64,6 +64,12 @@ export class AssignTopicCommand
           tenantId,
           type: TOPIC_ASSIGNED_EVENT_TYPE,
           version: TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+          // Keyed by the assignment itself, not by delivery: a clustering page
+          // re-run or an outbox retry re-asserting the same topic collapses on
+          // the event_log sort key, while a genuine re-topic lands as its own
+          // event. Deliberately excludes occurredAt — including it would mint a
+          // fresh key per delivery and defeat the collapse.
+          idempotencyKey: `${tenantIdStr}:${commandData.traceId}:topic:${commandData.topicId ?? ""}:${commandData.subtopicId ?? ""}`,
           data: {
             topicId: commandData.topicId,
             topicName: commandData.topicName,
@@ -99,9 +105,5 @@ export class AssignTopicCommand
       "payload.topic.id": payload.topicId ?? "",
       "payload.subtopic.id": payload.subtopicId ?? "",
     };
-  }
-
-  static makeJobId(payload: AssignTopicCommandData): string {
-    return `${payload.tenantId}:${payload.traceId}:topic`;
   }
 }

@@ -124,6 +124,43 @@ describe("EventSourcingService - Store Events Flow", () => {
       expect(mapDef.map).toHaveBeenCalledTimes(1);
       expect(mapDef.map).toHaveBeenCalledWith(events[0]);
     });
+
+    describe("when a global queue is configured", () => {
+      it("hands map projection work to the queue instead of running it inline", async () => {
+        const eventStore = createMockEventStore<Event>();
+        const mapDef = createMockMapProjectionDefinition("handler");
+
+        const globalQueue = {
+          send: vi.fn().mockResolvedValue(void 0),
+          sendBatch: vi.fn().mockResolvedValue(void 0),
+          close: vi.fn().mockResolvedValue(void 0),
+          waitUntilReady: vi.fn().mockResolvedValue(void 0),
+        };
+        const globalJobRegistry = new Map();
+
+        const service = new EventSourcingService({
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          aggregateType,
+          eventStore,
+          mapProjections: [mapDef],
+          globalQueue,
+          globalJobRegistry,
+        });
+
+        const event = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        );
+
+        await service.storeEvents([event], context);
+
+        // Map projections are batched onto the global queue, so nothing runs
+        // inline on the storeEvents path.
+        expect(globalQueue.sendBatch).toHaveBeenCalled();
+        expect(mapDef.map).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("projection updates", () => {

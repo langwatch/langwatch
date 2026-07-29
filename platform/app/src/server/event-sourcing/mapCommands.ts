@@ -1,14 +1,12 @@
 import type { EventSourcedQueueProcessor, QueueSendOptions } from "./queues";
 
 /** Convert pipeline command dispatchers to plain async functions. */
-export type MappedCommand<P> = {
+type MappedCommand<P> = {
   (data: P, options?: QueueSendOptions<P>): Promise<void>;
   sendBatch?: (data: P[], options?: QueueSendOptions<P>) => Promise<void>;
 };
 
-export type MapCommands<
-  T extends Record<string, EventSourcedQueueProcessor<any>>,
-> = {
+type MapCommands<T extends Record<string, EventSourcedQueueProcessor<any>>> = {
   [K in keyof T]: T[K] extends EventSourcedQueueProcessor<infer P>
     ? MappedCommand<P>
     : never;

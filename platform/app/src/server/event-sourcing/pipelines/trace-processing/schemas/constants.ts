@@ -35,10 +35,16 @@ export const TOPIC_ASSIGNED_EVENT_VERSIONS = [
 ] as const;
 
 /**
- * Trace-fold contribution event for a received log record. No live minter
- * since the `recordLog` command was retired (canonical `log_records` is now the
- * only log write path) — kept so historical `event_log` replays of the trace
- * folds still reproduce pre-cutover log contributions.
+ * RETIRED — nothing emits this any more. It was the trace-fold contribution
+ * event for a received log record, and lost its minter when the `recordLog`
+ * command was retired (canonical `log_records` is now the only log write path).
+ *
+ * It is kept registered because `traceSummary.foldProjection`,
+ * `traceAnalytics.foldProjection`, the `originGate` process manager and
+ * `lean-for-projection` still handle it, and events already committed under
+ * this type must still parse when the log is read. Its Zod schema and the
+ * `z.literal` built from this identifier are load-bearing for replay. Delete it
+ * only once no log within retention can contain one.
  */
 export const LOG_RECORD_RECEIVED_EVENT_TYPE =
   "lw.obs.trace.log_record_received" as const;
@@ -52,10 +58,18 @@ export const LOG_CONTRIBUTED_EVENT_TYPE =
   "lw.obs.trace.log_contributed" as const;
 export const LOG_CONTRIBUTED_EVENT_VERSION_LATEST = "2026-07-17" as const;
 
+export const LOG_CONTRIBUTED_EVENT_VERSIONS = [
+  LOG_CONTRIBUTED_EVENT_VERSION_LATEST,
+] as const;
+
 export const METRIC_DATA_POINT_CORRELATED_EVENT_TYPE =
   "lw.obs.trace.metric_data_point_correlated" as const;
 export const METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST =
   "2026-07-15" as const;
+
+export const METRIC_DATA_POINT_CORRELATED_EVENT_VERSIONS = [
+  METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST,
+] as const;
 
 /**
  * How many metric exemplars correlate to a trace — NOT how many metric data
@@ -121,9 +135,6 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
   TRACE_NAME_CHANGED_EVENT_TYPE,
 ] as const;
 
-export type TraceProcessingEventType =
-  (typeof TRACE_PROCESSING_EVENT_TYPES)[number];
-
 /**
  * Staging-only event types (ADR-069): valid Event brands that travel between
  * the routing seam and a subscriber's queue but are NEVER appended to the
@@ -134,9 +145,6 @@ export type TraceProcessingEventType =
 export const TRACE_PROCESSING_STAGING_EVENT_TYPES = [
   SPAN_REFERENCED_EVENT_TYPE,
 ] as const;
-
-export type TraceProcessingStagingEventType =
-  (typeof TRACE_PROCESSING_STAGING_EVENT_TYPES)[number];
 
 export const RECORD_SPAN_COMMAND_TYPE = "lw.obs.trace.record_span" as const;
 export const ASSIGN_TOPIC_COMMAND_TYPE = "lw.obs.trace.assign_topic" as const;
@@ -175,15 +183,11 @@ export const TRACE_PROCESSING_COMMAND_TYPES = [
 export const TRACE_NAME_MIN_LENGTH = 1;
 export const TRACE_NAME_MAX_LENGTH = 200;
 
-export type TraceProcessingCommandType =
-  (typeof TRACE_PROCESSING_COMMAND_TYPES)[number];
-
 export const TRACE_SUMMARY_PROJECTION_VERSION_LATEST = "2026-05-07" as const;
 
-/** Reactors skip traces older than this threshold to avoid re-processing during resyncs. */
+/**
+ * How stale an event may be before side-effect work is skipped for it. Replay
+ * and resync paths re-emit events with historical `occurredAt`, and re-running
+ * evaluations, alerts or origin gating for them is never wanted.
+ */
 export const STALE_TRACE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
-
-export const TRACE_SUMMARY_PROJECTION_VERSIONS = [
-  "2026-04-23",
-  TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-] as const;

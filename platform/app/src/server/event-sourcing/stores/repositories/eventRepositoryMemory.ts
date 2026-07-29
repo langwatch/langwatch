@@ -15,7 +15,7 @@ export class EventRepositoryMemory implements EventRepository {
   // Partition by tenant + aggregateType + aggregateId
   private readonly eventsByKey = new Map<string, EventRecord[]>();
 
-  async getEventRecords(
+  async findAll(
     tenantId: string,
     aggregateType: string,
     aggregateId: string,
@@ -39,44 +39,19 @@ export class EventRepositoryMemory implements EventRepository {
     return filtered.map((record) => ({ ...record }));
   }
 
-  async getEventRecordsUpTo(request: {
-    tenantId: string;
-    aggregateType: string;
-    aggregateId: string;
-    upToTimestamp: number;
-    upToEventId: string;
-    occurredAtFromMs?: number;
-  }): Promise<EventRecord[]> {
-    const {
-      tenantId,
-      aggregateType,
-      aggregateId,
-      upToTimestamp,
-      upToEventId,
-      occurredAtFromMs,
-    } = request;
+  async findAllUpTo(
+    tenantId: string,
+    aggregateType: string,
+    aggregateId: string,
+    upToTimestamp: number,
+    upToEventId: string,
+  ): Promise<EventRecord[]> {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 
-    // Mirrors the ClickHouse lower bound so a window that would drop events in
-    // production drops them here too — otherwise a too-small window passes
-    // every test and only fails against real data.
-    const hasLowerBound =
-      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
-
+    // Filter events up to and including the specified event
+    // Events where: timestamp < upToTimestamp OR (timestamp = upToTimestamp AND eventId <= upToEventId)
     const filteredRecords = records.filter((record) => {
-      // Records with an unknown occurred time are always kept, exactly as the
-      // SQL does, so the bound can never drop one. Null and 0 are both
-      // "unknown" here — the column is non-null in ClickHouse, but the memory
-      // record type allows null.
-      if (
-        hasLowerBound &&
-        record.EventOccurredAt != null &&
-        record.EventOccurredAt !== 0 &&
-        record.EventOccurredAt < occurredAtFromMs
-      ) {
-        return false;
-      }
       if (record.EventTimestamp < upToTimestamp) {
         return true;
       }
@@ -105,7 +80,7 @@ export class EventRepositoryMemory implements EventRepository {
     return sortedRecords.map((record) => ({ ...record }));
   }
 
-  async getEventRecordsUpToPaged(request: {
+  async findAllUpToPaged(request: {
     tenantId: string;
     aggregateType: string;
     aggregateId: string;
@@ -113,7 +88,6 @@ export class EventRepositoryMemory implements EventRepository {
     upToEventId: string;
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
-    occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
     const {
       tenantId,
@@ -123,20 +97,9 @@ export class EventRepositoryMemory implements EventRepository {
       upToEventId,
       after,
       limit,
-      occurredAtFromMs,
     } = request;
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
-
-    const hasLowerBound =
-      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
-
-    // Mirrors the ClickHouse lower bound; unknown occurred times are kept.
-    const withinLowerBound = (record: EventRecord): boolean =>
-      !hasLowerBound ||
-      record.EventOccurredAt == null ||
-      record.EventOccurredAt === 0 ||
-      record.EventOccurredAt >= occurredAtFromMs;
 
     const withinUpperBound = (record: EventRecord): boolean =>
       record.EventTimestamp < upToTimestamp ||
@@ -154,10 +117,7 @@ export class EventRepositoryMemory implements EventRepository {
     };
 
     const filtered = records.filter(
-      (record) =>
-        withinLowerBound(record) &&
-        withinUpperBound(record) &&
-        afterCursor(record),
+      (record) => withinUpperBound(record) && afterCursor(record),
     );
 
     // Plain relational comparison, not localeCompare: withinUpperBound and

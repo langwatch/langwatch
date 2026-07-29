@@ -50,6 +50,13 @@ import { TraceRequestUtils } from "../utils/traceRequest.utils";
  * Exported so the dedup-coverage integration test can import the exact same
  * shape rather than reproducing it inline — keeps production and the test
  * registered against a single source of truth.
+ *
+ * Keys on the OTLP ids exactly as they arrived, NOT on the normalized ids the
+ * emitted event carries (`normalizeOtlpSpanIds`, used below in `handle`). Two
+ * encodings of the same span therefore stage as two jobs and collapse later,
+ * at the store, on the event's `idempotencyKey`. Normalizing here would widen
+ * the collapse; it is deliberately not done on the ingest hot path, where this
+ * runs per span.
  */
 export const RECORD_SPAN_DEDUPLICATION = {
   makeId: (payload: RecordSpanCommandData) =>
@@ -437,12 +444,12 @@ export class RecordSpanCommand
    *
    * EXCEPTIONS — system-emitted attributes that ride in on OTLP from
    * trusted internal services (nlpgo, langevals, etc.) and MUST survive
-   * this strip because downstream reactors depend on them:
+   * this strip because downstream consumers depend on them:
    *
    *   - `langwatch.reserved.causality_depth` — stamped by nlpgo's
    *     `BaggageAttributeProcessor` on every span emitted during an
-   *     evaluator workflow run. The evaluationTrigger reactor reads
-   *     this on the inbound span_received event to block infinite
+   *     evaluator workflow run. The `evaluationTrigger` process manager
+   *     reads this off the inbound span_received event to block infinite
    *     loops (post-2026-05-11 incident). Stripping it here would
    *     silently disable the loop-prevention guard in production.
    *
@@ -494,13 +501,5 @@ export class RecordSpanCommand
     if (resource) {
       resource.attributes = strip(resource.attributes);
     }
-  }
-
-  static makeJobId(payload: RecordSpanCommandData): string {
-    const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-      payload.span,
-    );
-
-    return `${payload.tenantId}:${traceId}:${spanId}`;
   }
 }

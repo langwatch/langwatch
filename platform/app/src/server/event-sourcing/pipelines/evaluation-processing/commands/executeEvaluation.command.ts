@@ -121,7 +121,10 @@ const SCHEMA = defineCommandSchema(
  *
  * Sampling + preconditions + execution -> emits a single EvaluationReportedEvent.
  * Results are persisted to CH via the evaluationRun fold projection.
- * Deduped by traceId + evaluatorId (makeJobId), delayed 30s.
+ * One of the four commands whose *enqueue* is deduped: the pipeline wires
+ * `deduplication.makeId` to `makeJobId` below (30s ttl, matching the 30s
+ * delay). Every other key a command declares is an `idempotencyKey`, which
+ * collapses at the store and never suppresses a job.
  *
  * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
  */
@@ -151,6 +154,21 @@ export class ExecuteEvaluationCommand
     };
   }
 
+  /**
+   * The enqueue-dedup key, and the one `makeJobId` in the codebase that is
+   * actually read. It is not consulted by any framework machinery — it is a
+   * plain function two wiring sites bind as their `deduplication.makeId`:
+   *
+   *   - `evaluation-processing/pipeline.ts` (ttl 30s, matching the 30s delay)
+   *   - `trace-processing/process-manager/evaluationTriggerIntentHandlers.ts`
+   *     (per-dispatch override; ttl = the monitor's thread idle timeout, or
+   *     `EVALUATION_REQUEST_DEDUP_TTL_MS`)
+   *
+   * Both need the same key, and the thread-idle branch below is why it cannot
+   * be inlined at either: a monitor with a thread idle timeout collapses on
+   * the thread, everything else on the trace. Change this and both windows
+   * change together, which is the point.
+   */
   static makeJobId(payload: ExecuteEvaluationCommandData): string {
     if (
       payload.threadIdleTimeout &&
@@ -345,6 +363,14 @@ export class ExecuteEvaluationCommand
       if (result.status === "processed" && result.cost) {
         costId = await this.deps.costRecorder.recordCost({
           projectId: tenantId,
+          // The natural key that makes the write idempotent. This handler runs
+          // under at-least-once delivery, and a failure below this point
+          // re-runs it from the top; `evaluationId` is fixed in the command
+          // payload, so the retry lands on the same Cost row instead of
+          // billing twice. A genuine re-evaluation gets a fresh evaluationId
+          // from the `evaluationTrigger` process manager, whose
+          // `derivedEvaluationId` keys it by generation, and still bills.
+          evaluationId: data.evaluationId,
           isGuardrail: !!data.isGuardrail,
           evaluatorName: data.evaluatorName ?? data.evaluatorType,
           evaluatorId: data.evaluatorId,

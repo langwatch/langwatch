@@ -9,8 +9,6 @@ vi.mock("~/server/metrics", async (importOriginal) => {
     observeEsFoldProjectionDuration: vi.fn(),
     incrementEsFoldRefoldTotal: vi.fn(),
     incrementEsFoldDuplicateEventsSkipped: vi.fn(),
-    incrementEsReactorTotal: vi.fn(),
-    incrementEsReactorCollapsedTotal: vi.fn(),
   };
 });
 

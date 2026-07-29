@@ -1,4 +1,3 @@
-import type { ProcessRole } from "../../app-layer/config";
 import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
@@ -10,7 +9,6 @@ import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { EventSourcedQueueProcessor } from "../queues";
-import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { CommandHandlerOptions } from "../services/commands/commandDispatcher";
 import type { EventSourcingService } from "../services/eventSourcingService";
 import type { JobRegistryEntry } from "../services/queues/queueManager";
@@ -60,14 +58,6 @@ export interface EventSourcingPipelineDefinition<
   foldProjections?: FoldProjectionDefinition<any, EventType>[];
   stateProjections?: StateProjectionDefinition<any, EventType>[];
   mapProjections?: MapProjectionDefinition<any, EventType>[];
-  reactors?: Array<{
-    foldName: string;
-    definition: ReactorDefinition<EventType>;
-  }>;
-  mapReactors?: Array<{
-    mapName: string;
-    definition: ReactorDefinition<EventType>;
-  }>;
   subscribers?: EventSubscriberDefinition<EventType>[];
   globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   globalJobRegistry?: Map<string, JobRegistryEntry>;
@@ -78,7 +68,6 @@ export interface EventSourcingPipelineDefinition<
     options?: CommandHandlerOptions<unknown>;
   }>;
   globalRegistry?: ProjectionRegistry<Event>;
-  processRole?: ProcessRole;
   replayMarkerChecker?: ReplayMarkerChecker;
   retentionPolicyResolver?: RetentionPolicyResolver;
 }

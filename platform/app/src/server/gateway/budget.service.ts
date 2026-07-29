@@ -446,10 +446,10 @@ export class GatewayBudgetService {
   /**
    * Resolve the projectId that the ClickHouse client should be scoped to
    * when reading ledger events for `budget`. Tenant resolution mirrors the
-   * trace-fold reactor's logic: the events table is sharded on
-   * `TenantId = projectId` so only org/team/project/VK-scoped budgets
-   * have a meaningful tenant; principal-scoped budgets cross projects
-   * and we return null (no ledger lookup).
+   * `gatewayBudgetDebits` projection's write side: the events table is
+   * sharded on `TenantId = projectId` so only org/team/project/VK-scoped
+   * budgets have a meaningful tenant; principal-scoped budgets cross
+   * projects and we return null (no ledger lookup).
    */
   private async resolveTenantIdForBudget(
     budget: GatewayBudget,

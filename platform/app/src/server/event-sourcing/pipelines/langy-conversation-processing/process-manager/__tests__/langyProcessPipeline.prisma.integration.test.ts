@@ -1,30 +1,26 @@
 import { nanoid } from "nanoid";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "~/server/db";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import {
   OutboxDispatcherService,
   PrismaProcessStore,
   type ProcessRef,
 } from "~/server/event-sourcing/process-manager";
+import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+
 import {
   buildIntentHandlers,
   ProcessRuntime,
 } from "~/server/event-sourcing/process-manager/processRuntime";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
-import { langyConversationProcess } from "../langyConversationProcess";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   type LangyConversationProcessState,
 } from "../langyConversationProcess.types";
-import {
-  createStubLangyEffectPorts,
-  type LangyEffectPorts,
-} from "../langyEffectPorts";
+import { buildLangyProcessManager } from "./helpers/langyProcessHarness";
 import {
   agentRespondedEvent,
   agentTurnAcceptedEvent,
@@ -98,27 +94,16 @@ afterEach(async () => {
   await prisma.processManagerInstance.deleteMany({ where });
 });
 
-function buildLangyManager(ports: LangyEffectPorts) {
-  return buildProcessManager<LangyConversationProcessingEvent>({
-    name: LANGY_CONVERSATION_PROCESS_NAME,
-    applier: langyConversationProcess(ports),
-  });
-}
-
 describe("Langy process manager and outbox with Postgres", () => {
   it("commits each event once and dispatches its durable intents through typed stubs", async () => {
-    const { ports, calls } = createStubLangyEffectPorts();
-    const definition = buildLangyManager(ports);
+    const { definition, calls } = buildLangyProcessManager({ projectId });
     // The real production path: ProcessRuntime generates the
     // `pm:langyConversation` subscriber from the pipeline declaration.
     const runtime = new ProcessRuntime({ store, consumersEnabled: false });
-    const { subscribers } =
-      runtime.registerPipeline<LangyConversationProcessingEvent>({
-        pipelineName: "langy-conversation-processing",
-        processManagers: new Map([
-          [LANGY_CONVERSATION_PROCESS_NAME, definition],
-        ]),
-      });
+    const { subscribers } = runtime.registerPipeline<LangyConversationProcessingEvent>({
+      pipelineName: "langy-conversation-processing",
+      processManagers: new Map([[LANGY_CONVERSATION_PROCESS_NAME, definition]]),
+    });
     const subscriber = subscribers[0];
     if (!subscriber) throw new Error("runtime generated no subscriber");
     const events = lifecycle();
@@ -174,12 +159,7 @@ describe("Langy process manager and outbox with Postgres", () => {
     expect(report.retried).toEqual([]);
     expect(report.dead).toEqual([]);
     expect(calls.dispatchedTurns).toEqual([
-      {
-        projectId,
-        conversationId,
-        turnId,
-        resumeFromTurnId: null,
-      },
+      { projectId, conversationId, turnId },
     ]);
     expect(calls.titleRequests).toEqual([
       { projectId, conversationId, turnId },

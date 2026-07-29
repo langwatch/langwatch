@@ -1,6 +1,5 @@
 import { defineCommand } from "../../commands/defineCommand";
 import {
-  evaluationCompletedEventDataSchema,
   evaluationReportedEventDataSchema,
   evaluationStartedEventDataSchema,
 } from "./schemas/events";
@@ -26,22 +25,6 @@ export const StartEvaluationCommand = defineCommand({
     "payload.evaluator.type": d.evaluatorType,
     ...(d.traceId && { "payload.trace.id": d.traceId }),
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.evaluationId}:start`,
-});
-
-export const CompleteEvaluationCommand = defineCommand({
-  commandType: "lw.evaluation.complete",
-  eventType: "lw.evaluation.completed",
-  eventVersion: "2025-01-14",
-  aggregateType: "evaluation",
-  schema: evaluationCompletedEventDataSchema,
-  aggregateId: (d) => d.evaluationId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.evaluationId}:completed`,
-  spanAttributes: (d) => ({
-    "payload.evaluation.id": d.evaluationId,
-    "payload.status": d.status,
-  }),
-  makeJobId: (d) => `${d.tenantId}:${d.evaluationId}:complete`,
 });
 
 export const ReportEvaluationCommand = defineCommand({
@@ -58,5 +41,4 @@ export const ReportEvaluationCommand = defineCommand({
     "payload.evaluator.type": d.evaluatorType,
     "payload.status": d.status,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.evaluationId}:report`,
 });

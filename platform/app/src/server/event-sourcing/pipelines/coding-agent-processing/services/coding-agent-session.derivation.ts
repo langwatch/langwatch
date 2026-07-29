@@ -44,7 +44,7 @@ import type {
 /** Ordered steps we keep. Enough for the shape of any session to survive. */
 const MAX_STEPS = 100;
 /** Distinct values kept in any bounded set (files, tools, skills, servers). */
-export const MAX_SET = 50;
+const MAX_SET = 50;
 
 /**
  * The OTLP numeric status enum's ERROR value. NOT the string "error": PR
@@ -212,28 +212,6 @@ export function createInitCodingAgentSession(): CodingAgentSessionData {
     stopReason: null,
     truncated: false,
   };
-}
-
-/**
- * The mean time-to-first-token. Kept as a sum + count on the state rather than a
- * running average, because a running average cannot be folded incrementally
- * without drifting.
- */
-export function meanTtftMs(state: CodingAgentSessionData): number | null {
-  return state.ttftSamples > 0
-    ? Math.round(state.ttftMsTotal / state.ttftSamples)
-    : null;
-}
-
-/**
- * The share of input tokens served from cache. The single most useful number for
- * a coding agent's economics: a low hit rate on a long session means the context
- * prefix keeps changing and every turn is re-paying for it.
- */
-export function cacheHitRate(state: CodingAgentSessionData): number | null {
-  const total =
-    state.cacheReadTokens + state.cacheCreationTokens + state.inputTokens;
-  return total > 0 ? state.cacheReadTokens / total : null;
 }
 
 function str(value: unknown): string | null {
@@ -451,7 +429,7 @@ function foldModelCall(
 }
 
 /** The compact span view a span-facts contribution carries. */
-export interface SpanFactsView {
+interface SpanFactsView {
   name: string;
   startTimeUnixMs: number;
   endTimeUnixMs: number;
@@ -834,7 +812,7 @@ export function applyLogToCodingAgentSession({
 const MAX_METRIC_SERIES = 200;
 
 /** The compact view a metric-facts contribution carries. */
-export interface MetricFactsView {
+interface MetricFactsView {
   /** The converged unit's id — a series for cumulative, a point for delta. */
   seriesId: string;
   metricName: string;

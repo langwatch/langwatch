@@ -31,7 +31,6 @@ type AllTimestampKeys =
   | "UpdatedAt"
   | "createdAt"
   | "updatedAt"
-  | "LastEventOccurredAt"
   | "LastEventOccurredAt";
 
 /** Full derivation: `"lw.suite_run.started"` → `"handleSuiteRunStarted"` */

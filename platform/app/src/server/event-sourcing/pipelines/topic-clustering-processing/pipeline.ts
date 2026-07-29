@@ -20,8 +20,10 @@ import {
 } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
 
 import { definePipeline } from "../../";
+import type { CommandBus } from "../../commands/commandBus";
 import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
+import type { TopicClusteringRunPort } from "./process-manager/topicClusteringIntentHandlers";
 import {
   RecordClusteringRunCompletedCommand,
   RecordClusteringRunFailedCommand,
@@ -47,7 +49,11 @@ import type { TopicClusteringProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
- *  inline below, ADR-052 "Approved builder API", like automations. */
+ *  inline below, ADR-052 "Approved builder API", like automations.
+ *
+ *  ADR-082 Rule 1: the executor's dispatch bundle is built here, from the run
+ *  port and this pipeline's own commands, so nothing in this interface is a
+ *  value the builder registers and nothing has to be resolved after `.build()`. */
 export interface TopicClusteringProcessingPipelineDeps {
   /** Postgres run-status read model behind the settings page (ADR-051 §7). */
   topicClusteringRunStatusStore: StateProjectionStore<TopicClusteringRunStatusData>;
@@ -55,7 +61,10 @@ export interface TopicClusteringProcessingPipelineDeps {
   topicClusteringRunHistoryStore: StateProjectionStore<TopicClusteringRunHistoryData>;
   /** Write-through store for the topic model (the Topic table + cursor). */
   topicModelStore: StateProjectionStore<TopicModelData>;
-  dispatch: TopicClusteringDispatchDeps;
+  /** Runs one clustering page — the ADR-051 effect's domain function. */
+  runPort: TopicClusteringRunPort;
+  /** ADR-082 §5 — identity-keyed dispatch into this pipeline's own commands. */
+  commands: CommandBus;
 }
 
 /**
@@ -165,7 +174,23 @@ export function createTopicClusteringProcessingPipeline(
     })
     .withProcessManager(
       TOPIC_CLUSTERING_PROCESS_NAME,
-      topicClusteringPM(deps.dispatch),
+      topicClusteringPM({
+        runPort: deps.runPort,
+        // The run outcomes are this pipeline's own commands. The bus binds now
+        // and resolves by class identity at send time, so naming them here —
+        // mid-`.build()`, before the builder has registered them — is sound.
+        commands: {
+          recordClusteringRunStarted: deps.commands.port(
+            RecordClusteringRunStartedCommand,
+          ),
+          recordClusteringRunCompleted: deps.commands.port(
+            RecordClusteringRunCompletedCommand,
+          ),
+          recordClusteringRunFailed: deps.commands.port(
+            RecordClusteringRunFailedCommand,
+          ),
+        },
+      }),
     )
     .build();
 }

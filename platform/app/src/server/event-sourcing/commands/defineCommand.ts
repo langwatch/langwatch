@@ -12,16 +12,14 @@ import type { CommandHandlerClass } from "./commandHandlerClass";
 import { defineCommandSchema } from "./commandSchema";
 
 /**
- * Return type of defineCommand() — extends CommandHandlerClass with optional makeJobId.
+ * Return type of defineCommand().
  * Uses Event (base) for the event type parameter so commands are compatible with
  * any pipeline event union (covariant event type).
  */
 export type DefinedCommandClass<
   TCommandData,
   TCmdType extends CommandType,
-> = CommandHandlerClass<TCommandData, TCmdType, Event> & {
-  makeJobId?: (data: TCommandData) => string;
-};
+> = CommandHandlerClass<TCommandData, TCmdType, Event>;
 
 /**
  * Defines a pure command handler class from a Zod event data schema.
@@ -33,16 +31,29 @@ export type DefinedCommandClass<
  * Returns a class with a zero-arg constructor, satisfying queueManager's
  * `new handlerClass()` constraint.
  *
+ * `idempotencyKey` is the ONLY key a command declares, and it is a
+ * storage-level guarantee: the event store drops a second event carrying a key
+ * it has already appended, so a redelivered command is absorbed after the
+ * handler runs. It does not stop the job from being enqueued or handled.
+ *
+ * Suppressing the *enqueue* is a separate, opt-in decision that belongs to the
+ * pipeline wiring, not to the command: pass `deduplication: { makeId, ttlMs }`
+ * to `.withCommand(…)` / `.withCommandInstance(…)`. It needs a TTL and a
+ * squash policy, and whether collapsing two dispatches is correct depends on
+ * the queue's traffic — which the command cannot know. Four commands opt in
+ * today (`recordSpan`, `executeEvaluation`, `recordTopics`,
+ * `reportUsageForMonth`); every other command runs every job it is handed.
+ *
  * @example
  * ```typescript
- * export const StartSuiteRunCommand = defineCommand({
- *   commandType: "lw.suite_run.start",
- *   eventType: "lw.suite_run.started",
- *   eventVersion: "2026-03-01",
- *   aggregateType: "suite_run",
- *   schema: suiteRunStartedEventDataSchema,
- *   aggregateId: (d) => d.batchRunId,
- *   idempotencyKey: (d) => `${d.tenantId}:${d.batchRunId}:${d.idempotencyKey}`,
+ * export const QueueRunCommand = defineCommand({
+ *   commandType: "lw.simulation_run.queue",
+ *   eventType: "lw.simulation_run.queued",
+ *   eventVersion: "2026-03-08",
+ *   aggregateType: "simulation_run",
+ *   schema: simulationRunQueuedEventDataSchema,
+ *   aggregateId: (d) => d.scenarioRunId,
+ *   idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:queueRun`,
  * });
  * ```
  */
@@ -60,7 +71,6 @@ export function defineCommand<
   idempotencyKey,
   groupKey,
   spanAttributes,
-  makeJobId,
 }: {
   commandType: TCmdType;
   eventType: TEvtType;
@@ -73,7 +83,6 @@ export function defineCommand<
   spanAttributes?: (
     data: z.infer<TEventDataSchema> & CommandEnvelope,
   ) => Record<string, string | number | boolean>;
-  makeJobId?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
 }): DefinedCommandClass<z.infer<TEventDataSchema> & CommandEnvelope, TCmdType> {
   type CommandData = z.infer<TEventDataSchema> & CommandEnvelope;
 
@@ -94,9 +103,6 @@ export function defineCommand<
     static getSpanAttributes:
       | ((payload: CommandData) => Record<string, string | number | boolean>)
       | undefined = spanAttributes;
-
-    static makeJobId: ((payload: CommandData) => string) | undefined =
-      makeJobId;
 
     handle(command: Command<CommandData>): CommandHandlerResult<Event> {
       const { tenantId: tenantIdStr, data: commandData } = command;

@@ -4,14 +4,14 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExecutionJobData } from "../execution/execution-pool";
 import {
   buildOtelResourceAttributes,
   handleCancelledJobResult,
   handleFailedJobResult,
-  type ProcessorDependencies,
   parseChildProcessResult,
+  type ProcessorDependencies,
 } from "../scenario.processor";
+import type { ExecutionJobData } from "../execution/execution-pool";
 
 describe("parseChildProcessResult", () => {
   it("extracts the result line from stdout mixed with pino logs", () => {
@@ -36,9 +36,7 @@ describe("parseChildProcessResult", () => {
   });
 
   it("returns null when no result line is present", () => {
-    expect(
-      parseChildProcessResult('{"level":30,"msg":"only logs"}'),
-    ).toBeNull();
+    expect(parseChildProcessResult('{"level":30,"msg":"only logs"}')).toBeNull();
     expect(parseChildProcessResult("")).toBeNull();
     expect(parseChildProcessResult("not json at all")).toBeNull();
   });
@@ -90,9 +88,7 @@ describe("handleCancelledJobResult", () => {
   beforeEach(() => {
     mockDeps = {
       scenarioLookup: {
-        getById: vi
-          .fn()
-          .mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
+        getById: vi.fn().mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
       },
       failureEmitter: {
         ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined),
@@ -100,20 +96,18 @@ describe("handleCancelledJobResult", () => {
     };
   });
 
-  it("passes cancelled: true to failure emitter", async () => {
+  it("tells the failure emitter the run was cancelled", async () => {
     await handleCancelledJobResult(baseJobData, "Job was cancelled", mockDeps);
 
-    expect(
-      mockDeps.failureEmitter.ensureFailureEventsEmitted,
-    ).toHaveBeenCalledWith(expect.objectContaining({ cancelled: true }));
+    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "cancelled" }),
+    );
   });
 
   it("includes scenario name and description from lookup", async () => {
     await handleCancelledJobResult(baseJobData, "Job was cancelled", mockDeps);
 
-    expect(
-      mockDeps.failureEmitter.ensureFailureEventsEmitted,
-    ).toHaveBeenCalledWith(
+    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "Test Scenario",
         description: "A test",
@@ -124,9 +118,7 @@ describe("handleCancelledJobResult", () => {
   it("defaults error message to 'Cancelled by user' when none provided", async () => {
     await handleCancelledJobResult(baseJobData, undefined, mockDeps);
 
-    expect(
-      mockDeps.failureEmitter.ensureFailureEventsEmitted,
-    ).toHaveBeenCalledWith(
+    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
       expect.objectContaining({ error: "Cancelled by user" }),
     );
   });
@@ -146,9 +138,7 @@ describe("handleFailedJobResult", () => {
   beforeEach(() => {
     mockDeps = {
       scenarioLookup: {
-        getById: vi
-          .fn()
-          .mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
+        getById: vi.fn().mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
       },
       failureEmitter: {
         ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined),
@@ -159,11 +149,7 @@ describe("handleFailedJobResult", () => {
   it("does not pass cancelled flag to failure emitter", async () => {
     await handleFailedJobResult(baseJobData, "Child process exited", mockDeps);
 
-    const params = (
-      mockDeps.failureEmitter.ensureFailureEventsEmitted as ReturnType<
-        typeof vi.fn
-      >
-    ).mock.calls[0]?.[0];
+    const params = (mockDeps.failureEmitter.ensureFailureEventsEmitted as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(params.cancelled).toBeUndefined();
   });
 });

@@ -30,5 +30,4 @@ export const ChangeTraceNameCommand = defineCommand({
     "payload.new_name.length": d.newName.length,
     "payload.changed_by_user_id": d.changedByUserId ?? "",
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.traceId}:change_trace_name`,
 });

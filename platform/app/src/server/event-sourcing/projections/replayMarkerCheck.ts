@@ -22,7 +22,7 @@ export class ReplayDeferralError extends RecoverableError {
 }
 
 /** Outcome of a replay marker check. */
-export type ReplayMarkerDecision = "process" | "skip";
+type ReplayMarkerDecision = "process" | "skip";
 
 /**
  * Interface for checking replay markers. Implementations determine
@@ -113,19 +113,6 @@ export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
         : "process";
     }
 
-    return "process";
-  }
-}
-
-/**
- * No-op implementation for tests and local development where no replay
- * coordination is needed. Always allows events through.
- */
-export class NoopReplayMarkerChecker implements ReplayMarkerChecker {
-  async check(
-    _projectionName: string,
-    _event: Event,
-  ): Promise<ReplayMarkerDecision> {
     return "process";
   }
 }

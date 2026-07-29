@@ -29,8 +29,6 @@ export const AddAnnotationCommand = defineCommand({
     "payload.trace.id": d.traceId,
     "payload.annotation.id": d.annotationId,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
 });
 
 export const RemoveAnnotationCommand = defineCommand({
@@ -46,8 +44,6 @@ export const RemoveAnnotationCommand = defineCommand({
     "payload.trace.id": d.traceId,
     "payload.annotation.id": d.annotationId,
   }),
-  makeJobId: (d) =>
-    `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
 });
 
 export const BulkSyncAnnotationsCommand = defineCommand({
@@ -62,5 +58,4 @@ export const BulkSyncAnnotationsCommand = defineCommand({
     "payload.trace.id": d.traceId,
     "payload.annotation.count": d.annotationIds.length,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.traceId}:bulk_sync_annotations`,
 });

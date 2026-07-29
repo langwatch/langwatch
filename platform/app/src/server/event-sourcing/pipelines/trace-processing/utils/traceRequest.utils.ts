@@ -17,19 +17,19 @@ const TRACE_FLAGS_MASK = 0xff as const; // bits 0–7
 const TRACE_FLAGS_IS_REMOTE_MASK = 1 << 8; // bit 8
 const TRACE_FLAGS_HAS_IS_REMOTE_MASK = 1 << 9; // bit 9
 
-export type TraceFlagsInfo = {
+type TraceFlagsInfo = {
   sampled: boolean | null; // only meaningful if not null
   remote: boolean | null; // only meaningful if not null
 };
 
-export type ParentContext = {
+type ParentContext = {
   traceId: string | null;
   spanId: string | null;
   isRemote: boolean | null;
   isSampled: boolean | null;
 };
 
-export type TraceStateInfo = {
+type TraceStateInfo = {
   version: string | null;
   versionFormat: string | null;
   traceId: string | null;
@@ -62,25 +62,30 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
       v.arrayValue.values.map((item) => scalar(item) ?? item),
     );
   }
-  if ("bytesValue" in v && v.bytesValue) {
+  // Every branch below guards on presence (`!= null`), never truthiness: 0,
+  // 0.0, false and "" are all legitimate reported values, and a truthiness
+  // guard would drop them here and make them indistinguishable downstream from
+  // an attribute that was never reported at all.
+  if ("bytesValue" in v && v.bytesValue != null) {
     if (typeof v.bytesValue === "string") {
       return Buffer.from(v.bytesValue, "base64");
     }
     return v.bytesValue;
   }
-  if ("boolValue" in v && v.boolValue !== null) {
+  if ("boolValue" in v && v.boolValue != null) {
     if (typeof v.boolValue === "string") {
       return (v.boolValue as string).toLowerCase() === "true";
     }
     return v.boolValue;
   }
-  if ("intValue" in v && v.intValue) {
+  if ("intValue" in v && v.intValue != null) {
     if (typeof v.intValue === "string") {
-      return parseInt(v.intValue, 10);
+      const parsed = parseInt(v.intValue, 10);
+
+      return Number.isNaN(parsed) ? void 0 : parsed;
     }
     if (
       typeof v.intValue === "object" &&
-      v.intValue !== null &&
       "high" in v.intValue &&
       "low" in v.intValue
     ) {
@@ -90,9 +95,11 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     }
     return v.intValue;
   }
-  if ("doubleValue" in v && v.doubleValue) {
+  if ("doubleValue" in v && v.doubleValue != null) {
     if (typeof v.doubleValue === "string") {
-      return parseFloat(v.doubleValue);
+      const parsed = parseFloat(v.doubleValue);
+
+      return Number.isNaN(parsed) ? void 0 : parsed;
     }
     return v.doubleValue;
   }

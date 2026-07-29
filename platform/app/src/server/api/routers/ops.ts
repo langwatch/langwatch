@@ -14,10 +14,12 @@ import {
   TABLE_TTL_CONFIG,
 } from "~/server/clickhouse/ttlReconciler";
 import {
+  collapseKillSwitchDescriptorsByKey,
+  describeKillSwitchMounts,
   getEventSubscriberMetadata,
   getKillSwitchDescriptors,
   getProjectionMetadata,
-} from "~/server/event-sourcing/pipelineRegistry";
+} from "~/server/event-sourcing/introspection";
 import {
   getFeatureFlagStore,
   listFeatureFlagFamilies,
@@ -781,25 +783,31 @@ export const opsRouter = createTRPCRouter({
       // Merge: combine generated descriptors with any postgres rows
       // that don't have an explicit registry entry. Postgres value wins
       // the row but the descriptor provides the metadata.
+      //
+      // Collapsed by key first — descriptors are one-per-mount, but a switch is
+      // one control. See `collapseKillSwitchDescriptorsByKey`.
       const familyKeysSeen = new Set<string>();
-      const familyRows = generatedKillSwitches.map((desc) => {
-        familyKeysSeen.add(desc.key);
-        const row = stored.find((s) => s.key === desc.key);
-        const def = resolveFlagDefinition(desc.key);
-        const envOverride = checkFlagEnvOverride(desc.key, def?.legacyEnvVar);
+      const familyRows = collapseKillSwitchDescriptorsByKey(
+        generatedKillSwitches,
+      ).map(({ key, mounts: mountDescriptors }) => {
+        familyKeysSeen.add(key);
+        const row = stored.find((s) => s.key === key);
+        const def = resolveFlagDefinition(key);
+        const envOverride = checkFlagEnvOverride(key, def?.legacyEnvVar);
         const effective = resolveEffectiveForListing({
           envOverride: envOverride ?? null,
           rules: row?.rules ?? [],
           rowEnabled: row?.enabled ?? null,
           registryDefault: def?.defaultValue ?? false,
         });
+        const mounts = describeKillSwitchMounts(mountDescriptors);
         return {
-          key: desc.key,
+          key,
           scope: def?.scope ?? "SYSTEM",
           defaultValue: def?.defaultValue ?? false,
           description: def?.description
-            ? `${def.description} (${desc.pipelineName}: ${desc.componentType} ${desc.componentName})`
-            : `Pipeline ${desc.pipelineName} ${desc.componentType} ${desc.componentName}.`,
+            ? `${def.description} (${mounts})`
+            : `Pipeline ${mounts}.`,
           family: def?.family ?? null,
           storedValue: row?.enabled ?? null,
           rules: row?.rules ?? [],

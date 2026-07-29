@@ -50,9 +50,9 @@ const SEVERITY_OPTIONS: Array<{
   { value: "info", label: "Info", tone: "blue" },
 ];
 
-// Reactor evaluates organization / source_type / source today; team and
-// project are persisted but skipped at evaluation time, so they're held
-// back from the composer until the reactor adds them. See
+// SpendSpikeAnomalyEvaluator evaluates organization / source_type / source
+// today; team and project are persisted but skipped at evaluation time, so
+// they're held back from the composer until the evaluator adds them. See
 // docs/ai-gateway/governance/anomaly-rules.mdx scope coverage table.
 const SCOPE_OPTIONS: Array<{ value: Scope; label: string }> = [
   { value: "organization", label: "Organization" },
@@ -60,8 +60,9 @@ const SCOPE_OPTIONS: Array<{ value: Scope; label: string }> = [
   { value: "source", label: "Specific ingestion source" },
 ];
 
-// Only spend_spike is wired to the anomaly reactor today; the other rule
-// types accept persistence but the reactor logs debug + skips them. The
+// Only spend_spike has a wired evaluator today; the other rule types accept
+// persistence but the evaluation tick never selects them — the evaluator
+// queries `ruleType: "spend_spike"` and nothing else. The
 // composer offers only the live type — admins typing a custom value can
 // still override (the field stays freeform), but autocomplete won't
 // promise something the runtime doesn't deliver. Doc page lists the full
@@ -647,8 +648,8 @@ function RuleComposer({
                       ruleType: nextRuleType,
                       // Auto-fill the threshold template when the user picks
                       // spend_spike from a blank composer — saves them
-                      // grepping the reactor for the schema. If they've
-                      // already customised the JSON, leave it alone.
+                      // grepping thresholdConfig.schema.ts for the shape.
+                      // If they've already customised the JSON, leave it alone.
                       thresholdConfig:
                         nextRuleType === "spend_spike" &&
                         (composer.thresholdConfig.trim() === "" ||
@@ -665,8 +666,8 @@ function RuleComposer({
                   ))}
                 </datalist>
                 <Text fontSize="xs" color="fg.muted">
-                  Only <code>spend_spike</code> is evaluated by the anomaly
-                  reactor today. Other rule types (<code>rate_limit</code>,
+                  Only <code>spend_spike</code> is evaluated today. Other rule
+                  types (<code>rate_limit</code>,
                   <code>after_hours</code>, …) are{" "}
                   <Link
                     href="/ai-gateway/governance/anomaly-rules"

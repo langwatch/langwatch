@@ -10,9 +10,9 @@
  * inputs are written once to the content-addressed stored-objects service and
  * the payload carries a bounded marker: a small, valid JSON object that
  * references the durable object plus a preview. Reads at API boundaries
- * resolve the marker back to the full inputs transparently; folds and
- * reactors receive the marker opaquely so the fat payload never re-inlines
- * on a fold re-write.
+ * resolve the marker back to the full inputs transparently; folds,
+ * projections and subscribers receive the marker opaquely so the fat payload
+ * never re-inlines on a fold re-write.
  *
  * This mirrors the trace blob-offload pattern (ADR-022) but stores the
  * content in a DURABLE object rather than a transient spool, because here

@@ -74,6 +74,7 @@ export const APP_ERROR_CODES = [
   // code for an unhandled failure, so the scan sees it here too.
   "internal_error",
   "invalid_action_params",
+  "invalid_annotator_reference",
   "invalid_email_recipient",
   "invalid_experiment_configuration",
   "langy_agent_at_capacity",

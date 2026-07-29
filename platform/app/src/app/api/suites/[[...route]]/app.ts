@@ -2,10 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import type { SimulationSuite } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
+import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
-import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { ProjectRepository } from "~/server/projects/project.repository";
@@ -61,7 +61,14 @@ const updateSuiteInputSchema = z.object({
 });
 
 const runSuiteInputSchema = z.object({
-  idempotencyKey: z.string().optional(),
+  // Bounded because it is load-bearing, not decorative: the key feeds the
+  // SHA-256 that DERIVES the batch and run ids (`scenario.ids.ts`).
+  // `.min(1)` because the downstream check is a truthiness test — an empty
+  // string is silently treated as "no key given" and the submit mints random
+  // ids, so a caller who believed they had opted into an idempotent retry
+  // gets a second run instead of a 400. `.max(255)` bounds what an
+  // authenticated caller can make us hash.
+  idempotencyKey: z.string().min(1).max(255).optional(),
 });
 
 const suiteRunResultSchema = z.object({
@@ -73,14 +80,12 @@ const suiteRunResultSchema = z.object({
     scenarios: z.array(z.string()),
     targets: z.array(z.string()),
   }),
-  items: z.array(
-    z.object({
-      scenarioRunId: z.string(),
-      scenarioId: z.string(),
-      target: suiteTargetSchema,
-      name: z.string().nullable(),
-    }),
-  ),
+  items: z.array(z.object({
+    scenarioRunId: z.string(),
+    scenarioId: z.string(),
+    target: suiteTargetSchema,
+    name: z.string().nullable(),
+  })),
 });
 
 function toSuiteResponse(suite: SimulationSuite) {
@@ -115,84 +120,82 @@ const secured = createProjectApp({ basePath: "/api/suites" });
 
 // ── List Suites ────────────────────────────────────────────
 secured.access(requires("scenarios:view")).get(
-  "/",
-  describeRoute({
-    description: "List all non-archived suites (run plans) for the project",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(z.array(suiteResponseWithPlatformUrlSchema)),
+    "/",
+    describeRoute({
+      description: "List all non-archived suites (run plans) for the project",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(z.array(suiteResponseWithPlatformUrlSchema)),
+            },
           },
         },
       },
-    },
-  }),
-  async (c) => {
-    const project = c.get("project");
-    logger.info({ projectId: project.id }, "Listing suites");
+    }),
+    async (c) => {
+      const project = c.get("project");
+      logger.info({ projectId: project.id }, "Listing suites");
 
-    const service = createService();
-    const suites = await service.getAll({ projectId: project.id });
+      const service = createService();
+      const suites = await service.getAll({ projectId: project.id });
 
-    return c.json(
-      suites.map((s) => ({
+      return c.json(suites.map((s) => ({
         ...toSuiteResponse(s),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/simulations/run-plans/${s.slug}`,
         }),
-      })),
-    );
-  },
-);
+      })));
+    },
+  );
 
 // ── Get Suite ──────────────────────────────────────────────
 secured.access(requires("scenarios:view")).get(
-  "/:id",
-  describeRoute({
-    description: "Get a suite (run plan) by its ID",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(suiteResponseWithPlatformUrlSchema),
+    "/:id",
+    describeRoute({
+      description: "Get a suite (run plan) by its ID",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
+            },
+          },
+        },
+        404: {
+          description: "Suite not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      404: {
-        description: "Suite not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
+    }),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      logger.info({ projectId: project.id, suiteId: id }, "Getting suite");
+
+      const service = createService();
+      const suite = await service.getById({ id, projectId: project.id });
+
+      if (!suite) {
+        return c.json({ error: "Suite not found" }, 404);
+      }
+
+      return c.json({
+        ...toSuiteResponse(suite),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/simulations/run-plans/${suite.slug}`,
+        }),
+      });
     },
-  }),
-  async (c) => {
-    const project = c.get("project");
-    const { id } = c.req.param();
-    logger.info({ projectId: project.id, suiteId: id }, "Getting suite");
-
-    const service = createService();
-    const suite = await service.getById({ id, projectId: project.id });
-
-    if (!suite) {
-      return c.json({ error: "Suite not found" }, 404);
-    }
-
-    return c.json({
-      ...toSuiteResponse(suite),
-      platformUrl: platformUrl({
-        projectSlug: project.slug,
-        path: `/simulations/run-plans/${suite.slug}`,
-      }),
-    });
-  },
-);
+  );
 
 // ── Create Suite ───────────────────────────────────────────
 // Creating a run plan asks for `scenarios:create`, not `scenarios:manage`.
@@ -202,158 +205,152 @@ secured.access(requires("scenarios:view")).get(
 // honoured instead of refused at the door. A viewer holds only `scenarios:view`
 // and is declined exactly as before.
 secured.access(requires("scenarios:create")).post(
-  "/",
-  resourceLimitMiddleware("experiments"),
-  describeRoute({
-    description: "Create a new suite (run plan)",
-    responses: {
-      ...baseResponses,
-      201: {
-        description: "Suite created",
-        content: {
-          "application/json": {
-            schema: resolver(suiteResponseWithPlatformUrlSchema),
+    "/",
+    resourceLimitMiddleware("experiments"),
+    describeRoute({
+      description: "Create a new suite (run plan)",
+      responses: {
+        ...baseResponses,
+        201: {
+          description: "Suite created",
+          content: {
+            "application/json": {
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
+            },
           },
         },
       },
-    },
-  }),
-  zValidator("json", createSuiteInputSchema),
-  async (c) => {
-    const project = c.get("project");
-    const body = c.req.valid("json");
-    logger.info({ projectId: project.id }, "Creating suite");
+    }),
+    zValidator("json", createSuiteInputSchema),
+    async (c) => {
+      const project = c.get("project");
+      const body = c.req.valid("json");
+      logger.info({ projectId: project.id }, "Creating suite");
 
-    const service = createService();
-    try {
-      const suite = await service.create({
-        ...body,
-        projectId: project.id,
-      });
-      return c.json(
-        {
+      const service = createService();
+      try {
+        const suite = await service.create({
+          ...body,
+          projectId: project.id,
+        });
+        return c.json({
           ...toSuiteResponse(suite),
           platformUrl: platformUrl({
             projectSlug: project.slug,
             path: `/simulations/run-plans/${suite.slug}`,
           }),
-        },
-        201,
-      );
-    } catch (error) {
-      if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
+        }, 201);
+      } catch (error) {
+        if (error instanceof SuiteDomainError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
       }
-      throw error;
-    }
-  },
-);
+    },
+  );
 
 // ── Update Suite ───────────────────────────────────────────
 // `:update` for the same reason as `:create` above.
 secured.access(requires("scenarios:update")).patch(
-  "/:id",
-  describeRoute({
-    description: "Update a suite (run plan)",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Suite updated",
-        content: {
-          "application/json": {
-            schema: resolver(suiteResponseWithPlatformUrlSchema),
+    "/:id",
+    describeRoute({
+      description: "Update a suite (run plan)",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Suite updated",
+          content: {
+            "application/json": {
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
+            },
+          },
+        },
+        404: {
+          description: "Suite not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      404: {
-        description: "Suite not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  zValidator("json", updateSuiteInputSchema),
-  async (c) => {
-    const project = c.get("project");
-    const { id } = c.req.param();
-    const body = c.req.valid("json");
-    logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
+    }),
+    zValidator("json", updateSuiteInputSchema),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const body = c.req.valid("json");
+      logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
 
-    const service = createService();
-    try {
-      const suite = await service.update({
-        id,
-        projectId: project.id,
-        data: body,
-      });
-      return c.json({
-        ...toSuiteResponse(suite),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${suite.slug}`,
-        }),
-      });
-    } catch (error) {
-      if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
+      const service = createService();
+      try {
+        const suite = await service.update({
+          id,
+          projectId: project.id,
+          data: body,
+        });
+        return c.json({
+          ...toSuiteResponse(suite),
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/simulations/run-plans/${suite.slug}`,
+          }),
+        });
+      } catch (error) {
+        if (error instanceof SuiteDomainError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
       }
-      throw error;
-    }
-  },
-);
+    },
+  );
 
 // ── Duplicate Suite ────────────────────────────────────────
 // A duplicate is a create: it leaves the source suite untouched and produces a
 // new one, so it asks for `scenarios:create`.
 secured.access(requires("scenarios:create")).post(
-  "/:id/duplicate",
-  describeRoute({
-    description: "Duplicate a suite (run plan)",
-    responses: {
-      ...baseResponses,
-      201: {
-        description: "Suite duplicated",
-        content: {
-          "application/json": {
-            schema: resolver(suiteResponseWithPlatformUrlSchema),
+    "/:id/duplicate",
+    describeRoute({
+      description: "Duplicate a suite (run plan)",
+      responses: {
+        ...baseResponses,
+        201: {
+          description: "Suite duplicated",
+          content: {
+            "application/json": {
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
+            },
+          },
+        },
+        404: {
+          description: "Suite not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      404: {
-        description: "Suite not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  async (c) => {
-    const project = c.get("project");
-    const { id } = c.req.param();
-    logger.info({ projectId: project.id, suiteId: id }, "Duplicating suite");
+    }),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      logger.info({ projectId: project.id, suiteId: id }, "Duplicating suite");
 
-    const service = createService();
-    try {
-      const suite = await service.duplicate({ id, projectId: project.id });
-      return c.json(
-        {
+      const service = createService();
+      try {
+        const suite = await service.duplicate({ id, projectId: project.id });
+        return c.json({
           ...toSuiteResponse(suite),
           platformUrl: platformUrl({
             projectSlug: project.slug,
             path: `/simulations/run-plans/${suite.slug}`,
           }),
-        },
-        201,
-      );
-    } catch (error) {
-      if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 404);
+        }, 201);
+      } catch (error) {
+        if (error instanceof SuiteDomainError) {
+          return c.json({ error: error.message }, 404);
+        }
+        throw error;
       }
-      throw error;
-    }
-  },
-);
+    },
+  );
 
 // ── Run Suite ──────────────────────────────────────────────
 // RUNNING A SUITE IS NOT ADMINISTERING IT. The run creates scenario runs; the
@@ -365,115 +362,112 @@ secured.access(requires("scenarios:create")).post(
 // so nobody who could run a suite yesterday loses that today, and a viewer is
 // declined as before.
 secured.access(requires("scenarios:create")).post(
-  "/:id/run",
-  describeRoute({
-    description:
-      "Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Suite run scheduled",
-        content: {
-          "application/json": {
-            schema: resolver(suiteRunResultSchema),
+    "/:id/run",
+    describeRoute({
+      description: "Trigger a suite run. Schedules scenario executions for all active scenarios × targets × repeatCount.",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Suite run scheduled",
+          content: {
+            "application/json": {
+              schema: resolver(suiteRunResultSchema),
+            },
+          },
+        },
+        404: {
+          description: "Suite not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      404: {
-        description: "Suite not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  zValidator("json", runSuiteInputSchema),
-  async (c) => {
-    const project = c.get("project");
-    const { id } = c.req.param();
-    const body = c.req.valid("json");
-    logger.info({ projectId: project.id, suiteId: id }, "Running suite");
+    }),
+    zValidator("json", runSuiteInputSchema),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const body = c.req.valid("json");
+      logger.info({ projectId: project.id, suiteId: id }, "Running suite");
 
-    const service = createService();
-    const suite = await service.getById({ id, projectId: project.id });
+      const service = createService();
+      const suite = await service.getById({ id, projectId: project.id });
 
-    if (!suite) {
-      return c.json({ error: "Suite not found" }, 404);
-    }
-
-    const projectRepository = new ProjectRepository(prisma);
-    const organizationId = await projectRepository.getOrganizationId({
-      projectId: project.id,
-    });
-    if (!organizationId) {
-      return c.json({ error: "Organization not found for project" }, 404);
-    }
-
-    try {
-      const idempotencyKey =
-        body.idempotencyKey ??
-        `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const result = await service.run({
-        suite,
-        projectId: project.id,
-        organizationId,
-        idempotencyKey,
-      });
-
-      return c.json({
-        scheduled: true,
-        ...result,
-      });
-    } catch (error) {
-      if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
+      if (!suite) {
+        return c.json({ error: "Suite not found" }, 404);
       }
-      throw error;
-    }
-  },
-);
+
+      const projectRepository = new ProjectRepository(prisma);
+      const organizationId = await projectRepository.getOrganizationId({
+        projectId: project.id,
+      });
+      if (!organizationId) {
+        return c.json({ error: "Organization not found for project" }, 404);
+      }
+
+      try {
+        // Passed through as-is: a fabricated default would make every submit
+        // look keyed while none of them deduplicated. Supplying a key is what
+        // opts a caller into an idempotent retry.
+        const result = await service.run({
+          suite,
+          projectId: project.id,
+          organizationId,
+          idempotencyKey: body.idempotencyKey,
+        });
+
+        return c.json({
+          scheduled: true,
+          ...result,
+        });
+      } catch (error) {
+        if (error instanceof SuiteDomainError) {
+          return c.json({ error: error.message }, 400);
+        }
+        throw error;
+      }
+    },
+  );
 
 // ── Delete (Archive) Suite ─────────────────────────────────
 // Archiving deliberately stays at `:manage` — it is the only grain that carries
 // destruction, and a credential scoped to read-and-write must not inherit it.
 secured.access(requires("scenarios:manage")).delete(
-  "/:id",
-  describeRoute({
-    description: "Archive (soft-delete) a suite (run plan)",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Suite archived",
-        content: {
-          "application/json": {
-            schema: resolver(
-              z.object({ id: z.string(), archived: z.boolean() }),
-            ),
+    "/:id",
+    describeRoute({
+      description: "Archive (soft-delete) a suite (run plan)",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Suite archived",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ id: z.string(), archived: z.boolean() })),
+            },
+          },
+        },
+        404: {
+          description: "Suite not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      404: {
-        description: "Suite not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
+    }),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      logger.info({ projectId: project.id, suiteId: id }, "Archiving suite");
+
+      const service = createService();
+      const result = await service.archive({ id, projectId: project.id });
+
+      if (!result) {
+        return c.json({ error: "Suite not found" }, 404);
+      }
+
+      return c.json({ id, archived: true });
     },
-  }),
-  async (c) => {
-    const project = c.get("project");
-    const { id } = c.req.param();
-    logger.info({ projectId: project.id, suiteId: id }, "Archiving suite");
-
-    const service = createService();
-    const result = await service.archive({ id, projectId: project.id });
-
-    if (!result) {
-      return c.json({ error: "Suite not found" }, 404);
-    }
-
-    return c.json({ id, archived: true });
-  },
-);
+  );
 
 export const app = secured.hono;

@@ -1,5 +1,4 @@
 import type { z } from "zod";
-import type { ScenarioRunStatus } from "./scenario-event.enums";
 import type {
   runDataSchema,
   scenarioBatchSchema,
@@ -7,13 +6,14 @@ import type {
   scenarioMessageSnapshotSchema,
   scenarioRunFinishedSchema,
   scenarioRunStartedSchema,
-  scenarioTextMessageContentSchema,
-  scenarioTextMessageEndSchema,
   scenarioTextMessageStartSchema,
+  scenarioTextMessageEndSchema,
+  scenarioTextMessageContentSchema,
+  scenarioToolCallStartSchema,
   scenarioToolCallArgsSchema,
   scenarioToolCallEndSchema,
-  scenarioToolCallStartSchema,
 } from "./schemas";
+import type { ScenarioRunStatus } from "./scenario-event.enums";
 
 // Type exports
 export type ScenarioRunStartedEvent = z.infer<typeof scenarioRunStartedSchema>;
@@ -23,24 +23,12 @@ export type ScenarioRunFinishedEvent = z.infer<
 export type ScenarioMessageSnapshotEvent = z.infer<
   typeof scenarioMessageSnapshotSchema
 >;
-export type ScenarioTextMessageStartEvent = z.infer<
-  typeof scenarioTextMessageStartSchema
->;
-export type ScenarioTextMessageEndEvent = z.infer<
-  typeof scenarioTextMessageEndSchema
->;
-export type ScenarioTextMessageContentEvent = z.infer<
-  typeof scenarioTextMessageContentSchema
->;
-export type ScenarioToolCallStartEvent = z.infer<
-  typeof scenarioToolCallStartSchema
->;
-export type ScenarioToolCallArgsEvent = z.infer<
-  typeof scenarioToolCallArgsSchema
->;
-export type ScenarioToolCallEndEvent = z.infer<
-  typeof scenarioToolCallEndSchema
->;
+export type ScenarioTextMessageStartEvent = z.infer<typeof scenarioTextMessageStartSchema>;
+export type ScenarioTextMessageEndEvent = z.infer<typeof scenarioTextMessageEndSchema>;
+export type ScenarioTextMessageContentEvent = z.infer<typeof scenarioTextMessageContentSchema>;
+export type ScenarioToolCallStartEvent = z.infer<typeof scenarioToolCallStartSchema>;
+export type ScenarioToolCallArgsEvent = z.infer<typeof scenarioToolCallArgsSchema>;
+export type ScenarioToolCallEndEvent = z.infer<typeof scenarioToolCallEndSchema>;
 export type ScenarioEvent = z.infer<typeof scenarioEventSchema>;
 export type ScenarioBatch = z.infer<typeof scenarioBatchSchema>;
 export type ScenarioRunData = z.infer<typeof runDataSchema>;
@@ -72,14 +60,24 @@ export type BatchHistoryItemRun = {
 export type BatchHistoryItem = {
   batchRunId: string;
   totalCount: number;
-  passCount: number; // SUCCESS
-  failCount: number; // FAILED | FAILURE | ERROR | CANCELLED
+  /**
+   * How many runs the batch set out to queue (ADR-072), carried on each child
+   * row. Equal to `totalCount` for a fully dispatched batch, and larger when
+   * some of the fan-out never reached the queue — which is the difference
+   * between "this batch is five runs" and "this batch lost one".
+   *
+   * Falls back to `totalCount` for batches queued before the denominator was
+   * recorded, so history never shows a zero total.
+   */
+  expectedCount: number;
+  passCount: number;    // SUCCESS
+  failCount: number;    // FAILED | FAILURE | ERROR | CANCELLED
   runningCount: number; // IN_PROGRESS | PENDING
   stalledCount: number; // STALLED
-  lastRunAt: number; // max CreatedAt (display / sort)
+  lastRunAt: number;    // max CreatedAt (display / sort)
   lastUpdatedAt: number; // max UpdatedAt (cache comparison key)
   firstCompletedAt: number | null; // earliest completion timestamp
-  allCompletedAt: number | null; // latest non-stalled/running completion timestamp
+  allCompletedAt: number | null;   // latest non-stalled/running completion timestamp
   items: BatchHistoryItemRun[];
 };
 
@@ -88,7 +86,7 @@ export type BatchHistoryResult = {
   nextCursor?: string;
   hasMore: boolean;
   lastUpdatedAt: number; // max across all returned batches
-  totalCount: number; // total distinct batch runs for this scenario set
+  totalCount: number;    // total distinct batch runs for this scenario set
 };
 
 /** Return type for the conditional getBatchRunData. */

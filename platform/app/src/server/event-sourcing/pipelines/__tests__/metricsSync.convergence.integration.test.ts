@@ -19,6 +19,7 @@ import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repos
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { AggregateType } from "../../";
 import { definePipeline } from "../../";
 import { getTestClickHouseClient } from "../../__tests__/integration/testContainers";
@@ -142,12 +143,6 @@ describe.skipIf(!hasTestcontainers)(
         ).repository,
       );
 
-      const noopReactor = {
-        name: "noop",
-        options: {},
-        handle: async () => {},
-      };
-
       const pipelineName = `trace_role_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const pipelineDef = definePipeline<TraceProcessingEvent>()
         .withName(pipelineName)
@@ -160,16 +155,6 @@ describe.skipIf(!hasTestcontainers)(
           "spanStorage",
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withReactor("traceSummary", "evaluationTrigger", noopReactor as any)
-        .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
-        .withReactor("traceSummary", "traceUpdateBroadcast", noopReactor as any)
-        .withReactor(
-          "traceSummary",
-          "simulationMetricsSync",
-          noopReactor as any,
-        )
-        .withReactor("traceSummary", "projectMetadata", noopReactor as any)
-        .withReactor("spanStorage", "spanStorageBroadcast", noopReactor as any)
         .withCommand("recordSpan", TestRecordSpanCommand as any)
         .withCommand("assignTopic", AssignTopicCommand as any)
         .build();
@@ -374,8 +359,8 @@ describe.skipIf(!hasTestcontainers)(
             spanCostService: new SpanCostService(),
           });
 
-        expect(scenarioRoleCosts.Agent).toBeGreaterThan(0);
-        expect(scenarioRoleLatencies.Agent).toBe(4000);
+        expect(scenarioRoleCosts["Agent"]).toBeGreaterThan(0);
+        expect(scenarioRoleLatencies["Agent"]).toBe(4000);
       }, 60_000);
     });
   },

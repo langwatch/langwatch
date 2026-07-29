@@ -1,24 +1,17 @@
 /**
  * Unit tests for ScenarioExecutionPool.
- * @see specs/scenarios/event-driven-execution-prep.feature
+ *
+ * The pool is a registry of live children, not a queue: pending work is an
+ * outbox row and concurrency is the dispatcher's (ADR-073 step 2). What is
+ * left to test is what cancellation depends on.
+ *
+ * @see specs/scenarios/scenario-execution-process-manager.feature
  */
 
 import type { ChildProcess } from "child_process";
 import { EventEmitter } from "events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ExecutionJobData } from "../execution-pool";
 import { ScenarioExecutionPool } from "../execution-pool";
-
-function makeJob(id: string): ExecutionJobData {
-  return {
-    projectId: "proj-1",
-    scenarioId: "scen-1",
-    scenarioRunId: id,
-    batchRunId: "batch-1",
-    setId: "set-1",
-    target: { type: "http", referenceId: "agent-1" },
-  };
-}
 
 function makeFakeChild(): ChildProcess {
   const child = new EventEmitter() as unknown as ChildProcess;
@@ -29,111 +22,28 @@ function makeFakeChild(): ChildProcess {
 
 describe("ScenarioExecutionPool", () => {
   let pool: ScenarioExecutionPool;
-  let spawnedJobs: ExecutionJobData[];
 
   beforeEach(() => {
-    spawnedJobs = [];
-    pool = new ScenarioExecutionPool({ concurrency: 2 });
-    pool.setSpawnFunction(async (jobData) => {
-      spawnedJobs.push(jobData);
-      // Simulate: register child, then "run" until deregistered
+    pool = new ScenarioExecutionPool();
+  });
+
+  describe("when a child is registered", () => {
+    it("makes it findable by run id so a cancel can signal it", () => {
       const child = makeFakeChild();
-      pool.registerChild(jobData.scenarioRunId, child);
+      pool.registerChild("run-1", child);
+
+      expect(pool.runningChildren.get("run-1")).toBe(child);
+      expect(pool.activeCount).toBe(1);
     });
   });
 
-  describe("when pool has capacity", () => {
-    it("starts the job immediately", () => {
-      pool.submit(makeJob("run-1"));
-      expect(spawnedJobs).toHaveLength(1);
-      expect(spawnedJobs[0]!.scenarioRunId).toBe("run-1");
-    });
-  });
-
-  describe("when pool is at capacity", () => {
-    it("buffers the job", () => {
-      pool.submit(makeJob("run-1"));
-      pool.submit(makeJob("run-2"));
-      pool.submit(makeJob("run-3"));
-
-      expect(spawnedJobs).toHaveLength(2);
-      expect(pool.pendingCount).toBe(1);
-    });
-
-    it("dequeues when a slot opens", async () => {
-      pool.submit(makeJob("run-1"));
-      pool.submit(makeJob("run-2"));
-      pool.submit(makeJob("run-3")); // pending
-
-      expect(spawnedJobs).toHaveLength(2);
-
-      // Complete run-1
+  describe("when a child exits", () => {
+    it("drops it from the registry", () => {
+      pool.registerChild("run-1", makeFakeChild());
       pool.deregisterChild("run-1");
 
-      // Allow microtask for fire-and-forget spawn
-      await new Promise((r) => setTimeout(r, 10));
-
-      expect(spawnedJobs).toHaveLength(3);
-      expect(spawnedJobs[2]!.scenarioRunId).toBe("run-3");
-    });
-  });
-
-  describe("when a cancelled job is submitted", () => {
-    it("skips the job entirely", () => {
-      pool.markCancelled("run-1");
-      pool.submit(makeJob("run-1"));
-
-      expect(spawnedJobs).toHaveLength(0);
-    });
-
-    it("calls onSkipCancelled so the terminal event is written", () => {
-      const onSkip = vi.fn();
-      pool.setOnSkipCancelled(onSkip);
-
-      pool.markCancelled("run-1");
-      pool.submit(makeJob("run-1"));
-
-      expect(onSkip).toHaveBeenCalledTimes(1);
-      expect(onSkip).toHaveBeenCalledWith(
-        expect.objectContaining({ scenarioRunId: "run-1" }),
-      );
-    });
-  });
-
-  describe("when cancel arrives for a pending job", () => {
-    it("skips the cancelled pending job when dequeuing", async () => {
-      pool.submit(makeJob("run-1"));
-      pool.submit(makeJob("run-2"));
-      pool.submit(makeJob("run-3")); // pending
-
-      // Cancel run-3 while it's pending
-      pool.markCancelled("run-3");
-
-      // Complete run-1 to trigger dequeue
-      pool.deregisterChild("run-1");
-      await new Promise((r) => setTimeout(r, 10));
-
-      // run-3 should NOT have been spawned
-      expect(spawnedJobs).toHaveLength(2);
-      expect(pool.pendingCount).toBe(0);
-    });
-
-    it("calls onSkipCancelled for the skipped pending job", async () => {
-      const onSkip = vi.fn();
-      pool.setOnSkipCancelled(onSkip);
-
-      pool.submit(makeJob("run-1"));
-      pool.submit(makeJob("run-2"));
-      pool.submit(makeJob("run-3")); // pending
-
-      pool.markCancelled("run-3");
-      pool.deregisterChild("run-1");
-      await new Promise((r) => setTimeout(r, 10));
-
-      expect(onSkip).toHaveBeenCalledTimes(1);
-      expect(onSkip).toHaveBeenCalledWith(
-        expect.objectContaining({ scenarioRunId: "run-3" }),
-      );
+      expect(pool.runningChildren.has("run-1")).toBe(false);
+      expect(pool.activeCount).toBe(0);
     });
   });
 
@@ -146,58 +56,29 @@ describe("ScenarioExecutionPool", () => {
       pool.markCancelled("run-1");
       expect(pool.wasCancelled("run-1")).toBe(true);
     });
+
+    it("remembers a cancel that arrived before the run was ever registered", () => {
+      // The pre-dispatch case: the broadcast lands while the dispatch is
+      // still an outbox row, and the executor has to see it before it
+      // spawns anything.
+      pool.markCancelled("run-1");
+
+      expect(pool.wasCancelled("run-1")).toBe(true);
+      expect(pool.activeCount).toBe(0);
+    });
   });
 
-  describe("drain", () => {
-    it("clears pending queue and kills running children", () => {
-      pool.submit(makeJob("run-1"));
-      pool.submit(makeJob("run-2"));
-      pool.submit(makeJob("run-3")); // pending
-
-      const child1 = pool.runningChildren.get("run-1");
-      const child2 = pool.runningChildren.get("run-2");
+  describe("when the pool is drained", () => {
+    it("kills every running child", () => {
+      const child1 = makeFakeChild();
+      const child2 = makeFakeChild();
+      pool.registerChild("run-1", child1);
+      pool.registerChild("run-2", child2);
 
       pool.drain();
 
-      expect(pool.pendingCount).toBe(0);
       expect((child1 as any).kill).toHaveBeenCalledWith("SIGTERM");
       expect((child2 as any).kill).toHaveBeenCalledWith("SIGTERM");
-    });
-  });
-
-  describe("inFlightJobs", () => {
-    describe("when jobs are running and buffered", () => {
-      it("returns both running and pending job data", () => {
-        pool.submit(makeJob("run-1")); // running
-        pool.submit(makeJob("run-2")); // running
-        pool.submit(makeJob("run-3")); // pending
-
-        const inFlightIds = pool.inFlightJobs.map((j) => j.scenarioRunId);
-
-        expect(inFlightIds).toHaveLength(3);
-        expect(inFlightIds).toEqual(
-          expect.arrayContaining(["run-1", "run-2", "run-3"]),
-        );
-      });
-    });
-
-    describe("when a running child is deregistered", () => {
-      it("drops it from the in-flight set", () => {
-        pool.submit(makeJob("run-1"));
-        pool.submit(makeJob("run-2"));
-
-        pool.deregisterChild("run-1");
-
-        const inFlightIds = pool.inFlightJobs.map((j) => j.scenarioRunId);
-        expect(inFlightIds).not.toContain("run-1");
-        expect(inFlightIds).toContain("run-2");
-      });
-    });
-
-    describe("when the pool is empty", () => {
-      it("returns an empty list", () => {
-        expect(pool.inFlightJobs).toEqual([]);
-      });
     });
   });
 });

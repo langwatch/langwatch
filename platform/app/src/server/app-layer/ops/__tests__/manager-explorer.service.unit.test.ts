@@ -4,11 +4,11 @@ import type { ProcessStore } from "~/server/event-sourcing/process-manager/store
 
 import { ManagerExplorerService } from "../manager-explorer.service";
 
-vi.mock("~/server/event-sourcing/pipelineRegistry", () => ({
+vi.mock("~/server/event-sourcing/introspection", () => ({
   getProcessManagerMetadata: vi.fn(),
 }));
 
-import { getProcessManagerMetadata } from "~/server/event-sourcing/pipelineRegistry";
+import { getProcessManagerMetadata } from "~/server/event-sourcing/introspection";
 
 const perAggregate = {
   processName: "triggerSettlement",

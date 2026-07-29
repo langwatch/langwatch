@@ -70,7 +70,7 @@ describe("createTopicClusteringRunHandler", () => {
             };
           }),
         },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -100,7 +100,7 @@ describe("createTopicClusteringRunHandler", () => {
       });
       const run = createTopicClusteringRunHandler({
         runPort: { runClusteringPage },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -125,7 +125,7 @@ describe("createTopicClusteringRunHandler", () => {
             nextSearchAfter: [123, "trace-a"],
           }),
         },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -159,7 +159,7 @@ describe("createTopicClusteringRunHandler", () => {
             skippedReason: "recently_clustered",
           }),
         },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -186,7 +186,7 @@ describe("createTopicClusteringRunHandler", () => {
       });
       const run = createTopicClusteringRunHandler({
         runPort: { runClusteringPage },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -207,7 +207,7 @@ describe("createTopicClusteringRunHandler", () => {
             .fn()
             .mockRejectedValue(new Error("langevals unavailable")),
         },
-        commands: () => commands,
+        commands,
       });
 
       await expect(
@@ -233,7 +233,7 @@ describe("createTopicClusteringRunHandler", () => {
               ),
             ),
         },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -265,7 +265,7 @@ describe("createTopicClusteringRunHandler", () => {
               ),
             ),
         },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -294,7 +294,7 @@ describe("createTopicClusteringRunHandler", () => {
               new Error("Code: 499. DB::Exception: 403 Forbidden (S3Error)"),
             ),
         },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -330,7 +330,7 @@ describe("createTopicClusteringRunHandler", () => {
           );
         const run = createTopicClusteringRunHandler({
           runPort: { runClusteringPage },
-          commands: () => commands,
+          commands,
           clock: () => 999,
         });
 
@@ -349,7 +349,7 @@ describe("createTopicClusteringRunHandler", () => {
           .mockRejectedValue(new Error("langevals unavailable"));
         const run = createTopicClusteringRunHandler({
           runPort: { runClusteringPage },
-          commands: () => commands,
+          commands,
           clock: () => 999,
         });
 
@@ -373,7 +373,7 @@ describe("run outcome metrics (ADR-054)", () => {
         runPort: {
           runClusteringPage: vi.fn().mockRejectedValue(new Error("down")),
         },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 
@@ -405,7 +405,7 @@ describe("run outcome metrics (ADR-054)", () => {
             skippedReason: "recently_clustered",
           }),
         },
-        commands: () => commands,
+        commands,
         clock: () => 999,
       });
 

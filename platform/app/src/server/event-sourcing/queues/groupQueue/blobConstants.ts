@@ -67,7 +67,7 @@ export const BLOB_RELEASE_GRACE_TTL_SECONDS = 60 * 60;
  * the blob has been unreferenced for at least this long. A just-written blob
  * still carries the full backstop and can never satisfy it.
  */
-export const BLOB_RECLAIM_SAFETY_MARGIN_SECONDS = 10 * 60;
+const BLOB_RECLAIM_SAFETY_MARGIN_SECONDS = 10 * 60;
 
 /**
  * TTL at or below which the reclaim runner may destroy an unleased blob.

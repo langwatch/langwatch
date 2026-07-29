@@ -43,10 +43,8 @@ vi.mock("../commands/recordSpanCommand", async (importOriginal) => {
  * checks that the composition root installs span-command sharding on the
  * recordSpan command — through both registration branches — while leaving the
  * trace-summary fold keyed per trace. `build()` only stores references, so no
- * store / reactor is ever invoked.
+ * store, process or subscriber is ever invoked.
  */
-
-const reactorStub = (name: string) => ({ name, handle: async () => {} }) as any;
 
 function buildTraceDeps(
   overrides: Partial<TraceProcessingPipelineDeps> = {},
@@ -57,18 +55,29 @@ function buildTraceDeps(
     traceSummaryStore: store,
     traceAnalyticsStore: store,
     traceAnalyticsRollupAppendStore: store,
-    originGateReactor: reactorStub("originGate"),
-    evaluationTriggerReactor: reactorStub("evaluationTrigger"),
-    customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
-    traceUpdateBroadcastReactor: reactorStub("traceUpdateBroadcast"),
-    projectMetadataReactor: reactorStub("projectMetadata"),
-    simulationMetricsSyncReactor: reactorStub("simulationMetricsSync"),
-    experimentMetricsSyncReactor: reactorStub("experimentMetricsSync"),
+    commands: { port: () => async () => {} } as any,
+    broadcast: {} as any,
+    hasRedis: true,
+    projects: {} as any,
+    bootstrapTopicClustering: async () => {},
+    evaluationTriggerDispatch: {
+      monitors: {} as any,
+      readTraceSummary: async () => null,
+      evaluation: async () => {},
+    },
+    customEvaluationSyncDispatch: {
+      getSpanEvents: async () => [],
+      reportEvaluation: async () => {},
+    },
+    isSaas: false,
     automations: {
-      triggerMatchHandler: vi.fn().mockResolvedValue(undefined),
+      triggerMatchSubscriber: {
+        name: "triggerMatch",
+        eventTypes: [],
+        handle: async () => {},
+      },
       graphActivityHandler: vi.fn().mockResolvedValue(undefined),
     },
-    spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
     ...overrides,
   };
 }

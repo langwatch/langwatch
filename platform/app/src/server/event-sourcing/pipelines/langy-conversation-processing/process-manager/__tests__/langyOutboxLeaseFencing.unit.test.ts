@@ -1,26 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AGENT_DISPATCH_TIMEOUT_MS } from "~/server/app-layer/langy/langyWorker";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
 import {
   InMemoryProcessStore,
-  type IntentHandler,
   OutboxDispatcherService,
   ProcessManagerService,
+  type IntentHandler,
 } from "~/server/event-sourcing/process-manager";
+
 import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
-import { langyConversationProcess } from "../langyConversationProcess";
+import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
+
 import type { LangyConversationProcessState } from "../langyConversationProcess.types";
+import { buildLangyProcessManager } from "./helpers/langyProcessHarness";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,
 } from "../langyConversationProcess.types";
-import {
-  createStubLangyEffectPorts,
-  LANGY_OUTBOX_LEASE_DURATION_MS,
-} from "../langyEffectPorts";
+import { LANGY_OUTBOX_LEASE_DURATION_MS } from "../langyEffectPorts";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,
@@ -30,19 +27,17 @@ import {
 } from "./helpers/langyEventFixtures";
 
 /**
- * The EXACT definition the runtime mounts — built through the pipeline's own
- * `langyConversationProcess` applier and the runtime's
+ * The EXACT definition the runtime mounts — built by building the pipeline
+ * itself and taking the process manager it mounts, through the runtime's
  * `buildProcessDefinition`, so these tests cover the generated evolve
  * (intent-key prefixing, undeclared-event guard, schema-validated intent
- * payloads) rather than a re-implementation. The effect ports are stubs:
- * evolve never dispatches.
+ * payloads) rather than a re-implementation. Evolve never dispatches, so the
+ * effects behind it are inert here.
  */
-const langyConversationProcessDefinition = buildProcessDefinition(
-  buildProcessManager<LangyConversationProcessingEvent>({
-    name: LANGY_CONVERSATION_PROCESS_NAME,
-    applier: langyConversationProcess(createStubLangyEffectPorts().ports),
-  }).config,
+const langyConversationPMDefinition = buildProcessDefinition(
+  buildLangyProcessManager({ projectId: PROJECT_ID }).definition.config,
 ) as ProcessDefinition<LangyConversationProcessState>;
+
 
 const ref = {
   processName: LANGY_CONVERSATION_PROCESS_NAME,
@@ -66,7 +61,7 @@ describe("Langy process outbox lease fencing", () => {
   beforeEach(async () => {
     store = new InMemoryProcessStore();
     const service = new ProcessManagerService({
-      definition: langyConversationProcessDefinition,
+      definition: langyConversationPMDefinition,
       store,
     });
     // AGENT_TURN_ACCEPTED enqueues exactly one `dispatch:<turnId>` intent.
@@ -103,11 +98,7 @@ describe("Langy process outbox lease fencing", () => {
       // A leases the dispatch and blocks inside its handler (a live turn still
       // waiting on the manager).
       const runA = dispatcherA.runOnce({ now: T0, limit: 1 });
-      await vi.waitFor(() =>
-        expect(delivered).toContain(
-          `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
-        ),
-      );
+      await vi.waitFor(() => expect(delivered).toContain(`A:process:${CONVERSATION_ID}:dispatch:turn_1`));
 
       const fastHandler = vi.fn<IntentHandler>(async ({ message }) => {
         delivered.push(`B:${message.messageKey}`);
@@ -121,13 +112,8 @@ describe("Langy process outbox lease fencing", () => {
       // After the 100ms lease has expired but while A is still in-flight, B
       // re-leases the row and delivers the SAME turn a second time.
       const reportB = await dispatcherB.runOnce({ now: T0 + 200, limit: 1 });
-      expect(reportB.dispatched).toEqual([
-        `process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
-      expect(delivered).toEqual([
-        `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
-        `B:process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(reportB.dispatched).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
+      expect(delivered).toEqual([`A:process:${CONVERSATION_ID}:dispatch:turn_1`, `B:process:${CONVERSATION_ID}:dispatch:turn_1`]);
 
       // A finally completes; its markDispatched is fenced by B's superseding
       // lease, so the double delivery already happened and cannot be undone.
@@ -158,11 +144,7 @@ describe("Langy process outbox lease fencing", () => {
       });
 
       const runA = dispatcherA.runOnce({ now: T0, limit: 1 });
-      await vi.waitFor(() =>
-        expect(delivered).toContain(
-          `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
-        ),
-      );
+      await vi.waitFor(() => expect(delivered).toContain(`A:process:${CONVERSATION_ID}:dispatch:turn_1`));
 
       const fastHandler = vi.fn<IntentHandler>(async ({ message }) => {
         delivered.push(`B:${message.messageKey}`);
@@ -181,9 +163,7 @@ describe("Langy process outbox lease fencing", () => {
       });
       expect(reportB.dispatched).toEqual([]);
       expect(fastHandler).not.toHaveBeenCalled();
-      expect(delivered).toEqual([
-        `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(delivered).toEqual([`A:process:${CONVERSATION_ID}:dispatch:turn_1`]);
 
       releaseSlow();
       await runA;

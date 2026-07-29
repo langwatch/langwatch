@@ -33,6 +33,7 @@ interface ClickHouseSimulationRunRecord {
   ScenarioId: string;
   BatchRunId: string;
   ScenarioSetId: string;
+  BatchTotal: number;
   Version: string;
   Status: string;
   Name: string | null;
@@ -53,7 +54,6 @@ interface ClickHouseSimulationRunRecord {
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
   RoleLatencies: Record<string, number[]>;
-  TraceMetricsJson: string;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -94,6 +94,7 @@ export class SimulationRunStateRepositoryClickHouse<
       ScenarioId: record.ScenarioId,
       BatchRunId: record.BatchRunId,
       ScenarioSetId: record.ScenarioSetId,
+      BatchTotal: Number(record.BatchTotal ?? 0),
       Status: record.Status,
       Name: record.Name,
       Description: record.Description,
@@ -115,9 +116,6 @@ export class SimulationRunStateRepositoryClickHouse<
       TotalCost: record.TotalCost ?? null,
       RoleCosts: record.RoleCosts ?? {},
       RoleLatencies: record.RoleLatencies ?? {},
-      TraceMetrics: record.TraceMetricsJson
-        ? JSON.parse(record.TraceMetricsJson)
-        : {},
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       QueuedAt:
         record.QueuedAt === null || record.QueuedAt === undefined
@@ -151,6 +149,7 @@ export class SimulationRunStateRepositoryClickHouse<
       ScenarioId: data.ScenarioId,
       BatchRunId: data.BatchRunId,
       ScenarioSetId: data.ScenarioSetId,
+      BatchTotal: data.BatchTotal ?? 0,
       Version: projectionVersion,
       Status: data.Status,
       Name: data.Name,
@@ -171,10 +170,10 @@ export class SimulationRunStateRepositoryClickHouse<
       TotalCost: data.TotalCost,
       RoleCosts: data.RoleCosts,
       RoleLatencies: data.RoleLatencies,
-      TraceMetricsJson:
-        Object.keys(data.TraceMetrics).length > 0
-          ? JSON.stringify(data.TraceMetrics)
-          : "",
+      // TraceMetricsJson is intentionally absent: the per-trace accumulator it
+      // persisted is gone, so the column keeps its DEFAULT '' on every new row.
+      // It is not dropped here — expand now, contract a release later, once no
+      // deployed reader still selects it.
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       QueuedAt: data.QueuedAt != null ? new Date(data.QueuedAt) : null,
       CreatedAt: data.CreatedAt != null ? new Date(data.CreatedAt) : new Date(),
@@ -213,8 +212,8 @@ export class SimulationRunStateRepositoryClickHouse<
       // Latest-version read over the ReplacingMergeTree(UpdatedAt) for a single
       // run. The inner scalar subquery finds the newest UpdatedAt reading only
       // the light sort-key columns; the outer `t.UpdatedAt = (...)` equality is
-      // PREWHERE-able, so the heavy columns (Messages.*, TraceMetricsJson,
-      // RoleCosts, etc.) are materialized for only the single surviving row.
+      // PREWHERE-able, so the heavy columns (Messages.*, RoleCosts, etc.) are
+      // materialized for only the single surviving row.
       //
       // The earlier `(TenantId, ScenarioRunId, UpdatedAt) IN (max-subquery)`
       // tuple form was not applied as a PREWHERE on the version, so ClickHouse
@@ -236,6 +235,7 @@ export class SimulationRunStateRepositoryClickHouse<
             t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
             t.ScenarioRunId AS ScenarioRunId, t.ScenarioId AS ScenarioId,
             t.BatchRunId AS BatchRunId, t.ScenarioSetId AS ScenarioSetId,
+            t.BatchTotal AS BatchTotal,
             t.Version AS Version, t.Status AS Status, t.Name AS Name,
             t.Description AS Description, t.Metadata AS Metadata,
             t.\`Messages.Id\` AS \`Messages.Id\`,
@@ -250,7 +250,6 @@ export class SimulationRunStateRepositoryClickHouse<
             toString(t.DurationMs) AS DurationMs,
             t.TotalCost AS TotalCost, t.RoleCosts AS RoleCosts,
             t.RoleLatencies AS RoleLatencies,
-            t.TraceMetricsJson AS TraceMetricsJson,
             toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
             if(t.QueuedAt IS NOT NULL, toUnixTimestamp64Milli(t.QueuedAt), NULL) AS QueuedAt,
             toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,

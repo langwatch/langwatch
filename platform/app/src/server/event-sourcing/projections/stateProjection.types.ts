@@ -37,7 +37,7 @@ export interface StateProjectionStore<State> {
   ): Promise<void>;
 }
 
-export interface StateProjectionOptions {
+interface StateProjectionOptions {
   killSwitch?: KillSwitchOptions;
   /** One load and one store may fold this many queued events. Defaults to 1. */
   coalesceMaxBatch?: number;
@@ -48,7 +48,7 @@ export interface StateProjectionOptions {
  *
  * It is mechanically a fold, but deliberately has a narrower contract than a
  * ClickHouse fold: direct store load/apply/store, no event-log recovery read,
- * no Redis cache hook, and no projection-attached reactor or outbox.
+ * no Redis cache hook, and no projection-attached outbox.
  */
 export interface StateProjectionDefinition<State, E extends Event = Event> {
   name: string;

@@ -1,96 +1,94 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
+// Stable singleton logger so a test can spy the SAME `error` fn the module
+// captured at import time (`const logger = createLogger(...)` runs once).
+const loggerMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => loggerMock,
+}));
 
 import { COMMAND_TYPES } from "../../domain/commandType";
 import { defineCommandSchema } from "../commandSchema";
 
+/**
+ * `defineCommandSchema` delegates parsing to the Zod schema it is handed, so
+ * the only behaviour of ours worth pinning is what it does around that call:
+ * logging the failure with enough context to identify the offending command.
+ */
 describe("defineCommandSchema", () => {
-  describe("when creating a schema with all parameters", () => {
-    it("preserves the command type", () => {
-      const zodSchema = z.string();
-      const schema = defineCommandSchema(COMMAND_TYPES[0], zodSchema);
-
-      expect(schema.type).toBe(COMMAND_TYPES[0]);
-    });
-
-    it("preserves the description when provided", () => {
-      const zodSchema = z.string();
-      const description = "Test command schema description";
-      const schema = defineCommandSchema(
-        COMMAND_TYPES[0],
-        zodSchema,
-        description,
-      );
-
-      expect(schema.description).toBe(description);
-    });
-
-    it("preserves the validate function", () => {
-      const zodSchema = z.string();
-      const schema = defineCommandSchema(COMMAND_TYPES[0], zodSchema);
-
-      expect(typeof schema.validate).toBe("function");
-    });
+  const payloadSchema = z.object({
+    id: z.string(),
+    profile: z.object({ name: z.string() }),
   });
 
-  describe("when creating a schema without description", () => {
-    it("returns a schema with undefined description", () => {
-      const zodSchema = z.string();
-      const schema = defineCommandSchema(COMMAND_TYPES[0], zodSchema);
-
-      expect(schema.description).toBeUndefined();
-    });
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  describe("when using the validate function", () => {
-    it("validates the payload correctly", () => {
-      const zodSchema = z.string();
-      const schema = defineCommandSchema(COMMAND_TYPES[0], zodSchema);
+  describe("given a payload that fails validation", () => {
+    describe("when validate is called", () => {
+      it("logs the command type and every Zod issue with a dotted path", () => {
+        const schema = defineCommandSchema(COMMAND_TYPES[0], payloadSchema);
 
-      const testPayload = "test-payload";
-      const result = schema.validate(testPayload);
+        schema.validate({ id: 42, profile: {} });
 
-      expect(result.success).toBe(true);
-    });
+        expect(loggerMock.error).toHaveBeenCalledTimes(1);
+        expect(loggerMock.error).toHaveBeenCalledWith(
+          {
+            commandType: COMMAND_TYPES[0],
+            zodIssues: expect.arrayContaining([
+              expect.objectContaining({
+                path: "id",
+                code: "invalid_type",
+                message: expect.any(String),
+              }),
+              expect.objectContaining({
+                path: "profile.name",
+                code: "invalid_type",
+                message: expect.any(String),
+              }),
+            ]),
+          },
+          "Command payload validation failed",
+        );
 
-    it("returns true when validator returns true", () => {
-      const zodSchema = z.string();
-      const schema = defineCommandSchema(COMMAND_TYPES[0], zodSchema);
-
-      const result = schema.validate("valid-string");
-
-      expect(result.success).toBe(true);
-    });
-
-    it("returns false when validator returns false", () => {
-      const zodSchema = z.string();
-      const schema = defineCommandSchema(COMMAND_TYPES[0], zodSchema);
-
-      const result = schema.validate(123);
-
-      expect(result.success).toBe(false);
-    });
-
-    it("works with complex payload types", () => {
-      const complexPayloadSchema = z.object({
-        id: z.string(),
-        data: z.array(z.number()),
+        // Every issue is forwarded, not just the first one.
+        const logContext = loggerMock.error.mock.calls[0]?.[0] as {
+          zodIssues: unknown[];
+        };
+        expect(logContext.zodIssues).toHaveLength(2);
       });
 
-      const schema = defineCommandSchema(
-        COMMAND_TYPES[0],
-        complexPayloadSchema,
-      );
+      it("returns the failed parse result instead of throwing", () => {
+        const schema = defineCommandSchema(COMMAND_TYPES[0], payloadSchema);
 
-      const validPayload = { id: "test-id", data: [1, 2, 3] };
-      const invalidPayload = { id: "test-id" };
+        const result = schema.validate({ id: 42, profile: {} });
 
-      expect(schema.validate(validPayload).success).toBe(true);
-      expect(schema.validate(invalidPayload).success).toBe(false);
+        expect(result.success).toBe(false);
+      });
     });
   });
 
-  describe("when working with different command types", () => {
-    it.todo("preserves different command types correctly");
+  describe("given a payload that passes validation", () => {
+    describe("when validate is called", () => {
+      it("returns the parsed data without logging an error", () => {
+        const schema = defineCommandSchema(COMMAND_TYPES[0], payloadSchema);
+        const payload = { id: "command-1", profile: { name: "Jane" } };
+
+        const result = schema.validate(payload);
+
+        if (!result.success) {
+          throw new Error("expected the payload to pass validation");
+        }
+        expect(result.data).toEqual(payload);
+        expect(loggerMock.error).not.toHaveBeenCalled();
+      });
+    });
   });
 });

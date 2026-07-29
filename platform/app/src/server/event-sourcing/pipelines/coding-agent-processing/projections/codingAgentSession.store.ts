@@ -1,7 +1,7 @@
 import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-session.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { retentionDaysFrom } from "../../shared/analyticsStoreBase";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP,
@@ -47,6 +47,12 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
 export class CodingAgentSessionStore
   implements FoldProjectionStore<CodingAgentSessionState>
 {
+  /**
+   * Keys the fold cache, so a version bump misses rather than serving state in
+   * the old shape past `getWithApplied`'s gate.
+   */
+  readonly projectionVersion = CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST;
+
   constructor(private readonly repo: CodingAgentSessionRepository) {}
 
   async store(
@@ -98,8 +104,7 @@ export class CodingAgentSessionStore
         sessionId: String(context.aggregateId),
         version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
       }),
-      retentionDays:
-        context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
+      retentionDays: retentionDaysFrom(context, "traces"),
       // The executor's redelivery-dedup watermark, persisted next to the row so
       // a retry with a cold cache still recognises a batch it committed.
       appliedEventIds: context.appliedEventIds
@@ -111,7 +116,7 @@ export class CodingAgentSessionStore
   /**
    * Read the session's last committed state back together with the
    * applied-event-id watermark persisted next to it (ADR-066) — the
-   * CH-fallthrough side of the read path: `RedisCachedFoldStore` serves the warm
+   * CH-fallthrough side of the read path: `CachedFoldStore` serves the warm
    * cache and only calls this on a miss. The row round-trips the full working
    * state — counters, ordered steps (with their start times), the sub-agent
    * dedup set, the previous-call context size, and the converged metric units —

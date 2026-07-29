@@ -11,7 +11,10 @@
  *      event_log or any projection;
  *   2. projection execution and subscriber execution are independent jobs, so
  *      a subscriber redelivery never reapplies a committed projection;
- *   3. projection replay never invokes live subscribers; and
+ *   3. projection replay never invokes live subscribers — shown against a
+ *      subscriber the same test has already watched live dispatch reach, so
+ *      the not-called assertion is about the replay path and not about an
+ *      unwired spy;  and
  *   4. the publication / queue-processing OTel context is active inside the
  *      subscriber handler, which opens its own span carrying
  *      tenant / pipeline / subscriber attributes.
@@ -27,6 +30,7 @@ import {
   afterAll,
   afterEach,
   beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
@@ -35,7 +39,10 @@ import {
 
 import type { Event } from "../../domain/types";
 import { EventSourcedQueueProcessorMemory } from "../../queues/memory";
-import { replayEvents } from "../../replay/replayExecutor";
+import type { ReplayEvent } from "../../replay/replayEventLoader";
+import { FoldAccumulator } from "../../replay/replayExecutor";
+import { EventSourcingService } from "../../services/eventSourcingService";
+import type { JobRegistryEntry } from "../../services/queues/queueManager";
 import {
   createMockEventStore,
   createMockFoldProjectionDefinition,
@@ -45,8 +52,6 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
-import { EventSourcingService } from "../../services/eventSourcingService";
-import type { JobRegistryEntry } from "../../services/queues/queueManager";
 import type { EventSubscriberDefinition } from "../eventSubscriber.types";
 
 /**
@@ -120,6 +125,27 @@ function makeEvent(id: string): Event {
     { marker: id },
     id,
   );
+}
+
+/**
+ * Widen a committed domain event into the row-derived shape replay feeds its
+ * accumulators — the same fields `replayEventLoader.rowToEvent` reconstructs
+ * from an `event_log` row, so the rebuild below starts from what the log holds.
+ */
+function toReplayEvent(event: Event): ReplayEvent {
+  return {
+    id: event.id,
+    aggregateId: event.aggregateId,
+    aggregateType: event.aggregateType,
+    tenantId: event.tenantId,
+    createdAt: event.createdAt,
+    timestamp: event.createdAt,
+    occurredAt: event.occurredAt,
+    type: event.type,
+    version: event.version,
+    idempotencyKey: event.id,
+    data: event.data,
+  };
 }
 
 describe("event-subscriber runtime boundary", () => {
@@ -201,9 +227,7 @@ describe("event-subscriber runtime boundary", () => {
           handled.push(event);
           if (failFirstSubscriberCall) {
             failFirstSubscriberCall = false;
-            throw new Error(
-              "subscriber transient failure — will be redelivered",
-            );
+            throw new Error("subscriber transient failure — will be redelivered");
           }
         },
       };
@@ -235,9 +259,7 @@ describe("event-subscriber runtime boundary", () => {
         "test-pipeline:subscriber:conversationProcess",
       );
       expect(subscriberEntry).toBeDefined();
-      await subscriberEntry!.process(
-        event as unknown as Record<string, unknown>,
-      );
+      await subscriberEntry!.process(event as unknown as Record<string, unknown>);
 
       expect(handled).toHaveLength(2); // subscriber retried and succeeded
       expect(applied).toHaveLength(1); // projection NOT reapplied by the retry
@@ -245,7 +267,7 @@ describe("event-subscriber runtime boundary", () => {
   });
 
   describe("given a projection replay over canonical events", () => {
-    it("rebuilds the projection without invoking any live subscriber", async () => {
+    it("rebuilds the projection without invoking a subscriber that live dispatch does reach", async () => {
       const applied: Event[] = [];
       const fold = createMockFoldProjectionDefinition("operationalFold", {
         eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
@@ -256,30 +278,51 @@ describe("event-subscriber runtime boundary", () => {
         },
       });
 
-      // A subscriber observing the same event types. Replay must never reach it.
+      // A subscriber observing the same event types as the fold.
       const subscriberHandle = vi.fn().mockResolvedValue(undefined);
       const subscriber: EventSubscriberDefinition<Event> = {
         name: "conversationProcess",
         eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
         handle: subscriberHandle,
       };
-      void subscriber; // registered nowhere in the replay path — by construction
 
-      const events = [makeEvent("evt-replay-1"), makeEvent("evt-replay-2")];
-
-      // The real replay execution primitive rebuilds the fold from events.
-      const processed = await replayEvents({
-        projection: fold,
-        events: events as unknown as Parameters<
-          typeof replayEvents
-        >[0]["events"],
+      // Wire BOTH into a real service on a real queue and commit an event. This
+      // is the control: it proves this exact subscriber object is genuinely
+      // registered and does fire for this event type, so the not-called
+      // assertion below is about the replay path rather than about an orphan.
+      const registry = new Map<string, JobRegistryEntry>();
+      const service = new EventSourcingService({
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+        aggregateType,
+        eventStore: createMockEventStore<Event>(),
+        foldProjections: [fold],
+        subscribers: [subscriber],
+        globalQueue: createMemoryGlobalQueue(registry),
+        globalJobRegistry: registry,
       });
+      await service.storeEvents([makeEvent("evt-live")], context_);
 
-      expect(processed).toBe(2);
-      expect(applied).toHaveLength(2); // projection rebuilt
-      expect(fold.store.storeBatch ?? fold.store.store).toBeDefined();
-      // The replay engine has no subscriber seam — the subscriber never ran.
-      expect(subscriberHandle).not.toHaveBeenCalled();
+      expect(subscriberHandle).toHaveBeenCalledTimes(1); // live dispatch reaches it
+      expect(applied).toHaveLength(1);
+
+      // Now rebuild the SAME fold through FoldAccumulator — the primitive every
+      // production replay path (fold / map / optimized / state) constructs
+      // directly. `ReplayConfig` carries only projections / mapProjections /
+      // stateProjections: there is no field a subscriber could occupy, and the
+      // accumulator has no seam that could dispatch one. If either ever grew
+      // one, the count below moves and this fails.
+      const replayed = [makeEvent("evt-replay-1"), makeEvent("evt-replay-2")];
+      const accumulator = new FoldAccumulator(fold);
+      for (const event of replayed) accumulator.apply(toReplayEvent(event));
+      await accumulator.flush();
+
+      expect(accumulator.processed).toBe(2);
+      expect(applied).toHaveLength(3); // 1 live + 2 rebuilt
+      // The rebuild wrote the fold…
+      expect(fold.store.store).toHaveBeenCalled();
+      // …and the subscriber is still on its single LIVE invocation: replay
+      // added none.
+      expect(subscriberHandle).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -1,56 +1,54 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
+
 import {
   InMemoryProcessStore,
   ProcessManagerService,
   type ProcessRef,
 } from "~/server/event-sourcing/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
-import { langyConversationProcess } from "../langyConversationProcess";
+import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
+import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
+
+import { buildLangyProcessManager } from "./helpers/langyProcessHarness";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,
   type LangyConversationProcessState,
 } from "../langyConversationProcess.types";
-import { createStubLangyEffectPorts } from "../langyEffectPorts";
 import {
   agentRespondedEvent,
   agentResponseFailedEvent,
   agentTurnAcceptedEvent,
-  CONVERSATION_ID,
   conversationArchivedEvent,
+  messageRecordedEvent,
   conversationRenamedEvent,
   conversationStartedEvent,
+  CONVERSATION_ID,
   handoffConsumedEvent,
   handoffPendingEvent,
-  messageRecordedEvent,
-  PROJECT_ID,
   planUpdatedEvent,
+  PROJECT_ID,
   SENTINELS,
   T0,
   titleGeneratedEvent,
-  toLangyProcessEnvelope,
   toolCallInitiatedEvent,
+  toLangyProcessEnvelope,
   toolCallSucceededEvent,
 } from "./helpers/langyEventFixtures";
 
 /**
- * The EXACT definition the runtime mounts — built through the pipeline's own
- * `langyConversationProcess` applier and the runtime's
+ * The EXACT definition the runtime mounts — built by building the pipeline
+ * itself and taking the process manager it mounts, through the runtime's
  * `buildProcessDefinition`, so these tests cover the generated evolve
  * (intent-key prefixing, undeclared-event guard, schema-validated intent
- * payloads) rather than a re-implementation. The effect ports are stubs:
- * evolve never dispatches.
+ * payloads) rather than a re-implementation. Evolve never dispatches, so the
+ * effects behind it are inert here.
  */
-const langyConversationProcessDefinition = buildProcessDefinition(
-  buildProcessManager<LangyConversationProcessingEvent>({
-    name: LANGY_CONVERSATION_PROCESS_NAME,
-    applier: langyConversationProcess(createStubLangyEffectPorts().ports),
-  }).config,
+const langyConversationPMDefinition = buildProcessDefinition(
+  buildLangyProcessManager({ projectId: PROJECT_ID }).definition.config,
 ) as ProcessDefinition<LangyConversationProcessState>;
+
 
 const ref: ProcessRef = {
   processName: LANGY_CONVERSATION_PROCESS_NAME,
@@ -65,7 +63,7 @@ describe("LangyConversationProcess", () => {
   beforeEach(() => {
     store = new InMemoryProcessStore();
     service = new ProcessManagerService({
-      definition: langyConversationProcessDefinition,
+      definition: langyConversationPMDefinition,
       store,
     });
   });
@@ -97,9 +95,8 @@ describe("LangyConversationProcess", () => {
   }
 
   async function state(): Promise<LangyConversationProcessState> {
-    const instance = await store.findByRef<LangyConversationProcessState>({
-      ref,
-    });
+    const instance =
+      await store.findByRef<LangyConversationProcessState>({ ref });
     expect(instance).not.toBeNull();
     return instance!.state;
   }
@@ -159,9 +156,7 @@ describe("LangyConversationProcess", () => {
 
         expect(await state()).toEqual(runningState);
         const messages = await store.findMessagesByRef({ ref });
-        expect(messages.map((m) => m.messageKey)).toEqual([
-          `process:${CONVERSATION_ID}:dispatch:turn_1`,
-        ]);
+        expect(messages.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
       });
     });
 
@@ -243,9 +238,7 @@ describe("LangyConversationProcess", () => {
       expect(result.outcome).toBe("committed");
       expect(await state()).toEqual(before);
       const messages = await store.findMessagesByRef({ ref });
-      expect(messages.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(messages.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
     });
 
     it("emits no fail-turn or redispatch intent, ever", async () => {
@@ -335,9 +328,7 @@ describe("LangyConversationProcess", () => {
       const titles = (await store.findMessagesByRef({ ref })).filter(
         (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
       );
-      expect(titles.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:title:turn_2`,
-      ]);
+      expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_2`]);
     });
 
     it("does not title a second successful turn while the first request is still in flight", async () => {
@@ -352,9 +343,7 @@ describe("LangyConversationProcess", () => {
       const titles = (await store.findMessagesByRef({ ref })).filter(
         (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
       );
-      expect(titles.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:title:turn_1`,
-      ]);
+      expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_1`]);
     });
 
     it("never retitles once titleSource is auto, regardless of later turns", async () => {
@@ -376,9 +365,7 @@ describe("LangyConversationProcess", () => {
       const titles = (await store.findMessagesByRef({ ref })).filter(
         (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
       );
-      expect(titles.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:title:turn_1`,
-      ]);
+      expect(titles.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:title:turn_1`]);
     });
 
     it("records no automatic title after the user renamed the conversation", async () => {
@@ -415,9 +402,7 @@ describe("LangyConversationProcess", () => {
         pendingHandoffTurnId: "turn_1",
       });
       const messages = await store.findMessagesByRef({ ref });
-      expect(messages.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(messages.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
     });
 
     it("threads the handed-off turn id into the next dispatch intent, by reference only", async () => {
@@ -464,10 +449,7 @@ describe("LangyConversationProcess", () => {
     it("dispatches nothing for later turn events", async () => {
       await deliver([
         ...startedTurnHistory(),
-        conversationArchivedEvent({
-          id: "evt_archive",
-          occurredAt: T0 + 12_000,
-        }),
+        conversationArchivedEvent({ id: "evt_archive", occurredAt: T0 + 12_000 }),
         agentTurnAcceptedEvent({
           id: "evt_started_after_archive",
           occurredAt: T0 + 13_000,
@@ -479,9 +461,7 @@ describe("LangyConversationProcess", () => {
       const dispatches = (await store.findMessagesByRef({ ref })).filter(
         (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.WORKER_DISPATCH,
       );
-      expect(dispatches.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(dispatches.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
     });
   });
 
@@ -501,9 +481,7 @@ describe("LangyConversationProcess", () => {
         turnStatus: "failed",
       });
       const messages = await store.findMessagesByRef({ ref });
-      expect(messages.map((m) => m.messageKey)).toEqual([
-        `process:${CONVERSATION_ID}:dispatch:turn_1`,
-      ]);
+      expect(messages.map((m) => m.messageKey)).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
     });
   });
 

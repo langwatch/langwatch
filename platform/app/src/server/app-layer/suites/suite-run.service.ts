@@ -1,18 +1,13 @@
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
-import type { SuiteRunStateData } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
-import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
-import { generateBatchRunId } from "~/server/scenarios/scenario.ids";
-import { getSuiteSetId } from "~/server/suites/suite-set-id";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { traced } from "../tracing";
-import { SuiteRunClickHouseRepository } from "./repositories/suite-run.clickhouse.repository";
 import {
-  NullSuiteRunReadRepository,
-  type SuiteRunReadRepository,
-} from "./repositories/suite-run.repository";
+  deriveBatchRunId,
+  deriveScenarioRunId,
+  generateBatchRunId,
+  generateScenarioRunId,
+} from "~/server/scenarios/scenario.ids";
+import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { traced } from "../tracing";
 
 const logger = createLogger("langwatch:suite-run:service");
 
@@ -45,35 +40,20 @@ export type SuiteRunTarget = {
 
 export class SuiteRunService {
   constructor(
-    readonly repository: SuiteRunReadRepository,
-    private readonly startSuiteRunCommand: (
-      data: StartSuiteRunCommandData,
-    ) => Promise<void>,
-    private readonly queueSimulationRunCommand: (
-      data: QueueRunCommandData,
-    ) => Promise<void>,
+    private readonly queueSimulationRunCommand: (data: QueueRunCommandData) => Promise<void>,
   ) {}
 
   static create(params: {
-    resolveClickHouseClient: ClickHouseClientResolver | null;
-    startSuiteRun: (data: StartSuiteRunCommandData) => Promise<void>;
     queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
   }): SuiteRunService {
-    const repo = params.resolveClickHouseClient
-      ? new SuiteRunClickHouseRepository(params.resolveClickHouseClient)
-      : new NullSuiteRunReadRepository();
     return traced(
-      new SuiteRunService(
-        repo,
-        params.startSuiteRun,
-        params.queueSimulationRun,
-      ),
+      new SuiteRunService(params.queueSimulationRun),
       "SuiteRunService",
     );
   }
 
   /**
-   * Start a suite run: dispatch the startSuiteRun command and schedule BullMQ jobs.
+   * Start a suite run: queue one simulation run per scenario/target/repeat.
    *
    * Generates the batchRunId upfront and returns it synchronously (before jobs
    * finish scheduling), so the frontend can navigate to the run page immediately.
@@ -86,8 +66,15 @@ export class SuiteRunService {
     activeTargets: SuiteRunTarget[];
     repeatCount: number;
     skippedArchived: SuiteRunResult["skippedArchived"];
-    idempotencyKey: string;
     batchRunId?: string;
+    /**
+     * Supplied by the caller to make a repeated submit idempotent. When set,
+     * the batch and every run id are derived from it, so a retry re-dispatches
+     * the same `queueRun` commands and the event store collapses them. Absent,
+     * ids are random and a second submit is a second run — which is what the
+     * UI's "run again" wants.
+     */
+    idempotencyKey?: string;
   }): Promise<SuiteRunResult> {
     const {
       suiteId,
@@ -100,7 +87,33 @@ export class SuiteRunService {
       idempotencyKey,
     } = params;
 
-    const batchRunId = params.batchRunId ?? generateBatchRunId();
+    // An explicit batch id and an idempotency key cannot both be honoured. The
+    // key derives the batch FROM the active set precisely so a batch and its
+    // denominator cannot disagree; a caller-pinned id would name a batch the
+    // server never derived, and reusing that id against a changed set is the
+    // mixed-denominator defect the derivation exists to close. Callers pin an
+    // id only on the non-idempotent path.
+    if (params.batchRunId && idempotencyKey) {
+      throw new Error(
+        "SuiteRunService.startRun: batchRunId and idempotencyKey are mutually exclusive — " +
+          "an idempotent submit derives its batch from the active set",
+      );
+    }
+
+    const batchRunId =
+      params.batchRunId ??
+      (idempotencyKey
+        ? deriveBatchRunId({
+            projectId,
+            suiteId,
+            idempotencyKey,
+            // The active set is part of the batch's identity: it decides the
+            // denominator every child stamps. See `deriveBatchRunId`.
+            scenarioIds: activeScenarioIds,
+            targetReferenceIds: activeTargets.map((t) => t.referenceId),
+            repeatCount,
+          })
+        : generateBatchRunId());
     const setId = getSuiteSetId(suiteId);
     const total = activeScenarioIds.length * activeTargets.length * repeatCount;
 
@@ -117,28 +130,11 @@ export class SuiteRunService {
       "Starting suite run",
     );
 
-    await this.startSuiteRunCommand({
-      tenantId: projectId,
-      batchRunId,
-      scenarioSetId: setId,
-      suiteId,
-      total,
-      scenarioIds: activeScenarioIds,
-      targetIds: activeTargets.map((t) => t.referenceId),
-      idempotencyKey,
-      occurredAt: Date.now(),
-    });
-
     // Pre-generate scenarioRunIds and dispatch queueRun for each so QUEUED
     // entries appear in ClickHouse immediately. The same IDs are passed to the
     // SDK via RunOptions.runId (see scenario-child-process.ts), ensuring the
     // SDK's events use matching aggregate IDs.
-    const items: Array<{
-      scenarioId: string;
-      target: SuiteRunTarget;
-      repeat: number;
-      scenarioRunId: string;
-    }> = [];
+    const items: Array<{ scenarioId: string; target: SuiteRunTarget; repeat: number; scenarioRunId: string }> = [];
     for (const scenarioId of activeScenarioIds) {
       for (const target of activeTargets) {
         for (let repeat = 0; repeat < repeatCount; repeat++) {
@@ -146,7 +142,15 @@ export class SuiteRunService {
             scenarioId,
             target,
             repeat,
-            scenarioRunId: generate(KSUID_RESOURCES.SCENARIO_RUN).toString(),
+            scenarioRunId: idempotencyKey
+              ? deriveScenarioRunId({
+                  projectId,
+                  batchRunId,
+                  scenarioId,
+                  targetReferenceId: target.referenceId,
+                  repeat,
+                })
+              : generateScenarioRunId(),
           });
         }
       }
@@ -165,17 +169,18 @@ export class SuiteRunService {
           metadata: {
             langwatch: { targetReferenceId: item.target.referenceId },
           },
-          target: {
-            type: item.target.type,
-            referenceId: item.target.referenceId,
-          },
+          target: { type: item.target.type, referenceId: item.target.referenceId },
+          // The batch denominator travels with every child (ADR-072), so the
+          // suite's progress is readable from the first row that lands.
+          batchTotal: total,
           occurredAt: now,
         }),
       ),
     );
 
-    // No explicit job scheduling — the execution reactor picks up queued events
-    // via the GroupQueue and spawns child processes in the execution pool.
+    // No explicit job scheduling — the `scenarioExecution` process manager sees
+    // each queued event and enqueues an `executeRun` outbox message; whichever
+    // worker leases one spawns its child process in the execution pool.
 
     logger.debug(
       { suiteId, batchRunId, itemCount: items.length },
@@ -196,18 +201,4 @@ export class SuiteRunService {
     };
   }
 
-  async getSuiteRunState(params: {
-    projectId: string;
-    batchRunId: string;
-  }): Promise<SuiteRunStateData | null> {
-    return this.repository.getSuiteRunState(params);
-  }
-
-  async getBatchHistory(params: {
-    projectId: string;
-    scenarioSetId: string;
-    limit?: number;
-  }): Promise<SuiteRunStateData[]> {
-    return this.repository.getBatchHistory(params);
-  }
 }

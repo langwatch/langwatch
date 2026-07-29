@@ -13,7 +13,7 @@ import { isRecord, type UnknownRecord } from "./serialization";
  * rendered from this same view, so a point's identity can never disagree with
  * its own persisted content.
  */
-export interface CanonicalPointValues {
+interface CanonicalPointValues {
   valueType: "none" | "int" | "double";
   valueInt: string | null;
   valueDouble: number | null;

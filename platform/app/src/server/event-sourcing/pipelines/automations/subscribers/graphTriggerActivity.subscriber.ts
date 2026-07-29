@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { GraphTriggerEvaluationReason } from "~/server/app-layer/automations/graph-trigger-evaluation.service";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { Event } from "~/server/event-sourcing/domain/types";
+import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
 
 const logger = createLogger(
   "langwatch:triggers:graph-trigger-activity-subscriber",
@@ -10,7 +11,17 @@ const logger = createLogger(
 /** Locked ADR-034 Phase 5 real-time debounce. */
 export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 
-export interface GraphTriggerActivityDeps {
+/**
+ * The dedup key. Exported so a mount can assert what it is collapsing on, and
+ * so the one string that must never drift lives in exactly one place: change it
+ * and a rolling deploy runs the old and new keys side by side, double-firing
+ * every project's trigger evaluation for the length of the rollout.
+ */
+export function graphTriggerActivityDedupId(event: Event): string {
+  return `graph-trigger-activity:${String(event.tenantId)}`;
+}
+
+interface GraphTriggerActivityDeps {
   triggers: TriggerService;
   evaluateGraphTrigger: (params: {
     triggerId: string;
@@ -68,5 +79,42 @@ export function createGraphTriggerActivityHandler(
         `graphTriggerActivity: ${failures}/${triggers.length} evaluations failed — retry via queue redelivery`,
       );
     }
+  };
+}
+
+/**
+ * The real-time graph-alert subscriber, authored once for the several pipelines
+ * that mount it. The debounce is the whole economics of the thing, so it lives
+ * here rather than in each mount: a 5s NON-extending, NON-replacing dedup window
+ * per project collapses a burst of events into at most one evaluation sweep per
+ * window, and refusing to extend is what stops a project under constant traffic
+ * from starving — the window closes on schedule and the next event opens a fresh
+ * one. The matching `delay` holds the job for that same window so the sweep runs
+ * once the burst has actually landed.
+ *
+ * Each mount supplies its own `eventTypes`, because "activity" means different
+ * events on each pipeline and no single pipeline sees all of them.
+ */
+export function createGraphTriggerActivitySubscriber<
+  E extends Event = Event,
+>(deps: {
+  /** The activity events on the pipeline this is mounted on. */
+  eventTypes: readonly string[];
+  /** Usually `createGraphTriggerActivityHandler(...)`, injected by the mount. */
+  handler: (event: E, context: { tenantId: string }) => Promise<void>;
+}): EventSubscriberDefinition<E> {
+  return {
+    name: "graphTriggerActivity",
+    eventTypes: deps.eventTypes,
+    options: {
+      delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+      deduplication: {
+        makeId: graphTriggerActivityDedupId,
+        ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+        extend: false,
+        replace: false,
+      },
+    },
+    handle: (event, context) => deps.handler(event, context),
   };
 }

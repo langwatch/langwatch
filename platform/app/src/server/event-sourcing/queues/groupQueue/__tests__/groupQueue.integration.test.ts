@@ -311,7 +311,7 @@ describe.skipIf(!hasTestcontainers)(
       // displaced a blob-backed payload but nothing reclaimed the displaced
       // blob, so ~280K orphans (~7.4 GB) accumulated until their 7-day TTL. The
       // `delay` keeps both sends in staging so the second squash-replaces the
-      // first in place (the production path: a reactor re-folding a turn).
+      // first in place (the production path: a projection job re-folding a turn).
       describe("when a dedup squash displaces a large payload", () => {
         const bigPayload = (filler: string): TestPayload => ({
           id: "dup",

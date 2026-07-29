@@ -131,7 +131,7 @@ export const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * cap; a batch at or above it would break redelivery dedup — the projection
  * router rejects such a config at registration).
  */
-export const CODING_AGENT_SESSION_COALESCE_MAX_BATCH = 128;
+const CODING_AGENT_SESSION_COALESCE_MAX_BATCH = 128;
 
 /**
  * The fold's state: the derived session plus the bookkeeping the abstract fold

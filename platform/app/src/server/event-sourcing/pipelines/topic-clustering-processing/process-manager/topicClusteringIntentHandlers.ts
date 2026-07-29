@@ -1,14 +1,17 @@
 import { createLogger } from "@langwatch/observability";
-import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
-import { classifyClusteringError } from "~/server/app-layer/topic-clustering/clustering-error";
-import type {
-  IntentContext,
-  IntentExecutor,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+
 import {
   incrementTopicClusteringPageTotal,
   observeTopicClusteringPageDuration,
 } from "~/server/metrics";
+
+import type {
+  IntentContext,
+  IntentExecutor,
+} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
+import { classifyClusteringError } from "~/server/app-layer/topic-clustering/clustering-error";
+import { boundClusteringErrorMessage } from "~/server/app-layer/topic-clustering/clustering-error-excerpt";
 
 import type { TopicClusteringRunIntent } from "./topicClusteringProcess.types";
 
@@ -83,12 +86,12 @@ export interface TopicClusteringOutcomeCommands {
 export interface TopicClusteringDispatchDeps {
   runPort: TopicClusteringRunPort;
   /**
-   * Late-bound on purpose: the executor is declared while the pipeline is
-   * being built, and these are the SAME pipeline's commands — they only
-   * exist after `.build()`. The registry supplies a getter it resolves
-   * post-build; dispatch happens long after that.
+   * This same pipeline's write surface. No longer late-bound: the pipeline
+   * builds these from command-bus ports (ADR-082 §5), which resolve by class
+   * identity at send time, so an executor declared mid-`.build()` can name
+   * commands the builder has not registered yet.
    */
-  commands: () => TopicClusteringOutcomeCommands;
+  commands: TopicClusteringOutcomeCommands;
   maxAttempts?: number;
   clock?: () => number;
 }
@@ -101,8 +104,18 @@ interface PageContext {
   attempt: number;
 }
 
+/**
+ * The text of a failure, bounded before it reaches a log line or — far more
+ * consequentially — the event log. `recordClusteringRunFailed` persists this
+ * string, so an unbounded message is an unbounded durable row; the excerpt it
+ * quotes has already had the request echo stripped upstream
+ * (`clustering-error-excerpt.ts`), and this is the bound that holds for the
+ * failures that never went through that path.
+ */
 function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return boundClusteringErrorMessage(
+    error instanceof Error ? error.message : String(error),
+  );
 }
 
 /**
@@ -161,14 +174,7 @@ async function recordClusteringFailure(params: {
   const errorMessage = errorText(params.error);
   const classified = classifyClusteringError(params.error);
   logger.error(
-    {
-      projectId,
-      runId,
-      page,
-      attempt,
-      error: errorMessage,
-      errorCode: classified.code,
-    },
+    { projectId, runId, page, attempt, error: errorMessage, errorCode: classified.code },
     "Clustering page failed on final attempt; recording run_failed",
   );
   try {
@@ -276,7 +282,7 @@ export function createTopicClusteringRunHandler(
     payload: TopicClusteringRunIntent,
     intentContext: IntentContext,
   ) => {
-    const commands = deps.commands();
+    const commands = deps.commands;
     const context: PageContext = {
       projectId: intentContext.projectId,
       runId: payload.runId,

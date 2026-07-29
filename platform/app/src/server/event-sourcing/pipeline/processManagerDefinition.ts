@@ -7,32 +7,7 @@ import type {
 } from "../process-manager/processManager.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 
-/** Shared delivery descriptor for lightweight subscribers. */
-export type TriggerSpec =
-  | { events: readonly string[]; fold?: never; map?: never }
-  | { fold: string; events?: readonly string[]; map?: never }
-  | { map: string; events?: readonly string[]; fold?: never };
-
-export interface TriggerOptions<E extends Event = Event> {
-  delay?: number;
-  ttl?: number;
-  dedup?: DeduplicationStrategy<E>;
-  dedupId?: (event: E) => string;
-  when?: (event: E) => boolean;
-}
-
-export interface TriggerContext<State = unknown> {
-  tenantId: string;
-  aggregateId: string;
-  state: State;
-}
-
-export type SubscriberSpec<E extends Event = Event> = TriggerSpec &
-  TriggerOptions<E> & {
-    handler: (event: E, context: TriggerContext<any>) => Promise<void>;
-  };
-
-export type IntentFactories<Intents extends Record<string, IntentSpec<any>>> = {
+type IntentFactories<Intents extends Record<string, IntentSpec<any>>> = {
   [K in keyof Intents & string]: (
     key: string,
     payload: z.input<Intents[K]["schema"]>,
@@ -102,6 +77,62 @@ export type WakeHandler<
   context: ProcessHandlerContext<Intents>,
 ) => ProcessEvolution<State>;
 
+/**
+ * What a process manager may declare about the *staging* of its own delivery,
+ * evaluated at fan-out before a job exists (ADR-069 invariant 4).
+ *
+ * The runtime generates one event subscriber per process manager, and without
+ * this the generated subscriber carried no options at all: every declared event
+ * type minted a GroupQueue job and a `ProcessManagerInbox` row, and the
+ * process's own narrowing ran only after dequeue. On a trace-keyed process that
+ * is one durable transition per span. The reactors these processes replaced
+ * gated before enqueue; this is where that gate goes now.
+ *
+ * **Everything declared here MUST be total.** `filter` and `deduplication.makeId`
+ * both run on the shared routing-dispatch path, which has no retry: a throw is
+ * reported (logged, and surfaced as an `AggregateError` from `dispatch`) but
+ * still loses this process's job for that event permanently. A reactor's
+ * `shouldReact` was caught and read as `true` — fail-open, never dropped; this
+ * seam fails LOST. So only pure field-picks belong here, and every guard that
+ * decodes, reads a flag or touches a store stays in the handler, where a throw
+ * re-delivers that one job (ADR-075, "The one migration hazard").
+ *
+ * Three subscriber options are deliberately NOT exposed:
+ *
+ * - `stage` (the claim-check swap) — it changes the staged event's TYPE, and a
+ *   worker on the previous build silently *completes* a job whose type it does
+ *   not recognise. That is a deploy-order contract (consumer half one release
+ *   ahead), not a line in a process definition.
+ * - `groupKeyFn` — the generated subscriber's group is the aggregate, which is
+ *   what serializes one process instance's inbox writes. Re-keying it would let
+ *   two events for the same process key be handled concurrently.
+ * - `disabled` / `killSwitch` — a killed subscriber drops events, and a process
+ *   manager's events are durable work with a deadline behind them.
+ */
+export interface ProcessManagerEnqueueOptions<E extends Event = Event> {
+  /**
+   * Decides whether this event stages a job at all. `false` → no job, no inbox
+   * row, no transition. Total predicates only — see the interface docblock.
+   *
+   * A handler must stay correct for events its filter would have declined: jobs
+   * staged by a build without the filter can still be draining.
+   */
+  filter?: (event: E) => boolean;
+  /**
+   * Collapses a burst into one delivery per window. `makeId` is total for the
+   * same reason `filter` is.
+   *
+   * A process SEES FEWER EVENTS under a dedup window, so the key must separate
+   * events that would drive different transitions — collapse only what is
+   * decision-equivalent. Keying on the process's own narrowed view is the
+   * straightforward way to get that: two events that narrow to the same view
+   * are interchangeable to the process by construction.
+   */
+  deduplication?: DeduplicationStrategy<E>;
+  /** Holds the staged job for a window, so the dedup above has one to collapse into. */
+  delay?: number;
+}
+
 export interface ProcessManagerConfig<
   State,
   Intents extends Record<string, IntentSpec<any>>,
@@ -123,6 +154,8 @@ export interface ProcessManagerConfig<
    * prompts, parts, tool output, titles, or tokens at all.
    */
   toPayload?: (event: E) => ProcessEventEnvelope["payload"];
+  /** @see ProcessManagerEnqueueOptions */
+  enqueue?: ProcessManagerEnqueueOptions<E>;
   intents: Intents;
   outbox?: {
     maxAttempts?: number;

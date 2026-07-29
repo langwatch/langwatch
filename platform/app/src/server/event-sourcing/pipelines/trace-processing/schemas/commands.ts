@@ -96,5 +96,3 @@ export type ResolveOriginCommandData = z.infer<
 export const changeTraceNameInputSchema = z.object({
   newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),
 });
-
-export type ChangeTraceNameInput = z.infer<typeof changeTraceNameInputSchema>;
