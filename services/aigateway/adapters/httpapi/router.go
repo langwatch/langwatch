@@ -322,7 +322,7 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		peek, body, release, ok := readAndPeekBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
@@ -351,7 +351,7 @@ func speechHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		peek, body, release, ok := readAndPeekBody(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
@@ -391,12 +391,15 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		r.Body = http.MaxBytesReader(w, r.Body, maxTranscriptionBodyBytes)
+		if err := prepareRequestBody(w, r, maxTranscriptionBodyBytes); err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
 		// Memory threshold: files up to 10 MB stay in memory, larger ones
 		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
+			if errors.As(err, &maxErr) || errors.Is(err, errDecodedBodyTooLarge) {
 				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
 					"message": "audio upload exceeds the 25 MB transcription limit",
 				}))
@@ -465,7 +468,7 @@ func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
 
 		// Match chat/responses — bodies from coding-agent clients run 30-60 KiB
 		// and we must fit flags like action suffix discovery into the peek.
-		peek, body, release, ok := readAndPeekBodyLarge(w, r, deps.MaxRequestBodyBytes)
+		peek, body, release, ok := readAndPeekBodyLarge(deps.Logger, w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
@@ -641,8 +644,8 @@ const (
 	largePeekBytes   = 256 * 1024
 )
 
-func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
-	return readAndPeekBodySized(w, r, maxBytes, defaultPeekBytes)
+func readAndPeekBody(logger *zap.Logger, w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
+	return readAndPeekBodySized(logger, w, r, maxBytes, defaultPeekBytes)
 }
 
 // readAndPeekBodyLarge peeks 256 KiB instead of the 32 KiB default.
@@ -650,8 +653,8 @@ func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]
 // routinely push `stream` and other flags past the standard window —
 // a miss there mis-routes a streaming request to the non-streaming
 // handler, surfacing as a 502 SSE-in-error-body to the client.
-func readAndPeekBodyLarge(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
-	return readAndPeekBodySized(w, r, maxBytes, largePeekBytes)
+func readAndPeekBodyLarge(logger *zap.Logger, w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
+	return readAndPeekBodySized(logger, w, r, maxBytes, largePeekBytes)
 }
 
 // readFullBody materializes the entire request body (capped at maxBytes)
@@ -670,21 +673,19 @@ func readFullBody(logger *zap.Logger, w http.ResponseWriter, r *http.Request, ma
 	if maxBytes <= 0 {
 		maxBytes = config.DefaultMaxRequestBodyBytes
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		writeError(logger, w, ctx, err)
+		return nil, false
+	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		code := domain.ErrBadRequest
-		var mbe *http.MaxBytesError
-		if errors.As(err, &mbe) {
-			code = domain.ErrPayloadTooLarge
-		}
-		writeError(logger, w, ctx, herr.New(ctx, code, nil))
+		writeError(logger, w, ctx, herr.New(ctx, bodyReadErrorCode(err), nil))
 		return nil, false
 	}
 	return body, true
 }
 
-func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64, peekSize int) ([]byte, io.Reader, func(), bool) {
+func readAndPeekBodySized(logger *zap.Logger, w http.ResponseWriter, r *http.Request, maxBytes int64, peekSize int) ([]byte, io.Reader, func(), bool) {
 	// Cap body size to prevent OOM on drive-by scans while leaving headroom
 	// for 1M-context LLM workloads (multi-MB prompts, vision images, long
 	// tool-result blocks). Zero / unset → fall back to the shared default
@@ -693,7 +694,10 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 	if maxBytes <= 0 {
 		maxBytes = config.DefaultMaxRequestBodyBytes
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		writeError(logger, w, r.Context(), err)
+		return nil, nil, func() {}, false
+	}
 
 	buf := bodyPool.Get().(*bytes.Buffer)
 	peeked := make([]byte, peekSize)

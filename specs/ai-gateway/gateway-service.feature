@@ -144,6 +144,56 @@ Feature: Gateway service — public HTTP surface and operational basics
       And 30 MiB requests succeed (below new cap)
       And 60 MiB requests still return 413
 
+  Rule: Compressed request bodies are decoded before anything reads them
+
+    # Clients are free to compress what they upload, and coding agents do:
+    # codex 0.145 posts /v1/responses under `Content-Encoding: zstd` once the
+    # user is signed in with an OpenAI account. Every stage past the transport
+    # (model peek, stream detection, guardrails, the provider adapters) reads
+    # JSON, so the compressed bytes have to be decoded at the edge. Reading
+    # them raw finds no top-level `model` and fails the turn with a 400
+    # "missing model field" before any provider is contacted.
+
+    @integration
+    Scenario Outline: a compressed body is decoded on every dispatch lane
+      Given a valid VK
+      When I POST <path> with a <encoding>-compressed JSON body and header "Content-Encoding: <encoding>"
+      Then the gateway resolves the model from the decoded body
+      And the provider receives the decoded JSON body
+      And the response status is 200
+
+      Examples:
+        | path                  | encoding |
+        | /v1/chat/completions  | gzip     |
+        | /v1/chat/completions  | deflate  |
+        | /v1/chat/completions  | br       |
+        | /v1/chat/completions  | zstd     |
+        | /v1/responses         | zstd     |
+        | /v1/embeddings        | zstd     |
+
+    @integration
+    Scenario: the passthrough lane does not forward a stale Content-Encoding
+      Given a valid VK
+      When I POST /v1beta/models/gemini-2.5-flash:generateContent with a gzip-compressed body
+      Then the provider receives the decoded JSON body
+      And the forwarded upstream headers carry no "Content-Encoding"
+
+    @integration
+    Scenario: a content coding the gateway cannot decode is a bad request
+      Given a valid VK
+      When I POST /v1/chat/completions with header "Content-Encoding: snappy"
+      Then the response status is 400
+      And error.type equals "bad_request"
+      And error.message references "unsupported content-encoding"
+
+    @integration
+    Scenario: a compression bomb is capped at the same ceiling as a raw body
+      Given GATEWAY_MAX_REQUEST_BODY_BYTES = 65536
+      When I POST /v1/chat/completions with a zstd body that fits the cap on the wire but decodes to 4 MiB
+      Then the response status is 413
+      And error.type equals "payload_too_large"
+      And no provider dispatch occurs
+
   Rule: Graceful SIGTERM drain (iter 24, `ea167ca`)
 
     # Four-phase shutdown guarantees in-flight requests complete before pod exit.
