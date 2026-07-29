@@ -301,38 +301,64 @@ export class LangyGithubInstallationsService {
     const usable = installations.filter((i) => !i.suspendedAt);
     if (usable.length === 0) return null;
 
-    // Explicit repo: pick the installation that can reach it and scope to it.
-    // A candidate that turns out to be a dead installation — whether that
-    // surfaces while resolving the repo id (an uncached "all" selection has to
-    // list live) or while minting — is self-healed away in favor of the next
-    // one that can reach the same repo, rather than failing the turn outright.
-    if (repositoryFullName) {
-      for (const inst of usable) {
-        let repoId: string | null;
-        try {
-          repoId = await this.resolveRepositoryId(inst, repositoryFullName);
-        } catch (error) {
-          if (!(error instanceof GithubInstallationNotFoundError)) throw error;
-          await this.markInstallationDead(inst.installationId);
-          continue;
-        }
-        if (!repoId) continue;
-        const outcome = await this.mintScoped({
-          installationId: inst.installationId,
-          repositoryIds: [repoId],
-        });
-        if (outcome.token) return outcome.token;
-        if (!outcome.wasDeadInstallation) return null;
-      }
-      // The App is not installed on that repo — bounded by the installation.
-      return null;
-    }
+    return repositoryFullName
+      ? this.mintForExplicitRepo(usable, repositoryFullName)
+      : this.mintForAnyInstallation(usable);
+  }
 
-    // No explicit repo: mint against the org's installation(s) scoped to the
-    // full repo set, oldest first. An installation GitHub confirms is gone
-    // (404) is removed and the next candidate is tried instead of failing the
-    // whole turn; any other mint failure stops here, same as before — a
-    // transient error must not make us skip past a live installation.
+  // Pick the installation that can reach `repositoryFullName` and scope the
+  // token to only that repo. A candidate that turns out to be a dead
+  // installation — whether that surfaces while resolving the repo id (an
+  // uncached "all" selection has to list live) or while minting — is
+  // self-healed away in favor of the next one that can reach the same repo,
+  // rather than failing the turn outright.
+  private async mintForExplicitRepo(
+    usable: LangyGithubInstallationRow[],
+    repositoryFullName: string,
+  ): Promise<LangyGithubTurnToken | null> {
+    for (const inst of usable) {
+      const resolved = await this.resolveRepositoryIdOrHeal(
+        inst,
+        repositoryFullName,
+      );
+      if (!resolved.repoId) continue;
+      const outcome = await this.mintScoped({
+        installationId: inst.installationId,
+        repositoryIds: [resolved.repoId],
+      });
+      if (outcome.token) return outcome.token;
+      if (!outcome.wasDeadInstallation) return null;
+    }
+    // The App is not installed on that repo — bounded by the installation.
+    return null;
+  }
+
+  // resolveRepositoryId, with the self-heal-and-continue decision factored out
+  // of the caller's control flow: a confirmed-dead installation is healed here
+  // and reported back as "nothing to resolve" rather than thrown, so
+  // mintForExplicitRepo stays a flat loop.
+  private async resolveRepositoryIdOrHeal(
+    inst: LangyGithubInstallationRow,
+    repositoryFullName: string,
+  ): Promise<{ repoId: string | null; wasDeadInstallation: boolean }> {
+    try {
+      const repoId = await this.resolveRepositoryId(inst, repositoryFullName);
+      return { repoId, wasDeadInstallation: false };
+    } catch (error) {
+      if (!(error instanceof GithubInstallationNotFoundError)) throw error;
+      await this.markInstallationDead(inst.installationId);
+      return { repoId: null, wasDeadInstallation: true };
+    }
+  }
+
+  // Mint against the org's installation(s) scoped to the full repo set,
+  // oldest first. An installation GitHub confirms is gone (404) is removed
+  // and the next candidate is tried instead of failing the whole turn; any
+  // other mint failure stops here — a transient error must not make us skip
+  // past a live installation.
+  private async mintForAnyInstallation(
+    usable: LangyGithubInstallationRow[],
+  ): Promise<LangyGithubTurnToken | null> {
     for (const inst of usable) {
       const outcome = await this.mintScoped({
         installationId: inst.installationId,
