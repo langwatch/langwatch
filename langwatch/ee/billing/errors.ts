@@ -245,3 +245,49 @@ export class UsageReportFailedError extends HandledError {
     this.name = "UsageReportFailedError";
   }
 }
+
+/**
+ * The account is billed in a currency we sell no prices in.
+ *
+ * A billing account is locked to one currency once it has been invoiced, and
+ * every later checkout has to match it. If that currency isn't one we price
+ * plans in, no self-serve upgrade can succeed — so this stops before anything
+ * is written rather than letting the payment provider reject the session and
+ * leave a half-made subscription behind.
+ *
+ * `fault: "customer"` only in the sense that it is account state, not an
+ * outage: it is not something the customer can correct from the UI, which is
+ * why the copy sends them to support instead of telling them to retry.
+ */
+export class UnsupportedBillingCurrencyError extends HandledError {
+  declare readonly code: "billing_currency_unsupported";
+
+  constructor() {
+    super(
+      "billing_currency_unsupported",
+      "This account is billed in a currency this plan isn't sold in",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "UnsupportedBillingCurrencyError";
+  }
+}
+
+/**
+ * We could not establish which currency the account is billed in.
+ *
+ * A failed lookup is not evidence that the account is unfixed, so guessing
+ * would risk a rejected checkout *after* the pending subscription and its
+ * invites exist. Retrying is the correct response, and nothing was charged.
+ */
+export class BillingCurrencyUnavailableError extends HandledError {
+  declare readonly code: "billing_currency_unavailable";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "billing_currency_unavailable",
+      "We couldn't confirm this account's billing currency",
+      { httpStatus: 503, fault: "provider", ...options },
+    );
+    this.name = "BillingCurrencyUnavailableError";
+  }
+}

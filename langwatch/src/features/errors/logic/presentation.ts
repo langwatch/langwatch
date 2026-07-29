@@ -561,6 +561,19 @@ const presentations = {
     describe: () =>
       "We've been notified. Contact support if you need it sooner.",
   },
+  billing_currency_unsupported: {
+    // Account state, not an outage, and not fixable from the UI: the account is
+    // locked to a currency we don't price plans in, so retrying never helps.
+    title: "This plan isn't available in your billing currency",
+    describe: () =>
+      "Contact support and we'll get you onto the right plan.",
+  },
+  billing_currency_unavailable: {
+    // fault: provider. We couldn't confirm the billing currency, so we stopped
+    // before creating anything. Saying nothing was charged comes first.
+    title: "Couldn't confirm your billing currency",
+    describe: () => "Nothing was charged. Try again in a moment.",
+  },
   seat_billing_unavailable: {
     // fault: provider. The payment provider didn't answer. Nothing was
     // charged, and saying so is the first thing anyone wants to know.

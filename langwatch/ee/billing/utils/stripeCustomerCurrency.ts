@@ -5,29 +5,31 @@ import type Stripe from "stripe";
 const logger = createLogger("langwatch:billing:stripeCustomerCurrency");
 
 /**
- * Stripe fixes a customer's currency the moment they have any subscription or
- * invoice, and rejects checkout sessions in any other currency. Returns that
- * fixed currency, or null when the customer is deleted, has no currency yet,
- * or is fixed to a currency we don't sell in.
+ * What we were able to establish about the currency a checkout must use.
+ *
+ * The three cases are kept apart on purpose. Collapsing them into "a currency,
+ * or else the one the caller asked for" is what the original bug looked like:
+ * Stripe fixes a customer's currency once they have an invoice and rejects
+ * sessions in any other one, so guessing wrong is not a degraded result, it is
+ * a failed checkout — and by the time the session is created the caller has
+ * already written a pending subscription and its invites.
+ *
+ * - `resolved`  — use this currency. Either the customer's fixed one, or the
+ *                 requested one when the customer genuinely has none yet.
+ * - `unsupported` — the customer is fixed to a currency we sell no prices in.
+ * - `unavailable` — we could not ask. Not evidence that they are unfixed.
  */
-export const getStripeCustomerFixedCurrency = async ({
-  stripe,
-  customerId,
-}: {
-  stripe: Stripe;
-  customerId: string;
-}): Promise<Currency | null> => {
-  const customer = await stripe.customers.retrieve(customerId);
-  if (customer.deleted || !customer.currency) return null;
-
-  const fixed = customer.currency.toUpperCase();
-  return fixed in Currency ? (fixed as Currency) : null;
-};
+export type CheckoutCurrencyResolution =
+  | { status: "resolved"; currency: Currency }
+  | { status: "unsupported"; stripeCurrency: string }
+  | { status: "unavailable"; reason: string };
 
 /**
- * Currency the checkout must be built in: the customer's fixed currency when
- * Stripe has one, otherwise whatever the caller asked for. A failed lookup
- * falls back to the requested currency rather than aborting checkout.
+ * Establish the currency a checkout session must be created in.
+ *
+ * Callers must handle `unsupported` and `unavailable` before performing any
+ * writes — neither can be turned into a working checkout, so proceeding only
+ * trades one failure for the same failure plus orphaned pending records.
  */
 export const resolveCheckoutCurrency = async ({
   stripe,
@@ -39,24 +41,41 @@ export const resolveCheckoutCurrency = async ({
   customerId: string;
   organizationId: string;
   requestedCurrency: Currency;
-}): Promise<Currency> => {
-  const fixedCurrency = await getStripeCustomerFixedCurrency({
-    stripe,
-    customerId,
-  }).catch((error: unknown) => {
+}): Promise<CheckoutCurrencyResolution> => {
+  let customer: Stripe.Customer | Stripe.DeletedCustomer;
+  try {
+    customer = await stripe.customers.retrieve(customerId);
+  } catch (error) {
+    const reason = (error as Error).message;
     logger.warn(
-      { organizationId, error: (error as Error).message },
-      "[billing] Failed to look up Stripe customer currency, using requested currency",
+      { organizationId, error: reason },
+      "[billing] Could not read the customer's billing currency",
     );
-    return null;
-  });
+    return { status: "unavailable", reason };
+  }
 
-  if (fixedCurrency && fixedCurrency !== requestedCurrency) {
+  // No currency yet means nothing is fixed, so the requested one is still free
+  // to use — this is the path every first-time subscriber takes.
+  if (customer.deleted || !customer.currency) {
+    return { status: "resolved", currency: requestedCurrency };
+  }
+
+  const fixed = customer.currency.toUpperCase();
+  if (!(fixed in Currency)) {
     logger.warn(
-      { organizationId, requestedCurrency, customerCurrency: fixedCurrency },
-      "[billing] Requested checkout currency differs from Stripe customer currency, using customer currency",
+      { organizationId, customerCurrency: fixed },
+      "[billing] Customer is fixed to a currency with no price catalog",
+    );
+    return { status: "unsupported", stripeCurrency: fixed };
+  }
+
+  const currency = fixed as Currency;
+  if (currency !== requestedCurrency) {
+    logger.warn(
+      { organizationId, requestedCurrency, customerCurrency: currency },
+      "[billing] Requested checkout currency differs from the customer's billing currency, using the customer's",
     );
   }
 
-  return fixedCurrency ?? requestedCurrency;
+  return { status: "resolved", currency };
 };

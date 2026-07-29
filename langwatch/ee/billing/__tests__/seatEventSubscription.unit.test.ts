@@ -752,7 +752,7 @@ describe("seatEventSubscription", () => {
     });
 
     describe("when the Stripe customer currency lookup fails", () => {
-      it("falls back to the requested currency instead of aborting checkout", async () => {
+      beforeEach(() => {
         db.subscription.findMany.mockResolvedValue([]);
         stripe.customers.retrieve.mockRejectedValue(
           new Error("rate limit exceeded"),
@@ -760,25 +760,86 @@ describe("seatEventSubscription", () => {
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
         });
+      });
 
-        const result = await service.createSeatEventCheckout({
-          organizationId: "org_1",
-          customerId: "cus_1",
-          baseUrl: "https://app.test",
-          currency: "USD" as any,
-          billingInterval: "monthly",
-          membersToAdd: 2,
+      it("fails with a retryable billing-currency error", async () => {
+        await expect(
+          service.createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          }),
+        ).rejects.toMatchObject({ code: "billing_currency_unavailable" });
+      });
+
+      it("creates no checkout session and no pending records", async () => {
+        await service
+          .createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          })
+          .catch(() => undefined);
+
+        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(db.$transaction).not.toHaveBeenCalled();
+        expect(db.subscription.updateMany).not.toHaveBeenCalled();
+        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the Stripe customer is fixed to a currency we do not sell in", () => {
+      beforeEach(() => {
+        db.subscription.findMany.mockResolvedValue([]);
+        stripe.customers.retrieve.mockResolvedValue({
+          id: "cus_1",
+          currency: "gbp",
         });
+        stripe.checkout.sessions.create.mockResolvedValue({
+          url: "https://checkout.stripe.com/session",
+        });
+      });
 
-        expect(result).toEqual({ url: "https://checkout.stripe.com/session" });
-        expect(stripe.checkout.sessions.create).toHaveBeenCalledWith(
-          expect.objectContaining({ currency: "usd" }),
-        );
+      it("fails with an unsupported-billing-currency error", async () => {
+        await expect(
+          service.createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          }),
+        ).rejects.toMatchObject({ code: "billing_currency_unsupported" });
+      });
+
+      it("creates no checkout session and no pending records", async () => {
+        await service
+          .createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          })
+          .catch(() => undefined);
+
+        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(db.$transaction).not.toHaveBeenCalled();
+        expect(db.subscription.updateMany).not.toHaveBeenCalled();
+        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
       });
     });
 
     describe("when the Stripe customer is deleted", () => {
-      it("falls back to the requested currency", async () => {
+      it("uses the requested currency, since nothing is fixed yet", async () => {
         db.subscription.findMany.mockResolvedValue([]);
         stripe.customers.retrieve.mockResolvedValue({
           id: "cus_1",
@@ -802,6 +863,7 @@ describe("seatEventSubscription", () => {
         );
       });
     });
+
   });
 
   // ── seatEventBillingPortalUrl ─────────────────────────────────────────────
