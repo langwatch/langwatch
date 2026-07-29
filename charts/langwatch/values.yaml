@@ -323,7 +323,8 @@ app:
     # Storage provider to use. Options: awsS3 (default), azureBlob.
     # When set to 'awsS3', enables AWS S3 native integration.
     # When set to 'azureBlob', enables Azure Blob Storage (STORED_OBJECTS_BACKEND=azure,
-    # AC37 / issue #4133) — SharedKey auth only, mirrors the awsS3 shape.
+    # AC37 / issue #4133) — shared key or a Microsoft Entra identity, selected
+    # by providers.azureBlob.authMode; mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
 
@@ -354,8 +355,8 @@ app:
           secretKeyRef: { name: "", key: "" }
 
       # Azure Blob Storage configuration for dataset + stored-objects storage
-      # (AC37, issue #4133). SharedKey auth only — workload identity is a later
-      # issue (#6087), per-project Azure BYOC is #6088.
+      # (AC37, issue #4133). Shared key or a Microsoft Entra identity, selected
+      # by authMode below (#6087). Per-project Azure BYOC is still #6088.
       ## @extra app.dataplane.providers.azureBlob Azure Blob provider configuration.
       ## @param app.dataplane.providers.azureBlob.accountName.value [string] Azure Storage account name (not recommended in production — use accountName.secretKeyRef).
       ## @param app.dataplane.providers.azureBlob.accountKey.value [string] Azure Storage account key (not recommended in production — use accountKey.secretKeyRef).

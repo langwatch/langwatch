@@ -67,11 +67,31 @@ function chartDepsReady(): boolean {
     });
     return true;
   } catch {
+    // Only a genuinely unavailable dependency (no network, no repo definition)
+    // may skip. Everything else — a stale Chart.lock, a mistyped dependency
+    // repo — is a real chart bug, and swallowing it here would let the chart
+    // switch off its own alarm.
     return false;
   }
 }
 
 const canRenderChart = hasHelm() && chartDepsReady();
+
+/**
+ * CI must never report these as skipped: the suite is the only enforcement of
+ * the workload-identity label and ServiceAccount guards, so a silent skip
+ * turns a green job into no coverage at all. Locally (no helm, no network) the
+ * skip stays, which is what keeps it usable on a laptop.
+ */
+if (process.env.REQUIRE_HELM_TESTS === "1" && !canRenderChart) {
+  throw new Error(
+    "REQUIRE_HELM_TESTS=1 but the chart cannot be rendered here: helm is " +
+      `${hasHelm() ? "present" : "MISSING"} and the chart dependencies are ` +
+      "unavailable. Install helm and run `helm repo add` for the chart's " +
+      "dependency repositories — do not let this suite skip in CI.",
+  );
+}
+
 const describeHelm = canRenderChart ? describe : describe.skip;
 
 /** Renders the chart, returning stdout. Throws on a failed render. */
@@ -168,17 +188,66 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
     /** @scenario "The chart binds every storage-touching workload to one federated service account" */
     it("carries the identity client-id annotation on the rendered account", () => {
-      const out = render([
-        ...ALL_WORKLOADS,
-        ...IDENTITY_SERVICE_ACCOUNT,
-        "--set",
-        String.raw`global.serviceAccount.annotations.azure\.workload\.identity/client-id=00000000-1111-2222-3333-444444444444`,
-      ]);
+      const out = render([...ALL_WORKLOADS, ...IDENTITY_SERVICE_ACCOUNT]);
 
       expect(out).toContain("kind: ServiceAccount");
       expect(out).toContain(
         "azure.workload.identity/client-id: 00000000-1111-2222-3333-444444444444",
       );
+    });
+
+    /**
+     * A created ServiceAccount with no client-id annotation is the same class
+     * of failure as a pod with no label: the chart renders, the pods come up
+     * healthy, and the webhook has nothing to bind them to, so the first byte
+     * fails blaming the operator's cluster. Only enforced when the chart
+     * creates the account — a pre-existing account named by the operator lives
+     * outside this chart and its annotations are not ours to inspect.
+     */
+    /** @scenario "The chart refuses a created service account with no identity annotation" */
+    it("refuses to render workload identity with a created account carrying no client-id", () => {
+      expect(
+        renderExpectingFailure([
+          ...ALL_WORKLOADS,
+          "--set",
+          "global.serviceAccount.create=true",
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=azureBlob",
+          "--set",
+          "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+          "--set",
+          "app.dataplane.providers.azureBlob.accountName.value=acct",
+          "--set",
+          "app.dataplane.providers.azureBlob.container.value=cont",
+          "--set",
+          "app.storedObjects.localFilesystem.enabled=false",
+        ]),
+      ).toMatch(/azure\.workload\.identity\/client-id/);
+    });
+
+    /** @scenario "The chart refuses a created service account with no identity annotation" */
+    it("still renders when the operator names a pre-existing account instead", () => {
+      const out = render([
+        ...ALL_WORKLOADS,
+        "--set",
+        "global.serviceAccount.name=external-identity",
+        "--set",
+        "app.dataplane.enabled=true",
+        "--set",
+        "app.dataplane.provider=azureBlob",
+        "--set",
+        "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        "--set",
+        "app.dataplane.providers.azureBlob.accountName.value=acct",
+        "--set",
+        "app.dataplane.providers.azureBlob.container.value=cont",
+        "--set",
+        "app.storedObjects.localFilesystem.enabled=false",
+      ]);
+
+      expect(out).toContain("serviceAccountName: external-identity");
     });
 
     /**

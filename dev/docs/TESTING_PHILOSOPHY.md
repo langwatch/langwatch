@@ -174,6 +174,7 @@ The scenario title in the feature file should match the `it()` description in th
 | `@integration` | Component/boundary test | Testing rendering, API calls, DB queries |
 | `@regression` | Prevents a previously-fixed bug from recurring | Bug fix scenarios — must fail without the fix |
 | `@e2e` | Stable core flow (deprioritized) | Only for the 5-10 stable happy-path tests |
+| `@manual` | Verified by hand against real infrastructure, cannot run in CI | Needs a real cloud account/subscription. Still **requires a binding** to a test that self-skips without credentials, so the verification keeps an anchor in the codebase. Record the date and result in a comment above the scenario |
 
 Bug-fix feature specs should use `@regression` (alongside `@unit` or `@integration` for pyramid level):
 

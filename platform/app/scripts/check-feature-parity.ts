@@ -656,7 +656,20 @@ const PYTHON_TEST_FILE_RE = /^test_.+\.py$/;
 const FEATURE_FILE_RE = /\.feature$/;
 const SKIP_DIR = new Set(["node_modules", ".next", "dist", "build"]);
 
-const BOUND_TAGS = new Set(["@unit", "@integration", "@e2e", "@regression"]);
+/**
+ * `@manual` is enforced like the automated tiers: the scenario cannot run in
+ * CI (it needs real cloud credentials), but it is still bound to a test that
+ * self-skips without them. Leaving it out of this set made it invisible to the
+ * scanner — neither bound nor reported unbound — so deleting its test failed
+ * nothing and the manual verification silently lost its anchor.
+ */
+const BOUND_TAGS = new Set([
+  "@unit",
+  "@integration",
+  "@e2e",
+  "@regression",
+  "@manual",
+]);
 
 /**
  * Scenarios tagged `@unimplemented` have no expected test and are filtered

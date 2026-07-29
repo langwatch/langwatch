@@ -8,6 +8,7 @@
  *
  * Call once per request — construction is lightweight; drivers are stateless.
  */
+import { env } from "~/env.mjs";
 import { AzureBlobDriver } from "./azure-blob-driver";
 import {
   AzureBackendMisconfiguredError,
@@ -51,7 +52,20 @@ export function maybeAzureDriver(): AzureBlobDriver | undefined {
     // message, so failing here too would crash every request that never
     // touches storage. Anything else is a bug in our own code, and a bare
     // catch would bury it as "Azure just isn't configured" forever.
-    if (error instanceof AzureBackendMisconfiguredError) return undefined;
+    //
+    // That reasoning only covers WRITES, and only where Azure is not the
+    // selected backend. When STORED_OBJECTS_BACKEND=azure the operator has
+    // asked for Azure explicitly, and swallowing here registers nothing, so
+    // every READ surfaces as `Storage scheme "azure-blob" is not configured
+    // in this deployment` — a message that flatly contradicts their config and
+    // buries the webhook/label/annotation guidance the original error carries.
+    // Let it through there; keep the quiet path for the migration case.
+    if (
+      error instanceof AzureBackendMisconfiguredError &&
+      env.STORED_OBJECTS_BACKEND !== "azure"
+    ) {
+      return undefined;
+    }
     throw error;
   }
 }

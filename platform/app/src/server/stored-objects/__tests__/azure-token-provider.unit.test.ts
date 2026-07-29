@@ -107,12 +107,23 @@ describe("getAzureBlobToken", () => {
         audience: "https://storage.azure.us",
       };
 
+      // The real WorkloadIdentityCredential throws CredentialUnavailableError
+      // without tenantId/clientId; our mock accepts any options object, so the
+      // constructor wiring is exactly what this suite cannot catch unless it
+      // asserts on it. Dropping those two lines from buildCredential() would
+      // otherwise leave every test here green while breaking every real
+      // workload-identity exchange in production.
+      process.env.AZURE_TENANT_ID = "tenant-id-from-webhook";
+      process.env.AZURE_CLIENT_ID = "client-id-from-webhook";
+
       const token = await getAzureBlobToken(sovereignCredentials);
 
       expect(token).toBe("sovereign-token");
       expect(workloadCtorCalls).toHaveLength(1);
       expect(workloadCtorCalls[0]).toMatchObject({
         authorityHost: "https://login.microsoftonline.us",
+        tenantId: "tenant-id-from-webhook",
+        clientId: "client-id-from-webhook",
       });
       expect(workloadGetToken).toHaveBeenCalledWith(
         "https://storage.azure.us/.default",

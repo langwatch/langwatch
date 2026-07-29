@@ -111,6 +111,14 @@ jobs:
               - 'pnpm-workspace.yaml'
               - 'package.json'
               - '.npmrc'
+              # NOTE: 'charts/**' is deliberately NOT listed. Integration suites
+              # do render the chart and assert on the output, so a chart-only
+              # edit can break a test under platform/app/ without touching a file
+              # there — but this one flag gates nine jobs (typecheck, every unit
+              # and integration shard, e2e), so adding it would run the entire
+              # app suite for a comment change in values.yaml. That trade is a
+              # repo-wide cost decision, not part of this change; tracked
+              # separately.
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
@@ -438,6 +446,18 @@ jobs:
           done
           exit 1
 
+      # The chart-rendering integration tests shell out to `helm template`, and
+      # skip themselves when helm or the chart dependencies are missing. That
+      # honesty is only honest if CI actually supplies both — otherwise the
+      # suite reports "skipped", the job exits 0, and every guard it contains
+      # is silently unenforced. REQUIRE_HELM_TESTS below turns a skip here into
+      # a failure, so this setup can never quietly rot.
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+      - name: Add chart dependency repositories
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add langwatch https://langwatch.github.io/langwatch
+
       - name: Run integration tests (shard ${{ matrix.shard }}/4)
         id: integration-tests
         working-directory: platform/app
@@ -450,6 +470,9 @@ jobs:
         # worker (execArgv is not), so it raises the heap where it's needed.
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          # Fail loudly if the helm-backed suites cannot run here, rather than
+          # skipping into a green job.
+          REQUIRE_HELM_TESTS: "1"
         run: |
           # shardFailureReporter feeds the globalSetup hard-floor so a wedged
           # shard that already printed failures exits 1, not a masked 0.
