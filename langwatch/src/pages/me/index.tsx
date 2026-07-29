@@ -15,6 +15,7 @@ import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
+import { spentSubline } from "~/components/me/spentSubline";
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
@@ -56,15 +57,7 @@ function MyUsagePage() {
     0,
     summary.spentThisMonthUsd - summary.billedThisMonthUsd,
   );
-  const budgetSubline = isOverBudget
-    ? "Limit reached"
-    : summary.budgetUsd !== null
-      ? `of ${fmtUsd(summary.budgetUsd)} budget`
-      : "No budget set";
-  const spentSubline =
-    bundledThisMonthUsd > 0
-      ? `${fmtUsd(bundledThisMonthUsd)} bundled · ${budgetSubline}`
-      : budgetSubline;
+  const spentCardSubline = spentSubline({ bundledUsd: bundledThisMonthUsd });
 
   // Two cost series across the spend charts: the theoretical list-price total
   // (includes bundled / not-billed-per-token usage like Claude Max) and the
@@ -148,7 +141,7 @@ function MyUsagePage() {
           <SummaryCard
             title="Spent this month"
             value={fmtUsd(summary.billedThisMonthUsd)}
-            subline={spentSubline}
+            subline={spentCardSubline}
             tone={isOverBudget ? "red" : "default"}
           />
           <SummaryCard
@@ -358,7 +351,9 @@ function SummaryCard({
 }: {
   title: string;
   value: string;
-  subline: string;
+  /** Omitted or empty renders no second line at all, so the card keeps its
+   *  shape instead of reserving a blank row. */
+  subline?: string;
   tone?: "default" | "red";
 }) {
   return (
@@ -385,13 +380,15 @@ function SummaryCard({
       >
         {value}
       </Text>
-      <Text
-        fontSize="sm"
-        color={tone === "red" ? "red.500" : "fg.muted"}
-        marginTop={1}
-      >
-        {subline}
-      </Text>
+      {subline ? (
+        <Text
+          fontSize="sm"
+          color={tone === "red" ? "red.500" : "fg.muted"}
+          marginTop={1}
+        >
+          {subline}
+        </Text>
+      ) : null}
     </Box>
   );
 }
