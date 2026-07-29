@@ -24,6 +24,7 @@ type Config struct {
 	Circuit                       CircuitConfig             `env:"LW_GATEWAY_CIRCUIT"`
 	CustomerTraceBridge           CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
 	LangyMirror                   LangyMirrorConfig         `env:"LANGY_MIRROR"`
+	SpendEmitter                  SpendEmitterConfig        `env:"LW_GATEWAY_SPEND"`
 	OTel                          config.OTel               `env:"OTEL"`
 	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
 	// non-streaming response writes a keep-alive byte while dispatch is
@@ -39,6 +40,30 @@ type Config struct {
 	// non-streaming HTTP surface — services/langyagent and services/nlpgo
 	// both embed config.Server too but have no use for this field.
 	NonStreamingHeartbeatIntervalSeconds int64 `env:"NON_STREAMING_HEARTBEAT_INTERVAL_SECONDS"`
+}
+
+// SpendEmitterConfig governs the async spend-command emission (the billing
+// pipeline's gateway leg). Disabled unless Enabled is set: the drainer would
+// otherwise retry against a control plane that has not deployed the ingest
+// route yet. When enabled, records spool under SpoolDir (bounded, oldest
+// dropped first with a counter when full) and ship to the control plane's
+// spend-command ingest, signed with the shared internal secret. The request
+// hot path never performs a networked write and is never delayed or refused
+// for recordability.
+type SpendEmitterConfig struct {
+	Enabled bool `env:"ENABLED"`
+	// SpoolDir holds the on-disk spool. Empty defaults to
+	// <os.TempDir()>/langwatch-gateway-spend-spool.
+	SpoolDir string `env:"SPOOL_DIR"`
+	// SpoolMaxBytes bounds the spool on disk. 0 defaults to 64 MiB.
+	SpoolMaxBytes int64 `env:"SPOOL_MAX_BYTES"`
+	// FlushIntervalSeconds bounds how long a record can sit unsealed (and
+	// therefore unshippable). 0 defaults to 1 second. Plain seconds, same
+	// parsing trap as NonStreamingHeartbeatIntervalSeconds above.
+	FlushIntervalSeconds int64 `env:"FLUSH_INTERVAL_SECONDS"`
+	// IngestBaseURL overrides where batches ship. Empty defaults to
+	// ControlPlane.BaseURL.
+	IngestBaseURL string `env:"INGEST_BASE_URL"`
 }
 
 // ControlPlaneConfig holds control plane connection settings.
