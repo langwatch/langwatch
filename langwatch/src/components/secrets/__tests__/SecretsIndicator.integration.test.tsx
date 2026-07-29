@@ -46,26 +46,20 @@ function renderIndicator({
   );
 }
 
-describe("<SecretsIndicator />", () => {
-  beforeEach(() => {
-    mockSecrets = [];
-    mockIsLoading = false;
-    mockOnInsertSecret.mockClear();
-    mockSecretsListQuery.mockReset();
-    mockSecretsListQuery.mockImplementation(() => ({
-      data: mockSecrets,
-      isLoading: mockIsLoading,
-    }));
-  });
+beforeEach(() => {
+  mockSecrets = [];
+  mockIsLoading = false;
+  mockOnInsertSecret.mockClear();
+  mockSecretsListQuery.mockReset();
+  mockSecretsListQuery.mockImplementation(() => ({
+    data: mockSecrets,
+    isLoading: mockIsLoading,
+  }));
+});
 
-  it("renders the trigger button with key icon", () => {
-    renderIndicator();
-    expect(screen.getByTestId("secrets-indicator")).toBeInTheDocument();
-    expect(screen.getByText("Secrets")).toBeInTheDocument();
-  });
-
+describe("<SecretsIndicator /> secrets query", () => {
   describe("when the popover has not been opened", () => {
-    it("does not enable the secrets query", () => {
+    it("does not enable the query", () => {
       renderIndicator();
 
       expect(mockSecretsListQuery).toHaveBeenCalledWith(
@@ -75,8 +69,8 @@ describe("<SecretsIndicator />", () => {
     });
   });
 
-  describe("when clicked", () => {
-    it("enables the secrets query", async () => {
+  describe("when the popover is opened", () => {
+    it("enables the query", async () => {
       const user = userEvent.setup();
       renderIndicator();
 
@@ -89,7 +83,17 @@ describe("<SecretsIndicator />", () => {
         );
       });
     });
+  });
+});
 
+describe("<SecretsIndicator />", () => {
+  it("renders the trigger button with key icon", () => {
+    renderIndicator();
+    expect(screen.getByTestId("secrets-indicator")).toBeInTheDocument();
+    expect(screen.getByText("Secrets")).toBeInTheDocument();
+  });
+
+  describe("when clicked", () => {
     it("shows usage hint at the bottom of the popover", async () => {
       const user = userEvent.setup();
       renderIndicator();
