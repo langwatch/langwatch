@@ -12,13 +12,13 @@
  *
  * See specs/server/worker-liveness-probe.feature.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Counter, register } from "prom-client";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  WORKER_LIVENESS_PATH,
   createWorkerMetricsHandler,
+  WORKER_LIVENESS_PATH,
 } from "../startWorkers";
 
 // Derive the fakes' types from the handler itself, so this test cannot drift
