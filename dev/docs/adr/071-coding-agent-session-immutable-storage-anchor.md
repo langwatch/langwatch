@@ -163,7 +163,7 @@ The **second** is the anchor a *rebuild from `event_log`* derives if the committ
 - **Milder:** its sort key is `(TenantId, TraceId)` and does **not** include `OccurredAt`, so the RMT collapses a trace's versions regardless of the anchor moving. Consequence 1 (orphaned versions that can never collapse) does not apply, and the sort-key argument that shapes the `trace_analytics` fix is unnecessary here.
 - **Worse:** it does not set `refoldOnStoreMiss`, which defaults to `false`. When the epoch row is reaped there is no rebuild net at all — `get()` misses, the fold restarts from `init()`, and the row is rewritten from post-reap events only. The failure mode is silent loss of the trace's accumulated cost, tokens and span count, not a refold storm.
 
-Not fixed in this change, and deliberately: it needs its own migration and a decision about the missing refold net. Tracked as a follow-up.
+Not fixed in this change, and deliberately: it needs its own migration and a decision about the missing refold net. Tracked as [#6312](https://github.com/langwatch/langwatch/issues/6312).
 
 `trace_analytics` knew about consequence 1 and priced only that one, exactly as ADR-056 did — its fold docblock said, before the amendment above replaced it, *"OccurredAt can shift when an earlier-starting span arrives late, so superseded rows may persist until TTL"*. The partition, TTL and dedup-scope consequences went unpriced there too.
 
@@ -190,7 +190,7 @@ A partition key, a sort key and a TTL anchor each need all three of **immutable*
 
 #### Scope of this finding
 
-This records the **target anchor** and a **systemic finding across three tables**. It re-plumbs nothing and adds no migration. `trace_analytics` and `evaluation_analytics` are named as same-class instances so nobody re-derives this later; whether either also needs the consequence-4 read fix `coding_agent_sessions` just got belongs to sequencing step 4's audit, not to this change.
+This records the **target anchor** and a **systemic finding across three tables**. *(As originally accepted: it re-plumbed nothing and added no migration. That held until the 2026-07-29 amendment, which ships migration 00061 for `trace_analytics`; the sentence stands as the record of the original decision, not of the current state.)* `trace_analytics` and `evaluation_analytics` are named as same-class instances so nobody re-derives this later; whether either also needs the consequence-4 read fix `coding_agent_sessions` just got belongs to sequencing step 4's audit, not to this change.
 
 Also ruled out, unchanged:
 
@@ -267,5 +267,5 @@ We accept both. Neither is a wrong answer on an ordinary read once this change l
 - [ADR-068](./068-windowed-clickhouse-reads.md) — windowed ClickHouse reads (the list read here is the counter-example; sequencing step 4 extends its discipline to the dedup-scope rule)
 - [ADR-015](./015-projection-replay-coordination.md) — replay coordination (the most likely vehicle for a re-key, if it ever happens)
 - `dev/docs/best_practices/clickhouse-queries.md` — IN-tuple dedup, version-stamp monotonicity, the `ORDER BY <version> DESC LIMIT 1` anti-pattern this tiebreak is not
-- **Same-class instances of the anchor defect** (recorded, not changed here): `00039_create_trace_analytics.sql:189-192` with `span-timing.service.ts:36-38` (**fixed — see the 2026-07-29 amendment**); `00041_create_evaluation_analytics.sql:135-138` with `evaluationAnalytics.foldProjection.ts:252` and `abstractFoldProjection.ts:235-238`
+- **Same-class instances of the anchor defect.** FIXED since: `00039_create_trace_analytics.sql:189-192` with `span-timing.service.ts:36-38` — see the 2026-07-29 amendment and migration 00061. STILL RECORDED-ONLY, not changed: `00041_create_evaluation_analytics.sql:135-138` with `evaluationAnalytics.foldProjection.ts:252` and `abstractFoldProjection.ts:235-238`; and `trace_summaries` (`00002_create_schema.sql`, `ttlReconciler.ts:149-151`), added by the 2026-07-29 inventory correction and tracked as [#6312](https://github.com/langwatch/langwatch/issues/6312)
 - **Accept time as the codebase already names it:** `foldProjection.types.ts:130-140` (`eventOrdering: "occurredAt" | "acceptedAt"`, the `(createdAt/EventTimestamp, EventId)` log cursor)
