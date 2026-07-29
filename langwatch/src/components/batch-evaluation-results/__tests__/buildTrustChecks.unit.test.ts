@@ -10,6 +10,7 @@ import {
   buildTrustChecks,
   type LeaderboardTrustPanelProps,
 } from "../LeaderboardTrustPanel";
+import { DEFAULT_WARN_THRESHOLD } from "../PairwiseLeaderboard";
 
 const leaderboard = (
   overrides: Partial<BTLeaderboard> = {},
@@ -379,6 +380,51 @@ describe("buildTrustChecks — reasons that must be the actual reason", () => {
       const detail = find(checks, "Judge independence").detail;
       expect(detail).toContain("warm-premium");
       expect(detail).not.toContain("discount that variant's lead");
+    });
+  });
+});
+
+describe("buildTrustChecks — the sample-size threshold the product actually ships", () => {
+  // Every test above passes `warnThreshold: 30` into the fixture, so none of
+  // them touches DEFAULT_WARN_THRESHOLD — the value the drawer really uses in
+  // three places. Zeroing it meant no run ever warned about a thin sample,
+  // and the whole suite stayed green.
+  //
+  // The thin fixture below is a fixed 5 matchups rather than one derived from
+  // the constant. Deriving it would move the fixture along with the constant
+  // and quietly stop testing anything, which is how the noise-floor test
+  // managed to pass against a build with no floor at all.
+  const THIN = 5;
+
+  describe("given a variant with far fewer matchups than the shipped threshold", () => {
+    it("warns, using the default rather than a value the test chose", () => {
+      const checks = build({
+        leaderboard: leaderboard({ minMatchups: THIN }),
+        warnThreshold: DEFAULT_WARN_THRESHOLD,
+      });
+
+      const check = find(checks, "Enough comparisons");
+      expect(check.tone).toBe("warn");
+      expect(check.detail).toContain(`only ${THIN}`);
+    });
+
+    it("keeps the shipped threshold above the thin fixture", () => {
+      // Asserted so that lowering the default below 5 fails here loudly
+      // instead of silently turning the test above into a no-op.
+      expect(DEFAULT_WARN_THRESHOLD).toBeGreaterThan(THIN);
+    });
+  });
+
+  describe("given a variant comfortably above the shipped threshold", () => {
+    it("passes the check", () => {
+      const checks = build({
+        leaderboard: leaderboard({
+          minMatchups: DEFAULT_WARN_THRESHOLD + 10,
+        }),
+        warnThreshold: DEFAULT_WARN_THRESHOLD,
+      });
+
+      expect(find(checks, "Enough comparisons").tone).toBe("ok");
     });
   });
 });
