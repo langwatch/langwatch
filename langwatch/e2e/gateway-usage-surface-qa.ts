@@ -10,6 +10,12 @@ import { hash } from "bcrypt";
 import { chromium, type Page } from "playwright";
 
 const BASE_URL = process.env.QA_BASE_URL ?? "http://localhost:5590";
+
+// This script writes a known password onto a real user row to obtain a
+// session, so it must only ever point at a local dev stack.
+if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(BASE_URL)) {
+  throw new Error(`refusing to run against a non-local target: ${BASE_URL}`);
+}
 const EMAIL = "dogfood@langwatch.local";
 const PASSWORD = "gateway-usage-qa-2026";
 const SHOT_DIR = process.env.QA_SHOT_DIR ?? "/tmp/gateway-usage-qa";
