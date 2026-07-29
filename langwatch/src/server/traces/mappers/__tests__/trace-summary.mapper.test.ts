@@ -273,3 +273,40 @@ describe("mapTraceSummaryToTrace — display-side single-key wrapper recursion",
     });
   });
 });
+
+describe("mapTraceSummaryToTrace — metadata.models", () => {
+  describe("when the attribute holds the fold's JSON array", () => {
+    it("surfaces it as a real array", () => {
+      const summary = makeSummary({
+        attributes: {
+          "metadata.models": JSON.stringify(["claude-opus-5", "gpt-5"]),
+        },
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.metadata.models).toEqual(["claude-opus-5", "gpt-5"]);
+    });
+  });
+
+  describe("when a user set the attribute to a value that is not a JSON array", () => {
+    it("keeps a scalar reachable through the generic passthrough", () => {
+      const summary = makeSummary({
+        attributes: { "metadata.models": "claude-opus-5" },
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.metadata.models).toBe("claude-opus-5");
+    });
+
+    it("keeps a JSON object reachable through the generic passthrough", () => {
+      const raw = JSON.stringify({ primary: "claude-opus-5" });
+      const summary = makeSummary({ attributes: { "metadata.models": raw } });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.metadata.models).toBe(raw);
+    });
+  });
+});

@@ -157,7 +157,10 @@ describe("trace-level model metadata stamping", () => {
         store: { store: async () => {}, get: async () => null },
       });
       let state = projection.init();
-      state = applySpanToAnalytics({ state, span: llmSpan("s1", "claude-opus-5") });
+      state = applySpanToAnalytics({
+        state,
+        span: llmSpan("s1", "claude-opus-5"),
+      });
       state = applySpanToAnalytics({
         state,
         span: llmSpan("s2", "claude-sonnet-4-5"),

@@ -1529,7 +1529,9 @@ function buildArrayJoinTimeseriesQuery({
     `${traceColumnWrapper(
       partitionedOrTrace(
         bucketNonBilledExpr,
-        needsNonBilledCost ? nonBilledCostExpression(ts) : `${ts}.NonBilledCost`,
+        needsNonBilledCost
+          ? nonBilledCostExpression(ts)
+          : `${ts}.NonBilledCost`,
       ),
     )} AS trace_non_billed_cost`,
   );

@@ -623,7 +623,9 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("gen_ai.response.model");
       expect(result.sql).toContain("gen_ai.request.model");
       // The fold's redundant-usage gate must apply to the buckets too.
-      expect(result.sql).toContain("langwatch.reserved.skip_token_accumulation");
+      expect(result.sql).toContain(
+        "langwatch.reserved.skip_token_accumulation",
+      );
       // Traces without span-model rows fall back to their primary model.
       expect(result.sql).toContain(
         "if(empty(ts.Models), 'unknown', ts.Models[1])",
