@@ -21,7 +21,10 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -55,8 +58,20 @@ jobs:
       # reach each other. Files inside a shard share one Redis server and are
       # kept apart only by logical-database juggling, which is exactly what
       # stopped holding. Buy the parallelism where it is free.
+      #
+      # The counts below are the `--shard=N/COUNT` denominators, and they MUST
+      # track the arrays. They were a literal `/4` in both run steps, which is
+      # how raising integration to six produced `--shard=5/4` and a startup
+      # error. Emitting the count next to the array is what keeps the two from
+      # drifting apart again.
+      #
+      # It also fixes the draft case, which was silently wrong: a draft got
+      # `shards: [1]` and still ran `--shard=1/4`, so it executed a quarter of
+      # its files while reporting a pass over all of them.
       unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4]' || '[1]' }}
+      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '4' || '1' }}
       integration-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '[1,2,3,4,5,6]' || '[1]' }}
+      integration-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && '6' || '1' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -207,7 +222,7 @@ jobs:
               --dangerouslyIgnoreUnhandledErrors
           else
             # shellcheck disable=SC2086
-            pnpm test:unit --run --shard=${{ matrix.shard }}/4 $COV \
+            pnpm test:unit --run --shard=${{ matrix.shard }}/${{ needs.changes.outputs.unit-shard-count }} $COV \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
           fi
@@ -409,7 +424,7 @@ jobs:
               --outputFile=test-results.json
           else
             # shellcheck disable=SC2086
-            pnpm test:integration --shard=${{ matrix.shard }}/4 $COV \
+            pnpm test:integration --shard=${{ matrix.shard }}/${{ needs.changes.outputs.integration-shard-count }} $COV \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json
           fi
