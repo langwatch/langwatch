@@ -1,9 +1,8 @@
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import type { PlanProvider } from "../app-layer/subscription/plan-provider";
-import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
-import type { LimitCheckResult, LimitType } from "./types";
-import { limitTypes } from "./types";
 import { LimitExceededError } from "./errors";
+import type { ILicenseEnforcementRepository } from "./license-enforcement.repository";
+import type { LimitCheckResult, LimitType, limitTypes } from "./types";
 
 /**
  * Configuration for a single limit type.
@@ -91,11 +90,12 @@ const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
 
 // Compile-time check: ensure all LimitTypes are covered in config
 // This will fail to compile if a LimitType is added but not configured
-type _AssertAllTypesConfigured = (typeof limitTypes)[number] extends keyof typeof LIMIT_TYPE_CONFIG
-  ? keyof typeof LIMIT_TYPE_CONFIG extends (typeof limitTypes)[number]
-    ? true
-    : never
-  : never;
+type _AssertAllTypesConfigured =
+  (typeof limitTypes)[number] extends keyof typeof LIMIT_TYPE_CONFIG
+    ? keyof typeof LIMIT_TYPE_CONFIG extends (typeof limitTypes)[number]
+      ? true
+      : never
+    : never;
 const _typeCheck: _AssertAllTypesConfigured = true;
 void _typeCheck; // Suppress unused variable warning
 
@@ -137,7 +137,10 @@ export class LicenseEnforcementService {
     limitType: LimitType,
     user?: MinimalUser,
   ): Promise<LimitCheckResult> {
-    const plan = await this.planProvider.getActivePlan({ organizationId, user });
+    const plan = await this.planProvider.getActivePlan({
+      organizationId,
+      user,
+    });
 
     // If plan has override flag, skip enforcement (e.g., unlimited OSS plan)
     if (plan.overrideAddingLimitations) {

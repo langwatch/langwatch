@@ -1,12 +1,12 @@
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
-import type {
-	ExperimentRunState,
-	ExperimentRunStateData,
-} from "./experimentRunState.foldProjection";
-import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type { ExperimentRunStateRepository } from "../repositories/experimentRunState.repository";
+import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import { parseExperimentRunKey } from "../utils/compositeKey";
+import type {
+  ExperimentRunState,
+  ExperimentRunStateData,
+} from "./experimentRunState.foldProjection";
 
 /**
  * Creates a FoldProjectionStore for experiment run state.
@@ -25,7 +25,9 @@ export function createExperimentRunStateFoldStore(
       // even before the "started" event sets them via apply().
       // This prevents the split-row bug where ExperimentId mutates from ""
       // to the real value between writes.
-      const { experimentId, runId } = parseExperimentRunKey(context.aggregateId);
+      const { experimentId, runId } = parseExperimentRunKey(
+        context.aggregateId,
+      );
       const stateWithKeys: ExperimentRunStateData = {
         ...state,
         RunId: runId,
@@ -41,7 +43,9 @@ export function createExperimentRunStateFoldStore(
         data: stateWithKeys,
       };
 
-      await repository.storeProjection(projection, { tenantId: context.tenantId });
+      await repository.storeProjection(projection, {
+        tenantId: context.tenantId,
+      });
     },
 
     async get(

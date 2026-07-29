@@ -7,8 +7,8 @@
  * fragility of a native HEAD probe.
  */
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "~/server/api/rbac";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 
 /**

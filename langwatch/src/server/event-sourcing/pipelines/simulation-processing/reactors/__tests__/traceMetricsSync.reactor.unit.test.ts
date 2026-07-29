@@ -1,19 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTraceMetricsSyncReactor } from "../traceMetricsSync.reactor";
-import type { TraceMetricsSyncReactorDeps } from "../traceMetricsSync.reactor";
-import type { SimulationRunStateData } from "../../projections/simulationRunState.foldProjection";
 import { createTenantId } from "../../../../domain/tenantId";
+import type { SimulationRunStateData } from "../../projections/simulationRunState.foldProjection";
+import type { TraceMetricsSyncReactorDeps } from "../traceMetricsSync.reactor";
+import { createTraceMetricsSyncReactor } from "../traceMetricsSync.reactor";
 
 const TEST_TENANT = createTenantId("tenant-1");
 
-function makeDeps(overrides: Partial<TraceMetricsSyncReactorDeps> = {}): TraceMetricsSyncReactorDeps {
+function makeDeps(
+  overrides: Partial<TraceMetricsSyncReactorDeps> = {},
+): TraceMetricsSyncReactorDeps {
   return {
     computeRunMetrics: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
 
-function makeSimState(overrides: Partial<SimulationRunStateData> = {}): SimulationRunStateData {
+function makeSimState(
+  overrides: Partial<SimulationRunStateData> = {},
+): SimulationRunStateData {
   return {
     ScenarioRunId: "run-1",
     ScenarioId: "scenario-1",
@@ -95,7 +99,11 @@ describe("traceMetricsSync reactor (simulation-side)", () => {
         aggregateId: "run-1",
         foldState: makeSimState({
           TraceMetrics: {
-            "trace-1": { totalCost: 0.003, roleCosts: { Agent: 0.003 }, roleLatencies: { Agent: 4000 } },
+            "trace-1": {
+              totalCost: 0.003,
+              roleCosts: { Agent: 0.003 },
+              roleLatencies: { Agent: 4000 },
+            },
           },
         }),
       });

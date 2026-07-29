@@ -27,10 +27,10 @@
  *      "A failure keeps its structure all the way to the card"
  */
 import {
+  type CliHandledError,
+  isTerminalFailure,
   parseCliJson,
   readCliErrorDocument,
-  isTerminalFailure,
-  type CliHandledError,
 } from "@langwatch/langy";
 import { LIMIT_TYPE_LABELS } from "~/server/license-enforcement/constants";
 
@@ -233,9 +233,7 @@ function limitLabel(limitType: unknown): string | undefined {
 }
 
 /** The plan allowance behind a failure, or null when it was not one. */
-function readPlanLimit(
-  domain: CliHandledError,
-): LangyToolFailureLimit | null {
+function readPlanLimit(domain: CliHandledError): LangyToolFailureLimit | null {
   if (!PLAN_LIMIT_CODES.has(normalizedCode(domain))) return null;
   const label = limitLabel(domain.meta.limitType);
   if (!label) return null;
@@ -364,7 +362,8 @@ export function presentLangyToolError({
   const traceUrl = safeHttpUrl(domain.traceUrl) ?? safeHttpUrl(trace?.traceUrl);
   const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
   const docsUrl = safeHttpUrl(domain.docUrl);
-  const { message, detail, limit, remediationApplies } = describeFailure(domain);
+  const { message, detail, limit, remediationApplies } =
+    describeFailure(domain);
 
   return {
     title: `${title} failed`,

@@ -5,7 +5,7 @@ import { useEffect } from "react";
  */
 export function useAutoFocusInput(
   isOpen: boolean,
-  inputRef: React.RefObject<HTMLInputElement | null>
+  inputRef: React.RefObject<HTMLInputElement | null>,
 ) {
   useEffect(() => {
     if (isOpen) {

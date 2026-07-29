@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { detectEntityId } from "../useCommandSearch";
 
 /**
@@ -50,7 +50,7 @@ describe("detectEntityId", () => {
         projectSlug: PROJECT_SLUG,
       });
       expect(result?.path).toBe(
-        "/test-project/agents?drawer.open=agentViewer&drawer.agentId=agent_abc123"
+        "/test-project/agents?drawer.open=agentViewer&drawer.agentId=agent_abc123",
       );
     });
 
@@ -91,7 +91,7 @@ describe("detectEntityId", () => {
         projectSlug: PROJECT_SLUG,
       });
       expect(result?.path).toBe(
-        "/test-project/traces?drawer.open=traceV2Details&drawer.traceId=trace_abc123"
+        "/test-project/traces?drawer.open=traceV2Details&drawer.traceId=trace_abc123",
       );
       expect(result?.drawerAction).toBeUndefined();
     });
@@ -116,7 +116,7 @@ describe("detectEntityId", () => {
         projectSlug: PROJECT_SLUG,
       });
       expect(result?.path).toBe(
-        "/test-project/traces#all-traces?q=spanId%3Aspan_abc123"
+        "/test-project/traces#all-traces?q=spanId%3Aspan_abc123",
       );
       expect(result?.drawerAction).toBeUndefined();
     });
@@ -125,37 +125,37 @@ describe("detectEntityId", () => {
   describe("non-ID queries", () => {
     it("returns null for regular search queries", () => {
       expect(
-        detectEntityId({ query: "my prompt", projectSlug: PROJECT_SLUG })
+        detectEntityId({ query: "my prompt", projectSlug: PROJECT_SLUG }),
       ).toBeNull();
       expect(
-        detectEntityId({ query: "test agent", projectSlug: PROJECT_SLUG })
+        detectEntityId({ query: "test agent", projectSlug: PROJECT_SLUG }),
       ).toBeNull();
       expect(
-        detectEntityId({ query: "foo", projectSlug: PROJECT_SLUG })
+        detectEntityId({ query: "foo", projectSlug: PROJECT_SLUG }),
       ).toBeNull();
     });
 
     it("returns null for empty or whitespace", () => {
       expect(
-        detectEntityId({ query: "", projectSlug: PROJECT_SLUG })
+        detectEntityId({ query: "", projectSlug: PROJECT_SLUG }),
       ).toBeNull();
       expect(
-        detectEntityId({ query: "   ", projectSlug: PROJECT_SLUG })
+        detectEntityId({ query: "   ", projectSlug: PROJECT_SLUG }),
       ).toBeNull();
     });
 
     it("returns null for partial prefixes", () => {
       expect(
-        detectEntityId({ query: "agent", projectSlug: PROJECT_SLUG })
+        detectEntityId({ query: "agent", projectSlug: PROJECT_SLUG }),
       ).toBeNull();
       expect(
-        detectEntityId({ query: "trace", projectSlug: PROJECT_SLUG })
+        detectEntityId({ query: "trace", projectSlug: PROJECT_SLUG }),
       ).toBeNull();
     });
 
     it("returns null when projectSlug is empty", () => {
       expect(
-        detectEntityId({ query: "agent_abc123", projectSlug: "" })
+        detectEntityId({ query: "agent_abc123", projectSlug: "" }),
       ).toBeNull();
     });
   });

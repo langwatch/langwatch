@@ -25,22 +25,16 @@ const chatRoleSchema = z.union([
   z.literal("unknown"),
 ]);
 
-type ChatRole = z.infer<typeof chatRoleSchema>;
-
 const functionCallSchema = z.object({
   name: z.string().optional(),
   arguments: z.string().optional(),
 });
-
-type FunctionCall = z.infer<typeof functionCallSchema>;
 
 const toolCallSchema = z.object({
   id: z.string(),
   type: z.string(),
   function: functionCallSchema,
 });
-
-type ToolCall = z.infer<typeof toolCallSchema>;
 
 export const rAGChunkSchema = z.object({
   document_id: z.string().optional().nullable(),

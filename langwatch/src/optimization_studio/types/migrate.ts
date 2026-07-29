@@ -99,7 +99,10 @@ export const migrateDSLVersion = (dsl_: Workflow) => {
           if (p.type !== "llm") return p;
           const value = p.value as LLMConfig | undefined | null;
           if (value?.model) return p;
-          return { ...p, value: { ...defaultLLM, ...value, model: defaultLLM.model } };
+          return {
+            ...p,
+            value: { ...defaultLLM, ...value, model: defaultLLM.model },
+          };
         });
       });
     }

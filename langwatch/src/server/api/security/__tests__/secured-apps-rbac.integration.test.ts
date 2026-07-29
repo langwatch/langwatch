@@ -12,27 +12,26 @@
  *   - a key for one organization cannot resolve another organization's project
  *     (cross-tenant isolation at the token layer).
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-  type Organization,
-  type Project,
-  type Team,
-} from "@prisma/client";
+
 import { generate } from "@langwatch/ksuid";
+import {
+  type Organization,
+  OrganizationUserRole,
+  type Project,
+  RoleBindingScopeType,
+  type Team,
+  TeamUserRole,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { prisma } from "~/server/db";
-import { KSUID_RESOURCES } from "~/utils/constants";
-
 import { app as analyticsApp } from "~/app/api/analytics/[...route]/app";
 import { app as copilotkitApp } from "~/app/api/copilotkit/[[...route]]/app";
 import { app as experimentsApp } from "~/app/api/experiments/[[...route]]/app";
 import { app as modelDefaultsApp } from "~/app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "~/app/api/model-providers/[[...route]]/app";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 const ns = `secured-rbac-${nanoid(8)}`;
 

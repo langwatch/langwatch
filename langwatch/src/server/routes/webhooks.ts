@@ -8,76 +8,79 @@
  * is created, updated, or deleted via SCIM on an enterprise connection.
  */
 import { env } from "~/env.mjs";
-import { prisma } from "~/server/db";
+import { createServiceApp, internalSecret } from "~/server/api/security";
 import { extractEmailDomain } from "~/server/better-auth/sso";
+import { prisma } from "~/server/db";
 import { ScimService } from "~/server/scim/scim.service";
-import {
-  createServiceApp,
-  internalSecret,
-} from "~/server/api/security";
 
 const secured = createServiceApp({ basePath: "/api/webhooks" });
 
-secured.access(internalSecret("auth0 SCIM webhook shared secret compared against the Authorization header in-handler")).post("/auth0-scim", async (c) => {
-  const secret = env.AUTH0_SCIM_WEBHOOK_SECRET;
-  if (!secret) {
-    return c.json({ error: "Webhook not configured" }, { status: 404 });
-  }
+secured
+  .access(
+    internalSecret(
+      "auth0 SCIM webhook shared secret compared against the Authorization header in-handler",
+    ),
+  )
+  .post("/auth0-scim", async (c) => {
+    const secret = env.AUTH0_SCIM_WEBHOOK_SECRET;
+    if (!secret) {
+      return c.json({ error: "Webhook not configured" }, { status: 404 });
+    }
 
-  const authHeader = c.req.header("authorization");
-  if (authHeader !== secret) {
-    return c.json({ error: "Unauthorized" }, { status: 401 });
-  }
+    const authHeader = c.req.header("authorization");
+    if (authHeader !== secret) {
+      return c.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-  const events = Array.isArray(body) ? body : [body];
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+    const events = Array.isArray(body) ? body : [body];
 
-  const scimService = ScimService.create(prisma);
+    const scimService = ScimService.create(prisma);
 
-  for (const event of events) {
-    if (!isScimEvent(event)) continue;
+    for (const event of events) {
+      if (!isScimEvent(event)) continue;
 
-    const email = extractEmail(event);
-    if (!email) continue;
+      const email = extractEmail(event);
+      if (!email) continue;
 
-    const domain = extractEmailDomain(email);
-    if (!domain) continue;
+      const domain = extractEmailDomain(email);
+      if (!domain) continue;
 
-    const org = await prisma.organization.findUnique({
-      where: { ssoDomain: domain },
-    });
-    if (!org) continue;
-
-    const action = extractAction(event);
-
-    if (action === "create") {
-      const name = extractName(event) ?? email.split("@")[0] ?? email;
-      await scimService.createUser({
-        request: {
-          schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
-          userName: email,
-          name: parseName(name),
-        },
-        organizationId: org.id,
+      const org = await prisma.organization.findUnique({
+        where: { ssoDomain: domain },
       });
-    } else if (action === "deactivate") {
-      const user = await prisma.user.findUnique({ where: { email } });
-      if (user) {
-        await scimService.deleteUser({
-          id: user.id,
+      if (!org) continue;
+
+      const action = extractAction(event);
+
+      if (action === "create") {
+        const name = extractName(event) ?? email.split("@")[0] ?? email;
+        await scimService.createUser({
+          request: {
+            schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+            userName: email,
+            name: parseName(name),
+          },
           organizationId: org.id,
         });
+      } else if (action === "deactivate") {
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (user) {
+          await scimService.deleteUser({
+            id: user.id,
+            organizationId: org.id,
+          });
+        }
       }
     }
-  }
 
-  return c.json({ received: true });
-});
+    return c.json({ received: true });
+  });
 
 export const app = secured.hono;
 

@@ -248,4 +248,123 @@ describe("useOrganizationTeamProject personal-workspace resolution", () => {
       expect(result.current.team?.id).toBe("team-shared");
     });
   });
+
+  describe("given a personal-workspace-scoped page (/me) and nothing selected yet", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me";
+      mockRouter.pathname = "/me";
+      mockRouter.asPath = "/me";
+    });
+
+    // /me is the one "no slug" page that means the OPPOSITE of the
+    // organization-scoped case above: the personal workspace must win, not
+    // the shared team it otherwise correctly loses to. Unfixed, this landed
+    // on the shared team's own first project (or, per "given the shared team
+    // has no project yet" below, no project at all): any organization
+    // feature gated on "does this reader have a project" (Langy chief among
+    // them) then read a personal-workspace visit as project-less.
+    /** @scenario Visiting the personal-workspace page resolves the personal team */
+    it("resolves the personal team instead of the shared one", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-personal");
+    });
+
+    /** @scenario Visiting the personal-workspace page resolves the personal team */
+    it("resolves the personal project instead of the organization's", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.project?.id).toBe("proj-personal");
+    });
+  });
+
+  describe("given /me and the shared team has no project yet", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me";
+      mockRouter.pathname = "/me";
+      mockRouter.asPath = "/me";
+      mockOrganizationsQuery.mockReturnValue(
+        loadedOrganizationsQuery([
+          PERSONAL_TEAM,
+          { ...SHARED_TEAM, projects: [] },
+        ]),
+      );
+    });
+
+    // The organization-scoped equivalent of this fixture correctly leaves the
+    // page without a project (see "given the shared team has no project yet"
+    // above), /me must not inherit that outcome just because the same
+    // shared, project-less team exists in the organization.
+    /** @scenario A shared team without a project does not leak into the personal-workspace page */
+    it("still resolves the personal team and project, not an empty shared one", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-personal");
+      expect(result.current.project?.id).toBe("proj-personal");
+    });
+  });
+
+  describe("given a personal sub-route (/me/devices) and nothing selected yet", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me/devices";
+      mockRouter.pathname = "/me/devices";
+      mockRouter.asPath = "/me/devices";
+    });
+
+    /** @scenario Every personal-workspace sub-route gets the same treatment */
+    it("resolves the personal team and project there too", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-personal");
+      expect(result.current.project?.id).toBe("proj-personal");
+    });
+  });
+
+  describe("given /me and a stale non-personal team remembered from an earlier organization-scoped visit", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me";
+      mockRouter.pathname = "/me";
+      mockRouter.asPath = "/me";
+      // The exact stickiness an earlier organization-scoped visit leaves
+      // behind on purpose (see "given the personal project is only the
+      // remembered selection" above): the localStorage-remembered team
+      // lookup that persisted selection normally wins was the actual gap, it
+      // ran before any personal-workspace preference could apply, so this
+      // persisted id matched and /me silently resolved to the shared team.
+      mockLocalStorage.selectedTeamId = "team-shared";
+    });
+
+    // Unlike a stale PERSONAL slug fading off an organization page (which the
+    // code already handles), a stale SHARED team id must not follow the user
+    // onto /me: this route is unambiguously about the personal workspace
+    // regardless of whatever was last remembered.
+    /** @scenario A team remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page */
+    it("still resolves the personal team, not the remembered shared one", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-personal");
+      expect(result.current.project?.id).toBe("proj-personal");
+    });
+  });
+
+  describe("given /me but the organization has no personal team at all", () => {
+    beforeEach(() => {
+      mockRouter.route = "/me";
+      mockRouter.pathname = "/me";
+      mockRouter.asPath = "/me";
+      mockOrganizationsQuery.mockReturnValue(
+        loadedOrganizationsQuery([SHARED_TEAM]),
+      );
+    });
+
+    // An EXTERNAL member with no personal workspace of their own falls
+    // through to the ordinary ambient resolution exactly as before: the /me
+    // fix only ever adds a preference, never a requirement.
+    /** @scenario A member with no personal workspace of their own falls back to the ambient team */
+    it("falls back to the ambient team rather than resolving nothing", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.team?.id).toBe("team-shared");
+    });
+  });
 });

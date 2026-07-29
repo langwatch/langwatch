@@ -2,17 +2,20 @@
  * @vitest-environment jsdom
  *
  * Regression coverage for langwatch/langwatch#5550:
- * when `acceptInvite` fails, the page must tell the user what happened
- * (the server's error message) and offer a way out — a "Go to Dashboard"
- * action next to "Log Out and Try Again" — instead of dead-ending on the
- * loading screen with the error only in the console.
+ * when `acceptInvite` fails, the page must tell the user what happened and
+ * offer a way out — a "Go to Dashboard" action next to "Log Out and Try
+ * Again" — instead of dead-ending on the loading screen with the error only
+ * in the console.
+ *
+ * The words come from `~/features/errors`, never from `error.message`: since
+ * #5984 that is the code slug, and this page is the last thing a signed-out
+ * visitor with a dead invite link sees.
  */
 import "@testing-library/jest-dom/vitest";
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AcceptInviteStatus } from "~/hooks/useAcceptInviteOnce";
@@ -22,7 +25,7 @@ const { hardRedirectSpy, signOutSpy, mockAcceptState } = vi.hoisted(() => ({
   signOutSpy: vi.fn(),
   mockAcceptState: {
     status: "error" as AcceptInviteStatus,
-    errorMessage: null as string | null,
+    error: null as unknown,
   },
 }));
 
@@ -69,16 +72,22 @@ describe("Accept invite page", () => {
   describe("given the invite acceptance failed", () => {
     beforeEach(() => {
       mockAcceptState.status = "error";
-      mockAcceptState.errorMessage =
-        "The invite was sent to invitee@example.com, but you are signed in as someone-else@example.com";
+      // The shape tRPC puts on the wire for a message a procedure wrote to be
+      // read: a 4xx marked `authored` (see `readAuthoredMessage`).
+      mockAcceptState.error = Object.assign(
+        new Error(
+          "The invite was sent to invitee@example.com, but you are signed in as someone-else@example.com",
+        ),
+        { data: { httpStatus: 400, authored: true } },
+      );
     });
 
     describe("when the page renders", () => {
-      it("shows the server's explanation of what happened", () => {
+      it("shows the explanation the procedure authored for the user", () => {
         renderAccept();
 
         expect(
-          screen.getByText("An error occurred while accepting the invite."),
+          screen.getByText("An error occurred while accepting the invite"),
         ).toBeInTheDocument();
         expect(
           screen.getByText(
@@ -131,12 +140,12 @@ describe("Accept invite page", () => {
   describe("given the acceptance is still in flight", () => {
     it("renders the loading screen without any error alert", () => {
       mockAcceptState.status = "loading";
-      mockAcceptState.errorMessage = null;
+      mockAcceptState.error = null;
 
       renderAccept();
 
       expect(
-        screen.queryByText("An error occurred while accepting the invite."),
+        screen.queryByText("An error occurred while accepting the invite"),
       ).not.toBeInTheDocument();
     });
   });

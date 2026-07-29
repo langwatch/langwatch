@@ -24,11 +24,11 @@ import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import type { EvaluatorConfig, TargetConfig } from "../types";
 import { isComparisonEvaluator } from "../types";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
-import { toComparisonConfig } from "../utils/normalizeComparison";
 import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../utils/fieldMappingConverters";
+import { toComparisonConfig } from "../utils/normalizeComparison";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 /**

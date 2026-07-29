@@ -18,6 +18,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
   startTestContainers,
   stopTestContainers,
@@ -42,7 +43,7 @@ function sessionRow(
     tenantId,
     sessionId: `${tag}-s`,
     sessionKeySource: "provider",
-    version: "2026-07-21",
+    version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
     startedAtMs: baseMs,
     agent: "claude_code",
     agentVersion: "2.0.0",
@@ -282,6 +283,49 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     expect(unwindowed?.costUsd).toBeCloseTo(2);
   });
 
+  it("drops a session from a listed period once its latest StartedAt drifted out of it (ADR-071)", async () => {
+    // The list read's version of the case above. v1 sits inside the listed
+    // period; v2 — the true latest — backdates StartedAt two weeks out. The
+    // dedup subquery is unwindowed, so it resolves v2 and the outer period
+    // filter then excludes the session: absent, rather than rendered at a
+    // start time it no longer has with v1's stale cost. Windowing the dedup
+    // scope instead brings v1 back with costUsd 1.
+    const drifted = `${tag}-list-drift`;
+    const driftedStartMs = baseMs - 14 * 24 * 60 * 60 * 1000;
+    await sessions.upsert(
+      sessionRow({ sessionId: drifted, startedAtMs: baseMs, costUsd: 1 }),
+      30,
+    );
+    await sessions.upsert(
+      sessionRow({
+        sessionId: drifted,
+        startedAtMs: driftedStartMs,
+        costUsd: 2,
+      }),
+      30,
+    );
+
+    const listedNow = await sessions.findManyRecent({
+      tenantId,
+      fromMs: baseMs - 60_000,
+      toMs: baseMs + 60_000,
+      limit: 50,
+    });
+    const listedThen = await sessions.findManyRecent({
+      tenantId,
+      fromMs: driftedStartMs - 60_000,
+      toMs: driftedStartMs + 60_000,
+      limit: 50,
+    });
+
+    expect(listedNow.map((row) => row.sessionId)).not.toContain(drifted);
+    // Absent from the period it left, present exactly once — with its latest
+    // totals — in the period it moved into.
+    const inNewPeriod = listedThen.filter((row) => row.sessionId === drifted);
+    expect(inNewPeriod).toHaveLength(1);
+    expect(inNewPeriod[0]!.costUsd).toBeCloseTo(2);
+  });
+
   it("reads back the applied-event-id watermark next to the row (ADR-066)", async () => {
     const row = sessionRow({ sessionId: `${tag}-applied` });
     await sessions.upsert(row, 30, ["ev-1", "ev-2"]);
@@ -335,7 +379,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
           TenantId: tenantId,
           SessionId: sessionId,
           StartedAt: new Date(baseMs),
-          Version: "2026-07-21",
+          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
         },
       ],
       format: "JSONEachRow",

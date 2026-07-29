@@ -4,17 +4,17 @@ import type { FilterField } from "../../filters/types";
 import { filterOutEmptyFilters } from "../utils";
 
 describe("filterOutEmptyFilters", () => {
-  it("should return empty object when filters is undefined", () => {
+  it("returns empty object when filters is undefined", () => {
     const result = filterOutEmptyFilters(undefined);
     expect(result).toEqual({});
   });
 
-  it("should return empty object when filters is empty", () => {
+  it("returns empty object when filters is empty", () => {
     const result = filterOutEmptyFilters({});
     expect(result).toEqual({});
   });
 
-  it("should filter out empty strings from query params", () => {
+  it("filters out empty strings from query params", () => {
     const filters: Partial<Record<FilterField, FilterParam | string>> = {
       "metadata.user_id": "",
       "metadata.customer_id": "customer123",
@@ -25,7 +25,7 @@ describe("filterOutEmptyFilters", () => {
     });
   });
 
-  it("should keep non-empty strings from query params", () => {
+  it("keeps non-empty strings from query params", () => {
     const filters: Partial<Record<FilterField, FilterParam | string>> = {
       "metadata.user_id": "user123",
       "metadata.thread_id": "thread456",
@@ -37,7 +37,7 @@ describe("filterOutEmptyFilters", () => {
     });
   });
 
-  it("should filter out empty arrays", () => {
+  it("filters out empty arrays", () => {
     const filters: Partial<Record<FilterField, FilterParam>> = {
       "metadata.user_id": [],
       "metadata.customer_id": ["customer123"],
@@ -48,7 +48,7 @@ describe("filterOutEmptyFilters", () => {
     });
   });
 
-  it("should filter out empty objects", () => {
+  it("filters out empty objects", () => {
     const filters: Partial<Record<FilterField, FilterParam>> = {
       "metadata.user_id": {},
       "metadata.customer_id": { key1: ["value1"] },
@@ -59,7 +59,7 @@ describe("filterOutEmptyFilters", () => {
     });
   });
 
-  it("should handle mixed types including strings from query params", () => {
+  it("handles mixed types including strings from query params", () => {
     const filters: Partial<Record<FilterField, FilterParam | string>> = {
       "metadata.user_id": "",
       "metadata.customer_id": [],
@@ -76,7 +76,7 @@ describe("filterOutEmptyFilters", () => {
     });
   });
 
-  it("should keep arrays with elements", () => {
+  it("keeps arrays with elements", () => {
     const filters: Partial<Record<FilterField, FilterParam>> = {
       "metadata.labels": ["label1", "label2", "label3"],
     };
@@ -86,7 +86,7 @@ describe("filterOutEmptyFilters", () => {
     });
   });
 
-  it("should keep objects with keys", () => {
+  it("keeps objects with keys", () => {
     const filters: Partial<Record<FilterField, FilterParam>> = {
       "metadata.key": { field1: ["value1"], field2: ["value2"] },
     };
@@ -96,7 +96,7 @@ describe("filterOutEmptyFilters", () => {
     });
   });
 
-  it("should keep nested objects", () => {
+  it("keeps nested objects", () => {
     const filters: Partial<Record<FilterField, FilterParam>> = {
       "metadata.key": {
         level1: {

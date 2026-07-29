@@ -1,4 +1,4 @@
-import { Box, HStack, Heading, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useMemo } from "react";
 import {
@@ -56,7 +56,10 @@ export function SpendOverTimeChart({
 }) {
   const { rows, seriesKeys } = useMemo(() => {
     if (!buckets || buckets.length === 0) {
-      return { rows: [], seriesKeys: [] as Array<{ key: string; label: string }> };
+      return {
+        rows: [],
+        seriesKeys: [] as Array<{ key: string; label: string }>,
+      };
     }
     const labelByKey = new Map<string, string>();
     for (const bucket of buckets) {
@@ -106,13 +109,14 @@ export function SpendOverTimeChart({
             gap={1}
           >
             <Text fontSize="sm">No spend in this window yet.</Text>
-            {emptyHint && (
-              <Text fontSize="xs">{emptyHint}</Text>
-            )}
+            {emptyHint && <Text fontSize="xs">{emptyHint}</Text>}
           </VStack>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <AreaChart
+              data={rows}
+              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            >
               <defs>
                 {seriesKeys.map((s) => {
                   const color = getHexColorForString(s.label);
@@ -126,12 +130,20 @@ export function SpendOverTimeChart({
                       y2="1"
                     >
                       <stop offset="0%" stopColor={color} stopOpacity={0.45} />
-                      <stop offset="100%" stopColor={color} stopOpacity={0.05} />
+                      <stop
+                        offset="100%"
+                        stopColor={color}
+                        stopOpacity={0.05}
+                      />
                     </linearGradient>
                   );
                 })}
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="#e2e8f0"
+                vertical={false}
+              />
               <XAxis
                 dataKey="day"
                 tick={{ fontSize: 11, fill: "#64748b" }}
@@ -140,7 +152,9 @@ export function SpendOverTimeChart({
               />
               <YAxis
                 tick={{ fontSize: 11, fill: "#64748b" }}
-                tickFormatter={(v: number) => `$${numeral(v).format("0,0.[00]")}`}
+                tickFormatter={(v: number) =>
+                  `$${numeral(v).format("0,0.[00]")}`
+                }
                 width={60}
               />
               <Tooltip

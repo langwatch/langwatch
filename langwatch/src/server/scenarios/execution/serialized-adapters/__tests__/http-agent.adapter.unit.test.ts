@@ -14,10 +14,12 @@ vi.mock("~/utils/ssrfProtection", () => ({
 }));
 
 vi.mock("@langwatch/observability/tracing", () => ({
-  injectTraceContextHeaders: vi.fn(({ headers }: { headers: Record<string, string> }) => ({
-    headers,
-    traceId: undefined,
-  })),
+  injectTraceContextHeaders: vi.fn(
+    ({ headers }: { headers: Record<string, string> }) => ({
+      headers,
+      traceId: undefined,
+    }),
+  ),
 }));
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
@@ -347,7 +349,9 @@ describe("SerializedHttpAgentAdapter", () => {
       await adapter.call(defaultInput);
 
       expect(mockInjectTraceContextHeaders).toHaveBeenCalledWith({
-        headers: expect.objectContaining({ "Content-Type": "application/json" }),
+        headers: expect.objectContaining({
+          "Content-Type": "application/json",
+        }),
       });
     });
 
@@ -507,28 +511,25 @@ describe("SerializedHttpAgentAdapter", () => {
         ["localhost"],
         ["127.0.0.1"],
         ["169.254.169.254"],
-      ])(
-        "passes the %s-resolved url (post-render) to ssrfSafeFetch",
-        async (host) => {
-          const config: HttpAgentData = {
-            ...defaultConfig,
-            url: "https://{{input | raw}}/path",
-          };
-          const input: AgentInput = {
-            ...defaultInput,
-            messages: [{ role: "user", content: host }],
-            newMessages: [{ role: "user", content: host }],
-          };
-          const adapter = new SerializedHttpAgentAdapter(config);
+      ])("passes the %s-resolved url (post-render) to ssrfSafeFetch", async (host) => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://{{input | raw}}/path",
+        };
+        const input: AgentInput = {
+          ...defaultInput,
+          messages: [{ role: "user", content: host }],
+          newMessages: [{ role: "user", content: host }],
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
 
-          await expect(adapter.call(input)).rejects.toThrow();
+        await expect(adapter.call(input)).rejects.toThrow();
 
-          expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
-            `https://${host}/path`,
-            expect.any(Object),
-          );
-        },
-      );
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          `https://${host}/path`,
+          expect.any(Object),
+        );
+      });
     });
 
     describe("when url template is malformed", () => {

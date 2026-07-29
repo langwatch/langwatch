@@ -39,11 +39,11 @@
  */
 
 import {
-  type MeasuredCardKind,
   CLI_COLLECTION_VERBS,
   type CliResultDigest,
   cardKindFor,
   cliVerbTone,
+  type MeasuredCardKind,
 } from "@langwatch/langy";
 import {
   type CliCommand,
@@ -486,7 +486,7 @@ export function resolveCliCapability(rawName: string): CliCapability | null {
  * `cardKindFor` answers from the command's NAME, which is a PRIOR. The card on
  * the envelope is the DECISION — made once at the command boundary, where the
  * payload was in hand, and carried from there to the event log, the live edge
- * and this panel (ADR-059 §1/§3). When the two differ it is because the payload
+ * and this panel (ADR-079 §1/§3). When the two differ it is because the payload
  * earned a richer card than its name could give it, which is the only thing
  * promotion ever produces. So the decision wins, and the body widget is
  * re-derived for the card that is actually being drawn.

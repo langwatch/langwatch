@@ -13,8 +13,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
+import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { SessionView } from "../SessionView";
 
 /** Straight from ClickHouse. Do not tidy. */

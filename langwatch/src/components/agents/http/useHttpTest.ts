@@ -1,6 +1,10 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { HttpAuth, HttpHeader, HttpMethod } from "~/optimization_studio/types/dsl";
+import type {
+  HttpAuth,
+  HttpHeader,
+  HttpMethod,
+} from "~/optimization_studio/types/dsl";
 import { api } from "~/utils/api";
 import type { HttpTestResult } from "./HttpTestPanel";
 

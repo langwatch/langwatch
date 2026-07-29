@@ -23,14 +23,11 @@ import {
 } from "../constants/onboarding-data";
 import { useOnboardingFormContext } from "../contexts/form-context";
 import {
-  type CompanySize,
   type DesireType,
   type OnboardingFlowConfig,
-  type OnboardingFormData,
   type OnboardingScreen,
   OnboardingScreenIndex,
   type RoleType,
-  type SolutionType,
   type UsageStyle,
 } from "../types/types";
 
@@ -56,7 +53,6 @@ const OrganizationScreen: React.FC = () => {
           value={organizationName}
           onChange={(e) => setOrganizationName(e.target.value)}
         />
-        <Field.ErrorText />
       </Field.Root>
 
       <Field.Root colorPalette="orange">
@@ -193,7 +189,8 @@ export const useCreateWelcomeScreens = ({
         id: "intent",
         required: true,
         heading: "What do you want to do?",
-        subHeading: "Pick your starting point. You can explore the rest anytime",
+        subHeading:
+          "Pick your starting point. You can explore the rest anytime",
         component: IntentSelectionScreen,
       },
       [OnboardingScreenIndex.BASIC_INFO]: {

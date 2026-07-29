@@ -192,40 +192,45 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
   const isUnknown = !!model && !selectedItem;
 
-  const selectValueText = !model && inheritOption ? (
-    <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
-      {inheritIcon && (
-        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
-          {inheritIcon}
+  const selectValueText =
+    !model && inheritOption ? (
+      <HStack overflow="hidden" gap={2} align="center" opacity={0.55}>
+        {inheritIcon && (
+          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
+            {inheritIcon}
+          </Box>
+        )}
+        <Box
+          fontSize={size === "sm" ? 12 : 14}
+          fontFamily="mono"
+          lineClamp={1}
+          wordBreak="break-all"
+        >
+          {modelDisplayLabel({
+            fullModelId: inheritOption.model,
+            displayNames,
+          })}
         </Box>
-      )}
-      <Box
-        fontSize={size === "sm" ? 12 : 14}
-        fontFamily="mono"
-        lineClamp={1}
-        wordBreak="break-all"
-      >
-        {modelDisplayLabel({ fullModelId: inheritOption.model, displayNames })}
-      </Box>
-    </HStack>
-  ) : (
-    <HStack overflow="hidden" gap={2} align="center">
-      {selectedIcon && (
-        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
-          {selectedIcon}
+      </HStack>
+    ) : (
+      <HStack overflow="hidden" gap={2} align="center">
+        {selectedIcon && (
+          <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
+            {selectedIcon}
+          </Box>
+        )}
+        <Box
+          fontSize={size === "sm" ? 12 : 14}
+          fontFamily="mono"
+          lineClamp={1}
+          wordBreak="break-all"
+          color={isUnknown ? "gray.500" : undefined}
+        >
+          {selectedItem?.label ??
+            modelDisplayLabel({ fullModelId: model, displayNames })}
         </Box>
-      )}
-      <Box
-        fontSize={size === "sm" ? 12 : 14}
-        fontFamily="mono"
-        lineClamp={1}
-        wordBreak="break-all"
-        color={isUnknown ? "gray.500" : undefined}
-      >
-        {selectedItem?.label ?? modelDisplayLabel({ fullModelId: model, displayNames })}
-      </Box>
-    </HStack>
-  );
+      </HStack>
+    );
 
   const [highlightedValue, setHighlightedValue] = useState<string | null>(
     model,
@@ -338,7 +343,10 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
                   fontFamily="mono"
                   lineClamp={1}
                 >
-                  {modelDisplayLabel({ fullModelId: inheritOption.model, displayNames })}
+                  {modelDisplayLabel({
+                    fullModelId: inheritOption.model,
+                    displayNames,
+                  })}
                 </Text>
               </Box>
             </HStack>

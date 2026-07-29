@@ -1,8 +1,6 @@
 import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
 import type { Projection } from "../domain/types";
-import type {
-  ProjectionStore,
-} from "../stores/projectionStore.types";
+import type { ProjectionStore } from "../stores/projectionStore.types";
 import type { FoldProjectionStore } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
@@ -37,9 +35,7 @@ function sameRetention(
  * );
  * ```
  */
-export class RepositoryFoldStore<TData>
-  implements FoldProjectionStore<TData>
-{
+export class RepositoryFoldStore<TData> implements FoldProjectionStore<TData> {
   constructor(
     private readonly repo: ProjectionStore<Projection>,
     private readonly version: string,

@@ -197,7 +197,7 @@ export async function reconcileOrphanedQueuedRuns({
 
   let failed = 0;
   // Non-orphan candidates are skipped by definition.
-  let skipped = candidates.length - orphans.length;
+  const skipped = candidates.length - orphans.length;
   let errored = 0;
 
   for (const orphan of orphans) {

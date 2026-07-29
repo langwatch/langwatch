@@ -58,7 +58,9 @@ export function rateLimitedResponse(resetAtMs: number): Response {
     status: 429,
     headers: {
       "Content-Type": "application/json",
-      "Retry-After": String(Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000))),
+      "Retry-After": String(
+        Math.max(1, Math.ceil((resetAtMs - Date.now()) / 1000)),
+      ),
       ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
     },
   });

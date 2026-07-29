@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
@@ -21,9 +27,8 @@ import {
 // dropdown still renders with a stable label.
 const { useTargetNameMock, useTargetNamesMock } = vi.hoisted(() => {
   const useTargetNameMock = vi.fn((target: { id: string }) => target.id);
-  const useTargetNamesMock = vi.fn(
-    (targets: ({ id: string } | undefined)[]) =>
-      targets.map((target) => (target ? useTargetNameMock(target) : "")),
+  const useTargetNamesMock = vi.fn((targets: ({ id: string } | undefined)[]) =>
+    targets.map((target) => (target ? useTargetNameMock(target) : "")),
   );
   return { useTargetNameMock, useTargetNamesMock };
 });
@@ -601,7 +606,9 @@ describe("ComparisonConfigForm", () => {
         await user.click(
           screen.getByTestId("comparison-variant-output-t1-input"),
         );
-        await user.click(screen.getByTestId("field-option-output.document_type"));
+        await user.click(
+          screen.getByTestId("field-option-output.document_type"),
+        );
 
         expect(onChange).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -836,7 +843,9 @@ describe("ComparisonConfigForm", () => {
     // shows every available column, unqualified, rather than hiding them.
     it("falls back to an unqualified source name when the dataset name is unknown", async () => {
       const user = userEvent.setup();
-      renderForm({ datasetColumns: [{ id: "col-1", name: "expected_output" }] });
+      renderForm({
+        datasetColumns: [{ id: "col-1", name: "expected_output" }],
+      });
 
       await user.click(screen.getByTestId("comparison-golden-field-input"));
 
@@ -876,9 +885,7 @@ describe("ComparisonConfigForm", () => {
       expect(
         screen.getByTestId("field-option-output.confidence"),
       ).toBeVisible();
-      expect(
-        screen.getByTestId("field-option-output.reasoning"),
-      ).toBeVisible();
+      expect(screen.getByTestId("field-option-output.reasoning")).toBeVisible();
     });
 
     // The label names the full path ("…output.answer") but the PATH stored for

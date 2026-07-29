@@ -5,8 +5,8 @@ import {
   deriveSkills,
   skillSourceDirs,
 } from "../../../../scripts/generate-langy-skills";
+import { findSkill, LANGY_SKILLS } from "../langySkills";
 import GENERATED from "../langySkills.generated.json";
-import { LANGY_SKILLS, findSkill } from "../langySkills";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../../..");
 
@@ -39,9 +39,7 @@ describe("given the Langy skill catalogue", () => {
       // Every production skill, including Langy-only ones, is compiled from
       // root skills/. The app image can therefore generate this catalogue
       // without copying the service-internal Go embed directory.
-      expect(skillSourceDirs(dockerfile)).toEqual([
-        "skills/_compiled/native",
-      ]);
+      expect(skillSourceDirs(dockerfile)).toEqual(["skills/_compiled/native"]);
     });
   });
 

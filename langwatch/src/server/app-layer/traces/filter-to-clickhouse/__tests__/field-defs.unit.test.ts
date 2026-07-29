@@ -69,22 +69,21 @@ describe("FIELD_DEFS", () => {
   });
 
   describe("when every known field is evaluated on a minimal fixture", () => {
-    it.each(KNOWN_FIELDS)(
-      "[%s] returns a boolean or UNSUPPORTED without throwing",
-      (field) => {
-        const def = fieldDefs[field];
-        expect(def).toBeDefined();
+    it.each(
+      KNOWN_FIELDS,
+    )("[%s] returns a boolean or UNSUPPORTED without throwing", (field) => {
+      const def = fieldDefs[field];
+      expect(def).toBeDefined();
 
-        let result: boolean | typeof UNSUPPORTED;
-        expect(() => {
-          result = def!.evaluateInMemory(tag, false, minimalTrace);
-        }).not.toThrow();
+      let result: boolean | typeof UNSUPPORTED;
+      expect(() => {
+        result = def!.evaluateInMemory(tag, false, minimalTrace);
+      }).not.toThrow();
 
-        expect(
-          result! === true || result! === false || result! === UNSUPPORTED,
-        ).toBe(true);
-      },
-    );
+      expect(
+        result! === true || result! === false || result! === UNSUPPORTED,
+      ).toBe(true);
+    });
   });
 
   describe("when a field declares a ClickHouse compiler", () => {

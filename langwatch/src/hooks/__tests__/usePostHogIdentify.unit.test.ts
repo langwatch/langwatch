@@ -9,17 +9,16 @@
  * - Calls posthog.reset on logout (userId disappears)
  * - Tracks upgrade_modal_shown via Zustand subscribe
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { renderHook } from "@testing-library/react";
 
-const { mockIdentify, mockGroup, mockReset, mockCapture } = vi.hoisted(
-  () => ({
-    mockIdentify: vi.fn(),
-    mockGroup: vi.fn(),
-    mockReset: vi.fn(),
-    mockCapture: vi.fn(),
-  }),
-);
+import { renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockIdentify, mockGroup, mockReset, mockCapture } = vi.hoisted(() => ({
+  mockIdentify: vi.fn(),
+  mockGroup: vi.fn(),
+  mockReset: vi.fn(),
+  mockCapture: vi.fn(),
+}));
 
 vi.mock("posthog-js", () => ({
   default: {

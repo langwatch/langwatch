@@ -9,10 +9,13 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
   Two paths the wrapper can pick:
     - Path A "Gateway (virtual key)": LLM calls route through the LangWatch
       gateway via the user's personal virtual key. LLM usage is billed to the
-      gateway. (cfg.tool_mode = "gateway")
+      gateway. Offered in the prompt as "Using an API key".
+      (cfg.tool_mode = "gateway")
     - Path B "Direct OTLP": the tool calls its own provider with the user's own
       plan, and only OTLP telemetry is sent to LangWatch, authorized by the
-      user's personal ingest key. (cfg.tool_mode = "ingestion")
+      user's personal ingest key. Offered in the prompt with per-tool
+      subscription wording, e.g. "Using a Claude subscription" for claude.
+      (cfg.tool_mode = "ingestion")
 
   The remembered answer lives in cfg.tool_mode[tool] (the existing per-tool
   routing field). The wrapper only prompts when the answer is not already
@@ -29,19 +32,22 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
 
   Rule: prompt only when both paths are allowed, on a TTY, with no remembered answer
 
+    # Launch-day users are mostly on Claude subscriptions, so the subscription (direct OTLP) choice is listed first and is the default.
+
     @unit
     Scenario: First interactive run with both paths allowed prompts for the path
       Given tool_mode.claude is unset
       And stdin and stdout are a TTY
       When the user runs `langwatch claude`
       Then the wrapper shows a select prompt asking how `langwatch claude` should run
-      And the prompt offers a "Gateway (virtual key)" choice and a "Direct OTLP" choice
+      And the prompt offers "Using a Claude subscription" first and "Using an API key" second
+      And the pre-selected default is "Using a Claude subscription"
 
     @unit
     Scenario: Choosing the gateway remembers it and does not prompt again
       Given tool_mode.claude is unset
       And stdin and stdout are a TTY
-      When the user runs `langwatch claude` and picks "Gateway (virtual key)"
+      When the user runs `langwatch claude` and picks "Using an API key"
       Then cfg.tool_mode.claude is saved as "gateway"
       And the wrapper prints a one-line tip explaining how to change it later
       When the user runs `langwatch claude` again
@@ -51,7 +57,7 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
     Scenario: Choosing direct OTLP remembers it as ingestion
       Given tool_mode.claude is unset
       And stdin and stdout are a TTY
-      When the user runs `langwatch claude` and picks "Direct OTLP"
+      When the user runs `langwatch claude` and picks "Using a Claude subscription"
       Then cfg.tool_mode.claude is saved as "ingestion"
       And the wrapper proceeds in ingestion mode
 

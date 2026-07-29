@@ -5,30 +5,25 @@
  * loading states, success redirect, pending invites, and badge behaviour.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SubscriptionPage } from "../SubscriptionPage";
 import { ENTERPRISE_PLAN_FEATURES } from "../billing-plans";
+import { SubscriptionPage } from "../SubscriptionPage";
 import {
   createMockPlan,
-  mockCreateInvites,
-  mockCreateInvitesMutate,
-  mockCreateSubscription,
-  mockDetectCurrency,
   mockGetActivePlan,
-  mockGetLastSubscription,
   mockGetOrganizationWithMembers,
   mockGetPendingInvites,
-  mockAddTeamMemberOrEvents,
   mockListInvoices,
-  mockManageSubscription,
-  mockOpenSeats,
-  mockUpdateUsers,
-  mockUpgradeWithInvites,
   mockOrganizationMembers,
   resetMocks,
-  setMockOrganization,
 } from "./subscription-test-setup";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -66,8 +61,9 @@ vi.mock("~/components/ui/toaster", () => ({
 vi.mock("../../../stores/upgradeModalStore", async () => {
   const setup = await import("./subscription-test-setup");
   return {
-    useUpgradeModalStore: (selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown) =>
-      selector({ openSeats: setup.mockOpenSeats }),
+    useUpgradeModalStore: (
+      selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown,
+    ) => selector({ openSeats: setup.mockOpenSeats }),
   };
 });
 
@@ -85,7 +81,10 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
         getOrganizationPendingInvites: {
-          useQuery: () => ({ ...setup.mockGetPendingInvites(), refetch: vi.fn() }),
+          useQuery: () => ({
+            ...setup.mockGetPendingInvites(),
+            refetch: vi.fn(),
+          }),
         },
         createInvites: {
           useMutation: () => setup.mockCreateInvites(),
@@ -93,7 +92,10 @@ vi.mock("~/utils/api", async () => {
       },
       currency: {
         detectCurrency: {
-          useQuery: (_input: Record<string, never>, opts: { enabled: boolean }) =>
+          useQuery: (
+            _input: Record<string, never>,
+            opts: { enabled: boolean },
+          ) =>
             opts.enabled ? setup.mockDetectCurrency() : { data: undefined },
         },
       },
@@ -157,7 +159,9 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
-        expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("upgrade-plan-block"),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -173,7 +177,9 @@ describe("<SubscriptionPage/>", () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        const enterpriseFeatures = screen.getByTestId("enterprise-features-list");
+        const enterpriseFeatures = screen.getByTestId(
+          "enterprise-features-list",
+        );
         expect(
           within(enterpriseFeatures).getByText(ENTERPRISE_PLAN_FEATURES[0]!),
         ).toBeInTheDocument();
@@ -189,7 +195,9 @@ describe("<SubscriptionPage/>", () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        expect(screen.getByTestId("current-plan-features-grid")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("current-plan-features-grid"),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -219,7 +227,9 @@ describe("<SubscriptionPage/>", () => {
 
         // Features
         expect(within(currentBlock).getByText(/2 users/i)).toBeInTheDocument();
-        expect(within(currentBlock).getByText(/Community support/i)).toBeInTheDocument();
+        expect(
+          within(currentBlock).getByText(/Community support/i),
+        ).toBeInTheDocument();
       });
     });
 
@@ -231,7 +241,9 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("upgrade-plan-block"),
+      ).not.toBeInTheDocument();
     });
 
     it("displays the user count as N/M format", async () => {
@@ -261,12 +273,24 @@ describe("<SubscriptionPage/>", () => {
         const upgradeBlock = screen.getByTestId("upgrade-plan-block");
 
         // Features
-        expect(within(upgradeBlock).getByText(/200,000.*events/i)).toBeInTheDocument();
-        expect(within(upgradeBlock).getByText(/30 days.*retention/i)).toBeInTheDocument();
-        expect(within(upgradeBlock).getByText(/20.*core users/i)).toBeInTheDocument();
-        expect(within(upgradeBlock).getByText(/Unlimited.*lite users/i)).toBeInTheDocument();
-        expect(within(upgradeBlock).getByText(/Unlimited.*evals/i)).toBeInTheDocument();
-        expect(within(upgradeBlock).getByText(/Private Slack/i)).toBeInTheDocument();
+        expect(
+          within(upgradeBlock).getByText(/200,000.*events/i),
+        ).toBeInTheDocument();
+        expect(
+          within(upgradeBlock).getByText(/30 days.*retention/i),
+        ).toBeInTheDocument();
+        expect(
+          within(upgradeBlock).getByText(/20.*core users/i),
+        ).toBeInTheDocument();
+        expect(
+          within(upgradeBlock).getByText(/Unlimited.*lite users/i),
+        ).toBeInTheDocument();
+        expect(
+          within(upgradeBlock).getByText(/Unlimited.*evals/i),
+        ).toBeInTheDocument();
+        expect(
+          within(upgradeBlock).getByText(/Private Slack/i),
+        ).toBeInTheDocument();
       });
     });
 
@@ -279,7 +303,9 @@ describe("<SubscriptionPage/>", () => {
 
       await waitFor(() => {
         const upgradeBlock = screen.getByTestId("upgrade-plan-block");
-        expect(within(upgradeBlock).getByRole("button", { name: /Upgrade now/i })).toBeInTheDocument();
+        expect(
+          within(upgradeBlock).getByRole("button", { name: /Upgrade now/i }),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -310,7 +336,9 @@ describe("<SubscriptionPage/>", () => {
       await waitFor(() => {
         const currentBlock = screen.getByTestId("current-plan-block");
         expect(within(currentBlock).getByText("Current")).toBeInTheDocument();
-        expect(within(currentBlock).getByText("Growth plan")).toBeInTheDocument();
+        expect(
+          within(currentBlock).getByText("Growth plan"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -321,7 +349,9 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("upgrade-plan-block"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -405,9 +435,13 @@ describe("<SubscriptionPage/>", () => {
       });
 
       // No admin-requires-core-user info banner
-      expect(screen.queryByText(/admin.*requires.*core/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/admin.*requires.*core/i),
+      ).not.toBeInTheDocument();
       // No exceeded-limit warning banner
-      expect(screen.queryByText(/exceeded.*user limit/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/exceeded.*user limit/i),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -435,7 +469,9 @@ describe("<SubscriptionPage/>", () => {
       renderSubscriptionPage();
 
       await waitFor(() => {
-        expect(screen.getByTestId("manage-subscription-button")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("manage-subscription-button"),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -448,7 +484,9 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
       });
 
-      expect(screen.queryByTestId("manage-subscription-button")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("manage-subscription-button"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -538,9 +576,7 @@ describe("<SubscriptionPage/>", () => {
 
     it("excludes EXTERNAL invites from N count", async () => {
       mockGetPendingInvites.mockReturnValue({
-        data: [
-          { role: "EXTERNAL", status: "PENDING" },
-        ],
+        data: [{ role: "EXTERNAL", status: "PENDING" }],
         isLoading: false,
       });
 

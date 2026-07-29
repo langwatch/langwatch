@@ -73,6 +73,11 @@ export function createCodingAgentMetricFactsDispatchSubscriber(deps: {
         agent: detectCodingAgent({
           recordName: point.metricName,
           scopeName: point.scopeName,
+          // Resource service.name is the only signal that separates Cowork
+          // from the Claude Code runtime it reuses; without it a session's
+          // metric contribution could first-writer-win the fold's agent to
+          // claude_code while its log contributions say claude_cowork.
+          serviceName: serviceNameFromResource(point.resourceAttributesJson),
         }),
         occurredAt: point.timeUnixMs,
         seriesId: isDelta ? point.pointId : point.seriesId,
@@ -117,4 +122,13 @@ function parsePointAttributes(
     logger.warn({ error }, "unparseable metric point attributes; skipping");
     return null;
   }
+}
+
+/** Resource-level service.name off the point's canonical KeyValue JSON. */
+function serviceNameFromResource(json: string): string | null {
+  const resource = parsePointAttributes(json);
+  const serviceName = resource?.["service.name"];
+  return typeof serviceName === "string" && serviceName.length > 0
+    ? serviceName
+    : null;
 }

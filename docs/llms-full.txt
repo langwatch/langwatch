@@ -1878,6 +1878,7 @@ Errors (like successes) always carry:
 | `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed or used an unknown mode. |
 | `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
+| `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
 | `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
@@ -2748,6 +2749,7 @@ A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every g
 | `project` | All gateway traffic in this project. |
 | `virtual_key` | This specific VK. |
 | `principal` | This user or service account across any VK they use. |
+| `group` | Each member of the group individually (see below). |
 
 A request is evaluated against **every** budget whose scope applies. For example, a request made by user Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against:
 
@@ -2756,13 +2758,30 @@ A request is evaluated against **every** budget whose scope applies. For example
 - Project `demo`'s budgets (all windows).
 - VK `prod-key`'s budgets (all windows).
 - Alice's principal budgets (all windows).
+- Per-member budgets of every group Alice belongs to (all windows).
+
+### Group budgets are per member
+
+A `group` budget targets one of your [Groups](/ai-gateway/rbac) (the same entity SCIM provisions) and gives **each member their own allowance**, not one shared pot: a $10/day budget on group `engineering` caps Alice at $10 and Bob at $10, and Bob's spend never counts against Alice. One budget row covers every member, and someone joining the group is covered on their key's next configuration resolve without anyone editing budgets.
+
+Two consequences worth knowing:
+
+- Group budgets only apply to keys with a person behind them (a personal VK, or any VK with a principal). A shared service key has no member to charge the per-member allowance to, so group budgets do not constrain it; cap shared keys with `project`, `team`, or `virtual_key` budgets instead.
+- Group budgets require the ClickHouse spend ledger, because per-member enforcement needs each member's spend told apart. On self-hosted deploys reading budget spend from Postgres only, creating a group budget is refused with `group_budget_requires_clickhouse` rather than silently capping every member at the group's combined spend.
+
+### Provider-filtered budgets
+
+Any budget, on any scope, can additionally be filtered to a **single provider**: "OpenAI $200/month for this team" is one budget with a provider filter, not a new kind of scope. With a filter set:
+
+- Only requests dispatched to that provider debit the budget. Every ledger debit stamps the provider that actually served the request, so two budgets on the same target with different filters never share spend.
+- On breach, the filtered provider is removed from the request's candidate chain the way an unavailable provider would be. If the key can fall back, another provider serves the request and the caller sees nothing but a slower first token. Only when the exclusions leave the chain empty (for example on a key with routing set to no fallback) is the request blocked, with a `402` naming the budget in `error.meta.budget_id` and the provider in `error.meta.budget_provider`.
 
 If **any** budget hard-blocks, the request is rejected. If **any** warn-threshold is breached, a warning header is added. Hard-block wins over warn.
 
 ## Windows
 
 - `minute`, `hour`, `day`, `week`, `month`, `total`.
-- Calendar-aligned: `month` resets on day 1 of the next month in the org's default timezone (UTC unless the org overrides). `week` starts Monday in ISO-8601.
+- Calendar-aligned and computed in **UTC**: `day` resets at 00:00 UTC, `week` starts Monday 00:00 UTC (ISO-8601), `month` resets on day 1 at 00:00 UTC. The `timezone` column exists on the API for forward compatibility but enforcement does not honor it yet, so the UI states UTC and offers no timezone choice.
 - `total` never resets, useful for one-off grant-style budgets.
 
 ## on_breach
@@ -2777,13 +2796,18 @@ If **any** budget hard-blocks, the request is rejected. If **any** warn-threshol
 | Field | Example |
 |---|---|
 | Name | `eng-team-monthly` |
-| Scope | `team` |
+| Applies to | `organization`, `group`, `team`, `project`, `member`, or `virtual key` |
 | Target | `platform` team |
+| Provider | `All providers` (default), or a single provider to filter to |
 | Window | `month` |
 | Limit (USD) | `5000` |
 | on_breach | `warn` at 80%, `block` at 100% (see "Multiple tiers" below) |
 
 Save. The budget is in force immediately; the next request counts against it.
+
+<Frame caption="The budget drawer targets any dimension, with the provider filter as an orthogonal choice.">
+  ![New budget drawer](/images/ai-gateway/budget-create-drawer.png)
+</Frame>
 
 ## Multiple tiers on the same scope
 
@@ -2844,6 +2868,10 @@ Cache reads, writes are priced **separately** per provider, Anthropic cache read
 
 ## Viewing budget spend (UI)
 
+<Frame caption="The budgets list: one row per budget across every dimension, each with its utilization bar and reset.">
+  ![Budgets list](/images/ai-gateway/budgets-page.png)
+</Frame>
+
 The **/gateway/budgets** list shows every budget with a utilization bar, hard cap, and remaining amount:
 
 - **Spent/Limit column** carries a colored progress bar and a matching %-badge (green ≤ 50%, orange 50-80%, red ≥ 80%/100%) so scanning "which budgets are hot" is a one-glance read.
@@ -2859,7 +2887,15 @@ Clicking a row opens **/gateway/budgets/[id]**: a detail page mirroring the VK d
 - **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
 - **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact), Amount (smart-decimals, e.g. `$0.0183`, not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
 
-Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down.
+<Frame caption="A breached budget's detail page: full utilization, the enforcement mode, and the debits that consumed it.">
+  ![Breached budget detail](/images/ai-gateway/budget-breached-detail.png)
+</Frame>
+
+Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down. The **This month** preset covers the same UTC month-to-date window the keys list's spend column reports, which is where that column's click-through lands.
+
+<Frame caption="Usage on the This month preset, filtered to one key: the same window and the same figures as the spend column that linked here.">
+  ![Usage this month](/images/ai-gateway/usage-this-month.png)
+</Frame>
 
 Programmatic equivalent:
 
@@ -8189,7 +8225,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 - **Per-request guardrails**: invoke your LangWatch evaluators inline on the request, response, or each streaming chunk. Decisions: `allow`, `block`, `modify` (redact).
 - **Tool, MCP, URL policy**: block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
 - **Caching passthrough**: Anthropic `cache_control` markers are forwarded byte-for-byte by default (protecting your 90% cache discount). Override per-request with `X-LangWatch-Cache: respect|force|disable`.
-- **Automatic fallback**: per-virtual-key fallback chain (e.g. OpenAI → Anthropic → Bedrock) triggers on 5xx, timeout, 429, or circuit-breaker-open. 400/401 client errors never trigger fallback.
+- **Fallback, when the key asks for it**: per-virtual-key routing is an explicit choice. New keys default to no fallback (a provider failure surfaces to the caller); a key set to fall back walks its eligible chain (e.g. OpenAI → Anthropic → Bedrock) on 5xx, timeout, 429, or circuit-breaker-open. 400/401 client errors never trigger fallback.
 - **Per-tenant observability**: every request emits a LangWatch trace to the owning project with `langwatch.virtual_key_id`, `langwatch.project_id`, `langwatch.principal_id`, `langwatch.cost_usd`, cache-hit token breakdown, and status. Shared multi-tenant gateway, per-tenant trace routing.
 - **Coding-CLI integrations**: preserves the tool-call streaming deltas that Claude Code and Codex depend on. Documented setup for the major coding assistants in [CLI Integrations](/ai-gateway/cli/overview).
 - **Self-hostable**: ships as a Helm chart alongside the LangWatch app. Horizontally scales, serves traffic during control-plane outages (with bootstrap mode).
@@ -10632,22 +10668,25 @@ The last call traces end-to-end through auth, blocked-pattern enforcement, budge
 
 ---
 title: Health Checks
-description: Liveness, readiness, and startup probes for the LangWatch AI Gateway.
+description: Kubernetes probes and the public status endpoint for the LangWatch AI Gateway.
 sidebarTitle: Health Checks
 ---
 
-The gateway exposes three HTTP endpoints for Kubernetes probes, all on the same port the API listens on (`5563` by default, referenced as the named container port `http` in the chart). Each is deliberately scoped, `/readyz` flipping to 503 must mean "this replica should not serve customer traffic right now", and nothing more.
+The gateway exposes three HTTP endpoints for Kubernetes probes plus one public status endpoint, all on the same port the API listens on (`5563` by default, referenced as the named container port `http` in the chart). Each is deliberately scoped, `/readyz` flipping to 503 must mean "this replica should not serve customer traffic right now", and nothing more.
 
 ## Endpoint summary
 
 | Endpoint   | Used by                                | Returns 200 when                                                    |
 |------------|----------------------------------------|---------------------------------------------------------------------|
 | `/healthz` | Kubernetes `livenessProbe`             | The Go process is responsive (no registered checks fail)            |
-| `/readyz`  | Kubernetes `readinessProbe` + LB       | The pod is not draining and all readiness checks pass               |
-| `/startupz`| Kubernetes `startupProbe`              | Bootstrap (auth-cache warm-up) has completed, then mirrors `/readyz`|
+| `/readyz`  | Kubernetes `readinessProbe` + LB       | The pod is not draining                                             |
+| `/startupz`| Kubernetes `startupProbe`              | Startup is marked complete, then mirrors `/readyz`                  |
+| `/health`  | Your status page / uptime monitor      | The process is up and the control plane has answered within the last 60s |
 | `/metrics` | Prometheus                              | Always, counter + histogram surface (see [Observability](/ai-gateway/observability)) |
 
-All three return the same JSON shape:
+The three probes are in-cluster signals. `/health` is the one meant to be reachable from outside; the chart publishes it through the ingress and leaves the rest internal.
+
+The three probes return the same JSON shape:
 
 ```json
 {
@@ -10658,7 +10697,7 @@ All three return the same JSON shape:
 }
 ```
 
-`checks` is omitted when there are no registered checks AND the status is `ok`. Today the gateway registers `MarkStarted` (after the auth-cache bootstrap completes) and `MarkDraining` (on `SIGTERM`), but no per-dependency liveness or readiness checks, the probes are intentionally lightweight signals about process state and lifecycle, not external-dependency health. Dependency health is reported via per-request error codes and the OTel trace surface, not the probes.
+`checks` is omitted when there are no registered checks AND the status is `ok`. The gateway registers `MarkStarted` (at boot) and `MarkDraining` (on `SIGTERM`), but no per-dependency liveness or readiness checks. The probes are intentionally lightweight signals about process state and lifecycle, not external-dependency health. Dependency health is reported on `/health`, per-request error codes, and the OTel trace surface, never on the probes.
 
 ## `/healthz` (liveness)
 
@@ -10709,10 +10748,11 @@ readinessProbe:
 ### What `/readyz` does NOT check
 
 - **Per-provider live health.** If OpenAI is rate-limiting, the gateway still serves and falls back per the VK's configured chain. Reporting `not_ready` for one upstream would amplify the incident.
+- **The control plane.** A control-plane blip is a degradation the auth cache is built to absorb: warm keys keep serving from the in-process cache. Failing readiness on it would drop every replica from the load balancer at once and turn that degradation into a total outage. Control-plane reachability is reported on `/health` instead, where it informs a status page rather than gating traffic.
 - **Redis L2.** The current gateway has no Redis client; the auth cache is in-process LRU.
 - **PostgreSQL.** The gateway never talks to Postgres directly; the control plane mediates persistence.
 
-The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only conditions today are `MarkDraining` and (transitively, via `/startupz` mirroring `/readyz` once started) the auth-cache bootstrap.
+The blast-radius of readiness is specifically: "is this pod still meant to serve traffic?", and the only condition today is `MarkDraining`.
 
 ## `/startupz` (startup)
 
@@ -10726,7 +10766,7 @@ GET /startupz
 { "status": "ok", "version": "git-a1412a4", "uptime_s": 12.48 }
 ```
 
-The bootstrap step is the auth-cache warm-up: the gateway calls the control plane's `/api/internal/gateway/keys/changes` once on boot to fill the L1 cache before taking traffic. Tenants with 50K+ virtual keys take 2–3 seconds; the failure threshold gives ~60 s of room before the kubelet declares the pod failed and restarts it (chart default `failureThreshold: 30 × periodSeconds: 2 = 60 s` of bootstrap time).
+There is no blocking bootstrap step today: `MarkStarted` is called while dependencies are being constructed, which finishes before the HTTP listener opens, so `/startupz` is already 200 on the first request it can possibly receive and the `starting` state is unobservable over HTTP. The auth cache warms organically on the first request per virtual key; an unwarmed gateway costs a cold-cache request one extra control-plane round trip, which is the correct behavior for a fresh deployment. The chart's generous failure threshold is headroom kept for a future bootstrap-pull, not a window the gateway currently uses.
 
 ```yaml
 startupProbe:
@@ -10737,6 +10777,53 @@ startupProbe:
 ```
 
 Once `/startupz` first returns 200, Kubernetes stops calling it; readiness + liveness take over.
+
+## `/health` (public status endpoint)
+
+This is the endpoint to point a status page or uptime monitor at. Plain HTTP monitor semantics: 200 healthy, 503 not. `HEAD` returns the same status and headers with no body, as HTTP requires, so a monitor that probes with `HEAD` reads the same verdict. Responses carry `Cache-Control: no-store` so a CDN cannot serve a stale verdict. Any other method is 405: the ingress publishes the path, the gateway bounds the methods.
+
+```
+GET /health
+→ 200 OK
+{ "status": "ok", "checks": { "gateway": "ok", "control_plane": "ok" } }
+```
+
+```
+GET /health
+→ 503 Service Unavailable
+{ "status": "degraded", "checks": { "gateway": "ok", "control_plane": "unreachable for 65s" } }
+```
+
+The body is deliberately smaller than the probes': no `version`, no `uptime_s`. This endpoint is polled by the public internet, and restart cadence and build identity are not something to publish.
+
+### What it covers, and what it never will
+
+The verdict covers the gateway process and the dependencies you own: the control plane. It is structurally independent of model providers.
+
+- **A provider outage cannot turn it red.** Nothing on the verdict path reads dispatch state, so if OpenAI and Anthropic are both down, completions fail while `/health` stays 200. That is the providers' status page's news, not yours, and a gateway that goes red on someone else's outage trains people to ignore the page.
+- **A poll never triggers an upstream call.** A background monitor probes the control plane every 15 s and `/health` serves the cached verdict, so poll rate and control-plane load are unrelated. On an unauthenticated public endpoint, fanning out per poll would be an amplification and cost bug.
+
+### Control-plane semantics
+
+The monitor probes the control plane's `/api/internal/gateway/health` over the same HMAC-signed internal channel every request uses. That is the point of the design: a 200 proves DNS, TCP/TLS, the app being up, **and** the shared `LW_GATEWAY_INTERNAL_SECRET` matching. A mismatched secret is the misconfiguration where every pod looks green while every virtual-key resolve is refused, and this is the only signal that catches it.
+
+Unreachability shorter than 60 s stays 200: warm keys keep serving from the auth cache through a blip, and a page that flaps on what customers cannot feel is worse than no page. Past 60 s, cold-cache requests are failing with `auth_upstream_unavailable` and the page should say so. A booting pod is given one full 60 s window before it can report red, so a rolling deploy never blinks the page.
+
+Because the tolerance is 60 s and the probe interval is 15 s, a monitor polling every 30 to 60 s sees a sustained outage within about two minutes of onset.
+
+### Exposure
+
+The chart publishes exactly this one path through the ingress, as an `Exact` match, so `/healthz`, `/readyz`, `/startupz`, `/metrics` and `/internal` stay in-cluster:
+
+```yaml
+ingress:
+  host: gateway.your-corp.com
+  healthPath:
+    enabled: true   # default
+    path: /health
+```
+
+Point the monitor at `https://gateway.your-corp.com/health`. Set `ingress.healthPath.enabled: false` if you would rather not publish it at all; the endpoint still answers in-cluster.
 
 ## Graceful shutdown
 
@@ -10763,7 +10850,7 @@ lifecycle:
 
 ## End-to-end synthetic check
 
-`/readyz` validates lifecycle state but not the request path. For real-traffic confidence, run a synthetic completion every 30 s:
+Neither the probes nor `/health` exercise the request path, and `/health` will not tell you a provider is down, on purpose. For real-traffic confidence, run a synthetic completion every 30 s. Keep it on an internal alert rather than on the public status page, so a provider incident does not read as a LangWatch incident:
 
 ```bash
 curl --fail --max-time 5 \
@@ -10785,7 +10872,8 @@ On alert:
 | Symptom                                                         | Likely cause                                           | First step                                                         |
 |-----------------------------------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------|
 | `/healthz` 200, `/v1/chat/completions` returns 500 `auth_upstream_unavailable` | Gateway can't reach control plane (`LW_GATEWAY_BASE_URL` wrong/missing) | Check the env var on the pod; confirm Service, DNS resolves       |
-| `/startupz` fails 30× in a row, pod CrashLoopBackOff             | Control plane unreachable on boot, or auth secret mismatch | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods |
+| `/health` 503 with `control_plane: unreachable for Ns`           | Control plane down, unroutable, or the shared internal secret does not match (a mismatch 401s the probe and reads the same) | Compare `LW_GATEWAY_INTERNAL_SECRET` byte-for-byte between gateway and control-plane pods, then check the Service and DNS. The `statusprobe_control_plane_unreachable` log line carries the underlying probe failure |
+| `/health` 503 while completions still succeed                    | Expected during a control-plane outage longer than 60 s: warm keys keep serving from the auth cache, cold ones do not | Confirm it is a real outage and not a secret mismatch (row above, which reads identically), then fix whichever side is wrong. `/readyz` stays 200 on purpose so warm traffic keeps flowing |
 | `/readyz` flips to 503 mid-life                                  | Pod received `SIGTERM` (rolling deploy, eviction, OOMKill) | `kubectl describe pod` for the termination reason                   |
 | 502 from LB for a small window during rolling deploy             | LB hasn't yet removed the draining replica             | Add a `preStop: sleep 3` lifecycle hook (see Graceful shutdown above) |
 
@@ -12341,23 +12429,57 @@ Server-side, the secret is stored as `hex(hmac_sha256(server_pepper, secret))`. 
 
 ## Creating a VK
 
-Under **AI Gateway → Virtual Keys** click **New virtual key** and fill:
+Under **AI Gateway → Virtual Keys** click **New virtual key**. The drawer walks four decisions, top to bottom: where the key lives, what it may spend, which providers it may reach, and whether it fails over.
 
-| Field | Meaning |
-|---|---|
-| Name | Human label. Used in the UI and in `langwatch.vk.name` trace attribute. |
-| Environment | `live` (default) or `test`. Reflected in the key prefix. |
-| Scopes | One or more rows selecting where the VK is valid (ORGANIZATION / TEAM / PROJECT). The picker shows every scope the caller holds `virtualKeys:manage` on. Cross-scope VKs (e.g. TEAM "platform" AND TEAM "data-sci") require manage on every named scope. |
-| Routing policy | Optional. If unset, the VK falls back to the org's default policy, ordered by `fallbackPriorityGlobal` then `createdAt` across every ModelProvider visible in the VK's scope cascade. Pin a specific policy to override the default fallback order. |
-| Models allowed | Optional allowlist. Blank = "any model the eligible ModelProviders support." |
-| Model aliases | Map of client-friendly names → `provider/model`. E.g. `gpt-4o: azure/my-deployment`. |
-| Cache policy | `respect` (default), `force`, or `disable`. |
-| Guardrails | Attach existing LangWatch evaluators as `pre`, `post`, `stream_chunk` hooks, the drawer has a dedicated picker section listing every project evaluator with `executionMode = AS_GUARDRAIL`. Fail-open toggles on pre and post directions surface the concrete `403`, 50 ms, terminal-SSE enforcement shape so operators know what the toggle actually does. See [Guardrails → Attaching guardrails to a VK](/ai-gateway/guardrails#attaching-guardrails-to-a-vk). |
-| Blocked patterns | Regex allow/deny for tool names, MCP servers, URLs. |
-| Initial budget | Optionally attach a budget on creation. Budgets can always be added later. |
-| Personal (principal) | Optional. Mark the VK as personal by setting `principalUserId`. Personal VKs cascade budgets through the principal first. The CLI device-flow self-mints a personal VK at ORG scope without requiring an explicit `virtualKeys:manage` grant. |
+<Frame caption="The create drawer: ownership with the trace destination stated inline, the budget field with the budgets the draft already inherits, provider access and routing below.">
+  ![New virtual key drawer](/images/ai-gateway/vk-create-drawer.png)
+</Frame>
 
-Click **Create**. The full secret is revealed inline with a **Copy** button and a **I've saved it, close** confirmation that must be checked before dismissing. After dismiss, the secret is gone for good.
+### Ownership
+
+Who can see and manage the key, and where its traces and costs land:
+
+- **Project** (default): the key belongs to one project, and the drawer states the consequence inline: "Traces and costs land in `<project>`".
+- **Personal**: your own key. Traces and costs land in your personal workspace, and your per-member and principal budgets apply to it.
+- **Team** / **Organization** (for roles that can create shared keys): shared keys valid across the team or the whole org. A shared key still needs one project for its traces and costs to land in, and the drawer requires that choice before it lets you create the key: spend that lands nowhere could not be capped by any budget. The destination is stored as the key's `trace_project_id`, not as a scope: it decides where traces land and nothing else, so administering that project grants no visibility into the key and no right to change it. The drawer always requires the choice; the API additionally accepts omission, in which case traces land in the org's governance project, and refuses creation only when no destination resolves at all.
+
+Ownership decides which budgets the key inherits and which providers it can reach; changing it re-resolves both live in the drawer.
+
+### Budget
+
+A dollar amount and a period (`per day`, `per week`, `per month`). Leave it empty for no cap on the key itself. The annotation states exactly what a filled budget does, for example "Max $30/day, resets 00:00 UTC" (resets are computed in UTC; see [Budgets → Windows](/ai-gateway/budgets#windows)).
+
+Creating the key with a budget creates both in one transaction, so the key never exists without the cap its creator asked for. Clearing the field later, or revoking the key, archives the budget instead of deleting it: its ledger stays as the audit trail of what the key cost.
+
+Under the field, **Inherited budgets** lists every budget that already constrains the draft key, each with its limit, period, and current spend. A provider-filtered budget is badged with which provider it counts ("OpenAI only") and a per-member group budget is badged "per member". The list is resolved by the same code the gateway enforces from, so it cannot promise a constraint that will not apply or miss one that will. Group budgets appear only when the draft key carries a principal, the person behind the key; personal ownership is the usual way a draft gains one, but any key with a principal qualifies. A shared service key has no member to charge a per-member allowance to.
+
+### Provider access
+
+A checkbox list of every provider the key's ownership can reach, each with a chip naming where the provider is configured.
+
+- **All providers** (default) persists as the absence of a list: providers added to the key's scope later become reachable **without editing the key**. This is what keeps a long-lived key current.
+- An explicit selection stays exactly as picked: a provider added later is not reachable until someone edits the key. At least one provider must stay selected.
+- Expanding a provider row shows its models; checking models restricts the key to exactly those. The restriction is per **vendor**, not per provider row: two providers of the same vendor (say, two Anthropic accounts) share one model list, and the drawer mirrors a change made under either row in both. A per-row restriction for same-vendor providers is not supported yet.
+
+<Frame caption="Provider access with a model accordion expanded: every provider carries a chip naming where it is configured, and the routing decision sits directly below.">
+  ![Provider access section](/images/ai-gateway/vk-provider-access.png)
+</Frame>
+
+### Routing
+
+What happens when the provider serving a request fails:
+
+- **Default: no fallback** (new keys): the error surfaces to the caller. No silent retry on a different vendor.
+- **Fall back to all eligible providers**: the request retries on the next eligible provider, ordered by `fallbackPriorityGlobal` then `createdAt`. Keys created before routing became an explicit choice keep this behavior.
+- **A routing policy**: pins an explicit ordered provider list.
+
+Click **Create**. The full secret is revealed exactly once with a **Copy** button and a confirmation checkbox that must be checked before dismissing. After dismiss, the secret is gone for good.
+
+The keys list shows a **Spent this month** column for every key, read from the same cost data the Usage tab reports. Clicking it opens Usage on its **This month** preset, pre-filtered to that key: the same UTC month-to-date window the column is computed over, so the number you click and the page you land on agree.
+
+<Frame caption="Spent this month on the keys list. The figures come from the cost path, so uncapped keys report real spend too.">
+  ![Spend column](/images/ai-gateway/vk-spend-column.png)
+</Frame>
 
 ## VK detail page
 
@@ -12411,7 +12533,7 @@ Trace attribution on every request:
 
 - `langwatch.virtual_key_id`
 - `langwatch.organization_id` (always present)
-- `langwatch.project_id` — resolution order: (a) the VK's unique PROJECT-scope row, if it has exactly one; otherwise (b) the org's `internal_governance` project, where TEAM- and ORG-scoped VK spans land so all governance traffic surfaces in one filter view. If neither exists (older self-hosted deployments without governance), the attribute is omitted rather than 500ing the bundle.
+- `langwatch.project_id`, resolution order: (a) the VK's unique PROJECT-scope row, if it has exactly one; otherwise (b) the org's `internal_governance` project, where TEAM- and ORG-scoped VK spans land so all governance traffic surfaces in one filter view. The create drawer requires org- and team-owned keys to pick their trace project explicitly (spend that lands nowhere could not be capped by any budget); the governance fallback remains for API callers and pre-existing keys.
 - `langwatch.team_id` (present when the VK has a TEAM scope, or a unique team containing the resolved project)
 - `langwatch.principal_id` (present when `principalUserId` is set on the VK)
 
@@ -16389,19 +16511,24 @@ every matching user's `/me` portal grid.
 
 ## Starter pack
 
-A fresh organization has an empty catalog. Your first visit shows an
-**Import starter pack** CTA, one click publishes a sensible default
-set:
+A fresh organization does not start empty: the standard catalog is
+provisioned automatically at signup (and on the portal's first load for
+organizations created before this behavior), so your members' `/me`
+portal renders tiles from day one:
 
-- Coding assistants: Claude Code, Copilot, Cursor, Codex
-- Model providers: OpenAI, Anthropic, Bedrock, Gemini
+- Coding assistants: Claude Code, Codex, Gemini CLI, opencode
+- Model providers: OpenAI, Anthropic, AWS Bedrock, Google AI
 - External tools: empty (admins fill these in per-org with internal
   links)
 
-The starter pack is org-scoped and editable like any other entry. You
-can reorder, scope to specific teams, or archive entries afterward.
-There's no penalty for skipping the starter pack and adding tiles
-manually if your org's allowed-AI list is narrower.
+The provisioned set is org-scoped and editable like any other entry.
+You can reorder, scope, disable, or archive entries afterward.
+Auto-provisioning only ever runs on a catalog that has never had any
+entry, so a catalog you curated down to nothing stays empty. The
+**Import starter pack** button in the editor adds starter tiles the
+catalog never had, such as tiles added to the pack after your org was
+provisioned. Tiles you archived are respected as removed: import skips
+them, and **+ Add tile** recreates one if you want it back.
 
 ## Adding a tile
 
@@ -51086,7 +51213,7 @@ It omits `fsGroup`, since sharing it would reopen the cross-worker file boundary
 
 gVisor's kernel implements **no netfilter**. `iptables` and `nftables` fail in every mode under gVisor, so the usual way to control a container's outbound traffic (an `iptables` OWNER-match DROP or a REDIRECT to a local proxy) is not available here.
 
-That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-043) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
+That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-076) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
 
 The earlier `iptables`-based rule and its `NET_ADMIN` capability were removed because they are dead under gVisor.
 
@@ -54274,7 +54401,7 @@ Make sure `privateExcept` and `privateExceptV6` include any non-RFC1918 service 
 
 ## The L7 egress adapter
 
-When egress is on, each worker's outbound traffic is forced through a per-worker CONNECT proxy (ADR-043, Draft) that applies, in order:
+When egress is on, each worker's outbound traffic is forced through a per-worker CONNECT proxy (ADR-076) that applies, in order:
 
 | Control | Env var | Default | Effect |
 |---|---|---|---|

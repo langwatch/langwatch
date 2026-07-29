@@ -19,7 +19,10 @@ export default async function execute() {
       await reconcileTTL({ connectionUrl: url, verbose: true });
     } catch (error) {
       logger.error(
-        { orgId, error: error instanceof Error ? error.message : String(error) },
+        {
+          orgId,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "Failed to run migrations on private ClickHouse instance",
       );
       throw error;

@@ -9,13 +9,8 @@
  *
  * Uses mutable mockRouterQuery + rerender() pattern from experiments-v3 tests.
  */
-import {
-  renderHook,
-  act,
-  waitFor,
-  cleanup,
-} from "@testing-library/react";
-import React from "react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -48,9 +43,7 @@ vi.mock("../useFilterParams", () => ({
     const filters: Record<string, string[]> = {};
     if (mockRouterQuery.origin) {
       const origin = mockRouterQuery.origin;
-      filters["traces.origin"] = Array.isArray(origin)
-        ? origin
-        : [origin];
+      filters["traces.origin"] = Array.isArray(origin) ? origin : [origin];
     }
     return { filters };
   },
@@ -664,7 +657,7 @@ describe("useSavedViews() full restore lifecycle", () => {
       isFetched: false,
     });
 
-    const { result, rerender } = renderHook(() => useSavedViews(), {
+    const { result } = renderHook(() => useSavedViews(), {
       wrapper,
     });
 

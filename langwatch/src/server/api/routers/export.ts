@@ -40,7 +40,10 @@ export const exportRouter = createTRPCRouter({
       const { projectId, exportId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
 
-      logger.info({ projectId, exportId }, "Export progress subscription started");
+      logger.info(
+        { projectId, exportId },
+        "Export progress subscription started",
+      );
 
       try {
         for await (const eventArgs of on(emitter, "export_progress", {
@@ -53,14 +56,20 @@ export const exportRouter = createTRPCRouter({
           try {
             parsed = JSON.parse(event.event) as ExportProgressEvent;
           } catch {
-            logger.warn({ projectId, exportId }, "Ignoring invalid export progress event");
+            logger.warn(
+              { projectId, exportId },
+              "Ignoring invalid export progress event",
+            );
             continue;
           }
 
           // Only yield events for this specific export
           if (parsed.exportId !== exportId) continue;
 
-          logger.debug({ projectId, exportId, event: parsed }, "Export progress event received");
+          logger.debug(
+            { projectId, exportId, event: parsed },
+            "Export progress event received",
+          );
           yield parsed;
 
           if (parsed.type === "done" || parsed.type === "error") {
@@ -68,7 +77,10 @@ export const exportRouter = createTRPCRouter({
           }
         }
       } finally {
-        logger.debug({ projectId, exportId }, "Export progress subscription cleanup");
+        logger.debug(
+          { projectId, exportId },
+          "Export progress subscription cleanup",
+        );
       }
     }),
 });

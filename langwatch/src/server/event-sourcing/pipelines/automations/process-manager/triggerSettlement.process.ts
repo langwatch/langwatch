@@ -1,26 +1,11 @@
 import { createHash } from "node:crypto";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/automations/schemas/constants";
-import type {
-  AutomationEvent,
-  TriggerMatchRecordedEventData,
-} from "~/server/event-sourcing/pipelines/automations/schemas/events";
+import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
 
 import { computeScheduledFor } from "../../../../app-layer/automations/dispatch/triggerActionDispatch";
-import {
-  createLogOverflowHandler,
-  createNotifyDigestHandler,
-  createPersistMatchHandler,
-  type TriggerSettlementDispatchDeps,
-} from "./triggerSettlementIntentHandlers";
-import {
-  logOverflowIntentSchema,
-  notifyDigestIntentSchema,
-  type PendingMatch,
-  persistMatchIntentSchema,
-  TRIGGER_SETTLEMENT_INTENT_TYPES,
-  type TriggerSettlementState,
+import type {
+  PendingMatch,
+  TriggerSettlementState,
 } from "./triggerSettlementProcess.types";
 
 export const TRIGGER_SETTLEMENT_PROCESS_NAME = "triggerSettlement" as const;

@@ -20,7 +20,9 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({ project: { id: "p_demo", slug: "demo" } }),
+  useOrganizationTeamProject: () => ({
+    project: { id: "p_demo", slug: "demo" },
+  }),
 }));
 
 import { LangyCapabilityRenderer } from "../components/capabilities/LangyCapabilityRenderer";

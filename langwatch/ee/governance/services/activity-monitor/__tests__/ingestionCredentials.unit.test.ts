@@ -19,7 +19,10 @@ describe("ingestionCredentials", () => {
     it("encrypts the credentials subtree to a tagged string and leaves other keys", () => {
       const out = encryptParserConfigCredentials({
         ottlStatements: ["keep me"],
-        credentials: { aws_access_key_id: "AKIA", aws_secret_access_key: "s3cr3t" },
+        credentials: {
+          aws_access_key_id: "AKIA",
+          aws_secret_access_key: "s3cr3t",
+        },
       })!;
       expect(out.ottlStatements).toEqual(["keep me"]);
       expect(typeof out.credentials).toBe("string");
@@ -33,7 +36,9 @@ describe("ingestionCredentials", () => {
     });
 
     it("is idempotent — an already-encrypted value is left untouched", () => {
-      const once = encryptParserConfigCredentials({ credentials: { token: "t" } })!;
+      const once = encryptParserConfigCredentials({
+        credentials: { token: "t" },
+      })!;
       const twice = encryptParserConfigCredentials(once)!;
       expect(twice.credentials).toBe(once.credentials);
     });

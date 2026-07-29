@@ -1,6 +1,6 @@
 import {
-  mapLangyMessageEvent,
   type LangyMessageProjectionRecord,
+  mapLangyMessageEvent,
 } from "@langwatch/langy";
 import {
   AbstractMapProjection,
@@ -9,11 +9,11 @@ import {
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import {
   type LangyAgentRespondedEvent,
-  type LangyMessageRecordedEvent,
-  type LangyMessageImportedEvent,
   LangyAgentRespondedEventSchema,
-  LangyMessageRecordedEventSchema,
+  type LangyMessageImportedEvent,
   LangyMessageImportedEventSchema,
+  type LangyMessageRecordedEvent,
+  LangyMessageRecordedEventSchema,
 } from "../schemas/events";
 
 const messageEvents = [

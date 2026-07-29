@@ -67,6 +67,12 @@ type RouterDeps struct {
 	// config.DefaultNonStreamingHeartbeatInterval (45s); negative disables
 	// heartbeating entirely.
 	HeartbeatInterval time.Duration
+	// Status backs the public GET /health status-page endpoint
+	// (specs/ai-gateway/gateway-health.feature). Optional in the type so a
+	// router can be built without it, but a nil reporter makes /health
+	// answer 503: a gateway that cannot observe its control plane must not
+	// report itself healthy to a public status page.
+	Status StatusReporter
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -93,6 +99,15 @@ func NewRouter(deps RouterDeps) http.Handler {
 		r.Get("/readyz", deps.Health.Readiness)
 		r.Get("/startupz", deps.Health.Startup)
 	}
+
+	// Public status-page surface, distinct from the k8s probes above: the
+	// probes gate pod lifecycle in-cluster, while /health is exposed
+	// through the ingress for status.langwatch.ai. HEAD is registered
+	// explicitly because chi does not fall HEAD back to GET, and uptime
+	// monitors commonly probe with HEAD.
+	statusRoute := statusHandler(deps.Status)
+	r.Get("/health", statusRoute)
+	r.Head("/health", statusRoute)
 
 	// Unauthenticated like the probes: the cluster's scraper has no
 	// virtual key, and the endpoint is kept off the public ingress by the
@@ -936,12 +951,23 @@ func streamErrorFrame(err error) []byte {
 		return ue.Body
 	}
 	msg := err.Error()
-	if ue != nil && ue.Message != "" {
-		msg = ue.Message
+	errType := "provider_error"
+	if ue != nil {
+		if ue.Message != "" {
+			msg = ue.Message
+		}
+		// Keep the provider's own error discriminant when the adapter parsed
+		// one, so SDK clients that dispatch on error.type still recognize
+		// e.g. insufficient_quota without the native event body.
+		if ue.ErrorType != "" {
+			errType = ue.ErrorType
+		} else if ue.ErrorCode != "" {
+			errType = ue.ErrorCode
+		}
 	}
 	frame, marshalErr := sonic.Marshal(sseErrorPayload{
 		Type:  "error",
-		Error: sseErrorDetail{Type: "provider_error", Message: msg},
+		Error: sseErrorDetail{Type: errType, Message: msg},
 	})
 	if marshalErr != nil {
 		return []byte(`{"type":"error","error":{"type":"provider_error","message":"stream failed"}}`)
@@ -1040,8 +1066,12 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 // The provider's native error body is written byte-for-byte when present, so
 // the client sees the exact upstream envelope under the upstream's real
 // status code (not a masked 502) and can tell terminal from retryable. When
-// only the status + message are available, a minimal JSON envelope carrying
-// both is emitted instead.
+// the native body is unavailable, the minimal envelope still preserves the
+// error's identity: the provider's own error type/code (insufficient_quota,
+// overloaded_error, ...) when the adapter parsed them, and a generic
+// provider_error only when nothing better is known. The originating provider
+// rides a response header either way, since the verbatim body cannot be
+// tampered with to carry it.
 func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	status := ue.StatusCode
 	if status <= 0 {
@@ -1049,21 +1079,45 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	}
 	// Forward the upstream's retry-signaling headers (Retry-After,
 	// x-should-retry) so the client can honor the provider's backoff and
-	// terminal-vs-retryable hint, not just the status code.
+	// terminal-vs-retryable hint, not just the status code. Passthrough
+	// lanes forward the upstream's headers wholesale, including its exact
+	// Content-Type (e.g. Google's "application/json; charset=UTF-8"), so
+	// only default the Content-Type when the upstream did not provide one.
 	for k, v := range ue.Headers {
 		w.Header().Set(k, v)
 	}
-	w.Header().Set("Content-Type", "application/json")
+	if ue.Provider != "" {
+		w.Header().Set("X-LangWatch-Provider", ue.Provider)
+	}
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	w.WriteHeader(status)
 	if len(ue.Body) > 0 {
 		_, _ = w.Write(ue.Body)
 		return
 	}
+	errType := ue.ErrorType
+	if errType == "" {
+		errType = ue.ErrorCode
+	}
+	if errType == "" {
+		errType = "provider_error"
+	}
+	errCode := ue.ErrorCode
+	if errCode == "" {
+		errCode = errType
+	}
+	meta := map[string]any{"status": status}
+	if ue.Provider != "" {
+		meta["provider"] = ue.Provider
+	}
 	body, _ := sonic.Marshal(map[string]any{
 		"error": map[string]any{
-			"type":    "provider_error",
+			"type":    errType,
+			"code":    errCode,
 			"message": ue.Message,
-			"meta":    map[string]any{"status": status},
+			"meta":    meta,
 		},
 	})
 	_, _ = w.Write(body)
@@ -1088,6 +1142,11 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
+	// 503, not 500: an open breaker is the gateway declining to hit an
+	// upstream that has been failing, a retryable provider-side condition.
+	// Unregistered it would default to 500 internal_error, which reads as a
+	// gateway bug and hides that the provider is the thing to look at.
+	herr.RegisterStatus(domain.ErrCircuitOpen, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)

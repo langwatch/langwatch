@@ -101,7 +101,12 @@ void (async () => {
         await page.waitForTimeout(400);
         await page.screenshot({
           path: path.join(OUTPUT_DIR, "me-install-drawer-claude-code.png"),
-          clip: { x: VIEWPORT.width - 600, y: 0, width: 600, height: VIEWPORT.height },
+          clip: {
+            x: VIEWPORT.width - 600,
+            y: 0,
+            width: 600,
+            height: VIEWPORT.height,
+          },
         });
       },
     },

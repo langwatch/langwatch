@@ -1,73 +1,42 @@
 /**
  * One vocabulary for every coding agent.
  *
- * Claude Code, opencode, Codex, Gemini CLI and Copilot all describe the same
- * handful of things — a model call, a tool run, a prompt, a denial, a token —
- * and every one of them spells those things differently. This module is where
- * that ends: raw wire strings in, one canonical fact out. Nothing downstream of
- * here should ever compare against a vendor's literal.
+ * Claude Code, Cowork, opencode, Codex, Gemini CLI and Copilot all describe
+ * the same handful of things — a model call, a tool run, a prompt, a denial,
+ * a token — and every one of them spells those things differently. This
+ * module is where that ends: raw wire strings in, one canonical fact out.
+ * Nothing downstream of here should ever compare against a vendor's literal.
  *
- * The rules below are not guesses. They come from reading each agent's source
+ * WHO each agent is lives in `../agents/` — one pure definition per agent,
+ * registered in an ordered registry (the trace-canonicalisation extractor
+ * shape). This engine folds the registry into the shared detection,
+ * prefix-stripping and alias tables; the per-vendor evidence lives with each
+ * definition. Adding an agent touches `agents/` only.
+ *
+ * The rules here are not guesses. They come from reading each agent's source
  * and from 30 days of live telemetry, and each surprising one carries the
  * evidence that forced it.
  */
 
-/** The agents we can name. `unknown` is not a failure — it is an honest answer. */
-export type CodingAgent =
-  | "claude_code"
-  | "opencode"
-  | "codex"
-  | "gemini_cli"
-  | "copilot"
-  | "unknown";
-
-/**
- * The canonical event kinds. Every agent's event name maps onto one of these, or
- * onto nothing (which is fine — an event we have no use for costs one lookup).
- */
-export type CodingAgentEvent =
-  | "user_prompt"
-  | "assistant_response"
-  | "api_request"
-  | "api_response"
-  | "api_error"
-  | "api_refusal"
-  | "retries_exhausted"
-  | "tool_result"
-  | "tool_decision"
-  | "compaction"
-  | "permission_mode_changed"
-  | "skill_activated"
-  | "mcp_server_connection"
-  | "hook_execution_complete"
-  | "at_mention"
-  | "internal_error"
-  | "session_created"
-  | "session_idle"
-  | "session_error"
-  | "subtask_invoked"
-  | "commit";
-
-/**
- * Token buckets. Three agents, three vocabularies for the same five things —
- * and the distinction that actually costs money (a cache READ is cheap, a cache
- * WRITE costs more than fresh input) is spelled differently by every one of them.
- */
-export type TokenType =
-  | "input"
-  | "output"
-  | "cache_read"
-  | "cache_creation"
-  | "reasoning";
+import { CODING_AGENT_REGISTRY } from "../agents";
+import type {
+  CodingAgent,
+  CodingAgentEvent,
+  CodingAgentMetric,
+  CodingAgentSignal,
+  TokenType,
+} from "../agents/_types";
 
 /**
  * Which agent produced this record.
  *
- * Deliberately NOT keyed on instrumentation scope. Claude Code uses
- * `com.anthropic.claude_code.events` and opencode uses `com.opencode`, but Codex
- * uses whatever `service_name` it was configured with — there is no stable scope
- * string to match on. The NAME of the span/metric/event is the reliable signal,
- * so that is what we key on, with the scope as a fallback hint.
+ * Deliberately NOT keyed on instrumentation scope alone. Claude Code uses
+ * `com.anthropic.claude_code.events` and opencode uses `com.opencode`, but
+ * Codex uses whatever `service_name` it was configured with — there is no
+ * stable scope string to match on. The NAME of the span/metric/event is the
+ * reliable signal, so that is what definitions key on, with the scope and
+ * service as supporting hints. Registry order resolves the one genuine
+ * overlap (Cowork before Claude Code — see `agents/index.ts`).
  */
 export function detectCodingAgent({
   scopeName,
@@ -79,20 +48,15 @@ export function detectCodingAgent({
   recordName?: string | null;
   serviceName?: string | null;
 }): CodingAgent {
-  const name = (recordName ?? "").toLowerCase();
-  const scope = (scopeName ?? "").toLowerCase();
-  const service = (serviceName ?? "").toLowerCase();
+  const signal: CodingAgentSignal = {
+    name: (recordName ?? "").toLowerCase(),
+    scope: (scopeName ?? "").toLowerCase(),
+    service: (serviceName ?? "").toLowerCase(),
+  };
 
-  const says = (needle: string) =>
-    name.startsWith(`${needle}.`) ||
-    scope.includes(needle) ||
-    service.includes(needle);
-
-  if (says("claude_code") || scope.includes("anthropic")) return "claude_code";
-  if (says("opencode")) return "opencode";
-  if (says("codex")) return "codex";
-  if (says("gemini_cli") || says("gemini")) return "gemini_cli";
-  if (says("copilot")) return "copilot";
+  for (const agent of CODING_AGENT_REGISTRY) {
+    if (agent.matches(signal)) return agent.id;
+  }
   return "unknown";
 }
 
@@ -102,9 +66,10 @@ export function detectCodingAgent({
  * The single most load-bearing function here, because it is the ONLY key every
  * agent agrees on — and they agree on it under four different names:
  *
- *   - Claude Code: `session.id` on logs and metrics, `gen_ai.conversation.id` on
- *     SPANS. Verified identical: the same UUID appears under both keys for the
- *     same trace, so a span and a log of one session do join.
+ *   - Claude Code / Cowork: `session.id` on logs and metrics,
+ *     `gen_ai.conversation.id` on SPANS. Verified identical: the same UUID
+ *     appears under both keys for the same trace, so a span and a log of one
+ *     session do join.
  *   - opencode:    `session.id` everywhere.
  *   - Codex:       `conversation.id` == `thread.id` == `session.id` (its MCP span
  *     sets two of them to the same thread id).
@@ -124,6 +89,12 @@ export function resolveConversationKey(
   for (const key of candidates) {
     const value = attrs[key];
     if (typeof value === "string" && value.length > 0) return value;
+    // The span-store read-back deserializes purely numeric attribute strings
+    // as numbers, so an agent whose session key is all digits must resolve
+    // to the same key on both the inline and the claim-check path.
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
   }
   return null;
 }
@@ -131,8 +102,8 @@ export function resolveConversationKey(
 /**
  * The canonical event, from whatever the agent called it.
  *
- * Two agents namespace their event names (`claude_code.tool_result`,
- * `codex.tool_result`) and one does not (opencode emits a bare `tool_result`),
+ * Some agents namespace their event names (`claude_code.tool_result`,
+ * `codex.tool_result`) and some do not (opencode emits a bare `tool_result`),
  * so the prefix is stripped before matching rather than enumerated per agent.
  */
 export function normalizeEventName(
@@ -150,7 +121,13 @@ export function normalizeEventName(
   return EVENT_ALIASES[canonical] ?? null;
 }
 
-const EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
+/**
+ * The canonical vocabulary every agent shares: identity mappings for the
+ * canonical names themselves, plus spellings not attributable to a single
+ * vendor. Vendor-specific aliases live on the agent definitions and are
+ * merged in below.
+ */
+const BASE_EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   user_prompt: "user_prompt",
   assistant_response: "assistant_response",
   api_request: "api_request",
@@ -177,33 +154,16 @@ const EVENT_ALIASES: Readonly<Record<string, CodingAgentEvent>> = {
   session_error: "session_error",
   subtask_invoked: "subtask_invoked",
   commit: "commit",
-  // Codex names its shell outcome differently but means "the tool ran".
-  sandbox_outcome: "tool_result",
-  // Gemini logs a COMPLETED tool call (it carries success + duration_ms), which
-  // is our tool_result, not a separate "the tool was requested" fact.
-  tool_call: "tool_result",
-  chat_compression: "compaction",
   conversation_finished: "session_idle",
   slash_command: "user_prompt",
-  // Copilot emits these as SPAN EVENTS rather than log records — see the note on
-  // the Copilot shape below. Mapped so they fold the same way if they ever
-  // arrive as logs.
-  session_compaction_complete: "compaction",
-  skill_invoked: "skill_activated",
 };
 
 /**
  * The canonical metric, from whatever the agent called it.
  *
  * The agent prefix is the only difference for the metrics we care about
- * (`claude_code.lines_of_code.count` vs `opencode.lines_of_code.count`), so it is
- * stripped and the remainder matched — the same trick the event names use.
- *
- * Two deliberate omissions:
- *   - opencode's `lines_of_code.total` is a cumulative GAUGE that sits alongside
- *     the `.count` delta counter. Adding both would double every line.
- *   - Codex has no lines-of-code and no cost metric at all; its cost must be
- *     priced from tokens. There is nothing here to map.
+ * (`claude_code.lines_of_code.count` vs `opencode.lines_of_code.count`), so it
+ * is stripped and the remainder matched — the same trick the event names use.
  */
 export function normalizeMetricName(
   rawMetricName: string | null | undefined,
@@ -212,17 +172,7 @@ export function normalizeMetricName(
   return METRIC_ALIASES[stripAgentPrefix(rawMetricName)] ?? null;
 }
 
-export type CodingAgentMetric =
-  | "tool_call"
-  | "lines_of_code"
-  | "commit"
-  | "pull_request"
-  | "edit_decision"
-  | "active_time"
-  | "token_usage"
-  | "cost_usage";
-
-const METRIC_ALIASES: Readonly<Record<string, CodingAgentMetric>> = {
+const BASE_METRIC_ALIASES: Readonly<Record<string, CodingAgentMetric>> = {
   "lines_of_code.count": "lines_of_code",
   "commit.count": "commit",
   "pull_request.count": "pull_request",
@@ -230,12 +180,44 @@ const METRIC_ALIASES: Readonly<Record<string, CodingAgentMetric>> = {
   "active_time.total": "active_time",
   "token.usage": "token_usage",
   "cost.usage": "cost_usage",
-  // Codex spells its token metric differently, and reports it per turn.
-  "turn.token_usage": "token_usage",
-  // Gemini: `gemini_cli.lines.changed` with type=added|removed.
-  "lines.changed": "lines_of_code",
   "tool.call.count": "tool_call",
 };
+
+/**
+ * Base table + every registered agent's aliases, collisions rejected.
+ * Exported for the unit suite, which proves the collision guard fires.
+ */
+export function mergeAliasTables<Value>(
+  base: Readonly<Record<string, Value>>,
+  perAgent: ReadonlyArray<Readonly<Record<string, Value>> | undefined>,
+): Readonly<Record<string, Value>> {
+  const merged: Record<string, Value> = { ...base };
+  for (const table of perAgent) {
+    if (!table) continue;
+    for (const [alias, canonical] of Object.entries(table)) {
+      if (alias in merged && merged[alias] !== canonical) {
+        // Module-load failure on a genuine conflict: two agents (or an agent
+        // and the base vocabulary) disagreeing on one spelling is a wiring
+        // bug, not a runtime condition.
+        throw new Error(
+          `Conflicting coding-agent alias "${alias}": ${String(merged[alias])} vs ${String(canonical)}`,
+        );
+      }
+      merged[alias] = canonical;
+    }
+  }
+  return Object.freeze(merged);
+}
+
+const EVENT_ALIASES = mergeAliasTables(
+  BASE_EVENT_ALIASES,
+  CODING_AGENT_REGISTRY.map((agent) => agent.eventAliases),
+);
+
+const METRIC_ALIASES = mergeAliasTables(
+  BASE_METRIC_ALIASES,
+  CODING_AGENT_REGISTRY.map((agent) => agent.metricAliases),
+);
 
 /**
  * Is this metric from a coding agent at all?
@@ -264,9 +246,21 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "session.id",
   "user.id",
   "user.email",
+  "user.account_uuid",
+  "user.account_id",
+  "organization.id",
   "app.version",
   "app.entrypoint",
   "terminal.type",
+  // Cowork correlation + decision vocabulary (its events are otherwise
+  // Claude Code's): the per-prompt id, in-session ordering, request speed
+  // tier, and the tool_result-embedded decision fields.
+  "prompt.id",
+  "event.sequence",
+  "speed",
+  "decision_type",
+  "decision_source",
+  "mcp_server_scope",
   "gen_ai.request.model",
   "mcp_server.name",
   "mcp_tool.name",
@@ -294,7 +288,6 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "post_tokens",
   "pre_tokens",
   "prompt_length",
-  "request_id",
   "response_length",
   "server_fallback_hop",
   "server_name",
@@ -312,6 +305,7 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "total_retry_duration_ms",
   "ttft_ms",
   "type",
+  "request_id",
 ];
 
 /**
@@ -319,6 +313,23 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
  * or null when the record is not a coding agent's, which doubles as the
  * consumer-side gate (a contribution without the lift never reaches the
  * session fold).
+ *
+ * **Deliberately blind to `service.name`**, unlike `detectCodingAgent`. This
+ * runs on every ingested log record, and the service name lives only inside
+ * `resourceAttributesFlatJson` — there is no extracted column for it — so
+ * consulting it here would put a JSON parse on the whole log firehose to
+ * answer a question that is almost always "no". That is the cost ADR-069
+ * exists to refuse, so the gate stays on the cheap signals (scope, event name)
+ * and the caller supplies `service.name` afterwards, to LABEL a record this
+ * has already admitted.
+ *
+ * The residual gap is narrow and known: an agent identified by service name
+ * ALONE, emitting bare event names under a scope this does not recognise,
+ * would be declined here. Cowork is not that case — it reuses Claude Code's
+ * runtime, so its records carry the anthropic scope and `claude_code.*` event
+ * names and pass on those. An agent that genuinely needs naming by service
+ * alone needs a `ServiceName` column extracted on the canonical log record
+ * first; do not close it by parsing resource attributes in this path.
  */
 export function liftCodingAgentLogFacts({
   scopeName,
@@ -353,17 +364,10 @@ export function liftCodingAgentLogFacts({
 
 /** `claude_code.tool_result` → `tool_result`; `tool_result` → `tool_result`. */
 function stripAgentPrefix(name: string): string {
-  const AGENT_PREFIXES = [
-    "claude_code.",
-    "opencode.",
-    "codex.",
-    "gemini_cli.",
-    // Copilot namespaces under the ORG, not the product.
-    "github.copilot.",
-    "copilot.",
-  ];
-  for (const prefix of AGENT_PREFIXES) {
-    if (name.startsWith(prefix)) return name.slice(prefix.length);
+  for (const agent of CODING_AGENT_REGISTRY) {
+    for (const prefix of agent.namePrefixes) {
+      if (name.startsWith(prefix)) return name.slice(prefix.length);
+    }
   }
   return name;
 }
@@ -371,10 +375,10 @@ function stripAgentPrefix(name: string): string {
 /**
  * The token bucket, from any agent's spelling.
  *
- * The cache distinction is the one that matters and the one they all spell
- * differently: `cacheRead` (Claude Code, opencode) vs `cached_input` (Codex),
- * `cacheCreation` vs `cache_creation`. Getting this wrong does not throw — it
- * silently misprices the session, which is worse.
+ * Deliberately SHARED rather than per-agent: the spellings overlap and
+ * folding them in one place is what keeps a new agent's `cacheRead` /
+ * `cache_read` / `cached_input` from silently mispricing a session — which
+ * does not throw, and is worse than throwing.
  */
 export function normalizeTokenType(
   rawType: string | null | undefined,
@@ -422,12 +426,10 @@ export function normalizeTokenType(
 }
 
 /**
- * The tool that ran.
- *
- * opencode puts the tool name IN the span name (`opencode.tool.bash`) while
- * Claude Code and Codex keep the span name constant and carry the tool in an
- * attribute. Reading only the attribute loses every opencode tool; reading only
- * the span name loses everyone else's.
+ * The tool that ran: the attribute when the agent carries one, else whatever
+ * a registered definition can read off the span name (opencode encodes the
+ * tool there). Reading only the attribute loses every opencode tool; reading
+ * only the span name loses everyone else's.
  */
 export function resolveToolName({
   spanName,
@@ -439,12 +441,11 @@ export function resolveToolName({
   const fromAttr = firstString(attrs, ["tool_name", "tool.name"]);
   if (fromAttr !== null) return fromAttr;
 
-  // `opencode.tool.bash` → `bash`. Only the opencode shape encodes it this way.
   const name = spanName ?? "";
-  const OPENCODE_TOOL_SPAN = "opencode.tool.";
-  if (name.startsWith(OPENCODE_TOOL_SPAN)) {
-    const tool = name.slice(OPENCODE_TOOL_SPAN.length);
-    return tool.length > 0 ? tool : null;
+  if (name.length === 0) return null;
+  for (const agent of CODING_AGENT_REGISTRY) {
+    const tool = agent.toolNameFromSpanName?.(name) ?? null;
+    if (tool !== null) return tool;
   }
   return null;
 }

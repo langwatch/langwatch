@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCustomerService } from "../services/customerService";
-import {
-  CustomerCreationRaceError,
-  OrganizationNotFoundError,
-  UserEmailRequiredError,
-} from "../errors";
 
 const createMockStripe = () => ({
   customers: {
@@ -37,7 +32,7 @@ describe("customerService", () => {
 
   describe("getOrCreateCustomerId()", () => {
     describe("when organization not found", () => {
-      it("throws OrganizationNotFoundError", async () => {
+      it("raises organization_not_found", async () => {
         db.organization.findUnique.mockResolvedValue(null);
 
         await expect(
@@ -45,7 +40,7 @@ describe("customerService", () => {
             user: { email: "test@example.com" },
             organizationId: "org_missing",
           }),
-        ).rejects.toThrow(OrganizationNotFoundError);
+        ).rejects.toMatchObject({ code: "organization_not_found" });
       });
     });
 
@@ -68,7 +63,7 @@ describe("customerService", () => {
     });
 
     describe("when user has no email", () => {
-      it("throws UserEmailRequiredError", async () => {
+      it("raises billing_customer_email_required", async () => {
         db.organization.findUnique.mockResolvedValue({
           id: "org_123",
           name: "Acme",
@@ -80,7 +75,7 @@ describe("customerService", () => {
             user: { email: null },
             organizationId: "org_123",
           }),
-        ).rejects.toThrow(UserEmailRequiredError);
+        ).rejects.toMatchObject({ code: "billing_customer_email_required" });
       });
     });
 
@@ -157,7 +152,7 @@ describe("customerService", () => {
         expect(result).toBe("cus_winner");
       });
 
-      it("throws CustomerCreationRaceError when refreshed org has no customer ID", async () => {
+      it("raises subscription_sync_failed when the refreshed org still has no customer id", async () => {
         db.organization.findUnique.mockResolvedValue({
           id: "org_123",
           name: "Acme",
@@ -176,7 +171,7 @@ describe("customerService", () => {
             user: { email: "test@example.com" },
             organizationId: "org_123",
           }),
-        ).rejects.toThrow(CustomerCreationRaceError);
+        ).rejects.toMatchObject({ code: "subscription_sync_failed" });
       });
     });
   });

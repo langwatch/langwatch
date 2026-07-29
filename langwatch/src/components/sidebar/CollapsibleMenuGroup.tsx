@@ -1,7 +1,7 @@
 import {
+  Badge,
   Box,
   Collapsible,
-  Badge,
   HStack,
   Spacer,
   Text,

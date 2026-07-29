@@ -64,16 +64,39 @@ vi.mock("~/features/langy/stores/langyStore", () => {
     openPanel: () => undefined,
     attachContext: () => undefined,
   });
-  const useLangyStore = (
-    selector: (s: ReturnType<typeof state>) => unknown,
-  ) => selector(state());
+  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
+    selector(state());
   useLangyStore.getState = state;
   return { useLangyStore };
 });
 
+import { explainAnyError } from "~/features/errors";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { useFilterStore } from "../../../stores/filterStore";
 import { SearchBar } from "../SearchBar";
+
+/**
+ * A handled failure exactly as tRPC delivers it — the code under `data.error`,
+ * with `meta` alongside. The banner has no other channel to a cause any more:
+ * the server stopped sending a sentence for it to print.
+ */
+function handledCause(code: string, meta: Record<string, unknown> = {}) {
+  return {
+    data: {
+      error: { code, httpStatus: 502, fault: "provider", meta, reasons: [] },
+    },
+  };
+}
+
+/**
+ * What the banner is required to render: the words the code-keyed registry
+ * has for this failure. Derived rather than transcribed — the assertion is
+ * "the banner delegates to the registry", not "the registry says X today".
+ */
+function registryCopy(cause: unknown): string {
+  const { title, description } = explainAnyError(cause);
+  return description ? `${title}. ${description}` : title;
+}
 
 afterEach(() => {
   cleanup();
@@ -140,25 +163,32 @@ describe("<SearchBar /> unified error banner", () => {
   });
 
   describe("given an AI error with structured details in the store", () => {
+    const details = {
+      provider: "openai",
+      model: "gpt-5-mini",
+      httpStatus: 503,
+      reason: "Service unavailable",
+    };
     const aiError: AiActionError = {
-      code: "provider_error",
-      message:
-        "Failed after 2 attempts. Last error: Cannot connect to provider.",
-      details: {
-        provider: "openai",
-        model: "gpt-5-mini",
-        httpStatus: 503,
-        reason: "Service unavailable",
-      },
+      code: "ai_query_provider_error",
+      cause: handledCause("ai_query_provider_error", details),
+      details,
     };
 
     beforeEach(() => {
       useFilterStore.getState().setAiError(aiError);
     });
 
-    it("renders the AI error message in the banner", () => {
+    it("renders the registry's copy for the failure's code", () => {
       renderSearchBar();
-      expect(screen.getByText(aiError.message)).toBeInTheDocument();
+      expect(screen.getByText(registryCopy(aiError.cause))).toBeInTheDocument();
+    });
+
+    it("keeps the provider's own sentence out of the headline", () => {
+      // It is diagnostic detail, available behind the chevron — never the
+      // sentence a customer is shown first.
+      renderSearchBar();
+      expect(screen.queryByText("Service unavailable")).not.toBeInTheDocument();
     });
 
     it("shows an expand chevron because details are present", () => {
@@ -172,7 +202,7 @@ describe("<SearchBar /> unified error banner", () => {
       // The inline ErrorBadge was removed from AiPromptInput — only the banner shows
       // Verify no second instance of the error message appears elsewhere
       renderSearchBar();
-      const messages = screen.getAllByText(aiError.message);
+      const messages = screen.getAllByText(registryCopy(aiError.cause));
       expect(messages).toHaveLength(1);
     });
 
@@ -211,16 +241,21 @@ describe("<SearchBar /> unified error banner", () => {
   describe("given an AI error without structured details", () => {
     const simpleAiError: AiActionError = {
       code: "unknown",
-      message: "Something went wrong with the AI request.",
+      cause: new Error("connection reset by peer"),
     };
 
     beforeEach(() => {
       useFilterStore.getState().setAiError(simpleAiError);
     });
 
-    it("renders the message", () => {
+    it("renders the generic unknown copy, not the raw failure", () => {
       renderSearchBar();
-      expect(screen.getByText(simpleAiError.message)).toBeInTheDocument();
+      expect(
+        screen.getByText(registryCopy(simpleAiError.cause)),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/connection reset by peer/i),
+      ).not.toBeInTheDocument();
     });
 
     it("shows no expand chevron when there are no details", () => {
@@ -233,8 +268,8 @@ describe("<SearchBar /> unified error banner", () => {
 
   describe("given both a parse error and an AI error", () => {
     const aiError: AiActionError = {
-      code: "provider_error",
-      message: "AI provider failed.",
+      code: "ai_query_provider_error",
+      cause: handledCause("ai_query_provider_error", { provider: "openai" }),
       details: { provider: "openai" },
     };
 
@@ -246,7 +281,7 @@ describe("<SearchBar /> unified error banner", () => {
 
     it("shows the AI error message (AI error wins priority)", () => {
       renderSearchBar();
-      expect(screen.getByText(aiError.message)).toBeInTheDocument();
+      expect(screen.getByText(registryCopy(aiError.cause))).toBeInTheDocument();
     });
 
     it("does not show the parse error message while AI error is active", () => {
@@ -265,8 +300,8 @@ describe("<SearchBar /> unified error banner", () => {
 
   describe("AI error persistence — given an AI error set in the store", () => {
     const aiError: AiActionError = {
-      code: "provider_error",
-      message: "Persistent AI failure.",
+      code: "ai_query_provider_error",
+      cause: handledCause("ai_query_provider_error", { provider: "anthropic" }),
       details: { provider: "anthropic" },
     };
 
@@ -276,7 +311,7 @@ describe("<SearchBar /> unified error banner", () => {
       // Verify it persists without being cleared
       expect(useFilterStore.getState().aiError).toEqual(aiError);
       renderSearchBar();
-      expect(screen.getByText(aiError.message)).toBeInTheDocument();
+      expect(screen.getByText(registryCopy(aiError.cause))).toBeInTheDocument();
     });
 
     it("clears when clearAll is called", () => {

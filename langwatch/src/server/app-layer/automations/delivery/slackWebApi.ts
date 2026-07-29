@@ -1,6 +1,6 @@
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
 import { createLogger } from "@langwatch/observability";
+import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { sendHttpDestination } from "./httpDestination";
 
 const logger = createLogger("langwatch:triggers:slackWebApi");
@@ -37,8 +37,14 @@ interface SlackApiResponse {
  * `channel_not_found`) are the top setup snags and read as opaque in a toast —
  * a bot posting to a public channel it hasn't joined needs either an invite or
  * the `chat:write.public` scope, and a bad channel value needs the picker.
+ *
+ * `null` for a code with no remediation we can vouch for. The caller ships this
+ * to the customer verbatim, so anything returned here has to be a sentence
+ * written FOR one — and `ratelimited` or `fatal_error` is a provider slug, not
+ * copy. Those get the registry's own "Check the destination and try again."
+ * instead; the code still travels in the log line.
  */
-function explainSlackPostError(code: string): string {
+function explainSlackPostError(code: string): string | null {
   switch (code) {
     case "not_in_channel":
       return "the bot isn't in that channel. Invite it with `/invite @LangWatch` in the channel, or reinstall the Slack app with the `chat:write.public` scope so it can post to any public channel";
@@ -54,7 +60,7 @@ function explainSlackPostError(code: string): string {
     case "missing_scope":
       return "the Slack app is missing a required scope. Reinstall it with the `chat:write` (and `chat:write.public`) scopes";
     default:
-      return `Slack rejected the message: ${code}`;
+      return null;
   }
 }
 
@@ -119,9 +125,26 @@ export async function postSlackChatMessage({
   const detail = body.response_metadata?.messages?.length
     ? ` (${body.response_metadata.messages.join("; ")})`
     : "";
+  const explanation = explainSlackPostError(code);
   throw new DispatchError({
-    message: `${label}: ${explainSlackPostError(code)}${detail}`,
+    message: `${label}: ${explanation ?? `Slack rejected the message: ${code}`}${detail}`,
     retryable: RETRYABLE_SLACK_ERRORS.has(code),
+    // Slack told us what the admin has to do; that sentence is the whole value
+    // of this failure, so it travels to them. Capitalised because
+    // `explainSlackPostError` writes a clause to follow the label, and this is
+    // read on its own. `label` and `detail` stay behind: one names an internal
+    // dispatcher, the other is raw provider metadata.
+    //
+    // Only when there IS one. Omitting the property is what makes the registry
+    // fall back to its own copy for `notification_delivery_error` — see
+    // NotificationDeliveryError. Sending `Slack rejected the message:
+    // ratelimited` instead would put a provider slug in front of a customer,
+    // which is neither remediation nor English.
+    ...(explanation
+      ? {
+          customerMessage: `${explanation.charAt(0).toUpperCase()}${explanation.slice(1)}`,
+        }
+      : {}),
   });
 }
 
@@ -129,6 +152,30 @@ export interface SlackChannel {
   id: string;
   name: string;
   isPrivate: boolean;
+}
+
+/**
+ * Why a channel listing is short of the workspace. A listing can succeed and
+ * still be incomplete, and the two are indistinguishable to the caller unless
+ * we say so — which is the whole reason this type exists.
+ *
+ *   - `page_cap` — the walk stopped before Slack ran out of channels. Slack
+ *     documents that "it's possible to receive fewer results than your
+ *     specified limit, even when there are additional results to retrieve", so
+ *     a page can carry a fraction of what we ask for. The real ceiling is
+ *     therefore well under `pages x limit`, varies by workspace, and cannot be
+ *     predicted from the page size — which is why the cap has to be reported
+ *     rather than reasoned about.
+ *   - `private_channels_hidden` — the app has no `groups:read`, so the listing
+ *     fell back to public channels only.
+ */
+export type SlackChannelListGap = "page_cap" | "private_channels_hidden";
+
+export interface SlackChannelListing {
+  channels: SlackChannel[];
+  error: string | null;
+  /** Empty when the listing covers the whole workspace. */
+  gaps: SlackChannelListGap[];
 }
 
 interface SlackConversationsResponse {
@@ -163,11 +210,19 @@ const CHANNEL_LIST_MAX_RESPONSE_BYTES = 1024 * 1024;
 async function listChannelsForTypes(
   token: string,
   types: string,
-): Promise<{ channels: SlackChannel[]; error: string | null }> {
+): Promise<SlackChannelListing> {
   const collected: SlackChannel[] = [];
-  const done = (error: string | null) => ({
+  // Sorting happens here, AFTER any truncation, so a capped walk yields a list
+  // that reads as alphabetical and complete while missing entries throughout.
+  // That is why a silent cap is so misleading: the holes look like absence, not
+  // truncation.
+  const done = (
+    error: string | null,
+    gaps: SlackChannelListGap[] = [],
+  ): SlackChannelListing => ({
     channels: [...collected].sort((a, b) => a.name.localeCompare(b.name)),
     error,
+    gaps,
   });
 
   let cursor: string | undefined;
@@ -222,7 +277,7 @@ async function listChannelsForTypes(
     { pages: MAX_CHANNEL_PAGES, channels: collected.length },
     "Slack conversations.list page cap reached; returning a partial channel list",
   );
-  return done(null);
+  return done(null, ["page_cap"]);
 }
 
 /**
@@ -238,12 +293,21 @@ async function listChannelsForTypes(
  */
 export async function listSlackChannels(
   token: string,
-): Promise<{ channels: SlackChannel[]; error: string | null }> {
+): Promise<SlackChannelListing> {
   const withPrivate = await listChannelsForTypes(
     token,
     "public_channel,private_channel",
   );
   if (withPrivate.error !== "missing_scope") return withPrivate;
-  // Missing `groups:read` (private) — fall back to public channels only.
-  return listChannelsForTypes(token, "public_channel");
+  // Missing `groups:read` (private) — fall back to public channels only. The
+  // retry succeeds, so without recording the gap the caller would see a clean
+  // listing and no reason to doubt it.
+  const publicOnly = await listChannelsForTypes(token, "public_channel");
+  // Only a listing that came back is missing something. If the retry failed too
+  // there is no list to be partial, and the error is the whole story.
+  if (publicOnly.error !== null) return publicOnly;
+  return {
+    ...publicOnly,
+    gaps: [...publicOnly.gaps, "private_channels_hidden"],
+  };
 }

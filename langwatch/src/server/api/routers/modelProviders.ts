@@ -148,48 +148,50 @@ export const modelProviderRouter = createTRPCRouter({
     }),
   update: protectedProcedure
     .input(
-      z.object({
-        id: z.string().optional(),
-        ...tenantAnchorSchema,
-        provider: z.string(),
-        // Human-readable label shown in the settings list and the model
-        // selector group headers. Defaults to the humanized provider name
-        // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
-        // column; now exposing it on the write path so operators can
-        // distinguish multiple same-provider instances at different
-        // scopes.
-        name: z.string().trim().min(1).max(128).optional(),
-        enabled: z.boolean(),
-        customKeys: z.object({}).passthrough().optional().nullable(),
-        customModels: customModelUpdateInputSchema.optional().nullable(),
-        customEmbeddingsModels: customModelUpdateInputSchema
-          .optional()
-          .nullable(),
-        extraHeaders: z
-          .array(z.object({ key: z.string(), value: z.string() }))
-          .optional()
-          .nullable(),
-        defaultModel: z.string().optional(),
-        // Multi-scope writes (iter 109). `scopes` is the canonical shape;
-        // `scopeType`/`scopeId` remain for the transition period so older
-        // callers still compile. When both arrive, `scopes` wins. The
-        // service runs the fail-closed authz check on every entry before
-        // persisting — any non-manageable scope aborts the whole write.
-        scopes: z
-          .array(scopeAssignmentSchema)
-          .min(1, "At least one scope must be selected.")
-          .optional(),
-        scopeType: z.enum(SCOPE_TIERS).optional(),
-        scopeId: z.string().optional(),
-        // Advanced (Gateway) fields live on the same ModelProvider row.
-        // Accepted on the unified write path so the drawer ships one Save
-        // button across basic + advanced settings.
-        rateLimitRpm: z.number().int().min(0).nullable().optional(),
-        rateLimitTpm: z.number().int().min(0).nullable().optional(),
-        rateLimitRpd: z.number().int().min(0).nullable().optional(),
-        fallbackPriorityGlobal: z.number().int().nullable().optional(),
-        providerConfig: z.object({}).passthrough().nullable().optional(),
-      }).superRefine(requireTenantAnchor),
+      z
+        .object({
+          id: z.string().optional(),
+          ...tenantAnchorSchema,
+          provider: z.string(),
+          // Human-readable label shown in the settings list and the model
+          // selector group headers. Defaults to the humanized provider name
+          // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
+          // column; now exposing it on the write path so operators can
+          // distinguish multiple same-provider instances at different
+          // scopes.
+          name: z.string().trim().min(1).max(128).optional(),
+          enabled: z.boolean(),
+          customKeys: z.object({}).passthrough().optional().nullable(),
+          customModels: customModelUpdateInputSchema.optional().nullable(),
+          customEmbeddingsModels: customModelUpdateInputSchema
+            .optional()
+            .nullable(),
+          extraHeaders: z
+            .array(z.object({ key: z.string(), value: z.string() }))
+            .optional()
+            .nullable(),
+          defaultModel: z.string().optional(),
+          // Multi-scope writes (iter 109). `scopes` is the canonical shape;
+          // `scopeType`/`scopeId` remain for the transition period so older
+          // callers still compile. When both arrive, `scopes` wins. The
+          // service runs the fail-closed authz check on every entry before
+          // persisting — any non-manageable scope aborts the whole write.
+          scopes: z
+            .array(scopeAssignmentSchema)
+            .min(1, "At least one scope must be selected.")
+            .optional(),
+          scopeType: z.enum(SCOPE_TIERS).optional(),
+          scopeId: z.string().optional(),
+          // Advanced (Gateway) fields live on the same ModelProvider row.
+          // Accepted on the unified write path so the drawer ships one Save
+          // button across basic + advanced settings.
+          rateLimitRpm: z.number().int().min(0).nullable().optional(),
+          rateLimitTpm: z.number().int().min(0).nullable().optional(),
+          rateLimitRpd: z.number().int().min(0).nullable().optional(),
+          fallbackPriorityGlobal: z.number().int().nullable().optional(),
+          providerConfig: z.object({}).passthrough().nullable().optional(),
+        })
+        .superRefine(requireTenantAnchor),
     )
     .use(checkProjectOrOrganizationPermission("project:update"))
     .mutation(async ({ input, ctx }) => {

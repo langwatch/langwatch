@@ -2,6 +2,7 @@ import { Box, chakra, HStack, Icon, Link, Text } from "@chakra-ui/react";
 import { AlertCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
+import { explainAnyError } from "~/features/errors";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { useFilterStore } from "../../stores/filterStore";
 import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
@@ -14,17 +15,30 @@ import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
  * report: Ask AI "does nothing", the provider_error only visible in the
  * network tab).
  *
- * Provider errors additionally deep-link to Model Providers settings:
- * they almost always trace back to the project's model configuration
- * (wrong deployment, disabled provider, stale credentials), and the
- * operator can't act on a bare "Resource not found".
+ * Model-configuration failures additionally deep-link to Model Providers
+ * settings: they almost always trace back to the project's model
+ * configuration (wrong deployment, disabled provider, stale credentials),
+ * and the operator can't act on a bare "Resource not found".
+ *
+ * The words come from `explainAnyError` — the code-keyed registry — not from
+ * the error. This row used to render a server-composed sentence built out of
+ * the SDK's own exception text.
  */
+const CONFIGURATION_CODES = new Set([
+  "ai_query_provider_error",
+  "ai_call_failed",
+  "model_not_configured",
+  "model_provider_disabled",
+]);
+
 export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
   error,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const expandable = hasAiErrorDetails(error);
   const setAiError = useFilterStore((s) => s.setAiError);
+  const { title, description } = explainAnyError(error.cause);
+  const text = description ? `${title}. ${description}` : title;
 
   return (
     <Box
@@ -46,9 +60,9 @@ export const FloatingAiErrorRow: React.FC<{ error: AiActionError }> = ({
           <AlertCircle />
         </Icon>
         <Text textStyle="2xs" color="red.fg" lineHeight="1.3">
-          {error.message}
+          {text}
         </Text>
-        {error.code === "provider_error" && (
+        {CONFIGURATION_CODES.has(error.code) && (
           <Link
             href="/settings/model-providers"
             textStyle="2xs"

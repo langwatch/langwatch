@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
+import { describeError } from "../features/errors";
 import { api } from "../utils/api";
-import { errorDisplayMessage } from "../utils/trpcError";
 
 /**
  * Hook for validating model provider API keys.
@@ -64,9 +64,12 @@ export function useModelProviderApiKeyValidation(
     } catch (error) {
       // Not `error.message`: a handled error's message is replaced with its
       // stable code on the wire, so reading it renders a slug like
-      // `provider_unreachable` straight into the drawer. `errorDisplayMessage`
-      // reads the authored prose first and only falls back to the code.
-      setValidationError(errorDisplayMessage(error));
+      // `provider_unreachable` straight into the drawer. `describeError`
+      // resolves the code against the presentation registry instead. The
+      // drawer's slot is a plain string, which is exactly what it is for.
+      setValidationError(
+        describeError({ error, fallbackTitle: "Couldn't check this API key" }),
+      );
       return false;
     } finally {
       setIsValidating(false);
@@ -110,7 +113,9 @@ export function useModelProviderApiKeyValidation(
 
         return true;
       } catch (error) {
-        setValidationError(errorDisplayMessage(error));
+        setValidationError(
+          describeError({ error, fallbackTitle: "Couldn't check this API key" }),
+        );
         return false;
       } finally {
         setIsValidating(false);

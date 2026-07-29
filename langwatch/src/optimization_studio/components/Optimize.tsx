@@ -1,6 +1,5 @@
 import {
   Alert,
-  Box,
   Button,
   createListCollection,
   Grid,
@@ -31,11 +30,11 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { DEFAULT_MODEL } from "../../utils/constants";
 import { trackEvent } from "../../utils/tracking";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
-import { DEFAULT_MODEL } from "../../utils/constants";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Entry } from "../types/dsl";
 import { OPTIMIZERS } from "../types/optimizers";
@@ -44,8 +43,8 @@ import { checkIsEvaluator } from "../utils/nodeUtils";
 
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState } from "./History";
-import { VersionToBeUsed } from "./VersionToBeUsed";
 import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/OptimizationStudioLLMConfigField";
+import { VersionToBeUsed } from "./VersionToBeUsed";
 
 const optimizerOptions: {
   label: string;
@@ -204,15 +203,14 @@ export function OptimizeModalContent({
     },
   );
 
-  const { versions } =
-    useVersionState({
-      project,
-      form: form as unknown as UseFormReturn<{
-        version: string;
-        commitMessage: string;
-      }>,
-      allowSaveIfAutoSaveIsCurrentButNotLatest: false,
-    });
+  const { versions } = useVersionState({
+    project,
+    form: form as unknown as UseFormReturn<{
+      version: string;
+      commitMessage: string;
+    }>,
+    allowSaveIfAutoSaveIsCurrentButNotLatest: false,
+  });
   const canSave = checkCanCommitNewVersion();
 
   const commitVersion = api.workflow.commitVersion.useMutation();
@@ -367,112 +365,113 @@ export function OptimizeModalContent({
 
   return (
     <FormProvider {...form}>
-    <Dialog.Content bg="bg"
-      as="form"
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onSubmit={form.handleSubmit(onSubmit)}
-      borderTop="5px solid"
-      borderColor="green.400"
-    >
-      <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
-      <Dialog.CloseTrigger />
-      <Dialog.Body display="flex" flexDirection="column" gap={4}>
-        <VStack align="start" width="full" gap={4}>
-          <VStack align="start" width="full">
-            <VersionToBeUsed />
-          </VStack>
-          <VStack align="start" width="full" gap={2}>
-            <SmallLabel>Optimizer</SmallLabel>
-            <Controller
-              control={form.control}
-              name="optimizer"
-              rules={{ required: "Optimizer is required" }}
-              render={({ field }) => <OptimizerSelect field={field} />}
-            />
-          </VStack>
-        </VStack>
-        <VStack width="full" align="start">
-          {"llm" in optimizer.params && (
+      <Dialog.Content
+        bg="bg"
+        as="form"
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
+        onSubmit={form.handleSubmit(onSubmit)}
+        borderTop="5px solid"
+        borderColor="green.400"
+      >
+        <Dialog.Header fontWeight={600}>Optimize Workflow</Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body display="flex" flexDirection="column" gap={4}>
+          <VStack align="start" width="full" gap={4}>
+            <VStack align="start" width="full">
+              <VersionToBeUsed />
+            </VStack>
             <VStack align="start" width="full" gap={2}>
-              <HStack>
-                <SmallLabel>Teacher LLM</SmallLabel>
-                <Tooltip content="The LLM that will be used to generate the prompts and/or demonstrations. You can, for example, use a more powerful LLM to teach a smaller one.">
-                  <Info size={16} />
-                </Tooltip>
-              </HStack>
+              <SmallLabel>Optimizer</SmallLabel>
               <Controller
                 control={form.control}
-                name="params.llm"
-                render={({ field }) => (
-                  <OptimizationStudioLLMConfigField
-                    showProviderKeyMessage={false}
-                    llmConfig={llmConfig ?? { model: DEFAULT_MODEL }}
-                    onChange={(llmConfig) => {
-                      field.onChange(llmConfig);
-                    }}
-                  />
-                )}
+                name="optimizer"
+                rules={{ required: "Optimizer is required" }}
+                render={({ field }) => <OptimizerSelect field={field} />}
               />
             </VStack>
-          )}
-        </VStack>
-        <Grid templateColumns="repeat(2, 1fr)" gap={5}>
-          {"num_candidates" in optimizer.params && (
-            <GridItem>
-              <VStack align="start" gap={2}>
-                <HStack>
-                  <SmallLabel>Number of Candidate Prompts</SmallLabel>
-                  <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
-                    <Info size={16} />
-                  </Tooltip>
-                </HStack>
-                <Input
-                  {...form.register("params.num_candidates")}
-                  type="number"
-                  min={1}
-                  max={100}
-                />
-              </VStack>
-            </GridItem>
-          )}
-          {"max_bootstrapped_demos" in optimizer.params && (
-            <GridItem>
+          </VStack>
+          <VStack width="full" align="start">
+            {"llm" in optimizer.params && (
               <VStack align="start" width="full" gap={2}>
                 <HStack>
-                  <SmallLabel>Max Bootstrapped Demos</SmallLabel>
-                  <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
+                  <SmallLabel>Teacher LLM</SmallLabel>
+                  <Tooltip content="The LLM that will be used to generate the prompts and/or demonstrations. You can, for example, use a more powerful LLM to teach a smaller one.">
                     <Info size={16} />
                   </Tooltip>
                 </HStack>
-                <Input
-                  {...form.register("params.max_bootstrapped_demos")}
-                  type="number"
-                  min={1}
-                  max={100}
+                <Controller
+                  control={form.control}
+                  name="params.llm"
+                  render={({ field }) => (
+                    <OptimizationStudioLLMConfigField
+                      showProviderKeyMessage={false}
+                      llmConfig={llmConfig ?? { model: DEFAULT_MODEL }}
+                      onChange={(llmConfig) => {
+                        field.onChange(llmConfig);
+                      }}
+                    />
+                  )}
                 />
               </VStack>
-            </GridItem>
-          )}
-          {"max_labeled_demos" in optimizer.params && (
-            <GridItem>
-              <VStack align="start" width="full" gap={2}>
-                <HStack>
-                  <SmallLabel>Max Labeled Demos</SmallLabel>
-                  <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
-                    <Info size={16} />
-                  </Tooltip>
-                </HStack>
-                <Input
-                  {...form.register("params.max_labeled_demos")}
-                  type="number"
-                  min={1}
-                  max={100}
-                />
-              </VStack>
-            </GridItem>
-          )}
-        </Grid>
-        {/* {"max_rounds" in optimizer.params && (
+            )}
+          </VStack>
+          <Grid templateColumns="repeat(2, 1fr)" gap={5}>
+            {"num_candidates" in optimizer.params && (
+              <GridItem>
+                <VStack align="start" gap={2}>
+                  <HStack>
+                    <SmallLabel>Number of Candidate Prompts</SmallLabel>
+                    <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
+                      <Info size={16} />
+                    </Tooltip>
+                  </HStack>
+                  <Input
+                    {...form.register("params.num_candidates")}
+                    type="number"
+                    min={1}
+                    max={100}
+                  />
+                </VStack>
+              </GridItem>
+            )}
+            {"max_bootstrapped_demos" in optimizer.params && (
+              <GridItem>
+                <VStack align="start" width="full" gap={2}>
+                  <HStack>
+                    <SmallLabel>Max Bootstrapped Demos</SmallLabel>
+                    <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
+                      <Info size={16} />
+                    </Tooltip>
+                  </HStack>
+                  <Input
+                    {...form.register("params.max_bootstrapped_demos")}
+                    type="number"
+                    min={1}
+                    max={100}
+                  />
+                </VStack>
+              </GridItem>
+            )}
+            {"max_labeled_demos" in optimizer.params && (
+              <GridItem>
+                <VStack align="start" width="full" gap={2}>
+                  <HStack>
+                    <SmallLabel>Max Labeled Demos</SmallLabel>
+                    <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
+                      <Info size={16} />
+                    </Tooltip>
+                  </HStack>
+                  <Input
+                    {...form.register("params.max_labeled_demos")}
+                    type="number"
+                    min={1}
+                    max={100}
+                  />
+                </VStack>
+              </GridItem>
+            )}
+          </Grid>
+          {/* {"max_rounds" in optimizer.params && (
           <VStack align="start" width="full" gap={2}>
             <SmallLabel>Max Rounds</SmallLabel>
             <Input
@@ -483,52 +482,50 @@ export function OptimizeModalContent({
             />
           </VStack>
         )} */}
-        {hasProvidersWithoutCustomKeys ? (
-          <AddModelProviderKey
-            runWhat="run optimizations"
-            nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
-          />
-        ) : !hasEvaluator ? (
-          <Alert.Root status="warning">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                You need at least one evaluator node in your workflow to be able
-                to run optimizations
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        ) : null}
-      </Dialog.Body>
-      <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
-        <VStack align="start" width="full" gap={3}>
-          <HStack width="full">
-            <VStack align="start" gap={0}>
-              <Text fontWeight={500}>
-                {train.length} optimization set entries
-              </Text>
-            </VStack>
-            <Spacer />
-            <Tooltip content={isDisabled}>
-              <Button
-                variant="outline"
-                type="submit"
-                loading={
-                  commitVersion.isLoading ||
-                  optimizationState?.status === "waiting"
-                }
-                disabled={!!isDisabled}
-              >
-                <CheckSquare size={16} />
-                {canSave
-                  ? "Save & Run Optimization"
-                  : "Run Optimization"}
-              </Button>
-            </Tooltip>
-          </HStack>
-        </VStack>
-      </Dialog.Footer>
-    </Dialog.Content>
+          {hasProvidersWithoutCustomKeys ? (
+            <AddModelProviderKey
+              runWhat="run optimizations"
+              nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+            />
+          ) : !hasEvaluator ? (
+            <Alert.Root status="warning">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  You need at least one evaluator node in your workflow to be
+                  able to run optimizations
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+          ) : null}
+        </Dialog.Body>
+        <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
+          <VStack align="start" width="full" gap={3}>
+            <HStack width="full">
+              <VStack align="start" gap={0}>
+                <Text fontWeight={500}>
+                  {train.length} optimization set entries
+                </Text>
+              </VStack>
+              <Spacer />
+              <Tooltip content={isDisabled}>
+                <Button
+                  variant="outline"
+                  type="submit"
+                  loading={
+                    commitVersion.isLoading ||
+                    optimizationState?.status === "waiting"
+                  }
+                  disabled={!!isDisabled}
+                >
+                  <CheckSquare size={16} />
+                  {canSave ? "Save & Run Optimization" : "Run Optimization"}
+                </Button>
+              </Tooltip>
+            </HStack>
+          </VStack>
+        </Dialog.Footer>
+      </Dialog.Content>
     </FormProvider>
   );
 }

@@ -8,11 +8,7 @@
  * and `Calls over the realtime transports still correlate` in
  * specs/observability/browser-rum-trace-correlation.feature. See ADR-058.
  */
-import {
-  context as otelContext,
-  propagation,
-  trace,
-} from "@opentelemetry/api";
+import { context as otelContext, propagation, trace } from "@opentelemetry/api";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { StackContextManager } from "@opentelemetry/sdk-trace-web";
@@ -111,8 +107,9 @@ describe("callerTraceContext", () => {
     });
 
     it("survives a req with no headers", () => {
-      expect(spanContextOf(callerTraceContext({ req: {}, type: "query" })))
-        .toBeUndefined();
+      expect(
+        spanContextOf(callerTraceContext({ req: {}, type: "query" })),
+      ).toBeUndefined();
     });
   });
 

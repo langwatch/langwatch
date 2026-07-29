@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 import type { TraceSummaryData } from "../types";
 
 export interface FindByTraceIdOptions {
@@ -21,9 +23,17 @@ export interface FindByTraceIdOptions {
 }
 
 export interface TraceSummaryRepository {
-  upsert(data: TraceSummaryData, tenantId: string, retentionDays?: number): Promise<void>;
+  upsert(
+    data: TraceSummaryData,
+    tenantId: string,
+    retentionDays?: number,
+  ): Promise<void>;
   upsertBatch?(
-    entries: Array<{ data: TraceSummaryData; tenantId: string; retentionDays?: number }>,
+    entries: Array<{
+      data: TraceSummaryData;
+      tenantId: string;
+      retentionDays?: number;
+    }>,
   ): Promise<void>;
   findByTraceId(
     tenantId: string,

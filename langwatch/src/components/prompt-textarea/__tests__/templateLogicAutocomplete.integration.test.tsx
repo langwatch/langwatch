@@ -90,17 +90,19 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
     // Mock document.execCommand to simulate insertText behavior in jsdom.
     // When 'insertText' is called, update the focused textarea value so that
     // subsequent assertions can verify the inserted content.
-    document.execCommand = vi.fn((command: string, _showUI?: boolean, value?: string) => {
-      if (command === "insertText" && value !== undefined) {
-        const el = document.activeElement;
-        if (el instanceof HTMLTextAreaElement) {
-          // Simulate native insertText: replace selected text (select-all was called first)
-          el.value = value;
-          el.dispatchEvent(new Event("input", { bubbles: true }));
+    document.execCommand = vi.fn(
+      (command: string, _showUI?: boolean, value?: string) => {
+        if (command === "insertText" && value !== undefined) {
+          const el = document.activeElement;
+          if (el instanceof HTMLTextAreaElement) {
+            // Simulate native insertText: replace selected text (select-all was called first)
+            el.value = value;
+            el.dispatchEvent(new Event("input", { bubbles: true }));
+          }
         }
-      }
-      return true;
-    });
+        return true;
+      },
+    );
   });
 
   afterEach(() => {
@@ -121,9 +123,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
     });
 
@@ -149,9 +149,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
     });
   });
@@ -170,12 +168,18 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
-      const keywords = ["if", "for", "assign", "unless", "elsif", "else", "comment"];
+      const keywords = [
+        "if",
+        "for",
+        "assign",
+        "unless",
+        "elsif",
+        "else",
+        "comment",
+      ];
       for (const keyword of keywords) {
         expect(
           screen.getByTestId(`logic-construct-${keyword}`),
@@ -192,9 +196,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       expect(screen.getByText("Conditional block")).toBeInTheDocument();
@@ -210,9 +212,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       const docsLink = screen.getByText("Learn template syntax");
@@ -238,14 +238,10 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
-      expect(
-        screen.getByTestId("logic-construct-if"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("logic-construct-if")).toBeInTheDocument();
       expect(
         screen.queryByTestId("logic-construct-for"),
       ).not.toBeInTheDocument();
@@ -260,14 +256,10 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
-      expect(
-        screen.getByTestId("logic-construct-assign"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("logic-construct-assign")).toBeInTheDocument();
       expect(
         screen.queryByTestId("logic-construct-for"),
       ).not.toBeInTheDocument();
@@ -282,14 +274,10 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
-      expect(
-        screen.getByText("No matching constructs"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("No matching constructs")).toBeInTheDocument();
     });
 
     it("filters case-insensitively", async () => {
@@ -301,14 +289,10 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
-      expect(
-        screen.getByTestId("logic-construct-if"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("logic-construct-if")).toBeInTheDocument();
     });
   });
 
@@ -328,9 +312,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       // Click on the "if" construct
@@ -344,16 +326,12 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       // onChange is called with the trigger text replaced by the if/endif block
-      expect(onChange).toHaveBeenCalledWith(
-        expect.stringContaining("{% if"),
-      );
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining("{% if"));
       expect(onChange).toHaveBeenCalledWith(
         expect.stringContaining("{% endif %}"),
       );
       // The prefix text before the trigger should be preserved
-      expect(onChange).toHaveBeenCalledWith(
-        expect.stringMatching(/^Hello /),
-      );
+      expect(onChange).toHaveBeenCalledWith(expect.stringMatching(/^Hello /));
     });
 
     /** @scenario Selecting "for" inserts for/endfor block */
@@ -367,9 +345,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByTestId("logic-construct-for"));
@@ -381,9 +357,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       // onChange is called with the for/endfor template replacing the trigger
-      expect(onChange).toHaveBeenCalledWith(
-        expect.stringContaining("{% for"),
-      );
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining("{% for"));
       expect(onChange).toHaveBeenCalledWith(
         expect.stringContaining("{% endfor %}"),
       );
@@ -398,9 +372,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByTestId("logic-construct-assign"));
@@ -421,9 +393,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByTestId("logic-construct-else"));
@@ -444,9 +414,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByTestId("logic-construct-comment"));
@@ -468,9 +436,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByTestId("logic-construct-for"));
@@ -482,14 +448,14 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       // The partial "{% fo" trigger text is fully replaced by the for template
-      expect(onChange).toHaveBeenCalledWith(
-        expect.stringContaining("{% for"),
-      );
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining("{% for"));
       expect(onChange).toHaveBeenCalledWith(
         expect.stringContaining("{% endfor %}"),
       );
       // The original "{% fo" trigger should not remain
-      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1]![0] as string;
+      const lastCall = onChange.mock.calls[
+        onChange.mock.calls.length - 1
+      ]![0] as string;
       expect(lastCall).not.toContain("{% fo %}");
     });
   });
@@ -530,9 +496,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
 
       // The logic menu should open
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       // Select the "if" construct
@@ -546,9 +510,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       // onChange should have been called with the if/endif template
-      expect(onChange).toHaveBeenCalledWith(
-        expect.stringContaining("{% if"),
-      );
+      expect(onChange).toHaveBeenCalledWith(expect.stringContaining("{% if"));
       expect(onChange).toHaveBeenCalledWith(
         expect.stringContaining("{% endif %}"),
       );
@@ -579,21 +541,15 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       // Press ArrowDown - should not crash
       fireEvent.keyDown(textarea, { key: "ArrowDown" });
 
       // Menu should still be open with all constructs
-      expect(
-        screen.getByTestId("template-logic-menu"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId("logic-construct-if"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
+      expect(screen.getByTestId("logic-construct-if")).toBeInTheDocument();
     });
 
     it("closes popup and inserts construct on Enter", async () => {
@@ -605,9 +561,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       // Press Enter to select the first item (if)
@@ -629,9 +583,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       // Press Tab to select the first item
@@ -653,9 +605,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       fireEvent.keyDown(textarea, { key: "Escape" });
@@ -679,21 +629,15 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       // Press ArrowUp at the first item - should not crash or wrap
       fireEvent.keyDown(textarea, { key: "ArrowUp" });
 
       // Menu should still be open
-      expect(
-        screen.getByTestId("template-logic-menu"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByTestId("logic-construct-if"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
+      expect(screen.getByTestId("logic-construct-if")).toBeInTheDocument();
     });
   });
 
@@ -711,9 +655,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       // Variable menu should NOT be open
@@ -740,9 +682,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
 
       // Now complete the tag with %}
@@ -771,9 +711,7 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("template-logic-menu"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
     });
 

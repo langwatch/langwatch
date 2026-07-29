@@ -21,6 +21,7 @@ function canonicalLogEvent({
   correlationSource = "none",
   providerSessionId = "",
   recordId = "rec-1",
+  resourceAttributes = { "service.version": "2.0.1" },
 }: {
   attributes: Record<string, unknown>;
   scopeName?: string;
@@ -29,6 +30,7 @@ function canonicalLogEvent({
   correlationSource?: string;
   providerSessionId?: string;
   recordId?: string;
+  resourceAttributes?: Record<string, unknown>;
 }): LogProcessingEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -40,9 +42,7 @@ function canonicalLogEvent({
       scopeName,
       eventName,
       attributesFlatJson: JSON.stringify(attributes),
-      resourceAttributesFlatJson: JSON.stringify({
-        "service.version": "2.0.1",
-      }),
+      resourceAttributesFlatJson: JSON.stringify(resourceAttributes),
       correlationTraceId,
       correlationSpanId: "",
       correlationSource,
@@ -96,6 +96,52 @@ describe("codingAgentLogFactsDispatch", () => {
       expect(contribution!.facts["service.version"]).toBe("2.0.1");
       // No correlation on the record: the contribution carries no trace.
       expect(contribution!.traceId).toBeNull();
+    });
+  });
+
+  describe("when a Cowork session's events arrive", () => {
+    /** @scenario a Cowork session is an agent session */
+    /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */
+    it("labels the contribution claude_cowork and lifts its correlation facts", async () => {
+      const { subscriber, dispatched } = makeSubscriber();
+
+      // Real Cowork wire shape: Claude Code's runtime scope and event
+      // vocabulary, service.name `cowork`, logs-only (no spans, no wire
+      // correlation), per-prompt correlation via prompt.id + event.sequence.
+      await subscriber.handle(
+        canonicalLogEvent({
+          attributes: {
+            "event.name": "claude_code.user_prompt",
+            "session.id": "cw-sess-1",
+            "prompt.id": "0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c",
+            "event.sequence": 7,
+            "organization.id": "b3d7a45e-1189-4e0f-8b7a-2c3d4e5f6a7b",
+            "terminal.type": "non-interactive",
+            prompt_length: 42,
+          },
+          resourceAttributes: {
+            "service.name": "cowork",
+            "service.version": "1.1.4173",
+          },
+        }),
+        context,
+      );
+
+      expect(dispatched).toHaveLength(1);
+      const [contribution] = dispatched;
+      expect(contribution!.agent).toBe("claude_cowork");
+      expect(contribution!.sessionId).toBe("cw-sess-1");
+      expect(contribution!.sessionKeySource).toBe("provider");
+      expect(contribution!.traceId).toBeNull();
+      expect(contribution!.facts["prompt.id"]).toBe(
+        "0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c",
+      );
+      expect(contribution!.facts["event.sequence"]).toBe(7);
+      expect(contribution!.facts["organization.id"]).toBe(
+        "b3d7a45e-1189-4e0f-8b7a-2c3d4e5f6a7b",
+      );
+      expect(contribution!.facts["terminal.type"]).toBe("non-interactive");
+      expect(contribution!.facts["service.version"]).toBe("1.1.4173");
     });
   });
 

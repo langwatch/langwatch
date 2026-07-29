@@ -15,13 +15,13 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "../../../../";
 import type { Command } from "../../../../";
+import { createTenantId } from "../../../../";
+import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 import {
   ExecuteEvaluationCommand,
   type ExecuteEvaluationCommandDeps,
 } from "../executeEvaluation.command";
-import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 
 const EVALUATOR_SETTINGS = { model: "gpt-5-mini", temperature: 0.7 };
 const MONITOR_PARAMETERS = { model: "gpt-5-mini", temperature: 0.5 };

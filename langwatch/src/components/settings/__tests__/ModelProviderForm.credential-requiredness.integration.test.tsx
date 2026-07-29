@@ -15,10 +15,15 @@
  * the boundaries are stubbed: the tRPC client, the router-backed drawer,
  * org/project context, feature flags, the API-key probe and the toaster.
  */
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 
 const {
   mockMutateAsync,
@@ -151,92 +156,95 @@ describe("Feature: the drawer asks for the credentials the provider actually nee
     cleanup();
   });
 
-  describe.each(eitherOrProviders)(
-    "given $providerKey, which accepts an API key or a base URL",
-    ({ providerKey, apiKey, baseUrl }) => {
-      describe("when no base URL is entered", () => {
-        beforeEach(() => {
-          primeQueries([]);
-          renderDrawer({ modelProviderId: "new", providerKey });
+  describe.each(
+    eitherOrProviders,
+  )("given $providerKey, which accepts an API key or a base URL", ({
+    providerKey,
+    apiKey,
+    baseUrl,
+  }) => {
+    describe("when no base URL is entered", () => {
+      beforeEach(() => {
+        primeQueries([]);
+        renderDrawer({ modelProviderId: "new", providerKey });
+      });
+
+      /** @scenario The API key stops being required once a base URL is entered */
+      it("marks the API key required", () => {
+        expect(isMarkedRequired(apiKey)).toBe(true);
+      });
+
+      it("never marks the base URL required", () => {
+        expect(isMarkedRequired(baseUrl)).toBe(false);
+      });
+    });
+
+    describe("when a base URL is entered and then cleared", () => {
+      /** @scenario The API key stops being required once a base URL is entered */
+      it("drops the required marker and brings it back", async () => {
+        primeQueries([]);
+        renderDrawer({ modelProviderId: "new", providerKey });
+        const user = userEvent.setup();
+
+        await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
+        await waitFor(() => {
+          expect(isMarkedRequired(apiKey)).toBe(false);
         });
 
-        /** @scenario The API key stops being required once a base URL is entered */
-        it("marks the API key required", () => {
+        await user.clear(inputFor(baseUrl));
+        await waitFor(() => {
           expect(isMarkedRequired(apiKey)).toBe(true);
         });
-
-        it("never marks the base URL required", () => {
-          expect(isMarkedRequired(baseUrl)).toBe(false);
-        });
       });
+    });
 
-      describe("when a base URL is entered and then cleared", () => {
-        /** @scenario The API key stops being required once a base URL is entered */
-        it("drops the required marker and brings it back", async () => {
-          primeQueries([]);
-          renderDrawer({ modelProviderId: "new", providerKey });
-          const user = userEvent.setup();
+    describe("when only a base URL is entered and the form is saved", () => {
+      /** @scenario A self-hosted endpoint is saved with no API key at all */
+      it("saves with an empty API key and never probes the endpoint with one", async () => {
+        primeQueries([]);
+        renderDrawer({ modelProviderId: "new", providerKey });
+        const user = userEvent.setup();
 
-          await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
-          await waitFor(() => {
-            expect(isMarkedRequired(apiKey)).toBe(false);
-          });
+        await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
+        await user.click(screen.getByRole("button", { name: /^save$/i }));
 
-          await user.clear(inputFor(baseUrl));
-          await waitFor(() => {
-            expect(isMarkedRequired(apiKey)).toBe(true);
-          });
+        await waitFor(() => {
+          expect(mockMutateAsync).toHaveBeenCalledTimes(1);
         });
-      });
-
-      describe("when only a base URL is entered and the form is saved", () => {
-        /** @scenario A self-hosted endpoint is saved with no API key at all */
-        it("saves with an empty API key and never probes the endpoint with one", async () => {
-          primeQueries([]);
-          renderDrawer({ modelProviderId: "new", providerKey });
-          const user = userEvent.setup();
-
-          await user.type(inputFor(baseUrl), SELF_HOSTED_URL);
-          await user.click(screen.getByRole("button", { name: /^save$/i }));
-
-          await waitFor(() => {
-            expect(mockMutateAsync).toHaveBeenCalledTimes(1);
-          });
-          expect(mockMutateAsync).toHaveBeenCalledWith(
-            expect.objectContaining({
-              customKeys: expect.objectContaining({
-                [apiKey]: "",
-                [baseUrl]: SELF_HOSTED_URL,
-              }),
+        expect(mockMutateAsync).toHaveBeenCalledWith(
+          expect.objectContaining({
+            customKeys: expect.objectContaining({
+              [apiKey]: "",
+              [baseUrl]: SELF_HOSTED_URL,
             }),
-          );
-          expect(mockValidateApiKey).not.toHaveBeenCalled();
-        });
+          }),
+        );
+        expect(mockValidateApiKey).not.toHaveBeenCalled();
       });
+    });
 
-      describe("when neither credential is entered and the form is saved", () => {
-        /** @scenario Saving with neither an API key nor a base URL says what to enter */
-        it("explains what to enter, next to the API key field, and saves nothing", async () => {
-          primeQueries([]);
-          renderDrawer({ modelProviderId: "new", providerKey });
-          const user = userEvent.setup();
+    describe("when neither credential is entered and the form is saved", () => {
+      /** @scenario Saving with neither an API key nor a base URL says what to enter */
+      it("explains what to enter, next to the API key field, and saves nothing", async () => {
+        primeQueries([]);
+        renderDrawer({ modelProviderId: "new", providerKey });
+        const user = userEvent.setup();
 
-          // Something has to be dirty for Save to be clickable at all.
-          await user.type(inputFor(baseUrl), "   ");
-          await user.click(screen.getByRole("button", { name: /^save$/i }));
+        // Something has to be dirty for Save to be clickable at all.
+        await user.type(inputFor(baseUrl), "   ");
+        await user.click(screen.getByRole("button", { name: /^save$/i }));
 
-          await waitFor(() => {
-            expect(
-              within(fieldWrapper(apiKey)).getByText(
-                "Add an API key, or a base URL if your endpoint does not need one.",
-              ),
-            ).toBeInTheDocument();
-          });
-          expect(mockMutateAsync).not.toHaveBeenCalled();
+        await waitFor(() => {
+          expect(
+            within(fieldWrapper(apiKey)).getByText(
+              "Add an API key, or a base URL if your endpoint does not need one.",
+            ),
+          ).toBeInTheDocument();
         });
+        expect(mockMutateAsync).not.toHaveBeenCalled();
       });
-    },
-  );
+    });
+  });
 
   describe("given a provider whose only credential is an API key", () => {
     /** @scenario A provider with a single credential keeps its required marker */

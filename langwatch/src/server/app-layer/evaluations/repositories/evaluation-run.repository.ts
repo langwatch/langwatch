@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 import type { EvalSummary, EvaluationRunData } from "../types";
 
 /**
@@ -23,9 +25,21 @@ export interface GetByEvaluationIdParams {
 }
 
 export interface EvaluationRunRepository {
-  upsert(data: EvaluationRunData, tenantId: string, retentionDays?: number): Promise<void>;
-  upsertBatch?(entries: Array<{ data: EvaluationRunData; tenantId: string; retentionDays?: number }>): Promise<void>;
-  getByEvaluationId(params: GetByEvaluationIdParams): Promise<EvaluationRunData | null>;
+  upsert(
+    data: EvaluationRunData,
+    tenantId: string,
+    retentionDays?: number,
+  ): Promise<void>;
+  upsertBatch?(
+    entries: Array<{
+      data: EvaluationRunData;
+      tenantId: string;
+      retentionDays?: number;
+    }>,
+  ): Promise<void>;
+  getByEvaluationId(
+    params: GetByEvaluationIdParams,
+  ): Promise<EvaluationRunData | null>;
   findByTraceId(
     tenantId: string,
     traceId: string,

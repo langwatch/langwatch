@@ -1,23 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MASKED_KEY_PLACEHOLDER } from "../constants";
 
-// Mock the registry module so we can control getProviderModelOptions
-vi.mock("../../server/modelProviders/registry", () => ({
-  getProviderModelOptions: vi.fn().mockReturnValue([]),
-}));
-
-import { getProviderModelOptions } from "../../server/modelProviders/registry";
 import {
   buildCustomKeyState,
   getDisplayKeysForProvider,
   getProviderFromModel,
   getSchemaShape,
   hasUserEnteredNewApiKey,
-  resolveModelForProvider,
   shouldAutoEnableAsDefault,
 } from "../modelProviderHelpers";
-
-const mockGetProviderModelOptions = vi.mocked(getProviderModelOptions);
 
 describe("modelProviderHelpers", () => {
   describe("getProviderFromModel()", () => {
@@ -41,8 +32,6 @@ describe("modelProviderHelpers", () => {
       expect(getProviderFromModel("custom/namespace/model")).toBe("custom");
     });
   });
-
-
 
   describe("getSchemaShape()", () => {
     it("returns shape from schema with shape property", () => {
@@ -283,111 +272,26 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("resolveModelForProvider()", () => {
-    describe("when current model already matches the provider", () => {
-      it("returns it unchanged", () => {
-        const result = resolveModelForProvider({
-          current: "azure/gpt-4o",
-          providerKey: "azure",
-          storedModels: null,
-          mode: "chat",
-        });
-
-        expect(result).toBe("azure/gpt-4o");
-      });
-    });
-
-    describe("when current model does not match provider", () => {
-      it("picks from stored models first", () => {
-        const result = resolveModelForProvider({
-          current: "openai/gpt-5.2",
-          providerKey: "azure",
-          storedModels: ["gpt-4o", "gpt-4-turbo"],
-          mode: "chat",
-        });
-
-        expect(result).toBe("azure/gpt-4o");
-      });
-
-      it("falls back to registry models when no stored models exist", () => {
-        mockGetProviderModelOptions.mockReturnValueOnce([
-          { value: "claude-sonnet-4", label: "claude-sonnet-4" },
-          { value: "claude-haiku-3.5", label: "claude-haiku-3.5" },
-        ]);
-
-        const result = resolveModelForProvider({
-          current: "openai/gpt-5.2",
-          providerKey: "anthropic",
-          storedModels: null,
-          mode: "chat",
-        });
-
-        expect(result).toBe("anthropic/claude-sonnet-4");
-        expect(mockGetProviderModelOptions).toHaveBeenCalledWith(
-          "anthropic",
-          "chat",
-        );
-      });
-
-      it("returns current model when no provider models exist anywhere", () => {
-        mockGetProviderModelOptions.mockReturnValueOnce([]);
-
-        const result = resolveModelForProvider({
-          current: "openai/gpt-5.2",
-          providerKey: "custom-provider",
-          storedModels: null,
-          mode: "chat",
-        });
-
-        expect(result).toBe("openai/gpt-5.2");
-      });
-    });
-
-    describe("when mode is embedding", () => {
-      it("resolves embedding models from registry", () => {
-        mockGetProviderModelOptions.mockReturnValueOnce([
-          {
-            value: "text-embedding-3-small",
-            label: "text-embedding-3-small",
-          },
-        ]);
-
-        const result = resolveModelForProvider({
-          current: "openai/text-embedding-3-small",
-          providerKey: "azure",
-          storedModels: null,
-          mode: "embedding",
-        });
-
-        expect(mockGetProviderModelOptions).toHaveBeenCalledWith(
-          "azure",
-          "embedding",
-        );
-        expect(result).toBe("azure/text-embedding-3-small");
-      });
-    });
-  });
-
   describe("shouldAutoEnableAsDefault()", () => {
     describe("when enabledProvidersCount is 0 or 1", () => {
       it("returns true for the first-provider case (0)", () => {
-        expect(
-          shouldAutoEnableAsDefault({ enabledProvidersCount: 0 }),
-        ).toBe(true);
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 0 })).toBe(
+          true,
+        );
       });
 
       it("returns true when there is exactly one provider", () => {
-        expect(
-          shouldAutoEnableAsDefault({ enabledProvidersCount: 1 }),
-        ).toBe(true);
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 1 })).toBe(
+          true,
+        );
       });
     });
 
     describe("when enabledProvidersCount is greater than 1", () => {
       it("returns false; the user must opt in explicitly", () => {
-        expect(
-          shouldAutoEnableAsDefault({ enabledProvidersCount: 2 }),
-        ).toBe(false);
+        expect(shouldAutoEnableAsDefault({ enabledProvidersCount: 2 })).toBe(
+          false,
+        );
       });
     });
   });

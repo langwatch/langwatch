@@ -37,7 +37,7 @@ function buildLargePredicted(nodeCount = 40, nodeSizeChars = 2048) {
   }
 
   // The key that was historically dropped — the terminal result node
-  predicted["end"] = {
+  predicted.end = {
     score: 0.95,
     passed: true,
     details: "All criteria met",
@@ -103,7 +103,11 @@ describe("no-truncation regression — issue #2487", () => {
     it("current code passes the end key through intact", () => {
       // Simulate what the current log_results.ts does: no transformation
       const result = { ...predicted };
-      expect(result["end"]).toEqual({ score: 0.95, passed: true, details: "All criteria met" });
+      expect(result.end).toEqual({
+        score: 0.95,
+        passed: true,
+        details: "All criteria met",
+      });
     });
 
     it("current code preserves all node keys", () => {
@@ -144,7 +148,7 @@ describe("no-truncation regression — issue #2487", () => {
     for (let i = 0; i < 40; i++) {
       largeInputs[`chunk_${i}`] = "i".repeat(2048);
     }
-    largeInputs["result"] = { verdict: "pass", confidence: 0.99 };
+    largeInputs.result = { verdict: "pass", confidence: 0.99 };
 
     it("has a serialized size greater than 32KB", () => {
       expect(JSON.stringify(largeInputs).length).toBeGreaterThan(32 * 1024);
@@ -160,7 +164,7 @@ describe("no-truncation regression — issue #2487", () => {
 
     it("current code preserves the result key", () => {
       const result = { ...largeInputs };
-      expect(result["result"]).toEqual({ verdict: "pass", confidence: 0.99 });
+      expect(result.result).toEqual({ verdict: "pass", confidence: 0.99 });
     });
   });
 
@@ -202,7 +206,7 @@ describe("no-truncation regression — issue #2487", () => {
     for (let i = 0; i < 150; i++) {
       largeParams[`chunk_${i}`] = "s".repeat(2048);
     }
-    largeParams["config"] = { temperature: 0.7, model: "gpt-5-mini" };
+    largeParams.config = { temperature: 0.7, model: "gpt-5-mini" };
 
     it("has a serialized size greater than 128KB", () => {
       expect(JSON.stringify(largeParams).length).toBeGreaterThan(128 * 1024);
@@ -218,7 +222,7 @@ describe("no-truncation regression — issue #2487", () => {
 
     it("current code preserves the config key", () => {
       const result = { ...largeParams };
-      expect(result["config"]).toEqual({ temperature: 0.7, model: "gpt-5-mini" });
+      expect(result.config).toEqual({ temperature: 0.7, model: "gpt-5-mini" });
     });
   });
 
@@ -229,7 +233,7 @@ describe("no-truncation regression — issue #2487", () => {
     for (let i = 0; i < 40; i++) {
       largeMetadata[`section_${i}`] = "m".repeat(2048);
     }
-    largeMetadata["tags"] = ["regression", "issue-2487"];
+    largeMetadata.tags = ["regression", "issue-2487"];
 
     it("has a serialized size greater than 32KB", () => {
       expect(JSON.stringify(largeMetadata).length).toBeGreaterThan(32 * 1024);
@@ -244,7 +248,7 @@ describe("no-truncation regression — issue #2487", () => {
 
     it("current code preserves the tags key", () => {
       const result = { ...largeMetadata };
-      expect(result["tags"]).toEqual(["regression", "issue-2487"]);
+      expect(result.tags).toEqual(["regression", "issue-2487"]);
     });
   });
 });

@@ -166,10 +166,6 @@ export function withExecutionContext<T>(
   return storage.run(context, () => withOutputScope(fn));
 }
 
-export function currentExecutionContext(): ExecutionContext | undefined {
-  return storage.getStore();
-}
-
 let installed = false;
 
 /**

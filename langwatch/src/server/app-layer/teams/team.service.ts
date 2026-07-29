@@ -1,6 +1,6 @@
+import type { Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
-import type { Team } from "@prisma/client";
 import type {
   PaginatedResult,
   TeamRepository,
@@ -49,9 +49,7 @@ export class TeamRestService {
     const teamNanoId = nanoid();
     const id = `team_${teamNanoId}`;
     const slug =
-      slugify(name, { lower: true, strict: true }) +
-      "-" +
-      id.substring(0, 11);
+      slugify(name, { lower: true, strict: true }) + "-" + id.substring(0, 11);
 
     const existing = await this.repo.findBySlugInOrganization({
       slug,

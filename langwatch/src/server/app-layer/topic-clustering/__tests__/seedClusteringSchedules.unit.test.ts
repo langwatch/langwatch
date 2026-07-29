@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  type BackfillDeps,
   backfillTopicClusteringSchedules,
   seedClusteringSchedules,
-  type BackfillDeps,
 } from "../seedClusteringSchedules";
 
 /**
@@ -129,11 +129,7 @@ describe("backfillTopicClusteringSchedules", () => {
         const requestClustering = vi.fn().mockResolvedValue(undefined);
 
         const summary = await backfillTopicClusteringSchedules({
-          ...pagerOver([
-            ["p1", "p2"],
-            ["p3", "p4"],
-            ["p5"],
-          ]),
+          ...pagerOver([["p1", "p2"], ["p3", "p4"], ["p5"]]),
           findAlreadyScheduledProjectIds: noneScheduled,
           requestClustering,
           pageSize: 2,
@@ -146,11 +142,7 @@ describe("backfillTopicClusteringSchedules", () => {
       });
 
       it("advances the keyset cursor to the last id of the previous page", async () => {
-        const pager = pagerOver([
-          ["p1", "p2"],
-          ["p3", "p4"],
-          ["p5"],
-        ]);
+        const pager = pagerOver([["p1", "p2"], ["p3", "p4"], ["p5"]]);
 
         await backfillTopicClusteringSchedules({
           ...pager,
@@ -210,11 +202,7 @@ describe("backfillTopicClusteringSchedules", () => {
           });
 
         const summary = await backfillTopicClusteringSchedules({
-          ...pagerOver([
-            ["p1", "p2"],
-            ["p3", "p4"],
-            ["p5"],
-          ]),
+          ...pagerOver([["p1", "p2"], ["p3", "p4"], ["p5"]]),
           findAlreadyScheduledProjectIds: noneScheduled,
           requestClustering,
           pageSize: 2,
@@ -271,7 +259,9 @@ function fakeRedis() {
 }
 
 describe("seedClusteringSchedules", () => {
-  const oneProjectDeps = (requestClustering = vi.fn().mockResolvedValue(undefined)) => ({
+  const oneProjectDeps = (
+    requestClustering = vi.fn().mockResolvedValue(undefined),
+  ) => ({
     ...pagerOver([["p1"]]),
     findAlreadyScheduledProjectIds: noneScheduled,
     requestClustering,

@@ -1,7 +1,6 @@
 import type { MiddlewareHandler } from "hono";
-
-import { prisma } from "~/server/db";
 import { DatasetService } from "~/server/datasets/dataset.service";
+import { prisma } from "~/server/db";
 
 export type DatasetServiceMiddlewareVariables = {
   datasetService: DatasetService;

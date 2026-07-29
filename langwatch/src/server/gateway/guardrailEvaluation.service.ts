@@ -10,16 +10,18 @@
  * Wire shape is fixed by specs/ai-gateway/_shared/contract.md 4.6.
  * Behaviour: specs/ai-gateway/guardrail-check-endpoint.feature
  */
+
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayGuardrailDirection,
   Monitor,
   PrismaClient,
 } from "@prisma/client";
-
-import type { EvaluatorTypes } from "../evaluations/evaluators.generated";
+import type {
+  EvaluatorTypes,
+  SingleEvaluationResult,
+} from "../evaluations/evaluators.generated";
 import { runEvaluation } from "../evaluations/runEvaluation";
-import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
-import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");
 
@@ -34,8 +36,7 @@ export const GUARDRAIL_WIRE_DIRECTIONS = [
   "stream_chunk",
 ] as const;
 
-export type GuardrailWireDirection =
-  (typeof GUARDRAIL_WIRE_DIRECTIONS)[number];
+export type GuardrailWireDirection = (typeof GUARDRAIL_WIRE_DIRECTIONS)[number];
 
 export type GuardrailDecision = "allow" | "block" | "modify";
 
@@ -178,7 +179,8 @@ export class GatewayGuardrailEvaluationService {
           // mode decides, rather than silently allowing.
           return this.onFailure({
             guardrail,
-            reason: "guardrail evaluator is not enabled for guardrail execution",
+            reason:
+              "guardrail evaluator is not enabled for guardrail execution",
           });
         }
         return this.runOne({ guardrail, monitor, data, projectId });
@@ -190,7 +192,11 @@ export class GatewayGuardrailEvaluationService {
 
     return {
       decision: "block",
-      reason: blocked.map((verdict) => verdict.reason).filter(Boolean).join("; ") || null,
+      reason:
+        blocked
+          .map((verdict) => verdict.reason)
+          .filter(Boolean)
+          .join("; ") || null,
       modified_content: null,
       policies_triggered: blocked.flatMap(
         (verdict) => verdict.policies_triggered,

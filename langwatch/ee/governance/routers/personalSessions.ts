@@ -16,10 +16,10 @@
  *
  * Spec: specs/ai-governance/sessions/sessions-inventory.feature
  */
-import { z } from "zod";
 
 import { CliSessionInventoryService } from "@ee/governance/services/cliSessionInventory.service";
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
+import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";

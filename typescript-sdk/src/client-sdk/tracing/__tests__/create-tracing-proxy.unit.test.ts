@@ -77,7 +77,7 @@ describe("createTracingProxy", () => {
   }
 
   describe("basic functionality", () => {
-    it("should create a proxy that traces public methods", () => {
+    it("creates a proxy that traces public methods", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -91,7 +91,7 @@ describe("createTracingProxy", () => {
       expect(span?.ended).toBe(true);
     });
 
-    it("should not trace private methods", () => {
+    it("does not trace private methods", () => {
       const testInstance = new TestClass();
       createTracingProxy(testInstance, langwatchTracer);
 
@@ -99,7 +99,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(0);
     });
 
-    it("should not trace getters and setters", () => {
+    it("does not trace getters and setters", () => {
       const testInstance = new TestClass();
       const tracingProxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -111,7 +111,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(0);
     });
 
-    it("should not trace built-in methods", () => {
+    it("does not trace built-in methods", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -123,7 +123,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(0);
     });
 
-    it("should not trace constructor", () => {
+    it("does not trace constructor", () => {
       const testInstance = new TestClass();
       createTracingProxy(testInstance, langwatchTracer);
 
@@ -133,7 +133,7 @@ describe("createTracingProxy", () => {
   });
 
   describe("span creation and attributes", () => {
-    it("should create spans with correct name format", () => {
+    it("creates spans with correct name format", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -144,7 +144,7 @@ describe("createTracingProxy", () => {
       expect(span?.name).toBe("TestClass.publicMethod");
     });
 
-    it("should set correct span attributes", () => {
+    it("sets correct span attributes", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -157,7 +157,7 @@ describe("createTracingProxy", () => {
       expect(span?.ended).toBe(true);
     });
 
-    it("should set correct span kind", () => {
+    it("sets correct span kind", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -171,7 +171,7 @@ describe("createTracingProxy", () => {
   });
 
   describe("method execution", () => {
-    it("should execute methods with arguments correctly", () => {
+    it("executes methods with arguments correctly", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -181,7 +181,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(1);
     });
 
-    it("should handle async methods", async () => {
+    it("handles async methods", async () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -194,7 +194,7 @@ describe("createTracingProxy", () => {
       expect(span?.ended).toBe(true);
     });
 
-    it("should preserve method context and binding", () => {
+    it("preserves method context and binding", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -208,7 +208,7 @@ describe("createTracingProxy", () => {
   });
 
   describe("error handling", () => {
-    it("should handle synchronous errors", () => {
+    it("handles synchronous errors", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -221,7 +221,7 @@ describe("createTracingProxy", () => {
       expect(span?.ended).toBe(true);
     });
 
-    it("should handle asynchronous errors", async () => {
+    it("handles asynchronous errors", async () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -232,7 +232,7 @@ describe("createTracingProxy", () => {
       expect(span?.ended).toBe(true);
     });
 
-    it("should handle async errors with different error types", async () => {
+    it("handles async errors with different error types", async () => {
       class ErrorTestClass {
         public async stringError() {
           await createDelayedPromise("work", 5);
@@ -278,7 +278,7 @@ describe("createTracingProxy", () => {
       expect(complexSpan?.ended).toBe(true);
     });
 
-    it("should handle async errors in decorators", async () => {
+    it("handles async errors in decorators", async () => {
       class AsyncErrorDecorator {
         private target: TestClass;
 
@@ -336,7 +336,7 @@ describe("createTracingProxy", () => {
       expect(errorSpan?.ended).toBe(true);
     });
 
-    it("should handle concurrent async errors", async () => {
+    it("handles concurrent async errors", async () => {
       class ConcurrentErrorClass {
         public async delayedError(delay: number) {
           await createDelayedPromise("work", delay);
@@ -367,7 +367,7 @@ describe("createTracingProxy", () => {
       }
     });
 
-    it("should handle async errors with promise chains", async () => {
+    it("handles async errors with promise chains", async () => {
       class PromiseChainClass {
         public async promiseChain() {
           return Promise.resolve("step1")
@@ -388,7 +388,7 @@ describe("createTracingProxy", () => {
       expect(span?.ended).toBe(true);
     });
 
-    it("should handle async errors with finally blocks", async () => {
+    it("handles async errors with finally blocks", async () => {
       class FinallyClass {
         public async withFinally() {
           try {
@@ -447,7 +447,7 @@ describe("createTracingProxy", () => {
       }
     }
 
-    it("should use decorator when provided", () => {
+    it("uses decorator when provided", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer, TestDecorator);
 
@@ -461,7 +461,7 @@ describe("createTracingProxy", () => {
       expect(span?.getAttributeValue("decorator.args")).toBe(0);
     });
 
-    it("should pass arguments to decorator methods", () => {
+    it("passes arguments to decorator methods", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer, TestDecorator);
 
@@ -475,7 +475,7 @@ describe("createTracingProxy", () => {
       expect(span?.getAttributeValue("decorator.arg2")).toBe(42);
     });
 
-    it("should handle async decorator methods", async () => {
+    it("handles async decorator methods", async () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer, TestDecorator);
 
@@ -489,7 +489,7 @@ describe("createTracingProxy", () => {
       expect(span?.getAttributeValue("decorator.result")).toBe("async-result");
     });
 
-    it("should fall back to original method when decorator doesn't have the method", () => {
+    it("falls back to original method when decorator doesn't have the method", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer, TestDecorator);
 
@@ -502,7 +502,7 @@ describe("createTracingProxy", () => {
   });
 
   describe("proxy behavior", () => {
-    it("should return non-function properties as-is", () => {
+    it("returns non-function properties as-is", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -511,7 +511,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(0);
     });
 
-    it("should bind non-traced functions to target", () => {
+    it("binds non-traced functions to target", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -521,7 +521,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(0);
     });
 
-    it("should maintain proxy identity", () => {
+    it("maintains proxy identity", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -531,7 +531,7 @@ describe("createTracingProxy", () => {
   });
 
   describe("edge cases", () => {
-    it("should handle class with no public methods", () => {
+    it("handles class with no public methods", () => {
       class EmptyClass {
         private _privateMethod() {
           return "private";
@@ -545,7 +545,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(0);
     });
 
-    it("should handle class with only built-in methods", () => {
+    it("handles class with only built-in methods", () => {
       class BuiltInOnlyClass {
         public toString() {
           return "built-in";
@@ -559,7 +559,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(0);
     });
 
-    it("should handle methods that return promises", async () => {
+    it("handles methods that return promises", async () => {
       class PromiseClass {
         public async promiseMethod() {
           return Promise.resolve("promise-result");
@@ -575,7 +575,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(1);
     });
 
-    it("should handle methods that return undefined", () => {
+    it("handles methods that return undefined", () => {
       class UndefinedClass {
         public undefinedMethod() {
           return undefined;
@@ -593,7 +593,7 @@ describe("createTracingProxy", () => {
   });
 
   describe("concurrent execution", () => {
-    it("should handle concurrent method calls", async () => {
+    it("handles concurrent method calls", async () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -611,7 +611,7 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpanCount()).toBe(5);
     });
 
-    it("should handle nested method calls", async () => {
+    it("handles nested method calls", async () => {
       class NestedClass {
         public async outerMethod() {
           return this.innerMethod();
@@ -669,7 +669,7 @@ describe("createTracingProxy", () => {
       }
     }
 
-    it("should handle decorator errors", () => {
+    it("handles decorator errors", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer, ErrorDecorator as any);
 
@@ -685,7 +685,7 @@ describe("createTracingProxy", () => {
   });
 
   describe("type safety", () => {
-    it("should maintain type safety for the proxy", () => {
+    it("maintains type safety for the proxy", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
@@ -694,7 +694,7 @@ describe("createTracingProxy", () => {
       expect(typeof proxy.publicMethod).toBe("function");
     });
 
-    it("should work with generic types", () => {
+    it("works with generic types", () => {
       class GenericClass<T> {
         public method(value: T): T {
           return value;

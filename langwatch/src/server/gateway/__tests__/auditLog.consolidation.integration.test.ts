@@ -26,9 +26,8 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "~/server/db";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
+import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
@@ -51,7 +50,11 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
     await startTestContainers();
 
     await prisma.organization.create({
-      data: { id: ORG_ID, name: `Audit Org ${suffix}`, slug: `audit-${suffix}` },
+      data: {
+        id: ORG_ID,
+        name: `Audit Org ${suffix}`,
+        slug: `audit-${suffix}`,
+      },
     });
     await prisma.team.create({
       data: {
@@ -107,8 +110,9 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
       // probe would be stronger but is blocked by our multitenancy
       // middleware which rejects `$queryRaw` calls — see
       // `src/utils/dbMultiTenancyProtection.ts`.
-      expect((prisma as unknown as Record<string, unknown>).gatewayAuditLog)
-        .toBeUndefined();
+      expect(
+        (prisma as unknown as Record<string, unknown>).gatewayAuditLog,
+      ).toBeUndefined();
     });
   });
 
@@ -116,7 +120,10 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
     /** @scenario Virtual Key creation writes a unified AuditLog row */
     it("creates an AuditLog row in gateway shape (targetKind + before/after)", async () => {
       const before = await prisma.auditLog.count({
-        where: { organizationId: ORG_ID, action: "gateway.virtual_key.created" },
+        where: {
+          organizationId: ORG_ID,
+          action: "gateway.virtual_key.created",
+        },
       });
 
       await auditLog.append({
@@ -153,7 +160,10 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
 
       // Sanity: total gateway.virtual_key.created rows for this org went up by 1.
       const after = await prisma.auditLog.count({
-        where: { organizationId: ORG_ID, action: "gateway.virtual_key.created" },
+        where: {
+          organizationId: ORG_ID,
+          action: "gateway.virtual_key.created",
+        },
       });
       expect(after).toBe(before + 1);
     });
@@ -197,7 +207,9 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
         pageSize: 25,
       });
 
-      const gatewayRows = result.auditLogs.filter((r) => r.source === "gateway");
+      const gatewayRows = result.auditLogs.filter(
+        (r) => r.source === "gateway",
+      );
       expect(gatewayRows.length).toBeGreaterThan(0);
 
       const sample = gatewayRows[0]!;

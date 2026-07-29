@@ -43,11 +43,12 @@ export function useWorkspaceData(): Pick<
   WorkspaceSwitcherProps,
   "personals" | "teams" | "projects" | "onCreateProjectForTeam"
 > {
-  const { organizations, project: currentProject } =
-    useOrganizationTeamProject({
+  const { organizations, project: currentProject } = useOrganizationTeamProject(
+    {
       redirectToOnboarding: false,
       redirectToProjectOnboarding: false,
-    });
+    },
+  );
   const { data: session } = useRequiredSession();
   const userId = session?.user?.id;
   const { openDrawer } = useDrawer();
@@ -80,19 +81,18 @@ export function useWorkspaceData(): Pick<
   // refocus without caching. Mirror useFeatureFlag's policy: long
   // staleTime + no refetch on focus / reconnect — a full reload picks
   // up new flag state, which is what governance preview rollouts need.
-  const governanceQuery =
-    api.featureFlag.isEnabledForEachOrganization.useQuery(
-      {
-        flag: "release_ui_ai_governance_enabled",
-        organizationIds,
-      },
-      {
-        enabled: organizationIds.length > 0,
-        staleTime: CLIENT_FLAG_STALE_TIME_MS,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-      },
-    );
+  const governanceQuery = api.featureFlag.isEnabledForEachOrganization.useQuery(
+    {
+      flag: "release_ui_ai_governance_enabled",
+      organizationIds,
+    },
+    {
+      enabled: organizationIds.length > 0,
+      staleTime: CLIENT_FLAG_STALE_TIME_MS,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    },
+  );
 
   const onCreateProjectForTeam = useCallback(
     ({ teamId, orgId }: { teamId: string; orgId: string }) => {
@@ -176,8 +176,7 @@ export function useWorkspaceData(): Pick<
         },
       ];
     }
-    const enabledByOrg =
-      governanceQuery.data?.enabledByOrganizationId ?? {};
+    const enabledByOrg = governanceQuery.data?.enabledByOrganizationId ?? {};
     const governanceOrgs = (organizations ?? []).filter(
       (org) => enabledByOrg[org.id],
     );

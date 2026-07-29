@@ -119,9 +119,8 @@ export function registerCodeActions(
           // scaffold quick fix to land them in a known state first).
           const outputName = markerCode.slice(MISSING_OUTPUT_KEY.length + 1);
           const outputType =
-            contractRef.current.outputs.find(
-              (o) => o.identifier === outputName,
-            )?.type ?? "str";
+            contractRef.current.outputs.find((o) => o.identifier === outputName)
+              ?.type ?? "str";
           const defaultLit = defaultValueLiteralFor(outputType);
           const returnRe = /(return\s*\{)([^}]*)\}/g;
           let lastMatch: RegExpExecArray | null = null;
@@ -133,11 +132,12 @@ export function registerCodeActions(
             const body = lastMatch[2] ?? "";
             const insertOffset = dictBodyStart + body.length;
             const startPos = model.getPositionAt(insertOffset);
-            const sep = body.trim().length > 0 && !body.trimEnd().endsWith(",")
-              ? ", "
-              : body.trim().length > 0
-                ? " "
-                : "";
+            const sep =
+              body.trim().length > 0 && !body.trimEnd().endsWith(",")
+                ? ", "
+                : body.trim().length > 0
+                  ? " "
+                  : "";
             actions.push({
               title: `Add "${outputName}" (${outputType}) to return dict`,
               kind: "quickfix",

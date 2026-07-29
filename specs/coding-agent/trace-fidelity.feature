@@ -1,7 +1,7 @@
 Feature: Coding Agent Trace Fidelity (Path B direct OTLP)
 
-  Coding assistants (claude, codex, gemini, opencode) export OpenTelemetry
-  straight to LangWatch on the direct-OTLP "Path B". This feature captures the
+  Coding assistants (claude, cowork, codex, gemini, opencode, copilot) export
+  OpenTelemetry straight to LangWatch on the direct-OTLP "Path B". This feature captures the
   fidelity guarantees for what lands on the trace: token accuracy, reasoning
   signals, tool calls, and how the bundled cost classification is surfaced.
 

@@ -1,7 +1,4 @@
-import type {
-  LlmPromptConfigComponent,
-  NodeDataset,
-} from "~/optimization_studio/types/dsl";
+import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import type { NodeWithOptionalPosition } from "../../types";
 
 type LlmSignatureNode = NodeWithOptionalPosition<LlmPromptConfigComponent>;

@@ -5,16 +5,15 @@ import { projectFactory } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
-
-import { app as triggersApp } from "../../triggers/[[...route]]/app";
-import { app as monitorsApp } from "../../monitors/[[...route]]/app";
 import { app as graphsApp } from "../../graphs/[[...route]]/app";
+import { app as monitorsApp } from "../../monitors/[[...route]]/app";
 import { app as suitesApp } from "../../suites/[[...route]]/app";
+import { app as triggersApp } from "../../triggers/[[...route]]/app";
 
 /**
  * Integration tests verifying that resourceLimitMiddleware is correctly wired
@@ -80,8 +79,12 @@ describe("Feature: REST API resource limit enforcement parity", () => {
 
     await prisma.trigger.deleteMany({ where: { projectId: testProjectId } });
     await prisma.monitor.deleteMany({ where: { projectId: testProjectId } });
-    await prisma.customGraph.deleteMany({ where: { projectId: testProjectId } });
-    await prisma.simulationSuite.deleteMany({ where: { projectId: testProjectId } });
+    await prisma.customGraph.deleteMany({
+      where: { projectId: testProjectId },
+    });
+    await prisma.simulationSuite.deleteMany({
+      where: { projectId: testProjectId },
+    });
     await prisma.experiment.deleteMany({ where: { projectId: testProjectId } });
     await prisma.scenario.deleteMany({ where: { projectId: testProjectId } });
     await prisma.project.delete({ where: { id: testProjectId } });

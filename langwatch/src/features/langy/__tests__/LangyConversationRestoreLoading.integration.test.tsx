@@ -124,6 +124,9 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 vi.mock("~/utils/api", async () => {
   const React = await import("react");
+  const { createTrpcUtils, idleQuery, withFallback } = await import(
+    "./support/langyApiMock"
+  );
 
   const useHeldHistoryQuery = (enabled: boolean) => {
     React.useSyncExternalStore(
@@ -166,54 +169,7 @@ vi.mock("~/utils/api", async () => {
     };
   };
 
-  const trpcUtils = {
-    langy: {
-      list: {
-        getData: () => undefined,
-        setData: () => undefined,
-        getInfiniteData: () => undefined,
-        setInfiniteData: () => undefined,
-        cancel: () => Promise.resolve(),
-        invalidate: () => Promise.resolve(),
-      },
-      messages: { invalidate: () => Promise.resolve() },
-      detail: { setData: () => undefined },
-    },
-    langyGithub: { getInstallStatus: { invalidate: () => Promise.resolve() } },
-  };
-
-  const idleQuery = () => ({
-    data: undefined,
-    isLoading: false,
-    isInitialLoading: false,
-    isFetching: false,
-    isPreviousData: false,
-    isFetched: true,
-    isError: false,
-    error: null,
-    refetch: () => Promise.resolve(),
-  });
-  const noopMutation = () => ({
-    mutate: () => undefined,
-    mutateAsync: () => Promise.resolve(),
-    isPending: false,
-  });
-  const routerProxy: unknown = new Proxy(
-    {},
-    {
-      get: (_target, prop) => {
-        if (prop === "useQuery" || prop === "useInfiniteQuery") return idleQuery;
-        if (prop === "useMutation") return noopMutation;
-        if (prop === "useSubscription") return () => undefined;
-        return routerProxy;
-      },
-    },
-  );
-  const withFallback = (explicit: Record<string, unknown>) =>
-    new Proxy(explicit, {
-      get: (target, prop) =>
-        prop in target ? target[prop as string] : (routerProxy as never),
-    });
+  const trpcUtils = createTrpcUtils();
 
   const explicitApi: Record<string, unknown> = {
     langy: withFallback({
@@ -257,9 +213,14 @@ vi.mock("~/utils/api", async () => {
         useQuery: (
           input: { projectId: string; conversationId: string },
           opts?: { enabled?: boolean },
-        ) => useHeldHistoryQuery(opts?.enabled !== false && !!input.conversationId),
+        ) =>
+          useHeldHistoryQuery(
+            opts?.enabled !== false && !!input.conversationId,
+          ),
       },
-      stopTurn: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
+      stopTurn: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       onConversationUpdate: { useSubscription: () => undefined },
     }),
     useUtils: () => trpcUtils,

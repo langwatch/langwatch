@@ -40,7 +40,7 @@ vi.mock("../../utils/api", () => ({
 
 import { TRPCClientError } from "@trpc/client";
 import { useModelProviderApiKeyValidation } from "../useModelProviderApiKeyValidation";
-import { errorFormatterForTesting } from "../../server/api/trpc";
+import { errorFormatter } from "../../server/api/trpc";
 import { ProviderUnreachableError } from "../../server/api/routers/providerValidation";
 
 /**
@@ -51,7 +51,7 @@ import { ProviderUnreachableError } from "../../server/api/routers/providerValid
  */
 const wireErrorFor = (domainError: Error) =>
   TRPCClientError.from({
-    error: errorFormatterForTesting({
+    error: errorFormatter({
       shape: {
         message: domainError.message,
         code: -32603,
@@ -126,7 +126,11 @@ describe("useModelProviderApiKeyValidation", () => {
         });
 
         expect(valid).toBe(false);
-        expect(result.current.validationError).toContain("Failed to fetch");
+        // An error with no handled payload says nothing about what broke
+        // (ADR-045), so the customer reads the generic line rather than a
+        // string thrown by the transport.
+        expect(result.current.validationError).toBeTruthy();
+        expect(result.current.validationError).not.toContain("Failed to fetch");
       });
 
       // The regression this pins is invisible server-side: the sentence the
@@ -151,9 +155,10 @@ describe("useModelProviderApiKeyValidation", () => {
         });
 
         expect(result.current.validationError).toBe(
-          "Could not reach the provider to check this API key. " +
-            "Check your network connection. " +
-            "Check the base URL is correct and reachable.",
+          "Couldn't reach the provider. " +
+            "Nothing answered, so this API key was not checked. " +
+            "Check your network connection, and check the base URL is " +
+            "correct and reachable.",
         );
         // The defect was this slug reaching the customer verbatim.
         expect(result.current.validationError).not.toContain(

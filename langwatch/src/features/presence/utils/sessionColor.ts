@@ -1,8 +1,8 @@
-import { getColorForString } from "~/utils/rotatingColors";
 import type {
   PresenceSession,
   PresenceUser,
 } from "~/server/app-layer/presence/types";
+import { getColorForString } from "~/utils/rotatingColors";
 
 /** Display name used as the seed for avatar colours and tooltip labels. */
 export function presenceUserDisplayName(user: PresenceUser): string {

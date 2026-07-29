@@ -14,7 +14,11 @@ export function ResolvedModelCaption({
   if (!model) return null;
 
   return (
-    <Text fontSize="xs" color="fg.muted" data-testid="scenario-ai-model-caption">
+    <Text
+      fontSize="xs"
+      color="fg.muted"
+      data-testid="scenario-ai-model-caption"
+    >
       Uses{" "}
       <Text as="span" fontWeight="medium">
         {model}

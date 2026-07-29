@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { extractErrorMessage } from "../../../../../utils/captureError";
 import {
@@ -5,7 +6,6 @@ import {
   isAzureEvaluatorType,
 } from "../../../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
-import { HandledError } from "@langwatch/handled-error";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
@@ -21,7 +21,7 @@ import type { MappingState } from "../../../../tracer/tracesMapping";
 import type { ElasticSearchEvent, Span } from "../../../../tracer/types";
 import type { Command, CommandHandler } from "../../../";
 import {
-  createTenantId,
+  type createTenantId,
   defineCommandSchema,
   EventUtils,
 } from "../../../";
@@ -71,8 +71,19 @@ function isCustomerFixable(error: unknown): error is HandledError {
 
 export interface ExecuteEvaluationCommandDeps {
   monitors: MonitorService;
-  spanStorage: { getSpansByTraceId(params: { tenantId: string; traceId: string; occurredAtMs?: number }): Promise<Span[]> };
-  traceEvents: { getEventsByTraceId(params: { tenantId: string; traceId: string }): Promise<ElasticSearchEvent[]> };
+  spanStorage: {
+    getSpansByTraceId(params: {
+      tenantId: string;
+      traceId: string;
+      occurredAtMs?: number;
+    }): Promise<Span[]>;
+  };
+  traceEvents: {
+    getEventsByTraceId(params: {
+      tenantId: string;
+      traceId: string;
+    }): Promise<ElasticSearchEvent[]>;
+  };
   evaluationExecution: EvaluationExecutionService;
   costRecorder: EvaluationCostRecorder;
   /**
@@ -114,10 +125,13 @@ const SCHEMA = defineCommandSchema(
  *
  * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
  */
-export class ExecuteEvaluationCommand implements CommandHandler<
-  Command<ExecuteEvaluationCommandData>,
-  EvaluationProcessingEvent
-> {
+export class ExecuteEvaluationCommand
+  implements
+    CommandHandler<
+      Command<ExecuteEvaluationCommandData>,
+      EvaluationProcessingEvent
+    >
+{
   static readonly schema = SCHEMA;
 
   constructor(private readonly deps: ExecuteEvaluationCommandDeps) {}
@@ -260,7 +274,11 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       }));
     }
 
-    const traceData = buildPreconditionTraceDataFromCommand({ data, spans, events });
+    const traceData = buildPreconditionTraceDataFromCommand({
+      data,
+      spans,
+      events,
+    });
     const preconditionsMet = evaluatePreconditions({
       traceData,
       preconditions,
@@ -342,7 +360,7 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       // event's error field where the UI reads from.
       const isError = result.status === "error";
       const errorField = isError
-        ? result.error ?? result.details ?? "Evaluator failed"
+        ? (result.error ?? result.details ?? "Evaluator failed")
         : result.error;
 
       return await emitReported(
@@ -403,7 +421,7 @@ export class ExecuteEvaluationCommand implements CommandHandler<
       return emitReported(data, tenantId, {
         status: "error",
         error: extractErrorMessage(error),
-        errorDetails: error instanceof Error ? error.stack ?? null : null,
+        errorDetails: error instanceof Error ? (error.stack ?? null) : null,
       });
     }
   }
@@ -437,7 +455,7 @@ async function emitReported(
           evaluationId: data.evaluationId,
           inputs: result.inputs,
         })
-      : result.inputs ?? null;
+      : (result.inputs ?? null);
 
   const event = EventUtils.createEvent<EvaluationReportedEvent>({
     aggregateType: "evaluation",

@@ -126,13 +126,13 @@ export class ProviderUnreachableError extends HandledError {
       fault: "provider",
       httpStatus: 502,
       // A handled error's own message never crosses the tRPC boundary — the
-      // formatter replaces it with the code (ADR-045), so a surface reading
-      // `error.message` would render the literal slug. `meta.message` is the
-      // channel that does carry prose, and the one `errorDisplayMessage`
-      // reads first. The tips ride along in it so the single sentence the
-      // customer sees is the whole remediation, while `tips` stays structured
+      // formatter replaces it with the code (ADR-045) — so the words a
+      // customer reads come from this code's entry in the client presentation
+      // registry, not from here. `hasConfigurableEndpoint` is in `meta`
+      // because that entry branches on it: only some providers have a base URL
+      // there is any point telling someone to check. `tips` stays structured
       // for the API, CLI and MCP consumers that read it as data.
-      meta: { provider, message: [UNREACHABLE_MESSAGE, ...tips].join(" ") },
+      meta: { provider, hasConfigurableEndpoint },
       tips,
     });
   }

@@ -13,16 +13,13 @@
  *   - any other message contributes one `message` entry.
  */
 import {
-  parseLangyCardPart,
-  parseLangyChoiceSelectionPart,
   LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoicesTimelineEntry,
+  parseLangyCardPart,
+  parseLangyChoiceSelectionPart,
 } from "@langwatch/langy";
 
-import {
-  isQuestionToolPart,
-  questionToolCardParts,
-} from "./langyQuestionTool";
+import { isQuestionToolPart, questionToolCardParts } from "./langyQuestionTool";
 
 interface MessageLike {
   role: string;

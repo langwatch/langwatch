@@ -6,7 +6,6 @@ import {
   HStack,
   IconButton,
   Table,
-  Text,
   VStack,
 } from "@chakra-ui/react";
 import { Mail, MoreVertical, Trash2 } from "lucide-react";
@@ -81,8 +80,7 @@ export function InvitesTable({
             </Table.Header>
             <Table.Body>
               {orderedInvites.map((invite) => {
-                const isWaitingApproval =
-                  invite.status === "WAITING_APPROVAL";
+                const isWaitingApproval = invite.status === "WAITING_APPROVAL";
                 const roleLabel =
                   orgRoleOptions.find((o) => o.value === invite.role)?.label ??
                   invite.role;
@@ -95,7 +93,11 @@ export function InvitesTable({
                     <Table.Cell>{invite.email}</Table.Cell>
                     <Table.Cell>
                       {isWaitingApproval ? (
-                        <Badge size="sm" variant="surface" colorPalette="orange">
+                        <Badge
+                          size="sm"
+                          variant="surface"
+                          colorPalette="orange"
+                        >
                           Pending Approval
                         </Badge>
                       ) : (

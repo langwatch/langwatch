@@ -33,9 +33,7 @@ function makeRepo(
     findAllForOrganization: vi.fn(async (orgId: string) =>
       [...byId.values()].filter((r) => r.organizationId === orgId),
     ),
-    findByInstallationId: vi.fn(
-      async (id: string) => byId.get(id) ?? null,
-    ),
+    findByInstallationId: vi.fn(async (id: string) => byId.get(id) ?? null),
     upsert: vi.fn(async (_i: UpsertLangyGithubInstallationInput) => {}),
     // Mirrors the real unique-index semantics: the read (`byId.get`) and the
     // write (`byId.set`) below have no `await` between them, so this function
@@ -140,7 +138,9 @@ describe("recordInstallation", () => {
     it("rejects the rebind and never upserts (cross-tenant takeover guard)", async () => {
       // inst-1 already belongs to org-1; a /setup call bound to org-2 (an
       // attacker's own org, with a valid signed state) must not steal it.
-      const repo = makeRepo([row({ installationId: "inst-1", organizationId: "org-1" })]);
+      const repo = makeRepo([
+        row({ installationId: "inst-1", organizationId: "org-1" }),
+      ]);
       const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
 
       await expect(
@@ -208,7 +208,9 @@ describe("recordInstallation", () => {
 
   describe("when the same organization re-installs the same installation", () => {
     it("upserts cleanly (no conflict on a genuine re-install)", async () => {
-      const repo = makeRepo([row({ installationId: "inst-1", organizationId: "org-1" })]);
+      const repo = makeRepo([
+        row({ installationId: "inst-1", organizationId: "org-1" }),
+      ]);
       const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
 
       await svc.recordInstallation({
@@ -231,7 +233,10 @@ describe("handleWebhookEvent", () => {
     it("removes the row", async () => {
       const repo = makeRepo([row()]);
       const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
-      await svc.handleWebhookEvent({ action: "deleted", installationId: "inst-1" });
+      await svc.handleWebhookEvent({
+        action: "deleted",
+        installationId: "inst-1",
+      });
       expect(repo.deleteByInstallationId).toHaveBeenCalledWith("inst-1");
     });
   });
@@ -240,7 +245,10 @@ describe("handleWebhookEvent", () => {
     it("flags it suspended", async () => {
       const repo = makeRepo([row()]);
       const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
-      await svc.handleWebhookEvent({ action: "suspend", installationId: "inst-1" });
+      await svc.handleWebhookEvent({
+        action: "suspend",
+        installationId: "inst-1",
+      });
       expect(repo.setSuspended).toHaveBeenCalledWith({
         installationId: "inst-1",
         suspended: true,
@@ -252,7 +260,10 @@ describe("handleWebhookEvent", () => {
     it("does nothing (setup callback owns first-time mapping)", async () => {
       const repo = makeRepo();
       const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
-      await svc.handleWebhookEvent({ action: "added", installationId: "ghost" });
+      await svc.handleWebhookEvent({
+        action: "added",
+        installationId: "ghost",
+      });
       expect(repo.setRepositories).not.toHaveBeenCalled();
     });
   });
@@ -266,9 +277,7 @@ describe("mintTurnToken", () => {
         repo,
         makeAppTokens({ configured: false }),
       );
-      expect(
-        await svc.mintTurnToken({ organizationId: "org-1" }),
-      ).toBeNull();
+      expect(await svc.mintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
   });
 
@@ -276,9 +285,7 @@ describe("mintTurnToken", () => {
     it("returns null", async () => {
       const repo = makeRepo([]);
       const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
-      expect(
-        await svc.mintTurnToken({ organizationId: "org-1" }),
-      ).toBeNull();
+      expect(await svc.mintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
   });
 
@@ -347,9 +354,7 @@ describe("mintTurnToken", () => {
     it("returns null", async () => {
       const repo = makeRepo([row({ suspendedAt: new Date() })]);
       const svc = new LangyGithubInstallationsService(repo, makeAppTokens());
-      expect(
-        await svc.mintTurnToken({ organizationId: "org-1" }),
-      ).toBeNull();
+      expect(await svc.mintTurnToken({ organizationId: "org-1" })).toBeNull();
     });
   });
 });

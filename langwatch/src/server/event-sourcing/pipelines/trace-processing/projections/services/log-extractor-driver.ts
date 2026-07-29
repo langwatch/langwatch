@@ -10,7 +10,6 @@
  * canonicalisation/extractors/.
  */
 
-import { LogRecordDataBag } from "../../../../../app-layer/traces/canonicalisation/logRecordDataBag";
 import {
   ClaudeCodeExtractor,
   CodexExtractor,
@@ -21,8 +20,9 @@ import type {
   CanonicalAttributesExtractor,
   LogExtractorContext,
 } from "../../../../../app-layer/traces/canonicalisation/extractors/_types";
-import type { NormalizedAttributes } from "../../schemas/spans";
+import { LogRecordDataBag } from "../../../../../app-layer/traces/canonicalisation/logRecordDataBag";
 import type { LogRecordReceivedEventData } from "../../schemas/events";
+import type { NormalizedAttributes } from "../../schemas/spans";
 
 const LOG_EXTRACTORS: readonly CanonicalAttributesExtractor[] = [
   new ClaudeCodeExtractor(),

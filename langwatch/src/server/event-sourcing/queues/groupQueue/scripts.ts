@@ -1,7 +1,5 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-
-import { CachedLuaScript } from "./cachedLuaScript";
 import {
   BLOB_BACKSTOP_TTL_SECONDS,
   BLOB_LEASE_SET_TTL_SECONDS,
@@ -9,6 +7,7 @@ import {
   LEGACY_HOLDER_LEASE_GUARD,
 } from "./blobConstants";
 import { GQ_BLOB_GRACE_LUA } from "./blobGraceLua";
+import { CachedLuaScript } from "./cachedLuaScript";
 
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
@@ -1321,7 +1320,8 @@ local activeKey    = keyPrefix .. "group:" .. groupId .. ":active"
 -- 1. Block the group — prevents dispatcher from re-dispatching
 redis.call("SADD", blockedKey, groupId)
 
--- 2. Re-stage the failed job with a new ID
+-- 2. Re-stage the failed job under the id it was dispatched under (ADR-080).
+--    Its member was ZREMed at claim time, so this insert lands on an absent one.
 local inserted = redis.call("ZADD", groupJobsKey, score, newStagedJobId)
 redis.call("HSET", groupDataKey, newStagedJobId, jobDataJson)
 local stagedLease = gqParseLease(jobDataJson)
@@ -1379,6 +1379,15 @@ const RETRY_RESTAGE_LUA =
   `
 local activeKey       = KEYS[1]
 local totalPendingKey = KEYS[2]
+-- The group's retry chain. Written HERE rather than by the caller beforehand:
+-- with the staged job id no longer carrying a /r/<n> marker (ADR-080), this
+-- counter is the only attempt carrier a re-staged SIBLING has — a sibling is
+-- re-queued with its original envelope and no attempt of its own. A separate
+-- SET that failed while this script went on to succeed would hand the next
+-- sibling-led claim a fresh budget, restarting a bounded ladder and letting a
+-- fold re-apply what the chain had already applied. One script means both land
+-- or neither does.
+local attemptKey      = KEYS[3]
 
 local keyPrefix             = ARGV[1]
 local groupId               = ARGV[2]
@@ -1392,11 +1401,19 @@ local retryTtlSec           = tonumber(ARGV[7])
 -- in-flight retry's slot doesn't lapse out of the live count.
 local tenantCountKeyPrefix  = ARGV[8]
 local nowMs                 = tonumber(ARGV[9])
+local attempt               = ARGV[10]
+local attemptTtlSec         = tonumber(ARGV[11])
 
 -- 1. Validate active key matches
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
   return 0
+end
+
+-- 1b. Record the attempt on the group's retry chain. After the guard, so a
+--     worker that has lost the slot cannot advance a chain it no longer owns.
+if attempt ~= "" then
+  redis.call("SET", attemptKey, attempt, "EX", attemptTtlSec)
 end
 
 -- 2. Re-stage job with future score (backoff delay)
@@ -1420,15 +1437,22 @@ refreshGroupKeyTtl(groupJobsKey, groupDataKey, nowMs)
 local readyKey = keyPrefix .. "ready"
 addToReadyOrParked(readyKey, groupId, dispatchAfterMs, false)
 
--- 4. Rotate the active key to the NEW staged-job id with a TTL matching the
---    backoff period. While the key exists the group is locked (preserves FIFO
+-- 4. Set the active key to the staged-job id with a TTL matching the backoff
+--    period. While the key exists the group is locked (preserves FIFO
 --    ordering); when it expires the dispatcher picks up the retry on its next
---    poll. Rotating the VALUE (not just EXPIRE-ing the old one) invalidates
---    the retired job id: the worker's activeKey heartbeat interval is still
---    armed for a few awaits after this eval returns (blob transfer, audit
---    write), and a late REFRESH matching the old id would reset this TTL to
---    the full activeTtlSec and push the ready score out with it — delaying
---    the retry by up to activeTtlSec instead of the backoff.
+--    poll.
+--
+--    THIS TTL IS WHAT MAKES THE BACKOFF REAL, and nothing here defends it.
+--    A REFRESH from the worker's heartbeat would reset it to the full
+--    activeTtlSec and push the ready score out with it, delaying the retry by
+--    up to activeTtlSec instead of the backoff. This used to be prevented
+--    here: the re-stage rotated the active key to a NEW id, so a late beat
+--    naming the retired id no longer matched. Since ADR-080 the id is reused,
+--    so newStagedJobId equals stagedJobId and this write invalidates nothing.
+--    The ONLY protection is that the caller stops the heartbeat before issuing
+--    this script (stopHeartbeat() in groupQueue.ts, ordered ahead of
+--    retryRestage on the same connection). Do not move that call later on the
+--    assumption that this line still guards it.
 redis.call("SET", activeKey, newStagedJobId, "EX", retryTtlSec)
 
 -- 5. Bump this slot's expiry score in lockstep with the activeKey TTL so the
@@ -1862,7 +1886,11 @@ export class GroupStagingScripts {
     nowMs: number;
     activeTtlSec: number;
   }): Promise<DispatchResult | null> {
-    const results = await this.dispatchBatch({ nowMs, activeTtlSec, maxJobs: 1 });
+    const results = await this.dispatchBatch({
+      nowMs,
+      activeTtlSec,
+      maxJobs: 1,
+    });
     return results[0] ?? null;
   }
 
@@ -2036,16 +2064,26 @@ export class GroupStagingScripts {
     groupId,
     stagedJobId,
     activeTtlSec,
+    isCancelled,
   }: {
     groupId: string;
     stagedJobId: string;
     activeTtlSec: number;
+    /**
+     * Withdraws the refresh if the caller stops wanting it while the call is in
+     * flight. Only the NOSCRIPT fallback can be withdrawn — see
+     * {@link CachedLuaScript.runCancellable} — which is exactly the window
+     * where a refresh could otherwise land behind a re-stage and undo its
+     * backoff.
+     */
+    isCancelled?: () => boolean;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const readyKey = `${this.keyPrefix}ready`;
 
-    const result = await refreshScript.run(
+    const result = await refreshScript.runCancellable(
       this.redis,
+      isCancelled ?? null,
       2,
       activeKey,
       readyKey,
@@ -2119,6 +2157,8 @@ export class GroupStagingScripts {
     dispatchAfterMs,
     jobDataJson,
     backoffMs,
+    attempt,
+    attemptTtlSec,
   }: {
     groupId: string;
     stagedJobId: string;
@@ -2126,17 +2166,22 @@ export class GroupStagingScripts {
     dispatchAfterMs: number;
     jobDataJson: string;
     backoffMs: number;
+    /** Recorded on the group's retry chain in the same atomic step. */
+    attempt: number;
+    attemptTtlSec: number;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
+    const attemptKey = `${this.keyPrefix}group:${groupId}:attempt`;
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
 
     const result = await retryRestageScript.run(
       this.redis,
-      2,
+      3,
       activeKey,
       totalPendingKey,
+      attemptKey,
       this.keyPrefix,
       groupId,
       stagedJobId,
@@ -2146,6 +2191,8 @@ export class GroupStagingScripts {
       String(retryTtlSec),
       `${this.keyPrefix}tenant_active_z:`,
       String(Date.now()),
+      String(attempt),
+      String(attemptTtlSec),
     );
 
     return result === 1;

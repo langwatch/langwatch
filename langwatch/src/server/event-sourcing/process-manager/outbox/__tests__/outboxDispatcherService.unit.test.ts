@@ -1,17 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { ProcessManagerService } from "../../processManagerService";
-import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore";
 import {
+  type PilotState,
   pilotDefinition,
   pilotEvent,
   pilotRef,
   T0,
-  type PilotState,
 } from "../../__tests__/helpers/pilotProcess.fixture";
+import { ProcessManagerService } from "../../processManagerService";
+import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore";
 import {
-  OutboxDispatcherService,
   type DispatchableMessage,
+  OutboxDispatcherService,
 } from "../outboxDispatcherService";
 
 describe("OutboxDispatcherService", () => {

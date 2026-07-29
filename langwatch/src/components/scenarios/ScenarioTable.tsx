@@ -168,7 +168,13 @@ export function ScenarioTable({
                 cursor={header.column.getCanSort() ? "pointer" : "default"}
                 onClick={header.column.getToggleSortingHandler()}
                 userSelect="none"
-                width={header.id === "select" ? "40px" : header.id === "actions" ? "48px" : undefined}
+                width={
+                  header.id === "select"
+                    ? "40px"
+                    : header.id === "actions"
+                      ? "48px"
+                      : undefined
+                }
               >
                 <HStack gap={1}>
                   {flexRender(
@@ -199,17 +205,17 @@ export function ScenarioTable({
               noun: "scenario",
             })}
           >
-          <Table.Row
-            cursor="pointer"
-            _hover={{ bg: "bg.emphasized" }}
-            onClick={() => onRowClick(row.original.id)}
-          >
-            {row.getVisibleCells().map((cell) => (
-              <Table.Cell key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </Table.Cell>
-            ))}
-          </Table.Row>
+            <Table.Row
+              cursor="pointer"
+              _hover={{ bg: "bg.emphasized" }}
+              onClick={() => onRowClick(row.original.id)}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <Table.Cell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </Table.Cell>
+              ))}
+            </Table.Row>
           </LangyContextTarget>
         ))}
       </Table.Body>

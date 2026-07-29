@@ -218,7 +218,10 @@ describe("promptContextChip", () => {
   describe("given a prompt with a handle", () => {
     it("labels and refs by the handle — the name the agent's tools resolve", () => {
       expect(
-        promptContextChip({ promptId: "prompt_123456", handle: "billing/tone" }),
+        promptContextChip({
+          promptId: "prompt_123456",
+          handle: "billing/tone",
+        }),
       ).toEqual({
         id: "prompt:prompt_123456",
         kind: "prompt",
@@ -276,9 +279,9 @@ describe("the resource chip factories", () => {
 
   describe("given a resource with no name to show", () => {
     it("falls back to a shortened id rather than an empty label", () => {
-      expect(automationContextChip({ automationId: "au_123456789" }).label).toBe(
-        "automation au_123…89",
-      );
+      expect(
+        automationContextChip({ automationId: "au_123456789" }).label,
+      ).toBe("automation au_123…89");
       expect(
         workflowContextChip({ workflowId: "wf_123456789", name: "  " }).label,
       ).toBe("workflow wf_123…89");

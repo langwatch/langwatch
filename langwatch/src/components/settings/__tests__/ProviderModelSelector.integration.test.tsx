@@ -26,9 +26,7 @@ import {
 afterEach(() => cleanup());
 
 function renderSelector(ui: React.ReactElement) {
-  return render(
-    <ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>,
-  );
+  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 }
 
 describe("ProviderModelSelector with inheritOption", () => {
@@ -39,13 +37,18 @@ describe("ProviderModelSelector with inheritOption", () => {
         model=""
         options={["openai/gpt-5", "gemini/gemini-3.1-flash-lite"]}
         onChange={vi.fn()}
-        inheritOption={{ model: "openai/gpt-5.2", label: "Inherit (from System)" }}
+        inheritOption={{
+          model: "openai/gpt-5.2",
+          label: "Inherit (from System)",
+        }}
       />,
     );
 
     // Trigger always renders even when collapsed; the inherit label
     // shows in the placeholder area when model is empty.
-    expect(screen.getAllByText("Inherit (from System)").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Inherit (from System)").length).toBeGreaterThan(
+      0,
+    );
     // Cascade is jargon, not user copy — must be gone from the picker.
     expect(screen.queryByText(/cascade/i)).not.toBeInTheDocument();
   });

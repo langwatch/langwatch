@@ -12,6 +12,8 @@
  * Real logic follows once the service layer for VirtualKey / Budget lands.
  */
 
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { createLogger } from "@langwatch/observability";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
@@ -27,11 +29,11 @@ import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.click
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
+import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
 } from "~/server/gateway/guardrailEvaluation.service";
-import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import { resolveTraceProject } from "~/server/gateway/scopeResolver";
 import {
   hashVirtualKeySecret,
@@ -269,6 +271,21 @@ function notImplemented(c: Context) {
 }
 
 // ── routes ──────────────────────────────────────────────────────────────
+
+/**
+ * §4.7: connectivity probe for the gateway's public /health endpoint.
+ *
+ * The Go gateway's statusprobe monitor calls this on its own clock
+ * (default every 15s per gateway pod) and serves the cached verdict to
+ * the status page. Riding the signed channel is the point: a 200 proves
+ * not just that the app is up but that the shared HMAC secret matches,
+ * the misconfig where every pod looks green while every virtual-key
+ * resolve is refused. Body deliberately static; the gateway only reads
+ * the status code.
+ */
+secured.access(gatewayPolicy()).get("/health", (c) => {
+  return c.json({ status: "ok" });
+});
 
 /**
  * §4.1 — resolve a raw virtual key to a signed JWT + current revision.

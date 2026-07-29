@@ -8,8 +8,8 @@ import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { USAGE_UNKNOWN } from "~/server/traces/usage-count";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
-import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   reportHasFailures,
@@ -109,6 +109,20 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
             logger.debug(
               { organizationId: org.id },
               "organization has unlimited plan, skipping usage check",
+            );
+            continue;
+          }
+
+          if (currentMonthCount === USAGE_UNKNOWN) {
+            // Skipped, not treated as 0. This job decides whether an
+            // organization has crossed a usage threshold; against a fabricated
+            // zero it concludes "comfortably under" for every organization at
+            // once and sends nothing, which is indistinguishable from a quiet
+            // day. Skipping says the same thing honestly and re-checks on the
+            // next tick.
+            logger.warn(
+              { organizationId: org.id },
+              "usage is unknown, skipping usage check for this organization",
             );
             continue;
           }
@@ -215,46 +229,5 @@ const seedDemoHandler = async (c: CronContext) => {
 };
 secured.access(cronPolicy()).get("/cron/seed_demo", seedDemoHandler);
 secured.access(cronPolicy()).post("/cron/seed_demo", seedDemoHandler);
-
-/**
- * Revokes every Langy session key whose lifetime has elapsed.
- *
- * THIS IS THE GUARANTEE. The agent manager revokes a worker's session key the
- * moment it sees the worker die, which is the fast path and covers the ordinary
- * cases — capability change, idle reap, shutdown, crash. But a manager that is
- * SIGKILLed (OOM, node eviction, `--force` delete) sees nothing and runs no
- * cleanup at all, and every key its workers held then stays valid for the rest of
- * its TTL. No callback can close that hole: the process that would make the call
- * is the one that died.
- *
- * So this reaper is not redundant with revocation-on-death — it is what makes the
- * scheme safe, and removing it would reintroduce the long tail of live, orphaned
- * credentials the whole change set out to remove.
- */
-const langySessionKeysReapHandler = async (c: CronContext) => {
-  if (!validateInternalSecret(c)) return c.body(null, 401);
-  try {
-    const revoked = await reapExpiredLangySessionApiKeys({ prisma });
-    // Worth watching: a number that stays stubbornly high means workers are dying
-    // without their manager noticing, i.e. the fast path is not firing.
-    if (revoked > 0) {
-      logger.info({ revoked }, "reaped expired Langy session keys");
-    }
-    return c.json({ revoked });
-  } catch (error) {
-    logger.error({ error }, "reaping expired Langy session keys failed");
-    captureException(toError(error), {
-      extra: { context: "cron:langy_session_keys_reap" },
-    });
-    return c.json({ error: "reap failed" }, { status: 500 });
-  }
-};
-
-secured
-  .access(cronPolicy())
-  .get("/cron/langy_session_keys_reap", langySessionKeysReapHandler);
-secured
-  .access(cronPolicy())
-  .post("/cron/langy_session_keys_reap", langySessionKeysReapHandler);
 
 export const app = secured.hono;

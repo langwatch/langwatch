@@ -1,18 +1,24 @@
 import type IORedis from "ioredis";
 import {
-  CUTOFF_KEY_PREFIX,
   COMPLETED_KEY_PREFIX,
-  MARKER_TTL_SECONDS,
+  CUTOFF_KEY_PREFIX,
   DONE_MARKER_TTL_SECONDS,
   doneMarkerKey,
+  MARKER_TTL_SECONDS,
 } from "./replayConstants";
 import type { ReplayLogWriter } from "./replayLog";
 
 /** Throw if any command in a pipeline result has an error. */
-function checkPipelineErrors(results: [error: Error | null, result: unknown][] | null, operation: string): void {
+function checkPipelineErrors(
+  results: [error: Error | null, result: unknown][] | null,
+  operation: string,
+): void {
   if (!results) throw new Error(`Pipeline returned null during ${operation}`);
   for (const [err] of results) {
-    if (err) throw new Error(`Pipeline command failed during ${operation}: ${err.message}`);
+    if (err)
+      throw new Error(
+        `Pipeline command failed during ${operation}: ${err.message}`,
+      );
   }
 }
 
@@ -203,7 +209,9 @@ export async function clearFailedBatchMarkers({
     log.write({
       step: "error",
       error: `failed to clear replay markers for failed batch: ${
-        cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+        cleanupError instanceof Error
+          ? cleanupError.message
+          : String(cleanupError)
       }`,
     });
   }

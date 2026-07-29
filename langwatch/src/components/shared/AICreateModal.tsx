@@ -2,7 +2,6 @@ import {
   Box,
   Button,
   chakra,
-  Code,
   HStack,
   Icon,
   Spinner,
@@ -12,6 +11,10 @@ import {
 } from "@chakra-ui/react";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+// Deep import on purpose: `ErrorActions` is deliberately absent from the
+// `~/features/errors` barrel, which would put it in an import cycle with the
+// toaster. `components/ui/toaster.tsx` reaches for it the same way.
+import { ErrorActions } from "~/features/errors/components/ErrorActions";
 import {
   LangyMark,
   LangyMarkGradientDefs,
@@ -421,7 +424,8 @@ function InspirationChips({
   return (
     <Box>
       <Text fontSize="sm" color="fg.muted" mb={2}>
-        Need inspiration? Pick a pattern and {assistantName} takes it from there.
+        Need inspiration? Pick a pattern and {assistantName} takes it from
+        there.
       </Text>
       <HStack gap={2} flexWrap="wrap">
         {templates.map((template) => (
@@ -542,24 +546,17 @@ function ErrorState({ error }: ErrorStateProps) {
         <Icon as={AlertCircle} boxSize={6} />
       </Box>
       <VStack gap={1}>
-        <Text fontWeight="semibold">Something went wrong</Text>
-        <Text color="fg.muted" fontSize="sm" textAlign="center">
-          {classified.copy}
-        </Text>
-        {classified.tier === "unknown" && classified.rawMessage && (
-          <Code
-            fontSize="xs"
-            mt={2}
-            px={2}
-            py={1}
-            borderRadius="md"
-            whiteSpace="pre-wrap"
-            wordBreak="break-word"
-            maxW="100%"
-          >
-            {classified.rawMessage}
-          </Code>
+        <Text fontWeight="semibold">{classified.title}</Text>
+        {classified.copy && (
+          <Text color="fg.muted" fontSize="sm" textAlign="center">
+            {classified.copy}
+          </Text>
         )}
+        {/* The trace id is the only technical detail that belongs in front of a
+            customer (ADR-045) — it is the handle support can act on, where the
+            raw failure text that used to sit here was neither readable nor
+            ours to show. */}
+        <ErrorActions traceId={classified.traceId} />
       </VStack>
     </VStack>
   );

@@ -9,9 +9,9 @@
  * peak memory under the per-query limit — and the query must stream (no outer
  * ORDER BY / LIMIT top-N buffer holding every ComputedInput at once).
  */
-import { describe, expect, it } from "vitest";
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { describe, expect, it } from "vitest";
 
 import { fetchTracesFromClickHouse } from "../clustering";
 
@@ -34,9 +34,7 @@ describe("topicClustering page fetch memory guard", () => {
 
       await fetchTracesFromClickHouse(clickhouse, "project-1", false, [], []);
 
-      const pageFetch = captured.find((c) =>
-        c.query.includes("ComputedInput"),
-      );
+      const pageFetch = captured.find((c) => c.query.includes("ComputedInput"));
       expect(pageFetch).toBeDefined();
       return pageFetch!;
     }

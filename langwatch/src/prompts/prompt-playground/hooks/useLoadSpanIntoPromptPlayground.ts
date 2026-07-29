@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { useEffect, useRef } from "react";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { LLM_PARAMETER_MAP } from "~/prompts/prompt-playground/llmParameterMap";
 import { formSchema } from "~/prompts/schemas";
@@ -110,7 +111,8 @@ function useSpanIdFromUrl() {
  */
 export function coerceToNumber(value: unknown): number | undefined {
   if (value == null) return undefined;
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? value : undefined;
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "") return undefined;
@@ -131,7 +133,8 @@ export function coerceToNumber(value: unknown): number | undefined {
 export function coerceToString(value: unknown): string | undefined {
   if (value == null) return undefined;
   if (typeof value === "string") return value === "" ? undefined : value;
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : undefined;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? String(value) : undefined;
   if (typeof value === "boolean") return String(value);
   return undefined;
 }
@@ -234,12 +237,17 @@ async function tryOpenExistingPromptTab({
   promptTag?: string | null;
   projectId: string;
   trpc: ReturnType<typeof api.useContext>;
-}): Promise<{ formValues: PromptConfigFormValues; versionNumber: number } | null> {
+}): Promise<{
+  formValues: PromptConfigFormValues;
+  versionNumber: number;
+} | null> {
   try {
     const prompt = await trpc.prompts.getByIdOrHandle.fetch({
       idOrHandle: promptHandle,
       projectId,
-      ...(promptTag ? { tag: promptTag } : { version: promptVersionNumber ?? undefined }),
+      ...(promptTag
+        ? { tag: promptTag }
+        : { version: promptVersionNumber ?? undefined }),
     });
 
     if (!prompt) {
@@ -340,7 +348,11 @@ export function useLoadSpanIntoPromptPlayground() {
   const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
   const trpc = api.useContext();
   const { addTab, updateTabData, removeTab } = useDraggableTabsBrowserStore(
-    ({ addTab, updateTabData, removeTab }) => ({ addTab, updateTabData, removeTab }),
+    ({ addTab, updateTabData, removeTab }) => ({
+      addTab,
+      updateTabData,
+      removeTab,
+    }),
   );
 
   useEffect(() => {
@@ -447,12 +459,9 @@ export function useLoadSpanIntoPromptPlayground() {
       } catch (error) {
         logger.error({ error }, "Error loading span data into prompt studio");
         removeTab({ tabId: loadingTabId });
-        toaster.create({
-          title: "Error loading span data into prompt studio",
-          description: (error as Error).message,
-          meta: {
-            closable: true,
-          },
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't open this span in the prompt playground",
         });
       }
     })();

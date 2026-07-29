@@ -1,16 +1,17 @@
 import { Box, Field, Input, VStack } from "@chakra-ui/react";
-import React, { useEffect } from "react";
+import type React from "react";
+import { useEffect, useMemo } from "react";
+import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
+import { modelProviderRegistry } from "../../features/onboarding/regions/model-providers/registry";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
-import { modelProviderRegistry } from "../../features/onboarding/regions/model-providers/registry";
+import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import { api } from "../../utils/api";
 import { isApiKeyField } from "../../utils/modelProviderHelpers";
 import { SmallLabel } from "../SmallLabel";
-import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
-import { api } from "../../utils/api";
 
 /**
  * Renders credential input fields (API keys, endpoints, etc.) based on the provider's schema.
@@ -60,7 +61,7 @@ export const CredentialsSection = ({
   // saw a bare env-var name and had to guess which key was wanted. Keyed by
   // the backend provider, since a few entries name themselves differently
   // there (open_ai_azure -> azure).
-  const fieldMetadata = React.useMemo(
+  const fieldMetadata = useMemo(
     () =>
       modelProviderRegistry.find(
         (entry) => entry.backendModelProviderKey === provider.provider,

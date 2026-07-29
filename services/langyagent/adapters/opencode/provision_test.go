@@ -297,7 +297,7 @@ func TestBuildWorkerEnv_AppendsCapabilityEnv(t *testing.T) {
 }
 
 // buildWorkerEnv must point the worker's HTTPS_PROXY at the per-worker egress
-// adapter (ADR-043) when an egress port is set, and must NO_PROXY the loopback +
+// adapter (ADR-076) when an egress port is set, and must NO_PROXY the loopback +
 // in-cluster control-plane / gateway hosts so their traffic goes direct rather
 // than through the throttled per-worker proxy. With no egress port, no proxy env
 // is injected (the worker egresses direct, as before).

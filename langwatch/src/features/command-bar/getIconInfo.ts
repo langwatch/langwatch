@@ -1,5 +1,5 @@
 import { Folder } from "lucide-react";
-import { featureIcons, type FeatureKey } from "~/utils/featureIcons";
+import { type FeatureKey, featureIcons } from "~/utils/featureIcons";
 import { iconColors } from "./constants";
 import type { Command, RecentItem, SearchResult } from "./types";
 
@@ -36,7 +36,10 @@ export function getIconInfo(item: ListItem) {
 
   if (item.type === "command") {
     Icon = item.data.icon;
-    colorKey = item.data.id.replace("nav-", "").replace("action-new-", "").replace("action-", "");
+    colorKey = item.data.id
+      .replace("nav-", "")
+      .replace("action-new-", "")
+      .replace("action-", "");
   } else if (item.type === "search") {
     Icon = item.data.icon;
     colorKey = item.data.type;

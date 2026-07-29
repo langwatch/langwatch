@@ -92,9 +92,7 @@ describe("EventSourcing.close", () => {
     });
 
     const failingPipeline = createMockPipeline("failing");
-    failingPipeline.service.close.mockRejectedValue(
-      new Error("close failed"),
-    );
+    failingPipeline.service.close.mockRejectedValue(new Error("close failed"));
     const healthyPipeline = createMockPipeline("healthy");
 
     const pipelines = (es as any).pipelines as Map<string, any>;

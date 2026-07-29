@@ -1,26 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AGENT_DISPATCH_TIMEOUT_MS } from "~/server/app-layer/langy/langyWorker";
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
 import {
   InMemoryProcessStore,
+  type IntentHandler,
   OutboxDispatcherService,
   ProcessManagerService,
-  type IntentHandler,
 } from "~/server/event-sourcing/process-manager";
-
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
-import type { ProcessDefinition } from "~/server/event-sourcing/process-manager";
-
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { LangyConversationProcessState } from "../langyConversationProcess.types";
 import { langyConversationProcess } from "../langyConversationProcess";
-import { createStubLangyEffectPorts } from "../langyEffectPorts";
+import type { LangyConversationProcessState } from "../langyConversationProcess.types";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
   LANGY_PROCESS_INTENT_TYPES,
 } from "../langyConversationProcess.types";
-import { LANGY_OUTBOX_LEASE_DURATION_MS } from "../langyEffectPorts";
+import {
+  createStubLangyEffectPorts,
+  LANGY_OUTBOX_LEASE_DURATION_MS,
+} from "../langyEffectPorts";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,
@@ -43,7 +43,6 @@ const langyConversationProcessDefinition = buildProcessDefinition(
     applier: langyConversationProcess(createStubLangyEffectPorts().ports),
   }).config,
 ) as ProcessDefinition<LangyConversationProcessState>;
-
 
 const ref = {
   processName: LANGY_CONVERSATION_PROCESS_NAME,
@@ -104,7 +103,11 @@ describe("Langy process outbox lease fencing", () => {
       // A leases the dispatch and blocks inside its handler (a live turn still
       // waiting on the manager).
       const runA = dispatcherA.runOnce({ now: T0, limit: 1 });
-      await vi.waitFor(() => expect(delivered).toContain(`A:process:${CONVERSATION_ID}:dispatch:turn_1`));
+      await vi.waitFor(() =>
+        expect(delivered).toContain(
+          `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
+        ),
+      );
 
       const fastHandler = vi.fn<IntentHandler>(async ({ message }) => {
         delivered.push(`B:${message.messageKey}`);
@@ -118,8 +121,13 @@ describe("Langy process outbox lease fencing", () => {
       // After the 100ms lease has expired but while A is still in-flight, B
       // re-leases the row and delivers the SAME turn a second time.
       const reportB = await dispatcherB.runOnce({ now: T0 + 200, limit: 1 });
-      expect(reportB.dispatched).toEqual([`process:${CONVERSATION_ID}:dispatch:turn_1`]);
-      expect(delivered).toEqual([`A:process:${CONVERSATION_ID}:dispatch:turn_1`, `B:process:${CONVERSATION_ID}:dispatch:turn_1`]);
+      expect(reportB.dispatched).toEqual([
+        `process:${CONVERSATION_ID}:dispatch:turn_1`,
+      ]);
+      expect(delivered).toEqual([
+        `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
+        `B:process:${CONVERSATION_ID}:dispatch:turn_1`,
+      ]);
 
       // A finally completes; its markDispatched is fenced by B's superseding
       // lease, so the double delivery already happened and cannot be undone.
@@ -150,7 +158,11 @@ describe("Langy process outbox lease fencing", () => {
       });
 
       const runA = dispatcherA.runOnce({ now: T0, limit: 1 });
-      await vi.waitFor(() => expect(delivered).toContain(`A:process:${CONVERSATION_ID}:dispatch:turn_1`));
+      await vi.waitFor(() =>
+        expect(delivered).toContain(
+          `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
+        ),
+      );
 
       const fastHandler = vi.fn<IntentHandler>(async ({ message }) => {
         delivered.push(`B:${message.messageKey}`);
@@ -169,7 +181,9 @@ describe("Langy process outbox lease fencing", () => {
       });
       expect(reportB.dispatched).toEqual([]);
       expect(fastHandler).not.toHaveBeenCalled();
-      expect(delivered).toEqual([`A:process:${CONVERSATION_ID}:dispatch:turn_1`]);
+      expect(delivered).toEqual([
+        `A:process:${CONVERSATION_ID}:dispatch:turn_1`,
+      ]);
 
       releaseSlow();
       await runA;

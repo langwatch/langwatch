@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-07-26T15:42:18.790Z",
-  "modelCount": 363,
+  "updatedAt": "2026-07-27T03:08:01.673Z",
+  "modelCount": 361,
   "models": {
     "anthropic/claude-opus-5-fast": {
       "id": "anthropic/claude-opus-5-fast",
@@ -1268,7 +1268,7 @@
       "name": "MoonshotAI: Kimi K2.7 Code",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 7.5e-7,
+        "inputCostPerToken": 7.3e-7,
         "outputCostPerToken": 0.0000035,
         "inputCacheReadPerToken": 1.5e-7
       },
@@ -6505,7 +6505,7 @@
       "pricing": {
         "inputCostPerToken": 0.00000125,
         "outputCostPerToken": 0.00001,
-        "inputCacheReadPerToken": 1.25e-7,
+        "inputCacheReadPerToken": 1.3e-7,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
@@ -6554,11 +6554,11 @@
       "pricing": {
         "inputCostPerToken": 2.5e-7,
         "outputCostPerToken": 0.000002,
-        "inputCacheReadPerToken": 2.5e-8,
+        "inputCacheReadPerToken": 3e-8,
         "webSearchCostPerQuery": 0.01
       },
       "contextLength": 400000,
-      "maxCompletionTokens": 100000,
+      "maxCompletionTokens": 128000,
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
@@ -9180,7 +9180,6 @@
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
-        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -9193,7 +9192,6 @@
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -11642,56 +11640,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "inflection/inflection-3-pi": {
-      "id": "inflection/inflection-3-pi",
-      "name": "Inflection: Inflection 3 Pi",
-      "provider": "inflection",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.00001
-      },
-      "contextLength": 8000,
-      "maxCompletionTokens": 1024,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Inflection 3 Pi powers Inflection's [Pi](https://pi.ai) chatbot, including backstory, emotional intelligence, productivity, and safety. It has access to recent news, and excels in scenarios like customer support and roleplay. Pi...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "inflection/inflection-3-productivity": {
-      "id": "inflection/inflection-3-productivity",
-      "name": "Inflection: Inflection 3 Productivity",
-      "provider": "inflection",
-      "pricing": {
-        "inputCostPerToken": 0.0000025,
-        "outputCostPerToken": 0.00001
-      },
-      "contextLength": 8000,
-      "maxCompletionTokens": 1024,
-      "supportedParameters": [
-        "max_tokens",
-        "stop",
-        "temperature",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Inflection 3 Productivity is optimized for following instructions. It is better for tasks requiring JSON output or precise adherence to provided guidelines. It has access to recent news. For emotional...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "thedrummer/rocinante-12b": {
       "id": "thedrummer/rocinante-12b",
       "name": "TheDrummer: Rocinante 12B",
@@ -13436,6 +13384,27 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": true
     },
+    "elevenlabs/scribe_v1": {
+      "id": "elevenlabs/scribe_v1",
+      "name": "scribe_v1",
+      "provider": "elevenlabs",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerSecond": 0.0000611
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "audio->text",
+      "mode": "audio",
+      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": true,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "elevenlabs/scribe_v1_experimental": {
       "id": "elevenlabs/scribe_v1_experimental",
       "name": "scribe_v1_experimental",
@@ -13478,69 +13447,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "openai/tts-1-1106": {
-      "id": "openai/tts-1-1106",
-      "name": "tts-1-1106",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 0.000015
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    },
-    "openai/tts-1-hd-1106": {
-      "id": "openai/tts-1-hd-1106",
-      "name": "tts-1-hd-1106",
-      "provider": "openai",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerCharacter": 0.00003
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "text->audio",
-      "mode": "audio",
-      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": true
-    },
-    "elevenlabs/scribe_v1": {
-      "id": "elevenlabs/scribe_v1",
-      "name": "scribe_v1",
-      "provider": "elevenlabs",
-      "pricing": {
-        "inputCostPerToken": 0,
-        "outputCostPerToken": 0,
-        "inputCostPerSecond": 0.0000611
-      },
-      "contextLength": 0,
-      "maxCompletionTokens": null,
-      "supportedParameters": [],
-      "defaultParameters": null,
-      "modality": "audio->text",
-      "mode": "audio",
-      "description": "Speech-to-text, priced per second of audio. Synced from litellm's price registry.",
-      "supportsImageInput": false,
-      "supportsAudioInput": true,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "openai/tts-1": {
       "id": "openai/tts-1",
       "name": "tts-1",
@@ -13562,9 +13468,51 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": true
     },
+    "openai/tts-1-1106": {
+      "id": "openai/tts-1-1106",
+      "name": "tts-1-1106",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.000015
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
     "openai/tts-1-hd": {
       "id": "openai/tts-1-hd",
       "name": "tts-1-hd",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0,
+        "outputCostPerToken": 0,
+        "inputCostPerCharacter": 0.00003
+      },
+      "contextLength": 0,
+      "maxCompletionTokens": null,
+      "supportedParameters": [],
+      "defaultParameters": null,
+      "modality": "text->audio",
+      "mode": "audio",
+      "description": "Speech synthesis, priced per input character. Synced from litellm's price registry.",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": true
+    },
+    "openai/tts-1-hd-1106": {
+      "id": "openai/tts-1-hd-1106",
+      "name": "tts-1-hd-1106",
       "provider": "openai",
       "pricing": {
         "inputCostPerToken": 0,

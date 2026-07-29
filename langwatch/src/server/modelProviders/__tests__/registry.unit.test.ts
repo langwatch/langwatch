@@ -183,7 +183,9 @@ describe("Backward Compatibility", () => {
     it("includes models with numeric suffixes like Bedrock version numbers", () => {
       // Bedrock models use :0 suffix for versions, not variants
       expect(hasVariantSuffix("bedrock/amazon.nova-pro-v1:0")).toBe(false);
-      expect(hasVariantSuffix("bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0")).toBe(false);
+      expect(
+        hasVariantSuffix("bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0"),
+      ).toBe(false);
     });
 
     it("includes standard models without suffixes", () => {
@@ -292,11 +294,15 @@ describe("hasVariantSuffix", () => {
 
       it("preserves Meta Llama models on Bedrock", () => {
         expect(hasVariantSuffix("meta.llama3-70b-instruct-v1:0")).toBe(false);
-        expect(hasVariantSuffix("meta.llama3-1-405b-instruct-v1:0")).toBe(false);
+        expect(hasVariantSuffix("meta.llama3-1-405b-instruct-v1:0")).toBe(
+          false,
+        );
       });
 
       it("preserves Mistral models on Bedrock", () => {
-        expect(hasVariantSuffix("mistral.mistral-7b-instruct-v0:2")).toBe(false);
+        expect(hasVariantSuffix("mistral.mistral-7b-instruct-v0:2")).toBe(
+          false,
+        );
         expect(hasVariantSuffix("mistral.mistral-large-2402-v1:0")).toBe(false);
       });
 
@@ -480,7 +486,9 @@ describe("Parameter Constraints", () => {
 
     /** @scenario "Unknown provider returns undefined constraints" */
     it("returns undefined for unknown provider", () => {
-      const constraints = getParameterConstraints("unknown-provider/some-model");
+      const constraints = getParameterConstraints(
+        "unknown-provider/some-model",
+      );
 
       expect(constraints).toBeUndefined();
     });

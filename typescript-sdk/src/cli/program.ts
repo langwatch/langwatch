@@ -71,14 +71,30 @@ const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boole
   return pushCommandImpl(options);
 };
 
-export function buildProgram(): Command {
+/**
+ * The name to title usage, help and commander errors with.
+ *
+ * The package ships two bin names for the same bundle (see package.json): `lw`
+ * (the advertised name) and `langwatch` (the long-standing alias). Whichever
+ * one was invoked is the one the caller must be shown.
+ *
+ * `bin` is the CALLER's `process.argv[1]`, which is only distinct from this
+ * process's when the program is built inside the daemon — one daemon serves
+ * both bins (`resolveBuildId` stats the same symlink target either way), so its
+ * own argv[1] is whichever bin happened to spawn it and is a coin flip for
+ * everybody else. Absent, this falls back to the running process's argv, which
+ * is correct for every in-process invocation.
+ */
+function resolveProgramName(bin: string | undefined): string {
+  const invoked = (bin ?? process.argv[1] ?? "").split(/[\\/]/).pop();
+  return invoked === "lw" ? "lw" : "langwatch";
+}
+
+export function buildProgram({ bin }: { bin?: string } = {}): Command {
   const program = new Command();
 
   program
-    // The package ships two bin names for the same bundle (see package.json):
-    // `lw` (the advertised name) and `langwatch` (the long-standing alias).
-    // Reflect whichever one was invoked in usage/help lines.
-    .name(process.argv[1]?.split(/[\\/]/).pop() === "lw" ? "lw" : "langwatch")
+    .name(resolveProgramName(bin))
     .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, suites, and more")
     .version(__CLI_VERSION__, "-v, --version", "Display the current version")
     .enablePositionalOptions()
@@ -2376,6 +2392,24 @@ export function buildProgram(): Command {
       return impl(runId, options);
     },
   );
+
+  // Ask the platform to open, in the user's browser, a resource this
+  // conversation already looked up. Carries only the resource's id — never
+  // an address; the platform resolves where it actually lives from the link
+  // it remembered surfacing. See specs/langy/langy-agent-driven-navigation.feature.
+  const navigateCmd = program
+    .command("navigate")
+    .description(
+      "Ask the platform to open a resource this conversation already looked up",
+    );
+
+  navigateCmd
+    .command("open <resourceId>")
+    .description("Open a previously looked-up resource by id")
+    .action(async (resourceId: string) => {
+      const { navigateOpenCommand: impl } = await import("./commands/navigate/open.js");
+      await impl(resourceId);
+    });
 
   // Add dataset command group
   const datasetCmd = program

@@ -174,7 +174,9 @@ describe("prompts.duplicate", () => {
           where: { configId: duplicate.id, projectId },
         });
         expect(versions).toHaveLength(1);
-        expect(versions[0]?.commitMessage).toBe('Duplicated from "support-bot"');
+        expect(versions[0]?.commitMessage).toBe(
+          'Duplicated from "support-bot"',
+        );
       });
 
       it("checks the prompt allowance the plan grants before duplicating", async () => {

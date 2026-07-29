@@ -9,21 +9,19 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useSession } from "~/utils/auth-client";
+import type { TeamUserRole } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
-import { Drawer } from "../../../components/ui/drawer";
-import { Select } from "../../../components/ui/select";
+import { useSession } from "~/utils/auth-client";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
 } from "../../../components/settings/ScopeChipPicker";
+import { Drawer } from "../../../components/ui/drawer";
+import { Select } from "../../../components/ui/select";
+import { getTeamRolePermissions } from "../../../server/api/rbac";
+import { computePermissionsFromSelections } from "../../../server/api-key/permission-categories";
 import type { RouterOutputs } from "../../../utils/api";
 import { api } from "../../../utils/api";
-import {
-  computePermissionsFromSelections,
-} from "../../../server/api-key/permission-categories";
-import { getTeamRolePermissions } from "../../../server/api/rbac";
-import { TeamUserRole } from "@prisma/client";
 import {
   PermissionCategoryList,
   PermissionCounter,
@@ -144,7 +142,8 @@ export function CreateApiKeyDrawer({
         organizationId,
         orgProjects,
         isServiceKey: keyType === "service",
-        getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
+        getTeamRolePermissions: (role) =>
+          getTeamRolePermissions(role as TeamUserRole),
       }),
     [
       myBindings.data,
@@ -195,8 +194,13 @@ export function CreateApiKeyDrawer({
 
     const bindings = selectedScopes.map((s) => ({
       role: deriveBindingRole({
-        permissionMode, scopeType: s.scopeType, scopeId: s.scopeId,
-        myBindings: myBindings.data, organizationId, orgProjects, isServiceKey,
+        permissionMode,
+        scopeType: s.scopeType,
+        scopeId: s.scopeId,
+        myBindings: myBindings.data,
+        organizationId,
+        orgProjects,
+        isServiceKey,
       }),
       scopeType: s.scopeType,
       scopeId: s.scopeId,
@@ -225,8 +229,12 @@ export function CreateApiKeyDrawer({
     permissionMode === "all" ||
     Object.values(categorySelections).some((v) => v !== "none");
 
-  const canCreate = name.trim() && !isCreating && !myBindings.isLoading && hasAnySelection
-    && (selectedScopes.length > 0 || !!currentProjectId);
+  const canCreate =
+    name.trim() &&
+    !isCreating &&
+    !myBindings.isLoading &&
+    hasAnySelection &&
+    (selectedScopes.length > 0 || !!currentProjectId);
 
   return (
     <Drawer.Root
@@ -299,8 +307,8 @@ export function CreateApiKeyDrawer({
                 )}
                 {keyType === "service" && (
                   <Text fontSize="xs" color="fg.muted">
-                    Not tied to any user. Cannot be revoked when a user
-                    leaves. Set permissions below.
+                    Not tied to any user. Cannot be revoked when a user leaves.
+                    Set permissions below.
                   </Text>
                 )}
               </VStack>
@@ -365,30 +373,34 @@ export function CreateApiKeyDrawer({
                 Permissions
               </Text>
               <HStack justify="space-between" width="full">
-              <SegmentGroup.Root
-                size="sm"
-                value={permissionMode}
-                onValueChange={(e) => {
-                  const mode = e.value as "all" | "restricted";
-                  setPermissionMode(mode);
-                  if (mode === "all") setCategorySelections({});
-                }}
-              >
-                <SegmentGroup.Indicator />
-                <SegmentGroup.Item value="all">
-                  <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
-                  <SegmentGroup.ItemHiddenInput />
-                </SegmentGroup.Item>
-                <SegmentGroup.Item value="restricted">
-                  <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
-                  <SegmentGroup.ItemHiddenInput />
-                </SegmentGroup.Item>
-              </SegmentGroup.Root>
-              {permissionMode === "restricted" && (
-                <PermissionCounter
-                  count={Object.values(categorySelections).filter((v) => v && v !== "none").length}
-                />
-              )}
+                <SegmentGroup.Root
+                  size="sm"
+                  value={permissionMode}
+                  onValueChange={(e) => {
+                    const mode = e.value as "all" | "restricted";
+                    setPermissionMode(mode);
+                    if (mode === "all") setCategorySelections({});
+                  }}
+                >
+                  <SegmentGroup.Indicator />
+                  <SegmentGroup.Item value="all">
+                    <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
+                    <SegmentGroup.ItemHiddenInput />
+                  </SegmentGroup.Item>
+                  <SegmentGroup.Item value="restricted">
+                    <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
+                    <SegmentGroup.ItemHiddenInput />
+                  </SegmentGroup.Item>
+                </SegmentGroup.Root>
+                {permissionMode === "restricted" && (
+                  <PermissionCounter
+                    count={
+                      Object.values(categorySelections).filter(
+                        (v) => v && v !== "none",
+                      ).length
+                    }
+                  />
+                )}
               </HStack>
 
               {permissionMode === "all" && (

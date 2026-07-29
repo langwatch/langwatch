@@ -88,6 +88,14 @@ Feature: Langy in-product AI assistant — baseline (v1)
     When I navigate to any "/[project]/*" route in project "demo"
     Then the Langy handle is not visible
 
+  # Nothing about the active project is known yet while it is still loading,
+  # so nothing about it can be compared against. That must not be treated as
+  # a reason to hide the handle for a rollout that already applies.
+  Scenario: The handle stays visible while the active project is still loading
+    Given Langy has been rolled out to my organization
+    When I navigate to any "/[project]/*" route before its project finishes loading
+    Then the Langy handle is visible
+
   # ============================================================================
   # Read-only tools (information retrieval)
   # ============================================================================

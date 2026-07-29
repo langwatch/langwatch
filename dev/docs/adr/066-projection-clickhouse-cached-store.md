@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 
-**Shipped** with this ADR's PR train: Pillar 1 adopter #1 — `codingAgentSession` read-back store, migration 00053; Pillar 2 adopter #1 — `recordTriggerMatch` append coalescing on the count+byte-bounded drain; the durable dedup watermark — migration 00054. Remaining follow-ups are tracked in *Adopters & sequencing*.
+**Shipped** with this ADR's PR train: Pillar 1 adopter #1 — `codingAgentSession` read-back store, migration 00053; Pillar 1 adopters #2 & #3 — the slim analytics folds `traceAnalytics` and `evaluationAnalytics` read-back stores, migration 00056 (the LAST two folds that refolded in steady state; `refoldOnStoreMiss` survives on all three read-back folds only as a version-gated transitional net — see *Adopters & sequencing*); Pillar 2 adopter #1 — `recordTriggerMatch` append coalescing on the count+byte-bounded drain; the durable dedup watermark — migrations 00054 (coding-agent) and 00056 (both analytics folds). Remaining follow-ups are tracked in *Adopters & sequencing*.
 
 **Re-affirms & hardens:** [ADR-007](./007-event-sourcing-architecture.md) §"Fold Projections", §"No Checkpoints" ("fold state = stored data"; "`store.get()` loads last state").
 
@@ -74,12 +74,14 @@ Idempotency is a **platform property**, not a per-fold concern: writes are full-
 
 What the contract removes:
 
-- **`refoldOnStoreMiss` is gone.** There is no store miss that returns null, so there is nothing to refold. A cache miss is a one-row ClickHouse read.
+- **A read-back fold's INSERT must fail on an unknown column.** The workers Deployment overrides its entrypoint and never runs migrations — they run during the app pod's boot, and the two Deployments roll concurrently — so a worker can write before the fold's own migration applies. ClickHouse defaults `input_format_skip_unknown_fields` ON and `wrapWithDefaultSettings` proxies only `.query`, so without an explicit `input_format_skip_unknown_fields: 0` that write returns HTTP 200 with the new columns dropped **and the row stamped at the current projection version**. It then passes the store's own version gate and decodes as all-defaults, which for these folds is not "empty" but actively wrong — and it is never rebuilt, because it wears the current stamp. The corruption launders itself past the gate that exists to reject it. Failing the insert instead makes the job retry on normal backoff and recover when the migration lands, matching the read half, whose `ORDER BY` references the new columns and already throws `UNKNOWN_IDENTIFIER` in the same window. (Omitting a column the table HAS is the opposite case and stays safe: that is an *omitted* field, governed by `input_format_defaults_for_omitted_fields`, so column defaults still apply.)
+
+- **`refoldOnStoreMiss` is gone from steady state.** A store that satisfies this contract returns state, so there is nothing to refold; a cache miss is a one-row ClickHouse read. It survives on exactly the three read-back folds above as a **version-gated transitional net**: a row written before its read-back columns existed decodes those columns as ClickHouse defaults that cannot be told apart from real values, so the store reports a miss and the aggregate refolds ONCE before being rewritten at the current version. It fires for old rows only, never in steady state, and is deletable once retention has aged those rows out (see *Adopters & sequencing*).
 - **`event_log` leaves the projection hot path entirely.** It is read only by the **replay tool** (ADR-015), for deliberate, offline projection-version migration or disaster recovery.
 - **Ordering is a property of the derivation, declared by the fold — not a cache knob.** Order-insensitive folds (accumulators, first-seen bounded sets, business-time step insertion) need no reprocessing. Order-dependent folds (state machines) encode monotonic transitions. Neither reaches for `event_log`.
 - **A store whose `get()` cannot return the state is not permitted.** The durable row must round-trip the fold's working state (this is ADR-007's "state = stored data"). A projection may *also* expose queryable analytics columns, but those ride alongside a lossless state; they never replace it.
 
-**Why this is "impossible to foul up":** a projection author supplies exactly two things — the derivation, and the state↔row mapping. They do **not** choose a store, a cache, a TTL, or a refold flag. There is one store, and there is no configuration surface on which to repeat the `codingAgentSession` mistake.
+**Why this is "impossible to foul up":** a projection author supplies exactly two things — the derivation, and the state↔row mapping. They do **not** choose a store, a cache, a TTL, or a refold flag. There is one store, and there is no configuration surface on which to repeat the `codingAgentSession` mistake. (The three read-back folds carry `refoldOnStoreMiss` today only as the version-gated transitional net described above — an artefact of their schema change, scheduled for removal, not a knob a new fold may reach for.)
 
 ## Pillar 2 — producer-side append coalescing
 
@@ -105,7 +107,7 @@ Coalescing is applied where fan-in is high, not everywhere — a producer mintin
 
 *(Read this section instead of the superseded ADRs. You do not need to reconstruct the history to understand the system.)*
 
-1. **We do not refold projection state from `event_log` on a cache miss.** *(Was: `refoldOnStoreMiss`.)* It replays the aggregate's whole history per miss; on large aggregates that is an unbounded, S3-walking read that starved ClickHouse merges and caused a platform-wide outage (2026-07-23). The store reads its own last committed state instead.
+1. **We do not refold projection state from `event_log` on a cache miss.** *(Was: `refoldOnStoreMiss`.)* It replays the aggregate's whole history per miss; on large aggregates that is an unbounded, S3-walking read that starved ClickHouse merges and caused a platform-wide outage (2026-07-23). The store reads its own last committed state instead. **The one sanctioned exception is a schema transition:** when a fold gains read-back columns, rows written before them decode as defaults indistinguishable from real values, so the store rejects them by projection version and the refold rebuilds each such aggregate once. That is a migration mechanism with a self-expiry, not a continuity mechanism — it is scoped to old rows, cannot fire in steady state, and comes out with them.
 2. **We do not refold on out-of-order delivery.** *(Was: `refoldOnOutOfOrder`, default-on.)* Ordering is handled in the derivation, not by replaying history — a no-op for order-insensitive folds, and encoded in transitions for order-dependent ones.
 3. **We do not allow a projection store whose `get()` returns null or cannot reconstruct its state.** *(Was: `codingAgentSession`'s lossy analytics row.)* It is exactly what forced (1) and (2). The durable row must round-trip the fold state; analytics columns are additive.
 4. **We do not aggregate projection state at read time in ClickHouse.** *(No `SummingMergeTree`/`AggregatingMergeTree` merging partial rows.)* The fold owns all aggregation in-process; ClickHouse stores the complete state, latest-version-wins. Read-time aggregation would return a merged partial that is **not** the fold's state, which breaks read-back.
@@ -145,7 +147,22 @@ Independently of the store: fix the **session = traceId fallback** so one large 
 ## Adopters & sequencing
 
 1. **Now (relief) — shipped:** `refoldOnOutOfOrder: false` on `codingAgentSession` — safe today (order-insensitive derivation), stops the replay storm. Small standalone PR.
-2. **Pillar 1, first adopter — shipped:** `codingAgentSession` → lossless read-back store (kills `refoldOnStoreMiss` on the hot path). The concrete shape is in *"codingAgentSession decomposition"* below. Then roll the same pattern to any other lossy-row fold. Migration is per-fold: until the last lossy-row fold adopts read-back (ADR-034's slim analytics folds are the remaining users), `refoldOnStoreMiss` / `refoldOnOutOfOrder` stay in the executor for those folds — the Rules below bind a fold from the moment it adopts, and the flags (with their executor support) are deleted with the final adopter.
+2. **Pillar 1, first adopter — shipped:** `codingAgentSession` → lossless read-back store (kills `refoldOnStoreMiss` on the hot path). The concrete shape is in *"codingAgentSession decomposition"* below. Then roll the same pattern to any other lossy-row fold. The row carries the `AppliedEventIds` durable watermark (migration 00054), bounded per row by an explicit `coalesceMaxBatch` (128) rather than the platform default, since for this fold the coalesce ceiling *is* the watermark size written into every superseded ClickHouse row version.
+
+   **This adopter carries the same schema-gated transitional net as #2 & #3, but its gate is NOT the version alone.** Its read-back columns (migrations 00053/00054) are only trustworthy on rows written after 00053 applied. A row older than that decodes with no sub-agent ids, no step start times, no metric series, no previous context size, and a zero checkpoint — which would collapse every metric-fed total (lines of code, commits, PRs, edit decisions, active time) to whatever series arrives next, reset the sub-agent count to one, leave later steps nothing but their arrival order to be placed by (the very failure the parallel `StepStartedAt` column exists to prevent), and read as "first model call ever" so the next cache rebuild goes uncounted.
+
+   Unlike #2 & #3, the projection version cannot separate those rows on its own. **00053 and 00054 shipped without bumping the stamp** (verified: the constant is `2026-07-21` at both merge commits and at their parents), so `2026-07-21` spans both sides of the column change: rows written since those migrations deployed carry it with every read-back column fully populated. Gating on `version === '2026-07-27'` alone would discard that whole live population and refold each session from full `event_log` history — a regression against the behaviour this ADR replaces, on the very aggregate class behind the 2026-07-23 outage.
+
+   The **discriminator is the version plus the `LastEventOccurredAt` checkpoint**: a row decodes when it carries `2026-07-27`, or `2026-07-21` with a non-zero checkpoint. That holds by construction, not by observation — `LastEventOccurredAt` arrived in 00053 with `DEFAULT 0`, `init()`s to 0, and is only ever `max(prev, occurredAt)` where the contribution schemas declare `occurredAt` a positive integer. It is therefore strictly positive on every row a build with the column wrote, and exactly 0 on every row that predates it. (It also has to be decoded as UTC — ClickHouse emits DateTime64 zone-less and V8 reads a bare datetime as local time, so west of UTC a pre-00053 row's `1970-01-01 00:00:00.000` reads positive. The repository parses all four of its DateTime64 columns through `parseClickHouseDateTimeMs`.) `refoldOnStoreMiss: true` is restored on the fold to catch the genuinely-undecodable rows; it refolds each such session ONCE before the rewrite carries it to the current version, and never fires in steady state.
+
+   **Deletion condition:** the same as for #2 & #3 — `refoldOnStoreMiss` (and its executor support) can be removed once `coding_agent_sessions` retention has aged out every row written before migration 00053, and the same holds for the analytics tables against 00056. **Checkable, not assumed:** `es_fold_refold_on_miss_total{projection_name, outcome="performed"}` counts exactly this path, so the condition is "the `performed` rate for the projection has been flat at zero for a full retention period", not "enough time has probably passed". Removing it earlier re-opens the defects above for any surviving old row. A `performed` rate that RISES rather than decays is the regression signal — it means misses are being served by `event_log` again, which is the pre-ADR-066 steady state and the shape of the 2026-07-23 outage.
+   - **Pillar 1, adopters #2 & #3 — shipped:** ADR-034's slim analytics folds, `traceAnalytics` (`trace_analytics`) and `evaluationAnalytics` (`evaluation_analytics`), migration 00056. These were the last two folds that refolded `event_log` on the delivery path (observed cold-scanning S3 partitions continuously in prod worker logs, 2026-07-24 — the same pattern as the 2026-07-23 outage). Each now reads its own last committed row back via typed read-back columns: `traceAnalytics` persists the span count, the annotation id set, the four name-resolution bookkeeping fields, and the out-of-order checkpoint, and re-injects the hoisted dimensions into the trimmed attribute map on decode; `evaluationAnalytics` persists the started/completed lifecycle operands `DurationMs` is derived from. Both carry the `AppliedEventIds` durable watermark, bounded per row by an explicit `coalesceMaxBatch` (128) rather than the platform default, since for these folds the coalesce ceiling *is* the watermark size written into every superseded ClickHouse row version.
+
+     **`refoldOnStoreMiss` is NOT yet deletable; these two are its remaining adopters alongside `codingAgentSession` (see #1 above, which carries the identical net for the identical reason).** The read-back columns are only trustworthy on rows the new build wrote: every pre-existing row decodes with `SpanCount` 0, no annotation ids, no root claimed, and all three name-resolution booleans false — which would let one late non-root span overwrite a user-renamed trace, freeze a fallback-named trace against a real root, reset the `MAX_PROCESSED_SPANS` cap so committed cost/tokens are counted twice, and (on the eval side) compute a zero duration over a real one. So both folds' **projection version is the discriminator**: bumped to `2026-07-27` with the row-shape change (which is what the stamp records — ADR-021/022), and each store's read-back path decodes a row only at that version, reporting any other stamp as a store miss. `refoldOnStoreMiss: true` is restored on both folds to catch exactly those misses.
+
+     This is cheap and self-expiring: in steady state every row carries the current version, `get()` hits, and nothing refolds; a pre-existing row refolds exactly ONCE, on its next event, and is rewritten at the new version — so the population self-heals per aggregate with no backfill migration. It also closes the second gap the read-back PR opened: a state carrying only topic/annotation/name signal fails the store's persistable-signal predicate and writes no row at all, so before the gate it lived in Redis alone and was lost on eviction; now the missing row *is* a store miss and the refold rebuilds the signal from `event_log`.
+
+     **Deletion condition:** `refoldOnStoreMiss` (and its executor support) can be removed once `trace_analytics` and `evaluation_analytics` retention has aged out every row written before migration 00056 — and `coding_agent_sessions` likewise every row written before 00053 — i.e. one full retention period after the deploy that carries the `2026-07-27` stamp, observed as a flat-zero `es_fold_refold_on_miss_total{outcome="performed"}` for each projection rather than inferred from the calendar. Removing it earlier re-opens the defects above for any surviving old row. `refoldOnOutOfOrder` is independent of this and can be deleted on its own schedule.
 3. **Pillar 2, first adopter — shipped:** append coalescing for `recordTriggerMatch` (`processCommandBatch` → one multi-row insert; the drain bounds by count AND bytes for every coalescing consumer). **Remaining:** audit other high-fan-in `event_log` producers and coalesce them — serialized command producers registering without coalescing are logged at registration, so the gaps are enumerable.
 4. **Durable dedup watermark — shipped:** the applied-event-id set persists next to the state row (`AppliedEventIds`, migration 00054) and the executor commits the union of the loaded set and the fresh ids on retries, so "throw-and-retry" stays idempotent across cache loss for read-back folds. Folds without a durable set keep the cache-only behaviour.
 
@@ -167,6 +184,8 @@ The real gap between `CodingAgentSessionState` and the persisted row is five thi
 
 - **Step 1 (this PR — the outage fix): persist the `metricSeries` map as a bounded typed column** (`Array(Tuple(seriesId, metricName, type, decision, language, value))`, bounded at `MAX_METRIC_SERIES = 200`). On read-back, restoring the map makes the pure `recomputeMetricOverlay` reproduce all nine fields for free — so `get()` becomes lossless with **zero read-path change**. This closes the outage (kills `refoldOnStoreMiss`/`refoldOnOutOfOrder`) without touching any read consumer or SQL. It is transitional: the map is persisted so the fold round-trips *today*.
 - **Step 2 (follow-up — the subtraction): remove `metricSeries` + `recomputeMetricOverlay` + the nine columns from the fold**, and serve the nine values from `session_metric_series`. An application-level overlay **already exists** — `CodingAgentSessionService.withMetricTotals` merges the series read into `getBySessionId`/`listRecent` in TS today (for tokens/cost only). Extending it to the nine fields also means extending the series read (`findTotalsBySessionIds`), which currently buckets only by `Attributes['type']`, to also bucket by `decision` and `language`. Only two surfaces read these fields — `SessionView` (7 of them, single-session) and the `/me` usage card (4 of them, list-reduced) — and the list path already batches one `findTotalsBySessionIds` per scan, so no keyed rollup table is needed for correctness. This step is number-changing and gets its own validation against the current folded values; a keyed **rollup projection** (ADR-034 pattern) is the fallback only if the extended overlay's read cost proves it.
+
+**One hazard for whoever implements step 2, recorded because it is the obvious wrong way to do it.** The embedded map must **not** be replaced by having the fold read `session_metric_series` back on the delivery path. That makes one projection's hot path depend on another projection's write having landed, and a not-yet-visible series silently reconstructs state with that series *missing* — which, because the overlay **replaces** per series rather than incrementing, regresses the metric-fed fields to zero and then rewrites them. Step 2 as scoped above does not do this: it removes the nine fields from the fold entirely, so the fold stops needing the map at all. Any shortcut that reads the map back mid-fold should be rejected.
 
 Net (step 1): the session fold becomes round-trippable by construction (typed columns, no blob, no exotic type; the metric map persisted as a bounded typed column), `get()` reads its own last row via `fromRow`, and `refoldOnStoreMiss`/`refoldOnOutOfOrder` are deleted — the outage class is closed. Supersedes the bespoke read-back of PR #6081, which hand-rolled recovery inside the projection's own store instead of using the platform store. Step 2 then removes the last duplicated aggregate once its read-path move is validated.
 
@@ -192,6 +211,47 @@ Recorded here so the application-side and server-side levers are visible togethe
 - Folds declare their ordering contract. `event_log` is never read on the delivery path — only by the replay tool, for version migration or recovery.
 - Redelivery dedup travels with the state (applied-event-id set, reset on each fresh delivery, bounded to the in-flight batch) — and, for read-back folds, persists durably next to the state row (migration 00054), so it survives cache loss.
 - **High-fan-in `event_log` producers coalesce their appends** — a batched multi-row insert per drained batch, not one insert per item. A producer where a single aggregate can mint events faster than they drain, and does not coalesce, is a part-buildup regression. Any cap on coalescing coverage is logged, not silent.
+
+## Deploying an adopter: the rollout window fails loudly and retries
+
+A read-back adopter's migration is a migration like any other: it runs when
+migrations run. `clickhouse:migrate` runs from `start:prepare:db` on the app
+pod's entrypoint; the workers Deployment runs `start:workers`. The two roll
+concurrently, so for the length of a rollout new worker code can fold against
+the old schema.
+
+Both halves then fail, deliberately:
+
+- **reads** order by columns the migration adds, so the query throws
+  `UNKNOWN_IDENTIFIER`;
+- **writes** carry `input_format_skip_unknown_fields: 0`, so the insert is
+  rejected rather than silently dropping the new columns.
+
+Failing loudly is the correct behaviour and must not be softened. The
+alternative — letting ClickHouse drop unknown columns — writes a row stamped at
+the *current* projection version with the new columns defaulted, which then
+passes the version gate and decodes as real state. That corruption launders
+itself past the very gate that exists to reject it, and nothing later rebuilds
+it. A retry storm is recoverable; that is not.
+
+Nothing further is needed, because the failure is self-limiting: jobs retry on
+the shared platform budget (25 attempts, ≈2h27m) and recover the moment the
+migration lands, which is what a retrying queue is for. `es_fold_projection_total{status="failed"}`
+shows the window if anyone wants to watch it.
+
+### A version bump re-folds during the rollout
+
+The gate is strict equality, so an old pod reading a row stamped by a new
+pod reports `undecodable` and re-folds it — and each side rewrites at its own stamp,
+so the other refuses it again until the fleet has cycled. That is inherent: an
+old build cannot be taught a stamp that did not exist when it was compiled.
+`es_fold_refold_on_miss_total{outcome="performed"}` rises for the window and
+settles afterwards.
+
+Do not soften the gate to avoid it. A build that decodes a row it does not
+understand writes a current-stamped partial state over a complete one, and that
+corruption is undetectable afterwards — which is why the executor refuses to
+fold onto an empty state when a row was found, refused, and has no re-fold path.
 
 ## References
 

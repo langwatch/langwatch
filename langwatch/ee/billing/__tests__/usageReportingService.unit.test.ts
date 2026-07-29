@@ -1,3 +1,4 @@
+import type { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StripeUsageReportingService } from "../services/usageReportingService";
 
@@ -128,7 +129,7 @@ describe("usageReportingService", () => {
             type: "StripeInvalidRequestError",
             rawType: "invalid_request_error",
             code: "resource_already_exists",
-          })
+          }),
         );
 
         const results = await service.reportUsageDelta({
@@ -155,7 +156,7 @@ describe("usageReportingService", () => {
             rawType: "invalid_request_error",
             code: "meter_not_found",
             message: "No such meter",
-          })
+          }),
         );
 
         const results = await service.reportUsageDelta({
@@ -182,7 +183,7 @@ describe("usageReportingService", () => {
             type: "StripeAuthenticationError",
             rawType: "authentication_error",
             message: "Invalid API Key",
-          })
+          }),
         );
 
         const results = await service.reportUsageDelta({
@@ -216,7 +217,7 @@ describe("usageReportingService", () => {
             stripeCustomerId: "cus_abc123",
             organizationId: "org_1",
             events: [makeEvent()],
-          })
+          }),
         ).rejects.toThrow("Rate limit exceeded");
       });
     });
@@ -228,7 +229,7 @@ describe("usageReportingService", () => {
             stripeCustomerId: "invalid",
             organizationId: "org_1",
             events: [makeEvent()],
-          })
+          }),
         ).rejects.toThrow();
       });
 
@@ -238,7 +239,7 @@ describe("usageReportingService", () => {
             stripeCustomerId: "cus_abc123",
             organizationId: "org_1",
             events: [],
-          })
+          }),
         ).rejects.toThrow();
       });
 
@@ -248,7 +249,7 @@ describe("usageReportingService", () => {
             stripeCustomerId: "cus_abc123",
             organizationId: "org_1",
             events: [makeEvent({ value: -1 })],
-          })
+          }),
         ).rejects.toThrow();
       });
     });
@@ -278,13 +279,14 @@ describe("usageReportingService", () => {
           startTime: 1708300800,
           endTime: 1708387200,
         });
-        expect(
-          stripe.billing.meters.listEventSummaries
-        ).toHaveBeenCalledWith("mtr_test_abc123", {
-          customer: "cus_abc123",
-          start_time: 1708300800,
-          end_time: 1708387200,
-        });
+        expect(stripe.billing.meters.listEventSummaries).toHaveBeenCalledWith(
+          "mtr_test_abc123",
+          {
+            customer: "cus_abc123",
+            start_time: 1708300800,
+            end_time: 1708387200,
+          },
+        );
       });
     });
 
@@ -309,13 +311,44 @@ describe("usageReportingService", () => {
     });
 
     describe("when Stripe returns StripeInvalidRequestError", () => {
-      it("re-throws the error", async () => {
+      it("raises usage_report_failed with the provider error masked", async () => {
         stripe.billing.meters.listEventSummaries.mockRejectedValue(
           makeStripeError({
             type: "StripeInvalidRequestError",
             rawType: "invalid_request_error",
             message: "No such meter",
+          }),
+        );
+
+        const raised = await service
+          .getUsageSummary({
+            stripeCustomerId: "cus_abc123",
+            startTime: 1708300800,
+            endTime: 1708387200,
           })
+          .catch((error: unknown) => error);
+
+        expect(raised).toMatchObject({
+          code: "usage_report_failed",
+          fault: "platform",
+        });
+        // The provider's own sentence must not survive into the payload a
+        // client reads — an unhandled reason serialises as "unknown".
+        expect((raised as HandledError).serialize().reasons).toEqual([
+          { code: "unknown", kind: "unknown" },
+        ]);
+        expect((raised as Error).message).not.toContain("No such meter");
+      });
+    });
+
+    describe("when Stripe returns StripeAuthenticationError", () => {
+      it("raises usage_report_failed", async () => {
+        stripe.billing.meters.listEventSummaries.mockRejectedValue(
+          makeStripeError({
+            type: "StripeAuthenticationError",
+            rawType: "authentication_error",
+            message: "Invalid API key provided: sk_live_xxx",
+          }),
         );
 
         await expect(
@@ -323,8 +356,23 @@ describe("usageReportingService", () => {
             stripeCustomerId: "cus_abc123",
             startTime: 1708300800,
             endTime: 1708387200,
-          })
-        ).rejects.toThrow("No such meter");
+          }),
+        ).rejects.toMatchObject({ code: "usage_report_failed" });
+      });
+    });
+
+    describe("when the Stripe call fails for a reason we cannot name", () => {
+      it("re-throws it untouched so it degrades to unknown and stays retryable", async () => {
+        const blip = new Error("socket hang up");
+        stripe.billing.meters.listEventSummaries.mockRejectedValue(blip);
+
+        await expect(
+          service.getUsageSummary({
+            stripeCustomerId: "cus_abc123",
+            startTime: 1708300800,
+            endTime: 1708387200,
+          }),
+        ).rejects.toBe(blip);
       });
     });
 
@@ -335,7 +383,7 @@ describe("usageReportingService", () => {
             stripeCustomerId: "invalid",
             startTime: 1708300800,
             endTime: 1708387200,
-          })
+          }),
         ).rejects.toThrow();
       });
 
@@ -345,7 +393,7 @@ describe("usageReportingService", () => {
             stripeCustomerId: "cus_abc123",
             startTime: 1708387200,
             endTime: 1708300800,
-          })
+          }),
         ).rejects.toThrow();
       });
     });
@@ -377,7 +425,7 @@ describe("usageReportingService", () => {
         expect(stripe.billing.meterEvents.create).toHaveBeenCalledWith(
           expect.objectContaining({
             payload: expect.objectContaining({ value: "50" }),
-          })
+          }),
         );
       });
     });
@@ -455,7 +503,7 @@ describe("usageReportingService", () => {
         expect(stripe.billing.meterEvents.create).toHaveBeenCalledWith(
           expect.objectContaining({
             payload: expect.objectContaining({ value: "200" }),
-          })
+          }),
         );
       });
     });

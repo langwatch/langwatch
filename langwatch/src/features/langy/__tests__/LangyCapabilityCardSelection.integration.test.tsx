@@ -21,7 +21,7 @@
  *
  * Spec: specs/langy/langy-capability-cards.feature
  *       "The card a result was stamped with is the card that renders"
- * ADR:  dev/docs/adr/059-card-selection-is-deterministic.md
+ * ADR:  dev/docs/adr/079-card-selection-is-deterministic.md
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { toCliToolResult } from "@langwatch/langy";
@@ -140,7 +140,9 @@ function settledCall({
   };
 }
 
-function renderCall(call: Parameters<typeof LangyCapabilityRenderer>[0]["call"]) {
+function renderCall(
+  call: Parameters<typeof LangyCapabilityRenderer>[0]["call"],
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });

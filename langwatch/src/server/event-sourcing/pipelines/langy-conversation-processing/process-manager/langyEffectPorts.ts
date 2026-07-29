@@ -12,14 +12,10 @@ import type {
   LangyTurnHandoffStore,
 } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { LangyFailTurnCommandPort } from "~/server/app-layer/langy/subscribers/agent-turn-liveness.subscriber";
-import type { IntentHandler } from "~/server/event-sourcing/process-manager";
 
-import {
-  LANGY_PROCESS_INTENT_TYPES,
-  type LangyGenerateTitleIntent,
-  type LangyWorkerDispatchIntent,
-  langyGenerateTitleIntentSchema,
-  langyWorkerDispatchIntentSchema,
+import type {
+  LangyGenerateTitleIntent,
+  LangyWorkerDispatchIntent,
 } from "./langyConversationProcess.types";
 
 const logger = createLogger("langwatch:langy:process-effects");

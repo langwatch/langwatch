@@ -42,7 +42,9 @@ export function LangyFailureReference({
         size="2xs"
         variant="ghost"
         color={copied ? "green.fg" : "fg.subtle"}
-        aria-label={copied ? "Copied the error details" : "Copy the error details"}
+        aria-label={
+          copied ? "Copied the error details" : "Copy the error details"
+        }
         onClick={() => copy(raw ?? code)}
       >
         {copied ? (

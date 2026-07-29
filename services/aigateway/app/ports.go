@@ -73,6 +73,13 @@ type MetricsRecorder interface {
 	RecordCacheOutcome(usage domain.Usage)
 	RecordCacheRuleHit(ruleID, mode string)
 
+	// RecordBudgetBlock counts a request rejected on budget. The budget
+	// checker counts the plain blocks it decides itself; this port entry
+	// exists for the one budget rejection only the app layer can see:
+	// provider-filtered exclusions emptying the candidate chain, which is
+	// decided at dispatch, after the checker has already answered.
+	RecordBudgetBlock(scope string)
+
 	// SetRequestLabels hands the resolved provider and model back to the
 	// transport layer, which cannot see them: routing and model resolution
 	// both happen after the HTTP middleware has already been entered.

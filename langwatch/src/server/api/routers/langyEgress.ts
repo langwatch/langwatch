@@ -1,5 +1,5 @@
 /**
- * tRPC router for the per-project Langy egress allow-list (ADR-043).
+ * tRPC router for the per-project Langy egress allow-list (ADR-076).
  *
  *   get — the current allow-list for the settings editor. `null` means the
  *         project is in monitor-only mode (watch, never block).
@@ -28,16 +28,13 @@
 
 import { z } from "zod";
 import { checkProjectPermission } from "~/server/api/rbac";
-import { auditLog } from "~/server/auditLog";
 import {
-  langyEgressAllowlistSchema,
   LangyCredentialService,
+  langyEgressAllowlistSchema,
 } from "~/server/app-layer/langy/LangyCredentialService";
+import { auditLog } from "~/server/auditLog";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
-  enforceLangyAccess,
-  refuseDemoProject,
-} from "./langyAccessMiddleware";
+import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 
 export const langyEgressRouter = createTRPCRouter({
   get: protectedProcedure

@@ -49,12 +49,14 @@ vi.mock("~/features/langy/stores/langyStore", () => {
     askLangy: langyMock.ask,
     openPanel: langyMock.open,
     attachContext: langyMock.attach,
+    // `seedDraft` reads `draft.trim()` before writing (ADR-058), so the
+    // no-typed-text path throws on an undefined draft and never reaches
+    // `attachContext`. The store really does carry both.
     draft: langyMock.draft,
     setDraft: langyMock.setDraft,
   });
-  const useLangyStore = (
-    selector: (s: ReturnType<typeof state>) => unknown,
-  ) => selector(state());
+  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
+    selector(state());
   useLangyStore.getState = state;
   return { useLangyStore };
 });
@@ -243,9 +245,7 @@ describe("<SearchBar /> ask affordance", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Ask Langy" }));
 
-        expect(
-          screen.getByText(/Goes with your question/),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/Goes with your question/)).toBeInTheDocument();
       });
     });
 

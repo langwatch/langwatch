@@ -1,6 +1,6 @@
-import type { FilterField } from "./types";
-import { availableFilters } from "./registry";
 import type { CheckPreconditionRule } from "../evaluations/types";
+import { availableFilters } from "./registry";
+import type { FilterField } from "./types";
 
 // ---------------------------------------------------------------------------
 // PreconditionTraceData — unified trace data for in-memory matching

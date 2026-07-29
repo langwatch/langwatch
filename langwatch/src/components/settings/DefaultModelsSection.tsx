@@ -45,7 +45,7 @@ import {
 import type React from "react";
 import { useMemo, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
-
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -145,12 +145,9 @@ export function DefaultModelsSection({
         meta: { closable: true },
       });
     } catch (err) {
-      toaster.create({
-        title: "Failed to delete",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 6000,
-        meta: { closable: true },
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't remove the default model",
       });
     }
   };

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "../../schemas/spans";
-import { SpanCostService } from "../services/span-cost.service";
 import {
   aggregateScenarioRoleMetrics,
   deriveScenarioRoleMetricsFromSpans,
   type ScenarioRoleSpanInput,
 } from "../services/scenario-role-metrics.derivation";
+import { SpanCostService } from "../services/span-cost.service";
 import { createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 /**
@@ -57,8 +57,20 @@ describe("aggregateScenarioRoleMetrics", () => {
   describe("given a non-scenario trace (no role-bearing spans)", () => {
     it("returns empty cost and latency maps", () => {
       const inputs: ScenarioRoleSpanInput[] = [
-        { spanId: "a", parentSpanId: null, role: undefined, cost: 0.5, durationMs: 100 },
-        { spanId: "b", parentSpanId: "a", role: undefined, cost: 0.5, durationMs: 100 },
+        {
+          spanId: "a",
+          parentSpanId: null,
+          role: undefined,
+          cost: 0.5,
+          durationMs: 100,
+        },
+        {
+          spanId: "b",
+          parentSpanId: "a",
+          role: undefined,
+          cost: 0.5,
+          durationMs: 100,
+        },
       ];
 
       expect(aggregateScenarioRoleMetrics(inputs)).toEqual({
@@ -71,8 +83,20 @@ describe("aggregateScenarioRoleMetrics", () => {
   describe("given a child LLM span under a role-bearing agent span", () => {
     it("attributes the child cost to the ancestor's role", () => {
       const inputs: ScenarioRoleSpanInput[] = [
-        { spanId: "agent", parentSpanId: null, role: "assistant", cost: 0, durationMs: 3000 },
-        { spanId: "llm", parentSpanId: "agent", role: undefined, cost: 0.42, durationMs: 2000 },
+        {
+          spanId: "agent",
+          parentSpanId: null,
+          role: "assistant",
+          cost: 0,
+          durationMs: 3000,
+        },
+        {
+          spanId: "llm",
+          parentSpanId: "agent",
+          role: undefined,
+          cost: 0.42,
+          durationMs: 2000,
+        },
       ];
 
       expect(aggregateScenarioRoleMetrics(inputs)).toEqual({
@@ -85,9 +109,27 @@ describe("aggregateScenarioRoleMetrics", () => {
   describe("given deeply nested spans under a role", () => {
     it("propagates the role transitively to all descendants", () => {
       const inputs: ScenarioRoleSpanInput[] = [
-        { spanId: "agent", parentSpanId: null, role: "user", cost: 0, durationMs: 1000 },
-        { spanId: "gen", parentSpanId: "agent", role: undefined, cost: 0.1, durationMs: 500 },
-        { spanId: "doGen", parentSpanId: "gen", role: undefined, cost: 0.2, durationMs: 300 },
+        {
+          spanId: "agent",
+          parentSpanId: null,
+          role: "user",
+          cost: 0,
+          durationMs: 1000,
+        },
+        {
+          spanId: "gen",
+          parentSpanId: "agent",
+          role: undefined,
+          cost: 0.1,
+          durationMs: 500,
+        },
+        {
+          spanId: "doGen",
+          parentSpanId: "gen",
+          role: undefined,
+          cost: 0.2,
+          durationMs: 300,
+        },
       ];
 
       const { scenarioRoleCosts } = aggregateScenarioRoleMetrics(inputs);
@@ -99,10 +141,34 @@ describe("aggregateScenarioRoleMetrics", () => {
   describe("given two roles in one trace", () => {
     it("sums cost under each span's nearest role ancestor", () => {
       const inputs: ScenarioRoleSpanInput[] = [
-        { spanId: "user", parentSpanId: null, role: "user", cost: 0, durationMs: 1000 },
-        { spanId: "userLlm", parentSpanId: "user", role: undefined, cost: 1, durationMs: 500 },
-        { spanId: "asst", parentSpanId: null, role: "assistant", cost: 0, durationMs: 2000 },
-        { spanId: "asstLlm", parentSpanId: "asst", role: undefined, cost: 3, durationMs: 800 },
+        {
+          spanId: "user",
+          parentSpanId: null,
+          role: "user",
+          cost: 0,
+          durationMs: 1000,
+        },
+        {
+          spanId: "userLlm",
+          parentSpanId: "user",
+          role: undefined,
+          cost: 1,
+          durationMs: 500,
+        },
+        {
+          spanId: "asst",
+          parentSpanId: null,
+          role: "assistant",
+          cost: 0,
+          durationMs: 2000,
+        },
+        {
+          spanId: "asstLlm",
+          parentSpanId: "asst",
+          role: undefined,
+          cost: 3,
+          durationMs: 800,
+        },
       ];
 
       expect(aggregateScenarioRoleMetrics(inputs)).toEqual({
@@ -115,7 +181,13 @@ describe("aggregateScenarioRoleMetrics", () => {
   describe("given a span whose parent is missing from the trace", () => {
     it("does not assign a role and terminates without recursing", () => {
       const inputs: ScenarioRoleSpanInput[] = [
-        { spanId: "orphan", parentSpanId: "not-in-trace", role: undefined, cost: 5, durationMs: 100 },
+        {
+          spanId: "orphan",
+          parentSpanId: "not-in-trace",
+          role: undefined,
+          cost: 5,
+          durationMs: 100,
+        },
       ];
 
       expect(aggregateScenarioRoleMetrics(inputs)).toEqual({
@@ -128,8 +200,20 @@ describe("aggregateScenarioRoleMetrics", () => {
   describe("given a parent cycle (malformed parent links)", () => {
     it("terminates instead of recursing forever", () => {
       const inputs: ScenarioRoleSpanInput[] = [
-        { spanId: "a", parentSpanId: "b", role: undefined, cost: 1, durationMs: 10 },
-        { spanId: "b", parentSpanId: "a", role: undefined, cost: 1, durationMs: 10 },
+        {
+          spanId: "a",
+          parentSpanId: "b",
+          role: undefined,
+          cost: 1,
+          durationMs: 10,
+        },
+        {
+          spanId: "b",
+          parentSpanId: "a",
+          role: undefined,
+          cost: 1,
+          durationMs: 10,
+        },
       ];
 
       expect(aggregateScenarioRoleMetrics(inputs)).toEqual({
@@ -153,8 +237,14 @@ describe("deriveScenarioRoleMetricsFromSpans", () => {
 
   describe("when spans arrive in any order", () => {
     it("produces the same result (operates over the complete set)", () => {
-      const a = deriveScenarioRoleMetricsFromSpans({ spans: inOrder, spanCostService });
-      const b = deriveScenarioRoleMetricsFromSpans({ spans: outOfOrder, spanCostService });
+      const a = deriveScenarioRoleMetricsFromSpans({
+        spans: inOrder,
+        spanCostService,
+      });
+      const b = deriveScenarioRoleMetricsFromSpans({
+        spans: outOfOrder,
+        spanCostService,
+      });
       expect(a).toEqual(b);
     });
   });

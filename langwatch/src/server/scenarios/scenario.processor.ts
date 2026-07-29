@@ -19,7 +19,6 @@ import { env } from "~/env.mjs";
 import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
 import {
   createContextFromJobData,
-  getJobContextMetadata,
   type JobContextMetadata,
   runWithContext,
 } from "../context/asyncContext";

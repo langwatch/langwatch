@@ -24,13 +24,12 @@ import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import {
   RecordClusteringRunCompletedCommand,
-  RecordClusteringRunStartedCommand,
   RecordClusteringRunFailedCommand,
+  RecordClusteringRunStartedCommand,
   RecordTopicsCommand,
-  recordTopicsDedupeId,
   RequestTopicClusteringCommand,
+  recordTopicsDedupeId,
 } from "./commands";
-import { TOPIC_CLUSTERING_EVENT_TYPES } from "./schemas/constants";
 import {
   type TopicClusteringRunHistoryData,
   TopicClusteringRunHistoryFoldProjection,
@@ -43,6 +42,7 @@ import {
   type TopicModelData,
   TopicModelFoldProjection,
 } from "./projections/topicModel.foldProjection";
+import { TOPIC_CLUSTERING_EVENT_TYPES } from "./schemas/constants";
 import type { TopicClusteringProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
@@ -144,7 +144,10 @@ export function createTopicClusteringProcessingPipeline(
       new TopicModelFoldProjection({ store: deps.topicModelStore }),
     )
     .withCommand("requestClustering", RequestTopicClusteringCommand)
-    .withCommand("recordClusteringRunStarted", RecordClusteringRunStartedCommand)
+    .withCommand(
+      "recordClusteringRunStarted",
+      RecordClusteringRunStartedCommand,
+    )
     .withCommand(
       "recordClusteringRunCompleted",
       RecordClusteringRunCompletedCommand,

@@ -91,7 +91,7 @@ describe("Span Integration Tests", () => {
   });
 
   describe("data format serialization", () => {
-    it("should serialize complex input/output data correctly", async () => {
+    it("serializes complex input/output data correctly", async () => {
       const tracer = getLangWatchTracer("data-serialization-test");
 
       await tracer.withActiveSpan("complex-data-test", async (span) => {
@@ -141,7 +141,7 @@ describe("Span Integration Tests", () => {
       expect(outputData.value.timing.latencyMs).toBe(1333);
     });
 
-    it("should handle edge cases in data serialization", async () => {
+    it("handles edge cases in data serialization", async () => {
       const tracer = getLangWatchTracer("edge-cases-test");
 
       const edgeCaseData = {
@@ -204,7 +204,7 @@ describe("Span Integration Tests", () => {
       expect(inputData.value.nestedEmpty.level1.level2.level3).toEqual([]);
     });
 
-    it("should properly format string vs JSON inputs", async () => {
+    it("properly formats string vs JSON inputs", async () => {
       const tracer = getLangWatchTracer("format-comparison-test");
 
       const testString = "This is a plain text input with special chars: 🎯";
@@ -273,7 +273,7 @@ describe("Span Integration Tests", () => {
       expect(objectOutputData.value.original.text).toBe(testString);
     });
 
-    it("should maintain consistent JSON serialization formats across all data types", async () => {
+    it("maintains consistent JSON serialization formats across all data types", async () => {
       const tracer = getLangWatchTracer("comprehensive-serialization-test");
 
       const comprehensiveTestData = {
@@ -362,7 +362,7 @@ describe("Span Integration Tests", () => {
   });
 
   describe("attributes and metadata", () => {
-    it("should handle RAG context data correctly", async () => {
+    it("handles RAG context data correctly", async () => {
       const tracer = getLangWatchTracer("rag-context-test");
 
       const singleContext = {
@@ -438,7 +438,7 @@ describe("Span Integration Tests", () => {
       expect(multipleRagData[2].document_id).toBe("doc-003");
     });
 
-    it("should handle metrics data with various number types", async () => {
+    it("handles metrics data with various number types", async () => {
       const tracer = getLangWatchTracer("metrics-test");
 
       const metricsData = {
@@ -471,7 +471,7 @@ describe("Span Integration Tests", () => {
       expect(parsedMetrics.value.customMetric).toBe(42);
     });
 
-    it("should set model attributes correctly", async () => {
+    it("sets model attributes correctly", async () => {
       const tracer = getLangWatchTracer("model-attributes-test");
 
       await tracer.withActiveSpan("model-span", async (span) => {
@@ -500,7 +500,7 @@ describe("Span Integration Tests", () => {
   });
 
   describe("span lifecycle integration", () => {
-    it("should properly handle manual span lifecycle", () => {
+    it("properly handles manual span lifecycle", () => {
       const tracer = getLangWatchTracer("manual-lifecycle-test");
 
       // Create span manually
@@ -529,7 +529,7 @@ describe("Span Integration Tests", () => {
       expect(context.traceFlags).toBeDefined();
     });
 
-    it("should support fluent chaining", async () => {
+    it("supports fluent chaining", async () => {
       const tracer = getLangWatchTracer("fluent-chaining-test");
 
       await tracer.withActiveSpan("fluent-span", async (span) => {
@@ -573,7 +573,7 @@ describe("Span Integration Tests", () => {
   });
 
   describe("error handling and edge cases", () => {
-    it("should handle invalid data gracefully", async () => {
+    it("handles invalid data gracefully", async () => {
       const tracer = getLangWatchTracer("invalid-data-test");
 
       await tracer.withActiveSpan("invalid-data-span", async (span) => {
@@ -601,7 +601,7 @@ describe("Span Integration Tests", () => {
       expect(inputData.value).toBe("Valid input");
     });
 
-    it("should handle span status transitions correctly", async () => {
+    it("handles span status transitions correctly", async () => {
       const tracer = getLangWatchTracer("status-transitions-test");
 
       const span = tracer.startSpan("status-test-span");

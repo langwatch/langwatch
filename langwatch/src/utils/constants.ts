@@ -64,4 +64,7 @@ export const KSUID_RESOURCES = {
   TOPIC_CLUSTERING_RUN: "topicrun",
   TOPIC_CLUSTERING_RUN_HISTORY: "topicrunhist",
   TOPIC_MODEL_PROJECTION: "topicmodel",
+  PROCESS_MANAGER_INSTANCE: "pminstance",
+  PROCESS_MANAGER_INBOX: "pminbox",
+  PROCESS_MANAGER_OUTBOX: "pmoutbox",
 } as const;

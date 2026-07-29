@@ -84,9 +84,7 @@ describe("NoModelsConfiguredCallout", () => {
 
   it("includes the surface-specific label when forFeatureLabel is provided", () => {
     render(
-      withProviders(
-        <NoModelsConfiguredCallout forFeatureLabel="evaluators" />,
-      ),
+      withProviders(<NoModelsConfiguredCallout forFeatureLabel="evaluators" />),
     );
     expect(
       screen.getByText(/No models configured for evaluators/i),

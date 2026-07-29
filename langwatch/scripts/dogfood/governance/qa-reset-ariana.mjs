@@ -14,14 +14,24 @@ if (!user) {
 
 // password lives on Account row for credentials provider
 const accounts = await prisma.account.findMany({ where: { userId: user.id } });
-console.log("accounts:", accounts.map(a => ({ provider: a.provider, type: a.type })));
+console.log(
+  "accounts:",
+  accounts.map((a) => ({ provider: a.provider, type: a.type })),
+);
 
-const cred = accounts.find(a => a.type === "credential" || a.provider === "credential");
-if (!cred) { console.error("no credential account"); process.exit(1); }
+const cred = accounts.find(
+  (a) => a.type === "credential" || a.provider === "credential",
+);
+if (!cred) {
+  console.error("no credential account");
+  process.exit(1);
+}
 await prisma.account.update({
   where: { id: cred.id },
   data: { password: hash },
 });
 console.log("updated account.password");
-console.log(JSON.stringify({ ok: true, email, password: newPassword, userId: user.id }));
+console.log(
+  JSON.stringify({ ok: true, email, password: newPassword, userId: user.id }),
+);
 await prisma.$disconnect();

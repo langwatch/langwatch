@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
 import type { Output } from "~/components/llmPromptConfigs/LLMConfigPopover";
+import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
 import {
   allModelOptions,
   useModelSelectionOptions,

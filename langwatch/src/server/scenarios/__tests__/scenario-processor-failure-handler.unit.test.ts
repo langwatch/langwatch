@@ -34,10 +34,12 @@ describe("handleFailedJobResult", () => {
 
     mockDeps = {
       scenarioLookup: {
-        getById: mockGetById as ProcessorDependencies["scenarioLookup"]["getById"],
+        getById:
+          mockGetById as ProcessorDependencies["scenarioLookup"]["getById"],
       },
       failureEmitter: {
-        ensureFailureEventsEmitted: mockEnsureFailureEventsEmitted as ProcessorDependencies["failureEmitter"]["ensureFailureEventsEmitted"],
+        ensureFailureEventsEmitted:
+          mockEnsureFailureEventsEmitted as ProcessorDependencies["failureEmitter"]["ensureFailureEventsEmitted"],
       },
     };
   });
@@ -78,7 +80,11 @@ describe("handleFailedJobResult", () => {
       });
 
       // When: handleFailedJobResult is called
-      await handleFailedJobResult(mockJobData, "Child process exited with code 1", mockDeps);
+      await handleFailedJobResult(
+        mockJobData,
+        "Child process exited with code 1",
+        mockDeps,
+      );
 
       // Then: the handler receives name and description from the scenario
       expect(mockEnsureFailureEventsEmitted).toHaveBeenCalledWith(

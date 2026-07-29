@@ -6,12 +6,12 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  ScenarioInfraErrorCode,
   classifyScenarioInfraError,
   decodeScenarioError,
   encodeScenarioError,
   extractScenarioErrorText,
   resolveScenarioError,
+  ScenarioInfraErrorCode,
   scenarioErrorTitle,
 } from "../scenario-infra-error";
 
@@ -87,7 +87,9 @@ describe("classifyScenarioInfraError", () => {
   describe("when the raw error is unrecognised", () => {
     /** @scenario "An unrecognised failure keeps its message under a generic infra code" */
     it("keeps the message under the generic infra code", () => {
-      const result = classifyScenarioInfraError("Something unexpected happened");
+      const result = classifyScenarioInfraError(
+        "Something unexpected happened",
+      );
       expect(result.code).toBe(ScenarioInfraErrorCode.Infra);
       expect(result.message).toBe("Something unexpected happened");
       expect(result.hint).toBeUndefined();
@@ -184,7 +186,9 @@ describe("resolveScenarioError", () => {
 
 describe("scenarioErrorTitle", () => {
   it("returns a distinct human title per code", () => {
-    const titles = Object.values(ScenarioInfraErrorCode).map(scenarioErrorTitle);
+    const titles = Object.values(ScenarioInfraErrorCode).map(
+      scenarioErrorTitle,
+    );
     expect(new Set(titles).size).toBe(titles.length);
     titles.forEach((t) => expect(t.length).toBeGreaterThan(0));
   });

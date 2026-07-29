@@ -4,8 +4,8 @@ import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-ru
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { ChipDef } from "./ChipBar";
 import { useIsReadOnlyTrace } from "../../context/TraceViewerContext";
+import type { ChipDef } from "./ChipBar";
 
 /**
  * Plain data describing the scenario run a trace belongs to. Returned by

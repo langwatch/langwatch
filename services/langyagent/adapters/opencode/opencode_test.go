@@ -501,7 +501,7 @@ func TestStreamSession_SiblingErrorEventStillFiltered(t *testing.T) {
 
 func TestTextDeltaFromEvent_MessagePartDelta(t *testing.T) {
 	// The current opencode shape: message.part.delta with a text field carries a
-	// token in properties.delta. This is the Stream B fast-path source (ADR-048).
+	// token in properties.delta. This is the Stream B fast-path source (ADR-077).
 	ev := decodeSSE(t, `{"type":"message.part.delta","properties":{"sessionID":"s1","field":"text","delta":"Hel"}}`)
 	got, ok := textDeltaFromEvent(ev)
 	if !ok || got != "Hel" {

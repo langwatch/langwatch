@@ -22,13 +22,13 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   feedLangyDerivedCardPreview,
   initialLangyDerivedCardPreview,
-  type LangyDerivedCard,
-  type LangyDerivedChoicesCard,
   type LangyChoiceSelection,
   type LangyChoicesLockState,
+  type LangyDerivedCard,
+  type LangyDerivedChoicesCard,
 } from "@langwatch/langy";
 import { Pause, Play, RotateCcw, StepForward } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { LangyChoicesCard } from "./LangyChoicesCard";
 import { LangyDerivedCardView } from "./LangyDerivedCardView";
@@ -62,7 +62,10 @@ const TIMESERIES: LangyDerivedCard = {
     baselineLabel: "Last week",
     baseline: 1.37,
   },
-  hints: [{ type: "explore", query: { query: "checkout" } }, { type: "verify" }],
+  hints: [
+    { type: "explore", query: { query: "checkout" } },
+    { type: "verify" },
+  ],
 };
 
 const TABLE: LangyDerivedCard = {
@@ -164,10 +167,7 @@ function StreamingPlayground() {
 
   useEffect(() => {
     if (!playing || done) return;
-    const timer = setInterval(
-      () => setStep((current) => current + 1),
-      450,
-    );
+    const timer = setInterval(() => setStep((current) => current + 1), 450);
     return () => clearInterval(timer);
   }, [playing, done]);
 
@@ -183,7 +183,11 @@ function StreamingPlayground() {
   return (
     <VStack align="stretch" gap={2}>
       <HStack gap={1.5}>
-        <Button size="xs" variant="outline" onClick={() => setPlaying((p) => !p)}>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => setPlaying((p) => !p)}
+        >
           {playing ? <Pause size={12} /> : <Play size={12} />}
           {playing ? "Pause" : "Play"}
         </Button>
@@ -401,13 +405,7 @@ function VerifyDemo() {
   );
 }
 
-function Labeled({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Labeled({ label, children }: { label: string; children: ReactNode }) {
   return (
     <VStack align="stretch" gap={1.5}>
       <Text textStyle="2xs" color="fg.subtle" fontWeight="560">

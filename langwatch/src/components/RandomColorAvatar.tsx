@@ -1,6 +1,6 @@
-import { type AvatarRootProps } from "@chakra-ui/react";
-import { UserAvatar } from "./UserAvatar";
+import type { AvatarRootProps } from "@chakra-ui/react";
 import { getColorForString } from "../utils/rotatingColors";
+import { UserAvatar } from "./UserAvatar";
 
 /**
  * Person avatar with a deterministic name-hashed background behind the initials

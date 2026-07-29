@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventUsageService } from "../event-usage.service";
+import { USAGE_UNKNOWN } from "../usage-count";
 
 const mockQueryBillableEventsTotalUniq = vi.fn();
 const mockQueryBillableEventsByProjectApprox = vi.fn();
@@ -42,25 +43,32 @@ describe("EventUsageService", () => {
       });
     });
 
-    it("returns 0 when query returns null", async () => {
+    it("reports the count as unknown when the query returns null", async () => {
+      // A null total means the query did not run. Answering 0 makes that
+      // indistinguishable from an organization that genuinely billed nothing,
+      // and every consumer downstream then acts on the wrong one.
       mockQueryBillableEventsTotalUniq.mockResolvedValue(null);
 
       const result = await service.getCurrentMonthCount({
         organizationId: "org-1",
       });
 
-      expect(result).toBe(0);
+      expect(result).toBe(USAGE_UNKNOWN);
     });
 
     describe("when ClickHouse is unavailable", () => {
-      it("returns 0 (fail-open)", async () => {
+      it("reports the count as unknown, never 0", async () => {
+        // This asserted 0 and called it "fail-open". Letting traffic through
+        // during our own outage is still the right call — it is just not this
+        // service's call to make, and a fabricated number made it invisibly.
+        // UsageService.checkLimit now decides, and logs that it did.
         mockIsClickHouseEnabled.mockReturnValue(false);
 
         const result = await service.getCurrentMonthCount({
           organizationId: "org-1",
         });
 
-        expect(result).toBe(0);
+        expect(result).toBe(USAGE_UNKNOWN);
         expect(mockQueryBillableEventsTotalUniq).not.toHaveBeenCalled();
       });
     });
@@ -107,13 +115,11 @@ describe("EventUsageService", () => {
       });
 
       expect(result).toEqual([]);
-      expect(
-        mockQueryBillableEventsByProjectApprox,
-      ).not.toHaveBeenCalled();
+      expect(mockQueryBillableEventsByProjectApprox).not.toHaveBeenCalled();
     });
 
     describe("when ClickHouse is unavailable", () => {
-      it("returns zeros for all projects (fail-open)", async () => {
+      it("reports the whole set as unknown, not as zeros", async () => {
         mockIsClickHouseEnabled.mockReturnValue(false);
 
         const result = await service.getCountByProjects({
@@ -121,13 +127,11 @@ describe("EventUsageService", () => {
           projectIds: ["proj-1", "proj-2"],
         });
 
-        expect(result).toEqual([
-          { projectId: "proj-1", count: 0 },
-          { projectId: "proj-2", count: 0 },
-        ]);
-        expect(
-          mockQueryBillableEventsByProjectApprox,
-        ).not.toHaveBeenCalled();
+        // Not a list of zeroed projects: that shape reads as a complete
+        // answer, and the usage-limit email built from it would tell an admin
+        // every one of their projects had gone quiet.
+        expect(result).toBe(USAGE_UNKNOWN);
+        expect(mockQueryBillableEventsByProjectApprox).not.toHaveBeenCalled();
       });
     });
   });

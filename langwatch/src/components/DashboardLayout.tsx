@@ -76,9 +76,9 @@ import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { UserAvatar } from "./UserAvatar";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { GlobalUpgradeModal } from "./UpgradeModal";
+import { UserAvatar } from "./UserAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -601,7 +601,13 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  const isDemoProject = publicEnv.data?.DEMO_PROJECT_SLUG === project?.slug;
+  // Requires BOTH sides present: an install with no demo project configured
+  // leaves DEMO_PROJECT_SLUG undefined, and `===` against an equally-undefined
+  // `project?.slug` would otherwise read as a match on any route that hasn't
+  // resolved a project yet.
+  const isDemoProject =
+    !!publicEnv.data?.DEMO_PROJECT_SLUG &&
+    publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
   const userIsPartOfTeam =
     publicPage ||
     // Personal-scope routes (/me/* and the caller's own Personal Workspace
@@ -849,7 +855,9 @@ export const DashboardLayout = ({
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
-                    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                    <Menu.Root
+                      positioning={{ placement: "right-start", gutter: 2 }}
+                    >
                       <Menu.TriggerItem value="reduced-graphics">
                         <Monitor size={14} />
                         Reduced graphics (

@@ -87,7 +87,9 @@ export const FilterDisplay = ({
             // Handle double-nested objects (e.g., evaluations.passed)
             for (const [subKey, subValue] of Object.entries(nestedValue)) {
               if (Array.isArray(subValue)) {
-                nestedResult.push(`${nestedKey} → ${subKey}: ${subValue.join(", ")}`);
+                nestedResult.push(
+                  `${nestedKey} → ${subKey}: ${subValue.join(", ")}`,
+                );
               }
             }
           } else {

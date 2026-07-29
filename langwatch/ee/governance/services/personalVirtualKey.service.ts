@@ -21,10 +21,9 @@
  * Authorization is the caller's responsibility — this service never
  * checks permissions. tRPC routers + Hono handlers gate access first.
  */
-import { type PrismaClient } from "@prisma/client";
-
-import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
+import type { PrismaClient } from "@prisma/client";
 import type { VirtualKeyWithScopes } from "~/server/gateway/virtualKey.repository";
+import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 
 import { resolveGatewayBaseUrl } from "./gatewayUrl";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
@@ -167,11 +166,7 @@ export class PersonalVirtualKeyService {
     // a user-controlled routingPolicyId — without an org-scope check
     // here, a user could attach a policy from another organization
     // they discovered the id of.
-    if (
-      routingPolicyId &&
-      policy &&
-      policy.organizationId !== organizationId
-    ) {
+    if (routingPolicyId && policy && policy.organizationId !== organizationId) {
       throw new PersonalVirtualKeyNotFoundError(routingPolicyId);
     }
 
@@ -218,7 +213,9 @@ export class PersonalVirtualKeyService {
     }
 
     const resolvedPolicyId =
-      noPolicyRequested && (!policy || policyIsEmpty) ? null : policy?.id ?? null;
+      noPolicyRequested && (!policy || policyIsEmpty)
+        ? null
+        : (policy?.id ?? null);
 
     const vkService = VirtualKeyService.create(this.prisma);
     const { virtualKey, secret } = await vkService.create({
@@ -391,7 +388,9 @@ export class PersonalVirtualKeyAlreadyExistsError extends Error {
 
 export class PersonalVirtualKeyNotFoundError extends Error {
   constructor(public readonly virtualKeyId: string) {
-    super(`Personal virtual key ${virtualKeyId} not found or not owned by caller`);
+    super(
+      `Personal virtual key ${virtualKeyId} not found or not owned by caller`,
+    );
     this.name = "PersonalVirtualKeyNotFoundError";
   }
 }

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createStreamingStore,
   type StreamingMessage,
@@ -155,7 +155,10 @@ describe("createStreamingStore()", () => {
 
     describe("when finalContent is not provided", () => {
       it("sets status to complete and keeps accumulated content", () => {
-        store.upsert("m1", makeMsg({ messageId: "m1", content: "accumulated" }));
+        store.upsert(
+          "m1",
+          makeMsg({ messageId: "m1", content: "accumulated" }),
+        );
         raf.flush();
 
         store.complete("m1");

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Badge,
   Box,
@@ -8,9 +7,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { api } from "~/utils/api";
-import { useReplayStatus } from "~/hooks/useReplayStatus";
+import { useState } from "react";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
+import { useReplayStatus } from "~/hooks/useReplayStatus";
+import { api } from "~/utils/api";
 
 export function SingleAggregateReplay({
   projections,
@@ -42,13 +43,8 @@ export function SingleAggregateReplay({
       });
       onReplayStarted();
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to start replay",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't start the replay" }),
   });
 
   function toggleProjection(name: string) {

@@ -26,7 +26,6 @@ import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
-import { api } from "../../../../../utils/api";
 import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,

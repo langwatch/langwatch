@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  isLicenseExpired,
-  isCorruptedLicense,
+  formatFileSize,
   formatLicenseDate,
-  hasLicenseMetadata,
-  normalizeKeyForActivation,
   formatLimitOrUnlimited,
   formatResourceUsage,
-  formatFileSize,
+  hasLicenseMetadata,
+  isCorruptedLicense,
+  isLicenseExpired,
+  normalizeKeyForActivation,
 } from "../licenseStatusUtils";
 
 /**
@@ -214,7 +214,7 @@ describe("formatResourceUsage", () => {
   it("displays 'Unlimited' for large max values (>= 1M)", () => {
     expect(formatResourceUsage(5, 1_000_000)).toBe("5 / Unlimited");
     expect(formatResourceUsage(5, Number.MAX_SAFE_INTEGER)).toBe(
-      "5 / Unlimited"
+      "5 / Unlimited",
     );
   });
 });

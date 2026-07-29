@@ -9,9 +9,9 @@
  * @see specs/scenarios/scenario-input-mapping.feature
  */
 
-import type React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentHttpEditorDrawer } from "../AgentHttpEditorDrawer";
 

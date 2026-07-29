@@ -11,7 +11,7 @@
  * URL-encodes its own.
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 import {
   buildTemplateContext,
@@ -120,7 +120,8 @@ describe("body template JSON safety", () => {
       ];
 
       const body = render({
-        template: '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
+        template:
+          '{\n  "thread_id": "{{threadId}}",\n  "messages": {{messages}}\n}',
         input,
       });
 
@@ -131,7 +132,7 @@ describe("body template JSON safety", () => {
   });
 
   describe("given structured (non-string) message content", () => {
-    it("still injects {{input}} raw so {\"input\": {{input}}} stays valid", () => {
+    it('still injects {{input}} raw so {"input": {{input}}} stays valid', () => {
       const structured = [{ type: "text", text: "Hello world" }];
       const body = render({
         template: '{"input": {{input}}}',
@@ -187,7 +188,9 @@ describe("body template JSON safety", () => {
       const body = render({
         template: '{"sys": "{{ctx}}"}',
         input: inputWith("hi"),
-        scenarioMappings: { ctx: { type: "value", value: 'line\nwith "quote"' } },
+        scenarioMappings: {
+          ctx: { type: "value", value: 'line\nwith "quote"' },
+        },
       });
 
       expect(JSON.parse(body).sys).toBe('line\nwith "quote"');

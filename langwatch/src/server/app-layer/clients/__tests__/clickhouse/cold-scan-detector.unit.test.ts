@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   detectColdScan,
   TIME_PARTITIONED_TABLES,
@@ -39,9 +39,7 @@ describe("detectColdScan", () => {
       ),
     ).toBeNull();
     expect(
-      detectColdScan(
-        "SELECT 1 FROM stored_spans WHERE StartTime IN (1, 2, 3)",
-      ),
+      detectColdScan("SELECT 1 FROM stored_spans WHERE StartTime IN (1, 2, 3)"),
     ).toBeNull();
   });
 
@@ -119,7 +117,9 @@ describe("detectColdScan", () => {
   });
 
   it("flags every tracked table when its time predicate is missing", () => {
-    for (const [table, timeColumns] of Object.entries(TIME_PARTITIONED_TABLES)) {
+    for (const [table, timeColumns] of Object.entries(
+      TIME_PARTITIONED_TABLES,
+    )) {
       const cold = `SELECT 1 FROM ${table} WHERE TenantId = 'x'`;
       expect(detectColdScan(cold)).toBe(table);
 

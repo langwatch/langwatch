@@ -79,7 +79,10 @@ export function translateStringField(
   return wrap(`${columnExpr} = {${p}:String}`, negated);
 }
 
-function stringEqualityHandler(expression: string, name?: string): FieldHandler {
+function stringEqualityHandler(
+  expression: string,
+  name?: string,
+): FieldHandler {
   return (tag, negated, ctx) =>
     translateStringField(expression, tag, negated, ctx, name);
 }

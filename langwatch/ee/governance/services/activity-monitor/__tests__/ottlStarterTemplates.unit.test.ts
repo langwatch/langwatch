@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  OTTL_ENABLED_SOURCE_TYPES,
   getStarterTemplate,
   isOttlEnabledSourceType,
+  OTTL_ENABLED_SOURCE_TYPES,
 } from "../ottlStarterTemplates";
 
 describe("OTTL_ENABLED_SOURCE_TYPES", () => {

@@ -22,233 +22,230 @@ import {
   it,
   vi,
 } from "vitest";
-import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "~/server/app-layer/presets";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { prisma } from "../../../db";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
-describe(
-  "team.createTeamWithMembers plan limit enforcement",
-  () => {
-    const testNamespace = `team-limit-${nanoid(8)}`;
-    let organizationId: string;
-    let userId: string;
-    let mockGetActivePlan: ReturnType<typeof vi.fn>;
-    let mockNotifyResourceLimitReached: ReturnType<typeof vi.fn>;
+describe("team.createTeamWithMembers plan limit enforcement", () => {
+  const testNamespace = `team-limit-${nanoid(8)}`;
+  let organizationId: string;
+  let userId: string;
+  let mockGetActivePlan: ReturnType<typeof vi.fn>;
+  let mockNotifyResourceLimitReached: ReturnType<typeof vi.fn>;
 
-    beforeAll(async () => {
-      const organization = await prisma.organization.create({
-        data: {
-          name: "Test Organization",
-          slug: `--test-org-${testNamespace}`,
-        },
-      });
-      organizationId = organization.id;
+  beforeAll(async () => {
+    const organization = await prisma.organization.create({
+      data: {
+        name: "Test Organization",
+        slug: `--test-org-${testNamespace}`,
+      },
+    });
+    organizationId = organization.id;
 
-      const user = await prisma.user.create({
-        data: {
-          name: "Test User",
-          email: `test-${testNamespace}@example.com`,
-        },
-      });
-      userId = user.id;
+    const user = await prisma.user.create({
+      data: {
+        name: "Test User",
+        email: `test-${testNamespace}@example.com`,
+      },
+    });
+    userId = user.id;
 
-      await prisma.organizationUser.create({
-        data: {
-          userId: user.id,
-          organizationId: organization.id,
-          role: OrganizationUserRole.ADMIN,
-        },
-      });
-
-      // `organization:manage` resolves through an ORGANIZATION-scoped
-      // RoleBinding; OrganizationUser.role alone never grants it.
-      await prisma.roleBinding.create({
-        data: {
-          userId: user.id,
-          organizationId: organization.id,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organization.id,
-        },
-      });
-
-      // Create initial team + membership so RBAC passes
-      const initialTeam = await prisma.team.create({
-        data: {
-          name: "Initial Team",
-          slug: `--test-team-${testNamespace}-init`,
-          organizationId: organization.id,
-        },
-      });
-
-      await prisma.teamUser.create({
-        data: {
-          userId: user.id,
-          teamId: initialTeam.id,
-          role: TeamUserRole.ADMIN,
-        },
-      });
+    await prisma.organizationUser.create({
+      data: {
+        userId: user.id,
+        organizationId: organization.id,
+        role: OrganizationUserRole.ADMIN,
+      },
     });
 
-    beforeEach(async () => {
-      await resetApp();
-      mockGetActivePlan = vi.fn();
-      mockNotifyResourceLimitReached = vi.fn().mockResolvedValue(undefined);
-      globalForApp.__langwatch_app = createTestApp({
-        planProvider: PlanProviderService.create({
-          getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-        }),
-        usageLimits: {
-          notifyResourceLimitReached: mockNotifyResourceLimitReached,
-          checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
-        } as any,
-      });
+    // `organization:manage` resolves through an ORGANIZATION-scoped
+    // RoleBinding; OrganizationUser.role alone never grants it.
+    await prisma.roleBinding.create({
+      data: {
+        userId: user.id,
+        organizationId: organization.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organization.id,
+      },
     });
 
-    afterEach(async () => {
-      await resetApp();
+    // Create initial team + membership so RBAC passes
+    const initialTeam = await prisma.team.create({
+      data: {
+        name: "Initial Team",
+        slug: `--test-team-${testNamespace}-init`,
+        organizationId: organization.id,
+      },
     });
 
-    afterAll(async () => {
-      await prisma.roleBinding
-        .deleteMany({
-          where: { organization: { slug: `--test-org-${testNamespace}` } },
-        })
-        .catch(() => {});
-      await prisma.teamUser
-        .deleteMany({
-          where: {
-            team: { slug: { startsWith: `--test-team-${testNamespace}` } },
+    await prisma.teamUser.create({
+      data: {
+        userId: user.id,
+        teamId: initialTeam.id,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+  });
+
+  beforeEach(async () => {
+    await resetApp();
+    mockGetActivePlan = vi.fn();
+    mockNotifyResourceLimitReached = vi.fn().mockResolvedValue(undefined);
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
+      }),
+      usageLimits: {
+        notifyResourceLimitReached: mockNotifyResourceLimitReached,
+        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+      } as any,
+    });
+  });
+
+  afterEach(async () => {
+    await resetApp();
+  });
+
+  afterAll(async () => {
+    await prisma.roleBinding
+      .deleteMany({
+        where: { organization: { slug: `--test-org-${testNamespace}` } },
+      })
+      .catch(() => {});
+    await prisma.teamUser
+      .deleteMany({
+        where: {
+          team: { slug: { startsWith: `--test-team-${testNamespace}` } },
+        },
+      })
+      .catch(() => {});
+    await prisma.team
+      .deleteMany({
+        where: { slug: { startsWith: `--test-team-${testNamespace}` } },
+      })
+      .catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({
+        where: { organization: { slug: `--test-org-${testNamespace}` } },
+      })
+      .catch(() => {});
+    await prisma.organization
+      .deleteMany({
+        where: { slug: `--test-org-${testNamespace}` },
+      })
+      .catch(() => {});
+    await prisma.user
+      .deleteMany({
+        where: { email: `test-${testNamespace}@example.com` },
+      })
+      .catch(() => {});
+  });
+
+  function createCaller() {
+    const ctx = createInnerTRPCContext({
+      session: {
+        user: { id: userId },
+        expires: "1",
+      },
+    });
+    return appRouter.createCaller(ctx);
+  }
+
+  describe("when team count reaches maxTeams and overrideAddingLimitations is false", () => {
+    it("rejects with FORBIDDEN", async () => {
+      // Create teams up to the limit using real DB
+      const teamsToCreate = 2;
+      for (let i = 0; i < teamsToCreate; i++) {
+        await prisma.team.create({
+          data: {
+            name: `Existing Team ${i}`,
+            slug: `--test-team-${testNamespace}-fill-${i}`,
+            organizationId,
           },
-        })
-        .catch(() => {});
-      await prisma.team
-        .deleteMany({
-          where: { slug: { startsWith: `--test-team-${testNamespace}` } },
-        })
-        .catch(() => {});
-      await prisma.organizationUser
-        .deleteMany({
-          where: { organization: { slug: `--test-org-${testNamespace}` } },
-        })
-        .catch(() => {});
-      await prisma.organization
-        .deleteMany({
-          where: { slug: `--test-org-${testNamespace}` },
-        })
-        .catch(() => {});
-      await prisma.user
-        .deleteMany({
-          where: { email: `test-${testNamespace}@example.com` },
-        })
-        .catch(() => {});
-    });
-
-    function createCaller() {
-      const ctx = createInnerTRPCContext({
-        session: {
-          user: { id: userId },
-          expires: "1",
-        },
-      });
-      return appRouter.createCaller(ctx);
-    }
-
-    describe("when team count reaches maxTeams and overrideAddingLimitations is false", () => {
-      it("rejects with FORBIDDEN", async () => {
-        // Create teams up to the limit using real DB
-        const teamsToCreate = 2;
-        for (let i = 0; i < teamsToCreate; i++) {
-          await prisma.team.create({
-            data: {
-              name: `Existing Team ${i}`,
-              slug: `--test-team-${testNamespace}-fill-${i}`,
-              organizationId,
-            },
-          });
-        }
-
-        // Count includes the initial team from beforeAll, so total = teamsToCreate + 1
-        const totalTeams = teamsToCreate + 1;
-        const plan: PlanInfo = {
-          ...FREE_PLAN,
-          maxTeams: totalTeams,
-          overrideAddingLimitations: false,
-        };
-        mockGetActivePlan.mockResolvedValue(plan);
-
-        const caller = createCaller();
-
-        await expect(
-          caller.team.createTeamWithMembers({
-            organizationId,
-            name: "One Too Many",
-            members: [{ userId, role: "ADMIN" }],
-          }),
-        ).rejects.toMatchObject({
-          code: "FORBIDDEN",
-          message: "You have reached the maximum number of teams",
         });
-      });
+      }
 
-      it("sends a Slack notification to the ops team", async () => {
-        const plan: PlanInfo = {
-          ...FREE_PLAN,
-          maxTeams: 0,
-          overrideAddingLimitations: false,
-        };
-        mockGetActivePlan.mockResolvedValue(plan);
+      // Count includes the initial team from beforeAll, so total = teamsToCreate + 1
+      const totalTeams = teamsToCreate + 1;
+      const plan: PlanInfo = {
+        ...FREE_PLAN,
+        maxTeams: totalTeams,
+        overrideAddingLimitations: false,
+      };
+      mockGetActivePlan.mockResolvedValue(plan);
 
-        const caller = createCaller();
+      const caller = createCaller();
 
-        await expect(
-          caller.team.createTeamWithMembers({
-            organizationId,
-            name: "Triggers Notification",
-            members: [{ userId, role: "ADMIN" }],
-          }),
-        ).rejects.toMatchObject({ code: "FORBIDDEN" });
-
-        // Wait for fire-and-forget notification promise to settle
-        await vi.waitFor(() => {
-          expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith(
-            expect.objectContaining({
-              organizationId,
-              limitType: "teams",
-            }),
-          );
-        });
-      });
-    });
-
-    describe("when overrideAddingLimitations is true", () => {
-      it("allows team creation despite exceeding limit", async () => {
-        const plan: PlanInfo = {
-          ...FREE_PLAN,
-          maxTeams: 1,
-          overrideAddingLimitations: true,
-        };
-        mockGetActivePlan.mockResolvedValue(plan);
-
-        const caller = createCaller();
-
-        const result = await caller.team.createTeamWithMembers({
+      await expect(
+        caller.team.createTeamWithMembers({
           organizationId,
-          name: "Override Team",
+          name: "One Too Many",
           members: [{ userId, role: "ADMIN" }],
-        });
-
-        expect(result).toBeDefined();
-        expect(result.name).toBe("Override Team");
+        }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        message: "You have reached the maximum number of teams",
       });
     });
-  },
-);
+
+    it("sends a Slack notification to the ops team", async () => {
+      const plan: PlanInfo = {
+        ...FREE_PLAN,
+        maxTeams: 0,
+        overrideAddingLimitations: false,
+      };
+      mockGetActivePlan.mockResolvedValue(plan);
+
+      const caller = createCaller();
+
+      await expect(
+        caller.team.createTeamWithMembers({
+          organizationId,
+          name: "Triggers Notification",
+          members: [{ userId, role: "ADMIN" }],
+        }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+
+      // Wait for fire-and-forget notification promise to settle
+      await vi.waitFor(() => {
+        expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith(
+          expect.objectContaining({
+            organizationId,
+            limitType: "teams",
+          }),
+        );
+      });
+    });
+  });
+
+  describe("when overrideAddingLimitations is true", () => {
+    it("allows team creation despite exceeding limit", async () => {
+      const plan: PlanInfo = {
+        ...FREE_PLAN,
+        maxTeams: 1,
+        overrideAddingLimitations: true,
+      };
+      mockGetActivePlan.mockResolvedValue(plan);
+
+      const caller = createCaller();
+
+      const result = await caller.team.createTeamWithMembers({
+        organizationId,
+        name: "Override Team",
+        members: [{ userId, role: "ADMIN" }],
+      });
+
+      expect(result).toBeDefined();
+      expect(result.name).toBe("Override Team");
+    });
+  });
+});

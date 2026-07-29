@@ -6,7 +6,7 @@
  * Verifies that clicking a run row opens the drawer instead of navigating.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ExternalSetDetailPanel } from "../ExternalSetDetailPanel";
 
@@ -116,7 +116,16 @@ describe("<ExternalSetDetailPanel/>", () => {
         error: null,
       });
 
-      render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, { wrapper: Wrapper });
+      render(
+        <ExternalSetDetailPanel
+          scenarioSetId="ext-set-1"
+          period={{
+            startDate: new Date("2025-01-01"),
+            endDate: new Date("2025-01-31"),
+          }}
+        />,
+        { wrapper: Wrapper },
+      );
 
       // Row is auto-expanded, so click the scenario run card directly
       const scenarioCard = screen.getByLabelText(/View details for/);
@@ -137,9 +146,18 @@ describe("<ExternalSetDetailPanel/>", () => {
         error: null,
       });
 
-      render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <ExternalSetDetailPanel
+          scenarioSetId="ext-set-1"
+          period={{
+            startDate: new Date("2025-01-01"),
+            endDate: new Date("2025-01-31"),
+          }}
+        />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByTestId("run-history-skeleton")).toBeInTheDocument();
     });

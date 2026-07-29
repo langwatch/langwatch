@@ -41,6 +41,7 @@ function parseArgs(argv: string[]): Args {
     baseUrl: "http://localhost:5560",
     count: 1,
   };
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--email") out.email = argv[++i];
     else if (argv[i] === "--org-slug") out.orgSlug = argv[++i];

@@ -1,20 +1,23 @@
-import type { Command, CommandHandler } from "../../../commands/command";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
+import type { Command, CommandHandler } from "../../../commands/command";
+import {
+  type RecordMetricCorrelationCommandData,
+  recordMetricCorrelationCommandDataSchema,
+} from "../schemas/commands";
 import {
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
 } from "../schemas/constants";
-import {
-  recordMetricCorrelationCommandDataSchema,
-  type RecordMetricCorrelationCommandData,
-} from "../schemas/commands";
 import type { MetricDataPointCorrelatedEvent } from "../schemas/events";
 
-export class RecordMetricCorrelationCommand implements CommandHandler<
-  Command<RecordMetricCorrelationCommandData>,
-  MetricDataPointCorrelatedEvent
-> {
+export class RecordMetricCorrelationCommand
+  implements
+    CommandHandler<
+      Command<RecordMetricCorrelationCommandData>,
+      MetricDataPointCorrelatedEvent
+    >
+{
   static readonly schema = defineCommandSchema(
     RECORD_METRIC_CORRELATION_COMMAND_TYPE,
     recordMetricCorrelationCommandDataSchema,

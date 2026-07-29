@@ -2,10 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import type { Workflow } from "@prisma/client";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
 import { prisma } from "~/server/db";
 import {
@@ -82,7 +82,7 @@ secured.access(requires("workflows:view")).get(
         ...toWorkflowResponse(w),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/workflows`,
+          path: `/studio/${w.id}`,
         }),
       })),
     );
@@ -128,7 +128,7 @@ secured.access(requires("workflows:view")).get(
       ...toWorkflowResponse(workflow),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/workflows`,
+        path: `/studio/${workflow.id}`,
       }),
     });
   },
@@ -189,7 +189,7 @@ secured.access(requires("workflows:update")).patch(
       ...toWorkflowResponse(updated),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/workflows`,
+        path: `/studio/${updated.id}`,
       }),
     });
   },

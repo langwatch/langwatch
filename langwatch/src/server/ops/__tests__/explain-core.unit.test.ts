@@ -33,7 +33,9 @@ describe("buildExplainQuery", () => {
   it("expands INDEXES to `EXPLAIN PLAN indexes = 1, actions = 1` (CH parser quirk)", () => {
     const r = buildExplainQuery(TENANT_OK, "INDEXES");
     expect(r.ok).toBe(true);
-    expect(r.wrapped).toBe(`EXPLAIN PLAN indexes = 1, actions = 1 ${TENANT_OK}`);
+    expect(r.wrapped).toBe(
+      `EXPLAIN PLAN indexes = 1, actions = 1 ${TENANT_OK}`,
+    );
   });
 
   it("rejects an empty / whitespace-only query", () => {
@@ -113,7 +115,9 @@ describe("buildExplainQuery", () => {
 
   describe("comment / string-literal bypasses", () => {
     it("rejects table functions hidden behind a block comment", () => {
-      const r = buildExplainQuery(`SELECT * FROM url/**/('http://127.0.0.1:9/', CSV)`);
+      const r = buildExplainQuery(
+        `SELECT * FROM url/**/('http://127.0.0.1:9/', CSV)`,
+      );
       expect(r.ok).toBe(false);
       expect(r.reason).toMatch(/table function/i);
     });
@@ -132,12 +136,17 @@ describe("buildExplainQuery", () => {
     });
 
     it("does not treat `;` inside a string as multi-statement", () => {
-      expect(buildExplainQuery(`SELECT name FROM stored_spans WHERE name = 'a;b'`).ok).toBe(true);
+      expect(
+        buildExplainQuery(`SELECT name FROM stored_spans WHERE name = 'a;b'`)
+          .ok,
+      ).toBe(true);
     });
 
     it("treats a quoted block-comment marker as data", () => {
       expect(
-        buildExplainQuery(`SELECT count() FROM stored_spans WHERE name = '/* not a comment */'`).ok,
+        buildExplainQuery(
+          `SELECT count() FROM stored_spans WHERE name = '/* not a comment */'`,
+        ).ok,
       ).toBe(true);
     });
   });
@@ -145,16 +154,24 @@ describe("buildExplainQuery", () => {
 
 describe("stripCommentsAndStrings", () => {
   it("drops block comments", () => {
-    expect(stripCommentsAndStrings("SELECT /* x */ 1")).toMatch(/SELECT\s+\s+1/);
+    expect(stripCommentsAndStrings("SELECT /* x */ 1")).toMatch(
+      /SELECT\s+\s+1/,
+    );
   });
   it("drops line comments", () => {
-    expect(stripCommentsAndStrings("SELECT 1 -- trailing\nFROM x")).not.toMatch(/trailing/);
+    expect(stripCommentsAndStrings("SELECT 1 -- trailing\nFROM x")).not.toMatch(
+      /trailing/,
+    );
   });
   it("collapses string literals", () => {
-    expect(stripCommentsAndStrings("SELECT 'abc', \"def\" FROM x")).toMatch(/SELECT '', "" FROM x/);
+    expect(stripCommentsAndStrings("SELECT 'abc', \"def\" FROM x")).toMatch(
+      /SELECT '', "" FROM x/,
+    );
   });
   it("handles nested block comments", () => {
-    const out = stripCommentsAndStrings("WHERE 1=1 /* outer /* inner */ TenantId = 'p_fake' */");
+    const out = stripCommentsAndStrings(
+      "WHERE 1=1 /* outer /* inner */ TenantId = 'p_fake' */",
+    );
     expect(out).not.toMatch(/TenantId/i);
     expect(out).not.toMatch(/p_fake/);
   });
@@ -165,7 +182,9 @@ describe("stripCommentsAndStrings", () => {
     expect(out).toMatch(/url\s*\(/i);
   });
   it("consumes to EOF on an unbalanced opener", () => {
-    const out = stripCommentsAndStrings("SELECT 1 /* unterminated TenantId = 'p_x'");
+    const out = stripCommentsAndStrings(
+      "SELECT 1 /* unterminated TenantId = 'p_x'",
+    );
     expect(out).toMatch(/SELECT 1/);
     expect(out).not.toMatch(/TenantId/i);
   });
@@ -194,7 +213,9 @@ describe("redactQueryForAudit", () => {
 
 describe("parseOpsConnection", () => {
   it("splits scheme/host from userinfo/database", () => {
-    const r = parseOpsConnection("http://langwatch_ops:secret@ch.example:8123/langwatch");
+    const r = parseOpsConnection(
+      "http://langwatch_ops:secret@ch.example:8123/langwatch",
+    );
     expect(r).toEqual({
       url: "http://ch.example:8123",
       username: "langwatch_ops",
@@ -250,7 +271,8 @@ describe("getOpsClickHouseClient", () => {
   });
 
   it("builds and caches a client when set", () => {
-    process.env.CLICKHOUSE_OPS_URL = "http://langwatch_ops:secret@ch.example:8123/langwatch";
+    process.env.CLICKHOUSE_OPS_URL =
+      "http://langwatch_ops:secret@ch.example:8123/langwatch";
     const a = getOpsClickHouseClient();
     const b = getOpsClickHouseClient();
     expect(a).not.toBeNull();
