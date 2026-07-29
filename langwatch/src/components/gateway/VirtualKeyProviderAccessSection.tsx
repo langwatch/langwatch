@@ -5,7 +5,6 @@ import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { SmallLabel } from "../SmallLabel";
 import {
   buildScopeHierarchy,
-  type EligibleModelProvider,
   type ModelProviderScopeEntry,
   type OrgModelProvider,
   resolveEligible,

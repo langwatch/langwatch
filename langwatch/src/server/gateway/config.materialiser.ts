@@ -12,7 +12,6 @@ import type {
   GatewayBudget,
   GatewayCacheRule,
   ModelProvider,
-  Prisma,
   PrismaClient,
   VirtualKey,
 } from "@prisma/client";

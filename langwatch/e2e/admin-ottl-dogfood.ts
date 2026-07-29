@@ -161,13 +161,6 @@ void (async () => {
   });
 
   await step(results, "archive-org-authored-row", async () => {
-    const trashBtn = page
-      .locator('button[aria-label*="rash"], button:has(svg)')
-      .filter({ has: page.locator("svg") })
-      .last(); // Last action button — the archive trash icon
-    // Better: use the colorPalette=red button shape
-    const redArchive = page.locator("button.css-").filter({ hasText: "" });
-    // Fallback: last button in the org row Actions column
     const archiveCandidates = page.locator(
       'tr:has(span:has-text("Org-authored")) button',
     );
