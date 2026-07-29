@@ -314,6 +314,28 @@ HARDENED_WORKLOADS=(
   "charts/clickhouse/templates/statefulset.yaml"
 )
 
+# Workloads that render only behind a non-default value. They are as
+# operator-facing as the default ones, and the default render cannot see them,
+# so each needs its own flag set.
+HARDENED_WORKLOADS_GATED=(
+  "charts/clickhouse/templates/keeper-statefulset.yaml"
+  "charts/clickhouse/templates/backup-cronjobs.yaml"
+  "templates/cronjobs/cronjobs.yaml"
+)
+
+CH_FULL_FLAGS=(--set autogen.enabled=true
+               --set clickhouse.replicas=3
+               --set clickhouse.backup.enabled=true
+               --set clickhouse.objectStorage.bucket=test
+               --set clickhouse.objectStorage.region=us-east-1)
+
+# values.yaml ships `cronjobs.jobs: {}` as an operator extension point, so the
+# template renders nothing by default. Populate one so it is actually exercised.
+CRONJOB_FLAGS=(--set autogen.enabled=true
+               --set cronjobs.jobs.probe.enabled=true
+               --set "cronjobs.jobs.probe.schedule=0 0 * * *"
+               --set cronjobs.jobs.probe.endpoint=/api/cron/probe)
+
 # Workloads that cannot comply, each with the reason and the values key that
 # removes it. strict-admission.yaml must set every one of these to false.
 EXEMPT_WORKLOADS=(
@@ -324,65 +346,77 @@ EXEMPT_WORKLOADS=(
   # to hand each worker a distinct UID. Forcing it non-root re-opens
   # cross-worker credential theft (ADR-033).
   "charts/langyagent/templates/deployment.yaml:langyagent.chartManaged"
+  # Runs kubectl against Secrets, so it needs its token and a writable root for
+  # kubectl's discovery cache. Only renders on the operator-owned-Secret path.
+  "charts/clickhouse/templates/preflight-secrets-job.yaml:clickhouse.preflight.enabled"
 )
 
+# Every emptyDir in the rendered manifest must declare a sizeLimit: they are
+# backed by node ephemeral storage, so an unbounded one lets a single looping
+# pod evict its neighbours. Counts, not presence — these templates carry
+# several, and a presence check passes while any one of them loses its bound.
+assert_every_emptydir_bounded() {
+  local label="$1" manifest="$2" dirs bounded
+  dirs=$(count_matches "$manifest" "^[[:space:]]*emptyDir:")
+  bounded=$(count_matches "$manifest" "^[[:space:]]*sizeLimit:")
+  if (( dirs == bounded )); then
+    pass "hardening: $label — all $dirs emptyDir(s) size-bounded"
+  else
+    fail "hardening: $label — $bounded of $dirs emptyDir(s) size-bounded"
+  fi
+}
+
 # Assert one workload template carries the full hardened posture on EVERY
-# container it renders, not merely somewhere in the document. Extra helm flags
-# may follow the template path (some workloads only render when a feature is on).
+# container of EVERY pod spec it renders. Extra helm flags may follow the
+# template path (some workloads only render when a feature is on).
+#
+# This reads fields off each container OBJECT via charts/lib/pod-security-report.rb.
+# Counting matches across the rendered text does not work: a template with three
+# pod specs keeps its totals unchanged when a field moves from a container up to
+# the pod level (where Kubernetes ignores it), so a counting assertion reports
+# full coverage while containers run unhardened. Presence greps are worse again —
+# one hit anywhere satisfies them for the whole document.
 assert_workload_hardened() {
   local tpl="$1"; shift
-  local out
+  local out report
   out=$(tmpl_only "$tpl" "$@") || {
     fail "hardening: could not render $tpl"; return
   }
-
-  # One `image:` line per container, so this is the container count and the
-  # per-field counts below scale with it automatically as containers are added.
-  local containers ro ape
-  containers=$(count_matches "$out" "^[[:space:]]*image:")
-  if (( containers == 0 )); then
+  report=$(ruby "${CHART_DIR}/../lib/pod-security-report.rb" <<< "$out") || {
+    fail "hardening[$tpl]: could not parse the rendered manifest"; return
+  }
+  if [[ -z "$report" ]]; then
     fail "hardening[$tpl]: rendered no containers"; return
   fi
 
-  ro=$(count_matches "$out" "readOnlyRootFilesystem: true")
-  if (( ro == containers )); then
-    pass "hardening[$tpl]: read-only root on all $containers container(s)"
-  else
-    fail "hardening[$tpl]: read-only root on $ro of $containers container(s)"
+  local id cname ro ape nonroot podnonroot caps seccomp automount res
+  local missing failures=0 containers=0
+  while IFS='|' read -r id cname ro ape nonroot podnonroot caps seccomp automount res; do
+    [[ -z "$id" ]] && continue
+    containers=$((containers + 1))
+    missing=""
+    (( ro == 1 ))         || missing+=" readOnlyRootFilesystem:true"
+    (( ape == 1 ))        || missing+=" allowPrivilegeEscalation:false"
+    (( caps == 1 ))       || missing+=" capabilities.drop:[ALL]"
+    (( res == 1 ))        || missing+=" resources.requests+limits(cpu,memory)"
+    # runAsNonRoot is required at BOTH levels. Kubernetes inherits the pod-level
+    # value, but some Gatekeeper constraints read the container field directly
+    # and deny a pod that carries it only on the pod.
+    (( nonroot == 1 ))    || missing+=" container.runAsNonRoot:true"
+    (( podnonroot == 1 )) || missing+=" pod.runAsNonRoot:true"
+    (( seccomp == 1 ))    || missing+=" pod.seccompProfile:RuntimeDefault"
+    (( automount == 1 ))  || missing+=" pod.automountServiceAccountToken:false"
+    if [[ -n "$missing" ]]; then
+      fail "hardening[$tpl]: ${id} container '${cname}' missing:${missing}"
+      failures=$((failures + 1))
+    fi
+  done <<< "$report"
+
+  if (( failures == 0 )); then
+    pass "hardening[$tpl]: all $containers container(s) fully hardened"
   fi
 
-  ape=$(count_matches "$out" "allowPrivilegeEscalation: false")
-  if (( ape == containers )); then
-    pass "hardening[$tpl]: privilege escalation off on all $containers container(s)"
-  else
-    fail "hardening[$tpl]: privilege escalation off on $ape of $containers container(s)"
-  fi
-
-  assert_contains "hardening[$tpl]: RuntimeDefault seccomp" "$out" "type: RuntimeDefault"
-  assert_contains "hardening[$tpl]: SA token not mounted"  "$out" "automountServiceAccountToken: false"
-  assert_not_contains "hardening[$tpl]: not writable-root" "$out" "readOnlyRootFilesystem: false"
-  assert_not_contains "hardening[$tpl]: not privileged"    "$out" "privileged: true"
-
-  # Capabilities are dropped in two rendered forms: `drop: ["ALL"]` inline
-  # (datastores) and a `- ALL` list item (global containerSecurityContext).
-  if grep -qE 'drop: \["ALL"\]|^[[:space:]]+- ALL' <<< "$out"; then
-    pass "hardening[$tpl]: capabilities dropped"
-  else
-    fail "hardening[$tpl]: expected capabilities.drop ALL"
-  fi
-
-  # runAsNonRoot must appear at BOTH pod and container level: Kubernetes
-  # inherits the pod-level value, but some Gatekeeper constraints read the
-  # container-level field directly and deny pods that only carry it on the pod.
-  # Expect one per container plus at least one pod-level declaration, so a
-  # pod-level-only regression cannot satisfy it.
-  local nr
-  nr=$(count_matches "$out" "runAsNonRoot: true")
-  if (( nr >= containers + 1 )); then
-    pass "hardening[$tpl]: runAsNonRoot at pod + all $containers container(s)"
-  else
-    fail "hardening[$tpl]: expected >= $((containers + 1)) runAsNonRoot (pod + each container), found $nr"
-  fi
+  assert_not_contains "hardening[$tpl]: not privileged" "$out" "privileged: true"
 }
 
 test_pod_security() {
@@ -393,33 +427,50 @@ test_pod_security() {
     assert_workload_hardened "$tpl" --set autogen.enabled=true
   done
 
-  # Keeper and the backup/restore Jobs render only when replication and backup
-  # are switched on, so the default pass above never sees them — they were
-  # hardened with nothing asserting it, and the ClickHouse live e2e only checks
-  # that the CronJob objects exist, never that a Job runs. Cover them here.
-  local ch_full_flags=(--set autogen.enabled=true
-                       --set clickhouse.replicas=3
-                       --set clickhouse.backup.enabled=true
-                       --set clickhouse.objectStorage.bucket=test
-                       --set clickhouse.objectStorage.region=us-east-1)
-  for tpl in "charts/clickhouse/templates/keeper-statefulset.yaml" \
-             "charts/clickhouse/templates/backup-cronjobs.yaml"; do
-    assert_workload_hardened "$tpl" "${ch_full_flags[@]}"
+  # Keeper, the backup/restore Jobs and the cron pods render only when a
+  # non-default value switches them on, so the default pass above never sees
+  # them. That blind spot is not theoretical: the cronjobs template shipped
+  # unrenderable because nothing in the repo ever rendered it.
+  for tpl in "${HARDENED_WORKLOADS_GATED[@]}"; do
+    case "$tpl" in
+      templates/cronjobs/*) assert_workload_hardened "$tpl" "${CRONJOB_FLAGS[@]}" ;;
+      *)                    assert_workload_hardened "$tpl" "${CH_FULL_FLAGS[@]}" ;;
+    esac
+  done
+
+  # The hardened posture must also survive the overlays operators actually
+  # install — strict-admission most of all, since it is what the docs tell a
+  # locked-down cluster to apply. A per-component securityContext override in an
+  # overlay now MERGES over the defaults, so an overlay could relax a control
+  # without the default render noticing.
+  for tpl in "${HARDENED_WORKLOADS[@]}"; do
+    assert_workload_hardened "$tpl" --set autogen.enabled=true \
+      -f "${OVERLAYS}/strict-admission.yaml"
   done
 
   # The backup Jobs talk to S3, so they must carry the chart's ServiceAccount
   # rather than falling through to the namespace default, which would miss an
-  # IRSA annotation set on the chart SA.
+  # IRSA annotation set on the chart SA. Assert the VALUE: the key alone is
+  # satisfied by `serviceAccountName: default`, which is the bug.
   local backup_out
-  backup_out=$(tmpl_only "charts/clickhouse/templates/backup-cronjobs.yaml" "${ch_full_flags[@]}")
-  assert_contains "hardening: backup Jobs use the chart ServiceAccount" "$backup_out" "serviceAccountName:"
+  backup_out=$(tmpl_only "charts/clickhouse/templates/backup-cronjobs.yaml" "${CH_FULL_FLAGS[@]}")
+  assert_contains "hardening: backup Jobs use the chart ServiceAccount" "$backup_out" \
+    "serviceAccountName: ${RELEASE}-clickhouse"
 
   # Scratch volumes are bounded so a pod in an error loop is evicted on its own
-  # quota instead of filling the node's ephemeral storage.
+  # quota instead of filling the node's ephemeral storage. Compare counts, not
+  # presence: these templates carry several emptyDirs and a presence check is
+  # satisfied while any one of them silently loses its bound.
   local ch_sts
-  ch_sts=$(tmpl_only "charts/clickhouse/templates/statefulset.yaml" "${ch_full_flags[@]}")
-  assert_contains "hardening: clickhouse scratch volumes are bounded" "$ch_sts" "sizeLimit:"
-  assert_contains "hardening: backup Job scratch is bounded" "$backup_out" "sizeLimit:"
+  ch_sts=$(tmpl_only "charts/clickhouse/templates/statefulset.yaml" "${CH_FULL_FLAGS[@]}")
+  assert_every_emptydir_bounded "clickhouse statefulset" "$ch_sts"
+  assert_every_emptydir_bounded "backup Jobs" "$backup_out"
+  assert_every_emptydir_bounded "keeper" \
+    "$(tmpl_only "charts/clickhouse/templates/keeper-statefulset.yaml" "${CH_FULL_FLAGS[@]}")"
+  assert_every_emptydir_bounded "postgresql" \
+    "$(tmpl_only "templates/postgresql/statefulset.yaml" --set autogen.enabled=true)"
+  assert_every_emptydir_bounded "redis" \
+    "$(tmpl_only "templates/redis/statefulset.yaml" --set autogen.enabled=true)"
 
   local def
   def=$(tmpl --set autogen.enabled=true)
@@ -451,14 +502,28 @@ test_pod_security() {
   assert_contains "override: keeps dropped capabilities"        "$cont_override" "- ALL"
 
   # No workload may exist that is neither hardened nor a recorded exemption.
-  # This is what stops a new subchart from silently shipping unhardened.
-  local rendered expected found
-  rendered=$(awk '/^# Source:/{src=$3} /^kind: (Deployment|StatefulSet|CronJob|Job)$/{print src}' <<< "$def" \
-    | sed 's|^langwatch/||' | sort -u)
-  expected=$(printf '%s\n' "${HARDENED_WORKLOADS[@]}" "${EXEMPT_WORKLOADS[@]%%:*}" | sort -u)
-  found=$(comm -23 <(printf '%s\n' "$rendered") <(printf '%s\n' "$expected") || true)
+  #
+  # The triage set is the UNION of the default render and every feature-gated
+  # render, because a workload that is off by default is exactly where an
+  # unhardened one hides — reading the default render alone is how the cronjobs
+  # template stayed untriaged and unrenderable. LC_ALL=C pins byte ordering so
+  # `comm`'s sorted-input contract holds regardless of runner locale; comm does
+  # not warn when it is violated, it just returns the wrong answer.
+  local rendered expected found all_renders
+  all_renders=$(
+    printf '%s\n' "$def"
+    tmpl "${CH_FULL_FLAGS[@]}"
+    tmpl "${CRONJOB_FLAGS[@]}"
+    tmpl --set autogen.enabled=true --set clickhouse.preflight.enabled=true \
+      --set clickhouse.autogen.enabled=false --set clickhouse.auth.existingSecret=ch-secret 2>/dev/null || true
+  )
+  rendered=$(awk '/^# Source:/{src=$3} /^kind: (Deployment|StatefulSet|CronJob|Job)$/{print src}' <<< "$all_renders" \
+    | sed 's|^langwatch/||' | LC_ALL=C sort -u)
+  expected=$(printf '%s\n' "${HARDENED_WORKLOADS[@]}" "${HARDENED_WORKLOADS_GATED[@]}" \
+    "${EXEMPT_WORKLOADS[@]%%:*}" | LC_ALL=C sort -u)
+  found=$(LC_ALL=C comm -23 <(printf '%s\n' "$rendered") <(printf '%s\n' "$expected") || true)
   if [[ -z "$found" ]]; then
-    pass "hardening: no untriaged workloads in the default render"
+    pass "hardening: no untriaged workloads across default + feature-gated renders"
   else
     fail "hardening: workload(s) neither hardened nor exempt: $(tr '\n' ' ' <<< "$found")"
   fi
@@ -488,6 +553,9 @@ test_pod_security() {
   # test would fail against a perfectly good overlay.
   local metrics_base
   metrics_base=$(mktemp)
+  # fail() exits, so a trailing rm never runs on the failure path; RETURN fires
+  # either way and keeps failing CI runs from leaking a temp file each time.
+  trap 'rm -f "$metrics_base"' RETURN
   cat > "$metrics_base" <<'YAML'
 app:
   telemetry:
@@ -502,7 +570,6 @@ YAML
   metrics_off=$(tmpl --set autogen.enabled=true -f "$metrics_base" -f "${OVERLAYS}/strict-admission.yaml")
   assert_contains "strict-admission: metrics render produced a manifest" "$metrics_off" "kind: Deployment"
   assert_not_contains "strict-admission: app metrics scrape off" "$metrics_off" "prometheus.io/scrape"
-  rm -f "$metrics_base"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
