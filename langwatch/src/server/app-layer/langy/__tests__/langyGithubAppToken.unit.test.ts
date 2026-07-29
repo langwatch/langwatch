@@ -215,6 +215,45 @@ describe("mintInstallationToken", () => {
       expect(redis.store.size).toBe(0);
     });
   });
+
+  describe("when a token is cached but the installation was uninstalled since it was minted", () => {
+    it("rejects with GithubInstallationNotFoundError instead of serving the stale cached token", async () => {
+      const redis = fakeRedis();
+      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const scope = computeRepoScopeKey({});
+      // Simulate an already-warm cache entry from an earlier, successful mint —
+      // the exact state a missed deletion webhook leaves behind for up to the
+      // token's ~50min TTL.
+      redis.store.set(`langy:gh:insttoken:dead-inst:${scope}`, "ghs_stale");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(
+          async () => new Response("not found", { status: 404 }),
+        ),
+      );
+
+      await expect(
+        svc.mintInstallationToken({ installationId: "dead-inst" }),
+      ).rejects.toBeInstanceOf(GithubInstallationNotFoundError);
+    });
+  });
+
+  describe("when a token is cached and the liveness probe itself fails transiently", () => {
+    it("still serves the cached token (fails open, not closed)", async () => {
+      const redis = fakeRedis();
+      const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
+      const scope = computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(async () => new Response("boom", { status: 500 })),
+      );
+
+      const result = await svc.mintInstallationToken({ installationId: "5" });
+
+      expect(result.token).toBe("ghs_cached");
+    });
+  });
 });
 
 describe("configured", () => {

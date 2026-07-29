@@ -178,6 +178,9 @@ export class LangyGithubAppTokenService {
       { headers: { Authorization: `Bearer ${this.signAppJwt()}` } },
     );
     if (!res.ok) {
+      if (res.status === 404) {
+        throw new GithubInstallationNotFoundError(installationId);
+      }
       throw new Error(`GitHub GET /app/installations failed: ${res.status}`);
     }
     const body = (await res.json()) as {
@@ -192,6 +195,21 @@ export class LangyGithubAppTokenService {
       accountId: body.account?.id != null ? String(body.account.id) : "",
       repositorySelection: body.repository_selection ?? "all",
     };
+  }
+
+  // Confirms an installation still exists before trusting a cached token for
+  // it. Only a confirmed 404 (GithubInstallationNotFoundError) propagates —
+  // any other failure (network blip, GitHub 5xx) fails OPEN, same as every
+  // other best-effort check in this file: a flaky liveness probe must not
+  // block a cached token that is, as far as we know, still perfectly valid.
+  private async assertInstallationStillExists(
+    installationId: string,
+  ): Promise<void> {
+    try {
+      await this.getInstallation(installationId);
+    } catch (error) {
+      if (error instanceof GithubInstallationNotFoundError) throw error;
+    }
   }
 
   /**
@@ -209,7 +227,16 @@ export class LangyGithubAppTokenService {
     const cacheKey = `langy:gh:insttoken:${args.installationId}:${scopeKey}`;
 
     const cached = await this.redisGet(cacheKey);
-    if (cached) return { token: cached, expiresAt: "" };
+    if (cached) {
+      // A cache hit alone doesn't mean the installation is still alive: the
+      // token's ~50min TTL comfortably outlasts a missed deletion webhook, so
+      // without this check a dead installation would keep being served a
+      // "valid" token — and every self-heal path in the caller (which only
+      // ever sees GithubInstallationNotFoundError from a REAL mint attempt)
+      // would never fire until the cache happened to expire.
+      await this.assertInstallationStillExists(args.installationId);
+      return { token: cached, expiresAt: "" };
+    }
 
     // Best-effort lock to avoid a mint stampede; every branch falls through to a
     // direct mint (minting twice is harmless, unlike the old refresh rotation).
