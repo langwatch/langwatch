@@ -19,6 +19,9 @@ const RESOURCES_EXCLUDED_FROM_API_KEY_CATEGORIES = new Set<string>([
   Resources.GATEWAY_LOGS,
   Resources.GATEWAY_USAGE,
   Resources.GATEWAY_CACHE_RULES,
+  // Org-anchored like the gateway surfaces above: managed through org API
+  // keys and RoleBindings, never through user-issued project API keys.
+  Resources.WEBHOOK_ENDPOINTS,
   // Iter 110 governance resources — admin-config surfaces governed by
   // RoleBinding alone, never reachable through user-issued API keys.
   Resources.ROUTING_POLICIES,
