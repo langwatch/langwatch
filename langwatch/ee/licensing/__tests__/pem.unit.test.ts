@@ -49,7 +49,9 @@ describe("normalizePemKey", () => {
       });
     }
   });
+});
 
+describe("normalizePemKey, given input that is not one plain key", () => {
   describe("given a multi-block PEM bundle", () => {
     it("selects the private key rather than whichever block came first", () => {
       const normalized = normalizePemKey(`${TEST_PUBLIC_KEY}${canonicalKey}`);
@@ -81,7 +83,9 @@ describe("normalizePemKey", () => {
       expect(looksLikePemKey(truncated)).toBe(false);
     });
   });
+});
 
+describe("normalizePemKey, given an encrypted key", () => {
   describe("given a key carrying RFC 1421 headers", () => {
     const encryptedKey = [
       "-----BEGIN RSA PRIVATE KEY-----",

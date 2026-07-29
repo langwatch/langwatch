@@ -83,7 +83,9 @@ describe("signLicense", () => {
 
     expect(() => signLicense(licenseData, invalidKey)).toThrow();
   });
+});
 
+describe("signLicense, given a key the operator pasted", () => {
   describe("when the pasted private key carries stray whitespace", () => {
     const canonicalKey = canonicalPemKey(TEST_PRIVATE_KEY);
 
@@ -138,22 +140,25 @@ describe("signLicense", () => {
       expect(verifySignature(signedLicense, TEST_PUBLIC_KEY)).toBe(true);
     });
   });
+});
 
+/** A passphrase-protected key, which signing can never use as-is. */
+const encryptedKey = () =>
+  crypto
+    .generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+      privateKeyEncoding: {
+        type: "pkcs8",
+        format: "pem",
+        cipher: "aes-256-cbc",
+        passphrase: "hunter2",
+      },
+      publicKeyEncoding: { type: "spki", format: "pem" },
+    })
+    .privateKey.toString();
+
+describe("signLicense, given a key it cannot sign with", () => {
   describe("when the key is not a usable signing key", () => {
-    const encryptedKey = () =>
-      crypto
-        .generateKeyPairSync("rsa", {
-          modulusLength: 2048,
-          privateKeyEncoding: {
-            type: "pkcs8",
-            format: "pem",
-            cipher: "aes-256-cbc",
-            passphrase: "hunter2",
-          },
-          publicKeyEncoding: { type: "spki", format: "pem" },
-        })
-        .privateKey.toString();
-
     it("raises a handled error the transport layers map to a 400", () => {
       try {
         signLicense(createTestLicenseData(), "not-a-valid-key");
@@ -193,7 +198,11 @@ describe("signLicense", () => {
         LicenseSigningFailedError,
       );
     });
+  });
+});
 
+describe("signLicense, given a key it cannot sign with, what the failure carries", () => {
+  describe("when signing fails", () => {
     it("carries remediation tips for the operator", () => {
       try {
         signLicense(createTestLicenseData(), encryptedKey());
