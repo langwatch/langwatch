@@ -468,6 +468,11 @@ test_pod_security() {
   # unrelated resource keeping the same string cannot mask a failure.
   local strict entry
   strict=$(tmpl --set autogen.enabled=true -f "${OVERLAYS}/strict-admission.yaml")
+  # tmpl folds stderr into its output, so a failed render is a string that
+  # happens to contain none of the needles below — every assert_not_contains
+  # would pass on a broken overlay. Confirm we are looking at a real manifest
+  # before drawing conclusions from what is missing from it.
+  assert_contains "strict-admission: overlay renders a manifest" "$strict" "kind: Deployment"
   for entry in "${EXEMPT_WORKLOADS[@]}"; do
     assert_not_contains "strict-admission: ${entry##*:} off" "$strict" "# Source: langwatch/${entry%%:*}"
   done
@@ -495,6 +500,7 @@ YAML
   metrics_on=$(tmpl --set autogen.enabled=true -f "$metrics_base")
   assert_contains "baseline: app metrics scrape present when enabled" "$metrics_on" "prometheus.io/scrape"
   metrics_off=$(tmpl --set autogen.enabled=true -f "$metrics_base" -f "${OVERLAYS}/strict-admission.yaml")
+  assert_contains "strict-admission: metrics render produced a manifest" "$metrics_off" "kind: Deployment"
   assert_not_contains "strict-admission: app metrics scrape off" "$metrics_off" "prometheus.io/scrape"
   rm -f "$metrics_base"
 }
