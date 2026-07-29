@@ -22,10 +22,12 @@ export class InvalidDataPrivacyConfigError extends Error {
 }
 
 /**
- * Custom secret patterns and PII exception patterns run against every ingested
- * payload, so a pattern must both compile and pass the safe-regex (ReDoS)
- * analysis before it is stored. Rejecting at write time keeps the redaction hot
- * path free of per-event pattern vetting.
+ * Custom secret patterns and PII exception patterns are evaluated in the
+ * ingestion hot path whenever their redaction pass runs (secrets scanning when
+ * enabled; PII exceptions against detected PII spans), so a pattern must both
+ * compile and pass the safe-regex (ReDoS) analysis before it is stored.
+ * Rejecting at write time keeps that hot path free of per-event pattern
+ * vetting.
  */
 function assertSafePatterns(patterns: string[], label: string): void {
   for (const pattern of patterns) {

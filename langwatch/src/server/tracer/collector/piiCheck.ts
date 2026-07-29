@@ -2,6 +2,10 @@ import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { createLogger } from "@langwatch/observability";
 import { normalizePresidioMarkers } from "@langwatch/redaction";
+import {
+  compilePiiExceptPatterns,
+  matchesPiiException,
+} from "~/server/data-privacy/redaction/essentialPii";
 import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
 import type { BatchEvaluationResult } from "../../evaluations/evaluators";
@@ -203,26 +207,6 @@ const codepointToCodeUnitConverter = (
 };
 
 /**
- * Compile do-not-redact exception patterns for the DLP finding filter, each
- * anchored so it must cover a finding's whole quoted text. Invalid patterns are
- * skipped: they are validated at policy save time, so a failure here is legacy
- * config and redaction must keep running.
- */
-const compileDlpExceptions = (
-  patterns: readonly string[] | undefined,
-): RegExp[] => {
-  const compiled: RegExp[] = [];
-  for (const pattern of patterns ?? []) {
-    try {
-      compiled.push(new RegExp(`^(?:${pattern})$`));
-    } catch {
-      // Skip: rejected at save time; never let a bad pattern break ingestion.
-    }
-  }
-  return compiled;
-};
-
-/**
  * Mask every DLP finding over `text`, skipping findings vetoed by a policy
  * exception. DLP reports codepoint offsets against the original text; they are
  * converted to code-unit indices once. Each mask replaces the range with the
@@ -256,7 +240,7 @@ const maskDlpFindings = ({
     const matchedText = finding.quote?.length
       ? finding.quote
       : text.substring(startIdx, endIdx);
-    if (exceptions.some((exception) => exception.test(matchedText))) continue;
+    if (matchesPiiException(matchedText, exceptions)) continue;
     redacted =
       redacted.substring(0, startIdx) +
       "✳".repeat(endIdx - startIdx) +
@@ -287,7 +271,7 @@ export const googleDLPClearPII = async ({
   const { redacted, masked } = maskDlpFindings({
     text,
     findings,
-    exceptions: compileDlpExceptions(exceptPatterns),
+    exceptions: compilePiiExceptPatterns(exceptPatterns ?? []),
   });
   if (masked > 0) {
     currentObject[lastKey] = redacted.replace(/✳+/g, "[REDACTED]") + remaining;
