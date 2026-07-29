@@ -415,13 +415,21 @@ export function useURLSync(): void {
     if (!hasAppliedFragment.current) return;
 
     const handle = window.setTimeout(() => {
-      // A fragment naming a lens that hasn't hydrated is a live deep link, not
-      // stale state. Collapsing it to whatever live state currently spells —
-      // for the default fallback, the empty body — is what made a shared
+      // Same encoder the popstate guard compares against, so the entry this
+      // writes now reads back as "nothing left to apply" — and only this
+      // entry: older ones keep whatever body they were written with.
+      const body = liveBody({ activeLensId, queryText, timeRange });
+
+      // A fragment naming a lens that hasn't hydrated is a live deep link,
+      // not stale state, and collapsing it to what live state spells — for
+      // the default fallback, the empty body — is what made a shared
       // `#custom-…` link unopenable: the address was gone 150ms in, long
-      // before the lens it named arrived. Hold the URL until the replay above
-      // has had its turn.
-      if (pendingLens.current) return;
+      // before the lens it named arrived. Hold the URL for as long as the
+      // page still shows exactly what that link asked for. The moment
+      // anything moves the writer takes back over, so a lens that never
+      // hydrates cannot freeze the URL for the rest of the session.
+      const pending = pendingLens.current;
+      if (pending && body === canonicalBody(pending.applied)) return;
 
       // Never name a lens the list doesn't hold. The fragment is the shareable
       // address of the view, and an id nothing resolves to just makes the next
@@ -429,10 +437,7 @@ export function useURLSync(): void {
       // valid, body in place until the lens hydrates.
       if (!allLenses.some((l) => l.id === activeLensId)) return;
 
-      // Same encoder the popstate guard compares against, so this entry now
-      // reads back as "nothing left to apply" — and only this entry: older
-      // ones keep whatever body they were written with.
-      writeFragment(liveBody({ activeLensId, queryText, timeRange }));
+      writeFragment(body);
     }, 150);
 
     return () => window.clearTimeout(handle);
