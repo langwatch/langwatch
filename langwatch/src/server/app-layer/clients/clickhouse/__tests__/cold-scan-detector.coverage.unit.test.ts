@@ -18,61 +18,107 @@ import { TIME_PARTITIONED_TABLES } from "../cold-scan-detector";
  * A comment saying "keep in sync" could not have caught that, so this parses the
  * migrations and asserts the map matches.
  */
-describe("cold-scan detector coverage", () => {
-  const migrationDir = resolve(
-    process.cwd(),
-    "src/server/clickhouse/migrations",
-  );
+const migrationDir = resolve(process.cwd(), "src/server/clickhouse/migrations");
 
-  /**
-   * Tables created and later dropped. Their CREATE still exists in history —
-   * migrations are immutable — but they are gone, so the detector must not
-   * carry them.
-   */
-  const DROPPED = new Set<string>(["gateway_activity_events"]);
+/**
+ * Tables created and later dropped. Their CREATE still exists in history —
+ * migrations are immutable — but they are gone, so the detector must not
+ * carry them.
+ */
+const DROPPED = new Set<string>(["gateway_activity_events"]);
 
-  /**
-   * Scratch/rebuild tables that mirror a live table's schema. Queried only by
-   * the migration that builds them, never on a request path.
-   */
-  const NOT_ON_A_READ_PATH = new Set<string>([
-    "gateway_budget_scope_totals_rebuild",
-  ]);
+/**
+ * Scratch/rebuild tables that mirror a live table's schema. Queried only by
+ * the migration that builds them, never on a request path.
+ */
+const NOT_ON_A_READ_PATH = new Set<string>([
+  "gateway_budget_scope_totals_rebuild",
+]);
 
-  /** Every table whose Up section declares a PARTITION BY, mapped to it. */
-  function partitionedTablesFromMigrations(): Map<string, string> {
-    const found = new Map<string, string>();
+/**
+ * A migration's Up section, comments removed.
+ *
+ * Order matters: split on the Down marker BEFORE stripping comments. The
+ * marker is itself a comment line (`-- +goose Down`) in every migration, so
+ * stripping first would delete it and leave `split` matching nothing — the
+ * "Up section" would silently be the whole file, Down included.
+ *
+ * Comments go second because a commented-out CREATE is not a live table, and
+ * counting it would demand coverage for something that does not exist.
+ */
+function upSectionOf(raw: string): string {
+  const up = raw.split(/^\s*--\s*\+goose Down/m)[0] ?? raw;
+  return up
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("--"))
+    .join("\n");
+}
 
-    for (const file of readdirSync(migrationDir).sort()) {
-      if (!file.endsWith(".sql")) continue;
+/** Tables one Up section creates with a PARTITION BY, mapped to it. */
+function partitionedTablesIn(up: string): Map<string, string> {
+  const found = new Map<string, string>();
+  const createRe = /CREATE TABLE[^(]*?[.`]?(\w+)[\s`]*?\(/gi;
 
-      const raw = readFileSync(resolve(migrationDir, file), "utf-8");
-      // Split on the Down marker BEFORE stripping comments. The marker is
-      // itself a comment line (`-- +goose Down`) in every migration, so
-      // stripping first would delete it and leave `split` matching nothing —
-      // the "Up section" would silently be the whole file, Down included.
-      const upSection = raw.split(/^\s*--\s*\+goose Down/m)[0] ?? raw;
-      // Then drop comment lines: a commented-out CREATE is not a live table,
-      // and counting it would demand coverage for something that does not exist.
-      const up = upSection
-        .split("\n")
-        .filter((line) => !line.trim().startsWith("--"))
-        .join("\n");
-
-      const createRe = /CREATE TABLE[^(]*?[.`]?(\w+)[\s`]*?\(/gi;
-      let match: RegExpExecArray | null;
-      while ((match = createRe.exec(up)) !== null) {
-        const table = match[1];
-        if (!table) continue;
-        const tail = up.slice(match.index, match.index + 6000);
-        const partitionBy = /PARTITION BY\s+([^\n]+)/i.exec(tail);
-        if (partitionBy?.[1]) found.set(table, partitionBy[1].trim());
-      }
-    }
-
-    return found;
+  let match: RegExpExecArray | null;
+  while ((match = createRe.exec(up)) !== null) {
+    const table = match[1];
+    if (!table) continue;
+    const tail = up.slice(match.index, match.index + 6000);
+    const partitionBy = /PARTITION BY\s+([^\n]+)/i.exec(tail);
+    if (partitionBy?.[1]) found.set(table, partitionBy[1].trim());
   }
 
+  return found;
+}
+
+/** Every table whose Up section declares a PARTITION BY, mapped to it. */
+function partitionedTablesFromMigrations(): Map<string, string> {
+  const found = new Map<string, string>();
+
+  for (const file of readdirSync(migrationDir).sort()) {
+    if (!file.endsWith(".sql")) continue;
+    const raw = readFileSync(resolve(migrationDir, file), "utf-8");
+    for (const [table, expression] of partitionedTablesIn(upSectionOf(raw))) {
+      found.set(table, expression);
+    }
+  }
+
+  return found;
+}
+
+/**
+ * At least one declared column must appear in the PARTITION BY expression,
+ * else the detector is looking for a predicate that could never prune.
+ */
+function declaresAUsableColumn(
+  columns: readonly string[],
+  expression: string,
+): boolean {
+  return columns.some((column) =>
+    new RegExp(`\\b${column}\\b`, "i").test(expression),
+  );
+}
+
+/**
+ * Entries whose declared columns appear nowhere in the table's real PARTITION
+ * BY, rendered for the failure message.
+ */
+function pruneColumnMismatches(
+  partitioned: ReadonlyMap<string, string>,
+): string[] {
+  return Object.entries(TIME_PARTITIONED_TABLES)
+    .map(([table, columns]) => {
+      const expression = partitioned.get(table);
+      if (!expression) return null;
+      if (declaresAUsableColumn(columns as readonly string[], expression)) {
+        return null;
+      }
+      return `${table}: declares [${columns.join(", ")}], partitioned by ${expression}`;
+    })
+    .filter((entry): entry is string => entry !== null);
+}
+
+describe("cold-scan detector coverage", () => {
   describe("given a table is partitioned by a time expression", () => {
     /** @scenario Every partitioned table is known to the cold-scan detector */
     it("is listed in TIME_PARTITIONED_TABLES so its unpruned reads get flagged", () => {
@@ -95,23 +141,7 @@ describe("cold-scan detector coverage", () => {
 
     /** @scenario The declared prune column actually appears in the PARTITION BY */
     it("declares a prune column the PARTITION BY expression really uses", () => {
-      const partitioned = partitionedTablesFromMigrations();
-      const wrong: string[] = [];
-
-      for (const [table, columns] of Object.entries(TIME_PARTITIONED_TABLES)) {
-        const expression = partitioned.get(table);
-        if (!expression) continue;
-        // At least one declared column must appear in the expression, else the
-        // detector is looking for a predicate that could never prune anything.
-        const anyMatches = (columns as readonly string[]).some((column) =>
-          new RegExp(`\\b${column}\\b`, "i").test(expression),
-        );
-        if (!anyMatches) {
-          wrong.push(
-            `${table}: declares [${columns.join(", ")}], partitioned by ${expression}`,
-          );
-        }
-      }
+      const wrong = pruneColumnMismatches(partitionedTablesFromMigrations());
 
       expect(wrong).toEqual([]);
     });

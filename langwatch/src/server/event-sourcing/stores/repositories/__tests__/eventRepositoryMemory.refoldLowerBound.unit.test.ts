@@ -35,107 +35,100 @@ function record(eventId: string, occurredAt: number | null): EventRecord {
   };
 }
 
-describe("EventRepositoryMemory re-fold reads mirror the ClickHouse lower bound", () => {
-  const bound = 1_700_000_000_000;
+const bound = 1_700_000_000_000;
 
-  async function seeded() {
-    const repo = new EventRepositoryMemory();
-    await repo.insertEventRecords([
-      record("before", bound - 1000), // older than the bound
-      record("at", bound), // exactly at the bound
-      record("after", bound + 1000), // newer than the bound
-      record("unknown-zero", 0), // unknown occurred time, as ClickHouse spells it
-      record("unknown-null", null), // unknown occurred time, as the memory type allows
-    ]);
-    return repo;
-  }
+async function seeded() {
+  const repo = new EventRepositoryMemory();
+  await repo.insertEventRecords([
+    record("before", bound - 1000), // older than the bound
+    record("at", bound), // exactly at the bound
+    record("after", bound + 1000), // newer than the bound
+    record("unknown-zero", 0), // unknown occurred time, as ClickHouse spells it
+    record("unknown-null", null), // unknown occurred time, as the memory type allows
+  ]);
+  return repo;
+}
 
-  // Above every record's EventTimestamp, so the upper bound excludes nothing
-  // and each assertion below is about the lower bound alone.
-  const upToTimestamp = 2000;
-  const upToEventId = "zzz";
+// Above every record's EventTimestamp, so the upper bound excludes nothing
+// and each assertion below is about the lower bound alone.
+const upToTimestamp = 2000;
+const upToEventId = "zzz";
 
-  describe("given getEventRecordsUpTo", () => {
-    it("returns every event when no lower bound is passed", async () => {
-      const repo = await seeded();
+const ALL_IDS = ["before", "at", "after", "unknown-zero", "unknown-null"];
+const WITHIN_BOUND = ["at", "after", "unknown-zero", "unknown-null"];
 
-      const ids = (
-        await repo.getEventRecordsUpTo(
-          "tenant",
-          "trace",
-          "agg",
-          upToTimestamp,
-          upToEventId,
-        )
-      ).map((r) => r.EventId);
+describe("EventRepositoryMemory.getEventRecordsUpTo mirrors the lower bound", () => {
+  it("returns every event when no lower bound is passed", async () => {
+    const repo = await seeded();
 
-      expect(new Set(ids)).toEqual(
-        new Set(["before", "at", "after", "unknown-zero", "unknown-null"]),
-      );
-    });
+    const ids = (
+      await repo.getEventRecordsUpTo(
+        "tenant",
+        "trace",
+        "agg",
+        upToTimestamp,
+        upToEventId,
+      )
+    ).map((r) => r.EventId);
 
-    it("drops events older than the bound and keeps unknown occurred times", async () => {
-      const repo = await seeded();
-
-      const ids = (
-        await repo.getEventRecordsUpTo(
-          "tenant",
-          "trace",
-          "agg",
-          upToTimestamp,
-          upToEventId,
-          bound,
-        )
-      ).map((r) => r.EventId);
-
-      expect(new Set(ids)).toEqual(
-        new Set(["at", "after", "unknown-zero", "unknown-null"]),
-      );
-      expect(ids).not.toContain("before");
-    });
+    expect(new Set(ids)).toEqual(new Set(ALL_IDS));
   });
 
-  describe("given the paged re-fold", () => {
-    it("returns every event when no lower bound is passed", async () => {
-      const repo = await seeded();
+  it("drops events older than the bound and keeps unknown occurred times", async () => {
+    const repo = await seeded();
 
-      const ids = (
-        await repo.getEventRecordsUpToPaged({
-          tenantId: "tenant",
-          aggregateType: "trace",
-          aggregateId: "agg",
-          upToTimestamp,
-          upToEventId,
-          after: undefined,
-          limit: 100,
-        })
-      ).map((r) => r.EventId);
+    const ids = (
+      await repo.getEventRecordsUpTo(
+        "tenant",
+        "trace",
+        "agg",
+        upToTimestamp,
+        upToEventId,
+        bound,
+      )
+    ).map((r) => r.EventId);
 
-      expect(new Set(ids)).toEqual(
-        new Set(["before", "at", "after", "unknown-zero", "unknown-null"]),
-      );
-    });
+    expect(new Set(ids)).toEqual(new Set(WITHIN_BOUND));
+    expect(ids).not.toContain("before");
+  });
+});
 
-    it("applies the same bound as the unpaged read", async () => {
-      const repo = await seeded();
+describe("EventRepositoryMemory paged re-fold mirrors the lower bound", () => {
+  it("returns every event when no lower bound is passed", async () => {
+    const repo = await seeded();
 
-      const ids = (
-        await repo.getEventRecordsUpToPaged({
-          tenantId: "tenant",
-          aggregateType: "trace",
-          aggregateId: "agg",
-          upToTimestamp,
-          upToEventId,
-          after: undefined,
-          limit: 100,
-          occurredAtFromMs: bound,
-        })
-      ).map((r) => r.EventId);
+    const ids = (
+      await repo.getEventRecordsUpToPaged({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "agg",
+        upToTimestamp,
+        upToEventId,
+        after: undefined,
+        limit: 100,
+      })
+    ).map((r) => r.EventId);
 
-      expect(new Set(ids)).toEqual(
-        new Set(["at", "after", "unknown-zero", "unknown-null"]),
-      );
-      expect(ids).not.toContain("before");
-    });
+    expect(new Set(ids)).toEqual(new Set(ALL_IDS));
+  });
+
+  it("applies the same bound as the unpaged read", async () => {
+    const repo = await seeded();
+
+    const ids = (
+      await repo.getEventRecordsUpToPaged({
+        tenantId: "tenant",
+        aggregateType: "trace",
+        aggregateId: "agg",
+        upToTimestamp,
+        upToEventId,
+        after: undefined,
+        limit: 100,
+        occurredAtFromMs: bound,
+      })
+    ).map((r) => r.EventId);
+
+    expect(new Set(ids)).toEqual(new Set(WITHIN_BOUND));
+    expect(ids).not.toContain("before");
   });
 });
