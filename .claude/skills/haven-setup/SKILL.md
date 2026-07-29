@@ -99,7 +99,7 @@ Add it to the Step 5 command alongside `LANGY_UNSAFE_HOST_ACCESS=1`. Verify by s
 
 ## Step 4: Check `.env` for stale k8s/Minikube overrides
 
-`resolveWorkerCallbackUrl()` / `resolveWorkerGatewayBaseUrl()` (`langwatch/src/server/app-layer/langy/LangyCredentialService.ts`) check `LANGY_WORKER_CALLBACK_URL` / `LANGY_WORKER_GATEWAY_URL` **before** haven's own correctly-resolved URLs. If the user has previously run the stack via the `k8s` skill (Minikube), `.env` may have these hardcoded to `host.minikube.internal:<port>` — which doesn't resolve outside a Minikube VM and silently breaks **every** LLM call and turn-output callback under haven (symptom: chat sends, worker creates fine, but no reply ever arrives — no visible error to the user, just retries forever). Check:
+`resolveWorkerCallbackUrl()` / `resolveWorkerGatewayBaseUrl()` (`platform/app/src/server/app-layer/langy/LangyCredentialService.ts`) check `LANGY_WORKER_CALLBACK_URL` / `LANGY_WORKER_GATEWAY_URL` **before** haven's own correctly-resolved URLs. If the user has previously run the stack via the `k8s` skill (Minikube), `.env` may have these hardcoded to `host.minikube.internal:<port>` — which doesn't resolve outside a Minikube VM and silently breaks **every** LLM call and turn-output callback under haven (symptom: chat sends, worker creates fine, but no reply ever arrives — no visible error to the user, just retries forever). Check:
 
 ```bash
 grep -n "LANGY_WORKER_CALLBACK_URL\|LANGY_WORKER_GATEWAY_URL" langwatch/.env

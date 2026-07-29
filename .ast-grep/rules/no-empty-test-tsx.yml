@@ -13,7 +13,7 @@ rule:
     - pattern: test($NAME, () => {})
     - pattern: test($NAME, async () => {})
 files:
-  - "langwatch/**/*.test.tsx"
-  - "langwatch/**/*.spec.tsx"
-  - "typescript-sdk/**/*.test.tsx"
+  - "platform/app/**/*.test.tsx"
+  - "platform/app/**/*.spec.tsx"
+  - "sdks/typescript/**/*.test.tsx"
   - "packages/**/*.test.tsx"

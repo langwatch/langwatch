@@ -30,7 +30,7 @@ rule:
                     - regex: "^signal$"
 files:
   - "langwatch/src/**/*.tsx"
-  - "typescript-sdk/src/**/*.tsx"
+  - "sdks/typescript/src/**/*.tsx"
 ignores:
   - "**/*.test.tsx"
   - "**/*.spec.tsx"

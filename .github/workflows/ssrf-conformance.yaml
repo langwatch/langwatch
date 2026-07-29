@@ -44,7 +44,7 @@ jobs:
           filters: |
             ssrf:
               - 'pkg/ssrf/**'
-              - 'langwatch/packages/ssrf/**'
+              - 'platform/app/packages/ssrf/**'
               - '.github/workflows/ssrf-conformance.yaml'
 
   conformance:
@@ -71,5 +71,5 @@ jobs:
       # both sides in one log instead of making you re-run to see the second.
       - name: TypeScript half of the corpus
         if: ${{ !cancelled() }}
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm --filter @langwatch/ssrf test:unit

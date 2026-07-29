@@ -17,4 +17,4 @@ automated testing. **Production use requires a commercial Enterprise License**
 — see https://langwatch.ai/pricing or contact sales@langwatch.ai.
 
 Everything outside this directory is Apache 2.0 — see the repository root
-[`LICENSE.md`](../../LICENSE.md).
+[`LICENSE.md`](../../../LICENSE.md).

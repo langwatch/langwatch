@@ -38,7 +38,7 @@ make worktree my-feature    # Creates feat/my-feature
 
 The script fetches from origin, derives branch/directory names, creates the worktree, copies `.env*` files, and prints a summary with next steps.
 
-See `langwatch/src/docs/WORKTREES.md` for full details.
+See `platform/app/src/docs/WORKTREES.md` for full details.
 
 ## Issues
 

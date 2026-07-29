@@ -6,7 +6,7 @@ Feature: Batch Evaluation Results Visualization
 
   # Many scenarios in this file are bound below to existing JSDOM
   # render tests under
-  # `langwatch/src/components/batch-evaluation-results/__tests__/`:
+  # `platform/app/src/components/batch-evaluation-results/__tests__/`:
   #   * BatchEvaluationResultsTable.test.tsx — table rendering +
   #     loading skeleton + empty state + dataset/target columns.
   #   * BatchTargetCell.test.tsx — output display + cost/duration,

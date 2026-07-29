@@ -18,7 +18,7 @@ import type { EventBus } from "./event-bus.ts";
 
 /**
  * The workspace name of the langwatch app, as declared in
- * langwatch/package.json. Used to filter the install down to the app and its
+ * platform/app/package.json. Used to filter the install down to the app and its
  * dependencies. It was plain `langwatch` until ADR-076 — the same name the
  * published TypeScript SDK uses, which is exactly why it had to change before
  * the two could live in one workspace.
@@ -50,10 +50,10 @@ export function workspaceInstallArgs(
 }
 
 /**
- * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
+ * Ensure platform/app/node_modules exists + start:prepare:files has run, both of
  * which are prerequisites for `pnpm run prisma:migrate` and `pnpm run start:app`.
  *
- * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/langwatch/) — see
+ * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/platform/app/) — see
  * services/app-dir.ts for why we relocate out of node_modules.
  */
 export async function ensureLangwatchDeps(
@@ -259,7 +259,7 @@ export async function ensureLangwatchDeps(
 	// links, and the first runtime import dies minutes later inside a
 	// migration. Turn that into an install-time failure that names the
 	// packaging gap. (Exactly how 3.6.0 shipped: both .npmignore files still
-	// excluded langwatch/packages/ after runtime packages moved in.)
+	// excluded platform/app/packages/ after runtime packages moved in.)
 	assertWorkspaceLinksResolve(nodeModulesPath);
 
 	// Written LAST so an interrupted run never records success: any of the

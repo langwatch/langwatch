@@ -139,7 +139,7 @@ describe("the repo is a single pnpm workspace", () => {
 		/** @scenario The application and the SDK no longer share a package name */
 		it("gives the app the name the npx installer filters by, and the SDK its own", () => {
 			const app = readJson("langwatch/package.json").name;
-			const sdk = readJson("typescript-sdk/package.json").name;
+			const sdk = readJson("sdks/typescript/package.json").name;
 
 			// Cross-checked against the constant the end-user install filters
 			// by, not against a literal: pnpm exits 0 on a filter that matches
@@ -290,7 +290,7 @@ describe("the repo is a single pnpm workspace", () => {
 			const root = readJson("package.json") as { files?: string[] };
 			const shipped = root.files ?? [];
 
-			// Workspace members only — `typescript-sdk/examples/*` carry a
+			// Workspace members only — `sdks/typescript/examples/*` carry a
 			// package.json but are not members, so the lockfile never mentions
 			// them and the tarball has no reason to.
 			const memberManifests = trackedManifests().filter((manifest) =>

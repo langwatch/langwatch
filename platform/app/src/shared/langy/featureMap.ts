@@ -24,7 +24,7 @@
  *
  * @see specs/langy/langy-cli-tool-envelope.feature
  */
-import rawFeatureMap from "../../../../feature-map.json";
+import rawFeatureMap from "../../../../../feature-map.json";
 
 /** One feature (or sub-feature) of the map, reduced to what Langy needs. */
 export interface FeatureNode {

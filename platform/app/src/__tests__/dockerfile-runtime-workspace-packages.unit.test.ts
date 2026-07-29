@@ -4,14 +4,14 @@
  *
  * The builder stage does `COPY packages ./packages`, but the runtime stage
  * cherry-picks individual packages to keep the image slim. pnpm links these as
- * `langwatch/node_modules/@langwatch/<name> -> ../../../packages/<name>`, and
+ * `platform/app/node_modules/@langwatch/<name> -> ../../../../packages/<name>`, and
  * that symlink is copied along with `langwatch/`. If the package it points at
  * is not also copied, the link dangles and the process dies at boot with
  * `Cannot find module '@langwatch/<name>'` — which is exactly how
  * `@langwatch/handled-error` broke the workers entry point after it was added
  * as a root workspace package but never added to the runtime stage.
  *
- * Packages under `langwatch/packages/*` are exempt: they ride along with
+ * Packages under `platform/app/packages/*` are exempt: they ride along with
  * `COPY --from=builder /app/langwatch ./langwatch`.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";

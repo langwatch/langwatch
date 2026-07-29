@@ -71,7 +71,7 @@ Feature: Seed presets — a database that is ready to look at
 
   # --- The mass preset ---
   # Months of coherent, backdated activity, implemented in
-  # langwatch/scripts/seed-mass.ts on the pure generators in
+  # platform/app/scripts/seed-mass.ts on the pure generators in
   # scripts/seed-lib/mass-timeline.ts and scripts/seed-lib/mass-metrics.ts.
   # Event-sourced products (scenario simulations, evaluations, experiment
   # runs) are seeded as real commands whose backdated occurredAt the substrate

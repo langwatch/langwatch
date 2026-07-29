@@ -30,7 +30,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { toTimeseriesShape } from "../../../../../typescript-sdk/src/cli/commands/analytics/timeseriesShape";
+import { toTimeseriesShape } from "../../../../../../sdks/typescript/src/cli/commands/analytics/timeseriesShape";
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({

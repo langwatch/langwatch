@@ -8,18 +8,18 @@ WORKDIR /usr/src/app
 RUN pip install --target . awslambdaric
 
 # Copy workspace config and lock file
-COPY langevals/pyproject.toml langevals/uv.lock ./
+COPY services/langevals/pyproject.toml services/langevals/uv.lock ./
 
 # Copy workspace members
-COPY langevals/langevals_core/ langevals_core/
-COPY langevals/evaluators/ evaluators/
-COPY langevals/notebooks/pyproject.toml notebooks/
+COPY services/langevals/langevals_core/ langevals_core/
+COPY services/langevals/evaluators/ evaluators/
+COPY services/langevals/notebooks/pyproject.toml notebooks/
 
 # Install dependencies (frozen from lock file, no dev deps, all extras)
 RUN uv sync --frozen --no-dev --all-extras
 
 # Copy application code
-COPY langevals/langevals/ langevals/
+COPY services/langevals/langevals/ langevals/
 
 # Preload evaluators
 RUN PYTHONPATH="." uv run python langevals/server.py --preload
@@ -30,7 +30,7 @@ ENV PYTHONPYCACHEPREFIX=/tmp/pycache
 ENV PATH="/usr/src/app/.venv/bin:$PATH"
 
 # Copy remaining project files (scripts, docs, etc.)
-COPY langevals/scripts/ scripts/
-COPY langevals/Makefile langevals/README.md langevals/LICENSE.md ./
+COPY services/langevals/scripts/ scripts/
+COPY services/langevals/Makefile services/langevals/README.md services/langevals/LICENSE.md ./
 
 CMD ["python", "-c", "from langevals.server import main; main()"]

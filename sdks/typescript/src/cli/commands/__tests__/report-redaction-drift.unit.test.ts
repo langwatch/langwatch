@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 /**
  * The CLI ships a verbatim mirror of the platform's redaction engine
- * (langwatch/packages/redaction) so the code agents audit on GitHub is the
+ * (platform/app/packages/redaction) so the code agents audit on GitHub is the
  * exact code that scrubs their report. copy-types.sh refreshes the mirror;
  * this test fails when the canonical package changed without regenerating.
  */
@@ -13,7 +13,7 @@ const MIRRORED_FILES = ["markers.ts", "secrets.ts", "sessionReport.ts"] as const
 const generatedDir = join(__dirname, "../../../internal/generated/redaction");
 const canonicalDir = join(
   __dirname,
-  "../../../../../langwatch/packages/redaction/src",
+  "../../../../../../platform/app/packages/redaction/src",
 );
 
 describe("the bundled redaction mirror, given the canonical package", () => {
@@ -24,7 +24,7 @@ describe("the bundled redaction mirror, given the canonical package", () => {
       expect(
         generated,
         `src/internal/generated/redaction/${file} drifted from ` +
-          `langwatch/packages/redaction/src/${file}; run ./copy-types.sh`,
+          `platform/app/packages/redaction/src/${file}; run ./copy-types.sh`,
       ).toBe(canonical);
     });
   }

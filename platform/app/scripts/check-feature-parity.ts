@@ -39,7 +39,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const REPO_ROOT = resolve(__dirname, "../..");
+const REPO_ROOT = resolve(__dirname, "../../..");
 
 /**
  * Every tree that holds `.feature` files.
@@ -63,14 +63,14 @@ const SPECS_ROOTS = [
  * is not required — any test in these roots can bind any scenario.
  */
 const DEFAULT_TEST_ROOTS: string[] = [
-  "langwatch/src",
-  "langwatch/ee",
-  "langwatch/packages",
-  "langwatch/scripts",
+  "platform/app/src",
+  "platform/app/ee",
+  "platform/app/packages",
+  "platform/app/scripts",
   "packages",
-  "mcp-server/src",
-  "typescript-sdk/src",
-  "python-sdk/src",
+  "mcp/typescript/src",
+  "sdks/typescript/src",
+  "sdks/python/src",
   // What we SHIP as instructions is behavior too: the skill sources and the
   // assistant's rules are tested here (and nowhere else), so scenarios about
   // what an instruction teaches can only bind from this root.
@@ -88,7 +88,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
  */
 const DEFAULT_BATS_TEST_ROOTS: string[] = [
   "scripts/__tests__",
-  "langwatch/scripts/__tests__",
+  "platform/app/scripts/__tests__",
 ];
 
 /**
@@ -121,7 +121,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
  * misleading TS stub.
  */
 const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
-  "langevals",
+  "services/langevals",
   "langwatch_server",
   "python-sdk",
 ];
@@ -147,7 +147,7 @@ const LEGACY_UNBOUND: string[] = [
   // "the tree is fully resolved" — it is not. Adding the tree to SPECS_ROOTS
   // made it discoverable, and every scenario in it that carries a `@unit` /
   // `@integration` tag is bound. Most of its scenarios carry no tag at all and
-  // so are invisible to this gate: `typescript-sdk/specs/cli/daemon.feature`,
+  // so are invisible to this gate: `sdks/typescript/specs/cli/daemon.feature`,
   // for one, has 35 scenarios of which 2 are enforced and none are
   // @unimplemented. `LEGACY_INERT` below catches a file where that count falls
   // to zero; it does NOT catch a partially-tagged file like that one. Tagging

@@ -227,7 +227,7 @@ Coalesced batches go through the same envelope decoder and the same lifecycle: e
 The `{queue}:group:{groupId}:blocked` marker is set by:
 
 - A retry (`RESTAGE_AND_BLOCK_LUA`) — briefly blocks the group so the retry is next out.
-- An explicit pause from the queue-pausing pipeline (see [`specs/queue-pausing/queue-pausing.feature`](../../../../../../specs/queue-pausing/queue-pausing.feature)).
+- An explicit pause from the queue-pausing pipeline (see [`specs/queue-pausing/queue-pausing.feature`](../../../../../../../specs/queue-pausing/queue-pausing.feature)).
 
 `DISPATCH_BATCH_LUA` skips blocked groups when picking the next eligible group; the active sorted set is unchanged but the group is invisible to the dispatcher until unblocked. Unblock is just deleting the marker.
 
@@ -307,12 +307,12 @@ This keeps the queue testable in isolation: integration tests pass an in-memory 
 
 ## Related ADRs
 
-- [ADR-026](../../../../../../dev/docs/adr/026-groupqueue-payload-envelope.md) — the GQ1 envelope format
-- [ADR-029](../../../../../../dev/docs/adr/029-groupqueue-content-addressed-payload-store.md) — content-addressed tiered store (GQ2)
-- [ADR-030](../../../../../../dev/docs/adr/030-groupqueue-blob-handling-hardening.md) — hardening for the GQ2 store path
+- [ADR-026](../../../../../../../dev/docs/adr/026-groupqueue-payload-envelope.md) — the GQ1 envelope format
+- [ADR-029](../../../../../../../dev/docs/adr/029-groupqueue-content-addressed-payload-store.md) — content-addressed tiered store (GQ2)
+- [ADR-030](../../../../../../../dev/docs/adr/030-groupqueue-blob-handling-hardening.md) — hardening for the GQ2 store path
 
 ## Related Specs
 
-- [`payload-envelope.feature`](../../../../../../specs/event-sourcing/payload-envelope.feature) — GQ1 envelope behaviour
-- [`payload-store-content-addressed.feature`](../../../../../../specs/event-sourcing/payload-store-content-addressed.feature) — GQ2 content-addressed store behaviour
-- [`payload-store-blob-hardening.feature`](../../../../../../specs/event-sourcing/payload-store-blob-hardening.feature) — GQ2 hardening behaviour
+- [`payload-envelope.feature`](../../../../../../../specs/event-sourcing/payload-envelope.feature) — GQ1 envelope behaviour
+- [`payload-store-content-addressed.feature`](../../../../../../../specs/event-sourcing/payload-store-content-addressed.feature) — GQ2 content-addressed store behaviour
+- [`payload-store-blob-hardening.feature`](../../../../../../../specs/event-sourcing/payload-store-blob-hardening.feature) — GQ2 hardening behaviour

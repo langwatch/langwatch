@@ -21,8 +21,8 @@ rules:
     languages: [typescript, javascript]
     paths:
       include:
-        - "langwatch/src/**/*.ts"
-        - "langwatch/src/**/*.tsx"
+        - "platform/app/src/**/*.ts"
+        - "platform/app/src/**/*.tsx"
       exclude:
         - "**/__tests__/**"
         - "**/*.test.ts"
@@ -87,8 +87,8 @@ rules:
     languages: [generic]
     paths:
       include:
-        - "langwatch/src/server/clickhouse/migrations/**/*.sql"
-        - "langwatch/src/server/clickhouse/migrations/**/*.ts"
+        - "platform/app/src/server/clickhouse/migrations/**/*.sql"
+        - "platform/app/src/server/clickhouse/migrations/**/*.ts"
     pattern-either:
       - pattern-regex: '\$\{CLICKHOUSE_DATABASE\}\.\w+'
       - pattern-regex: '\b(FROM|JOIN|INTO|UPDATE|TABLE|VIEW|EXISTS|DROP)[[:space:]]+langwatch\.[a-z_]+'
@@ -109,8 +109,8 @@ rules:
     languages: [typescript, javascript]
     paths:
       include:
-        - "langwatch/src/server/clickhouse/**/*.ts"
-        - "langwatch/src/server/repositories/**/clickhouse*.ts"
+        - "platform/app/src/server/clickhouse/**/*.ts"
+        - "platform/app/src/server/repositories/**/clickhouse*.ts"
       exclude:
         - "**/migrations/**"
         - "**/__tests__/**"
@@ -139,8 +139,8 @@ rules:
     languages: [generic]
     paths:
       include:
-        - "langwatch/src/server/clickhouse/**/*.ts"
-        - "langwatch/src/server/clickhouse/**/*.sql"
+        - "platform/app/src/server/clickhouse/**/*.ts"
+        - "platform/app/src/server/clickhouse/**/*.sql"
       exclude:
         - "**/migrations/**"
         - "**/__tests__/**"

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/config"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
 
 // mergeTreeConfig maps to the ClickHouse merge_tree section in limits.yaml.

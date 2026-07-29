@@ -21,7 +21,7 @@ import path from "path";
 import { describe, expect, it } from "vitest";
 import { AVAILABLE_EVALUATORS } from "../evaluators";
 
-const repoRoot = path.resolve(__dirname, "../../../../..");
+const repoRoot = path.resolve(__dirname, "../../../../../..");
 
 /**
  * The documents that TEACH — the ones an agent or a developer copies from.

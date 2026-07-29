@@ -29,7 +29,7 @@
  *    and the pattern is too noisy against base64 and hex ids.
  *
  * This module is mirrored verbatim into the `langwatch` CLI
- * (`typescript-sdk/src/internal/generated/redaction/`), so this file is the
+ * (`sdks/typescript/src/internal/generated/redaction/`), so this file is the
  * exact code that runs before a report is sent. A drift test pins the mirror
  * byte-for-byte.
  */

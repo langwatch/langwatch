@@ -13,10 +13,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Repo root containing both `langwatch/` and `charts/`. `process.cwd()`
-// is the langwatch/ package dir when vitest runs (per package.json), so
-// one level up lands on the repo root reliably across worktrees and CI.
-const REPO_ROOT = path.resolve(process.cwd(), "..");
+// Repo root containing both `platform/app/` and `charts/`. `process.cwd()`
+// is the platform/app/ package dir when vitest runs (per package.json), so
+// two levels up lands on the repo root reliably across worktrees and CI.
+const REPO_ROOT = path.resolve(process.cwd(), "..", "..");
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
@@ -263,7 +263,7 @@ describe(".env.example carries the local storage path config", () => {
   describe("when the example env file is loaded", () => {
     /** @scenario ".env.example carries LANGWATCH_LOCAL_STORAGE_PATH with a sensible local default" */
     it("contains LANGWATCH_LOCAL_STORAGE_PATH with the make-quickstart default and a multi-pod warning", () => {
-      const example = readRepoFile("langwatch/.env.example");
+      const example = readRepoFile("platform/app/.env.example");
 
       expect(example).toContain("LANGWATCH_LOCAL_STORAGE_PATH");
       // The default that maps to the LocalFilesystemDriver fallback in
@@ -283,7 +283,7 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
   describe("when the example env file is loaded", () => {
     /** @scenario ".env.example and self-hosting docs describe the Azure stored-objects backend" */
     it("documents AZURE_BLOB_* as live config, no longer deferred, alongside STORED_OBJECTS_BACKEND and AZURE_BLOB_CONTAINER", () => {
-      const example = readRepoFile("langwatch/.env.example");
+      const example = readRepoFile("platform/app/.env.example");
 
       expect(example).not.toMatch(/Azure Blob Storage.*DEFERRED/i);
       expect(example).toContain("STORED_OBJECTS_BACKEND");
@@ -317,7 +317,7 @@ describe("Route handlers delegate to the service and never touch the repository 
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
       const route = readRepoFile(
-        "langwatch/src/app/api/scenario-events/[[...route]]/app.ts",
+        "platform/app/src/app/api/scenario-events/[[...route]]/app.ts",
       );
 
       expect(route).toContain(
@@ -334,7 +334,7 @@ describe("Route handlers delegate to the service and never touch the repository 
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
       const route = readRepoFile(
-        "langwatch/src/app/api/files/[[...route]]/app.ts",
+        "platform/app/src/app/api/files/[[...route]]/app.ts",
       );
 
       expect(route).toContain(
@@ -356,7 +356,7 @@ describe("storage_uri persisted on the stored_objects row is the authoritative b
       // even after S3_BUCKET_NAME changes. The read path receives the row
       // and hands `row.storage_uri` to the registry — never the env.
       const service = readRepoFile(
-        "langwatch/src/server/stored-objects/stored-objects.service.ts",
+        "platform/app/src/server/stored-objects/stored-objects.service.ts",
       );
 
       // The read code path must use row.storage_uri (the URI written at
@@ -390,7 +390,7 @@ describe("Stored objects migration is idempotent at the SQL level", () => {
     /** @scenario "Stored objects migration is idempotent" */
     it("uses CREATE TABLE IF NOT EXISTS so a second run is a no-op", () => {
       const migration = readRepoFile(
-        "langwatch/src/server/clickhouse/migrations/00023_create_stored_objects.sql",
+        "platform/app/src/server/clickhouse/migrations/00023_create_stored_objects.sql",
       );
 
       // The IF NOT EXISTS clause makes the migration safe to re-run.

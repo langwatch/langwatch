@@ -21,7 +21,7 @@ import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
 export async function givenIAmOnTheMembersPage(page: Page) {
   // Members settings is org-scoped at /settings/members (resolved via the
   // session's active org), not project-prefixed — every app nav link uses this
-  // exact href (see langwatch/src/routes.tsx). The org context comes from the
+  // exact href (see platform/app/src/routes.tsx). The org context comes from the
   // authenticated session, not the URL.
   await page.goto(`/settings/members`);
   await expect(
@@ -50,7 +50,7 @@ export async function whenIClickAddMembers(page: Page) {
 export async function whenIFillEmailWith(page: Page, email: string) {
   // The Add-members dialog uses a single comma/space-separated email input whose
   // placeholder is an example list ("alice@example.com, bob@example.com") — see
-  // langwatch/src/components/AddMembersForm.tsx. Match it by a stable substring.
+  // platform/app/src/components/AddMembersForm.tsx. Match it by a stable substring.
   await page.getByPlaceholder(/alice@example\.com/i).last().fill(email);
 }
 

@@ -129,7 +129,7 @@ Default role matrix assignments flow through SCIM, when an IdP pushes a user wit
 
 ## Changing the permission matrix
 
-Default roles are code-defined in `langwatch/src/server/api/rbac.ts`, see commit history for the shipping order. **Do not edit the default matrix in production**: changes to TEAM_ROLE_PERMISSIONS affect every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
+Default roles are code-defined in `platform/app/src/server/api/rbac.ts`, see commit history for the shipping order. **Do not edit the default matrix in production**: changes to TEAM_ROLE_PERMISSIONS affect every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
 
 For the policy rationale (why MEMBER can mint VKs but not create budgets, etc.), see [spec contract §10, Permissions](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/_shared/contract.md#10-permissions).
 

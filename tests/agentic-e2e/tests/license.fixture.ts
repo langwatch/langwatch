@@ -8,7 +8,7 @@
  * (maxMembers=100) so the invitation flows can be exercised.
  *
  * This is the pre-signed `ENTERPRISE_LICENSE_KEY` fixture from
- * `langwatch/ee/licensing/__tests__/fixtures/testLicenses.ts`, signed with the
+ * `platform/app/ee/licensing/__tests__/fixtures/testLicenses.ts`, signed with the
  * in-repo TEST keypair (`.../fixtures/testKeys.ts` `TEST_PRIVATE_KEY`), plan
  * ENTERPRISE, maxMembers=100, expires 2030-12-31. It stays a copied literal
  * even though agentic-e2e-tests is a workspace member since ADR-076 and COULD

@@ -5,7 +5,7 @@ Feature: Project becomes integrated after first trace ingestion
 
   # The 2 @unimplemented scenarios describe the trace-processing
   # pipeline marking projects as integrated. Need a targeted unit test
-  # in `langwatch/src/server/event-sourcing/pipelines/trace-processing/`
+  # in `platform/app/src/server/event-sourcing/pipelines/trace-processing/`
   # for the project.firstMessage projection.
 
   @integration

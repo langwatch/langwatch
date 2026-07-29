@@ -6,7 +6,7 @@
 # sessions itself.
 #
 # The per-agent env blocks MIRROR the CLI wrapper's buildOtelEnvBlock
-# (typescript-sdk/src/cli/utils/governance/wrapper-mode.ts). If the wrapper
+# (sdks/typescript/src/cli/utils/governance/wrapper-mode.ts). If the wrapper
 # gains a knob, add it here too, this script exists to test what the wrapper
 # ships, not a private variant.
 #

@@ -171,11 +171,11 @@ after the `finished` event.
 - Issue: [#3195](https://github.com/langwatch/langwatch/issues/3195)
 - PR: [#5006](https://github.com/langwatch/langwatch/pull/5006)
 - Spec: `langwatch/specs/scenarios/orphaned-run-reconciliation.feature`
-- `langwatch/src/server/scenarios/orphaned-run-reconciliation.ts`
-- `langwatch/src/server/scenarios/orphaned-run-reconciliation.clickhouse.ts`
-- `langwatch/src/server/scenarios/stall-detection.ts`
-- `langwatch/src/server/scenarios/scenario.constants.ts`
-- `langwatch/src/server/scenarios/scenario-failure-handler.ts`
-- `langwatch/src/server/scenarios/scenario.processor.ts`
-- `langwatch/src/server/event-sourcing/pipelines/simulation-processing/projections/simulationRunState.foldProjection.ts`
+- `platform/app/src/server/scenarios/orphaned-run-reconciliation.ts`
+- `platform/app/src/server/scenarios/orphaned-run-reconciliation.clickhouse.ts`
+- `platform/app/src/server/scenarios/stall-detection.ts`
+- `platform/app/src/server/scenarios/scenario.constants.ts`
+- `platform/app/src/server/scenarios/scenario-failure-handler.ts`
+- `platform/app/src/server/scenarios/scenario.processor.ts`
+- `platform/app/src/server/event-sourcing/pipelines/simulation-processing/projections/simulationRunState.foldProjection.ts`
 - Related: [ADR-009: OTEL Trace Context Propagation for HTTP Scenarios](009-otel-trace-context-propagation-for-http-scenarios.md)

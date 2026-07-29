@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/config"
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/render"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/render"
 )
 
 const gb1 int64 = 1 << 30

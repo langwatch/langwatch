@@ -52,10 +52,10 @@ async function main() {
   // Spawn the locally-built CLI so its output is what would land in a
   // screen recording. The system-installed `langwatch` may be older than
   // the R3 CLI rewrite shipped on this PR; the dist build under
-  // `typescript-sdk/dist/cli/index.js` is the authoritative artifact.
+  // `sdks/typescript/dist/cli/index.js` is the authoritative artifact.
   const child = spawn(
     "node",
-    ["typescript-sdk/dist/cli/index.js", "login", "--device"],
+    ["sdks/typescript/dist/cli/index.js", "login", "--device"],
     { env, stdio: ["ignore", "pipe", "pipe"], cwd: process.cwd() + "/.." },
   );
 
@@ -162,7 +162,7 @@ async function main() {
 
   // Trail with `langwatch whoami` showing the lazy-minted VK.
   console.log("\n$ langwatch whoami");
-  const whoami = spawn("node", ["typescript-sdk/dist/cli/index.js", "whoami"], {
+  const whoami = spawn("node", ["sdks/typescript/dist/cli/index.js", "whoami"], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
     cwd: process.cwd() + "/..",

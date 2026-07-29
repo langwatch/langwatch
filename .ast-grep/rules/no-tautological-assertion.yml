@@ -19,7 +19,7 @@ rule:
     - pattern: expect(true).toBe(true)
     - pattern: expect(false).toBe(false)
 files:
-  - "langwatch/**/*.test.ts"
-  - "langwatch/**/*.spec.ts"
-  - "typescript-sdk/**/*.test.ts"
+  - "platform/app/**/*.test.ts"
+  - "platform/app/**/*.spec.ts"
+  - "sdks/typescript/**/*.test.ts"
   - "packages/**/*.test.ts"

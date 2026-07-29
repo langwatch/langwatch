@@ -15,8 +15,8 @@
 #   scripts/dev.sh ps | logs | clean | rebuild
 set -e
 
-COMPOSE="docker compose -f compose.dev.yml"
-COMPOSE_MIGRATION="docker compose -f compose.dev.yml -f compose.dev.migration.yml"
+COMPOSE="docker compose -f infra/compose.dev.yml --project-directory ."
+COMPOSE_MIGRATION="docker compose -f infra/compose.dev.yml -f infra/compose.dev.migration.yml --project-directory ."
 
 # ---------------------------------------------------------------------------
 # Help — non-interactive reference
@@ -36,8 +36,8 @@ Presets — pass as the first arg or pick interactively:
   dev-storage     Local CH + PG + Redis + workers. Stored-objects route to the
                   dev S3 bucket runtime-storage-dev in lw-dev (eu-central-1).
                   Real AWS S3 driver under test without polluting shared dev
-                  tables. Requires fresh AWS SSO credentials in langwatch/.env
-                  — run `bash langwatch/scripts/refresh-dev-s3-env.sh` first
+                  tables. Requires fresh AWS SSO credentials in platform/app/.env
+                  — run `bash platform/app/scripts/refresh-dev-s3-env.sh` first
                   if S3_SESSION_TOKEN is missing or stale.
 
   dev-infra       Local app + local Redis + local workers container.
@@ -51,7 +51,7 @@ Presets — pass as the first arg or pick interactively:
                   data in dev CH / dev PG.
 
   frontend-only   No compose. Pure `pnpm dev` against the URLs in your
-                  langwatch/.env. UI / design / static iteration. Workers
+                  platform/app/.env. UI / design / static iteration. Workers
                   still run in-process via `pnpm dev`; set
                   START_WORKERS=false on the command line if you want pure
                   Vite with no background processing.
@@ -63,9 +63,9 @@ Presets — pass as the first arg or pick interactively:
   full-local      Kitchen-sink local: all-local-nlp + dedicated workers
                   container + ai-server. Slowest boot.
 
-URL-override model: each preset writes `langwatch/.env.dev-up` listing only
+URL-override model: each preset writes `platform/app/.env.dev-up` listing only
 the URLs whose services start locally. compose loads this overlay AFTER
-langwatch/.env (your source of truth), so non-overridden URLs keep their
+platform/app/.env (your source of truth), so non-overridden URLs keep their
 .env values. CREDENTIALS NEVER GO IN THE OVERLAY — only non-rotating
 infra shape (bucket/endpoint/region/connection-host).
 
@@ -103,9 +103,9 @@ LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-v4-${COMPOSE_PROJECT_NAME:-lan
 
 check_env_files() {
   local missing=0
-  if [ ! -f "langwatch/.env" ]; then
-    echo "WARNING: langwatch/.env not found"
-    echo "  → cp langwatch/.env.example langwatch/.env"
+  if [ ! -f "platform/app/.env" ]; then
+    echo "WARNING: platform/app/.env not found"
+    echo "  → cp platform/app/.env.example platform/app/.env"
     missing=1
   fi
   if [ $missing -eq 1 ]; then
@@ -120,13 +120,13 @@ check_env_files() {
 
 # Fail-fast on insecure SaaS-mode config.
 check_saas_ssrf_guard() {
-  if [ ! -f "langwatch/.env" ]; then return 0; fi
-  if ! grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" langwatch/.env; then
+  if [ ! -f "platform/app/.env" ]; then return 0; fi
+  if ! grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" platform/app/.env; then
     return 0
   fi
-  if ! grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?(true|1|yes)['\"]?[[:space:]]*$" langwatch/.env; then
+  if ! grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?(true|1|yes)['\"]?[[:space:]]*$" platform/app/.env; then
     cat >&2 <<'EOF'
-ERROR: langwatch/.env has IS_SAAS=true but BLOCK_LOCAL_HTTP_CALLS is not
+ERROR: platform/app/.env has IS_SAAS=true but BLOCK_LOCAL_HTTP_CALLS is not
        explicitly set to a truthy value. SaaS mode requires SSRF blocking;
        absence of the variable counts as disabled. Add:
          BLOCK_LOCAL_HTTP_CALLS=true
@@ -224,18 +224,18 @@ EOF
 # Skip with QUICKSTART_NO_REFRESH=1 if you want to manage creds manually
 # (e.g. you've pasted in an IAM-user access key instead of using SSO).
 check_dev_s3_credentials() {
-  if [ ! -f "langwatch/.env" ]; then
+  if [ ! -f "platform/app/.env" ]; then
     return 0
   fi
   local has_token
-  has_token=$(grep -E "^S3_SESSION_TOKEN[[:space:]]*=[[:space:]]*['\"]?.+['\"]?[[:space:]]*$" langwatch/.env || true)
+  has_token=$(grep -E "^S3_SESSION_TOKEN[[:space:]]*=[[:space:]]*['\"]?.+['\"]?[[:space:]]*$" platform/app/.env || true)
   if [ -n "$has_token" ]; then
     return 0
   fi
 
   if [ "${QUICKSTART_NO_REFRESH:-0}" = "1" ]; then
     cat >&2 <<'EOF'
-ERROR: dev-storage requires S3_SESSION_TOKEN in langwatch/.env but
+ERROR: dev-storage requires S3_SESSION_TOKEN in platform/app/.env but
        QUICKSTART_NO_REFRESH=1 was set. Set the credentials manually
        (e.g. an IAM user's access key) or unset QUICKSTART_NO_REFRESH
        and let the launcher rotate SSO creds for you.
@@ -243,8 +243,8 @@ EOF
     exit 1
   fi
 
-  echo "No S3_SESSION_TOKEN in langwatch/.env — auto-refreshing AWS SSO credentials..."
-  if ! bash langwatch/scripts/refresh-dev-s3-env.sh; then
+  echo "No S3_SESSION_TOKEN in platform/app/.env — auto-refreshing AWS SSO credentials..."
+  if ! bash platform/app/scripts/refresh-dev-s3-env.sh; then
     cat >&2 <<'EOF'
 ERROR: refresh-dev-s3-env.sh failed. Inspect the output above. Common causes:
   - lw-dev-sso profile not configured (~/.aws/config)
@@ -261,7 +261,7 @@ ensure_prepared() {
   check_saas_ssrf_guard
   check_stateful_collision
   check_host_redis_collision
-  ( cd langwatch
+  ( cd platform/app
     if [ ! -d node_modules ]; then
       echo "Installing host dependencies (for prep)..."
       pnpm install
@@ -278,13 +278,13 @@ ensure_prepared() {
 
 write_overrides() {
   local preset="$1"
-  local out="langwatch/.env.dev-up"
+  local out="platform/app/.env.dev-up"
   write_dev_overrides "$preset" "$out"
   if [ -s "$out" ]; then
     echo "URL overrides for preset=$preset written to $out:"
     sed 's/^/  /' "$out" >&2
   else
-    echo "No URL overrides for preset=$preset — your langwatch/.env values are used as-is."
+    echo "No URL overrides for preset=$preset — your platform/app/.env values are used as-is."
   fi
 }
 
@@ -333,7 +333,7 @@ run_dev_storage() {
   sanitize_localhost_dev_env
   write_overrides dev-storage
   echo "Starting: postgres + redis + clickhouse + app + workers (preset=dev-storage)"
-  echo "  Stored-objects route to s3://runtime-storage-dev/ via SSO credentials in langwatch/.env"
+  echo "  Stored-objects route to s3://runtime-storage-dev/ via SSO credentials in platform/app/.env"
   $COMPOSE --profile workers up
 }
 
@@ -371,16 +371,16 @@ EOF
   ensure_prepared
   write_overrides dev-infra
   echo "Starting: redis + workers compose services (preset=dev-infra)"
-  echo "  App runs via 'pnpm dev' from langwatch/ on the host for hot-reload."
+  echo "  App runs via 'pnpm dev' from platform/app/ on the host for hot-reload."
   echo "  Workers run in the compose 'workers' container (not in-process)."
-  echo "  DB / ClickHouse / NLP / S3 come from langwatch/.env (shared dev)."
+  echo "  DB / ClickHouse / NLP / S3 come from platform/app/.env (shared dev)."
   $COMPOSE --profile workers up -d redis workers
   cat <<'EOF'
 
 Redis is running detached on localhost:6379.
 Workers compose container is running detached. Next:
 
-  cd langwatch
+  cd platform/app
   pnpm dev
 
 Stop redis + workers with: scripts/dev.sh down
@@ -423,9 +423,9 @@ EOF
     $COMPOSE up -d redis
     echo "Redis is running detached on localhost:6379 (for in-process workers)."
   fi
-  echo "Preset: frontend-only — no app compose. Run 'pnpm dev' from langwatch/ to start."
+  echo "Preset: frontend-only — no app compose. Run 'pnpm dev' from platform/app/ to start."
   echo ""
-  echo "Tip: pure UI / design / static iteration. URLs come from langwatch/.env."
+  echo "Tip: pure UI / design / static iteration. URLs come from platform/app/.env."
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
   echo "     Pure Vite with no background processing: START_WORKERS=false pnpm dev."
   echo "     Stop redis with: scripts/dev.sh down"
@@ -433,7 +433,7 @@ EOF
   # .env.dev-up: start:prepare:db runs the migrations before the app boots
   # dotenv, so it reads the shell environment, not the overlay file. Frontend-only
   # targets shared dev infra whose ClickHouse schema we don't own, so skip migrate.
-  (cd langwatch && SKIP_CLICKHOUSE_MIGRATE=true SKIP_PRISMA_MIGRATE=true pnpm dev)
+  (cd platform/app && SKIP_CLICKHOUSE_MIGRATE=true SKIP_PRISMA_MIGRATE=true pnpm dev)
 }
 
 run_migration() {
@@ -444,11 +444,11 @@ run_migration() {
   cat <<EOF
 
 Postgres: localhost:5432  Clickhouse: localhost:8123
-DATABASE_URL and CLICKHOUSE_URL pinned to localhost in langwatch/.env.dev-up.
+DATABASE_URL and CLICKHOUSE_URL pinned to localhost in platform/app/.env.dev-up.
 
 Run migrations from your host shell:
 
-  cd langwatch
+  cd platform/app
   pnpm prisma migrate dev          # for postgres schema changes
   pnpm clickhouse:migrate           # for clickhouse schema changes
 

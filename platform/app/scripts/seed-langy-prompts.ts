@@ -21,7 +21,7 @@
  * This is a SCRIPT, not a migration: prompt content is data, and the codebase
  * never seeds prompt rows through Prisma migrations (migrations are schema only).
  *
- * Usage (from `langwatch/`):
+ * Usage (from `platform/app/`):
  *
  *   pnpm tsx scripts/seed-langy-prompts.ts --project <projectId>
  *   LANGY_PROMPT_PROJECT_ID=<projectId> pnpm tsx scripts/seed-langy-prompts.ts
@@ -44,7 +44,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** repo-root/langwatch/scripts → repo root → services/.../AGENTS.md */
 const AGENTS_MD_PATH = path.resolve(
   __dirname,
-  "../../services/langyagent/internal/assets/AGENTS.md",
+  "../../../services/langyagent/internal/assets/AGENTS.md",
 );
 
 const MODEL = "openai/gpt-5-mini";

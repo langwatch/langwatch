@@ -29,7 +29,7 @@ import { docsUrl } from "~/utils/docsUrl";
  *
  * Pairs with:
  *   - docs/integration/cli.mdx (canonical install + login guide)
- *   - typescript-sdk/src/cli (CLI itself)
+ *   - sdks/typescript/src/cli (CLI itself)
  *
  * Spec: specs/ai-governance/cli-onboarding/install-cli-card.feature
  */

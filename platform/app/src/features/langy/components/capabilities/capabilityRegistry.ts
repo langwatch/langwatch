@@ -5,7 +5,7 @@
  * AI-SDK tool part (`tool-<name>` / `dynamic-tool`). This module is the pure,
  * JSX-free mapping from a tool NAME to the bespoke card that should render it —
  * keyed off the real `langwatch-mcp-server` tool names (grounded against
- * `mcp-server/src/create-mcp-server.ts`).
+ * `mcp/typescript/src/create-mcp-server.ts`).
  *
  * Governing rule — propose-then-apply:
  *   - READ tools (search/get/list, analytics, run results) render their result

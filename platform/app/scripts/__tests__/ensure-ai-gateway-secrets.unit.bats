@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Unit tests for langwatch/scripts/ensure-ai-gateway-secrets.sh — guards
+# Unit tests for platform/app/scripts/ensure-ai-gateway-secrets.sh — guards
 # issue #3902 (fresh `make dev` crashloops because the env validator
 # requires three >=32-char AI Gateway secrets that ship empty in
 # .env.example).
@@ -10,7 +10,7 @@ SCRIPT="$SCRIPT_DIR/ensure-ai-gateway-secrets.sh"
 setup() {
   TEST_DIR="$(mktemp -d)"
   # The script resolves $ENV_FILE via dirname(self)/../.env, so we copy it
-  # into a fixture tree that mirrors the langwatch/scripts/ layout.
+  # into a fixture tree that mirrors the platform/app/scripts/ layout.
   mkdir -p "$TEST_DIR/scripts"
   cp "$SCRIPT" "$TEST_DIR/scripts/ensure-ai-gateway-secrets.sh"
   ENV_FILE="$TEST_DIR/.env"
@@ -20,7 +20,7 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
-@test "exits 0 cleanly when langwatch/.env does not exist" {
+@test "exits 0 cleanly when platform/app/.env does not exist" {
   run bash "$TEST_DIR/scripts/ensure-ai-gateway-secrets.sh"
   [ "$status" -eq 0 ]
   [ ! -f "$ENV_FILE" ]

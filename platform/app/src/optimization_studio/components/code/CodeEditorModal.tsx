@@ -1,13 +1,11 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { Prism } from "prism-react-renderer";
 import { LuFileCode, LuX } from "react-icons/lu";
 import { Dialog } from "../../../components/ui/dialog";
 import { EditorStatusBar } from "./EditorStatusBar";
 
-(typeof global !== "undefined" ? global : window).Prism = Prism;
-// Dynamic import — must happen after Prism is set on globalThis (ESM imports hoist above runtime code)
-// @ts-ignore — prismjs component modules lack type declarations
-void import("prismjs/components/prism-python");
+// Registers the Prism global before any grammar module evaluates; module
+// evaluation order inside prismLanguages guarantees the ordering.
+import "../../../components/code/prismLanguages";
 
 import dynamic from "~/utils/compat/next-dynamic";
 

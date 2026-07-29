@@ -15,11 +15,11 @@ If no feature file exists for your task, create one before writing code.
 
 **For frontend work, read the UX docs first.** Before any non-trivial frontend change (anything beyond a specific, targeted tweak the user spelled out), read the relevant pattern docs under `dev/docs/best_practices/` so you extend existing patterns instead of reinventing them. The UI ones: `react.md`, `drawers.md`, `row-actions-overflow-menu.md`, `selection-action-bar.md`, `scope-selector-and-badges.md`. If the surface you are building has no doc yet, write one as part of the change.
 
-**Error paths are part of the feature, not an afterthought.** Any code that can fail — a route, a service method, a mutation, a form submit — ships its failure modes deliberately: read `dev/docs/best_practices/error-handling.md` and [ADR-045](dev/docs/adr/045-domain-errors-handled-boundary.md). The rule in one line: throw a `HandledError` **only** when we know the cause *and* the caller can act on it; everything else stays a plain `Error` and correctly degrades to a generic "unknown" plus a trace id. When you add a feature, name its expected failures in the spec alongside the golden path, and give each one a stable `code`, customer-safe `message`, correct `fault`, remediation copy, and an entry in the client presentation registry (`langwatch/src/features/errors/logic/presentation.ts`) — that registry, keyed by `code`, is where the words a customer actually reads live. "Unknown error" reaching a user for a failure we could have named is a bug in the feature, not a gap in the error system. **A failure scenario in a spec enforces nothing until it is tagged and bound.** `check-feature-parity.ts` only counts scenarios carrying `@unit`, `@integration`, `@e2e` or `@regression` (and skips `@unimplemented`), so an untagged `.feature` file reports `0/0 scenarios bound` / `✓ all bound` and reads green while binding nothing at all. Every scenario you write for an error path needs a binding tag **and** a `@scenario "<title>"` annotation on the test that covers it, or it is vacuously bound.
+**Error paths are part of the feature, not an afterthought.** Any code that can fail — a route, a service method, a mutation, a form submit — ships its failure modes deliberately: read `dev/docs/best_practices/error-handling.md` and [ADR-045](dev/docs/adr/045-domain-errors-handled-boundary.md). The rule in one line: throw a `HandledError` **only** when we know the cause *and* the caller can act on it; everything else stays a plain `Error` and correctly degrades to a generic "unknown" plus a trace id. When you add a feature, name its expected failures in the spec alongside the golden path, and give each one a stable `code`, customer-safe `message`, correct `fault`, remediation copy, and an entry in the client presentation registry (`platform/app/src/features/errors/logic/presentation.ts`) — that registry, keyed by `code`, is where the words a customer actually reads live. "Unknown error" reaching a user for a failure we could have named is a bug in the feature, not a gap in the error system. **A failure scenario in a spec enforces nothing until it is tagged and bound.** `check-feature-parity.ts` only counts scenarios carrying `@unit`, `@integration`, `@e2e` or `@regression` (and skips `@unimplemented`), so an untagged `.feature` file reports `0/0 scenarios bound` / `✓ all bound` and reads green while binding nothing at all. Every scenario you write for an error path needs a binding tag **and** a `@scenario "<title>"` annotation on the test that covers it, or it is vacuously bound.
 
 ## Development Environment
 
-`make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
+`make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `platform/app/.env` is the source of truth for everything else.
 
 ### Running with no container runtime
 
@@ -80,7 +80,7 @@ haven logs nlp -t       # tail one service's logs from any terminal
 Open `https://langwatch.localhost` for the cross-worktree dashboard;
 `observability.langwatch.localhost` proxies the local Grafana LGTM stack;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
-resolved config lands in `langwatch/.env.portless` (loaded last with
+resolved config lands in `platform/app/.env.portless` (loaded last with
 `override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
 `HAVEN_AGENT=1`) for plain, token-free output; `haven status --json` is
 machine-readable. See `tools/thuishaven/README.md`.
@@ -100,7 +100,7 @@ make service svc=aigateway             # Start the Go AI Gateway data plane on :
 make help                              # Full target list including boxd workflows
 ```
 
-The preset-picker writes `langwatch/.env.dev-up` listing only the URLs to override; everything else comes from your `langwatch/.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash langwatch/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
+The preset-picker writes `platform/app/.env.dev-up` listing only the URLs to override; everything else comes from your `platform/app/.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash platform/app/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
 
 The legacy `make dev` / `make dev-nlp` / `make dev-scenarios` / `make dev-test` / `make dev-full` aliases were removed in #4053. Use the preset names directly. `make dev-up` / `make dev-down` / `make dev-logs` still exist for per-worktree isolated stacks (the `dev-up.sh` use case — separate from `quickstart`).
 
@@ -116,7 +116,7 @@ See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 ### AI Gateway (Go, services/aigateway/)
 
-The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
+The gateway is a separate Go service (not in `infra/compose.dev.yml`) that terminates
 virtual-key traffic, fans out to providers via Bifrost, and reports usage back to
 the control plane. `pnpm dev` auto-starts it alongside vite + api when the Go
 toolchain is on PATH; the process appears as `gateway` in the concurrent output
@@ -131,9 +131,9 @@ make service svc=aigateway       # run once
 make service-watch svc=aigateway # live reload via air
 ```
 
-Requires `langwatch/.env` with `LW_GATEWAY_INTERNAL_SECRET`,
+Requires `platform/app/.env` with `LW_GATEWAY_INTERNAL_SECRET`,
 `LW_GATEWAY_JWT_SECRET`, and `LW_GATEWAY_BASE_URL` set — see the
-"AI GATEWAY" block at the bottom of `langwatch/.env.example`. Generate
+"AI GATEWAY" block at the bottom of `platform/app/.env.example`. Generate
 secrets with `openssl rand -hex 32`. The Go gateway and the TS
 control-plane both source the same `.env`, so each secret lives in
 exactly one place (no prefix duplication). Set
@@ -167,18 +167,18 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `platform/app/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `platform/app/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
 ```
-langwatch/           # Next.js app (main product)
+platform/app/        # Vite app (main product)
 langwatch_server/    # Python server
-services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
+services/nlpgo/      # Go NLP engine (:5561, built as platform/app/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
-charts/gateway/      # Helm sub-chart for the gateway
-python-sdk/          # Python SDK
-typescript-sdk/      # TypeScript SDK
+charts/gateway/ # Helm sub-chart for the gateway
+sdks/python/         # Python SDK
+sdks/typescript/     # TypeScript SDK
 specs/               # BDD feature specs
 ```
 
@@ -241,7 +241,7 @@ specs/               # BDD feature specs
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
 | Setting up a Monitor / sleep that *can* take more than 5 minutes | Anthropic's prompt cache TTL is 5min, so any wait that crosses it forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). Cap each poll cycle at **4.5 min (270s)** — re-check, then re-arm. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |
-| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`typescript-sdk/src/cli/**` and `typescript-sdk/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
+| Using inline `import("...")` anywhere | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`sdks/typescript/src/cli/**` and `sdks/typescript/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands |
 | Running `pnpm typecheck` and assuming the TypeScript is checked | `tsconfig.tsgo.json` excludes `**/*.test.ts`, `**/*.test.tsx` and `**/__tests__/**`, so `pnpm typecheck` never looks at a test file. CI runs `pnpm typecheck` **and** `pnpm typecheck:tests` as separate steps in the same job. Use `pnpm typecheck:all`, which is both, or a change confined to a test file will typecheck clean locally and fail CI |
 | Assuming `go build`, `go test` and `gofmt` are enough before pushing Go | Run `golangci-lint run ./services/aigateway/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/...`, which is exactly what `go-ci / lint` runs. It catches a class the other three never will, most often `misspell` (it enforces US spelling, so `behaviour`, `unrecognised`, `labelled` and `funnelled` all fail even though the repo's prose uses British forms), `nolintlint` (a `//nolint` for a code already in the global `gosec.excludes` is flagged as unused) and `testifylint`. The pinned version is in `.golangci.yml`; `golangci-lint run --fix` handles misspell and nolintlint automatically |
 | Rewriting `assert.Equal(t, 1.0, ...)` to `assert.InEpsilon` because testifylint's `float-compare` says so | Check whether the expectation can be zero first. `InEpsilon` divides by the expected value, so it returns false even for `InEpsilon(0.0, 0.0)`, and a counter assertion meaning "this did not move" becomes one that always fails. For Prometheus counters, which are exact integers in a float64, `assert.Equal` is correct and `float-compare` is a false positive; `.golangci.yml` scopes an exclusion to `adapters/gatewaymetrics/*_test.go` rather than contorting the assertions |
@@ -274,4 +274,4 @@ specs/               # BDD feature specs
 | Not filtering on the partition key column in WHERE | Always include `StartedAt`/`OccurredAt`/`StartTime` range in WHERE when a date range is available — this enables partition pruning. Without it, ClickHouse scans ALL partitions including cold storage on S3, turning 100ms queries into 1-2s |
 | Writing down migrations in ClickHouse migration files | Always comment out down migrations to prevent accidental data loss. Add a note: "To roll back, uncomment and run manually" |
 | Putting multiple ALTER TABLE statements in one StatementBegin block | ClickHouse does not support multi-statement queries. Each ALTER TABLE needs its own `-- +goose StatementBegin` / `-- +goose StatementEnd` block |
-| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `langwatch/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals). This is needed after fresh clones, worktree creation, or any schema changes |
+| Getting "Cannot find module" errors for generated files (.prisma/client, types.generated, evaluators.generated) | Run `pnpm start:prepare:files` in the `langwatch/` directory to regenerate all generated types (Prisma, Zod, SDK versions, langevals) — run it in the `platform/app/` directory. This is needed after fresh clones, worktree creation, or any schema changes |

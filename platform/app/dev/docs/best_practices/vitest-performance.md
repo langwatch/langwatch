@@ -1,6 +1,6 @@
 # Vitest performance & memory
 
-Why the unit config (`langwatch/vitest.config.ts`) is shaped the way it is, and
+Why the unit config (`platform/app/vitest.config.ts`) is shaped the way it is, and
 what we tried from <https://vitest.dev/guide/improving-performance> that did NOT
 pay off. Numbers are from a controlled benchmark (2026-07-21) on
 `src/features/traces-v2` (68 files, 705 tests) unless noted, `maxWorkers: 50%`.

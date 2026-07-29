@@ -20,7 +20,7 @@ The division that keeps review comments worth reading:
 
 | Kind of rule | Home |
 |---|---|
-| Expressible as Biome config | `langwatch/biome.json` |
+| Expressible as Biome config | `platform/app/biome.json` |
 | Expressible as a syntactic pattern | `/.ast-grep/rules/` |
 | Expressible as a semantic pattern | `/.semgrep/langwatch.yml` |
 | Genuinely needs judgement | `path_instructions` in `/.coderabbit.yaml` |

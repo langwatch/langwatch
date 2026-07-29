@@ -83,7 +83,7 @@ Phase 1 + 2 mock UI is done. Phase 3A real-data wiring (tRPC routers, app-layer 
 - [Design Doc](trace-v2.md) — Problem statement, personas, product philosophy, approach rationale. The "why."
 
 ### Specifications
-- BDD feature files: [`specs/traces-v2/`](../../../../../specs/traces-v2/) at the repo root — one per surface. The single source of truth for acceptance criteria.
+- BDD feature files: [`specs/traces-v2/`](../../../../../../specs/traces-v2/) at the repo root — one per surface. The single source of truth for acceptance criteria.
 
 ### Decisions
 - [ADR-001: Visualization Types](decisions/adr-001-visualization-types.md) — Why Waterfall + Flame Graph + Span List.

@@ -223,7 +223,7 @@ jobs:
         continue-on-error: true
         run: |
           pip install pip-audit==2.9.0
-          for req in $(git ls-files '*requirements*.txt' 'python-sdk/pyproject.toml' 'langevals/pyproject.toml'); do
+          for req in $(git ls-files '*requirements*.txt' 'sdks/python/pyproject.toml' 'langevals/pyproject.toml'); do
             echo "==> $req"
             pip-audit -r "$req" || true
           done

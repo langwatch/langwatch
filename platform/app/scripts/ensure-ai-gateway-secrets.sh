@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ensure langwatch/.env has the three AI Gateway secrets that the env validator
+# Ensure platform/app/.env has the three AI Gateway secrets that the env validator
 # requires (>= 32 chars). Without them, the app crashloops on startup with
 # "Invalid environment variables: LW_GATEWAY_INTERNAL_SECRET, LW_GATEWAY_JWT_SECRET,
 # LW_VIRTUAL_KEY_PEPPER must contain at least 32 character(s)" and a fresh
@@ -10,11 +10,11 @@
 #   - Non-destructive: never overwrites a non-empty value.
 #   - Clearly logged: every generated secret prints its name (NOT the value).
 #
-# Skipped entirely when langwatch/.env doesn't exist — the env-files check
+# Skipped entirely when platform/app/.env doesn't exist — the env-files check
 # upstream catches that case with a friendlier message.
 set -euo pipefail
 
-# Resolve langwatch/.env relative to this script (langwatch/scripts/...).
+# Resolve platform/app/.env relative to this script (platform/app/scripts/...).
 ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
 
 # Skip if .env hasn't been created yet — the env-files check fires first
@@ -43,7 +43,7 @@ is_empty_or_missing() {
 }
 
 # generate_one — write a 64-hex-char value via openssl (matches the cadence
-# documented in langwatch/.env.example and CLAUDE.md).
+# documented in platform/app/.env.example and CLAUDE.md).
 generate_one() {
   if ! command -v openssl >/dev/null 2>&1; then
     echo "ERROR: openssl not found — cannot auto-generate AI Gateway secrets." >&2

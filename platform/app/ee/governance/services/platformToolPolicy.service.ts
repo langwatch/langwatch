@@ -17,7 +17,7 @@
  * map from those tiles via {@link AiToolEntryService.resolveToolPolicyOverrides},
  * merged over the defaults below - a tool with no tile keeps its default, so a
  * fresh org behaves exactly as before. The CLI mirror of these defaults lives
- * at typescript-sdk/src/cli/utils/governance/platform-tool-policy.ts for the
+ * at sdks/typescript/src/cli/utils/governance/platform-tool-policy.ts for the
  * offline / legacy fallback; the two tables must stay in sync.
  *
  * The Prisma `PlatformToolPolicy` model is intentionally kept (non-destructive

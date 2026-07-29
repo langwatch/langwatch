@@ -179,7 +179,7 @@ LangWatch container images and CLI packages are published with verifiable supply
 
 ### Container images (Docker Hub)
 
-Every release of `langwatch/langwatch`, `langwatch/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
+Every release of `langwatch/langwatch`, `platform/app/langwatch_nlp`, `langwatch/langevals`, and `langwatch/ai-gateway` is signed with [Sigstore](https://www.sigstore.dev/) cosign using keyless OIDC. Both the multi-arch index manifest and each per-platform manifest (linux/amd64, linux/arm64) are signed by digest. A CycloneDX SBOM is generated per platform and attached as a cosign attestation against the matching platform manifest digest, so the SBOM you verify always corresponds to the architecture you actually pulled.
 
 Verify a signature with [cosign](https://github.com/sigstore/cosign):
 

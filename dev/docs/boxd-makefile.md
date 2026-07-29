@@ -1,6 +1,6 @@
-# boxd workflows (`boxd.mk`)
+# boxd workflows (`dev/boxd.mk`)
 
-`boxd.mk` is a Makefile of multi-step orchestration over the [boxd](https://docs.boxd.sh) CLI. It exists for flows that need more than one boxd command — single-command operations stay on the CLI.
+`dev/boxd.mk` is a Makefile of multi-step orchestration over the [boxd](https://docs.boxd.sh) CLI. It exists for flows that need more than one boxd command — single-command operations stay on the CLI.
 
 > **Targets here orchestrate multi-step flows. For single-command operations, use the `boxd` CLI directly.**
 
@@ -83,7 +83,7 @@ The golden VM is a single fixed-name VM per namespace (e.g. `drewdrewthis--langw
 
 Recommended cadence: rebuild **weekly**, or after any of:
 - `pnpm-lock.yaml` change you want pre-installed
-- Docker image bump (compose.dev.yml)
+- Docker image bump (infra/compose.dev.yml)
 - Schema migration that changes seed data
 - New top-level subproject added
 
@@ -97,7 +97,7 @@ Preview targets complement `boxd-fork-*` with an **ephemeral, shareable** workfl
 
 1. **Fork** the team golden (`langwatch-golden-v2`) into `preview-<branch-slug>` — no per-user namespace prefix.
 2. **Checkout** the branch inside the VM (`git fetch origin && git checkout <branch>`).
-3. **Start** `docker compose -f compose.dev.yml --profile full up -d --build` — runs the full stack detached.
+3. **Start** `docker compose -f infra/compose.dev.yml --profile full up -d --build` — runs the full stack detached.
 4. **Print** the URL: `https://preview-<branch-slug>.boxd.sh`.
 
 Preview VMs do not receive `.env` uploads or Claude credentials — they are read-only stack snapshots for review/demo, not development environments.

@@ -4,7 +4,7 @@ Feature: Docker dev environment worktree isolation and startup speed
   So that parallel development work doesn't interfere
 
   # The dev-environment scripts live in `scripts/dev.sh` (bash) +
-  # `compose.dev.yml` and a TypeScript port allocator at
+  # `infra/compose.dev.yml` and a TypeScript port allocator at
   # `packages/server/src/shared/ports.ts`. Tests exist for the
   # TypeScript pieces (`packages/server/test/ports.test.ts`,
   # `env.test.ts`, `cli-doctor.test.ts`) and bash worktree helpers
@@ -17,7 +17,7 @@ Feature: Docker dev environment worktree isolation and startup speed
   # structural fix.
 
   Background:
-    Given the Docker dev environment is configured via compose.dev.yml
+    Given the Docker dev environment is configured via infra/compose.dev.yml
     And scripts/dev.sh provides an interactive launcher
 
   @integration @unimplemented
@@ -57,7 +57,7 @@ Feature: Docker dev environment worktree isolation and startup speed
 
   @unit @unimplemented
   Scenario: Environment variables are not duplicated across services
-    Given compose.dev.yml uses YAML anchors for shared env vars
+    Given infra/compose.dev.yml uses YAML anchors for shared env vars
     Then DATABASE_URL is defined once in x-common-env
     And REDIS_URL is defined once in x-common-env
     And services merge the anchor with service-specific overrides

@@ -31,7 +31,7 @@ constraints:
       - kind: arrow_function
       - kind: function_expression
 files:
-  - "langwatch/**/*.test.tsx"
-  - "langwatch/**/*.spec.tsx"
-  - "typescript-sdk/**/*.test.tsx"
+  - "platform/app/**/*.test.tsx"
+  - "platform/app/**/*.spec.tsx"
+  - "sdks/typescript/**/*.test.tsx"
   - "packages/**/*.test.tsx"

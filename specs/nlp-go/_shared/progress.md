@@ -145,7 +145,7 @@ topic clustering on Python. Roll out per-project via feature flag.
    returns `410 Gone` with a friendly explanation. No DSPy, no optimization.
    See `feature-flag.feature`.
 9. **Tests, real ones.** Provider matrix tests with `//go:build live_<provider>`
-   tags vs real keys in `langwatch/.env`. Engine integration tests exercise the
+   tags vs real keys in `platform/app/.env`. Engine integration tests exercise the
    engine end-to-end with a real HTTP gateway stub.
 
 ## Out of scope (this PR)
@@ -223,8 +223,8 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] Telemetry origin header set in runWorkflow (ash) — propagated through engine ctx → dispatcher
 
 ### Phase 3 — deployment (Go-only end state)
-- [x] Self-hosted `Dockerfile.langwatch_nlp` rewritten distroless Go-only (sarah) — distroless/python3 + the static Go binary + a curated code-block sandbox (requests/httpx/pydantic/langwatch); ~136MB, no uvicorn/litellm/dspy/langwatch_nlp.
-- [x] Monorepo `Dockerfile.langwatch_nlp.lambda` DELETED (sarah) — it was an orphan (only consumer was a CI build smoke). The prod per-tenant lambda image is owned entirely by the langwatch-saas runtime Dockerfile (langwatch-saas#570).
+- [x] Self-hosted `infra/docker/Dockerfile.langwatch_nlp` rewritten distroless Go-only (sarah) — distroless/python3 + the static Go binary + a curated code-block sandbox (requests/httpx/pydantic/langwatch); ~136MB, no uvicorn/litellm/dspy/langwatch_nlp.
+- [x] Monorepo `infra/docker/Dockerfile.langwatch_nlp.lambda` DELETED (sarah) — it was an orphan (only consumer was a CI build smoke). The prod per-tenant lambda image is owned entirely by the langwatch-saas runtime Dockerfile (langwatch-saas#570).
 - [x] uvicorn child + `NLPGO_BYPASS` / `NLPGO_CHILD_*` removed entirely (sarah) — nlpgo is unconditionally go-only; any non-`/go/*` path returns a typed 502.
 - [x] Helm chart points the nlp deployment at the Go image (sarah) — resources lowered to the Go tier, probes repointed to `/healthz` `/readyz` `/startupz`.
 - [x] Terraform memory right-sized for the Go service (ash, langwatch-saas#570) — 4Gi → 1–2Gi.
@@ -233,7 +233,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] Provider matrix tests **removed** (sarah, ba6d13353) — duplicated `services/aigateway/tests/matrix/` per rchaves's direction. Wire-format bugs they caught (prefix stripping, max_completion_tokens, Credential.ID, field-name mapping, DeploymentMap) are now protected by the e2e tests below + the `dispatcheradapter` unit tests.
 - [x] Engine integration tests through real chi router via httptest (sarah) — 8 sync workflow tests + 2 SSE streaming tests + 5 proxypass round-trip tests + 3 realistic code-block tests (stdlib + missing-import UX + urllib network) + 12 dispatcheradapter credential tests. All green.
 - [x] **Real workflow end-to-end against live OpenAI** (sarah, 2f4e7087a) — `TestSync_RealWorkflowEndToEnd_OpenAI`, gated by `live_openai`. Posts a Studio-shape DSL through `/go/studio/execute_sync`, signature node hits real OpenAI gpt-5-mini via in-process dispatcher.
-- [x] **TS integration test against live nlpgo subprocess** (sarah, ba6d13353) — `langwatch/src/server/nlpgo/__tests__/nlpgoFetch.integration.test.ts`. Spawns real nlpgo binary, mocks FF=true, calls real `nlpgoFetch` helper with Studio-shape DSL, asserts model output. **Stays on CI.**
+- [x] **TS integration test against live nlpgo subprocess** (sarah, ba6d13353) — `platform/app/src/server/nlpgo/__tests__/nlpgoFetch.integration.test.ts`. Spawns real nlpgo binary, mocks FF=true, calls real `nlpgoFetch` helper with Studio-shape DSL, asserts model output. **Stays on CI.**
 - [x] Topic clustering migrated to langevals (ash) — workspace member at `langevals/evaluators/topic_clustering/`, TS topicClustering.ts flag-forks, lambda module + API Gateway routes in `langwatch-saas#460`. Tests skipped in CI per rchaves; manual exercise points at langevals on :5561.
 - [x] PR opened — PR #3483 (https://github.com/langwatch/langwatch/pull/3483). QA evidence table embedded with 20 numbered proof points.
 - [ ] CodeRabbit review addressed (small inline comments outstanding; not blocking review)

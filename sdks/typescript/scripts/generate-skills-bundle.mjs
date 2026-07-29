@@ -27,7 +27,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const sdkRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const skillsRoot = path.resolve(sdkRoot, "..", "skills");
+const skillsRoot = path.resolve(sdkRoot, "..", "..", "skills");
 const nativeRoot = path.join(skillsRoot, "_compiled", "native");
 const outPath = path.join(
   sdkRoot,

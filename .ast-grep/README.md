@@ -28,9 +28,9 @@ rules that apply to both file types are split into `_ts` / `_tsx` siblings.
 | `no-export-star-shim` + `-tsx` | `export * from "..."`. Disable inline with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}` | `langwatch/src/**/*.{ts,tsx}` |
 | `no-localhost-fallback` + `-tsx` | `?? "http://localhost..."` and template-literal variants | `langwatch/src/**/*.{ts,tsx}` |
 | `no-form-disable-on-isvalid` | `disabled={!form.formState.isValid}` on submit buttons | `langwatch/src/**/*.tsx` |
-| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition | test files under `langwatch/**`, `typescript-sdk/**` |
-| `require-boolean-name-prefix` | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `langwatch/{src,ee}/**/*.ts` |
-| `require-fetch-timeout` + `-tsx` | `fetch(...)` with no `signal` — a hung peer hangs the caller | `langwatch/src/**`, `typescript-sdk/src/**` |
+| `require-bdd-describe-context` + `-tsx` | nested `describe` that names a topic instead of a `given`/`when` condition | test files under `langwatch/**`, `sdks/typescript/**` |
+| `require-boolean-name-prefix` | `foo: boolean` without an `is`/`has`/`should`/`can`/`will` prefix or a domain-adjective equivalent | `platform/app/{src,ee}/**/*.ts` |
+| `require-fetch-timeout` + `-tsx` | `fetch(...)` with no `signal` — a hung peer hangs the caller | `langwatch/src/**`, `sdks/typescript/src/**` |
 | `no-test-without-assertion` + `-tsx` | a test whose inline body contains no `expect`/`assert` — passes unless the code throws | test files |
 | `use-action-based-test-name` + `-tsx` | `it("should …")`, and names carrying no behaviour (`works`, `renders`, `test`) | test files |
 | `no-tautological-assertion` + `-tsx` | `expect(X).toBe(X)` — an assertion that cannot fail | test files |
@@ -46,7 +46,7 @@ assertions, 10 assertion-free tests.
 Biome covers the rest of the test surface — `noFocusedTests`,
 `noSkippedTests`, `noDuplicateTestHooks`, `noMisplacedAssertion`,
 `noExportsInTest`, `useTestHooksOnTop`, `noExcessiveNestedTestSuites` — scoped
-to test files in `langwatch/biome.jsonc`. Unscoped, `noFocusedTests` fires on
+to test files in `platform/app/biome.jsonc`. Unscoped, `noFocusedTests` fires on
 any function named `fit(...)`, including a production zoom hook. Each rule that moves here should be **deleted**
 from `path_instructions` in `/.coderabbit.yaml`, or every violation gets
 reported twice, once deterministically and once probabilistically.
@@ -80,5 +80,5 @@ rule is unproven.
   heavy-column dedup anti-pattern).
 - `/.coderabbit.yaml` — the AI reviewer; consumes `rules/`, and carries the
   judgement-level rules that genuinely cannot be expressed syntactically.
-- `langwatch/biome.json` — the TypeScript linter proper. Rules expressible as
+- `platform/app/biome.json` — the TypeScript linter proper. Rules expressible as
   Biome config belong there, not here.

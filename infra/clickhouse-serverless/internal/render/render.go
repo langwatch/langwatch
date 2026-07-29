@@ -8,8 +8,8 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/config"
-	"github.com/langwatch/langwatch/clickhouse-serverless/internal/storage"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
+	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/storage"
 )
 
 // RenderAll generates all ClickHouse configuration files under outputDir.

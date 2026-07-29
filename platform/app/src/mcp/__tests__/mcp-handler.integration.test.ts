@@ -1044,7 +1044,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const path = await import("node:path");
       const mcpServerDir = path.resolve(
         __dirname,
-        "../../../../mcp-server/src",
+        "../../../../../mcp/typescript/src",
       );
       const createMcpServerSrc = fs.readFileSync(
         path.join(mcpServerDir, "create-mcp-server.ts"),
@@ -1053,7 +1053,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // Should not import from the main app
       expect(createMcpServerSrc).not.toContain("~/server/");
       expect(createMcpServerSrc).not.toContain("../server/");
-      expect(createMcpServerSrc).not.toContain("langwatch/src/");
+      expect(createMcpServerSrc).not.toContain("platform/app/src/");
     });
   });
 

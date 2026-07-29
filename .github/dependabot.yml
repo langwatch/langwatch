@@ -17,7 +17,7 @@ version: 2
 #     instead of one PR per project per dependency.
 #     This also closed a coverage gap: while the repo had six install roots,
 #     only three of them were listed here, so skills/, agentic-e2e-tests/,
-#     packages/* and langwatch/packages/* were never scanned at all.
+#     packages/* and platform/app/packages/* were never scanned at all.
 #   - Everything left over is caught by a `minor-and-patch` group, so the long
 #     tail of trivial version bumps is a single PR. Major bumps of ungrouped
 #     dependencies stay individual for deliberate review.
@@ -107,7 +107,7 @@ updates:
           - "patch"
 
   - package-ecosystem: "uv"
-    directory: "/python-sdk"
+    directory: "/sdks/python"
     schedule:
       interval: "weekly"
       day: "monday"

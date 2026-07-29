@@ -6,7 +6,7 @@ Feature: Settings Plans Comparison Page
   Background:
     Given I am logged in as a member of an organization on LangWatch Cloud
 
-  # 5 of 9 scenarios are bound to existing tests in langwatch/src/components/plans/__tests__/PlansComparisonPage.integration.test.tsx.
+  # 5 of 9 scenarios are bound to existing tests in platform/app/src/components/plans/__tests__/PlansComparisonPage.integration.test.tsx.
   # The remaining 4 @unimplemented scenarios are UPDATE-class per AUDIT_MANIFEST
   # — detail tables rendered as feature tag lists, not structured detail/value rows — and need the scenarios
   # rewritten before binding (tracked under #3458):

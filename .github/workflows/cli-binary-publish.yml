@@ -1,5 +1,5 @@
 # Builds the standalone `langwatch` CLI binary (Bun --compile, bytecode +
-# minify — see typescript-sdk/scripts/build-cli-binary.ts) for every supported
+# minify — see sdks/typescript/scripts/build-cli-binary.ts) for every supported
 # platform and attaches it (with sha256 sidecars, a signed SHA256SUMS and a
 # build-provenance attestation) to the typescript-sdk GitHub release, so users
 # can install the CLI without npm.
@@ -286,8 +286,8 @@ jobs:
         with:
           name: cli-binary-${{ matrix.target }}
           path: |
-            typescript-sdk/dist/bin/${{ steps.names.outputs.asset }}
-            typescript-sdk/dist/bin/${{ steps.names.outputs.asset }}.sha256
+            sdks/typescript/dist/bin/${{ steps.names.outputs.asset }}
+            sdks/typescript/dist/bin/${{ steps.names.outputs.asset }}.sha256
           if-no-files-found: error
           retention-days: 7
 

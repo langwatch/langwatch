@@ -9,7 +9,7 @@ set -eo pipefail
 printf 'building mcp server... '
 
 # The published @langwatch/server artifact ships mcp-server PRE-BUILT and
-# deliberately excludes its build config (see mcp-server/.npmignore): there
+# deliberately excludes its build config (see mcp/typescript/.npmignore): there
 # is nothing to build from, and the shipped dist is the thing to use. Only
 # a tree that carries the build config gets rebuilt.
 mcp_root="$(cd "$(dirname "$0")/../.." && pwd)/mcp-server"
@@ -27,14 +27,14 @@ fi
 # piped — which then get interpolated into the elapsed-time eval below.
 start=$(node -e 'process.stdout.write(String(Date.now()))' 2>/dev/null)
 
-# Self-heal a half-linked mcp-server/node_modules. An interrupted prep run
+# Self-heal a half-linked mcp/typescript/node_modules. An interrupted prep run
 # (Ctrl-C, OOM, the compose-v5 crash) can leave the `.bin/tsup` symlink in
 # place while the `tsup` package files never finish linking. The next
 # `pnpm install` then reports "Lockfile is up to date" and skips repair, so
 # this build dies with `Cannot find module '.../tsup/dist/cli-default.js'`.
 # Re-link the workspace deps from the store when tsup's entrypoint is absent
 # — the exact one-liner we'd otherwise run by hand, made automatic.
-mcp_tsup="$(cd "$(dirname "$0")/../.." && pwd)/mcp-server/node_modules/tsup/dist/cli-default.js"
+mcp_tsup="$(cd "$(dirname "$0")/../../.." && pwd)/mcp/typescript/node_modules/tsup/dist/cli-default.js"
 if [ ! -e "$mcp_tsup" ]; then
   printf '(repairing deps) '
   if ! repair_output=$(pnpm --filter @langwatch/mcp-server install 2>&1); then

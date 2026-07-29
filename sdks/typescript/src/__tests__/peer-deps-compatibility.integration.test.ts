@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import semver from "semver";
 import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -27,12 +28,7 @@ function getLatestVersion(pkg: string): string {
 }
 
 function semverSatisfies(version: string, range: string): boolean {
-  // Use npm's own semver to check — avoids adding semver as a dependency
-  const result = execSync(
-    `node -e "console.log(require('semver').satisfies('${version}', '${range}'))"`,
-    { encoding: "utf-8", timeout: 10_000 }
-  ).trim();
-  return result === "true";
+  return semver.satisfies(version, range);
 }
 
 // Framework combos that users commonly install alongside langwatch.

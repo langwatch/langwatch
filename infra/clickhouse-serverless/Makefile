@@ -1,7 +1,7 @@
 IMAGE     ?= clickhouse-serverless
 TAG       ?= test
 PLATFORM  ?= linux/$(shell go env GOARCH)
-HELM_DIR  ?= ../charts/clickhouse-serverless
+HELM_DIR  ?= ../../charts/clickhouse-serverless
 
 .PHONY: test lint build e2e e2e-cold e2e-cold-move e2e-backup clean help
 

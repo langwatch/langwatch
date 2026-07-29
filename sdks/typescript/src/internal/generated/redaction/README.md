@@ -1,12 +1,12 @@
 # Verbatim mirror of @langwatch/redaction
 
-The canonical redaction engine lives at `langwatch/packages/redaction` and is
+The canonical redaction engine lives at `platform/app/packages/redaction` and is
 workspace-imported by the app and the MCP server. This directory is a
 byte-for-byte copy of its sources for the CLI, not a fork.
 
 Why a copy instead of an import: the repo has two disjoint pnpm workspaces,
 and `typescript-sdk` (published standalone to npm as `langwatch`) cannot
-declare a workspace dependency on `langwatch/packages/*`. Publishing
+declare a workspace dependency on `platform/app/packages/*`. Publishing
 `@langwatch/redaction` to npm would make it importable, but adds a second
 published package and a release-ordering coupling (redaction must publish
 before every CLI release that touches it) for identical shipped behavior. So
@@ -15,7 +15,7 @@ mirror.
 
 Rules:
 
-- Never edit these files here. Edit `langwatch/packages/redaction/src` and run
+- Never edit these files here. Edit `platform/app/packages/redaction/src` and run
   `./copy-types.sh` from `typescript-sdk/`.
 - `src/cli/commands/__tests__/report-redaction-drift.unit.test.ts` pins each
   file byte-for-byte against the canonical package, so drift fails CI.

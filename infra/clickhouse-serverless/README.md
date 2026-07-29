@@ -25,7 +25,7 @@ CPU and RAM are auto-detected from cgroups. Override with `CH_CPU` and `CH_RAM` 
 
 All other parameters (memory limits, pool sizes, merge settings, logging, network) are computed from CPU + RAM. See `internal/config/config.go` for the full list of overridable env vars.
 
-For Kubernetes deployment with the [Helm chart](../charts/clickhouse-serverless/), most of this is handled automatically via `values.yaml`.
+For Kubernetes deployment with the [Helm chart](../../charts/clickhouse-serverless/), most of this is handled automatically via `values.yaml`.
 
 ## What Gets Computed
 

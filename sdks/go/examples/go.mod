@@ -1,11 +1,11 @@
-module github.com/langwatch/langwatch/sdk-go/examples
+module github.com/langwatch/langwatch/sdks/go/examples
 
-replace github.com/langwatch/langwatch/sdk-go => ../
+replace github.com/langwatch/langwatch/sdks/go => ../
 
 go 1.25.0
 
 require (
-	github.com/langwatch/langwatch/sdk-go v0.0.0-00010101000000-000000000000
+	github.com/langwatch/langwatch/sdks/go v0.0.0-00010101000000-000000000000
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/sdk v1.43.0
 )

@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
  * regeneration or docs edit cannot silently drop the invitation.
  * Corresponds to specs/support/agent-report-discovery.feature.
  */
-const REPO_ROOT = join(__dirname, "../../..");
+const REPO_ROOT = join(__dirname, "../../../..");
 const read = (path: string) => readFileSync(join(REPO_ROOT, path), "utf8");
 
 describe("agent report discovery notices", () => {

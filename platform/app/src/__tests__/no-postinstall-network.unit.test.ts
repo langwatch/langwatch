@@ -7,7 +7,7 @@
  * blocks fresh-clone setups in air-gapped or restricted environments, and
  * degrades DX by making `pnpm install` non-deterministic.
  *
- * The current postinstall ("make -C .. setup-hooks 2>/dev/null || true") is
+ * The current postinstall ("make -C ../.. setup-hooks 2>/dev/null || true") is
  * intentionally local and SHOULD pass all three assertions below.
  */
 import { readFileSync } from "node:fs";

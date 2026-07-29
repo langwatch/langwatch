@@ -1,5 +1,5 @@
 // Package prompts emits the PromptApiService.get + Prompt.compile span
-// pair that the trace-UI consumer (langwatch/src/server/traces/
+// pair that the trace-UI consumer (platform/app/src/server/traces/
 // findPromptReferenceInAncestors.ts) walks to surface "Open in Prompts"
 // deep-links on LLM spans.
 //
@@ -24,7 +24,7 @@ import (
 	"context"
 	"encoding/json"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -32,7 +32,7 @@ import (
 // tracerName mirrors python's `trace.get_tracer(__name__)` — gives this
 // package its own tracer so spans are attributable to the SDK rather
 // than the calling engine.
-const tracerName = "github.com/langwatch/langwatch/sdk-go/prompts"
+const tracerName = "github.com/langwatch/langwatch/sdks/go/prompts"
 
 // GetSpec carries the identity of a prompt resolution event for the
 // PromptApiService.get span. PromptID is the input variable; Handle +

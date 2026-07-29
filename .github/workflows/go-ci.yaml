@@ -61,7 +61,7 @@ jobs:
               - 'pkg/**'
               - 'cmd/**'
               - 'tools/**'
-              - 'sdk-go/**'
+              - 'sdks/go/**'
               - 'clickhouse-serverless/**'
               - 'packages/handled-error/**'
               - 'go.mod'
@@ -131,7 +131,7 @@ jobs:
       #
       # Also note: a bare `golangci-lint run` cannot replace the explicit
       # package list — ./... pulls in the non-compiling codegen snippets under
-      # langwatch/src/.../snippets/go and fails on typecheck.
+      # platform/app/src/.../snippets/go and fails on typecheck.
       #
       # --disable below drops the three house-rule linters; they are gated on
       # changed lines only in the step after this one.

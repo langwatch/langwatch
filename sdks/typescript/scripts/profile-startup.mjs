@@ -4,7 +4,7 @@
  *
  * For a given CLI argv (default `--help`, always with LANGWATCH_NO_DAEMON=1
  * so the in-process path is what is measured) this produces, in
- * `typescript-sdk/.startup-profile/`:
+ * `sdks/typescript/.startup-profile/`:
  *
  *   <label>-require-tree.json   timed require tree (every external module,
  *                               with parent links, self + total time)

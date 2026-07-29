@@ -14,7 +14,7 @@
  * Cost amortization: `go run ./cmd/service` recompiles on every call,
  * which on CI's cold module cache blows any reasonable health-poll
  * budget. We `go build` ONCE per test process into a cached path under
- * the repo's langwatch/.vitest-tmp/ and exec it directly — the compiled
+ * the repo's platform/app/.vitest-tmp/ and exec it directly — the compiled
  * binary boots in ~1s. The cached artifact is shared across every test
  * that calls ensureNlpgoBinary() within the same CI job.
  */
@@ -28,11 +28,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-// _nlpgoSubprocess.ts lives in langwatch/src/server/nlpgo/__tests__ →
-// up 5 = repo root.
-export const REPO_ROOT = path.resolve(__dirname, "../../../../..");
+// _nlpgoSubprocess.ts lives in platform/app/src/server/nlpgo/__tests__ →
+// up 6 = repo root.
+export const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
-const NLPGO_TEST_BIN_DIR = path.join(REPO_ROOT, "langwatch", ".vitest-tmp");
+const NLPGO_TEST_BIN_DIR = path.join(REPO_ROOT, "platform", "app", ".vitest-tmp");
 const NLPGO_TEST_BIN = path.join(
   NLPGO_TEST_BIN_DIR,
   process.platform === "win32" ? "nlpgo-test.exe" : "nlpgo-test",

@@ -13,7 +13,7 @@ import {
   type BundledSkill,
 } from "../installer";
 
-const REPO_ROOT = path.join(__dirname, "../../../../../../");
+const REPO_ROOT = path.join(__dirname, "../../../../../../../");
 const SKILLS_ROOT = path.join(REPO_ROOT, "skills");
 
 /** The published set, read from the same sources the codegen reads. */

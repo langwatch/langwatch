@@ -24,7 +24,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
 	"go.opentelemetry.io/otel"
 )
 

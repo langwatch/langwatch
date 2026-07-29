@@ -32,13 +32,13 @@ on:
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
       - "packages/server/**"
-      - "langevals/pyproject.toml"
-      - "langevals/uv.lock"
+      - "services/langevals/pyproject.toml"
+      - "services/langevals/uv.lock"
       - "services/aigateway/**"
       - "cmd/service/**"
-      - "langwatch/package.json"
-      - "langwatch/scripts/start.sh"
-      - "langwatch/scripts/check-ports.sh"
+      - "platform/app/package.json"
+      - "platform/app/scripts/start.sh"
+      - "platform/app/scripts/check-ports.sh"
       - ".github/workflows/npx-server-smoke.yml"
       # The script that assembles the tarball. It decides what every npm user
       # receives, so a change to it is precisely what this job exists to
@@ -143,7 +143,7 @@ jobs:
           pnpm --filter @langwatch/server-cli run test:invariants
 
       # Same prebuild as npx-server-publish.yml: every published artifact
-      # ships langwatch/dist + mcp-server/dist (the publish sanity check
+      # ships platform/app/dist + mcp-server/dist (the publish sanity check
       # asserts both), so the artifact THIS job boots must carry them too —
       # otherwise the smoke exercises a tree shape no npm user ever receives
       # and pays a full on-runner vite build for it inside the health budget.
@@ -198,7 +198,7 @@ jobs:
           # (node_modules/@langwatch/server), so the run exercises the same
           # relocation + install path npm users get and the app tree is
           # exactly the published artifact. Booting the checkout instead
-          # masks packaging gaps: 3.6.0 shipped without langwatch/packages/*
+          # masks packaging gaps: 3.6.0 shipped without platform/app/packages/*
           # (both .npmignore files still excluded the dir after runtime
           # packages moved in), every install died at first boot with
           # MODULE_NOT_FOUND, and every checkout-based smoke run passed.

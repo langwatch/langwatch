@@ -57,7 +57,7 @@ vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
 //   55610 — this test (post_event SSE FF gating)
 //   55611 — post_event evaluator with real provider e2e
 const NLPGO_PORT = 55610;
-const REPO_ROOT = path.resolve(__dirname, "../../../../../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../../../../../..");
 
 let nlpgoProcess: ChildProcess | null = null;
 

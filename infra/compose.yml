@@ -12,7 +12,7 @@ services:
       INSTALL_METHOD: docker
       NODE_ENV: production
     env_file:
-      - langwatch/.env
+      - platform/app/.env
     pull_policy: always
     ports:
       - "5560:5560"
@@ -27,7 +27,7 @@ services:
   workers:
     image: langwatch/langwatch:latest
     command: ["pnpm", "run", "start:workers"]
-    working_dir: /app/langwatch
+    working_dir: /app/platform/app
     environment:
       SKIP_ENV_VALIDATION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
@@ -38,7 +38,7 @@ services:
       LANGWATCH_ENDPOINT: http://app:5560
       NODE_ENV: production
     env_file:
-      - langwatch/.env
+      - platform/app/.env
     pull_policy: always
     depends_on:
       postgres:
@@ -55,7 +55,7 @@ services:
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
     env_file:
-      - langwatch/.env
+      - platform/app/.env
     ports:
       - "5561:5561"
     restart: always

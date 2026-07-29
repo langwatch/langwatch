@@ -29,7 +29,7 @@ WORKDIR /src
 # Cache go module downloads in a layer that only invalidates when go.mod/
 # go.sum changes — the rest of the source tree is a churnier input.
 COPY go.mod go.sum ./
-COPY sdk-go ./sdk-go
+COPY sdks/go ./sdks/go
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     go mod download
@@ -93,12 +93,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 #
 # The npm/tsup build is untouched and remains how the public `langwatch`
 # package is produced; this stage only compiles an extra artifact for this
-# image. See typescript-sdk/scripts/build-cli-binary.ts.
+# image. See sdks/typescript/scripts/build-cli-binary.ts.
 FROM oven/bun:1.3.13-debian AS cli-builder
 
 WORKDIR /src
 
-# pnpm resolves the CLI's lockfile + the `../packages/langy` workspace link;
+# pnpm resolves the CLI's lockfile + the `../../packages/langy` workspace link;
 # the bun image ships no Node, and pnpm needs one.
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
@@ -112,52 +112,54 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # points at src/index.ts) and is bundled into the binary.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 COPY packages/langy ./packages/langy
-COPY typescript-sdk ./typescript-sdk
+COPY sdks/typescript ./sdks/typescript
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
-COPY langwatch/package.json ./langwatch/
-COPY langwatch/packages/api/package.json ./langwatch/packages/api/
-COPY langwatch/packages/automations/package.json ./langwatch/packages/automations/
-COPY langwatch/packages/observability/package.json ./langwatch/packages/observability/
-COPY langwatch/packages/react-rum/package.json ./langwatch/packages/react-rum/
-COPY langwatch/packages/redaction/package.json ./langwatch/packages/redaction/
-COPY langwatch/packages/ssrf/package.json ./langwatch/packages/ssrf/
+COPY platform/app/package.json ./platform/app/
+COPY platform/app/packages/api/package.json ./platform/app/packages/api/
+COPY platform/app/packages/automations/package.json ./platform/app/packages/automations/
+COPY platform/app/packages/observability/package.json ./platform/app/packages/observability/
+COPY platform/app/packages/react-rum/package.json ./platform/app/packages/react-rum/
+COPY platform/app/packages/redaction/package.json ./platform/app/packages/redaction/
+COPY platform/app/packages/ssrf/package.json ./platform/app/packages/ssrf/
 COPY packages/handled-error/package.json ./packages/handled-error/
 COPY packages/server/package.json ./packages/server/
-COPY mcp-server/package.json ./mcp-server/
+COPY mcp/typescript/package.json ./mcp/typescript/
 COPY skills/package.json ./skills/
-COPY agentic-e2e-tests/package.json ./agentic-e2e-tests/
+COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
 
 WORKDIR /src
 RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..."
 
 # Back to the SDK for the generator + compile steps below, which resolve their
-# inputs (../langwatch, ../langevals, ../feature-map.json) relative to it.
-WORKDIR /src/typescript-sdk
+# inputs (../../platform/app, ../../services/langevals, ../../feature-map.json)
+# relative to it.
+WORKDIR /src/sdks/typescript
 
 # The CLI imports types GENERATED from the platform source: copy-types.sh copies
-# the Zod-first modules out of langwatch/ + langevals/ and derives
+# the Zod-first modules out of platform/app/ + services/langevals/ and derives
 # default-prompt-model.generated.ts from llmModels.json, and the OpenAPI client is
-# generated from the app's OpenAPI json. Those sources live OUTSIDE typescript-sdk/
+# generated from the app's OpenAPI json. Those sources live OUTSIDE sdks/typescript/
 # and the install ran with --ignore-scripts, so the generated tree is absent and
 # the Bun compile fails to resolve `internal/generated/*`. Bring in exactly the
-# files the generators read (at the ../langwatch, ../langevals paths copy-types.sh
-# expects relative to /src/typescript-sdk), then run the generators. These are
+# files the generators read (at the ../../platform/app, ../../services/langevals paths copy-types.sh
+# expects relative to /src/sdks/typescript), then run the generators. These are
 # written INTO the image, so .dockerignore's `*.generated.*` filter (a host→context
 # rule) does not strip them.
-COPY langwatch/src/server/tracer/types.ts             /src/langwatch/src/server/tracer/types.ts
-COPY langwatch/src/server/filters/types.ts            /src/langwatch/src/server/filters/types.ts
-COPY langwatch/src/server/evaluations/types.ts        /src/langwatch/src/server/evaluations/types.ts
-COPY langwatch/src/server/evaluations/evaluators.native.ts /src/langwatch/src/server/evaluations/evaluators.native.ts
-COPY langwatch/src/server/modelProviders/llmModels.json /src/langwatch/src/server/modelProviders/llmModels.json
-COPY langwatch/packages/redaction/src               /src/langwatch/packages/redaction/src
-COPY langwatch/src/app/api/openapiLangWatch.json      /src/langwatch/src/app/api/openapiLangWatch.json
-COPY langevals/ts-integration/evaluators.generated.ts /src/langevals/ts-integration/evaluators.generated.ts
+COPY platform/app/src/server/tracer/types.ts             /src/platform/app/src/server/tracer/types.ts
+COPY platform/app/src/server/filters/types.ts            /src/platform/app/src/server/filters/types.ts
+COPY platform/app/src/server/evaluations/types.ts        /src/platform/app/src/server/evaluations/types.ts
+COPY platform/app/src/server/evaluations/evaluators.native.ts /src/platform/app/src/server/evaluations/evaluators.native.ts
+COPY platform/app/src/server/modelProviders/llmModels.json /src/platform/app/src/server/modelProviders/llmModels.json
+COPY platform/app/packages/redaction/src               /src/platform/app/packages/redaction/src
+COPY platform/app/src/app/api/openapiLangWatch.json      /src/platform/app/src/app/api/openapiLangWatch.json
+COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
 # copy-types.sh also embeds the repo-root feature-map.json (feature-map.generated.ts),
 # and generate-skills-bundle.mjs walks the whole skills/ tree (feature-skills.ts,
 # each published SKILL.mdx, recipes/, version.txt, and the committed _compiled/native
-# renders). Bring both in at the ../ paths those generators expect relative to
-# /src/typescript-sdk, or `pnpm run prepare` dies with `Cannot find module '../feature-map.json'`.
+# renders). Bring both in at the ../../ paths those generators expect relative to
+# /src/sdks/typescript, or `pnpm run prepare` dies with `Cannot find module
+# '../../feature-map.json'`.
 COPY feature-map.json                                 /src/feature-map.json
 COPY skills                                            /src/skills
 RUN pnpm run prepare
@@ -254,7 +256,7 @@ RUN set -eux; \
     opencode --version
 
 # The `langwatch` CLI as a single self-contained native binary, compiled from
-# THIS repo's typescript-sdk/ by the cli-builder stage — no longer
+# THIS repo's sdks/typescript/ by the cli-builder stage — no longer
 # `npm install -g langwatch@<pinned>`. Two consequences worth knowing:
 #
 #   1. SPEED. Every tool call the model makes spawns this process; a Node boot

@@ -74,7 +74,7 @@ delete process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
 // Was 6 historically (landed at worktrees/ instead of the repo) which
 // silently broke `go run ./cmd/service` with "directory not found"
 // any time OPENAI_API_KEY was set in the env that the test ran in.
-const REPO_ROOT = path.resolve(__dirname, "../../../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
 let nlpgoProcess: ChildProcess | null = null;
 

@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
 )
 
 // TestResponsesAPINonStreamResponse tests that Responses API non-streaming response attributes are correctly extracted

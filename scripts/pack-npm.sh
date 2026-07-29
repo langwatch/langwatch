@@ -55,13 +55,13 @@ mkdir -p "$APP"
 EXCLUDES=(
   --exclude=node_modules
   # No ignore files in the staged tree. npm/pnpm pack honours a .gitignore
-  # inside an included directory, and langwatch/.gitignore lists `/dist` and
+  # inside an included directory, and platform/app/.gitignore lists `/dist` and
   # `*.generated.ts` — both REQUIRED at runtime (the prebuilt vite client, and
   # the generated types the app imports). Carrying it into staging silently
   # strips them, the app tree arrives without dist/client, and first boot
   # falls back to a full on-runner `vite build`.
   #
-  # This is exactly what the deleted langwatch/.npmignore existed to prevent:
+  # This is exactly what the deleted platform/app/.npmignore existed to prevent:
   # an .npmignore overrides the sibling .gitignore, which is why the old file
   # had to restate the broad excludes explicitly. Staging replaces that
   # mechanism — the copy below IS the allowlist, so no ignore file should get
@@ -82,13 +82,13 @@ EXCLUDES=(
   --exclude=blob-report
   # NOT `--exclude=reports`. rsync matches a bare name at ANY depth, and the
   # app has two real source directories called that —
-  # langwatch/src/server/app-layer/reports (imported by presets.ts) and
-  # langwatch/src/components/analytics/reports. Excluding the name dropped
+  # platform/app/src/server/app-layer/reports (imported by presets.ts) and
+  # platform/app/src/components/analytics/reports. Excluding the name dropped
   # both, and the published server died at first boot with
   #   Cannot find module './reports/report-chart.service'
   # inside the ClickHouse migration, ~20 minutes in. The pattern was carried
-  # over from langwatch/.npmignore, where it was meant for the GDPR report
-  # output directory at langwatch/reports — a runtime artifact that a clean
+  # over from platform/app/.npmignore, where it was meant for the GDPR report
+  # output directory at platform/app/reports — a runtime artifact that a clean
   # checkout does not even have.
   #
   # Every remaining bare name here was checked against the shipped trees for
@@ -257,12 +257,12 @@ if [ -f "$ROOT/langwatch/dist/client/index.html" ]; then
   tar -tzf "$tarball" > "$listing"
   if ! grep -qx "package/app/langwatch/dist/client/index.html" "$listing"; then
     rm -f "$listing"
-    echo "✗ the repo has a built langwatch/dist/client but the tarball does not ship it." >&2
+    echo "✗ the repo has a built platform/app/dist/client but the tarball does not ship it." >&2
     echo "  Something filtered it out after staging — check for an ignore file in the staged tree." >&2
     exit 1
   fi
   rm -f "$listing"
-  echo "→ verified: tarball ships the prebuilt langwatch/dist/client"
+  echo "→ verified: tarball ships the prebuilt platform/app/dist/client"
 fi
 
 # Assert no application source went missing.

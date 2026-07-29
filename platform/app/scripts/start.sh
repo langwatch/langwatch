@@ -131,7 +131,7 @@ if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_AIGATEWAY" != "1" ]]; then
   elif lsof -i ":$_GATEWAY_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "  ✓ aigateway: already running on :$_GATEWAY_PORT, reusing"
   else
-    START_GATEWAY_COMMAND="make -C .. service svc=aigateway"
+    START_GATEWAY_COMMAND="make -C ../.. service svc=aigateway"
     echo "  ✓ aigateway: auto-start on :$_GATEWAY_PORT"
   fi
 fi
@@ -163,7 +163,7 @@ if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
     # SERVER_ADDR overrides the inherited gateway port; LANGWATCH_ENDPOINT is
     # the app URL the engine calls back for evaluator + agent-workflow nodes
     # (mirrors compose.dev.yml).
-    START_NLP_COMMAND="SERVER_ADDR=\":${_NLP_PORT}\" LANGWATCH_ENDPOINT=\"http://localhost:${_APP_PORT}\" make -C .. service svc=nlpgo"
+    START_NLP_COMMAND="SERVER_ADDR=\":${_NLP_PORT}\" LANGWATCH_ENDPOINT=\"http://localhost:${_APP_PORT}\" make -C ../.. service svc=nlpgo"
     echo "  ✓ nlpgo: auto-start on :$_NLP_PORT"
   fi
 fi

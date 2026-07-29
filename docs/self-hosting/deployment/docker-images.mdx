@@ -26,7 +26,7 @@ The main application image. Used for both LangWatch App and LangWatch Workers. H
 - Manages the control plane via PostgreSQL (Prisma ORM)
 - Broadcasts real-time updates via Server-Sent Events (SSE)
 
-### langwatch/langwatch_nlp
+### platform/app/langwatch_nlp
 
 Python service for natural language processing tasks.
 
@@ -106,17 +106,17 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # Pull from Docker Hub
 docker pull langwatch/langwatch:3.0.0
-docker pull langwatch/langwatch_nlp:3.0.0
+docker pull platform/app/langwatch_nlp:3.0.0
 docker pull langwatch/langevals:3.0.0
 
 # Tag for your registry
 docker tag langwatch/langwatch:3.0.0 registry.example.com/langwatch/langwatch:3.0.0
-docker tag langwatch/langwatch_nlp:3.0.0 registry.example.com/langwatch/langwatch_nlp:3.0.0
+docker tag platform/app/langwatch_nlp:3.0.0 registry.example.com/platform/app/langwatch_nlp:3.0.0
 docker tag langwatch/langevals:3.0.0 registry.example.com/langwatch/langevals:3.0.0
 
 # Push
 docker push registry.example.com/langwatch/langwatch:3.0.0
-docker push registry.example.com/langwatch/langwatch_nlp:3.0.0
+docker push registry.example.com/platform/app/langwatch_nlp:3.0.0
 docker push registry.example.com/langwatch/langevals:3.0.0
 ```
 
@@ -128,7 +128,7 @@ images:
     repository: registry.example.com/langwatch/langwatch
     tag: "3.0.0"
   langwatch_nlp:
-    repository: registry.example.com/langwatch/langwatch_nlp
+    repository: registry.example.com/platform/app/langwatch_nlp
     tag: "3.0.0"
   langevals:
     repository: registry.example.com/langwatch/langevals

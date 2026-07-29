@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
 )
 
 // TestResponsesAPIRequestAttributes tests that Responses API specific request attributes are correctly extracted

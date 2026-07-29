@@ -117,10 +117,10 @@ export default defineConfig({
     fs: {
       // Vite refuses to READ a file that is neither inside `fs.allow` nor in
       // its `safeModulePaths` set. `fs.allow` defaults to
-      // `searchForWorkspaceRoot(root)`, and because `langwatch/` carries its
+      // `searchForWorkspaceRoot(root)`, and because `platform/app/` carries its
       // OWN `pnpm-workspace.yaml`, that search stops HERE — so the
-      // source-only workspace packages one level up (`../packages/langy`,
-      // `../packages/handled-error`, `../mcp-server`) are outside the
+      // source-only workspace packages at the repo root (`../../packages/langy`,
+      // `../../packages/handled-error`, `../../mcp/typescript`) are outside the
       // allowlist. They still loaded, but only by accident: vite's
       // import-analysis adds every specifier it resolves to `safeModulePaths`,
       // so each langy file was "allowed" solely because vite had just
@@ -138,7 +138,7 @@ export default defineConfig({
       // Allowing the repo root states the intent directly instead of relying
       // on transform order. Derived from `__dirname` so it holds in a plain
       // clone, in a git worktree, and in CI.
-      allow: [join(__dirname, "..")],
+      allow: [join(__dirname, "..", "..")],
     },
   },
   resolve: {

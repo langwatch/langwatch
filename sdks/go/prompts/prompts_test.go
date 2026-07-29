@@ -10,8 +10,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
-	"github.com/langwatch/langwatch/sdk-go/prompts"
+	"github.com/langwatch/langwatch/sdks/go/internal/testutil"
+	"github.com/langwatch/langwatch/sdks/go/prompts"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"

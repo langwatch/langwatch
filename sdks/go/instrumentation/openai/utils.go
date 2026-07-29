@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
 	"go.opentelemetry.io/otel/attribute"
 )
 

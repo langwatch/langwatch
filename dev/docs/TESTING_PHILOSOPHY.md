@@ -187,7 +187,7 @@ Scenario: Analytics chart shows error state when ClickHouse query fails
 
 ### Binding scenarios to tests
 
-The parity checker (`langwatch/scripts/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
+The parity checker (`platform/app/scripts/check-feature-parity.ts`, run in CI as `pnpm check:feature-parity`) matches every `@unit` / `@integration` scenario to at least one test via a `@scenario "<title>"` JSDoc annotation placed directly above an `it(...)` / `test(...)` call:
 
 ```ts
 /** @scenario Analytics chart shows error state when ClickHouse query fails */
@@ -306,7 +306,7 @@ This keeps the suite lean while ensuring real failures never recur.
 
 ## E2E Patterns (Playwright)
 
-The stable E2E suite lives in `agentic-e2e-tests/`. These tests cover core happy paths only.
+The stable E2E suite lives in `tests/agentic-e2e/`. These tests cover core happy paths only.
 
 | Pattern | Convention |
 |---------|------------|
@@ -316,7 +316,7 @@ The stable E2E suite lives in `agentic-e2e-tests/`. These tests cover core happy
 | Test naming | Action-based, no "should" (see `CLAUDE.md`) |
 | Test credentials | `browser-test@langwatch.ai` / `BrowserTest123!` (consistent across scripts and tests) |
 
-See `agentic-e2e-tests/README.md` for setup and running tests.
+See `tests/agentic-e2e/README.md` for setup and running tests.
 
 ## Browser Verification
 

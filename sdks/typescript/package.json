@@ -57,7 +57,7 @@
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
     "test:e2e": "dotenv -- vitest run -c ./vitest.e2e.config.mts",
     "test:governance-e2e": "vitest run -c ./vitest.governance-e2e.config.mts",
-    "test:seed": "dotenv -e .env.test -- bash -c 'cd ../langwatch && pnpm prisma:seed'",
+    "test:seed": "dotenv -e .env.test -- bash -c 'cd ../../platform/app && pnpm prisma:seed'",
     "prebuild": "pnpm run prepare",
     "build": "tsc --noEmit && rm -rf dist && tsup",
     "postbuild": "node -e \"const{statSync}=require('node:fs'),{execFileSync}=require('node:child_process');const f='dist/cli/index.js',want=require('./package.json').version;const s=statSync(f);if(process.platform!=='win32'&&!(s.mode&0o111))throw new Error(f+' is not executable');const got=execFileSync(process.execPath,[f,'--version'],{encoding:'utf8',env:{...process.env,LANGWATCH_NO_DAEMON:'1'}}).trim();if(got!==want)throw new Error('version mismatch: '+f+' reports '+got+', package.json says '+want);console.log('postbuild: '+f+' ok ('+got+')')\"",
@@ -65,7 +65,7 @@
     "tarball": "pnpm build && pnpm pack",
     "typecheck": "tsc --noEmit",
     "prepublish": "pnpm run build",
-    "generate:openapi-types": "pnpm exec openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
+    "generate:openapi-types": "pnpm exec openapi-typescript ../../platform/app/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
     "generate:server-types": "./copy-types.sh"
   },
   "devDependencies": {

@@ -224,7 +224,7 @@ describe("Langy current-surfaces coverage", () => {
     // annotations:view/create/update are in LANGY_CANDIDATE_PERMISSIONS but had
     // ZERO scenario coverage anywhere in e2e/langy/ before this — a real
     // functional gap, not a red-team probe. `update` has no CLI surface
-    // (typescript-sdk/src/cli/commands/annotations/ has only
+    // (sdks/typescript/src/cli/commands/annotations/ has only
     // create/delete/get/list), so only list + create are scenario-tested here,
     // per the "verify a real capability exists before testing it" rule above.
     it("lists annotations without asking which trace first", async () => {

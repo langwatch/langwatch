@@ -59,7 +59,7 @@ constraints:
       regex: "(?i)^_?(is|has|had|should|can|could|will|would|must|does|did|allow|enable|disable|show|hide|use|include|require|omit|skip|force|only|no|not)|^(enabled|disabled|visible|hidden|allowed|active|inactive|open|closed|loading|pending|required|optional|dirty|pristine|valid|invalid|ready|done|used|empty|degenerate|converged|success|failed|ok)$"
 files:
   - "langwatch/src/**/*.ts"
-  - "langwatch/ee/**/*.ts"
+  - "platform/app/ee/**/*.ts"
 ignores:
   - "**/*.test.ts"
   - "**/*.spec.ts"

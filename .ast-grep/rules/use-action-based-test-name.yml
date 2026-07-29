@@ -20,7 +20,7 @@ constraints:
       # Names that carry no behaviour at all.
       - regex: "^[\"'`]\\s*(?i)(works?|test|tests|it works|renders?|ok|basic|simple|happy path|sanity)\\s*[\"'`]$"
 files:
-  - "langwatch/**/*.test.ts"
-  - "langwatch/**/*.spec.ts"
-  - "typescript-sdk/**/*.test.ts"
+  - "platform/app/**/*.test.ts"
+  - "platform/app/**/*.spec.ts"
+  - "sdks/typescript/**/*.test.ts"
   - "packages/**/*.test.ts"

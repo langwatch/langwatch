@@ -148,7 +148,7 @@ jq -r '.[] | "  \(.file)\n    \(.rule): \(.base) -> \(.head)"' "$REGRESSIONS"
 echo
 echo "Each is a rule the repo already enforces on new code. Either fix it, or"
 echo "-- if the rule is genuinely wrong for this code -- scope an override in"
-echo "langwatch/biome.jsonc with a comment saying why."
+echo "platform/app/biome.jsonc with a comment saying why."
 
 # Also surface it on the run summary, so the reason is visible without opening
 # the log.

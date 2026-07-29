@@ -34,10 +34,10 @@
     "packages/server/dist/",
     "packages/handled-error/",
     "packages/langy/",
-    "langwatch/",
-    "langevals/",
-    "python-sdk/",
-    "mcp-server/",
+    "platform/app/",
+    "services/langevals/",
+    "sdks/python/",
+    "mcp/typescript/",
     "scripts/",
     "skills/",
     "feature-map.json",
@@ -46,8 +46,8 @@
     "pnpm-workspace.yaml",
     "pnpm-lock.yaml",
     "packages/server/package.json",
-    "typescript-sdk/package.json",
-    "agentic-e2e-tests/package.json"
+    "sdks/typescript/package.json",
+    "tests/agentic-e2e/package.json"
   ],
   "scripts": {
     "dev": "pnpm --filter @langwatch/web dev",
