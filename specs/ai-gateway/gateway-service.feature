@@ -225,23 +225,26 @@ Feature: Gateway service — public HTTP surface and operational basics
 
     # Four-phase shutdown guarantees in-flight requests complete before pod exit.
     # Preserves streaming connections (no mid-stream 5xx from drain).
+    # Bindings: .github/workflows/go-services.yaml's `helm` job ("Assert shutdown
+    # timing values reach the ConfigMap", "Assert terminationGracePeriodSeconds
+    # covers drain + timeout + slack")
 
     Scenario: SIGTERM phase 1 — readiness probe flips to 503 draining
       When the gateway receives SIGTERM
       Then within 100ms GET /readyz returns 503
       And the body JSON contains {"status": "draining"}
       And GET /healthz still returns 200 (liveness unchanged)
-      And structured log "gateway_draining" is emitted with preDrainWait duration
+      And structured log "gateway_draining" is emitted with preDrainWaitSeconds duration
 
-    Scenario: SIGTERM phase 2 — preDrainWait lets load balancer propagate the 503
-      Given Helm values.shutdown.preDrainWait = 5s
+    Scenario: SIGTERM phase 2 — preDrainWaitSeconds lets load balancer propagate the 503
+      Given Helm values.shutdown.preDrainWaitSeconds = 5
       When the gateway receives SIGTERM
       Then the gateway waits 5s for LB endpoint removal BEFORE stopping accept
-      And new requests continue landing during preDrainWait (LB still routes)
+      And new requests continue landing during preDrainWaitSeconds (LB still routes)
       And each new request is still served correctly (no rejection)
 
-    Scenario: SIGTERM phase 3 — server.Shutdown(timeout) drains in-flight handlers
-      Given Helm values.shutdown.timeout = 15s
+    Scenario: SIGTERM phase 3 — server.Shutdown(timeoutSeconds) drains in-flight handlers
+      Given Helm values.shutdown.timeoutSeconds = 15
       When the gateway has 20 in-flight streaming requests at SIGTERM
       Then the server stops accepting new connections
       And in-flight requests complete naturally (up to 15s)
@@ -249,9 +252,9 @@ Feature: Gateway service — public HTTP surface and operational basics
       And structured log "gateway_shutting_down" is emitted at shutdown start
       And structured log "gateway_stopped" is emitted when drain completes
 
-    Scenario: preDrainWait + timeout MUST be within terminationGracePeriodSeconds
-      Given Helm values.shutdown.preDrainWait = 5s + timeout = 15s + slack = 10s
-      Then terminationGracePeriodSeconds must be ≥ 30s (5+15+10)
+    Scenario: preDrainWaitSeconds + timeoutSeconds MUST be within terminationGracePeriodSeconds
+      Given Helm values.shutdown.preDrainWaitSeconds = 5 + timeoutSeconds = 15 + slack = 10
+      Then terminationGracePeriodSeconds must be ≥ 30 (5+15+10)
       And chart helm-template validation asserts this invariant
 
     Scenario: stuck handler beyond timeout is force-killed

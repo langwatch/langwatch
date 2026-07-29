@@ -10827,26 +10827,20 @@ Point the monitor at `https://gateway.your-corp.com/health`. Set `ingress.health
 
 ## Graceful shutdown
 
-`SIGTERM` triggers (the chart's `shutdown.preDrainWait` and `shutdown.timeout` knobs are not currently wired into the gateway code; the gateway uses `Server.GracefulSeconds` from `pkg/config/server.go`, default `5`, bump via `SERVER_GRACEFUL_SECONDS` if you need a longer window):
+`SIGTERM` triggers (the chart's `shutdown.preDrainWaitSeconds` and `shutdown.timeoutSeconds` knobs are wired into the gateway via `SERVER_DRAIN_DELAY_SECONDS`/`SERVER_GRACEFUL_SECONDS` — see [helm.mdx](/ai-gateway/self-hosting/helm#graceful-drain) for the full four-phase drain sequence):
 
 1. **Immediately**: `MarkDraining()` flips `/readyz` to 503 with `status:"draining"`. The Service's endpoint controller and the LB observe and stop routing new traffic.
-2. **Drain window**: existing in-flight requests continue. SSE streams continue until the upstream provider closes them or the request finishes naturally.
-3. **End of `GracefulSeconds`**: the HTTP server shuts down; remaining sockets close cleanly.
+2. **Pre-drain wait**: the pod keeps accepting connections for `shutdown.preDrainWaitSeconds` (default 5) while the LB catches up on the `/readyz` flip.
+3. **Drain window**: existing in-flight requests continue for up to `shutdown.timeoutSeconds` (default 15). SSE streams continue until the upstream provider closes them or the request finishes naturally.
 4. **Process exits 0**.
 
-Match your `terminationGracePeriodSeconds` to the drain window plus a few seconds of slack:
+Match your `terminationGracePeriodSeconds` to `preDrainWaitSeconds + timeoutSeconds` plus a few seconds of slack:
 
 ```yaml
-terminationGracePeriodSeconds: 30  # chart default
+terminationGracePeriodSeconds: 30  # chart default: 5 + 15 + 10 slack
 ```
 
-Without giving the LB time to notice `/readyz=503` before the listener closes, a small fraction of in-flight requests during rolling deploys hits a replica that has already shut down, the LB returns 502. If you observe this on rollout, add a `preStop` sleep so the pod stays around long enough for the LB to remove it:
-
-```yaml
-lifecycle:
-  preStop:
-    exec: { command: ["sleep", "3"] }
-```
+`preDrainWaitSeconds` exists precisely to give the LB time to notice `/readyz=503` before the listener stops accepting — if you still see a fraction of in-flight requests hit an already-draining replica during rolling deploys, bump `shutdown.preDrainWaitSeconds` (and `terminationGracePeriodSeconds` to match) rather than reaching for a manual `preStop` sleep.
 
 ## End-to-end synthetic check
 
@@ -11254,28 +11248,28 @@ Rolling deploys, HPA scale-downs, and voluntary pod evictions all invoke SIGTERM
 
 1. **SIGTERM received.** `ctx.Done()` fires.
 2. **Flip readiness + gauge.** `/readyz` starts returning `503 {"status":"draining"}`; `gateway_draining{pod=...}` goes to 1.
-3. **Pre-drain wait** (`shutdown.preDrainWait`, default 5 s). Gives the LB endpoint controller (nginx-ingress + kube-proxy) time to remove the pod from service endpoints. EKS-observed propagation is 3-4 s; 5 s has margin. During this window the pod is refusing new work via `/readyz` but `/livez` + `/startupz` stay green so kubelet doesn't short-circuit the drain.
+3. **Pre-drain wait** (`shutdown.preDrainWaitSeconds`, default 5). Gives the LB endpoint controller (nginx-ingress + kube-proxy) time to remove the pod from service endpoints. EKS-observed propagation is 3-4 s; 5 s has margin. During this window the pod is refusing new work via `/readyz` but `/livez` + `/startupz` stay green so kubelet doesn't short-circuit the drain.
 4. **Graceful close.** `server.Shutdown(Timeout=15s)` blocks until every in-flight handler exits, then force-closes. Streaming handlers that honour request context cancellation finish cleanly within the grace.
 
 ```yaml
 gateway:
   shutdown:
-    preDrainWait: 5s
-    timeout: 15s
-  terminationGracePeriodSeconds: 30   # MUST be ≥ preDrainWait + timeout + slack
+    preDrainWaitSeconds: 5
+    timeoutSeconds: 15
+  terminationGracePeriodSeconds: 30   # MUST be ≥ preDrainWaitSeconds + timeoutSeconds + slack
 ```
 
 ### Invariant
 
-`terminationGracePeriodSeconds ≥ preDrainWait + timeout + slack`. Violate this and k8s SIGKILLs the pod mid-drain. The chart defaults 5 + 15 + 10-slack = 30 which matches the template.
+`terminationGracePeriodSeconds ≥ preDrainWaitSeconds + timeoutSeconds + slack`. Violate this and k8s SIGKILLs the pod mid-drain. The chart defaults 5 + 15 + 10-slack = 30 which matches the template — enforced in CI (`.github/workflows/go-services.yaml`'s `helm` job renders the chart and checks this invariant directly).
 
-If your LB propagation is slower than EKS (e.g. cloud LB with 10+ second endpoint propagation), bump `preDrainWait` **and** `terminationGracePeriodSeconds` together:
+If your LB propagation is slower than EKS (e.g. cloud LB with 10+ second endpoint propagation), bump `preDrainWaitSeconds` **and** `terminationGracePeriodSeconds` together:
 
 ```yaml
 gateway:
   shutdown:
-    preDrainWait: 15s
-    timeout: 20s
+    preDrainWaitSeconds: 15
+    timeoutSeconds: 20
   terminationGracePeriodSeconds: 45   # 15 + 20 + 10 slack
 ```
 

@@ -43,6 +43,12 @@ jobs:
             chart:
               - 'charts/gateway/**'
               - '.github/workflows/go-services.yaml'
+              # The `helm` job's ConfigMap/env-var assertions encode a
+              # contract with these two Go files — a rename here that
+              # doesn't touch charts/gateway/** would otherwise skip the
+              # job that's supposed to catch exactly that regression.
+              - 'pkg/config/server.go'
+              - 'services/aigateway/config.go'
             langyagent:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
@@ -199,6 +205,21 @@ jobs:
           fi
           if ! grep -q 'SERVER_GRACEFUL_SECONDS: "15"' /tmp/defaults.yaml; then
             echo "SERVER_GRACEFUL_SECONDS missing/wrong in rendered ConfigMap (expected shutdown.timeoutSeconds default of 15)"; exit 1
+          fi
+
+      # values.yaml's own comment claims terminationGracePeriodSeconds "is
+      # computed from preDrainWaitSeconds + timeoutSeconds + 10s slack" —
+      # it's actually a static literal, so nothing enforced that until now.
+      # Violating it means the kubelet force-kills the pod mid-drain.
+      - name: Assert terminationGracePeriodSeconds covers drain + timeout + slack
+        run: |
+          drain=$(grep -oP 'SERVER_DRAIN_DELAY_SECONDS: "\K[0-9]+' /tmp/defaults.yaml)
+          graceful=$(grep -oP 'SERVER_GRACEFUL_SECONDS: "\K[0-9]+' /tmp/defaults.yaml)
+          grace_period=$(grep -oP 'terminationGracePeriodSeconds: \K[0-9]+' /tmp/defaults.yaml)
+          slack=10
+          required=$((drain + graceful + slack))
+          if [ "$grace_period" -lt "$required" ]; then
+            echo "terminationGracePeriodSeconds ($grace_period) must be >= preDrainWaitSeconds + timeoutSeconds + ${slack}s slack ($required)"; exit 1
           fi
 
       - name: helm dependency update (umbrella)

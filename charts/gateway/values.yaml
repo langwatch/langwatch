@@ -224,8 +224,9 @@ shutdown:
   preDrainWaitSeconds: 5
   timeoutSeconds: 15
 # terminationGracePeriodSeconds is computed from preDrainWaitSeconds +
-# timeoutSeconds + 5s slack. Operators with slow LB propagation can
-# override this directly AND bump preDrainWaitSeconds accordingly.
+# timeoutSeconds + 10s slack (5 + 15 + 10 = 30). Operators with slow LB
+# propagation can override this directly AND bump preDrainWaitSeconds
+# accordingly.
 terminationGracePeriodSeconds: 30
 
 # Edge protection. Caps request body size so a misconfigured (or
