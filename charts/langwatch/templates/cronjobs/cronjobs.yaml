@@ -54,7 +54,7 @@ spec:
           # Kubernetes API, so don't mount the SA token.
           automountServiceAccountToken: {{ $root.Values.global.automountServiceAccountToken }}
           # Pod security context
-                    securityContext:
+          securityContext:
             {{- include "langwatch.podSecurityContext" (dict "ctx" $root "component" $root.Values.cronjobs) | nindent 12 }}
           # Node selection
           {{- with (coalesce $root.Values.cronjobs.nodeSelector $root.Values.global.scheduling.nodeSelector) }}
