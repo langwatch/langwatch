@@ -6,11 +6,7 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -34,6 +30,7 @@ import { prisma } from "../../../db";
 import { ENTERPRISE_FEATURE_ERRORS } from "../../enterprise";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import { grantOrganizationAdmin } from "./helpers/roleBindings";
 
 describe("enterprise feature guards", () => {
   const testNamespace = `ent-guard-${nanoid(8)}`;
@@ -105,33 +102,13 @@ describe("enterprise feature guards", () => {
       },
     });
 
-    // RoleBindings, not just the OrganizationUser/TeamUser rows above.
-    //
-    // `OrganizationUser.role = ADMIN` does NOT confer admin permissions on its
-    // own — `hasOrganizationPermission` gives every member only MEMBER's base
-    // bag as a floor, then resolves the rest through ORGANIZATION-scoped
-    // bindings, and the legacy TeamUser union deliberately cannot grant
-    // `organization:*` (ADR-021). Without these rows the caller is rejected at
-    // the permission gate with UNAUTHORIZED and never reaches the enterprise
-    // guard each test here is about, which is exactly what happened while this
-    // suite was skipped.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: organization.id,
-        userId: user.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organization.id,
-      },
-    });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: organization.id,
-        userId: user.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: team.id,
-      },
+    // Without these the caller is refused at the permission gate and never
+    // reaches the enterprise guard each test here is about — see the helper.
+    await grantOrganizationAdmin({
+      prisma,
+      organizationId: organization.id,
+      userId: user.id,
+      teamId: team.id,
     });
 
     // Create a custom role for tests that need one
@@ -161,6 +138,10 @@ describe("enterprise feature guards", () => {
   });
 
   afterAll(async () => {
+    // First, and without a `.catch`: the bindings hold an FK to CustomRole, so
+    // a failure here would otherwise resurface as a confusing error on the
+    // customRole cleanup below, or vanish into a swallowed one.
+    await prisma.roleBinding.deleteMany({ where: { organizationId } });
     await prisma.teamUser
       .deleteMany({
         where: {

@@ -771,8 +771,15 @@ export class ModelProviderService {
     // which the settings list surfaces here by inheritance — resolved to null
     // and 404'd. Worse, it made the read gate below unreachable for exactly
     // the scopes it exists to judge: a row that never loads is never asked
-    // about. The gate, not the lookup, is the security boundary — the anchor
-    // keeps the query inside one tenant and `canReadAnyScope` then decides.
+    // about.
+    //
+    // Two boundaries, both load-bearing, and neither substitutes for the
+    // other: `findByIdForOrganization` is the TENANT boundary — it cannot
+    // return a row belonging to another organization — and `canReadAnyScope`
+    // below is the SCOPE-VISIBILITY boundary, deciding whether this caller may
+    // see this row within that tenant. Widening the lookup is only safe
+    // because the second one exists; do not drop either.
+    //
     // Falls back to the project lookup when the tenant can't be resolved, so
     // a missing project can't widen the blast radius.
     const anchor = await this.resolveOrganizationAnchor({ projectId });

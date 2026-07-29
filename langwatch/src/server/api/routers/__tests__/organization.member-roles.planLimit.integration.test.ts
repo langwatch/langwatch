@@ -7,11 +7,7 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
-} from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -33,6 +29,10 @@ import { prisma } from "../../../db";
 import { LICENSE_LIMIT_ERRORS } from "../../../license-enforcement/license-limit-guard";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+import {
+  bindCustomRoleToTeam,
+  grantOrganizationAdmin,
+} from "./helpers/roleBindings";
 
 describe("organization member role plan limit enforcement", () => {
   const testNamespace = `member-role-limit-${nanoid(8)}`;
@@ -88,21 +88,12 @@ describe("organization member role plan limit enforcement", () => {
       },
     });
 
-    // The ORGANIZATION-scoped binding is what actually confers
-    // `organization:manage`. `OrganizationUser.role = ADMIN` alone does not:
-    // `hasOrganizationPermission` grants every member only MEMBER's base bag
-    // as a floor and resolves everything above it through bindings, and the
-    // legacy TeamUser union deliberately cannot confer `organization:*`
-    // (ADR-021). Without this the caller is refused before any plan-limit
-    // logic runs, so the suite would assert nothing about plan limits.
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: organization.id,
-        userId: adminUser.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organization.id,
-      },
+    // Without this the caller is refused before any plan-limit logic runs, so
+    // the suite would assert nothing about plan limits — see the helper.
+    await grantOrganizationAdmin({
+      prisma,
+      organizationId: organization.id,
+      userId: adminUser.id,
     });
 
     // Create a custom role with non-view permissions (makes EXTERNAL user a FullMember)
@@ -176,7 +167,14 @@ describe("organization member role plan limit enforcement", () => {
   });
 
   afterAll(async () => {
-    // Clean up in reverse creation order
+    // Clean up in reverse creation order.
+    //
+    // RoleBindings go first and WITHOUT a `.catch`: they hold an FK to
+    // CustomRole, so a failure here would surface as a confusing error on the
+    // `customRole.deleteMany` below — or, swallowed, as rows that outlive the
+    // run. Deleting the organization would cascade them anyway; doing it
+    // explicitly means a broken teardown says so instead of passing quietly.
+    await prisma.roleBinding.deleteMany({ where: { organizationId } });
     await prisma.teamUser
       .deleteMany({
         where: {
@@ -225,7 +223,7 @@ describe("organization member role plan limit enforcement", () => {
     return appRouter.createCaller(ctx);
   }
 
-  describe("updateMemberRole", () => {
+  describe("when calling updateMemberRole", () => {
     describe("when demoting MEMBER to EXTERNAL (full-to-lite change)", () => {
       it("rejects when lite member limit reached", async () => {
         mockGetActivePlan.mockResolvedValue({
@@ -277,7 +275,7 @@ describe("organization member role plan limit enforcement", () => {
     });
   });
 
-  describe("updateTeamMemberRole", () => {
+  describe("when calling updateTeamMemberRole", () => {
     describe("when changing EXTERNAL user from custom role to built-in VIEWER (full-to-lite change)", () => {
       beforeEach(async () => {
         // Set target user as EXTERNAL with custom role (non-view permissions → FullMember)
@@ -300,30 +298,14 @@ describe("organization member role plan limit enforcement", () => {
           data: { role: TeamUserRole.CUSTOM, assignedRoleId: customRoleId },
         });
 
-        // The guard reads the custom role through `getUserCustomRoleBinding`
-        // — a RoleBinding lookup — not through the legacy
-        // `TeamUser.assignedRoleId` set above. Without this binding the
-        // caller's old permissions read as undefined, `getRoleChangeType`
-        // sees no full-to-lite transition, and the limit is never asserted:
-        // the mutation returns `{ success: true }` and the rejection this
-        // block is about silently stops being tested.
-        await prisma.roleBinding.deleteMany({
-          where: {
-            organizationId,
-            userId: targetUserId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-          },
-        });
-        await prisma.roleBinding.create({
-          data: {
-            organizationId,
-            userId: targetUserId,
-            role: TeamUserRole.CUSTOM,
-            customRoleId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: teamId,
-          },
+        // The binding, not the legacy `assignedRoleId` set above, is what the
+        // guard reads — see the helper.
+        await bindCustomRoleToTeam({
+          prisma,
+          organizationId,
+          userId: targetUserId,
+          teamId,
+          customRoleId,
         });
       });
 
