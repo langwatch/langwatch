@@ -59,8 +59,10 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
 -- IRREVERSIBLE: rolling back reinstates the defect. Dropping the DEFAULT puts
 -- parts written before 00008 back to decoding a size header that was never
 -- written, which is the read-time OOM this migration exists to stop. The Down
--- migration is therefore commented out to prevent accidental data loss. To roll
--- back, uncomment and run manually.
+-- migration is therefore commented out to prevent accidentally reinstating that
+-- failure. Dropping the DEFAULT is itself metadata-only and destroys nothing —
+-- the cost is paid on the next read of an old part, not on the ALTER. Rolling
+-- back is an explicit operational decision: uncomment and run manually.
 --
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs MODIFY COLUMN RoleCosts Map(String, Array(Float64));
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs MODIFY COLUMN RoleLatencies Map(String, Array(Float64));
