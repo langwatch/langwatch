@@ -166,9 +166,16 @@ guarantees it carries have very different risk profiles.
 **Step 1 — liveness.** The process observes the run's events, arms a durable
 deadline, and writes the terminal state when one fires. Dispatch is untouched:
 `scenarioExecution.reactor.ts` and the in-process pool keep doing what they do.
-This step only *adds* a safety net, and it is what lets both boot sweeps be
-deleted in the same change — the replacement is strictly stronger than what it
+This step only *adds* a safety net, and it is what lets both boot sweeps stop
+being the mechanism — the replacement is strictly stronger than what it
 removes, because it runs continuously rather than at boot.
+
+They are not deleted in the same change, though, and the gap is not fastidious.
+The process manager arms deadlines from *live* events, so it is blind to the
+population already stuck when it deploys: those runs have no future heartbeat
+and nothing to wake against them. The sweeps therefore keep their boot wiring
+for one release as a one-time drain of that population, and are deleted in the
+release after, once no run predating the cutover can still be open.
 
 The read-time `STALLED` derivation in `stall-detection.ts` survives step 1 and
 goes dormant on its own: `resolveRunStatus` returns the stored status whenever
