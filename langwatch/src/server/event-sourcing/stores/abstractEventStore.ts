@@ -292,6 +292,13 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             aggregateId,
             upToEvent.createdAt,
             upToEvent.id,
+            // Anchor on the triggering event's own occurred time. For a
+            // time-local aggregate every sibling event falls inside the
+            // aggregate's lifetime — seconds to hours — so a 45-day window
+            // around the anchor cannot exclude one. `rehydrationLowerBoundMs`
+            // returns undefined for long-lived types and for a missing anchor,
+            // leaving those reads unbounded exactly as before.
+            rehydrationLowerBoundMs(aggregateType, upToEvent.occurredAt),
           );
 
           const events = records.map((record) =>
@@ -388,6 +395,13 @@ export abstract class AbstractEventStore<EventType extends Event = Event>
             upToEventId: upToEvent.id,
             after,
             limit,
+            // Same bound as the unpaged read. It matters MORE here: without it
+            // every page re-opens every partition, so the cost is paid once per
+            // page rather than once per re-fold.
+            occurredAtFromMs: rehydrationLowerBoundMs(
+              aggregateType,
+              upToEvent.occurredAt,
+            ),
           });
 
           const events = records.map((record) =>

@@ -1,0 +1,130 @@
+import type { ClickHouseClient } from "@clickhouse/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AggregateType } from "../../";
+import { createTenantId } from "../../domain/tenantId";
+import type { Event } from "../../domain/types";
+import { EventStoreClickHouse } from "../eventStoreClickHouse";
+import { REHYDRATION_WINDOW_MS } from "../rehydrationWindow";
+import { EventRepositoryClickHouse } from "../repositories/eventRepositoryClickHouse";
+
+/**
+ * `event_log` is `PARTITION BY toYearWeek(EventOccurredAt)`, but the re-fold
+ * reads bound on `EventTimestamp` — acceptance order, NOT the partition key. So
+ * without a predicate on `EventOccurredAt` the read cannot prune, and walks
+ * every weekly partition ever written including the cold tier on S3.
+ *
+ * Measured in production before this bound existed: `event_log` was the ONLY
+ * table cold-scanning (198 scans in 15 minutes across 3 pods), all of it from
+ * these two loaders, against a table taking ~1M trace events/day with tenant
+ * retentions up to 1827 days.
+ *
+ * `getEvents` already passed this bound; these two paths were the holdouts.
+ */
+describe("EventStoreClickHouse — re-fold reads prune partitions", () => {
+  const tenantId = createTenantId("test-tenant");
+  const OCCURRED_AT = 1_700_000_000_000;
+
+  let queryMock: ReturnType<typeof vi.fn>;
+  let store: EventStoreClickHouse;
+
+  beforeEach(() => {
+    queryMock = vi.fn().mockResolvedValue({ json: async () => [] });
+    store = new EventStoreClickHouse(
+      new EventRepositoryClickHouse(
+        async () => ({ query: queryMock }) as unknown as ClickHouseClient,
+      ),
+    );
+  });
+
+  const upToEvent = {
+    id: "event-1",
+    createdAt: 1000,
+    occurredAt: OCCURRED_AT,
+  } as unknown as Event;
+
+  const lastCall = () => queryMock.mock.calls[0]![0] as {
+    query: string;
+    query_params: Record<string, unknown>;
+  };
+
+  describe("given a time-local aggregate type", () => {
+    const aggregateType: AggregateType = "trace";
+
+    describe("when getEventsUpTo runs", () => {
+      it("filters on EventOccurredAt so ClickHouse can prune partitions", async () => {
+        await store.getEventsUpTo("trace-1", { tenantId }, aggregateType, upToEvent);
+
+        expect(lastCall().query).toContain("EventOccurredAt >=");
+      });
+
+      it("anchors the window on the triggering event, one window back", async () => {
+        await store.getEventsUpTo("trace-1", { tenantId }, aggregateType, upToEvent);
+
+        expect(lastCall().query_params.occurredAtFromMs).toBe(
+          OCCURRED_AT - REHYDRATION_WINDOW_MS,
+        );
+      });
+
+      it("keeps rows with an unknown occurred time, so the bound can never drop one", async () => {
+        await store.getEventsUpTo("trace-1", { tenantId }, aggregateType, upToEvent);
+
+        expect(lastCall().query).toContain("EventOccurredAt = 0 OR");
+      });
+    });
+
+    describe("when the paginated re-fold runs", () => {
+      it("bounds every page, not just the first", async () => {
+        // Unbounded, the cost is paid once PER PAGE rather than once per
+        // re-fold — every page re-opens every partition.
+        await store.getEventsUpToPaged?.({
+          aggregateId: "trace-1",
+          context: { tenantId },
+          aggregateType,
+          upToEvent,
+          after: { timestamp: 500, eventId: "event-0" },
+          limit: 100,
+        });
+
+        expect(lastCall().query).toContain("EventOccurredAt >=");
+        expect(lastCall().query_params.occurredAtFromMs).toBe(
+          OCCURRED_AT - REHYDRATION_WINDOW_MS,
+        );
+      });
+    });
+  });
+
+  /**
+   * The safety half of the contract. `global` and `billing_report` aggregate
+   * over arbitrary time ranges, so a window around any single event WOULD drop
+   * their history. `rehydrationLowerBoundMs` returns undefined for them and the
+   * read must stay unbounded — slow, but correct.
+   */
+  describe("given a long-lived aggregate type", () => {
+    it("issues no lower bound, leaving the scan unbounded", async () => {
+      await store.getEventsUpTo(
+        "global-1",
+        { tenantId },
+        "global" as AggregateType,
+        upToEvent,
+      );
+
+      expect(lastCall().query).not.toContain("EventOccurredAt >=");
+      expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();
+    });
+  });
+
+  describe("given an event with no usable occurred time", () => {
+    it("issues no lower bound rather than anchoring on zero", async () => {
+      // Anchoring on 0 would produce a bound in 1970 and prune nothing, or
+      // worse, a negative bound. Better to skip it.
+      await store.getEventsUpTo("trace-1", { tenantId }, "trace" as AggregateType, {
+        id: "event-1",
+        createdAt: 1000,
+        occurredAt: 0,
+      } as unknown as Event);
+
+      expect(lastCall().query).not.toContain("EventOccurredAt >=");
+      expect(lastCall().query_params.occurredAtFromMs).toBeUndefined();
+    });
+  });
+});

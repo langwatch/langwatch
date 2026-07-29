@@ -50,6 +50,12 @@ export interface EventRepository {
    * Events are filtered where:
    * - timestamp < upToTimestamp, OR
    * - timestamp = upToTimestamp AND eventId <= upToEventId
+   *
+   * `occurredAtFromMs` carries the same meaning and the same caveats as on
+   * {@link EventRepository.getEventRecords}: a partition-pruning lower bound on
+   * `EventOccurredAt`, supplied by `rehydrationLowerBoundMs`. The upper bound
+   * above is on EventTimestamp, which is NOT the partition key, so without this
+   * the read walks every weekly partition ever written.
    */
   getEventRecordsUpTo(
     tenantId: string,
@@ -57,6 +63,7 @@ export interface EventRepository {
     aggregateId: string,
     upToTimestamp: number,
     upToEventId: string,
+    occurredAtFromMs?: number,
   ): Promise<EventRecord[]>;
 
   /**
@@ -79,6 +86,8 @@ export interface EventRepository {
     upToEventId: string;
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
+    /** Partition-pruning lower bound — see {@link EventRepository.getEventRecordsUpTo}. */
+    occurredAtFromMs?: number;
   }): Promise<EventRecord[]>;
 
   /**
