@@ -703,9 +703,9 @@ describe("validateProviderApiKey", () => {
         true,
       );
       expect(headers.some((h) => "x-goog-api-key" in h)).toBe(true);
-      expect(
-        headers.some((h) => h.Authorization?.startsWith("Bearer ")),
-      ).toBe(true);
+      expect(headers.some((h) => h.Authorization?.startsWith("Bearer "))).toBe(
+        true,
+      );
     });
 
     /** @scenario Probing stops at the first shape that answers */
@@ -759,7 +759,9 @@ describe("validateProviderApiKey", () => {
           JSON.stringify({
             error: {
               message: "API key not valid. Please pass a valid API key.",
-              details: [{ reason: "API_KEY_INVALID", domain: "googleapis.com" }],
+              details: [
+                { reason: "API_KEY_INVALID", domain: "googleapis.com" },
+              ],
             },
           }),
       };
@@ -803,7 +805,9 @@ describe("validateProviderApiKey", () => {
           JSON.stringify({
             error: {
               message: "API key not valid. Please pass a valid API key.",
-              details: [{ reason: "API_KEY_INVALID", domain: "googleapis.com" }],
+              details: [
+                { reason: "API_KEY_INVALID", domain: "googleapis.com" },
+              ],
             },
           }),
       });

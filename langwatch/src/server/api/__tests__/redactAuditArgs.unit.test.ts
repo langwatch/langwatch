@@ -70,7 +70,7 @@ describe("redactAuditArgs", () => {
       /** A passthrough object, so its contents cannot be assumed harmless. */
       it("redacts providerConfig values", () => {
         const redacted = redactAuditArgs({
-          providerConfig: { serviceAccountJson: "{\"private_key\":\"pk\"}" },
+          providerConfig: { serviceAccountJson: '{"private_key":"pk"}' },
         }) as Record<string, unknown>;
 
         expect(JSON.stringify(redacted)).not.toContain("private_key");
@@ -114,12 +114,9 @@ describe("redactAuditArgs", () => {
         expect(redactAuditArgs(input)).toBe(input);
       });
 
-      it.each([undefined, null, "a string", 42])(
-        "leaves %s alone",
-        (input) => {
-          expect(redactAuditArgs(input)).toBe(input);
-        },
-      );
+      it.each([undefined, null, "a string", 42])("leaves %s alone", (input) => {
+        expect(redactAuditArgs(input)).toBe(input);
+      });
 
       it("leaves a non-object customKeys alone", () => {
         const input = { customKeys: null };

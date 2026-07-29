@@ -11,7 +11,7 @@
  * Covers @unit scenarios from
  * specs/model-providers/credential-validation.feature.
  */
-import { renderHook, act } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockMutateAsync, mockQueryFetch } = vi.hoisted(() => ({
@@ -39,9 +39,9 @@ vi.mock("../../utils/api", () => ({
 }));
 
 import { TRPCClientError } from "@trpc/client";
-import { useModelProviderApiKeyValidation } from "../useModelProviderApiKeyValidation";
-import { errorFormatter } from "../../server/api/trpc";
 import { ProviderUnreachableError } from "../../server/api/routers/providerValidation";
+import { errorFormatter } from "../../server/api/trpc";
+import { useModelProviderApiKeyValidation } from "../useModelProviderApiKeyValidation";
 
 /**
  * The error the browser actually receives, assembled by the real formatter

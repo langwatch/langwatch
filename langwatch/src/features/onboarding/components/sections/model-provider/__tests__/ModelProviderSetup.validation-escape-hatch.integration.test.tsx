@@ -111,8 +111,8 @@ vi.mock("../../../../../../utils/api", () => ({
 }));
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { ModelProviderSetup } from "../ModelProviderSetup";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../../../utils/constants";
+import { ModelProviderSetup } from "../ModelProviderSetup";
 
 const renderSetup = () =>
   render(

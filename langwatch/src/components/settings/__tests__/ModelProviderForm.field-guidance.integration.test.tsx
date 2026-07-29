@@ -100,7 +100,11 @@ vi.mock("../../ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 
 import { modelProviderRegistry } from "../../../features/onboarding/regions/model-providers/registry";
 import { EditModelProviderForm } from "../ModelProviderForm";
-import { keyedRow, makePrimeQueries, Wrapper } from "./modelProviderDrawerHarness";
+import {
+  keyedRow,
+  makePrimeQueries,
+  Wrapper,
+} from "./modelProviderDrawerHarness";
 
 const primeQueries = makePrimeQueries({
   collapsedQuery: mockGetAllForProjectForFrontendQuery,
@@ -145,8 +149,8 @@ describe("Feature: the drawer says where each credential comes from", () => {
         ]);
         renderDrawer("gemini");
 
-        const description = geminiEntry?.fieldMetadata?.GEMINI_API_KEY
-          ?.description;
+        const description =
+          geminiEntry?.fieldMetadata?.GEMINI_API_KEY?.description;
         expect(description).toBeTruthy();
         expect(screen.getByText(description!)).toBeInTheDocument();
       });

@@ -74,14 +74,7 @@ export function useModelProviderApiKeyValidation(
     } finally {
       setIsValidating(false);
     }
-  }, [
-    projectId,
-    organizationId,
-    provider,
-    customKeys,
-    scopes,
-    validateApiKey,
-  ]);
+  }, [projectId, organizationId, provider, customKeys, scopes, validateApiKey]);
 
   /**
    * Validates stored or env var API key against a custom URL or default URL.
@@ -114,7 +107,10 @@ export function useModelProviderApiKeyValidation(
         return true;
       } catch (error) {
         setValidationError(
-          describeError({ error, fallbackTitle: "Couldn't check this API key" }),
+          describeError({
+            error,
+            fallbackTitle: "Couldn't check this API key",
+          }),
         );
         return false;
       } finally {

@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { HandledError } from "@langwatch/handled-error";
+import type { PrismaClient } from "@prisma/client";
 import {
   providerApiRoots,
   providerDefaultBaseUrls,
@@ -280,7 +280,9 @@ async function handleHttpError({
   if (isAuthFailure) {
     return {
       valid: false,
-      error: message ? `${INVALID_KEY_MESSAGE} ${message}` : INVALID_KEY_MESSAGE,
+      error: message
+        ? `${INVALID_KEY_MESSAGE} ${message}`
+        : INVALID_KEY_MESSAGE,
       rank: message ? FAILURE_RANK.explained : FAILURE_RANK.generic,
     };
   }
@@ -438,9 +440,7 @@ const FAILURE_RANK = {
 type RankedFailure = ValidationResult & { rank: number };
 
 /** Picks the refusal worth showing, keeping the first of equally useful ones. */
-function mostInformativeFailure(
-  failures: RankedFailure[],
-): RankedFailure {
+function mostInformativeFailure(failures: RankedFailure[]): RankedFailure {
   return failures.reduce<RankedFailure>(
     (chosen, failure) => (failure.rank < chosen.rank ? failure : chosen),
     failures[0] ?? {
