@@ -184,23 +184,6 @@ const errorSchema = z.object({
 });
 
 /**
- * Declare a route's JSON payload for the generated spec.
- *
- * The handlers parse with `safeParse` rather than a `zValidator` middleware,
- * so that a rejected body answers in the same `validation_error` envelope as
- * every other refusal on these routes instead of Hono's default. That choice
- * costs the generator its only view of the request schema, so state it here:
- * without this the spec publishes mutation routes with no documented payload
- * at all, and a caller has nothing to write their request against.
- */
-function jsonBody(schema: z.ZodTypeAny) {
-  return {
-    required: true,
-    content: { "application/json": { schema: resolver(schema) } },
-  };
-}
-
-/**
  * Best-effort organization lookup for the project behind the API key.
  * Cached off the project row we already fetched in `authMiddleware`.
  */
@@ -537,7 +520,6 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   "/virtual-keys",
   describeRoute({
     summary: "Create virtual key",
-    requestBody: jsonBody(createVirtualKeySchema),
     description:
       "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.",
     tags: ["Virtual Keys"],
@@ -792,7 +774,6 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
   "/virtual-keys/:id",
   describeRoute({
     summary: "Update virtual key",
-    requestBody: jsonBody(updateVirtualKeySchema),
     description:
       "Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
     tags: ["Virtual Keys"],
@@ -1148,7 +1129,6 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   "/budgets",
   describeRoute({
     summary: "Create budget",
-    requestBody: jsonBody(createBudgetSchema),
     description:
       "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). GROUP budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.",
     tags: ["Budgets"],
@@ -1205,7 +1185,6 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
   "/budgets/:id",
   describeRoute({
     summary: "Update budget",
-    requestBody: jsonBody(updateBudgetSchema),
     description:
       "Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.",
     tags: ["Budgets"],
@@ -1438,7 +1417,6 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
   "/cache-rules",
   describeRoute({
     summary: "Create a cache rule",
-    requestBody: jsonBody(createCacheRuleSchema),
     description:
       "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.",
     tags: ["Cache Rules"],
@@ -1489,7 +1467,6 @@ secured.access(apiKeyPermission("gatewayCacheRules:update")).patch(
   "/cache-rules/:id",
   describeRoute({
     summary: "Update a cache rule",
-    requestBody: jsonBody(updateCacheRuleSchema),
     description:
       "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
     tags: ["Cache Rules"],
