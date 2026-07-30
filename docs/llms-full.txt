@@ -17070,8 +17070,9 @@ session survives rotation without re-prompting login.
 
 Click **Revoke** on any session card. The corresponding access-token +
 refresh-token Redis keys are immediately deleted. The next CLI request
-from that device will return 401, your CLI will print "Session expired
-— run `langwatch login --device`" and you'll need to re-authenticate.
+from that device will return 401. The CLI tries to refresh once, the
+refresh is refused too because the pair was deleted, and it prints
+"Session expired, run `langwatch login --device` again".
 
 **Revoke all sessions** clears every active session in one action —
 useful if you suspect a compromise or are leaving the company.
@@ -17085,8 +17086,9 @@ themselves are separate inventory items.
 
 Your IT admin can cap how long any one session stays valid:
 
-- **0 (default)**: no cap; sessions live until you revoke or until the
-  refresh token's natural 30-day TTL.
+- **0 (default)**: no cap. A session you keep using never expires: every
+  CLI call that needs it rotates the refresh token and restarts its
+  90-day window. A session nobody touches for 90 days expires on its own.
 - **N days**: refresh requests are rejected once `(now - issued_at) >
   N days`. The CLI prints "Your CLI session is older than your
   organization's policy. Please run `langwatch login` again."

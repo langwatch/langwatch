@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
  * and a per-row revoke button.
  *
  * Storage model: each CLI session has 1 access token (1h TTL) + 1
- * refresh token (30d TTL) tracked in Redis. The per-user index
+ * refresh token (90d default TTL, rotated on use) tracked in Redis. The per-user index
  * `lwcli:user:<userId>:tokens` (maintained by `auth-cli.ts /exchange`
  * + `/refresh`) lists every Redis key the user owns. Reads SMEMBERS
  * the index, MGETs the records, and groups them by

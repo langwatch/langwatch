@@ -17,16 +17,19 @@
 import { spawn } from "node:child_process";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
-import { GovernanceCliError, getCliBootstrap } from "./cli-api";
+import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import { runDeviceFlowLogin } from "./login-flow";
-import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
 import { envForTool } from "./tool-env";
 import { resolveWrapperMode } from "./wrapper-mode";
 import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
+import {
+	classifyIngestionSetupError,
+	recoverExpiredSession,
+} from "./wrapper-session-recovery";
 
 /**
  * How often the wrapper polls codex's append-only rollout while the session
@@ -320,6 +323,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		process.stderr.write(`path selection failed: ${(err as Error).message}\n`);
 		process.exit(2);
 	}
+	if (pathChoice.isAborted) {
+		process.stderr.write(`${lwTag()} cancelled, ${tool} was not started.\n`);
+		process.exit(130);
+	}
 
 	const toolEnv = envForTool(cfg, tool);
 	const gatewayVars = toolEnv.vars;
@@ -334,31 +341,38 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			pathChoice.mode,
 		);
 	} catch (err) {
-		// Path B (ingestion) setup can fail at mint time - e.g. the user has
-		// no personal workspace yet, or the control plane is unreachable. If
-		// the gateway path is allowed for this tool, surface a clear message
-		// and fall back to it rather than dead-ending. The both-paths-off
-		// `tool_disabled` policy error is NOT a mint failure, so it never
-		// falls back; it exits with the admin hint.
-		const isToolDisabled =
-			err instanceof GovernanceCliError && err.code === "tool_disabled";
-		const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
-		if (pathChoice.mode === "ingestion" && policy.allowVk && !isToolDisabled) {
-			process.stderr.write(
-				`${lwTag()} couldn't set up direct OTLP ingestion for ${tool} ` +
-					`(${(err as Error).message}). Falling back to the gateway path.\n`,
-			);
+		// Direct-OTLP setup can fail at mint time: an expired device session,
+		// no personal workspace yet, an unreachable control plane. None of
+		// those are a reason to route the tool through the gateway instead;
+		// that path bills model usage to the org and the user has to opt into
+		// it. An expired session is the one recoverable case, so offer the
+		// login inline and retry the same path.
+		if (
+			pathChoice.mode === "ingestion" &&
+			classifyIngestionSetupError(err) === "expired_session"
+		) {
+			const recovery = await recoverExpiredSession({ cfg, tool });
+			if (recovery.status === "abort") {
+				process.stderr.write(recovery.message);
+				process.exit(recovery.exitCode);
+			}
+			cfg = recovery.cfg;
+			// The fresh login may carry a different personal VK, so recompute
+			// the gateway env from the new config rather than reusing the pair
+			// derived from the expired session.
+			const refreshedEnv = envForTool(cfg, tool);
 			try {
 				modeResult = await resolveWrapperMode(
 					cfg,
 					tool,
-					gatewayVars,
-					gatewayClears,
-					"gateway",
+					refreshedEnv.vars,
+					refreshedEnv.clears ?? [],
+					"ingestion",
 				);
 			} catch (err2) {
 				process.stderr.write(
-					`mode resolution failed: ${(err2 as Error).message}\n`,
+					`${lwTag()} still could not set up direct OTLP telemetry for ` +
+						`${tool}: ${(err2 as Error).message}\n`,
 				);
 				process.exit(2);
 			}

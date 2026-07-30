@@ -9,6 +9,7 @@ import {
   listIngestionSources,
 } from "../cli-api";
 import type { GovernanceConfig } from "../config";
+import { DeviceFlowError } from "../device-flow";
 
 const baseCfg = (token: string | undefined = "at_x"): GovernanceConfig => ({
   gateway_url: "http://gw.example",
@@ -86,6 +87,100 @@ describe("cli-api — auth contract", () => {
         status: 401,
         code: "unauthorized",
       });
+    });
+  });
+
+  describe("when the access token has aged out but the session is alive", () => {
+    it("refreshes before sending when the recorded expiry has passed", async () => {
+      const cfg = {
+        ...baseCfg("at_old"),
+        refresh_token: "rt_old",
+        // Already spent, so the proactive check fires and the request goes
+        // out once with the rotated token instead of eating a 401 first.
+        expires_at: 1,
+      };
+      const { fetchImpl, seen } = spyFetch(ok({ hasPersonalVKs: true }));
+
+      await getGovernanceStatus(cfg, {
+        fetchImpl,
+        refreshDeps: {
+          refreshImpl: (async () => ({
+            access_token: "at_new",
+            refresh_token: "rt_new",
+            expires_in: 3600,
+          })) as never,
+          saveImpl: vi.fn(),
+          loadImpl: vi.fn() as never,
+        },
+      });
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.authHeader).toBe("Bearer at_new");
+    });
+
+    it("refreshes and retries once, so the caller never sees the 401", async () => {
+      const cfg = { ...baseCfg("at_old"), refresh_token: "rt_old" };
+      const responses = [
+        status(401, { error: "unauthorized" }),
+        ok({ hasPersonalVKs: true }),
+      ];
+      const authHeaders: (string | undefined)[] = [];
+      const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+        authHeaders.push(
+          (init?.headers as Record<string, string> | undefined)
+            ?.Authorization,
+        );
+        return responses.shift()!;
+      }) as unknown as typeof fetch;
+
+      await getGovernanceStatus(cfg, {
+        fetchImpl,
+        refreshDeps: {
+          refreshImpl: (async () => ({
+            access_token: "at_new",
+            refresh_token: "rt_new",
+            expires_in: 3600,
+          })) as never,
+          saveImpl: vi.fn(),
+          loadImpl: vi.fn() as never,
+        },
+      });
+
+      expect(authHeaders).toEqual(["Bearer at_old", "Bearer at_new"]);
+      expect(cfg.access_token).toBe("at_new");
+    });
+
+    it("surfaces the 401 when the refresh token is refused too", async () => {
+      const cfg = { ...baseCfg("at_old"), refresh_token: "rt_dead" };
+      const fetchImpl = vi.fn(
+        async () => status(401, { error: "unauthorized" }),
+      ) as unknown as typeof fetch;
+
+      await expect(
+        getGovernanceStatus(cfg, {
+          fetchImpl,
+          refreshDeps: {
+            refreshImpl: (async () => {
+              throw new DeviceFlowError("unauthorized", "revoked");
+            }) as never,
+            loadImpl: (() => cfg) as never,
+            saveImpl: vi.fn(),
+          },
+        }),
+      ).rejects.toMatchObject({ status: 401, code: "unauthorized" });
+    });
+
+    it("does not try to refresh a session that has no refresh token", async () => {
+      const { fetchImpl, seen } = spyFetch(status(401, { error: "x" }));
+      const refreshImpl = vi.fn();
+      await expect(
+        getGovernanceStatus(baseCfg(), {
+          fetchImpl,
+          refreshDeps: { refreshImpl: refreshImpl as never },
+        }),
+      ).rejects.toMatchObject({ status: 401 });
+      expect(refreshImpl).not.toHaveBeenCalled();
+      expect(seen).toHaveLength(1);
     });
   });
 
