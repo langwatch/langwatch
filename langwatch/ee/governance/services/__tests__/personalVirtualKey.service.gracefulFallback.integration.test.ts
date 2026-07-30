@@ -29,10 +29,9 @@ import {
   PersonalVirtualKeyService,
 } from "../personalVirtualKey.service";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
-describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
+describe.skipIf(!hasCredentialsSecret)(
   "PersonalVirtualKeyService.issue — graceful fallback when no default policy (real DB)",
   () => {
     const service = PersonalVirtualKeyService.create(prisma, {
