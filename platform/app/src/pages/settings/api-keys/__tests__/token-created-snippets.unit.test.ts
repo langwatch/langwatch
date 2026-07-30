@@ -152,13 +152,13 @@ describe("given the token-created-snippets feature is implemented", () => {
       const highlightLibs = allDepNames
         .filter((name) => highlightLibPattern.test(name))
         .sort();
-      // Lock in the pre-existing set — any new highlighter dep added by a future
-      // PR will fail this test until the allowlist is intentionally expanded.
-      expect(highlightLibs).toEqual([
-        "prism-react-renderer",
-        "prismjs",
-        "shiki",
-      ]);
+      // Lock in the current set — any new highlighter dep added by a future PR
+      // will fail this test until the allowlist is intentionally expanded.
+      // Shiki is the app's only highlighter: prism-react-renderer and prismjs
+      // were removed once Vite 8's Rolldown bundler stopped preserving the
+      // import order their `global.Prism` side-effect registration relied on
+      // (RenderCode.tsx renders via the shared Shiki singleton instead).
+      expect(highlightLibs).toEqual(["shiki"]);
     });
   });
 });
