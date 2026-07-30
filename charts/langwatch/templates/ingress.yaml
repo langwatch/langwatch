@@ -6,16 +6,40 @@
   `/`-separated segments like `pathType: Prefix`, so the `/api/internal-status`
   sibling — which the block does not cover — still renders.
 
-  Literal paths only: a regex `ImplementationSpecific` path covering the same
-  URLs passes the guard, and beats the blackhole on nginx with `use-regex`.
+  Segment matching only covers LITERAL paths. Two other shapes defeat the block
+  while rendering a manifest that looks correct, so both are refused below:
+  a regex `ImplementationSpecific` path (ingress-nginx gives regex locations
+  priority over prefix locations, so `/api/(.*)` wins outright), and the
+  `default-backend` annotation, which ingress-nginx defines as the handler for
+  a service with no active endpoints — precisely what the blackhole is.
 */ -}}
+{{- if $blockedPaths }}
+  {{- /* ingress-nginx: `default-backend` reroutes exactly the no-endpoint case
+         the blackhole relies on, turning the block into a working proxy. */ -}}
+  {{- range $annotation, $value := (.Values.ingress.annotations | default dict) }}
+    {{- if hasSuffix "/default-backend" (toString $annotation) }}
+      {{- fail (printf "ingress.annotations contains %q, which routes requests for a backend with no endpoints to another service — that is exactly how the blackhole blocks %v, so the block would render but forward instead. Remove the annotation, or set ingress.blockedPaths: [] to disable the block knowingly." (toString $annotation) $blockedPaths) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
 {{- range $host := .Values.ingress.hosts }}
-  {{- if not $host.http }}
-    {{- fail (printf "ingress.hosts entry for host %q has no http.paths" (toString $host.host)) }}
+  {{- /* `not $host.http` accepted `http: {}` and `http: {paths: []}`, either of
+         which renders an Ingress whose only rules are blackholes — a total
+         outage that applies without error. Test the list itself. */ -}}
+  {{- if not (dig "http" "paths" list $host) }}
+    {{- fail (printf "ingress.hosts entry for host %q has no http.paths. An entry with no paths renders an Ingress that routes nothing to the app." (toString $host.host)) }}
   {{- end }}
   {{- range $path := $host.http.paths }}
     {{- if not $path.path }}
       {{- fail (printf "ingress.hosts entry for host %q has a path with no `path` key" (toString $host.host)) }}
+    {{- end }}
+    {{- if $blockedPaths }}
+      {{- /* A regex path is not comparable segment-wise, so the nested-path
+             guard below cannot reason about it at all. Refuse rather than
+             render a block the controller will rank below it. */ -}}
+      {{- if and (eq (toString ($path.pathType | default "")) "ImplementationSpecific") (regexMatch "[][(){}*+?^$\\\\|]" $path.path) }}
+        {{- fail (printf "ingress.hosts path %q uses pathType: ImplementationSpecific with regex metacharacters while ingress.blockedPaths is set. Controllers that honour regex (ingress-nginx with use-regex) rank it above the blackhole's Prefix rule, re-exposing the private control plane. Use a literal Prefix path, or set ingress.blockedPaths: [] to disable the block knowingly." $path.path) }}
+      {{- end }}
     {{- end }}
     {{- range $blocked := $blockedPaths }}
       {{- if or (eq $path.path $blocked) (hasPrefix (printf "%s/" $blocked) $path.path) }}

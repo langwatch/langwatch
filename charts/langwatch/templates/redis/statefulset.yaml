@@ -41,7 +41,7 @@ spec:
       # layers on top rather than replacing, so a partial override cannot
       # strip runAsNonRoot or the seccomp profile.
       securityContext:
-        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.redis "base" (dict "runAsUser" 999 "runAsGroup" 999 "fsGroup" 999 "runAsNonRoot" true "seccompProfile" (dict "type" "RuntimeDefault"))) | nindent 8 }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.redis "base" (dict "runAsUser" 999 "runAsGroup" 999 "fsGroup" 999)) | nindent 8 }}
       terminationGracePeriodSeconds: 30
       containers:
         - name: redis

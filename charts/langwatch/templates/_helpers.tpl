@@ -961,13 +961,27 @@ podAffinity:
 */}}
 {{- define "langwatch.podSecurityContext" -}}
 {{- $global := .ctx.Values.global.podSecurityContext | default dict -}}
-{{- /* Components whose image pins its own uid pass "base" instead of the
-       global default — the bundled datastores cannot run as uid 1000. The
-       override still layers on top, so a partial override cannot strip the
-       uid, runAsNonRoot or the seccomp profile. */ -}}
-{{- $defaults := .base | default $global -}}
+{{- /* Three levels, lowest priority first: global, then the component's uid
+       "base", then the operator's override.
+
+       `base` USED TO REPLACE global entirely (`.base | default $global`),
+       which quietly defeated the whole point of a global default: an operator
+       who raised the bar globally — seccompProfile.type: Localhost,
+       supplementalGroups, fsGroupChangePolicy — got it on app/workers/nlp/
+       langevals while the bundled PostgreSQL and Redis silently stayed on
+       whatever `base` happened to name. The two workloads holding data were
+       the two exempt from the hardening.
+
+       Now `base` pins ONLY the keys it actually names (the uid the image
+       requires, which the datastores cannot change), and every other global
+       key survives underneath it.
+
+       To DROP an inherited key rather than change it — e.g. runAsUser on
+       OpenShift, where the SCC assigns one from a range — set it to null:
+       `postgresql.podSecurityContext.runAsUser: null`. mustMergeOverwrite
+       keeps the explicit null, which renders as no value. */ -}}
 {{- $override := .component.podSecurityContext | default dict -}}
-{{- toYaml (mustMergeOverwrite (deepCopy $defaults) $override) -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) (.base | default dict) $override) -}}
 {{- end -}}
 
 {{- define "langwatch.containerSecurityContext" -}}
@@ -996,11 +1010,26 @@ here, once, by name, so both consuming templates agree.
       {{- if not (hasPrefix "/" $path) -}}
         {{- fail (printf "ingress.blockedPaths entry %q must be an absolute path beginning with \"/\". As written it renders an Ingress the API server rejects, and blocks nothing in the meantime." $path) -}}
       {{- end -}}
-      {{- $trimmed := trimSuffix "/" $path -}}
-      {{- if eq $trimmed "" -}}
+      {{- /* Reject rather than normalise. `trimSuffix "/"` strips exactly ONE
+             character, so "/api/internal//" became "/api/internal/" and the
+             nested-path guard then compared against a prefix no real request
+             path can match — rendering a blackhole rule that blocks nothing
+             while an app rule for /api/internal/status out-matched it. Silently
+             repairing operator input is what made that reachable; a security
+             control should refuse input it cannot interpret exactly. */ -}}
+      {{- if ne $path (trim $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q has leading or trailing whitespace. Kubernetes matches the path literally, so the block would never fire. Remove the whitespace." $path) -}}
+      {{- end -}}
+      {{- if contains "//" $path -}}
+        {{- fail (printf "ingress.blockedPaths entry %q contains an empty path segment (\"//\"). No request path matches it, so the block would render but never fire. Use a single slash between segments." $path) -}}
+      {{- end -}}
+      {{- if eq $path "/" -}}
         {{- fail "ingress.blockedPaths may not contain \"/\" — that would route the whole site to the blackhole. Block a specific prefix, or set ingress.enabled: false." -}}
       {{- end -}}
-      {{- $normalised = append $normalised $trimmed -}}
+      {{- if hasSuffix "/" $path -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must not end in a slash — with pathType: Prefix, %q already covers every path beneath it, and the trailing form silently fails to match the prefix itself." $path (trimSuffix "/" $path)) -}}
+      {{- end -}}
+      {{- $normalised = append $normalised $path -}}
     {{- end -}}
   {{- end -}}
   {{- $normalised | uniq | toJson -}}
