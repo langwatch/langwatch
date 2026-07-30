@@ -39,10 +39,17 @@ global:
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
   ## @param global.scheduling.tolerations [array] Tolerations applied to all pods.
+  ## @param global.scheduling.priorityClassName [string] PriorityClass for all pods. Set a per-component priorityClassName to override.
   scheduling:
     nodeSelector: {}
     affinity: {}
     tolerations: []
+    # Names an existing PriorityClass so the scheduler preempts less important
+    # workloads rather than leaving LangWatch pods Pending when a node fills
+    # up. The class must already exist in the cluster — the chart does not
+    # create one, since a PriorityClass is cluster-scoped and its value only
+    # means anything relative to the other classes an operator has defined.
+    priorityClassName: ""
 
 # =============================================================================
 # Auto-Generation Mode (Development Only)
@@ -147,7 +154,8 @@ app:
   ## @extra app.service Service configuration for the app.
   ## @param app.service.type [string, default: ClusterIP] Service type.
   ## @param app.service.port [default: 5560] Service port.
-  service: { type: ClusterIP, port: 5560 }
+  ## @param app.service.annotations [object] Additional Service annotations. Required for cloud load-balancer configuration (AWS NLB scheme/subnets, GCP internal LB, ingress-controller hints) — those controllers are driven entirely by annotations, so without this a `type: LoadBalancer` install cannot be steered at all.
+  service: { type: ClusterIP, port: 5560, annotations: {} }
 
   # Resource requirements and limits for the application pods
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
@@ -618,11 +626,30 @@ app:
   ## @param app.featureFlagForceEnable [string, default: ""] Comma-separated feature flag keys to force on for this install.
   featureFlagForceEnable: ""
 
+  # PriorityClass for the app pods, overriding global.scheduling.priorityClassName.
+  # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
+  ## @param app.priorityClassName [string] PriorityClass for app pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
   ## @param app.extraEnvs [array] Additional environment variables for app container.
   extraEnvs: []
+  # Bulk-import environment variables from existing ConfigMaps or Secrets.
+  # Entries are rendered verbatim into the container's `envFrom`, so each one
+  # is a `configMapRef` or `secretRef`. Use this when the operator's own
+  # tooling (External Secrets, SOPS, Terraform, Vault Agent) already
+  # materialises a Secret holding the app's configuration — listing every key
+  # under extraEnvs instead would mean re-declaring it here and keeping the
+  # two in sync by hand.
+  #
+  # Note: values arriving via envFrom are NOT available for `$(VAR)`
+  # interpolation in other env entries — Kubernetes only expands names defined
+  # in `env`. Anything referenced that way must stay in extraEnvs.
+  # See: https://kubespec.dev/v1/Pod#spec.containers.envFrom
+  ## @param app.extraEnvFrom [array] Additional envFrom sources (configMapRef/secretRef) for the app container.
+  extraEnvFrom: []
   # Additional containers in the pod
   # See: https://kubespec.dev/v1/Pod#spec.containers
   ## @param app.extraContainers [array] Additional sidecar containers.
@@ -739,9 +766,17 @@ workers:
     strategy: {}
     ## @param workers.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
     revisionHistoryLimit: 10
+  # PriorityClass for the worker pods, overriding global.scheduling.priorityClassName.
+  # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
+  ## @param workers.priorityClassName [string] PriorityClass for worker pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   # Additional Kubernetes resources
   ## @param workers.extraEnvs [array] Additional environment variables.
   extraEnvs: []
+  # See app.extraEnvFrom.
+  # See: https://kubespec.dev/v1/Pod#spec.containers.envFrom
+  ## @param workers.extraEnvFrom [array] Additional envFrom sources (configMapRef/secretRef) for the workers container.
+  extraEnvFrom: []
   ## @param workers.extraContainers [array] Additional sidecar containers.
   extraContainers: []
   ## @param workers.extraVolumes [array] Additional pod volumes.
@@ -761,6 +796,16 @@ workers:
 # used to sandbox user code blocks. The published image is named langwatch_nlp.
 ## @section NLP service
 langwatch_nlp:
+  # Deploy the NLP service as part of this release. Turn it off when the
+  # service is run outside the chart — a shared instance for several releases,
+  # or a serverless deployment — and point app.upstreams.nlp / workers at that
+  # address instead. Disabling only stops the chart rendering the Deployment
+  # and Service; the app still expects to reach an NLP service somewhere, so
+  # an install with this off and no upstream override will fail at runtime,
+  # not at render time.
+  ## @param langwatch_nlp.enabled [default: true] Deploy the NLP service.
+  enabled: true
+
   # Number of NLP service replicas
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param langwatch_nlp.replicaCount [default: 1] Number of NLP service replicas.
@@ -861,6 +906,8 @@ langwatch_nlp:
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
+  ## @param langwatch_nlp.priorityClassName [string] PriorityClass for NLP pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   ## @param langwatch_nlp.extraEnvs [array] Additional environment variables.
   extraEnvs: []
   # Additional containers in the pod
@@ -892,6 +939,13 @@ langwatch_nlp:
 # This service handles model evaluation, testing, and quality assessment
 ## @section Langevals service
 langevals:
+  # Deploy the evaluations service as part of this release. Same shape as
+  # langwatch_nlp.enabled: turn it off to point at a shared or externally-run
+  # instance via app.upstreams.langevals. Evaluators that call this service
+  # will fail at runtime if it is disabled without an upstream override.
+  ## @param langevals.enabled [default: true] Deploy the evaluations service.
+  enabled: true
+
   # Number of evaluation service replicas
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param langevals.replicaCount [default: 1] Number of Langevals replicas.
@@ -983,6 +1037,8 @@ langevals:
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
+  ## @param langevals.priorityClassName [string] PriorityClass for Langevals pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   ## @param langevals.extraEnvs [array] Additional environment variables.
   extraEnvs: []
   # Additional containers in the pod

@@ -1,3 +1,4 @@
+{{- if .Values.langevals.enabled }}
 # Deployment for the LangWatch Evaluations service
 apiVersion: apps/v1
 kind: Deployment
@@ -72,6 +73,11 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.langevals.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
       initContainers:
         {{- with .Values.langevals.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
@@ -139,3 +145,4 @@ spec:
           emptyDir: {}
         - name: cache-dir
           emptyDir: {}
+{{- end }}

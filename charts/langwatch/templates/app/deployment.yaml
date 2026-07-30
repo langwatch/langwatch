@@ -102,6 +102,11 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.app.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
       initContainers:
         {{- with .Values.app.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
@@ -331,6 +336,11 @@ spec:
             {{- with .Values.app.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+
+          {{- with .Values.app.extraEnvFrom}}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
           {{- if .Values.app.extraLifecycle}}
           lifecycle:

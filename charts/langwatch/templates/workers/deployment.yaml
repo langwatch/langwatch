@@ -102,6 +102,11 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      # PriorityClass - https://kubespec.dev/v1/Pod#spec.priorityClassName
+      {{- with (coalesce .Values.workers.priorityClassName .Values.global.scheduling.priorityClassName)}}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
       initContainers:
         {{- with .Values.workers.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
@@ -154,6 +159,11 @@ spec:
             {{- with .Values.workers.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+
+          {{- with .Values.workers.extraEnvFrom}}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
 
           # Probe the worker's HTTP listener (the metrics server port, 2999)
           # rather than just PID 1 liveness — an answered request proves the
