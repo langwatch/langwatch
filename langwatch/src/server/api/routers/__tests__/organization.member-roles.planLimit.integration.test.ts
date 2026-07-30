@@ -32,6 +32,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
 import { LICENSE_LIMIT_ERRORS } from "../../../license-enforcement/license-limit-guard";
 import { appRouter } from "../../root";
@@ -191,52 +192,18 @@ describe("organization member role plan limit enforcement", () => {
   });
 
   afterAll(async () => {
-    // beforeAll assigns organizationId as its first statement; if it threw
-    // before that, Vitest still runs this afterAll, and Prisma treats an
-    // undefined filter value as "no filter" — every deleteMany below would
-    // match the whole table instead of just this run's rows.
-    if (!organizationId) return;
-
-    // Clean up in reverse creation order.
-    //
-    // RoleBindings go first and WITHOUT a `.catch`: they hold an FK to
-    // CustomRole, so a failure here would surface as a confusing error on the
-    // `customRole.deleteMany` below — or, swallowed, as rows that outlive the
-    // run. Deleting the organization would cascade them anyway; doing it
-    // explicitly means a broken teardown says so instead of passing quietly.
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.teamUser
-      .deleteMany({
-        where: {
-          team: { slug: `--test-team-${testNamespace}` },
-        },
-      })
-      .catch(() => {});
-    await prisma.customRole
-      .deleteMany({
-        where: { organizationId },
-      })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({
-        where: { slug: `--test-team-${testNamespace}` },
-      })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({
-        where: { organizationId },
-      })
-      .catch(() => {});
-    await prisma.organization
-      .delete({ where: { id: organizationId } })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: {
-          email: { endsWith: `${testNamespace}@example.com` },
-        },
-      })
-      .catch(() => {});
+    // Reverse creation order. RoleBindings hold an FK to CustomRole, so
+    // they go first; the organization cascade would take them anyway, but
+    // deleting them explicitly means a broken teardown says so.
+    await cleanupTestRows(prisma, [
+      ["roleBinding", { organizationId }],
+      ["teamUser", { team: { slug: `--test-team-${testNamespace}` } }],
+      ["customRole", { organizationId }],
+      ["team", { slug: `--test-team-${testNamespace}` }],
+      ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { email: { endsWith: `${testNamespace}@example.com` } }],
+    ]);
 
     await resetApp();
   });
