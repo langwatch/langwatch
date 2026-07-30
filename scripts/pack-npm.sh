@@ -309,7 +309,18 @@ fi
 # The lockfile is the whole reason for the staged layout (npm strips one at
 # the package ROOT), so its presence is asserted on every pack — not only in
 # the smoke workflow.
-if ! tar -tzf "$tarball" | grep -qx "package/app/pnpm-lock.yaml"; then
+#
+# One listing, written to a file, shared with the secrets check below. NEVER
+# `tar -tzf | grep -q` in this script: grep -q exits at the first match, tar
+# takes SIGPIPE, GNU tar reports that as an error, and `set -o pipefail`
+# fails the pipeline even though the match succeeded — bsdtar on macOS shrugs
+# it off, so the failure is linux-only and looks like a missing file. This
+# script has now shipped that bug twice; the dist guard above documents the
+# first time.
+full_listing="$(mktemp)"
+tar -tzf "$tarball" > "$full_listing"
+if ! grep -qx "package/app/pnpm-lock.yaml" "$full_listing"; then
+  rm -f "$full_listing"
   echo "✗ the tarball ships no lockfile — the end-user install would not be reproducible." >&2
   exit 1
 fi
@@ -325,9 +336,9 @@ echo "→ verified: tarball ships the workspace lockfile at app/pnpm-lock.yaml"
 # check is fail-closed and runs on the packed artifact rather than on
 # intentions.
 secrets="$(mktemp)"
-tar -tzf "$tarball" \
-  | grep -Ei '(^|/)\.env($|\.)|\.pem$|\.key$|\.p12$|\.pfx$|(^|/)\.npmrc$|(^|/)id_(rsa|ed25519)|-debug\.log|(^|/)auth\.json$' \
+grep -Ei '(^|/)\.env($|\.)|\.pem$|\.key$|\.p12$|\.pfx$|(^|/)\.npmrc$|(^|/)id_(rsa|ed25519)|-debug\.log|(^|/)auth\.json$' "$full_listing" \
   | grep -v '\.env\.example$' > "$secrets" || true
+rm -f "$full_listing"
 if [ -s "$secrets" ]; then
   echo "✗ the tarball contains secret-shaped files — refusing to publish:" >&2
   head -20 "$secrets" >&2
