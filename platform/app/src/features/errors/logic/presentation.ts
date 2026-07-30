@@ -708,6 +708,16 @@ const presentations = {
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
   },
+  dataset_storage_not_writable: {
+    // fault: platform. Nothing was saved, and the reader cannot fix this by
+    // retrying — someone has to configure storage. Say both, and name neither
+    // the path nor the env vars (that detail is in the log line, for whoever
+    // runs the deployment).
+    title: "Dataset storage isn't set up for writing",
+    describe: () =>
+      "Your change wasn't saved. Storage has to be configured before datasets " +
+      "can be edited or uploaded — ask whoever administers this deployment.",
+  },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
     // copy has to say nothing was changed — an export that half-worked is the

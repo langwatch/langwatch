@@ -60,18 +60,40 @@ function UploadOrCreateDatasetMenu({
   children,
   onUpload,
   onCreate,
+  uploadDisabledReason,
 }: {
   children: React.ReactNode;
   onUpload: () => void;
   onCreate: () => void;
+  /** Present when this deployment cannot accept uploaded bytes. Disables the
+   *  upload flow and says why, rather than letting someone pick a file and
+   *  discover it partway through. Creating an empty dataset is unaffected —
+   *  that writes rows, not objects. */
+  uploadDisabledReason?: string;
 }) {
   return (
     <Menu.Root positioning={{ sameWidth: true }}>
       <Menu.Trigger asChild>{children}</Menu.Trigger>
       <Menu.Content>
-        <Menu.Item value="upload" onClick={onUpload}>
+        <Menu.Item
+          value="upload"
+          onClick={onUpload}
+          disabled={!!uploadDisabledReason}
+        >
           <Upload size={16} /> Upload datasets
         </Menu.Item>
+        {uploadDisabledReason ? (
+          <Text
+            fontSize="12px"
+            color="fg.muted"
+            paddingX={3}
+            paddingBottom={2}
+            maxWidth="280px"
+            data-testid="upload-disabled-reason"
+          >
+            {uploadDisabledReason}
+          </Text>
+        ) : null}
         <Menu.Item value="create" onClick={onCreate}>
           <Plus size={16} /> Create empty dataset
         </Menu.Item>
@@ -92,6 +114,19 @@ function DatasetsPage() {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+
+  // Asked once per page load so the upload entry point can be honest before a
+  // file is chosen. Only a definitive "not writable" disables anything: while
+  // the query is in flight, or if it fails, the upload stays available and the
+  // API's own guard is what refuses it.
+  const storageStatus = api.dataset.storageStatus.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
+  const uploadDisabledReason =
+    storageStatus.data?.writable === false
+      ? "Uploads need storage to be configured for this deployment."
+      : undefined;
 
   type Dataset = inferRouterOutputs<AppRouter>["dataset"]["getAll"][number];
 
@@ -226,6 +261,7 @@ function DatasetsPage() {
         </InputGroup>
         <UploadOrCreateDatasetMenu
           onUpload={() => bulkUploadModal.onOpen()}
+          uploadDisabledReason={uploadDisabledReason}
           onCreate={() => {
             setEditDataset(undefined);
             addEditDatasetDrawer.onOpen();
@@ -251,6 +287,7 @@ function DatasetsPage() {
                 <HStack gap={2}>
                   <UploadOrCreateDatasetMenu
                     onUpload={() => bulkUploadModal.onOpen()}
+                    uploadDisabledReason={uploadDisabledReason}
                     onCreate={() => {
                       setEditDataset(undefined);
                       addEditDatasetDrawer.onOpen();

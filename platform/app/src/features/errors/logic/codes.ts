@@ -50,6 +50,7 @@ export const APP_ERROR_CODES = [
   "dataset_name_taken",
   "dataset_not_ready",
   "dataset_stale_columns",
+  "dataset_storage_not_writable",
   "dspy_step_not_found",
   "evaluation_not_found",
   "evaluator_config_error",

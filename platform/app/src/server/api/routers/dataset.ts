@@ -3,6 +3,8 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { slugify } from "~/utils/slugify";
 import { DatasetService } from "../../datasets/dataset.service";
+import { assertDatasetStorageWritable } from "../../datasets/dataset-storage";
+import { StorageNotWritableError } from "../../datasets/errors";
 import { datasetErrorHandler } from "../../datasets/middleware";
 import {
   datasetColumnsSchema,
@@ -92,6 +94,33 @@ export const datasetRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const datasetService = DatasetService.create(ctx.prisma);
       return await datasetService.validateDatasetName(input);
+    }),
+
+  /**
+   * Whether this project's dataset bytes can be written at all.
+   *
+   * The upload UI asks before offering an upload, so a deployment with no
+   * writable backend says so on the page rather than accepting a file and
+   * failing partway through. This is the affordance, never the guard: the API
+   * enforces the same condition itself (`assertDatasetStorageWritable` on the
+   * direct-upload route), because a disabled button stops nobody holding a
+   * terminal.
+   */
+  storageStatus: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("datasets:view"))
+    .query(async ({ input }) => {
+      try {
+        await assertDatasetStorageWritable(input.projectId);
+        return { writable: true };
+      } catch (error) {
+        // Only the "nowhere to write" answer is a result; anything else is a
+        // genuine failure of the check and must not read as "storage is fine".
+        if (error instanceof StorageNotWritableError) {
+          return { writable: false };
+        }
+        throw error;
+      }
     }),
 
   /**

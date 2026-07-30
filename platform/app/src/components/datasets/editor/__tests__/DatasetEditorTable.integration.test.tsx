@@ -367,7 +367,10 @@ describe("given a saved dataset", () => {
           timeout: 2000,
         }),
       ).toBeInTheDocument();
-      expect(screen.getByText(/Failed to save/i)).toBeInTheDocument();
+      // The chip names the failure rather than restating that one happened.
+      // This mock is an unregistered failure, so the caller's fallback headline
+      // is what should show.
+      expect(screen.getByText(/Couldn't save this row/i)).toBeInTheDocument();
       // The edit is still visible locally, not silently discarded
       expect(screen.getByText("bonjour")).toBeInTheDocument();
     });
