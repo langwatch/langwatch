@@ -47,8 +47,7 @@ export interface IngestKeyProvenance {
 }
 
 export const PROVENANCE_ATTR_SOURCE = "langwatch.source" as const;
-export const PROVENANCE_ATTR_API_KEY_ID =
-  "langwatch.ingest_key_id" as const;
+export const PROVENANCE_ATTR_API_KEY_ID = "langwatch.ingest_key_id" as const;
 export const PROVENANCE_ATTR_ORIGIN = "langwatch.origin" as const;
 export const PROVENANCE_ATTR_ORGANIZATION_ID =
   "langwatch.organization_id" as const;

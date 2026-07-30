@@ -525,9 +525,7 @@ describe("OtlpSpanPiiRedactionService ingestion key id attribute", () => {
       "langwatch.ingest_key_id": "key_abc123def456",
     });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.ingest_key_id")).toBe(
-      "key_abc123def456",
-    );
+    expect(attr(span, "langwatch.ingest_key_id")).toBe("key_abc123def456");
   });
 
   /** @scenario Real key material under the ingestion key id attribute is still redacted */
@@ -537,12 +535,8 @@ describe("OtlpSpanPiiRedactionService ingestion key id attribute", () => {
       "langwatch.ingest_key_id": "sk-lw-" + "a".repeat(40),
     });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.ingest_key_id")).toContain(
-      "[SECRET]",
-    );
-    expect(attr(span, "langwatch.ingest_key_id")).not.toContain(
-      "sk-lw-",
-    );
+    expect(attr(span, "langwatch.ingest_key_id")).toContain("[SECRET]");
+    expect(attr(span, "langwatch.ingest_key_id")).not.toContain("sk-lw-");
   });
 
   /** @scenario A non-ingestion trace can never retain an arbitrary value under the old key id attribute name */
