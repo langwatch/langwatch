@@ -105,19 +105,46 @@ describe("validateProviderApiKey for google_agent_platform", () => {
      * leaving only the key. Asserting on it here pins the walk's behavior
      * directly, without needing a Prisma-backed test for that caller.
      */
-    /** @scenario A credential missing its project or location is not probed at all */
-    it("is unreachable rather than reporting a verdict on the key", async () => {
+    // Three separate cases, not one covering both fields at once: an `||`
+    // guard degrading to `&&` would still return no candidates when BOTH
+    // are missing, and only a case with exactly one present catches that.
+    const expectUnreachable = async (
+      credentials: Record<string, string>,
+    ) => {
       mockFetch.mockResolvedValue(generated());
 
       await expect(
-        validateProviderApiKey("google_agent_platform", {
-          GOOGLE_AGENT_PLATFORM_API_KEY:
-            CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
-        }),
+        validateProviderApiKey("google_agent_platform", credentials),
       ).rejects.toMatchObject({ code: "provider_unreachable" });
 
-      // Nothing to ask without a project and location, so nothing was sent.
+      // Nothing to ask without both a project and a location, so nothing
+      // was sent — true whichever one is the one missing.
       expect(mockFetch).not.toHaveBeenCalled();
+    };
+
+    /** @scenario A credential missing its project or location is not probed at all */
+    it("is unreachable when both project and location are missing", async () => {
+      await expectUnreachable({
+        GOOGLE_AGENT_PLATFORM_API_KEY: CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+      });
+    });
+
+    /** @scenario A credential missing its project or location is not probed at all */
+    it("is unreachable when only the location is missing", async () => {
+      await expectUnreachable({
+        GOOGLE_AGENT_PLATFORM_API_KEY: CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+        GOOGLE_AGENT_PLATFORM_PROJECT:
+          CREDENTIALS.GOOGLE_AGENT_PLATFORM_PROJECT,
+      });
+    });
+
+    /** @scenario A credential missing its project or location is not probed at all */
+    it("is unreachable when only the project is missing", async () => {
+      await expectUnreachable({
+        GOOGLE_AGENT_PLATFORM_API_KEY: CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+        GOOGLE_AGENT_PLATFORM_LOCATION:
+          CREDENTIALS.GOOGLE_AGENT_PLATFORM_LOCATION,
+      });
     });
   });
 
