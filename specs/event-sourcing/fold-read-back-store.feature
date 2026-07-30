@@ -130,16 +130,24 @@ Feature: Fold projections read back their own state
   # dimension, or with no identity of its own, still gets a row; readers that
   # want only aggregates carrying real signal filter on what the row records
   # rather than on whether it exists.
+  #
+  # This binds the folds whose row is the only durable home of their working
+  # state, which is what makes a declined write a lost classification. A fold
+  # that still declines one is making the narrower claim that what it declines
+  # holds nothing it would ever need back, and it reads its own absence as
+  # proof of that and nothing more.
 
   Scenario: absence is authoritative because nothing is ever gated out
-    Given an aggregate whose only signal so far is a dimension attached to it
+    Given a fold whose row is the only durable home of its working state
+    And an aggregate whose only signal so far is a dimension attached to it
     When the fold commits that state
     Then a row is written for it, flagged as carrying no signal of its own
     And a reader asking for aggregates with real signal does not see it
     And a missing row therefore proves the aggregate was never committed
 
   Scenario: no state is unwritable, identity falls back to the aggregate id
-    Given a committed state that carries no identity of its own
+    Given a fold whose row is the only durable home of its working state
+    And a committed state that carries no identity of its own
     When the fold commits it
     Then the row is written under the aggregate's id
     And no state is ever dropped for lacking an identity
