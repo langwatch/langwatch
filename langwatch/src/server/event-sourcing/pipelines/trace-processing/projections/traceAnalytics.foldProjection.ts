@@ -315,6 +315,29 @@ export interface TraceAnalyticsRow {
   // Trimmed Attributes map (post-trimAttributesForAnalytics).
   attributes: Record<string, string>;
 
+  /**
+   * The persistable-signal verdict. NOT a table column — the row already
+   * carries every operand (`SpanCount`, `EarliestSpanStartMs`, the reserved
+   * log-record-count attribute), so readers derive the verdict in SQL via
+   * {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL}; this field rides the in-memory
+   * row so the write path and tests can speak it directly, and the repository
+   * re-derives it on read-back.
+   *
+   * The store used to enforce this by NOT WRITING the row, which kept phantom
+   * traces out of analytics but made a missing row ambiguous — "new aggregate"
+   * and "declined to persist" were indistinguishable, so the executor answered
+   * every store miss with an unwindowed fallback scan plus a re-fold from
+   * `event_log` (measured: 150,573 fallback scans in 30 days, zero of which
+   * found anything). Now the row is always written and analytics readers
+   * filter the derived verdict, seeing the same population as before; the
+   * fold read-back ignores it, so absence is authoritative.
+   *
+   * Monotonic non-decreasing: `spanCount` only grows and `occurredAt` latches,
+   * so once a trace has signal every later version has it too. Readers may
+   * therefore filter on the LATEST version's flag alone.
+   */
+  hasSignal: boolean;
+
   // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
   // Not analytics columns — these round-trip the fold's working state so
   // store.get() can decode the row without replaying event_log. The hoisted
@@ -550,6 +573,57 @@ export function anchorStorageTime({
  *
  * Used by the projection's store adapter to derive the persisted record.
  */
+/**
+ * Does this state describe a trace the PRODUCT should count? True on any real
+ * telemetry: a folded span, a surviving business time (`occurredAt > 0` — only
+ * a folded span ever sets it, never a phantom init state), or a log record
+ * (Claude Code Path B, Codex Path B — the trace-summary fold counts these via
+ * langwatch.reserved.log_record_count and this mirrors its acceptance).
+ *
+ * A state carrying ONLY dimension signal (topic / annotation / name) answers
+ * false. That answer used to mean the row was NOT WRITTEN; now it is always
+ * written and analytics readers exclude it via
+ * {@link TRACE_ANALYTICS_HAS_SIGNAL_SQL} while the fold read-back still finds
+ * it. `storageAnchorMs` is deliberately NOT a door: a row on this table is a
+ * TRACE to every analytics read, so admitting a state whose sole signal is an
+ * annotation or a classification would change what the product means by "a
+ * trace" — the derived filter carries that refusal now, instead of the row's
+ * absence.
+ */
+export function hasPersistableSignal(state: TraceAnalyticsData): boolean {
+  if (state.spanCount > 0) return true;
+  if (state.occurredAt > 0) return true;
+  const raw = state.attributes?.["langwatch.reserved.log_record_count"];
+  return typeof raw === "string" && Number(raw) > 0;
+}
+
+/**
+ * {@link hasPersistableSignal}, as a SQL predicate over the columns the row
+ * already carries — which is what lets the always-write change ship with NO
+ * schema migration. The doors map 1:1 onto the in-memory predicate:
+ * `SpanCount` is `state.spanCount`, `EarliestSpanStartMs` is
+ * `state.occurredAt` (that column carries it since the 00061 anchor split),
+ * and the reserved log-record-count attribute survives
+ * `trimAttributesForAnalytics` by its `langwatch.reserved.` prefix — the
+ * ADR-066 read-back already depends on that, so the dependency is not new.
+ *
+ * The fourth door has no in-memory twin: rows stamped BEFORE the pre-split
+ * version predate the 00056 read-back columns, so their `SpanCount` /
+ * `EarliestSpanStartMs` decode as default 0 even though every one of them
+ * passed the write-gate (nothing else was ever written back then). Version
+ * stamps are ISO dates, so a lexicographic compare orders them correctly;
+ * without this door those real traces would vanish from analytics.
+ *
+ * Every reader that treats a row on this table as "a trace" must apply this —
+ * today that is one place, `dedupedSlim` in slim-timeseries-query.ts. The
+ * fold read-back must NOT.
+ */
+export const TRACE_ANALYTICS_HAS_SIGNAL_SQL =
+  `(SpanCount > 0` +
+  ` OR EarliestSpanStartMs > 0` +
+  ` OR Attributes['langwatch.reserved.log_record_count'] NOT IN ('', '0')` +
+  ` OR Version < '${TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}')`;
+
 export function projectAnalyticsStateToRow({
   state,
   tenantId,
@@ -640,6 +714,8 @@ export function projectAnalyticsStateToRow({
       state.annotationIds && state.annotationIds.length > 0 ? true : null,
 
     attributes: trimAttributesForAnalytics(attrs),
+
+    hasSignal: hasPersistableSignal(state),
 
     // Read-back state (ADR-066) — round-trips the fold's working bookkeeping.
     spanCount: state.spanCount,
@@ -1178,16 +1254,23 @@ export class TraceAnalyticsFoldProjection
    * would rebuild the whole population and a rebuild re-derives the anchor. See
    * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
    *
-   * ONE CLASS DOES NOT SELF-HEAL, so `es_fold_refold_on_miss_total` cannot reach
-   * zero for this adopter: a dimension-only trace (topic or annotation, no span,
-   * no log record) folds a state `hasPersistableSignal` refuses, so no row is
-   * written — and a refold's result is refused by the same gate, so it recurs.
-   * Whether to admit such rows is a product question, deliberately still open;
-   * see the gate's docblock in `traceAnalytics.store.ts`.
+   * Every miss class now self-heals, so `es_fold_refold_on_miss_total` CAN
+   * reach zero for this adopter and the option earns deletion once the
+   * pre-00056 rows age out. The two classes that could not: the log-only
+   * trace's row landed in partition `196952` already past its TTL and was
+   * reaped (closed by the storage anchor, 00061), and the dimension-only
+   * trace folded a state the store's persistability gate refused to write
+   * (closed by the always-write change — the row is always written now, and
+   * analytics readers exclude it via TRACE_ANALYTICS_HAS_SIGNAL_SQL).
    *
-   * (The log-only trace used to be a second such class — its row landed in
-   * partition `196952` already past its TTL and was reaped. The storage anchor
-   * closed it.)
+   * `trustAbsentMiss: true` — the other half of always-write. With every
+   * committed state guaranteed a row, an absent read proves the aggregate is
+   * new, so the executor folds from `init()` without the unwindowed fallback
+   * scan or the store-miss re-fold. The re-folds this retires were measured at
+   * ~111/min with 93% returning exactly the delivered batch; the fallback
+   * scans at ~110/min with 0 recoveries in 30 days (150,573 attempts). The
+   * `undecodable` transitional net above is NOT affected — a refused row still
+   * re-folds.
    *
    * `coalesceMaxBatch` — see below.
    *
@@ -1217,6 +1300,7 @@ export class TraceAnalyticsFoldProjection
    */
   override options: FoldProjectionOptions = {
     refoldOnStoreMiss: true,
+    trustAbsentMiss: true,
     refoldOnOutOfOrder: false,
     readWindow: { widthMs: TRACE_ANALYTICS_READ_WINDOW_MS },
     coalesceMaxBatch: TRACE_ANALYTICS_COALESCE_MAX_BATCH,

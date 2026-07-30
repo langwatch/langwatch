@@ -24,6 +24,7 @@
 
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
+import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import type { FilterField } from "~/server/filters/types";
 import {
   isSlimEligibleTraceMetricKey,
@@ -205,12 +206,25 @@ function slimAggExpression(agg: AggregationTypes, column: string): string {
  * `ReplacingMergeTree(UpdatedAt)`. Same pattern as the legacy
  * `dedupedTraceSummaries` helper, parameterised for the slim table + its
  * OccurredAt partition column.
+ *
+ * `TRACE_ANALYTICS_HAS_SIGNAL_SQL`: the store now writes dimension-only
+ * states — a topic, an annotation, a rename, with no span or log record —
+ * where it used to not write them at all (that always-write is what lets the
+ * fold trust an absent read). This filter is what keeps such rows out of the
+ * product's numbers: a row on this table is otherwise counted as A TRACE by
+ * every aggregate below. The verdict is DERIVED from columns the row already
+ * carries — no schema change — and defined next to the in-memory predicate it
+ * mirrors, so the two cannot drift apart silently. Outer SELECT only: the
+ * verdict is monotonic non-decreasing across a trace's versions (spans only
+ * accumulate), so the latest version speaks for the trace and the
+ * max(UpdatedAt) grouping needs no second filter.
  */
 function dedupedSlim(alias: string, dateClause: string): string {
   return `(
     SELECT *
     FROM ${SLIM_TABLE}
     WHERE TenantId = {tenantId:String}
+      AND ${TRACE_ANALYTICS_HAS_SIGNAL_SQL}
       ${dateClause}
       AND (TenantId, TraceId, UpdatedAt) IN (
         SELECT TenantId, TraceId, max(UpdatedAt)
