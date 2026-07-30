@@ -1,5 +1,9 @@
 import type { z } from "zod";
-import type { AppendStore, MergeStore, ReplaceStore } from "../projections/store.types";
+import type {
+  AppendStore,
+  MergeStore,
+  ReplaceStore,
+} from "../projections/store.types";
 import type { EventTypeString, IntentTypeString } from "./typeStrings";
 
 /**
@@ -33,7 +37,10 @@ export type IdMap<Events extends EventSchemaMap> = {
  * a key becomes the string that is actually written.
  */
 export type EmittedEvent<Events extends EventSchemaMap> = {
-  [K in keyof Events & string]: { readonly type: K; readonly data: z.infer<Events[K]> };
+  [K in keyof Events & string]: {
+    readonly type: K;
+    readonly data: z.infer<Events[K]>;
+  };
 }[keyof Events & string];
 
 /** An event as it arrives off the wire: a persisted type string and a payload
@@ -120,7 +127,10 @@ export interface IntentDef<Payload extends z.ZodTypeAny> {
 
 export type IntentMap = Record<string, IntentDef<z.ZodTypeAny>>;
 
-export type IntentTypeStrings<Name extends string, Intents extends IntentMap> = {
+export type IntentTypeStrings<
+  Name extends string,
+  Intents extends IntentMap,
+> = {
   readonly [K in keyof Intents & string]: IntentTypeString<Name, K>;
 };
 
@@ -162,7 +172,10 @@ export type ProcessManagerHandlerMap<
 
 // ---- what `.build()` hands back per member ----
 
-export interface BuiltCommand<Events extends EventSchemaMap, Input extends z.ZodTypeAny> {
+export interface BuiltCommand<
+  Events extends EventSchemaMap,
+  Input extends z.ZodTypeAny,
+> {
   readonly name: string;
   readonly input: Input;
   handle(
@@ -209,7 +222,10 @@ export interface BuiltProcessManagerIntent {
  * per-mount literal types, same as `BuiltCommand.handle`'s emitted events. */
 export interface BuiltEvolveStep<State> {
   readonly state: State;
-  readonly intents: readonly { readonly type: string; readonly payload: unknown }[];
+  readonly intents: readonly {
+    readonly type: string;
+    readonly payload: unknown;
+  }[];
   readonly nextWakeAt: number | null;
 }
 
@@ -223,7 +239,11 @@ export interface BuiltProcessManager<State = unknown> {
   readonly schemaHash: string;
   readonly intents: Readonly<Record<string, BuiltProcessManagerIntent>>;
   init(): State;
-  evolve(state: State, event: WireEvent, ctx: ProcessContext): BuiltEvolveStep<State> | null;
+  evolve(
+    state: State,
+    event: WireEvent,
+    ctx: ProcessContext,
+  ): BuiltEvolveStep<State> | null;
   onWake?(state: State, ctx: ProcessContext): BuiltEvolveStep<State>;
 }
 
@@ -233,14 +253,24 @@ export interface BuiltSubscriber {
   handle(event: WireEvent, ctx: HandlerContext): void | Promise<void>;
 }
 
+/** Any command, with its declaring vocabulary erased. `BuiltCommand` never
+ * uses its `Events` parameter, so erasing it costs nothing. */
+export type AnyBuiltCommand = BuiltCommand<EventSchemaMap, z.ZodTypeAny>;
+
+/** What a pipeline's commands look like before `.withCommand` has named any. */
+export type CommandMap = Readonly<Record<string, AnyBuiltCommand>>;
+
 export interface BuiltPipeline<
   Name extends string = string,
   Prefix extends string | undefined = string | undefined,
+  Commands extends CommandMap = CommandMap,
 > {
   readonly name: Name;
   readonly prefix: Prefix;
   readonly eventTypes: readonly string[];
-  readonly commands: Readonly<Record<string, BuiltCommand<EventSchemaMap, z.ZodTypeAny>>>;
+  /** Keyed by the names `.withCommand` was called with, so a caller reaching
+   * for one gets its own input type rather than `ZodTypeAny | undefined`. */
+  readonly commands: Commands;
   readonly folds: Readonly<Record<string, BuiltFold>>;
   readonly maps: Readonly<Record<string, BuiltMap>>;
   readonly processManagers: Readonly<Record<string, BuiltProcessManager>>;

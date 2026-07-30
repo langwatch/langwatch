@@ -5,7 +5,11 @@ import { validateMount } from "../mount/validateMount";
 import type { Metrics } from "../ports/metrics";
 import { createFoldExecutor } from "../projections/foldExecutor";
 import { createMapExecutor } from "../projections/mapExecutor";
-import type { AppendStore, MergeStore, ReplaceStore } from "../projections/store.types";
+import type {
+  AppendStore,
+  MergeStore,
+  ReplaceStore,
+} from "../projections/store.types";
 import type {
   BuiltCommand,
   BuiltFold,
@@ -14,6 +18,7 @@ import type {
   BuiltProcessManager,
   BuiltProcessManagerIntent,
   BuiltSubscriber,
+  CommandMap,
   EmittedEvent,
   EventSchemaMap,
   EvolveStep,
@@ -82,16 +87,21 @@ export function definePipeline<const Name extends string = string>(
 // ---------------------------------------------------------------------------
 
 export interface PipelineNamed<Name extends string> {
-  prefix<const Prefix extends string>(prefix: Prefix): PipelineNamedPrefixed<Name, Prefix>;
+  prefix<const Prefix extends string>(
+    prefix: Prefix,
+  ): PipelineNamedPrefixed<Name, Prefix>;
   events<const Events extends EventSchemaMap>(
     events: Events,
   ): PipelineChain<Name, undefined, Events>;
 }
 
-export interface PipelineNamedPrefixed<Name extends string, Prefix extends string> {
+export interface PipelineNamedPrefixed<
+  Name extends string,
+  Prefix extends string,
+> {
   events<const Events extends EventSchemaMap>(
     events: Events,
-  ): PipelineChain<Name, Prefix, Events>;
+  ): PipelineChain<Name, Prefix, Events, Commands>;
 }
 
 /**
@@ -104,18 +114,27 @@ export interface PipelineChain<
   Name extends string,
   Prefix extends string | undefined,
   Events extends EventSchemaMap,
+  Commands extends CommandMap = Record<never, never>,
 > {
-  id(idMap: IdMap<Events>): PipelineChainWithId<Name, Prefix, Events>;
+  id(idMap: IdMap<Events>): PipelineChainWithId<Name, Prefix, Events, Commands>;
 
-  withCommand<Input extends z.ZodTypeAny>(
-    name: string,
+  /** Accumulates `name` into the built pipeline's `commands`, so the
+   * composition root reaches a command by its own name and input type rather
+   * than through an index signature. */
+  withCommand<CommandName extends string, Input extends z.ZodTypeAny>(
+    name: CommandName,
     record: CommandBuilt<Events, Input>,
-  ): PipelineChain<Name, Prefix, Events>;
+  ): PipelineChain<
+    Name,
+    Prefix,
+    Events,
+    Commands & { readonly [K in CommandName]: BuiltCommand<Events, Input> }
+  >;
 
   withMap<Handle extends MapHandlerMap<Events, unknown>>(
     name: string,
     record: MapWithStore<Events, Handle>,
-  ): PipelineChain<Name, Prefix, Events>;
+  ): PipelineChain<Name, Prefix, Events, Commands>;
 
   /**
    * A map that arrives already built (ADR-107 decision 17): an enterprise
@@ -129,58 +148,75 @@ export interface PipelineChain<
    * a pre-built map's store is already erased into `apply` — mount legality
    * (decision 14) is still checked, over the shape the caller states.
    */
-  withMap(name: string, map: BuiltMap, mount: Mount): PipelineChain<Name, Prefix, Events>;
+  withMap(
+    name: string,
+    map: BuiltMap,
+    mount: Mount,
+  ): PipelineChain<Name, Prefix, Events, Commands>;
 
   withSubscriber(
     name: string,
     record: SubscriberOn<Events>,
-  ): PipelineChain<Name, Prefix, Events>;
+  ): PipelineChain<Name, Prefix, Events, Commands>;
 
   /** The `.withSubscriber` counterpart to the pre-built `.withMap` above. */
   withSubscriber(
     name: string,
     subscriber: BuiltSubscriber,
-  ): PipelineChain<Name, Prefix, Events>;
+  ): PipelineChain<Name, Prefix, Events, Commands>;
 
-  build(ports?: PipelinePorts): BuiltPipeline<Name, Prefix>;
+  build(ports?: PipelinePorts): BuiltPipeline<Name, Prefix, Commands>;
 }
 
 export interface PipelineChainWithId<
   Name extends string,
   Prefix extends string | undefined,
   Events extends EventSchemaMap,
-> extends PipelineChain<Name, Prefix, Events> {
-  withCommand<Input extends z.ZodTypeAny>(
-    name: string,
+  Commands extends CommandMap = Record<never, never>,
+> extends PipelineChain<Name, Prefix, Events, Commands> {
+  withCommand<CommandName extends string, Input extends z.ZodTypeAny>(
+    name: CommandName,
     record: CommandBuilt<Events, Input>,
-  ): PipelineChainWithId<Name, Prefix, Events>;
+  ): PipelineChainWithId<
+    Name,
+    Prefix,
+    Events,
+    Commands & { readonly [K in CommandName]: BuiltCommand<Events, Input> }
+  >;
 
   withFold<StateSchema extends z.ZodTypeAny>(
     name: string,
     record: FoldWithStore<Events, StateSchema>,
-  ): PipelineChainWithId<Name, Prefix, Events>;
+  ): PipelineChainWithId<Name, Prefix, Events, Commands>;
 
   withMap<Handle extends MapHandlerMap<Events, unknown>>(
     name: string,
     record: MapWithStore<Events, Handle>,
-  ): PipelineChainWithId<Name, Prefix, Events>;
+  ): PipelineChainWithId<Name, Prefix, Events, Commands>;
 
-  withMap(name: string, map: BuiltMap, mount: Mount): PipelineChainWithId<Name, Prefix, Events>;
+  withMap(
+    name: string,
+    map: BuiltMap,
+    mount: Mount,
+  ): PipelineChainWithId<Name, Prefix, Events, Commands>;
 
-  withProcessManager<StateSchema extends z.ZodTypeAny, Intents extends IntentMap>(
+  withProcessManager<
+    StateSchema extends z.ZodTypeAny,
+    Intents extends IntentMap,
+  >(
     name: string,
     record: ProcessManagerOn<Events, StateSchema, Intents>,
-  ): PipelineChainWithId<Name, Prefix, Events>;
+  ): PipelineChainWithId<Name, Prefix, Events, Commands>;
 
   withSubscriber(
     name: string,
     record: SubscriberOn<Events>,
-  ): PipelineChainWithId<Name, Prefix, Events>;
+  ): PipelineChainWithId<Name, Prefix, Events, Commands>;
 
   withSubscriber(
     name: string,
     subscriber: BuiltSubscriber,
-  ): PipelineChainWithId<Name, Prefix, Events>;
+  ): PipelineChainWithId<Name, Prefix, Events, Commands>;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +225,10 @@ export interface PipelineChainWithId<
 
 /** A command: what its input decodes to, and how it turns that input into the
  * events it emits. */
-export interface CommandBuilt<Events extends EventSchemaMap, Input extends z.ZodTypeAny> {
+export interface CommandBuilt<
+  Events extends EventSchemaMap,
+  Input extends z.ZodTypeAny,
+> {
   readonly input: Input;
   readonly handle: (
     input: z.infer<Input>,
@@ -200,7 +239,10 @@ export interface CommandBuilt<Events extends EventSchemaMap, Input extends z.Zod
 /** A fold: its state schema, how it initialises and evolves, and the store it
  * reads back before every apply. `state` fixes `StateSchema`; `init`, `on` and
  * `store` are contextually typed from it. */
-export interface FoldWithStore<Events extends EventSchemaMap, StateSchema extends z.ZodTypeAny> {
+export interface FoldWithStore<
+  Events extends EventSchemaMap,
+  StateSchema extends z.ZodTypeAny,
+> {
   readonly state: StateSchema;
   readonly init: () => z.output<StateSchema>;
   readonly pin?: string;
@@ -285,9 +327,12 @@ function typeOfEventIn(state: ChainState): (key: string) => string {
 function declareEvents(state: ChainState, events: EventSchemaMap): void {
   const keys = Object.keys(events);
   if (keys.length === 0) {
-    throw new ConfigurationError(`pipeline "${state.name}" declares no events`, {
-      pipeline: state.name,
-    });
+    throw new ConfigurationError(
+      `pipeline "${state.name}" declares no events`,
+      {
+        pipeline: state.name,
+      },
+    );
   }
   for (const key of keys) {
     assertKeyIsSafe(key, "event key", { pipeline: state.name, key });
@@ -340,10 +385,15 @@ const MAP_DECIDABLE_RULES: ReadonlySet<string> = new Set([
  * chain can decide in one pass rather than one per rebuild. */
 function assertMountsAreLegal(state: ChainState): void {
   const violations = state.mounts.flatMap(({ member, mount }) => {
-    const decidable = mount.projection === "fold" ? FOLD_DECIDABLE_RULES : MAP_DECIDABLE_RULES;
+    const decidable =
+      mount.projection === "fold" ? FOLD_DECIDABLE_RULES : MAP_DECIDABLE_RULES;
     return validateMount(mount)
       .filter((violation) => decidable.has(violation.rule))
-      .map((violation) => ({ member, rule: violation.rule, message: violation.message }));
+      .map((violation) => ({
+        member,
+        rule: violation.rule,
+        message: violation.message,
+      }));
   });
   if (violations.length === 0) return;
   throw new ConfigurationError(
@@ -357,7 +407,9 @@ function assertMountsAreLegal(state: ChainState): void {
 
 // ---- stages ----
 
-function namedStage<Name extends string>(state: ChainState): PipelineNamed<Name> {
+function namedStage<Name extends string>(
+  state: ChainState,
+): PipelineNamed<Name> {
   return {
     prefix<const Prefix extends string>(prefix: Prefix) {
       assertPrefixIsSafe(prefix, "pipeline prefix", { prefix });
@@ -421,7 +473,10 @@ function chainStage<
  * caller arriving through an erased type gets the reason rather than "x is not
  * a function".
  */
-function attachIdGuards<Chain extends object>(chain: Chain, state: ChainState): Chain {
+function attachIdGuards<Chain extends object>(
+  chain: Chain,
+  state: ChainState,
+): Chain {
   const refuse = (what: string) => (): never => {
     throw new ConfigurationError(
       `pipeline "${state.name}" mounts a ${what} before declaring .id()`,
@@ -476,11 +531,10 @@ function chainWithIdStage<
 
 // ---- mounts ----
 
-function mountCommand<Events extends EventSchemaMap, Input extends z.ZodTypeAny>(
-  state: ChainState,
-  name: string,
-  record: CommandBuilt<Events, Input>,
-): void {
+function mountCommand<
+  Events extends EventSchemaMap,
+  Input extends z.ZodTypeAny,
+>(state: ChainState, name: string, record: CommandBuilt<Events, Input>): void {
   assertNameNotTaken(state, name);
   const typeOf = typeOfEventIn(state);
   state.commands.set(name, {
@@ -488,12 +542,18 @@ function mountCommand<Events extends EventSchemaMap, Input extends z.ZodTypeAny>
     input: record.input,
     async handle(input, ctx) {
       const emitted = await record.handle(input, ctx);
-      return emitted.map((event) => ({ type: typeOf(event.type), data: event.data }));
+      return emitted.map((event) => ({
+        type: typeOf(event.type),
+        data: event.data,
+      }));
     },
   });
 }
 
-function mountFold<Events extends EventSchemaMap, StateSchema extends z.ZodTypeAny>(
+function mountFold<
+  Events extends EventSchemaMap,
+  StateSchema extends z.ZodTypeAny,
+>(
   state: ChainState,
   name: string,
   record: FoldWithStore<Events, StateSchema>,
@@ -524,10 +584,10 @@ function mountFold<Events extends EventSchemaMap, StateSchema extends z.ZodTypeA
       store: record.store,
       init: record.init,
       apply(foldState, event) {
-        const handler = wireHandler<[z.output<StateSchema>, unknown], z.output<StateSchema>>(
-          dispatch,
-          event.type,
-        );
+        const handler = wireHandler<
+          [z.output<StateSchema>, unknown],
+          z.output<StateSchema>
+        >(dispatch, event.type);
         return handler ? handler(foldState, event.data) : foldState;
       },
       stateVersion: version,
@@ -544,7 +604,10 @@ function mountFold<Events extends EventSchemaMap, StateSchema extends z.ZodTypeA
   });
 }
 
-function mountMap<Events extends EventSchemaMap, Handle extends MapHandlerMap<Events, unknown>>(
+function mountMap<
+  Events extends EventSchemaMap,
+  Handle extends MapHandlerMap<Events, unknown>,
+>(
   state: ChainState,
   name: string,
   record: MapWithStore<Events, Handle> | BuiltMap,
@@ -610,7 +673,11 @@ function mountProcessManager<
   Events extends EventSchemaMap,
   StateSchema extends z.ZodTypeAny,
   Intents extends IntentMap,
->(state: ChainState, name: string, record: ProcessManagerOn<Events, StateSchema, Intents>): void {
+>(
+  state: ChainState,
+  name: string,
+  record: ProcessManagerOn<Events, StateSchema, Intents>,
+): void {
   if (state.id === undefined) {
     throw new ConfigurationError(
       `pipeline "${state.name}" mounts a process manager before declaring .id()`,
@@ -621,9 +688,12 @@ function mountProcessManager<
 
   const intentKeys = Object.keys(record.intents);
   if (intentKeys.length === 0) {
-    throw new ConfigurationError(`process manager "${name}" declares no intents`, {
-      processManager: name,
-    });
+    throw new ConfigurationError(
+      `process manager "${name}" declares no intents`,
+      {
+        processManager: name,
+      },
+    );
   }
   for (const key of intentKeys) {
     assertNoSeparators(key, "intent key", { processManager: name, key });
@@ -649,8 +719,13 @@ function mountProcessManager<
       deliver: (payload, ctx) => intent.deliver(payload, ctx),
     };
   }
-  const toIntentRows = (emitted: readonly { type: string; payload: unknown }[]) =>
-    emitted.map((intent) => ({ type: intentTypeFor(intent.type), payload: intent.payload }));
+  const toIntentRows = (
+    emitted: readonly { type: string; payload: unknown }[],
+  ) =>
+    emitted.map((intent) => ({
+      type: intentTypeFor(intent.type),
+      payload: intent.payload,
+    }));
 
   const { onWake: onWakeFn } = record;
   state.processManagers.set(name, {
@@ -706,10 +781,10 @@ function mountSubscriber<Events extends EventSchemaMap>(
     name,
     eventTypes: [...dispatch.keys()],
     handle(event, ctx) {
-      const handler = wireHandler<[unknown, HandlerContext], void | Promise<void>>(
-        dispatch,
-        event.type,
-      );
+      const handler = wireHandler<
+        [unknown, HandlerContext],
+        void | Promise<void>
+      >(dispatch, event.type);
       return handler ? handler(event.data, ctx) : undefined;
     },
   });
@@ -718,11 +793,16 @@ function mountSubscriber<Events extends EventSchemaMap>(
 /** Binds each declared `.id()` extractor to its own event's persisted type
  * string, once, so `aggregateIdFor` is a map lookup rather than a re-walk of
  * the id map per call (ADR-107 decision 4). */
-function buildIdExtractors(state: ChainState): Map<string, (data: unknown) => string> {
+function buildIdExtractors(
+  state: ChainState,
+): Map<string, (data: unknown) => string> {
   const typeOf = typeOfEventIn(state);
   const extractors = new Map<string, (data: unknown) => string>();
   for (const [key, extractor] of Object.entries(state.id ?? {})) {
-    extractors.set(typeOf(key), extractor as unknown as (data: unknown) => string);
+    extractors.set(
+      typeOf(key),
+      extractor as unknown as (data: unknown) => string,
+    );
   }
   return extractors;
 }
@@ -740,10 +820,16 @@ function assemble<Name extends string, Prefix extends string | undefined>(
     eventTypes: Object.keys(state.events).map(typeOfEventIn(state)),
     commands: Object.fromEntries(state.commands),
     folds: Object.fromEntries(
-      [...state.folds].map(([memberName, factory]) => [memberName, factory(metrics)]),
+      [...state.folds].map(([memberName, factory]) => [
+        memberName,
+        factory(metrics),
+      ]),
     ),
     maps: Object.fromEntries(
-      [...state.maps].map(([memberName, factory]) => [memberName, factory(metrics)]),
+      [...state.maps].map(([memberName, factory]) => [
+        memberName,
+        factory(metrics),
+      ]),
     ),
     processManagers: Object.fromEntries(state.processManagers),
     subscribers: Object.fromEntries(state.subscribers),
