@@ -11,9 +11,9 @@ import type {
   BuiltPipeline,
   ClaimedBatch,
   ConsumerBudget,
+  GroupKey,
   Job,
   Lane,
-  LaneDescriptor,
   LaneQueue,
   Lease,
   Registry,
@@ -37,8 +37,8 @@ function fold(name: string): Lane {
 }
 
 function descriptor(
-  overrides: Partial<LaneDescriptor> & { aggregateId?: string } = {},
-): LaneDescriptor {
+  overrides: Partial<GroupKey> & { aggregateId?: string } = {},
+): GroupKey {
   return {
     tenantId: "tenant-1",
     lane: fold("traceSummary"),

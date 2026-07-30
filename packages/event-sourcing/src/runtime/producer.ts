@@ -19,8 +19,8 @@ import type {
   CommittedEvent,
   EventLog,
   EventProducer,
+  GroupKey,
   Lane,
-  LaneDescriptor,
   LaneQueue,
   Metrics,
   Registry,
@@ -183,7 +183,7 @@ export function createEventProducer(deps: EventProducerDeps): EventProducer {
 
     if (!shouldEnqueue({ member, lane, event, payload })) return null;
 
-    const descriptor: LaneDescriptor = {
+    const descriptor: GroupKey = {
       tenantId: event.tenantId,
       lane,
       scope: scopeFor({ pipeline, lane, event, payload }),
