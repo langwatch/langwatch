@@ -32,7 +32,8 @@ Feature: Unified API Keys
   # An ingestion key is an ApiKey row with ingestSourceType set non-null: a
   # project-scoped, ingest-only write credential the `langwatch <tool>` CLI
   # mints. Regular API / service keys have ingestSourceType == null. The page
-  # renders the two kinds in two labeled sections, Datadog-style.
+  # renders the regular keys under the page heading and the ingestion keys in
+  # their own labeled section below.
 
   Scenario: Ingestion keys render in their own labeled section
     Given the organization has an ingestion key with source "claude_code"
@@ -41,7 +42,7 @@ Feature: Unified API Keys
     Then I see an "Ingestion keys" section heading
     And the ingestion key row shows its source "claude_code"
     And the ingestion key row has a revoke button but no permissions editor
-    And I see an "API keys" section heading containing "CI Pipeline"
+    And the regular key "CI Pipeline" renders above that section
 
   Scenario: No ingestion section when no ingestion keys exist
     Given the organization has only regular API keys
@@ -49,11 +50,20 @@ Feature: Unified API Keys
     Then I do not see an "Ingestion keys" section heading
     And the regular API keys render exactly as before
 
-  Scenario: API keys render above ingestion keys
+  Scenario: The page carries a single title and subtitle
     Given the organization has an ingestion key with source "claude_code"
     And I have a regular API key named "CI Pipeline"
     When I navigate to Settings > API Keys
-    Then the "API keys" section renders above the "Ingestion keys" section
+    Then the only page-level title is "API Keys"
+    And it is followed by a single subtitle
+    And the regular keys table carries no heading of its own
+    And the "Do not share your API keys" warning still shows
+
+  Scenario: Deep link opens the page on a specific key
+    Given I have a regular API key named "CI Pipeline"
+    When I open "/settings/api-keys#api-key-<id of CI Pipeline>"
+    Then the row for "CI Pipeline" carries that anchor id
+    And it is scrolled into view once the keys have loaded
 
   Scenario: Legacy project key row names its project
     Given the project has a legacy per-project service key
