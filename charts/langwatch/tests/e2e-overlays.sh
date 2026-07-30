@@ -520,9 +520,23 @@ EXEMPT_WORKLOADS=(
 # several, and a presence check passes while any one of them loses its bound.
 assert_every_emptydir_bounded() {
   local label="$1" manifest="$2" dirs bounded
+  # Counting `emptyDir:` and `sizeLimit:` separately across the whole document
+  # was wrong twice over: an unrelated `sizeLimit:` elsewhere in the manifest
+  # balanced an unbounded emptyDir, and — worse — zero matches satisfied
+  # `dirs == bounded` and reported "all 0 emptyDir(s) size-bounded". A failed
+  # render (which reaches here as an error string, because tmpl_only folds
+  # stderr into stdout) therefore passed. The assertion could not fail.
+  #
+  # Now: pair each emptyDir with the line that follows it, and refuse to pass
+  # on an empty set.
   dirs=$(count_matches "$manifest" "^[[:space:]]*emptyDir:")
-  bounded=$(count_matches "$manifest" "^[[:space:]]*sizeLimit:")
-  if (( dirs == bounded )); then
+  bounded=$(printf '%s\n' "$manifest" \
+    | grep -A1 -E '^[[:space:]]*emptyDir:[[:space:]]*$' \
+    | grep -c -E '^[[:space:]]*sizeLimit:' || true)
+
+  if (( dirs == 0 )); then
+    fail "hardening: $label — no emptyDir found; the render probably failed"
+  elif (( dirs == bounded )); then
     pass "hardening: $label — all $dirs emptyDir(s) size-bounded"
   else
     fail "hardening: $label — $bounded of $dirs emptyDir(s) size-bounded"

@@ -27,6 +27,11 @@ def pod_spec(doc)
     doc.dig("spec", "template", "spec")
   when "CronJob"
     doc.dig("spec", "jobTemplate", "spec", "template", "spec")
+  when "Pod"
+    # A bare Pod (helm test hook, debug pod) produced NO report lines at all,
+    # so it was neither graded nor flagged as untriaged — a silent blind spot
+    # in the sweep that exists to close exactly that gap.
+    doc["spec"]
   end
 end
 
@@ -56,6 +61,13 @@ YAML.load_stream(ARGF.read) do |doc|
     sc = container["securityContext"] || {}
     caps = Array(sc.dig("capabilities", "drop")).map(&:to_s).include?("ALL")
 
+    # Seccomp is settable at BOTH levels and the container wins. Reading only
+    # the pod value meant a container-level `seccompProfile: Unconfined` —
+    # which PSA `restricted` denies — still scored as fully hardened, defeating
+    # the one regression class this report exists to catch.
+    c_seccomp = sc.dig("seccompProfile", "type")
+    effective_seccomp = c_seccomp.nil? ? seccomp : c_seccomp == "RuntimeDefault"
+
     puts [
       workload,
       container["name"],
@@ -64,7 +76,7 @@ YAML.load_stream(ARGF.read) do |doc|
       flag(sc["runAsNonRoot"] == true),
       flag(pod_non_root),
       flag(caps),
-      flag(seccomp),
+      flag(effective_seccomp),
       flag(automount),
       flag(resources_complete?(container)),
     ].join("|")
