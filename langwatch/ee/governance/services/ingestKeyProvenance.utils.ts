@@ -237,14 +237,18 @@ function stripProvenanceKeys(attrs: OtlpAttribute[]): OtlpAttribute[] {
  *     resource-level provenance, so a span-level copy is never legitimate.
  *   - When the request authenticated as an ApiKey, the true row id is written
  *     onto each resource.
- *   - When it authenticated as a legacy project key there IS no ApiKey row, so
- *     nothing is written and the attribute simply stays absent. Absent is a
- *     correct answer; a caller-supplied value is not.
+ *   - When it authenticated as something with no ApiKey row behind it (a legacy
+ *     project key, or an ingestion-source bearer secret on the
+ *     /api/ingest/otel/* passthroughs) nothing is written and the attribute
+ *     simply stays absent. Absent is a correct answer; a caller-supplied value
+ *     is not.
  *
- * Only the OTLP receivers need this. Every other ingestion path builds span
- * attributes from a fixed key set (the REST collector maps known fields through
- * `ATTR_KEYS`, and custom metadata lands namespaced under
- * `langwatch.metadata.*`), so no caller can produce this attribute name there.
+ * Only the OTLP receivers need this, because they are the only ingestion paths
+ * where the caller chooses attribute names. Everything else builds attributes
+ * from a fixed key set (the REST collector maps known fields through
+ * `ATTR_KEYS` and stringifies `params` into one attribute; caller metadata
+ * lands namespaced under `langwatch.metadata.*`), so no caller can produce this
+ * attribute name there at all.
  */
 export function enforceApiKeyIdOnTraceRequest(
   request: OtlpTraceRequest,
