@@ -12,6 +12,7 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   computeRepoScopeKey,
+  GithubInstallationNotFoundError,
   type GithubRepository,
   type LangyGithubAppTokenService,
 } from "./langyGithubAppToken";
@@ -275,6 +276,14 @@ export class LangyGithubInstallationsService {
    * Returns null when GitHub is unconfigured, the org has no (usable)
    * installation, or the mint fails — the caller degrades to the connect card.
    *
+   * Self-heals stale installations: a webhook delivery can be missed (or an
+   * installation can predate the webhook being configured at all), leaving a
+   * `LangyGithubInstallation` row for an installation GitHub has already
+   * forgotten. Rather than let that dead row block every real installation
+   * behind it forever, a confirmed 404 from GitHub — whether it surfaces
+   * while minting or while resolving an explicit repo id — removes the row
+   * and moves on to the next candidate.
+   *
    * TODO(JIT narrowing): the plan's delivery option 2 replaces spawn-env
    * with a clone-time credential-helper callback that mints per-clone; the
    * seam is `repoScopeKey`, already threaded into the worker signature.
@@ -292,26 +301,72 @@ export class LangyGithubInstallationsService {
     const usable = installations.filter((i) => !i.suspendedAt);
     if (usable.length === 0) return null;
 
-    // Explicit repo: pick the installation that can reach it and scope to it.
-    if (repositoryFullName) {
-      for (const inst of usable) {
-        const repoId = await this.resolveRepositoryId(inst, repositoryFullName);
-        if (repoId) {
-          return this.mintScoped({
-            installationId: inst.installationId,
-            repositoryIds: [repoId],
-          });
-        }
-      }
-      // The App is not installed on that repo — bounded by the installation.
-      return null;
-    }
+    return repositoryFullName
+      ? this.mintForExplicitRepo(usable, repositoryFullName)
+      : this.mintForAnyInstallation(usable);
+  }
 
-    // No explicit repo: mint against the org's installation scoped to its full
-    // repo set. When an org has multiple installations we take the first usable
-    // one (a repo chip disambiguates in the explicit path above).
-    const inst = usable[0]!;
-    return this.mintScoped({ installationId: inst.installationId });
+  // Pick the installation that can reach `repositoryFullName` and scope the
+  // token to only that repo. A candidate that turns out to be a dead
+  // installation — whether that surfaces while resolving the repo id (an
+  // uncached "all" selection has to list live) or while minting — is
+  // self-healed away in favor of the next one that can reach the same repo,
+  // rather than failing the turn outright.
+  private async mintForExplicitRepo(
+    usable: LangyGithubInstallationRow[],
+    repositoryFullName: string,
+  ): Promise<LangyGithubTurnToken | null> {
+    for (const inst of usable) {
+      const resolved = await this.resolveRepositoryIdOrHeal(
+        inst,
+        repositoryFullName,
+      );
+      if (!resolved.repoId) continue;
+      const outcome = await this.mintScoped({
+        installationId: inst.installationId,
+        repositoryIds: [resolved.repoId],
+      });
+      if (outcome.token) return outcome.token;
+      if (!outcome.wasDeadInstallation) return null;
+    }
+    // The App is not installed on that repo — bounded by the installation.
+    return null;
+  }
+
+  // resolveRepositoryId, with the self-heal-and-continue decision factored out
+  // of the caller's control flow: a confirmed-dead installation is healed here
+  // and reported back as "nothing to resolve" rather than thrown, so
+  // mintForExplicitRepo stays a flat loop.
+  private async resolveRepositoryIdOrHeal(
+    inst: LangyGithubInstallationRow,
+    repositoryFullName: string,
+  ): Promise<{ repoId: string | null; wasDeadInstallation: boolean }> {
+    try {
+      const repoId = await this.resolveRepositoryId(inst, repositoryFullName);
+      return { repoId, wasDeadInstallation: false };
+    } catch (error) {
+      if (!(error instanceof GithubInstallationNotFoundError)) throw error;
+      await this.markInstallationDead(inst.installationId);
+      return { repoId: null, wasDeadInstallation: true };
+    }
+  }
+
+  // Mint against the org's installation(s) scoped to the full repo set,
+  // oldest first. An installation GitHub confirms is gone (404) is removed
+  // and the next candidate is tried instead of failing the whole turn; any
+  // other mint failure stops here — a transient error must not make us skip
+  // past a live installation.
+  private async mintForAnyInstallation(
+    usable: LangyGithubInstallationRow[],
+  ): Promise<LangyGithubTurnToken | null> {
+    for (const inst of usable) {
+      const outcome = await this.mintScoped({
+        installationId: inst.installationId,
+      });
+      if (outcome.token) return outcome.token;
+      if (!outcome.wasDeadInstallation) return null;
+    }
+    return null;
   }
 
   private async mintScoped({
@@ -320,28 +375,52 @@ export class LangyGithubInstallationsService {
   }: {
     installationId: string;
     repositoryIds?: string[];
-  }): Promise<LangyGithubTurnToken | null> {
+  }): Promise<{
+    token: LangyGithubTurnToken | null;
+    wasDeadInstallation: boolean;
+  }> {
     try {
       const minted = await this.appTokens.mintInstallationToken({
         installationId,
         ...(repositoryIds ? { repositoryIds } : {}),
       });
       return {
-        token: minted.token,
-        repoScopeKey: computeRepoScopeKey({ repositoryIds }),
-        installationId,
+        token: {
+          token: minted.token,
+          repoScopeKey: computeRepoScopeKey({ repositoryIds }),
+          installationId,
+        },
+        wasDeadInstallation: false,
       };
     } catch (error) {
+      if (error instanceof GithubInstallationNotFoundError) {
+        await this.markInstallationDead(installationId);
+        return { token: null, wasDeadInstallation: true };
+      }
       logger.warn(
         { error, installationId },
         "failed to mint installation token for turn",
       );
-      return null;
+      return { token: null, wasDeadInstallation: false };
     }
   }
 
+  // Removes a `LangyGithubInstallation` row GitHub has confirmed (404) it no
+  // longer knows about. Shared by every call site that can hit that error —
+  // minting and, via listInstallationRepositories, resolving a repo id too.
+  private async markInstallationDead(installationId: string): Promise<void> {
+    logger.warn(
+      { installationId },
+      "github installation no longer exists, removing stale record",
+    );
+    await this.repo.deleteByInstallationId(installationId);
+  }
+
   // Resolve a repo full-name to its numeric id for a given installation, from
-  // the cached selection when present, else a live listing.
+  // the cached selection when present, else a live listing. A confirmed-dead
+  // installation (GithubInstallationNotFoundError) is rethrown so the caller
+  // can self-heal it — every other failure degrades to "can't resolve", same
+  // as before.
   private async resolveRepositoryId(
     inst: LangyGithubInstallationRow,
     repositoryFullName: string,
@@ -359,6 +438,7 @@ export class LangyGithubInstallationsService {
       const match = repos.find((r) => r.fullName.toLowerCase() === wanted);
       return match?.id ?? null;
     } catch (error) {
+      if (error instanceof GithubInstallationNotFoundError) throw error;
       logger.warn(
         { error, installationId: inst.installationId, repositoryFullName },
         "failed to resolve repository id for installation",
