@@ -157,13 +157,17 @@ export class GovernanceKpisClickHouseRepository {
    * one tenant, and a cross-tenant batch would have to pick one client and
    * write another tenant's rows through it. Rejected rather than guessed.
    */
-  async insertContributions(rows: GovernanceKpiContribution[]): Promise<void> {
+  async insertContributions(
+    rows: readonly GovernanceKpiContribution[],
+  ): Promise<void> {
     if (rows.length === 0) return;
     for (const row of rows) assertInsertable(row, "insertContributions");
     await this.insertRows(rows);
   }
 
-  private async insertRows(rows: GovernanceKpiContribution[]): Promise<void> {
+  private async insertRows(
+    rows: readonly GovernanceKpiContribution[],
+  ): Promise<void> {
     const tenantId = assertSingleTenantBatch(
       rows,
       "GovernanceKpisClickHouseRepository",

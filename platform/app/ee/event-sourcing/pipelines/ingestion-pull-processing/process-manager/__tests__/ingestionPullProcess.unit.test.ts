@@ -1,143 +1,124 @@
-import { ingestionPullPM } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/pipeline";
-
-import { INGESTION_PULL_EVENT_TYPES } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
-import type { IngestionPullProcessingEvent } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
-import { describe, expect, it } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing.old/pipeline/processBuilder";
 import type {
-  ProcessDefinition,
-  ProcessEventEnvelope,
-  ProcessInput,
-} from "~/server/event-sourcing.old/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing.old/process-manager/processRuntime";
+  BuiltProcessManager,
+  ProcessContext,
+  ReplaceStore,
+} from "@langwatch/event-sourcing";
+import { describe, expect, it } from "vitest";
 
+import { createIngestionPullProcessingPipeline } from "../..";
+import type { IngestionPullRunStatusData } from "../../projections/ingestionPullRunStatus.projection";
 import {
   INGESTION_PULL_PROCESS_NAME,
   type IngestionPullProcessState,
+  ingestionPullProcessStateSchema,
 } from "../ingestionPullProcess.types";
 
 /**
- * The EXACT definition the runtime mounts — built through the pipeline's own
- * `ingestionPullPM` applier and the runtime's `buildProcessDefinition`, so
- * these tests cover the generated evolve (clamping, intent-key prefixing,
- * undeclared-event guard) rather than a re-implementation. The executor is a
- * stub: evolve never dispatches.
+ * The EXACT manager the runtime mounts — built through `definePipeline`, so
+ * these tests cover the generated evolve (wire dispatch, intent-type
+ * qualification, wake clearing) rather than a re-implementation. The run port
+ * and the outcome commands are never reached: evolve dispatches nothing.
  */
-const definition = buildProcessDefinition(
-  buildProcessManager<IngestionPullProcessingEvent>({
-    name: INGESTION_PULL_PROCESS_NAME,
-    applier: ingestionPullPM({
-      runPort: { run: () => Promise.reject(new Error("unused")) },
-      commands: {
-        recordRunCompleted: () =>
-          Promise.reject(new Error("unused in evolve tests")),
-        recordRunFailed: () =>
-          Promise.reject(new Error("unused in evolve tests")),
-      },
-    }),
-  }).config,
-) as ProcessDefinition<IngestionPullProcessState>;
+const unreachable = () => Promise.reject(new Error("unused in evolve tests"));
 
-const ref = {
-  processName: INGESTION_PULL_PROCESS_NAME,
-  projectId: "gov-project",
-  processKey: "source-1",
-};
-
-/** Builder-authored intent keys are qualified per process instance. */
-const pullKey = (runId: string) =>
-  `process:${encodeURIComponent("source-1")}:pull:${runId}`;
-
-const configured = (occurredAt: number): ProcessEventEnvelope => ({
-  eventId: `event-${occurredAt}`,
-  eventType: INGESTION_PULL_EVENT_TYPES.CONFIGURED,
-  occurredAt,
-  tenantId: "gov-project",
-  projectId: "gov-project",
-  processKey: "source-1",
-  payload: {
-    sourceId: "source-1",
-    cron: "*/15 * * * *",
-    cursor: "cursor-1",
-    runId: null,
+const pipeline = createIngestionPullProcessingPipeline({
+  runStatusStore: {
+    kind: "replace",
+    read: async () => ({ kind: "absent" }),
+    write: async () => undefined,
+  } satisfies ReplaceStore<IngestionPullRunStatusData>,
+  runPort: { run: unreachable },
+  commands: {
+    recordRunCompleted: unreachable,
+    recordRunFailed: unreachable,
   },
 });
 
-function evolve({
-  previousState,
-  input,
-}: {
-  previousState: IngestionPullProcessState;
-  input: ProcessInput;
+const manager: BuiltProcessManager =
+  pipeline.processManagers[INGESTION_PULL_PROCESS_NAME]!;
+
+const context = (now: number): ProcessContext => ({
+  now,
+  tenantId: "gov-project",
+  processKey: "source-1",
+});
+
+function evolve(args: {
+  state: IngestionPullProcessState;
+  type: string;
+  data: unknown;
+  now: number;
 }) {
-  return definition.evolve({ previousState, input, ref });
+  const step = manager.evolve(
+    args.state,
+    { type: args.type, data: args.data },
+    context(args.now),
+  );
+  if (step === null) throw new Error(`no handler for "${args.type}"`);
+  return { ...step, state: ingestionPullProcessStateSchema.parse(step.state) };
 }
+
+function wake(state: IngestionPullProcessState, now: number) {
+  const step = manager.onWake?.(state, context(now));
+  if (!step) throw new Error("the ingestionPull manager declares no onWake");
+  return { ...step, state: ingestionPullProcessStateSchema.parse(step.state) };
+}
+
+const configuredData = (occurredAt: number) => ({
+  sourceId: "source-1",
+  cron: "*/15 * * * *",
+  configVersion: "v1",
+  cursor: "cursor-1",
+  occurredAt,
+});
 
 function boot(at: number) {
   return evolve({
-    previousState: definition.initialState,
-    input: {
-      kind: "event",
-      event: configured(at),
-      now: at,
-    },
+    state: ingestionPullProcessStateSchema.parse(manager.init()),
+    type: "lw.obs.ingestion_pull.configured",
+    data: configuredData(at),
+    now: at,
   });
 }
 
 describe("ingestionPull process manager", () => {
   describe("when a committed configuration carries an invalid cron", () => {
-    it("disables the process instead of poisoning the subscriber", () => {
-      const at = Date.parse("2026-07-17T10:00:00Z");
-      const previousState = boot(at).state;
+    it("stands the process down instead of poisoning it", () => {
+      const previous = boot(Date.parse("2026-07-17T10:00:00Z")).state;
+      const at = Date.parse("2026-07-17T10:05:00Z");
       const result = evolve({
-        previousState: previousState,
-        input: {
-          kind: "event",
-          event: {
-            ...configured(Date.parse("2026-07-17T10:05:00Z")),
-            payload: {
-              sourceId: "source-1",
-              cron: "not a cron",
-              cursor: null,
-              runId: null,
-            },
-          },
-          now: Date.parse("2026-07-17T10:05:00Z"),
-        },
+        state: previous,
+        type: "lw.obs.ingestion_pull.configured",
+        data: { ...configuredData(at), cron: "not a cron" },
+        now: at,
       });
-      expect(result.state).toEqual(previousState);
+      expect(result.state).toEqual(previous);
       expect(result.nextWakeAt).toBeNull();
       expect(result.intents).toEqual([]);
     });
 
-    it("disables the process when the committed configuration has no cron at all", () => {
-      const at = Date.parse("2026-07-17T10:00:00Z");
-      const previousState = boot(at).state;
+    it("stands the process down when the committed configuration has no cron at all", () => {
+      const previous = boot(Date.parse("2026-07-17T10:00:00Z")).state;
+      const at = Date.parse("2026-07-17T10:05:00Z");
       const result = evolve({
-        previousState: previousState,
-        input: {
-          kind: "event",
-          event: {
-            ...configured(Date.parse("2026-07-17T10:05:00Z")),
-            payload: {
-              sourceId: "source-1",
-              cron: null,
-              cursor: null,
-              runId: null,
-            },
-          },
-          now: Date.parse("2026-07-17T10:05:00Z"),
+        state: previous,
+        type: "lw.obs.ingestion_pull.configured",
+        data: {
+          sourceId: "source-1",
+          configVersion: "v2",
+          cursor: null,
+          occurredAt: at,
         },
+        now: at,
       });
-      expect(result.state).toEqual(previousState);
+      expect(result.state).toEqual(previous);
       expect(result.nextWakeAt).toBeNull();
       expect(result.intents).toEqual([]);
     });
   });
 
   it("persists configuration and schedules the first cron wake", () => {
-    const at = Date.parse("2026-07-17T10:07:00Z");
-    const result = boot(at);
+    const result = boot(Date.parse("2026-07-17T10:07:00Z"));
     expect(result.state).toMatchObject({
       sourceId: "source-1",
       enabled: true,
@@ -147,24 +128,30 @@ describe("ingestionPull process manager", () => {
     expect(result.nextWakeAt).toBe(Date.parse("2026-07-17T10:15:00Z"));
   });
 
-  it("runs one catch-up slot and schedules strictly after the handling time", () => {
-    const state = boot(Date.parse("2026-07-17T10:00:00Z")).state;
-    const scheduledFor = Date.parse("2026-07-17T10:15:00Z");
-    const result = evolve({
-      previousState: state,
-      input: {
-        kind: "wake",
-        scheduledFor,
-        now: Date.parse("2026-07-17T13:02:00Z"),
-      },
+  describe("when a deadline fires long after it was armed", () => {
+    it("runs one slot and schedules strictly after the handling time", () => {
+      const state = boot(Date.parse("2026-07-17T10:00:00Z")).state;
+      const now = Date.parse("2026-07-17T13:02:00Z");
+      const result = wake(state, now);
+
+      expect(result.intents).toEqual([
+        {
+          type: `${INGESTION_PULL_PROCESS_NAME}/run`,
+          payload: {
+            sourceId: "source-1",
+            runId: String(now),
+            scheduledFor: now,
+            cursor: "cursor-1",
+          },
+        },
+      ]);
+      expect(result.state.currentRun).toEqual({
+        runId: String(now),
+        scheduledFor: now,
+        startedAt: now,
+      });
+      expect(result.nextWakeAt).toBe(Date.parse("2026-07-17T13:15:00Z"));
     });
-    expect(result.intents).toEqual([
-      expect.objectContaining({
-        messageKey: pullKey(String(scheduledFor)),
-        payload: expect.objectContaining({ cursor: "cursor-1" }),
-      }),
-    ]);
-    expect(result.nextWakeAt).toBe(Date.parse("2026-07-17T13:15:00Z"));
   });
 
   it("does not overlap a healthy in-flight run", () => {
@@ -172,14 +159,7 @@ describe("ingestionPull process manager", () => {
       ...boot(Date.parse("2026-07-17T10:00:00Z")).state,
       currentRun: { runId: "run", scheduledFor: 1, startedAt: 1_000 },
     };
-    const result = evolve({
-      previousState: state,
-      input: {
-        kind: "wake",
-        scheduledFor: 2_000,
-        now: 2_000,
-      },
-    });
+    const result = wake(state, 2_000);
     expect(result.intents).toEqual([]);
     expect(result.state.currentRun).toEqual(state.currentRun);
   });
@@ -191,21 +171,17 @@ describe("ingestionPull process manager", () => {
     };
     const at = Date.parse("2026-07-17T10:01:00Z");
     const result = evolve({
-      previousState: state,
-      input: {
-        kind: "event",
-        event: {
-          ...configured(at),
-          eventType: INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
-          payload: {
-            sourceId: "source-1",
-            cron: null,
-            cursor: "cursor-2",
-            runId: "run-1",
-          },
-        },
-        now: at,
+      state,
+      type: "lw.obs.ingestion_pull.run_completed",
+      data: {
+        sourceId: "source-1",
+        runId: "run-1",
+        scheduledFor: 1,
+        nextCursor: "cursor-2",
+        eventCount: 3,
+        occurredAt: at,
       },
+      now: at,
     });
     expect(result.state.cursor).toBe("cursor-2");
     expect(result.state.currentRun).toBeNull();
@@ -213,9 +189,8 @@ describe("ingestionPull process manager", () => {
 
   describe("when a completion from a superseded run arrives late", () => {
     it("keeps the live cursor instead of regressing it", () => {
-      const bootAt = Date.parse("2026-07-17T10:00:00Z");
       const state: IngestionPullProcessState = {
-        ...boot(bootAt).state,
+        ...boot(Date.parse("2026-07-17T10:00:00Z")).state,
         cursor: "cursor-live",
         currentRun: {
           runId: "run-2",
@@ -225,21 +200,17 @@ describe("ingestionPull process manager", () => {
       };
       const lateAt = Date.parse("2026-07-17T10:31:00Z");
       const result = evolve({
-        previousState: state,
-        input: {
-          kind: "event",
-          event: {
-            ...configured(lateAt),
-            eventType: INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
-            payload: {
-              sourceId: "source-1",
-              cron: null,
-              cursor: "cursor-stale",
-              runId: "run-1",
-            },
-          },
-          now: lateAt,
+        state,
+        type: "lw.obs.ingestion_pull.run_completed",
+        data: {
+          sourceId: "source-1",
+          runId: "run-1",
+          scheduledFor: Date.parse("2026-07-17T10:00:00Z"),
+          nextCursor: "cursor-stale",
+          eventCount: 1,
+          occurredAt: lateAt,
         },
+        now: lateAt,
       });
       expect(result.state.cursor).toBe("cursor-live");
       expect(result.state.currentRun).toEqual(state.currentRun);
@@ -256,24 +227,18 @@ describe("ingestionPull process manager", () => {
           startedAt: Date.parse("2026-07-17T10:00:00Z"),
         },
       };
-      const occurredAt = Date.parse("2026-07-17T10:01:00Z");
-      const now = Date.parse("2026-07-17T13:02:00Z");
       const result = evolve({
-        previousState: state,
-        input: {
-          kind: "event",
-          event: {
-            ...configured(occurredAt),
-            eventType: INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
-            payload: {
-              sourceId: "source-1",
-              cron: null,
-              cursor: "cursor-2",
-              runId: "run-1",
-            },
-          },
-          now,
+        state,
+        type: "lw.obs.ingestion_pull.run_completed",
+        data: {
+          sourceId: "source-1",
+          runId: "run-1",
+          scheduledFor: Date.parse("2026-07-17T10:00:00Z"),
+          nextCursor: "cursor-2",
+          eventCount: 3,
+          occurredAt: Date.parse("2026-07-17T10:01:00Z"),
         },
+        now: Date.parse("2026-07-17T13:02:00Z"),
       });
       expect(result.nextWakeAt).toBe(Date.parse("2026-07-17T13:15:00Z"));
     });
@@ -283,35 +248,58 @@ describe("ingestionPull process manager", () => {
     const enabled = boot(Date.parse("2026-07-17T10:00:00Z")).state;
     const disabledAt = Date.parse("2026-07-17T10:01:00Z");
     const disabled = evolve({
-      previousState: enabled,
-      input: {
-        kind: "event",
-        event: {
-          ...configured(disabledAt),
-          eventType: INGESTION_PULL_EVENT_TYPES.DISABLED,
-        },
-        now: disabledAt,
+      state: enabled,
+      type: "lw.obs.ingestion_pull.disabled",
+      data: {
+        sourceId: "source-1",
+        configVersion: "v2",
+        occurredAt: disabledAt,
       },
+      now: disabledAt,
     });
     const lateAt = Date.parse("2026-07-17T10:02:00Z");
     const lateCompletion = evolve({
-      previousState: disabled.state,
-      input: {
-        kind: "event",
-        event: {
-          ...configured(lateAt),
-          eventType: INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
-          payload: {
-            sourceId: "source-1",
-            cron: null,
-            cursor: "late-cursor",
-            runId: "late-run",
-          },
-        },
-        now: lateAt,
+      state: disabled.state,
+      type: "lw.obs.ingestion_pull.run_completed",
+      data: {
+        sourceId: "source-1",
+        runId: "late-run",
+        scheduledFor: lateAt,
+        nextCursor: "late-cursor",
+        eventCount: 1,
+        occurredAt: lateAt,
       },
+      now: lateAt,
     });
     expect(lateCompletion.nextWakeAt).toBeNull();
     expect(lateCompletion.state.enabled).toBe(false);
+    expect(wake(lateCompletion.state, lateAt).intents).toEqual([]);
+  });
+
+  describe("when an event nobody declared a handler for arrives", () => {
+    it("runs no step at all", () => {
+      expect(
+        manager.evolve(
+          boot(1_000).state,
+          { type: "lw.obs.ingestion_pull.never_declared", data: {} },
+          context(1_000),
+        ),
+      ).toBeNull();
+    });
+  });
+});
+
+describe("the ingestionPull manager's declaration", () => {
+  it("subscribes to exactly the four pull events", () => {
+    expect([...manager.eventTypes].sort()).toEqual([
+      "lw.obs.ingestion_pull.configured",
+      "lw.obs.ingestion_pull.disabled",
+      "lw.obs.ingestion_pull.run_completed",
+      "lw.obs.ingestion_pull.run_failed",
+    ]);
+  });
+
+  it("qualifies its intent type by its own name, since the outbox is shared", () => {
+    expect(manager.intentTypes).toEqual([`${INGESTION_PULL_PROCESS_NAME}/run`]);
   });
 });

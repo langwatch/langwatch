@@ -155,7 +155,8 @@ describe("createGovernanceKpisMap", () => {
 
     expect(result).toEqual({ written: 2 });
     expect(writeBatch).toHaveBeenCalledTimes(1);
-    const [rows]: [GovernanceKpiContribution[]] = writeBatch.mock.calls[0]!;
+    const rows: readonly GovernanceKpiContribution[] =
+      writeBatch.mock.calls[0]![0];
     expect(rows).toHaveLength(2);
   });
 

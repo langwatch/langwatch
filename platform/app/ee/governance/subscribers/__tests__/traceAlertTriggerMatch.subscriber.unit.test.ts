@@ -119,7 +119,7 @@ describe("trace alert trigger match subscriber", () => {
   describe("given an automation with evaluation filters", () => {
     it("leaves the match to the evaluation subscriber", async () => {
       const { subscriber, recordTriggerMatch } = build({
-        triggers: [trigger({ filters: { "evaluations.passed": true } })],
+        triggers: [trigger({ filters: { "evaluations.passed": ["true"] } })],
       });
 
       await subscriber.handle(spanEvent(), CTX);

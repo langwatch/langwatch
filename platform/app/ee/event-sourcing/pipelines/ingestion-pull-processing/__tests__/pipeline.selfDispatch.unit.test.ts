@@ -1,64 +1,53 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { Event } from "~/server/event-sourcing.old/domain/types";
-import { EventSourcing } from "~/server/event-sourcing.old/eventSourcing";
-import type { IntentContext } from "~/server/event-sourcing.old/pipeline/processManagerDefinition";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing.old/projections/stateProjection.types";
-import { createMockEventStore } from "~/server/event-sourcing.old/services/__tests__/testHelpers";
-
-import { createIngestionPullProcessingPipeline } from "../pipeline";
 import {
-  INGESTION_PULL_PROCESS_INTENT_TYPES,
-  INGESTION_PULL_PROCESS_NAME,
-  type IngestionPullRunIntent,
-} from "../process-manager/ingestionPullProcess.types";
-import type { IngestionPullRunStatusData } from "../projections/ingestionPullRunStatus.foldProjection";
+  createEventSourcingService,
+  createRegistry,
+  type HandlerContext,
+  memoryEventLog,
+  memoryOutbox,
+  memoryProcessStore,
+  memoryQueue,
+  memorySpool,
+  type ReplaceStore,
+  type StateRead,
+  type StoredState,
+  systemClock,
+} from "@langwatch/event-sourcing";
+import { describe, expect, it } from "vitest";
+
+import { createIngestionPullProcessingPipeline } from "..";
+import { INGESTION_PULL_PROCESS_NAME } from "../process-manager/ingestionPullProcess.types";
+import type { IngestionPullRunStatusData } from "../projections/ingestionPullRunStatus.projection";
+import type { IngestionPullRunCompletedData } from "../schemas/events";
 
 /** A real, total store — nothing here is a stub with a green typecheck. */
-function memoryStateStore<State>(): StateProjectionStore<State> {
-  const rows = new Map<string, StoredProjection<State>>();
+function memoryReplaceStore<State>(): ReplaceStore<State> {
+  const rows = new Map<string, StoredState<State>>();
   return {
-    async load(key) {
-      return rows.get(key) ?? null;
+    kind: "replace",
+    async read(key): Promise<StateRead<State>> {
+      const stored = rows.get(key);
+      return stored ? { kind: "found", stored } : { kind: "absent" };
     },
-    async store(projection, context) {
-      rows.set(context.key ?? context.aggregateId, projection);
+    async write(key, stored) {
+      rows.set(key, stored);
     },
   };
 }
 
-function mockGlobalQueue() {
-  return {
-    send: vi.fn().mockResolvedValue(void 0),
-    sendBatch: vi.fn().mockResolvedValue(void 0),
-    close: vi.fn().mockResolvedValue(void 0),
-    waitUntilReady: vi.fn().mockResolvedValue(void 0),
-  };
-}
+const ctx: HandlerContext = { now: 200, tenantId: "gov-project" };
 
-const intent: IngestionPullRunIntent = {
+const intent = {
   sourceId: "source-1",
   runId: "run-1",
   scheduledFor: 100,
   cursor: "cursor-1",
 };
 
-const context = (attempt: number): IntentContext => ({
-  processName: INGESTION_PULL_PROCESS_NAME,
-  projectId: "gov-project",
-  processKey: "source-1",
-  tenantId: "gov-project",
-  messageKey: "process:source-1:pull:run-1",
-  attempt,
-});
-
 /**
- * Builds and registers the real pipeline, then hands back the `run` intent
- * executor the outbox dispatches into — the same object the runtime mounts,
- * with its outcome commands bound through the bus mid-`.build()`.
+ * Builds and registers the real pipeline on a real registry, then hands back
+ * the `run` intent the outbox worker delivers — the same object the runtime
+ * mounts, with its outcome commands bound through the shared command client
+ * before the pipeline itself has registered.
  */
 function registerPipeline({
   run,
@@ -68,73 +57,78 @@ function registerPipeline({
     cursor: string | null;
   }) => Promise<{ nextCursor: string | null; eventCount: number }>;
 }) {
-  const queue = mockGlobalQueue();
-  const es = EventSourcing.createForTesting({
-    eventStore: createMockEventStore<Event>(),
-    globalQueue: queue,
+  const clock = systemClock();
+  const spool = memorySpool();
+  const eventLog = memoryEventLog();
+  const registry = createRegistry();
+  const service = createEventSourcingService({
+    ports: {
+      eventLog,
+      queue: memoryQueue(clock),
+      spool,
+      processStore: memoryProcessStore(),
+      outbox: memoryOutbox(clock),
+      clock,
+    },
+    registry,
   });
 
-  // The ports are bound INSIDE the factory, before the pipeline exists.
-  const definition = createIngestionPullProcessingPipeline({
-    runStatusStore: memoryStateStore<IngestionPullRunStatusData>(),
+  // The outcome commands are named INSIDE the factory, before the pipeline
+  // exists — the client resolves them by name at send time.
+  const pipeline = createIngestionPullProcessingPipeline({
+    runStatusStore: memoryReplaceStore<IngestionPullRunStatusData>(),
     runPort: { run },
-    commands: es.commandBus,
+    commands: {
+      recordRunCompleted: (input, sendCtx) =>
+        service.commands.send("recordRunCompleted", input, sendCtx),
+      recordRunFailed: (input, sendCtx) =>
+        service.commands.send("recordRunFailed", input, sendCtx),
+    },
   });
-  es.register(definition);
+  service.register(pipeline);
 
-  const executor = definition.processManagers.get(INGESTION_PULL_PROCESS_NAME)
-    ?.config.intents[INGESTION_PULL_PROCESS_INTENT_TYPES.RUN]?.run;
+  const runIntent =
+    pipeline.processManagers[INGESTION_PULL_PROCESS_NAME]?.intents.run;
 
-  return { es, queue, executor };
+  return { eventLog, runIntent };
 }
 
-describe("ingestion_pull_processing self-dispatch", () => {
-  beforeEach(() => {
-    vi.stubEnv("BUILD_TIME", "");
-    vi.stubEnv("NODE_ENV", "test");
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
-  });
-
-  describe("when the pipeline binds ports for commands it registers itself", () => {
+describe("ingestion_pull self-dispatch", () => {
+  describe("when the pipeline names commands it registers itself", () => {
     /** @scenario A pipeline dispatching into its own command needs no late binding */
-    it("dispatches recordRunCompleted through the bus onto its own queue", async () => {
-      const { es, queue, executor } = registerPipeline({
+    it("commits run_completed through the shared command client", async () => {
+      const { eventLog, runIntent } = registerPipeline({
         run: async () => ({ nextCursor: "cursor-2", eventCount: 3 }),
       });
 
-      // The whole registration completed with the ports already bound, which
-      // is the case the hand-rolled thunk needed a resolve step for.
-      expect(() => es.commandBus.assertPortsResolvable()).not.toThrow();
+      await runIntent?.deliver(intent, ctx);
 
-      await executor?.(intent, context(1));
-
-      expect(queue.send).toHaveBeenCalledTimes(1);
-      expect(queue.send.mock.calls[0]?.[0]).toMatchObject({
-        __pipelineName: "ingestion_pull_processing",
-        __jobName: "recordRunCompleted",
-        tenantId: "gov-project",
+      expect(eventLog.rows).toHaveLength(1);
+      const row = eventLog.rows[0];
+      expect(row?.eventType).toBe("lw.obs.ingestion_pull.run_completed");
+      expect(row?.aggregateType).toBe("ingestion_pull");
+      expect(row?.aggregateId).toBe("source-1");
+      expect(row?.tenantId).toBe("gov-project");
+      expect(JSON.parse(row?.payload ?? "{}")).toMatchObject({
         sourceId: "source-1",
         runId: "run-1",
         nextCursor: "cursor-2",
         eventCount: 3,
-      });
+      } satisfies Partial<IngestionPullRunCompletedData>);
     });
 
-    it("dispatches recordRunFailed through the bus on the final attempt", async () => {
-      const { queue, executor } = registerPipeline({
+    it("commits run_failed when the provider is down", async () => {
+      const { eventLog, runIntent } = registerPipeline({
         run: () => Promise.reject(new Error("provider down")),
       });
 
-      await executor?.(intent, context(3));
+      await runIntent?.deliver(intent, ctx);
 
-      expect(queue.send).toHaveBeenCalledTimes(1);
-      expect(queue.send.mock.calls[0]?.[0]).toMatchObject({
-        __pipelineName: "ingestion_pull_processing",
-        __jobName: "recordRunFailed",
+      expect(eventLog.rows).toHaveLength(1);
+      expect(eventLog.rows[0]?.eventType).toBe(
+        "lw.obs.ingestion_pull.run_failed",
+      );
+      expect(JSON.parse(eventLog.rows[0]?.payload ?? "{}")).toMatchObject({
         sourceId: "source-1",
         runId: "run-1",
         error: "provider down",

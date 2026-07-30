@@ -1,80 +1,38 @@
-import { defineCommand } from "~/server/event-sourcing.old/commands/defineCommand";
-import {
-  INGESTION_PULL_COMMAND_TYPES,
-  INGESTION_PULL_EVENT_TYPES,
-  INGESTION_PULL_EVENT_VERSIONS,
-} from "./schemas/constants";
-import {
-  ingestionPullConfiguredCommandDataSchema,
-  ingestionPullDisabledEventDataSchema,
-  ingestionPullRunCompletedEventDataSchema,
-  ingestionPullRunFailedEventDataSchema,
+import type { EmittedEvent } from "@langwatch/event-sourcing";
+
+import type {
+  IngestionPullConfiguredData,
+  IngestionPullDisabledData,
+  IngestionPullRunCompletedData,
+  IngestionPullRunFailedData,
+  ingestionPullEvents,
 } from "./schemas/events";
 
-const identity = ({ sourceId, suffix }: { sourceId: string; suffix: string }) =>
-  `${sourceId}:ingestion_pull:${suffix}`;
+type Emitted = readonly EmittedEvent<typeof ingestionPullEvents>[];
 
-export const ConfigureIngestionPullCommand = defineCommand({
-  commandType: INGESTION_PULL_COMMAND_TYPES.CONFIGURE,
-  eventType: INGESTION_PULL_EVENT_TYPES.CONFIGURED,
-  eventVersion: INGESTION_PULL_EVENT_VERSIONS.CONFIGURED,
-  aggregateType: "ingestion_pull",
-  schema: ingestionPullConfiguredCommandDataSchema,
-  aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) =>
-    identity({
-      sourceId: data.sourceId,
-      suffix: `configure:${data.configVersion}`,
-    }),
-  spanAttributes: (data) => ({
-    "payload.source_id": data.sourceId,
-  }),
-});
+/** All four are pure: the config version, the cursor and the run outcome all
+ * arrive already decided on the input (ADR-105 decision 7). */
 
-export const DisableIngestionPullCommand = defineCommand({
-  commandType: INGESTION_PULL_COMMAND_TYPES.DISABLE,
-  eventType: INGESTION_PULL_EVENT_TYPES.DISABLED,
-  eventVersion: INGESTION_PULL_EVENT_VERSIONS.DISABLED,
-  aggregateType: "ingestion_pull",
-  schema: ingestionPullDisabledEventDataSchema,
-  aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) =>
-    identity({
-      sourceId: data.sourceId,
-      suffix: `disable:${data.configVersion}`,
-    }),
-  spanAttributes: (data) => ({
-    "payload.source_id": data.sourceId,
-  }),
-});
+export async function configureIngestionPull(
+  input: IngestionPullConfiguredData,
+): Promise<Emitted> {
+  return [{ type: "configured", data: input }];
+}
 
-export const RecordIngestionPullRunCompletedCommand = defineCommand({
-  commandType: INGESTION_PULL_COMMAND_TYPES.RECORD_RUN_COMPLETED,
-  eventType: INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED,
-  eventVersion: INGESTION_PULL_EVENT_VERSIONS.RUN_COMPLETED,
-  aggregateType: "ingestion_pull",
-  schema: ingestionPullRunCompletedEventDataSchema,
-  aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) =>
-    identity({ sourceId: data.sourceId, suffix: `${data.runId}:completed` }),
-  spanAttributes: (data) => ({
-    "payload.source_id": data.sourceId,
-    "payload.run_id": data.runId,
-    "payload.event_count": data.eventCount,
-  }),
-});
+export async function disableIngestionPull(
+  input: IngestionPullDisabledData,
+): Promise<Emitted> {
+  return [{ type: "disabled", data: input }];
+}
 
-export const RecordIngestionPullRunFailedCommand = defineCommand({
-  commandType: INGESTION_PULL_COMMAND_TYPES.RECORD_RUN_FAILED,
-  eventType: INGESTION_PULL_EVENT_TYPES.RUN_FAILED,
-  eventVersion: INGESTION_PULL_EVENT_VERSIONS.RUN_FAILED,
-  aggregateType: "ingestion_pull",
-  schema: ingestionPullRunFailedEventDataSchema,
-  aggregateId: (data) => data.sourceId,
-  idempotencyKey: (data) =>
-    identity({ sourceId: data.sourceId, suffix: `${data.runId}:failed` }),
-  spanAttributes: (data) => ({
-    "payload.source_id": data.sourceId,
-    "payload.run_id": data.runId,
-  }),
-});
+export async function recordIngestionPullRunCompleted(
+  input: IngestionPullRunCompletedData,
+): Promise<Emitted> {
+  return [{ type: "runCompleted", data: input }];
+}
+
+export async function recordIngestionPullRunFailed(
+  input: IngestionPullRunFailedData,
+): Promise<Emitted> {
+  return [{ type: "runFailed", data: input }];
+}

@@ -211,13 +211,15 @@ export class GovernanceOcsfEventsClickHouseRepository {
    * tenant's client is exactly the mistake this rejects rather than
    * guesses at.
    */
-  async insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void> {
+  async insertEvents(rows: readonly GovernanceOcsfEventInput[]): Promise<void> {
     if (rows.length === 0) return;
     for (const row of rows) assertInsertable(row, "insertEvents");
     await this.insertRows(rows);
   }
 
-  private async insertRows(rows: GovernanceOcsfEventInput[]): Promise<void> {
+  private async insertRows(
+    rows: readonly GovernanceOcsfEventInput[],
+  ): Promise<void> {
     const tenantId = assertSingleTenantBatch(
       rows,
       "GovernanceOcsfEventsClickHouseRepository",
