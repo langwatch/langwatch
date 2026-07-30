@@ -1,9 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  memoryClock,
-  memoryOutbox,
-  memoryProcessStore,
-} from "@langwatch/event-sourcing";
+import { clickhouseEventLog } from "@langwatch/clickhouse";
+import { memoryProcessStore, systemClock } from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
 import { Redis as IORedisClient } from "ioredis";
 import { env } from "~/env.mjs";
@@ -29,6 +26,8 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
+import { prismaOutbox } from "~/server/event-sourcing/adapters/prismaOutbox";
+import { prismaProcessStore } from "~/server/event-sourcing/adapters/prismaProcessStore";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
@@ -804,8 +803,14 @@ export function initializeDefaultApp(options?: {
   // a Cluster deployment falls back to the in-memory queue/spool until that
   // package grows Cluster support.
   const groupQueueRedis = redis instanceof IORedisClient ? redis : undefined;
-  const esClock = memoryClock();
-  const esOutbox = memoryOutbox(esClock);
+  const esClock = systemClock();
+  // The durable trio (ADR-109, ADR-110 §5). Every one of these has an in-memory
+  // sibling the engine falls back to when it is absent, and that fallback is for
+  // the fully in-process graph only: unwired here, `event_log` is never written,
+  // no process manager survives a restart, and two pods share neither.
+  const esEventLog = clickhouseEventLog({ client: esClient });
+  const esProcessStore = prismaProcessStore(prisma);
+  const esOutbox = prismaOutbox(prisma);
   const foldCache = <State>(keyPrefix: string) =>
     groupQueueRedis
       ? redisFoldStateCache<State>({ redis: groupQueueRedis, keyPrefix })
@@ -813,7 +818,13 @@ export function initializeDefaultApp(options?: {
 
   const es = createEventSourcingRegistry({
     client: esClient,
-    infra: { redis: groupQueueRedis, clock: esClock, outbox: esOutbox },
+    infra: {
+      redis: groupQueueRedis,
+      clock: esClock,
+      eventLog: esEventLog,
+      processStore: esProcessStore,
+      outbox: esOutbox,
+    },
     automations: {
       // `automation-dispatch.composition.ts` still builds the pre-rewrite
       // `AutomationDispatchCollaborators` shape (and itself imports three

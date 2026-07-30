@@ -10,7 +10,6 @@ import {
   type LaneExecution,
   type LaneExecutors,
   type Metrics,
-  memoryClock,
   memoryEventLog,
   memoryOutbox,
   memoryProcessStore,
@@ -24,6 +23,7 @@ import {
   type Registry,
   type StoreContext,
   type StoredState,
+  systemClock,
   toDispatchError,
 } from "@langwatch/event-sourcing";
 import { redisBlobSpool, redisLaneQueue } from "@langwatch/groupqueue";
@@ -59,7 +59,7 @@ export interface EngineInfra {
  * until their own adapters land, since nothing else built them yet.
  */
 export function buildEnginePorts(infra: EngineInfra = {}): EnginePorts {
-  const clock = infra.clock ?? memoryClock();
+  const clock = infra.clock ?? systemClock();
   const spool = infra.redis ? redisBlobSpool(infra.redis) : memorySpool();
   const queue = infra.redis
     ? redisLaneQueue(infra.redis, spool, { tenantSoftCap: infra.tenantSoftCap })

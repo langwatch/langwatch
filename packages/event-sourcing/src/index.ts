@@ -128,6 +128,7 @@ export type {
   StoredState,
   TenantId,
 } from "./projections/store.types";
+export { systemClock } from "./runtime/clock";
 export type {
   ConsumerDeps,
   LaneExecution,
