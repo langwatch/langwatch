@@ -579,6 +579,7 @@ describe("aiToolsRouter integration", () => {
           "claude-code",
           "codex",
           "gemini",
+          "github-copilot",
           "google",
           "openai",
           "opencode",
