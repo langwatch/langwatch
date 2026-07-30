@@ -251,7 +251,7 @@ function buildSignatures({
       kind,
       unmetCriterionIds: [],
       errorShape,
-      errorExample: run.error ? truncateError(run.error) : null,
+      errorExample: run.error ? toReadableError(run.error) : null,
       runIds: [],
       scenarioIds: [],
     };
@@ -270,14 +270,30 @@ function buildSignatures({
 }
 
 /**
- * An error message cut to a readable length.
+ * The part of a recorded error a person needs, cut to a readable length.
  *
- * Long enough for a stack-trace-prefixed provider error to still say what went
- * wrong, short enough that one group's error does not become the section.
+ * Runs record a serialised Error — `{"name","message","stack"}` — so the raw
+ * value opens with its own envelope and carries a stack trace that is longer
+ * than everything else in the group put together. The message is the half that
+ * says what went wrong, so it is unwrapped when it is there and the rest is
+ * left behind. Anything that is not that shape is used as it stands.
  */
-function truncateError(error: string): string {
-  const collapsed = error.replace(/\s+/g, " ").trim();
+function toReadableError(error: string): string {
+  const collapsed = unwrapErrorMessage(error).replace(/\s+/g, " ").trim();
   return collapsed.length <= 300 ? collapsed : `${collapsed.slice(0, 300)}…`;
+}
+
+function unwrapErrorMessage(error: string): string {
+  if (!error.trimStart().startsWith("{")) return error;
+  try {
+    const parsed: unknown = JSON.parse(error);
+    const message = (parsed as { message?: unknown } | null)?.message;
+    return typeof message === "string" && message.trim() !== ""
+      ? message
+      : error;
+  } catch {
+    return error;
+  }
 }
 
 /** A run that reached a terminal state without passing. */

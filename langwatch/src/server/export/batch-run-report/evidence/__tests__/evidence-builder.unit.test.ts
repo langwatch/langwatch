@@ -166,8 +166,9 @@ describe("buildEvidence() failure grouping", () => {
 
   /**
    * The fingerprint replaces every quoted value, which is right for grouping
-   * and leaves a JSON error as nothing but its own punctuation. Keeping one
-   * error as it was reported is what a reader is actually shown.
+   * and leaves a serialised error as nothing but its own punctuation. Runs
+   * record `{"name","message","stack"}`, so the readable half is the message —
+   * the stack is longer than the rest of the group put together.
    *
    * @scenario Infrastructure errors are separated from judged failures
    */
@@ -181,7 +182,11 @@ describe("buildEvidence() failure grouping", () => {
             verdict: Verdict.INCONCLUSIVE,
             metCriteria: [],
             unmetCriteria: [],
-            error: '{"message":"content flagged","code":"filtered"}',
+            error: JSON.stringify({
+              name: "Error",
+              message: "AI_APICallError: content flagged",
+              stack: "Error: AI_APICallError\n    at somewhere",
+            }),
           },
         }),
       ],
@@ -193,9 +198,32 @@ describe("buildEvidence() failure grouping", () => {
     }).signatures;
 
     expect(signature?.errorShape).not.toContain("content flagged");
-    expect(signature?.errorExample).toBe(
-      '{"message":"content flagged","code":"filtered"}',
-    );
+    expect(signature?.errorExample).toBe("AI_APICallError: content flagged");
+  });
+
+  /** @scenario Infrastructure errors are separated from judged failures */
+  it("uses an error that is not a serialised Error as it stands", () => {
+    const [signature] = buildEvidence({
+      runs: [
+        makeRun({
+          scenarioRunId: "run_plain",
+          status: ScenarioRunStatus.ERROR,
+          results: {
+            verdict: Verdict.INCONCLUSIVE,
+            metCriteria: [],
+            unmetCriteria: [],
+            error: "Connection refused by upstream",
+          },
+        }),
+      ],
+      priorRuns: [],
+      priorBatchOrder: [],
+      batchRunId: BATCH,
+      scenarioSetId: "set_1",
+      suiteName: null,
+    }).signatures;
+
+    expect(signature?.errorExample).toBe("Connection refused by upstream");
   });
 
   /** @scenario A group cannot claim a scenario that did not fail */
