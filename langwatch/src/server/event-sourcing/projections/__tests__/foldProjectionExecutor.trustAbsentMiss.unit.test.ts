@@ -139,9 +139,11 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
           refoldable: true,
           history: [eventAt(OCCURRED_AT - 5_000)],
         });
-        store.getWithApplied = vi
-          .fn()
-          .mockResolvedValue({ state: null, appliedEventIds: [], miss: "absent" });
+        store.getWithApplied = vi.fn().mockResolvedValue({
+          state: null,
+          appliedEventIds: [],
+          miss: "absent",
+        });
 
         const state = await executor.execute(
           fold,
@@ -164,9 +166,11 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
           refoldable: true,
           history: [eventAt(OCCURRED_AT - 5_000)],
         });
-        store.getWithApplied = vi
-          .fn()
-          .mockResolvedValue({ state: null, appliedEventIds: [], miss: "absent" });
+        store.getWithApplied = vi.fn().mockResolvedValue({
+          state: null,
+          appliedEventIds: [],
+          miss: "absent",
+        });
 
         const state = await executor.executeBatch(
           fold,
@@ -237,9 +241,11 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
           refoldable: true,
           history: [eventAt(OCCURRED_AT - 5_000)],
         });
-        store.getWithApplied = vi
-          .fn()
-          .mockResolvedValue({ state: null, appliedEventIds: [], miss: "absent" });
+        store.getWithApplied = vi.fn().mockResolvedValue({
+          state: null,
+          appliedEventIds: [],
+          miss: "absent",
+        });
 
         await executor.execute(fold, eventAt(OCCURRED_AT), context);
 
