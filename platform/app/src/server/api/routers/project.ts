@@ -446,6 +446,7 @@ export const projectRouter = createTRPCRouter({
         }
         await app.topicClustering.requestClustering(
           {
+            projectId: input.projectId,
             occurredAt: Date.now(),
             trigger: "manual",
             requestedByUserId: ctx.session.user.id,

@@ -978,15 +978,20 @@ export function initializeDefaultApp(options?: {
       prisma,
       redis: redis ?? null,
       commands: {
-        recordTopics: async (args) => {
-          await commands.topicClustering.recordTopics(args, {
-            tenantId: args.tenantId,
-          });
+        // The clustering stream is per project, so the aggregate names the
+        // project while the tenant travels as context — the same id, in the
+        // two places the pipeline reads it from.
+        recordTopics: async ({ tenantId, ...data }) => {
+          await commands.topicClustering.recordTopics(
+            { ...data, projectId: tenantId },
+            { tenantId },
+          );
         },
-        requestClustering: async (args) => {
-          await commands.topicClustering.requestClustering(args, {
-            tenantId: args.tenantId,
-          });
+        requestClustering: async ({ tenantId, ...data }) => {
+          await commands.topicClustering.requestClustering(
+            { ...data, projectId: tenantId },
+            { tenantId },
+          );
         },
       },
     });

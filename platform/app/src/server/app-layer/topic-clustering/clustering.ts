@@ -781,15 +781,17 @@ export const storeResults = async (
     // no-op once the projection owns the model.
     await seedProjectTopicModel({
       prisma,
-      recordTopics: async (args) => {
-        await getApp().topicClustering.recordTopics(args, {
-          tenantId: args.tenantId,
-        });
+      recordTopics: async ({ tenantId, ...data }) => {
+        await getApp().topicClustering.recordTopics(
+          { ...data, projectId: tenantId },
+          { tenantId },
+        );
       },
       projectId,
     });
     await getApp().topicClustering.recordTopics(
       {
+        projectId,
         occurredAt: Date.now(),
         mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
         source: "clustering",
