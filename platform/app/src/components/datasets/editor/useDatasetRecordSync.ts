@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useRef } from "react";
 
+import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
 import type { AutosaveState } from "./DatasetTableContext";
 
@@ -120,9 +121,17 @@ export const useDatasetRecordSync = ({
   }, [flushDeletedBatch, markSaved]);
 
   const handleSyncError = useCallback(
-    (error: { message: string }) => {
+    (error: unknown) => {
       pendingOpsRef.current = Math.max(0, pendingOpsRef.current - 1);
-      onStatusRef.current("error", error.message);
+      // Never `error.message`: since #5984 a handled error's wire message IS
+      // its code, so that read put `dataset_storage_not_writable` in front of
+      // the user, and an unhandled one put "An unknown error occurred" there.
+      // `describeError` resolves the code-keyed copy, and only falls back to
+      // the generic headline when the failure genuinely has no name.
+      onStatusRef.current(
+        "error",
+        describeError({ error, fallbackTitle: "Couldn't save this row" }),
+      );
       flushDeletedBatch();
     },
     [flushDeletedBatch],

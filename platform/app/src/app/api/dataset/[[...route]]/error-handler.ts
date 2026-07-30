@@ -37,7 +37,12 @@ const DOMAIN_ERROR_HTTP: Record<
   },
   UploadTooLargeError: { status: 400, code: "UploadTooLarge" },
   StagedUploadNotFoundError: { status: 422, code: "UploadNotFound" },
-  StorageNotWritableError: { status: 500, code: "StorageNotWritable" },
+  // A deployment with no writable backend: 503, because the write never had a
+  // chance and retrying it unchanged cannot help. Claimed here rather than left
+  // to `handleError` so the direct-upload client keeps reading `message` off the
+  // familiar `{ error, message }` shape; the message it now carries is the
+  // customer-safe one, with the path and env vars confined to the log below.
+  StorageNotWritableError: { status: 503, code: "StorageNotWritable" },
   // A PATCH that changes columnTypes on an s3_jsonl dataset is a client request
   // error, not a server fault — 400, matching the tRPC layer's BAD_REQUEST.
   ColumnTypeChangeNotSupportedError: {
@@ -91,6 +96,10 @@ export const handleDatasetError = async (
         name: error.name,
         message: error.message,
         stack: error.stack,
+        // Operator-only remediation (which path, which env vars) that a handled
+        // error deliberately keeps out of `message`. Undefined for every error
+        // that has none, so it costs nothing on the common path.
+        detail: (error as { operatorDetail?: string }).operatorDetail,
       },
     },
     `Dataset API Error [${status}]: ${error.message || String(error)}`,

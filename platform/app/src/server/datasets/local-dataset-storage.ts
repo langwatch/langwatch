@@ -96,11 +96,7 @@ export class LocalDatasetStorage implements DatasetStorage {
       errorHasProp(error, "code", "EROFS") ||
       errorHasProp(error, "code", "EPERM")
     ) {
-      throw new StorageNotWritableError(
-        `Dataset storage path "${this.root}" is not writable. ` +
-          "Configure object storage (set S3_BUCKET_NAME) or point " +
-          "LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.",
-      );
+      throw new StorageNotWritableError({ root: this.root });
     }
     throw error;
   }

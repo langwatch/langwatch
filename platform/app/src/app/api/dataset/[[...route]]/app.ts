@@ -10,6 +10,7 @@ import {
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
+import { assertDatasetStorageWritable } from "../../../../server/datasets/dataset-storage";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type {
   DatasetColumns,
@@ -342,6 +343,13 @@ secured.access(directUploadSessionAuth).post(
       // handled error behind them.
       return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
+
+    // Refuse the upload before it starts if the bytes have nowhere to land.
+    // Deliberately ahead of the pending row and the presigned URL: discovering
+    // this at the first written byte left a pending row with no object behind
+    // it, which is an orphan the finalize step can never resolve. Runs after
+    // auth so an unauthenticated caller learns nothing about our configuration.
+    await assertDatasetStorageWritable(auth.projectId);
 
     // Resource-limit enforcement runs inline here (not via
     // `resourceLimitMiddleware`) because the org is only known after in-handler

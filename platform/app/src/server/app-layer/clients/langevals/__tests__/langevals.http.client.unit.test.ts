@@ -120,9 +120,13 @@ describe("LangEvalsHttpClient", () => {
         await expect(client.evaluate(buildParams())).rejects.toThrow(
           EvaluatorExecutionError,
         );
-        await expect(client.evaluate(buildParams())).rejects.toThrow(
-          "Evaluator cannot be reached",
-        );
+        // On the code, not the prose — the message is customer copy and will
+        // change. It must also not carry the evaluator's URL to the client.
+        const error = (await client
+          .evaluate(buildParams())
+          .catch((e: unknown) => e)) as EvaluatorExecutionError;
+        expect(error.code).toBe("evaluator_execution_error");
+        expect(JSON.stringify(error.meta ?? {})).not.toContain(endpoint);
       });
     });
 
