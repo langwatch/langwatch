@@ -4,6 +4,7 @@ import {
   AI_TOOL_ORIGIN_VALUE,
   CODING_AGENT_ORIGIN_VALUE,
   originForIngestSourceType,
+  PROVENANCE_ATTR_API_KEY_ID,
   stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
 } from "../ingestKeyProvenance.utils";
@@ -70,7 +71,7 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
       for (const rm of request.resourceMetrics) {
         const map = attrMap(rm.resource.attributes);
         expect(map["langwatch.source"]).toBe("claude_code");
-        expect(map["langwatch.api_key.id"]).toBe("key_abc");
+        expect(map[PROVENANCE_ATTR_API_KEY_ID]).toBe("key_abc");
         expect(map["langwatch.origin"]).toBe(CODING_AGENT_ORIGIN_VALUE);
         expect(map["langwatch.organization_id"]).toBe("org_1");
       }
@@ -99,7 +100,7 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
               attributes: [
                 { key: "langwatch.source", value: { stringValue: "spoofed" } },
                 {
-                  key: "langwatch.api_key.id",
+                  key: PROVENANCE_ATTR_API_KEY_ID,
                   value: { stringValue: "spoofed_key" },
                 },
                 { key: "langwatch.origin", value: { stringValue: "gateway" } },
@@ -111,7 +112,7 @@ describe("stampIngestKeyProvenanceOnMetricRequest", () => {
       stampIngestKeyProvenanceOnMetricRequest(request, PROVENANCE);
       const map = attrMap(request.resourceMetrics[0]!.resource.attributes);
       expect(map["langwatch.source"]).toBe("claude_code");
-      expect(map["langwatch.api_key.id"]).toBe("key_abc");
+      expect(map[PROVENANCE_ATTR_API_KEY_ID]).toBe("key_abc");
       expect(map["langwatch.origin"]).toBe(CODING_AGENT_ORIGIN_VALUE);
       // No duplicate keys remain after the strip-then-push.
       const sourceCount =

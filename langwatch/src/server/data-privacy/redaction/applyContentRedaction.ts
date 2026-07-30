@@ -91,24 +91,21 @@ export function redactStringNative({
 }
 
 /**
- * Attribute keys exempt from the sensitive-NAME deny-list. These are platform
- * attributes whose values are opaque row ids by construction, not key material:
- * `langwatch.api_key.id` is stamped by the OTLP receiver with the ingestion
- * key's id, overwriting anything a client sent under that name (see
- * ingestKeyProvenance.utils.ts). The value still runs through the normal
- * value-scan passes, so actual key material under this name is scrubbed by
- * shape regardless.
- */
-const NAME_DENYLIST_EXEMPT_KEYS: ReadonlySet<string> = new Set([
-  "langwatch.api_key.id",
-]);
-
-/**
  * Redact one attribute (key + value). When secrets redaction is on and the
  * attribute NAME is obviously sensitive (authorization, api_key, cookie, ...),
  * the whole value is replaced regardless of its shape — the Sentry-style
  * field-name deny-list. Otherwise the value runs through the normal native
  * passes (secrets value-scan + essential PII).
+ *
+ * There is deliberately no exemption list here. An earlier version exempted
+ * `langwatch.api_key.id` by name so the OTLP receiver's stamped ingestion-key
+ * id (see ingestKeyProvenance.utils.ts) would stay readable — but the receiver
+ * only overwrites that attribute for ingest-key traffic; an ordinary project
+ * API key can submit an arbitrary value under the exact same name, and a
+ * name-based exemption can't tell the two apart. The receiver now stamps the
+ * id under `langwatch.reserved.ingest_key_id` instead, a name the sensitive-key
+ * pattern never matches, so it needs no special case and `langwatch.api_key.id`
+ * itself stays fully covered by the deny-list for anything a client sends.
  */
 export function redactAttributeNative({
   key,
@@ -126,8 +123,7 @@ export function redactAttributeNative({
   if (
     policy.secrets.enabled &&
     value.length > 0 &&
-    isSensitiveAttributeKey(key) &&
-    !NAME_DENYLIST_EXEMPT_KEYS.has(key)
+    isSensitiveAttributeKey(key)
   ) {
     return { text: SECRETS_REDACTION_MARKER, redactedCount: 1 };
   }

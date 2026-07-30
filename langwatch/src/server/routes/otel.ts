@@ -369,9 +369,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
 
       // Receiver-authoritative provenance stamp for ingestion-key traces.
       // Overwrites any payload-supplied provenance keys (langwatch.source /
-      // langwatch.api_key.id / langwatch.origin / langwatch.organization_id
-      // / langwatch.template.id) — even a malicious upstream cannot forge a
-      // different source / key / org identity onto its own traces.
+      // langwatch.reserved.ingest_key_id / langwatch.origin /
+      // langwatch.organization_id / langwatch.template.id) — even a
+      // malicious upstream cannot forge a different source / key / org
+      // identity onto its own traces.
       if (resolved.type === "apiKey" && resolved.ingestSourceType) {
         // Whether this tool's direct-OTLP usage is bundled (non-billed per
         // token). Cached per (org, sourceType); drives the trace summary's

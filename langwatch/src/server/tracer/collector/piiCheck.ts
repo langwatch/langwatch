@@ -410,10 +410,20 @@ export type PIICheckOptions = {
   entities?: readonly string[];
   /**
    * The policy's do-not-redact exception patterns (raw source strings). Only
-   * the Google DLP path can honor them (its findings carry the matched text);
-   * the Presidio path returns pre-anonymized text, which is why a policy with
-   * exceptions scopes the Presidio call to name/location entities instead
-   * (see lambdaAfterNative in span-pii-redaction.service.ts).
+   * `defaultBatchClearPII`'s google_dlp branch actually reads this: DLP
+   * findings carry the matched text, so a finding fully covered by an
+   * exception can be vetoed before masking (see maskDlpFindings above).
+   * `mainMethod: "presidio"` — the one every strict/custom analysis-service
+   * call currently uses — ignores this field entirely: Presidio's batch
+   * endpoint returns pre-anonymized text with no positions or matched text to
+   * veto against. This is why a resolved policy with exceptions narrows the
+   * Presidio call to just the strict-only entities (names, locations) instead
+   * of trying to pass exceptions through it (see lambdaAfterNative in
+   * span-pii-redaction.service.ts) — narrowing shrinks WHICH entities are
+   * exposed to the gap, it does not close it. A name/location match is never
+   * protected by an exception; only entities the native pass handles are
+   * (locked in by span-pii-redaction.nativeScopedPolicy.test.ts's
+   * "strict-only exception scoping" tests).
    */
   exceptPatterns?: readonly string[];
 };

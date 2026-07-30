@@ -326,6 +326,123 @@ export function subtractProtectedRanges(
 }
 
 /**
+ * Whether a raw recognizer match survives its own recognizer's rules: the
+ * checksum/format validator (if any) and the nearby-context-word requirement
+ * (if any). Does not apply the exception veto — that is shared across
+ * recognizer types, see `excepted` in `collectCandidateSpans`.
+ */
+function isValidRecognizerMatch({
+  recognizer,
+  raw,
+  span,
+  text,
+}: {
+  recognizer: Recognizer;
+  raw: string;
+  span: Span;
+  text: string;
+}): boolean {
+  if (recognizer.validate && !recognizer.validate(raw)) return false;
+  if (
+    recognizer.contextRequired &&
+    !hasContextWord(text, span, recognizer.contextWords ?? [])
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * One regex match reduced to a kept span, or null when the validator, the
+ * context gate, or the exception veto rules it out. Split out of
+ * `collectRecognizerSpans` so its loop body is a single call, not three
+ * nested conditionals per match.
+ */
+function recognizedSpanFor({
+  recognizer,
+  match,
+  text,
+  excepted,
+}: {
+  recognizer: Recognizer;
+  match: RegExpMatchArray;
+  text: string;
+  excepted: (span: Span) => boolean;
+}): Span | null {
+  const raw = match[0];
+  const start = match.index ?? 0;
+  const span: Span = {
+    start,
+    end: start + raw.length,
+    entity: recognizer.entity,
+  };
+  if (!isValidRecognizerMatch({ recognizer, raw, span, text })) return null;
+  if (excepted(span)) return null;
+  return span;
+}
+
+/**
+ * Regex/checksum recognizer pass: every `RECOGNIZERS` entry allowed by
+ * `allowed`, reduced match-by-match via `recognizedSpanFor`. Split out of
+ * `collectCandidateSpans` so each pass stays independently under the
+ * cognitive-complexity budget.
+ */
+function collectRecognizerSpans({
+  text,
+  allowed,
+  excepted,
+}: {
+  text: string;
+  allowed: ReadonlySet<string> | null;
+  excepted: (span: Span) => boolean;
+}): Span[] {
+  const spans: Span[] = [];
+  for (const recognizer of RECOGNIZERS) {
+    if (allowed && !allowed.has(recognizer.entity)) continue;
+    for (const match of text.matchAll(recognizer.regex)) {
+      const span = recognizedSpanFor({ recognizer, match, text, excepted });
+      if (span) spans.push(span);
+    }
+  }
+  return spans;
+}
+
+/**
+ * Phone-number pass via libphonenumber-js, with the same exception veto as
+ * the regex recognizers. Kept separate from `collectRecognizerSpans`: it is a
+ * different library and match shape (`startsAt`/`endsAt`, not a regex match),
+ * not a different set of rules.
+ */
+function collectPhoneSpans({
+  text,
+  allowed,
+  excepted,
+}: {
+  text: string;
+  allowed: ReadonlySet<string> | null;
+  excepted: (span: Span) => boolean;
+}): Span[] {
+  if (allowed && !allowed.has("PHONE_NUMBER")) return [];
+  const spans: Span[] = [];
+  try {
+    for (const phone of findPhoneNumbersInText(text, {
+      defaultCountry: "US",
+    })) {
+      const span: Span = {
+        start: phone.startsAt,
+        end: phone.endsAt,
+        entity: "PHONE_NUMBER",
+      };
+      if (excepted(span)) continue;
+      spans.push(span);
+    }
+  } catch {
+    // Defensive: never let phone parsing break ingestion.
+  }
+  return spans;
+}
+
+/**
  * Collect every candidate PII span in `text`: the regex/checksum recognizers
  * (respecting `allowed`) plus the phone detector, running each candidate
  * through its validator/context gate and the exception veto. Vetoed spans are
@@ -352,49 +469,10 @@ function collectCandidateSpans({
     return veto;
   };
 
-  const spans: Span[] = [];
-
-  for (const recognizer of RECOGNIZERS) {
-    if (allowed && !allowed.has(recognizer.entity)) continue;
-    for (const match of text.matchAll(recognizer.regex)) {
-      const raw = match[0];
-      const start = match.index ?? 0;
-      const span: Span = {
-        start,
-        end: start + raw.length,
-        entity: recognizer.entity,
-      };
-      if (recognizer.validate && !recognizer.validate(raw)) continue;
-      if (
-        recognizer.contextRequired &&
-        !hasContextWord(text, span, recognizer.contextWords ?? [])
-      ) {
-        continue;
-      }
-      if (excepted(span)) continue;
-      spans.push(span);
-    }
-  }
-
-  if (!allowed || allowed.has("PHONE_NUMBER")) {
-    try {
-      for (const phone of findPhoneNumbersInText(text, {
-        defaultCountry: "US",
-      })) {
-        const span: Span = {
-          start: phone.startsAt,
-          end: phone.endsAt,
-          entity: "PHONE_NUMBER",
-        };
-        if (excepted(span)) continue;
-        spans.push(span);
-      }
-    } catch {
-      // Defensive: never let phone parsing break ingestion.
-    }
-  }
-
-  return spans;
+  return [
+    ...collectRecognizerSpans({ text, allowed, excepted }),
+    ...collectPhoneSpans({ text, allowed, excepted }),
+  ];
 }
 
 /**

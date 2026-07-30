@@ -23,8 +23,20 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: vi.fn(async () => false) },
 }));
 
+// Mocked only for the strict-only-entities exception-scoping tests below,
+// which need the REAL defaultBatchClearPII wiring (mainMethod selection,
+// entity narrowing) rather than the batchClearPII-level mock the rest of this
+// file uses — batchPresidioClearPII is the actual external call that
+// mainMethod: "presidio" reaches.
+vi.mock("~/server/tracer/collector/piiCheck", () => ({
+  batchPresidioClearPII: vi.fn(),
+  googleDLPClearPII: vi.fn(),
+  PRESIDIO_STRICT_ENTITIES: ["PERSON", "LOCATION", "EMAIL_ADDRESS"],
+}));
+
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { featureFlagService } from "~/server/featureFlag";
+import { batchPresidioClearPII } from "~/server/tracer/collector/piiCheck";
 
 const TENANT = createTenantId("project-web-app");
 
@@ -506,23 +518,45 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
 });
 
 describe("OtlpSpanPiiRedactionService ingestion key id attribute", () => {
-  /** @scenario The receiver-stamped ingestion key id stays readable */
+  /** @scenario The receiver-stamped ingestion key id stays readable under its reserved name */
   it("keeps the receiver-stamped key id readable", async () => {
     const { service } = makeService(mkPolicy({}));
-    const span = spanWith({ "langwatch.api_key.id": "key_abc123def456" });
+    const span = spanWith({
+      "langwatch.reserved.ingest_key_id": "key_abc123def456",
+    });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.api_key.id")).toBe("key_abc123def456");
+    expect(attr(span, "langwatch.reserved.ingest_key_id")).toBe(
+      "key_abc123def456",
+    );
   });
 
-  /** @scenario Real key material under the key id attribute name is still redacted */
+  /** @scenario Real key material under the reserved key id attribute is still redacted */
   it("scrubs actual key material under that attribute name", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({
-      "langwatch.api_key.id": "sk-lw-" + "a".repeat(40),
+      "langwatch.reserved.ingest_key_id": "sk-lw-" + "a".repeat(40),
     });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.api_key.id")).toContain("[SECRET]");
-    expect(attr(span, "langwatch.api_key.id")).not.toContain("sk-lw-");
+    expect(attr(span, "langwatch.reserved.ingest_key_id")).toContain(
+      "[SECRET]",
+    );
+    expect(attr(span, "langwatch.reserved.ingest_key_id")).not.toContain(
+      "sk-lw-",
+    );
+  });
+
+  /**
+   * @scenario A non-ingestion trace can never retain an arbitrary value under
+   * the old langwatch.api_key.id name. That name carries no receiver-stamped
+   * guarantee any more (only langwatch.reserved.ingest_key_id does), so it
+   * stays fully covered by the sensitive-name deny-list for anything a client
+   * sends, exactly like every other api_key-named attribute.
+   */
+  it("still nukes an arbitrary value under the old langwatch.api_key.id name", async () => {
+    const { service } = makeService(mkPolicy({}));
+    const span = spanWith({ "langwatch.api_key.id": "plain text value" });
+    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    expect(attr(span, "langwatch.api_key.id")).toBe("[SECRET]");
   });
 
   it("still nukes other api_key-named attributes by name", async () => {
@@ -530,5 +564,70 @@ describe("OtlpSpanPiiRedactionService ingestion key id attribute", () => {
     const span = spanWith({ "user.api_key": "plain text value" });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
     expect(attr(span, "user.api_key")).toBe("[SECRET]");
+  });
+});
+
+/**
+ * A resolved policy's PII exceptions are honored wherever the NATIVE pass
+ * runs (secrets, and every essential-level entity, including under strict —
+ * see the block above and applyContentRedaction.unit.test.ts). They are NOT
+ * honored for the strict-only entities (names, locations) that only the
+ * analysis-service batch can detect: buildOptions() always selects
+ * mainMethod: "presidio", and the Presidio batch call has no parameter for
+ * exceptions in the first place (it returns pre-anonymized text, not
+ * positioned findings a veto could apply to — unlike the Google DLP path,
+ * see maskDlpFindings in piiCheck.ts). This is a documented, tested contract,
+ * not a bug: the UI tooltip in data-privacy.tsx and the doc-comment on
+ * lambdaAfterNative both call it out.
+ */
+describe("OtlpSpanPiiRedactionService strict-only exception scoping", () => {
+  function makeServiceWithRealBatch(policy: ResolvedDataPrivacy) {
+    return new OtlpSpanPiiRedactionService({
+      isLangevalsConfigured: true,
+      isProduction: false,
+      dataPrivacyResolver: resolverFor(policy),
+    });
+  }
+
+  beforeEach(() => {
+    vi.mocked(batchPresidioClearPII).mockReset();
+  });
+
+  it("still redacts a name/location match even when it fully matches an exception", async () => {
+    vi.mocked(batchPresidioClearPII).mockResolvedValue(["[ANONYMIZED]"]);
+    const service = makeServiceWithRealBatch(
+      mkPolicy({
+        piiLevel: "strict",
+        piiExceptPatterns: ["Acme Support Bot"],
+      }),
+    );
+    const span = spanWith({ "conversation.text": "Acme Support Bot" });
+    await service.redactSpan(span, null, "STRICT", TENANT);
+
+    // The mock stands in for the real Presidio call: it always anonymizes,
+    // exactly like the production endpoint, because exceptPatterns never
+    // reaches it. The exception configured above does not save this value.
+    expect(attr(span, "conversation.text")).toBe("[ANONYMIZED]");
+    expect(batchPresidioClearPII).toHaveBeenCalledTimes(1);
+  });
+
+  it("still keeps a native essential-entity match under the same strict policy", async () => {
+    vi.mocked(batchPresidioClearPII).mockResolvedValue([null]);
+    const service = makeServiceWithRealBatch(
+      mkPolicy({
+        piiLevel: "strict",
+        piiExceptPatterns: ["00[0-9]{12}"],
+      }),
+    );
+    // A 14-digit string reads as a credit card to the native (essential)
+    // recognizer, which strict runs first and which DOES honor exceptions.
+    const span = spanWith({
+      "conversation.text": "reservation 00528000043000 confirmed",
+    });
+    await service.redactSpan(span, null, "STRICT", TENANT);
+
+    expect(attr(span, "conversation.text")).toBe(
+      "reservation 00528000043000 confirmed",
+    );
   });
 });

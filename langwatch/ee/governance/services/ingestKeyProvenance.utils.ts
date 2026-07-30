@@ -9,7 +9,11 @@
  * never forge a different source / key / org identity onto its own traces:
  *
  *   - langwatch.source         (ingestSourceType — drives the /me/traces filter)
- *   - langwatch.api_key.id      (the ingestion key id)
+ *   - langwatch.reserved.ingest_key_id (the ingestion key id — lives under the
+ *                               reserved namespace, not `langwatch.api_key.id`,
+ *                               so the redaction secret-name deny-list never
+ *                               has to special-case it; see
+ *                               applyContentRedaction.ts)
  *   - langwatch.origin          ("coding_agent" for a CLI coding assistant,
  *                               "ai_tool" for any other ingest source) —
  *                               discriminator the governance content-strip /
@@ -39,7 +43,8 @@ export interface IngestKeyProvenance {
 }
 
 export const PROVENANCE_ATTR_SOURCE = "langwatch.source" as const;
-export const PROVENANCE_ATTR_API_KEY_ID = "langwatch.api_key.id" as const;
+export const PROVENANCE_ATTR_API_KEY_ID =
+  "langwatch.reserved.ingest_key_id" as const;
 export const PROVENANCE_ATTR_ORIGIN = "langwatch.origin" as const;
 export const PROVENANCE_ATTR_ORGANIZATION_ID =
   "langwatch.organization_id" as const;

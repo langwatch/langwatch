@@ -292,6 +292,16 @@ export class OtlpSpanPiiRedactionService {
    * exceptions applied, and re-scanning those entities out-of-process would
    * re-redact the very values an exception kept (the service returns anonymized
    * text, so vetoes cannot be applied to its findings).
+   *
+   * Narrowing to name/location entities shrinks the blast radius, it does not
+   * close the gap: `exceptPatterns` still rides along on the returned options
+   * (buildOptions), but `mainMethod` is always "presidio" here, and the
+   * Presidio batch call has no way to honor them (see the doc-comment on
+   * PIICheckOptions.exceptPatterns in piiCheck.ts). A name or location value
+   * that fully matches an exception can still be redacted by this call. That
+   * is a deliberate, tested contract, not a bug — see
+   * span-pii-redaction.nativeScopedPolicy.test.ts's "strict-only exception
+   * scoping" tests and the tooltip in data-privacy.tsx.
    */
   private lambdaAfterNative(policy: ResolvedDataPrivacy): {
     entities?: readonly string[];

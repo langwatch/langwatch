@@ -1124,7 +1124,7 @@ export function PrivacyRuleDrawer({
                     )}
                     {piiExceptPatterns.length > 0 && (
                       <Tooltip
-                        content="A detected value that fully matches one of these regular expressions is kept as is. Use this for business identifiers that look like personal data, such as an internal reservation number detection reads as a card number."
+                        content="A detected value that fully matches one of these regular expressions is kept as is. Use this for business identifiers that look like personal data, such as an internal reservation number detection reads as a card number. Applies to Fast detection matches; Deep detection (names, locations) can still redact a value even if it matches an exception."
                         contentProps={{ maxWidth: "340px" }}
                       >
                         <Box color="fg.muted" display="inline-flex">

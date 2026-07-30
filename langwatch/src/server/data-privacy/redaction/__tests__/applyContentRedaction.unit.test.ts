@@ -99,9 +99,9 @@ describe("needsStrictAnalysis", () => {
 
 describe("redactAttributeNative", () => {
   describe("given the receiver-stamped ingestion key id attribute", () => {
-    it("keeps an opaque key id readable", () => {
+    it("keeps an opaque key id readable under its reserved name", () => {
       const { text } = redactAttributeNative({
-        key: "langwatch.api_key.id",
+        key: "langwatch.reserved.ingest_key_id",
         value: "key_abc123def456",
         policy: policy({}),
       });
@@ -110,12 +110,27 @@ describe("redactAttributeNative", () => {
 
     it("still scrubs actual key material under that name via the value rules", () => {
       const { text } = redactAttributeNative({
-        key: "langwatch.api_key.id",
+        key: "langwatch.reserved.ingest_key_id",
         value: "sk-lw-" + "a".repeat(40),
         policy: policy({}),
       });
       expect(text).toContain("[SECRET]");
       expect(text).not.toContain("sk-lw-");
+    });
+  });
+
+  describe("given a non-ingestion attribute claiming the old langwatch.api_key.id name", () => {
+    it("nukes an arbitrary value by name, since only the receiver-stamped reserved name is exempt", () => {
+      // A regular project API key (no ingestSourceType) never goes through
+      // the receiver's provenance stamp, so a client can put anything under
+      // this literal name. It must still be covered by the deny-list, not
+      // waved through by shape-based value scanning alone.
+      const { text } = redactAttributeNative({
+        key: "langwatch.api_key.id",
+        value: "not even a secret shape",
+        policy: policy({}),
+      });
+      expect(text).toBe("[SECRET]");
     });
   });
 
