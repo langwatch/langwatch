@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { formatTable } from "../../utils/formatting";
 import { createDatasetService } from "./service-factory";
@@ -21,7 +21,7 @@ export const recordsListCommand = async (
   slugOrId: string,
   options: { page?: string; limit?: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const page = options.page ? parseInt(options.page, 10) : 1;
   const limit = options.limit ? parseInt(options.limit, 10) : 20;

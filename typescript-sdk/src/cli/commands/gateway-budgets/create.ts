@@ -6,7 +6,7 @@ import {
   type CreateGatewayBudgetScope,
   GatewayBudgetsApiService,
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -56,7 +56,7 @@ function buildScope(options: CreateGatewayBudgetOptions): CreateGatewayBudgetSco
 export const createGatewayBudgetCommand = async (
   options: CreateGatewayBudgetOptions,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const upperWindow = options.window.toUpperCase() as BudgetWindow;
   if (!ALLOWED_WINDOWS.includes(upperWindow)) {

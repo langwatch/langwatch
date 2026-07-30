@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope, parseScopeArg, virtualKeyDetailUrl } from "./_shared";
 import type { CommandResult } from "../../utils/output";
@@ -28,7 +28,7 @@ export interface CreateVirtualKeyOptions {
 export const createVirtualKeyCommand = async (
   options: CreateVirtualKeyOptions,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!options.name) {
     console.error(chalk.red("Error: --name is required"));

@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -12,7 +12,7 @@ import type { CommandResult } from "../../utils/output";
 export const revokeVirtualKeyCommand = async (
   id: string,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new VirtualKeysApiService();
   const spinner = createSpinner(`Revoking virtual key "${id}"...`).start();

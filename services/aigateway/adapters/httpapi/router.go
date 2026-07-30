@@ -572,10 +572,19 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		models, err := deps.App.ListModels(r.Context(), bundle)
+		models, gaps, err := deps.App.ListModels(r.Context(), bundle)
 		if err != nil {
 			writeError(deps.Logger, w, r.Context(), err)
 			return
+		}
+
+		// Discovery gaps make an empty or partial list diagnosable from
+		// the response itself: a provider the key can dispatch to that
+		// contributed no models is named here with the reason, instead of
+		// silently reading as "no models". A header rather than a body
+		// field so the payload stays exactly the OpenAI list shape.
+		if len(gaps) > 0 {
+			w.Header().Set("X-Langwatch-Models-Discovery-Incomplete", formatDiscoveryGaps(gaps))
 		}
 
 		// OpenAI list shape: model-picker clients (OpenWebUI, LibreChat,
@@ -615,6 +624,17 @@ func modelOwnedBy(m domain.Model) string {
 		return "langwatch"
 	}
 	return string(m.ProviderID)
+}
+
+// formatDiscoveryGaps renders gaps as "provider:reason" tokens, comma
+// separated ("bedrock:not-enumerable,openai:probe-failed"). The adapter
+// returns them deduped and sorted, so the header is deterministic.
+func formatDiscoveryGaps(gaps []domain.ModelDiscoveryGap) string {
+	tokens := make([]string, 0, len(gaps))
+	for _, gap := range gaps {
+		tokens = append(tokens, string(gap.ProviderID)+":"+string(gap.Reason))
+	}
+	return strings.Join(tokens, ",")
 }
 
 func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (*domain.Bundle, bool) {
