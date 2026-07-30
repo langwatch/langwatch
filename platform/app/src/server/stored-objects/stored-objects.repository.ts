@@ -291,6 +291,7 @@ export class StoredObjectsRepository {
             SELECT project_id, id, max(inserted_at)
             FROM ${TABLE_NAME}
             WHERE project_id = {projectId:String}
+              AND id > {afterId:String}
             GROUP BY project_id, id
           )
         ORDER BY t.id

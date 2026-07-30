@@ -640,9 +640,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       "--set",
       "app.dataplane.provider=awsS3",
       "--set",
-      "app.dataplane.providers.awsS3.bucket.value=bucket",
-      "--set",
-      "app.dataplane.providers.awsS3.region=us-east-1",
+      "app.dataplane.bucket=bucket",
       "--set",
       "app.dataplane.legacyAzureRead=true",
       "--set",
@@ -664,12 +662,21 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     it("writes to S3 while keeping the Azure read settings", () => {
       const out = render(MIGRATION);
 
-      // The write toggle is what selects the backend; it must be gone.
-      expect(out).not.toContain("STORED_OBJECTS_BACKEND");
-      // ...but the connection settings the read path resolves must remain.
+      // The S3 WRITE configuration must render exactly as on a plain S3
+      // install — an earlier version of the chart dropped it whenever
+      // legacyAzureRead was set, so new writes silently fell back to local
+      // storage while the operator believed S3 was live.
+      expect(out).toContain("name: STORED_OBJECTS_BACKEND");
+      expect(out).toContain('value: "s3"');
+      expect(out).toContain("name: USE_S3_STORAGE");
+      expect(out).toContain("name: S3_BUCKET_NAME");
+      expect(out).toContain('value: "bucket"');
+      // ...and the connection settings the read path resolves must remain.
       expect(out).toContain("name: AZURE_BLOB_ACCOUNT_NAME");
       expect(out).toContain("name: AZURE_BLOB_CONTAINER");
       expect(out).toContain('value: "workloadIdentity"');
+      // The write toggle must never say azure here.
+      expect(out).not.toContain('value: "azure"');
     });
 
     /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
@@ -696,6 +703,56 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       expect(renderExpectingFailure(MIGRATION_WITHOUT_SERVICE_ACCOUNT)).toMatch(
         /ServiceAccount to bind to/,
       );
+    });
+  });
+
+  describe("given a legacy read flag contradicting the active provider", () => {
+    /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
+    it("rejects legacyAzureRead while azureBlob is already active", () => {
+      expect(
+        renderExpectingFailure([
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=azureBlob",
+          "--set",
+          "app.dataplane.providers.azureBlob.accountName.value=acct",
+          "--set",
+          "app.dataplane.providers.azureBlob.accountKey.value=key",
+          "--set",
+          "app.dataplane.providers.azureBlob.container.value=cont",
+          "--set",
+          "app.dataplane.legacyAzureRead=true",
+        ]),
+      ).toMatch(/legacyAzureRead is set but azureBlob is already the active provider/);
+    });
+
+    /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
+    it("rejects legacyS3ReadBucket while awsS3 is already active", () => {
+      expect(
+        renderExpectingFailure([
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=awsS3",
+          "--set",
+          "app.dataplane.legacyS3ReadBucket=old-bucket",
+        ]),
+      ).toMatch(/legacyS3ReadBucket is set but awsS3 is already the active provider/);
+    });
+
+    /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
+    it("rejects an awsS3 install whose bucket is empty", () => {
+      expect(
+        renderExpectingFailure([
+          "--set",
+          "app.dataplane.enabled=true",
+          "--set",
+          "app.dataplane.provider=awsS3",
+          "--set",
+          "app.dataplane.bucket=",
+        ]),
+      ).toMatch(/app\.dataplane\.bucket is empty/);
     });
   });
 

@@ -187,9 +187,11 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
       const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
       expect(values).toContain("legacyS3ReadBucket");
-      // Emitted from inside the azureBlob branch, gated on the opt-in value.
+      // Emitted when azureBlob is the ACTIVE provider AND the opt-in value is
+      // set — the double gate is what prevents a duplicate S3_BUCKET_NAME
+      // when S3 is active (its own write block already emits one).
       expect(helpers).toMatch(
-        /if \.Values\.app\.dataplane\.legacyS3ReadBucket[\s\S]*?S3_BUCKET_NAME/,
+        /if and \(eq \.Values\.app\.dataplane\.provider "azureBlob"\) \.Values\.app\.dataplane\.legacyS3ReadBucket[\s\S]*?S3_BUCKET_NAME/,
       );
     });
   });

@@ -443,10 +443,23 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Given the active provider is awsS3 with legacy Azure reads kept enabled
     And the Azure auth mode is workloadIdentity
     When the chart renders
-    Then no stored-objects backend toggle selects Azure for writes
+    Then the S3 write configuration renders exactly as on a plain S3 install
+    And no stored-objects backend toggle selects Azure for writes
     And the Azure connection settings are still emitted for reads
     And the app and workers pods still carry the workload-identity webhook label
     And the cron pods still do not carry it
+
+  # Each legacy read flag belongs to one migration direction. Set alongside
+  # the provider it migrates away from it configures nothing — the chart
+  # rejects the contradiction instead of rendering a silent no-op. An awsS3
+  # install with an empty bucket is rejected for the same reason: it would
+  # render S3_BUCKET_NAME blank and every write would fall back to local
+  # storage while the operator believes S3 is live.
+  @integration
+  Scenario: The chart rejects a legacy read flag aimed at the active provider
+    Given a chart configuration whose legacy read flag targets the provider that is already active
+    When the chart renders
+    Then rendering fails naming the contradictory flag
 
   @integration
   Scenario: Installs that do not use Azure render exactly as they did before

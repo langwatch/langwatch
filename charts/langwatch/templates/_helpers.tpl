@@ -242,7 +242,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if not (has .Values.app.dataplane.provider (list "awsS3" "azureBlob")) }}
     {{- $errors = append $errors (printf "app.dataplane.provider is %q — must be one of awsS3, azureBlob" .Values.app.dataplane.provider) }}
   {{- end }}
+  {{/* Each legacy read flag belongs to exactly one migration direction. Set
+       alongside the provider it "migrates away from", it is a no-op the
+       operator almost certainly did not intend — reject rather than ignore. */}}
+  {{- if and (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyAzureRead }}
+    {{- $errors = append $errors "app.dataplane.legacyAzureRead is set but azureBlob is already the active provider — the flag is for keeping Azure reads alive AFTER moving writes to S3 (provider awsS3). Remove it." }}
+  {{- end }}
+  {{- if and (eq .Values.app.dataplane.provider "awsS3") .Values.app.dataplane.legacyS3ReadBucket }}
+    {{- $errors = append $errors "app.dataplane.legacyS3ReadBucket is set but awsS3 is already the active provider — the flag is for keeping S3 reads alive AFTER moving writes to Azure (provider azureBlob). Remove it." }}
+  {{- end }}
   {{- if eq .Values.app.dataplane.provider "awsS3" }}
+    {{- if empty .Values.app.dataplane.bucket }}
+      {{- $errors = append $errors "app.dataplane.provider is awsS3 but app.dataplane.bucket is empty — S3_BUCKET_NAME would render blank and every write would fall back to local storage" }}
+    {{- end }}
     {{- if .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.name }}
       {{- if empty .Values.app.dataplane.providers.awsS3.endpoint.secretKeyRef.key }}
         {{- $errors = append $errors "app.dataplane.providers.awsS3.endpoint.secretKeyRef.name is set but key is empty" }}
@@ -875,8 +887,29 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # why the connection settings below can outlive it (see legacyAzureRead).
 - name: STORED_OBJECTS_BACKEND
   value: "azure"
+{{- else }}
+- name: STORED_OBJECTS_BACKEND
+  value: "s3"
+- name: USE_S3_STORAGE
+  value: "true"
+# Emit S3_BUCKET_NAME — the app/server reads this name across all
+# storage code paths (storage.ts, stored-objects.service.ts,
+# env-create.mjs). The legacy `S3_BUCKET` env was a no-op for every
+# vanilla helm install because nothing read it; emitting it was a
+# silent bug that this fix resolves by aligning on S3_BUCKET_NAME.
+- name: S3_BUCKET_NAME
+  value: {{ .Values.app.dataplane.bucket | quote }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
+{{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
 {{- end }}
-{{/* Azure connection settings are emitted when Azure is the active write
+{{/* The active provider's WRITE configuration above never depends on the
+     legacy read flags below — an Azure->S3 migration must configure S3
+     writes exactly like a plain S3 install, or new writes silently fall
+     back to local storage while the operator believes S3 is live.
+
+     Azure connection settings are emitted when Azure is the active write
      backend OR when legacyAzureRead is set for an Azure->S3 migration. The
      app's driver registration resolves these for READS independently of the
      write toggle, so keeping them after the switch is what lets already
@@ -899,7 +932,12 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if or .Values.app.dataplane.providers.azureBlob.tokenAudience.value .Values.app.dataplane.providers.azureBlob.tokenAudience.secretKeyRef.name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_TOKEN_AUDIENCE" "fieldValues" .Values.app.dataplane.providers.azureBlob.tokenAudience) }}
 {{- end }}
-{{- if .Values.app.dataplane.legacyS3ReadBucket }}
+{{- end }}
+{{/* Gated on azureBlob being ACTIVE, not just on the bucket being set: when
+     S3 is the active provider its write block above already emits
+     S3_BUCKET_NAME, and a second entry with a different value would be a
+     duplicate env var whose winner is undefined. */}}
+{{- if and (eq .Values.app.dataplane.provider "azureBlob") .Values.app.dataplane.legacyS3ReadBucket }}
 # Retains reads for persisted s3:// stored-object URIs and legacy consumers
 # that already carry an S3 bucket/key after writes switch to Azure. This does
 # not route provider-derived dataset chunks or GroupQueue durable payloads:
@@ -907,23 +945,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # greenfield Azure install.
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.legacyS3ReadBucket | quote }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
-{{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
-{{- end }}
-{{- else }}
-- name: STORED_OBJECTS_BACKEND
-  value: "s3"
-- name: USE_S3_STORAGE
-  value: "true"
-# Emit S3_BUCKET_NAME — the app/server reads this name across all
-# storage code paths (storage.ts, stored-objects.service.ts,
-# env-create.mjs). The legacy `S3_BUCKET` env was a no-op for every
-# vanilla helm install because nothing read it; emitting it was a
-# silent bug that this fix resolves by aligning on S3_BUCKET_NAME.
-- name: S3_BUCKET_NAME
-  value: {{ .Values.app.dataplane.bucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ACCESS_KEY_ID" "fieldValues" .Values.app.dataplane.providers.awsS3.accessKeyId) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_SECRET_ACCESS_KEY" "fieldValues" .Values.app.dataplane.providers.awsS3.secretAccessKey) }}
