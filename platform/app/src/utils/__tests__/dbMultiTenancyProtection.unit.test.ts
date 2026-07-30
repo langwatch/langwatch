@@ -838,6 +838,63 @@ describe("project-tenancy regime partition", () => {
  * `update({ where: { id } })` and blew up at runtime on the first share
  * resolve; these lock the real repository's query shapes in.
  */
+/**
+ * EphemeralAccount query shapes. Same shape as ShareLink below: an
+ * unauthenticated CLI presents only a claim token, and the row is what teaches
+ * it the projectId. The lookup blew up at runtime on the very first `/status`
+ * call — a 500 that CI could not see, because nothing exercised the mounted
+ * route. These lock the real repository's query shapes in.
+ */
+describe("guardProjectId — EphemeralAccount", () => {
+  describe("findUnique by claimTokenHash (the anonymous capability lookup)", () => {
+    it("does NOT throw — projectId cannot be known before the row is read", async () => {
+      await expect(
+        runGuard({
+          model: "EphemeralAccount",
+          action: "findUnique",
+          args: { where: { claimTokenHash: "hash_abc" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findUnique by id (the handoff, which already resolved a token)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "EphemeralAccount",
+          action: "findUnique",
+          args: { where: { id: "acct_1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("updateMany by id (the conditional claim)", () => {
+    it("does NOT throw — the claimedAt condition is what makes it safe", async () => {
+      await expect(
+        runGuard({
+          model: "EphemeralAccount",
+          action: "updateMany",
+          args: { where: { id: "acct_1", claimedAt: null }, data: {} },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findMany with no scope at all", () => {
+    it("throws — only the capability lookups are exempt", async () => {
+      await expect(
+        runGuard({
+          model: "EphemeralAccount",
+          action: "findMany",
+          args: {},
+        }),
+      ).rejects.toThrow();
+    });
+  });
+});
+
 describe("guardProjectId — ShareLink", () => {
   describe("findUnique by token (the anonymous capability lookup)", () => {
     it("does NOT throw — projectId cannot be known before the row is read", async () => {

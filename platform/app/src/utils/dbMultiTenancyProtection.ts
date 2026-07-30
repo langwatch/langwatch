@@ -713,6 +713,34 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     return;
   }
 
+  // Agent-onboarding claim resolution, the same shape as ShareLink above: an
+  // unauthenticated CLI presents only a claim token, and the projectId is what
+  // the row teaches it, so it cannot be required in the where. Only the hashed
+  // token (the capability path) and the internal id (the handoff, which
+  // already resolved a token to get one) are exempt — every other query on
+  // EphemeralAccount still carries projectId.
+  // See specs/ai-governance/agent-onboarding/.
+  if (
+    action === "findUnique" &&
+    model === "EphemeralAccount" &&
+    (typeof params.args?.where?.claimTokenHash === "string" ||
+      typeof params.args?.where?.id === "string")
+  ) {
+    return;
+  }
+
+  // Claiming flips the row for a caller who authenticated by claim token or
+  // browser session, not by project. The update is already narrowed to a
+  // single id, and its `claimedAt: null` condition is what makes the race
+  // safe — projectId would add nothing.
+  if (
+    action === "updateMany" &&
+    model === "EphemeralAccount" &&
+    typeof params.args?.where?.id === "string"
+  ) {
+    return;
+  }
+
   // Gateway auth resolver: findByHashedSecret is the hot-path lookup
   // that converts an opaque `vk-lw-*` bearer token into a
   // VirtualKey row. The hashedSecret itself is a cryptographic

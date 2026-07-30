@@ -6,7 +6,6 @@ import {
   type BaseApp,
   createErrorHandler,
   createService,
-  routeHandlers,
   type VersionBuilder,
 } from "@langwatch/api";
 import {
@@ -226,5 +225,3 @@ function requireUserId(c: Context): string {
   if (userId === null) throw new ClaimRequiresIdentityError();
   return userId;
 }
-
-export const { GET, POST, PUT, PATCH, DELETE } = routeHandlers(app);

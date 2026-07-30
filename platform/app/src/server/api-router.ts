@@ -8,6 +8,7 @@ import { app as webhooksApp } from "@ee/scim/webhooks";
 import { type Context, Hono } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { app as adminApp } from "../../ee/admin/routes/admin";
+import { app as agentOnboardingApp } from "../app/api/agent-onboarding/[[...route]]/app";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
 import { app as apiKeysApp } from "../app/api/api-keys/[[...route]]/app";
@@ -109,6 +110,10 @@ export function createApiRouter() {
   api.route("/", workflowsApp); // /api/workflows/code-completion, /post_event
   api.route("/", healthChecksApp); // /api/health/collector, /evaluations, etc.
 
+  // Anonymous: `/provision` and the claim endpoints authenticate on a claim
+  // token or a PKCE verifier, not a session, so the app carries its own
+  // per-endpoint auth rather than sitting behind a namespace guard.
+  api.route("/", agentOnboardingApp);
   api.route("/", agentsApp);
   api.route("/", analyticsApp);
   api.route("/", copilotKitApp);
