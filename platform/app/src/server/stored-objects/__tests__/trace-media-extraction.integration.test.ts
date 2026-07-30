@@ -29,6 +29,8 @@ import {
   it,
   vi,
 } from "vitest";
+import type { OtlpSpan } from "~/server/app-layer/traces/ingest/otlp";
+import type { RecordSpanCommandData } from "~/server/app-layer/traces/ingest/recordSpanCommand";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { wrapRawPcmToWav } from "~/shared/audio/pcmToWav";
 import {
@@ -42,8 +44,6 @@ import {
 } from "../../app-layer/traces/edge-media-extraction";
 import { maybeSpool } from "../../app-layer/traces/edge-spool";
 import { COMMAND_INLINE_THRESHOLD } from "../../app-layer/traces/lean-for-projection";
-import type { RecordSpanCommandData } from "~/server/app-layer/traces/ingest/recordSpanCommand";
-import type { OtlpSpan } from "~/server/app-layer/traces/ingest/otlp";
 import { extractInlineMediaFromEvent } from "../content-extractor";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";

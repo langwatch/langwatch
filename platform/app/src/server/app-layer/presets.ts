@@ -934,10 +934,14 @@ export function initializeDefaultApp(options?: {
       ports: {
         // The tenant rides on the handler context now, not the intent payload.
         runClusteringPage: async ({ searchAfter, runId, page }, ctx) => {
-          await clusterTopicsForProject(ctx.tenantId, searchAfter ?? undefined, {
-            runId,
-            page,
-          });
+          await clusterTopicsForProject(
+            ctx.tenantId,
+            searchAfter ?? undefined,
+            {
+              runId,
+              page,
+            },
+          );
         },
       },
     },

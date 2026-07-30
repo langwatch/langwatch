@@ -29,9 +29,9 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
+import type { TraceAnalyticsRow } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TraceAnalyticsRow } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { TRACE_ANALYTICS_STATE_VERSION } from "~/server/event-sourcing/trace-processing/traceAnalytics.projection";
 import {
   startTestContainers,

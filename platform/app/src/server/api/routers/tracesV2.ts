@@ -1407,13 +1407,15 @@ export const tracesV2Router = createTRPCRouter({
         );
       }
 
-      await getApp().traces.changeTraceName({
-        tenantId: input.projectId,
-        traceId: input.traceId,
-        newName: parsed.data.newName,
-        changedByUserId: ctx.session.user.id,
-        occurredAt: Date.now(),
-      });
+      await getApp().traces.changeTraceName(
+        {
+          traceId: input.traceId,
+          newName: parsed.data.newName,
+          changedByUserId: ctx.session.user.id,
+          occurredAt: Date.now(),
+        },
+        { tenantId: input.projectId },
+      );
 
       return { traceId: input.traceId, newName: parsed.data.newName };
     }),

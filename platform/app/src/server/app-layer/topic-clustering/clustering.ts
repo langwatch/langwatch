@@ -790,7 +790,6 @@ export const storeResults = async (
     });
     await getApp().topicClustering.recordTopics(
       {
-        tenantId: projectId,
         occurredAt: Date.now(),
         mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
         source: "clustering",
@@ -836,7 +835,6 @@ export const storeResults = async (
         tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
           app.traces.assignTopic(
             {
-              tenantId: projectId,
               traceId: trace_id,
               topicId: topic_id,
               topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,

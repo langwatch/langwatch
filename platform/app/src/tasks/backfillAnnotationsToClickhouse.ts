@@ -46,7 +46,6 @@ export default async function execute() {
       try {
         await app.traces.bulkSyncAnnotations(
           {
-            tenantId: projectId,
             traceId,
             annotationIds,
             occurredAt: Date.now(),

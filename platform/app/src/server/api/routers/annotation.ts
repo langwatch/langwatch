@@ -159,12 +159,14 @@ export const annotationRouter = createTRPCRouter({
       // can reconcile any missed syncs.
       try {
         const app = getApp();
-        await app.traces.addAnnotation({
-          tenantId: input.projectId,
-          traceId: input.traceId,
-          annotationId: createdAnnotation.id,
-          occurredAt: Date.now(),
-        });
+        await app.traces.addAnnotation(
+          {
+            traceId: input.traceId,
+            annotationId: createdAnnotation.id,
+            occurredAt: Date.now(),
+          },
+          { tenantId: input.projectId },
+        );
       } catch (error) {
         logger.error(
           { error, traceId: input.traceId, projectId: input.projectId },
@@ -288,12 +290,14 @@ export const annotationRouter = createTRPCRouter({
       // Best-effort ClickHouse sync (see create mutation comment above).
       try {
         const app = getApp();
-        await app.traces.removeAnnotation({
-          tenantId: input.projectId,
-          traceId: deletedAnnotation.traceId,
-          annotationId: deletedAnnotation.id,
-          occurredAt: Date.now(),
-        });
+        await app.traces.removeAnnotation(
+          {
+            traceId: deletedAnnotation.traceId,
+            annotationId: deletedAnnotation.id,
+            occurredAt: Date.now(),
+          },
+          { tenantId: input.projectId },
+        );
       } catch (error) {
         logger.error(
           {

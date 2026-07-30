@@ -43,13 +43,13 @@ import {
   UNIQUE_TAIL,
 } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import {
-  EVENTREF_ATTR_PREFIX,
-  IO_PREVIEW_BYTES,
-} from "~/server/app-layer/traces/lean-for-projection";
-import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/app-layer/traces/ingest/constants";
+import {
+  EVENTREF_ATTR_PREFIX,
+  IO_PREVIEW_BYTES,
+} from "~/server/app-layer/traces/lean-for-projection";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import {
   startTestContainers,

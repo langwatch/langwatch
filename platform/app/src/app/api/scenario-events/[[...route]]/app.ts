@@ -319,60 +319,75 @@ async function dispatchSimulationEvent(
   };
 
   if (event.type === ScenarioEventType.RUN_STARTED) {
-    await getApp().simulations.startRun({
-      ...basePayload,
-      ...placement,
-      scenarioId: event.scenarioId,
-      name: event.metadata?.name,
-      description: event.metadata?.description,
-      metadata: event.metadata,
-    });
+    await getApp().simulations.startRun(
+      {
+        ...basePayload,
+        ...placement,
+        scenarioId: event.scenarioId,
+        name: event.metadata?.name,
+        description: event.metadata?.description,
+        metadata: event.metadata,
+      },
+      { tenantId: projectId },
+    );
   } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
     const messages = event.messages ?? [];
-    await getApp().simulations.messageSnapshot({
-      ...basePayload,
-      ...placement,
-      messages: messages as Array<{
-        trace_id?: string;
-        [key: string]: unknown;
-      }>,
-      traceIds: messages
-        .map((m: { trace_id?: string }) => m.trace_id)
-        .filter((id): id is string => typeof id === "string"),
-    });
+    await getApp().simulations.snapshotMessages(
+      {
+        ...basePayload,
+        ...placement,
+        messages: messages as Array<{
+          trace_id?: string;
+          [key: string]: unknown;
+        }>,
+        traceIds: messages
+          .map((m: { trace_id?: string }) => m.trace_id)
+          .filter((id): id is string => typeof id === "string"),
+      },
+      { tenantId: projectId },
+    );
   } else if (event.type === ScenarioEventType.TEXT_MESSAGE_START) {
-    await getApp().simulations.textMessageStart({
-      ...basePayload,
-      messageId: event.messageId,
-      role: event.role,
-      messageIndex: event.messageIndex,
-    });
+    await getApp().simulations.startTextMessage(
+      {
+        ...basePayload,
+        messageId: event.messageId,
+        role: event.role,
+        messageIndex: event.messageIndex,
+      },
+      { tenantId: projectId },
+    );
   } else if (event.type === ScenarioEventType.TEXT_MESSAGE_END) {
-    await getApp().simulations.textMessageEnd({
-      ...basePayload,
-      ...placement,
-      messageId: event.messageId,
-      role: event.role,
-      content: event.content ?? "",
-      message: event.message,
-      traceId: event.traceId,
-      messageIndex: event.messageIndex,
-    });
+    await getApp().simulations.endTextMessage(
+      {
+        ...basePayload,
+        ...placement,
+        messageId: event.messageId,
+        role: event.role,
+        content: event.content ?? "",
+        message: event.message,
+        traceId: event.traceId,
+        messageIndex: event.messageIndex,
+      },
+      { tenantId: projectId },
+    );
   } else if (event.type === ScenarioEventType.RUN_FINISHED) {
-    await getApp().simulations.finishRun({
-      ...basePayload,
-      ...placement,
-      results: event.results
-        ? {
-            verdict: event.results.verdict,
-            reasoning: event.results.reasoning,
-            metCriteria: event.results.metCriteria,
-            unmetCriteria: event.results.unmetCriteria,
-            error: event.results.error,
-          }
-        : undefined,
-      status: event.status,
-    });
+    await getApp().simulations.finishRun(
+      {
+        ...basePayload,
+        ...placement,
+        results: event.results
+          ? {
+              verdict: event.results.verdict,
+              reasoning: event.results.reasoning,
+              metCriteria: event.results.metCriteria,
+              unmetCriteria: event.results.unmetCriteria,
+              error: event.results.error,
+            }
+          : undefined,
+        status: event.status,
+      },
+      { tenantId: projectId },
+    );
   }
 }
 
@@ -422,16 +437,18 @@ export async function archiveScenarioSetRuns({
     concurrency: 8,
     fn: async (id) => {
       try {
-        await getApp().simulations.deleteRun({
-          tenantId: projectId,
-          scenarioRunId: id,
-          // The set is the whole subject of this request, so the archive push
-          // can say which set emptied. `batchRunId` is genuinely unknown here —
-          // a set spans many batches and the run-id lookup returns ids alone —
-          // so it stays absent rather than being guessed.
-          scenarioSetId,
-          occurredAt: now,
-        });
+        await getApp().simulations.deleteRun(
+          {
+            scenarioRunId: id,
+            // The set is the whole subject of this request, so the archive push
+            // can say which set emptied. `batchRunId` is genuinely unknown here —
+            // a set spans many batches and the run-id lookup returns ids alone —
+            // so it stays absent rather than being guessed.
+            scenarioSetId,
+            occurredAt: now,
+          },
+          { tenantId: projectId },
+        );
         archived++;
       } catch (err) {
         failed++;

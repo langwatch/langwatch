@@ -26,11 +26,11 @@ import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
-import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type {
   NormalizedAttributes,
   NormalizedSpan,
 } from "~/server/app-layer/traces/ingest/normalizedSpan";
+import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 import type {
   ResolvedTraceSpans,

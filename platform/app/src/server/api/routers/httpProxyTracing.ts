@@ -221,14 +221,17 @@ export async function createAgentTestTrace({
     expectedOutput: null,
   });
 
-  await getApp().traces.recordSpan({
-    tenantId: projectId,
-    span: CollectorSpanUtils.convertSpanToOtlp(span),
-    resource,
-    instrumentationScope: { name: "langwatch.agent_test" },
-    piiRedactionLevel,
-    occurredAt: now,
-  });
+  await getApp().traces.recordSpan(
+    {
+      tenantId: projectId,
+      span: CollectorSpanUtils.convertSpanToOtlp(span),
+      resource,
+      instrumentationScope: { name: "langwatch.agent_test" },
+      piiRedactionLevel,
+      occurredAt: now,
+    },
+    { tenantId: projectId },
+  );
 
   return { traceId };
 }
