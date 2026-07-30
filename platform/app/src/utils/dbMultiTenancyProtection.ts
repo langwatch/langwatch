@@ -39,6 +39,10 @@ const GLOBAL_MODELS = [
   "Session",
   "User",
   "VerificationToken",
+  // WebAuthn credentials. Scoped to a user, not a project — a passkey signs
+  // you in before any project is in scope, and its credential id is the
+  // platform-wide lookup an authenticator presents.
+  "Passkey",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",
