@@ -35,9 +35,12 @@ import { isAdmin } from "../isAdmin";
 import { ORGANIZATION_SAFE_SELECT, PROJECT_SAFE_SELECT } from "../safeSelects";
 
 const secured = createServiceApp({ basePath: "/api" });
-const adminAuth = handlerManagedAuth(
-  "super-admin session validated in-handler via isAdmin",
-);
+const adminAuth = handlerManagedAuth({
+  reason: "super-admin session validated in-handler via isAdmin",
+  // Gated by super-admin identity, not by an RBAC permission.
+  permissions: [],
+  credential: "session",
+});
 
 /**
  * The answer to "you are not an admin", which deliberately says nothing more.

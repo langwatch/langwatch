@@ -328,9 +328,13 @@ async function extractCostEventsForSource(input: {
 }
 
 const secured = createServiceApp({ basePath: "/api/ingest" });
-const ingestAuth = handlerManagedAuth(
-  "ingestion source bearer secret resolved in-handler via authIngestionSource",
-);
+const ingestAuth = handlerManagedAuth({
+  reason:
+    "ingestion source bearer secret resolved in-handler via authIngestionSource",
+  // Per-source bearer secret, not an RBAC permission.
+  permissions: [],
+  credential: "internal",
+});
 
 /**
  * Resolve `Authorization: Bearer <secret>` against IngestionSource.

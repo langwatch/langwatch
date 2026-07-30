@@ -50,6 +50,14 @@ const loggerMetrics = createLogger("langwatch:otel:v1:metrics");
 
 const AUTH_REASON = "OTLP ingestion API key resolved in-handler";
 
+// One policy for all three OTLP signals: traces, logs and metrics are the same
+// write to the same tenant, so they answer to the same permission.
+const otelIngestAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["traces:create"],
+  credential: "apiKey",
+});
+
 const secured = createServiceApp({ basePath: "/api/otel/v1" });
 
 // ── shared auth + limit check ────────────────────────────────────────
@@ -391,7 +399,7 @@ export function peekCustomerTraceIds(
 
 // ── POST /traces ─────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
+secured.access(otelIngestAuth).post("/traces", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.traces");
 
   return tracer.withActiveSpan(
@@ -512,7 +520,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
 
 // ── POST /logs ───────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
+secured.access(otelIngestAuth).post("/logs", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.logs");
 
   return tracer.withActiveSpan(
@@ -613,7 +621,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
 
 // ── POST /metrics ────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
+secured.access(otelIngestAuth).post("/metrics", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.metrics");
 
   return tracer.withActiveSpan(

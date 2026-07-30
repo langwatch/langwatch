@@ -81,6 +81,7 @@ function makeSlimRow(
     tenantId,
     traceId: `slim-trace-${generate("trace").toString()}`,
     version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+    hasSignal: true,
     occurredAtMs: bucketMs,
     createdAtMs: bucketMs,
     updatedAtMs: bucketMs,

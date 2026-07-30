@@ -28,9 +28,11 @@ const secured = createServiceApp({ basePath: "/api/dataset" });
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      permissions: ["datasets:manage"],
+      credential: "session",
+    }),
   )
   .post("/generate", async (c) => {
     const session = await getServerAuthSession({ req: c.req.raw as any });

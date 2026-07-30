@@ -36,6 +36,7 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
     tenantId,
     traceId: `${tag}-t`,
     version: "2026-06-20",
+    hasSignal: true,
     occurredAtMs: baseMs,
     createdAtMs: baseMs,
     updatedAtMs: baseMs,

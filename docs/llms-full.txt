@@ -2022,6 +2022,8 @@ Self-hosted: replace the base with your control plane's DNS.
 GET /virtual-keys
 ```
 
+Returns every key visible to your credential: keys scoped to your project, its team, or the whole organization.
+
 Response:
 
 ```json
@@ -2029,25 +2031,29 @@ Response:
   "data": [
     {
       "id": "vk_01HZX...",
+      "organization_id": "org_01HZ...",
       "name": "prod-key",
       "description": null,
-      "environment": "live",
-      "prefix": "vk-lw-01H",
-      "last_four": "NZ0Z",
-      "status": "ACTIVE",
+      "status": "active",
+      "purpose": "user",
+      "display_prefix": "vk-lw-01HZX9",
       "principal_user_id": null,
-      "project_id": "proj_01HZ...",
-      "organization_id": "org_01HZ...",
-      "provider_credential_ids": ["gpc_01HZ...", "gpc_01HZW..."],
-      "config": { /* model_aliases, cache, fallback, ... */ },
+      "trace_project_id": null,
+      "scopes": [{ "scope_type": "PROJECT", "scope_id": "proj_01HZ..." }],
+      "routing_policy_id": null,
+      "routing_mode": "NONE",
+      "config": { /* modelsAllowed, model_aliases, cache, fallback, ... */ },
+      "revision": "3",
       "created_at": "2026-04-10T12:00:00Z",
       "updated_at": "2026-04-18T18:21:00Z",
-      "revoked_at": null,
-      "last_used_at": "2026-04-18T21:03:12Z"
+      "last_used_at": "2026-04-18T21:03:12Z",
+      "revoked_at": null
     }
   ]
 }
 ```
+
+`purpose: "langy"` marks a product-managed key (auto-provisioned by LangWatch). Those rows appear in listings but refuse every mutation; filter on `purpose` when scripting bulk operations.
 
 ### Create
 
@@ -2055,18 +2061,25 @@ Response:
 POST /virtual-keys
 ```
 
-Body:
+Body (only `name` is required):
 
 ```json
 {
   "name": "ci-key",
   "description": "CI smoke tests",
-  "environment": "live",                         // or "test"
-  "principal_user_id": null,                     // optional
-  "provider_credential_ids": ["gpc_01HZ..."],    // required, min 1
-  "config": { /* optional partial config */ }
+  "principal_user_id": null,
+  "scopes": [{ "scope_type": "PROJECT", "scope_id": "proj_01HZ..." }],
+  "routing_mode": "NONE",
+  "routing_policy_id": null,
+  "budget": { "limit_usd": "25", "window": "MONTH", "on_breach": "BLOCK" },
+  "config": { "providersAllowed": ["mp_openai..."] }
 }
 ```
+
+- `scopes` defaults to the calling project. Team- and org-scoped keys need a scoped API key holding `virtualKeys:manage` at each requested scope; legacy project keys can only mint keys for their own project.
+- An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (requires `virtualKeys:manage` on that project; it is a destination, not a scope, and grants no access to the key), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.
+- `budget` creates a budget atomically with the key and manages exactly that row on later updates: the key can never exist without the cap you asked for. Windows: `DAY`, `WEEK`, `MONTH`.
+- `routing_mode` is one of `NONE` (default: no silent failover), `FALLBACK_ALL`, or `POLICY` (requires `routing_policy_id`).
 
 Response `201`:
 
@@ -2087,6 +2100,27 @@ GET /virtual-keys/:id
 
 Response: `{ "virtual_key": {...} }`. No secret.
 
+### Spend
+
+```
+GET /virtual-keys/:id/spend?from=2026-07-01T00:00:00Z&to=2026-07-15T00:00:00Z
+```
+
+Requires `gatewayUsage:view`. Both window params are optional; the default window is the current UTC calendar month. Reads the same cost path (`trace_summaries`) the dashboard reads, so this number and the UI agree by construction.
+
+Response:
+
+```json
+{
+  "virtual_key_id": "vk_01HZX...",
+  "spent_usd": "12.4531",
+  "requests": 1841,
+  "window": { "from": "2026-07-01T00:00:00.000Z", "to": "2026-07-15T00:00:00.000Z" }
+}
+```
+
+On deployments without a ClickHouse spend source the endpoint answers `412` with `error.code = "spend_source_unavailable"` rather than a `$0.00` that cannot be told apart from a zero-spend key.
+
 ### Update
 
 ```
@@ -2095,14 +2129,17 @@ PATCH /virtual-keys/:id
 
 Body (all fields optional):
 
-```json
+```jsonc
 {
   "name": "new-name",
-  "description": null,                         // null clears
-  "provider_credential_ids": ["gpc_...", "..."],
+  "scopes": [{ "scope_type": "TEAM", "scope_id": "team_..." }],
+  "routing_mode": "FALLBACK_ALL",
+  "budget": { "limit_usd": "50", "window": "MONTH" },
   "config": { /* partial, merges with existing */ }
 }
 ```
+
+`scopes` replaces the whole visibility set and requires `virtualKeys:manage` at every NEW scope. `budget: null` archives the key's own cap (spend history is retained); omitting `budget` leaves it alone.
 
 ### Rotate
 
@@ -2112,14 +2149,14 @@ POST /virtual-keys/:id/rotate
 
 Response `200`:
 
-```json
+```jsonc
 {
   "virtual_key": { /* ... */ },
   "secret": "vk-lw-NEW..."
 }
 ```
 
-The previous secret stops authenticating immediately (modulo ~60 s of gateway L1 cache TTL).
+The previous secret keeps authenticating for a 24 h grace window so in-flight clients can roll over.
 
 ### Revoke
 
@@ -2127,7 +2164,7 @@ The previous secret stops authenticating immediately (modulo ~60 s of gateway L1
 POST /virtual-keys/:id/revoke
 ```
 
-Idempotent: revoking an already-revoked VK returns `200` with the same status.
+Idempotent: revoking an already-revoked VK returns `200` with the same status. Revocation also archives the key's own budgets.
 
 ## Budgets
 
@@ -2135,9 +2172,43 @@ Idempotent: revoking an already-revoked VK returns `200` with the same status.
 
 ```
 GET /budgets
+GET /budgets?scope_type=VIRTUAL_KEY,PRINCIPAL
 ```
 
-Response: `{ "data": [{...}, ...] }`. Each entry has `limit_usd` and `spent_usd` as strings (decimal precision preserved).
+Returns every non-archived budget in your organization across all six scope types (`ORGANIZATION`, `TEAM`, `PROJECT`, `VIRTUAL_KEY`, `PRINCIPAL`, `GROUP`), with live `spent_usd` from the spend ledger. `scope_type` is an optional comma-separated filter.
+
+Response:
+
+```json
+{
+  "spend_available": true,
+  "data": [
+    {
+      "id": "bgt_01HZ...",
+      "organization_id": "org_01HZ...",
+      "scope_type": "VIRTUAL_KEY",
+      "scope_id": "vk_01HZX...",
+      "name": "customer-acme cap",
+      "description": null,
+      "window": "MONTH",
+      "on_breach": "BLOCK",
+      "limit_usd": "25",
+      "spent_usd": "12.4531",
+      "timezone": null,
+      "provider_key": null,
+      "current_period_started_at": "2026-07-01T00:00:00.000Z",
+      "resets_at": "2026-08-01T00:00:00.000Z",
+      "last_reset_at": null,
+      "archived_at": null,
+      "created_at": "2026-06-12T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+- `spend_available: false` means spend could not be totalled server-side; do not read `spent_usd` as real spend in that case.
+- `GROUP` rows are per-member allowances: `limit_usd` is what EACH member may spend, `spent_usd` is the group's summed spend, and `member_count` says how many members the allowance currently covers.
+- `provider_key` names the ModelProvider the budget is pinned to; `null` counts every provider.
 
 ### Create
 
@@ -2147,20 +2218,25 @@ POST /budgets
 
 Body:
 
-```json
+```jsonc
 {
   "scope": {
-    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL
-    "project_id": "proj_..."   // the id field depends on scope.kind
+    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL, GROUP
+    "project_id": "proj_..."   // the id field depends on scope.kind:
+                               // organization_id | team_id | project_id |
+                               // virtual_key_id | principal_user_id | group_id
   },
   "name": "project-monthly-cap",
   "description": "Standard monthly envelope",
   "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL
   "limit_usd": 5000,           // or "5000.00"
   "on_breach": "BLOCK",        // or WARN
-  "timezone": "Europe/Amsterdam"
+  "timezone": "Europe/Amsterdam",
+  "provider_key": null         // optional ModelProvider id to pin the budget to one provider
 }
 ```
+
+`GROUP` budgets track spend per member, which requires the ClickHouse spend ledger; deployments without it answer `400` with `error.code = "group_budget_requires_clickhouse"`.
 
 ### Update
 
@@ -2168,7 +2244,7 @@ Body:
 PATCH /budgets/:id
 ```
 
-Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`.
+Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`. Scope and window are immutable after create.
 
 ### Archive
 
@@ -2176,76 +2252,11 @@ Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`.
 DELETE /budgets/:id
 ```
 
-Soft archive: preserves ledger history, stops enforcement on new requests.
+Soft archive: preserves ledger history, stops enforcement on new requests. Returns the archived row with `archived_at` set.
 
 ## Provider bindings
 
-### List
-
-```
-GET /providers
-```
-
-Response:
-
-```json
-{
-  "data": [
-    {
-      "id": "gpc_01HZ...",
-      "model_provider_id": "mp_openai",
-      "model_provider_name": "openai",
-      "slot": "primary",
-      "rate_limit_rpm": 10000,
-      "rate_limit_tpm": 1000000,
-      "rate_limit_rpd": null,
-      "rotation_policy": "manual",
-      "fallback_priority_global": 10,
-      "health_status": "healthy",
-      "disabled_at": null,
-      "created_at": "2026-04-10T12:00:00Z"
-    }
-  ]
-}
-```
-
-### Create
-
-```
-POST /providers
-```
-
-Body:
-
-```json
-{
-  "model_provider_id": "mp_openai",   // the existing provider row id
-  "slot": "primary",                  // free-text
-  "rate_limit_rpm": 10000,
-  "rate_limit_tpm": 1000000,
-  "rate_limit_rpd": null,
-  "rotation_policy": "manual",        // v1 accepts "manual" only; auto + external_secret_store are v1.1
-  "extra_headers": null,
-  "provider_config": null,
-  "fallback_priority_global": 10
-}
-```
-
-Response `201`: `{ "provider_credential": { "id": "gpc_01HZ..." } }`.
-
-### Update
-
-```
-PATCH /providers/:id
-```
-
-### Disable
-
-```
-DELETE /providers/:id
-```
-
-Soft disable: existing VKs bound to this credential continue to resolve; new VK creation rejects this credential.
+The `/providers` routes are **gone** (`410`). Gateway provider bindings were folded into the platform-wide ModelProvider in iteration 110: configure credentials, rate limits, and fallback priority via `/api/gateway-platform/v1/model-providers` or the Advanced (Gateway) tab in the dashboard. Budgets reference providers by ModelProvider id (`provider_key`).
 
 ## Cache rules
 
@@ -2357,28 +2368,28 @@ All responses follow the OpenAI-compatible envelope:
 {
   "error": {
     "type": "bad_request",
-    "code": "validation_error",
-    "message": "provider_credential_ids must contain at least 1 element"
+    "code": "trace_project_required",
+    "message": "trace_project_required: an organization- or team-owned key needs a project for its traces and costs to land in..."
   }
 }
 ```
 
-See [API: Errors](/ai-gateway/api/errors) for the full type enum.
+`error.code` carries the machine code your integration can branch on (`validation_error`, `trace_project_required`, `routing_policy_required`, `scope_org_mismatch`, `group_budget_requires_clickhouse`, `spend_source_unavailable`, ...). See [API: Errors](/ai-gateway/api/errors) for the full type enum.
 
 Common management-side types:
 
 | HTTP | `type` | Meaning |
 |---|---|---|
-| 400 | `bad_request` | Validation, missing required field |
+| 400 | `bad_request` | Validation, missing required field, cross-org scope |
 | 401 | `unauthenticated` | Missing or invalid API token |
-| 403 | `permission_denied` | Token lacks the required RBAC scope |
-| 404 | `not_found` | Resource doesn't exist or isn't visible in this project |
-| 409 | `conflict` | Name collision on create, stale update (optimistic concurrency) |
-| 422 | `validation_error` | Semantic error (e.g. `window=MINUTE` but `limit_usd=100000`, impossibly large per-minute cap) |
+| 403 | `permission_denied` | Token lacks the required RBAC permission (route ceiling or per-scope) |
+| 404 | `not_found` | Resource doesn't exist or isn't visible to this credential |
+| 410 | `gone` | Route folded away (the `/providers` bindings) |
+| 412 | `precondition_failed` | Deployment lacks a required capability (`spend_source_unavailable`) |
 
 ## Audit
 
-Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetKind`, `targetId`, `before`, `after`). Visible under **/settings/audit-log** with the Source = "Gateway" badge; filter by Target (`virtual_key`, `budget`, `provider_binding`, `cache_rule`) to scope. Writes via API tokens are attributed to the API token's resolved user. See [Audit log](/ai-gateway/audit) for the full schema, REST export path, and migration note from the v3.0 gateway-only table.
+Every write emits a row in the platform-wide `AuditLog` (gateway shape, `targetKind`, `targetId`, `before`, `after`). Visible under **/settings/audit-log** with the Source = "Gateway" badge; filter by Target (`virtual_key`, `budget`, `cache_rule`) to scope. Writes via scoped API keys are attributed to the key's owning user; legacy project keys carry no user, so their writes record the machine principal `svc_<projectId>`. See [Audit log](/ai-gateway/audit) for the full schema, REST export path, and migration note from the v3.0 gateway-only table.
 
 ## Rate limits
 
@@ -2386,13 +2397,11 @@ Management endpoints are rate-limited to 100 req/min/token. For bulk operations,
 
 ## Shared service layer
 
-Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `modelProviders.*`) call the same service classes on the server, `VirtualKeyService`, `GatewayBudgetService`, and the platform-wide ModelProvider service. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase). Behaviour is identical.
-
-This matters for testing: the BDD scenarios in `specs/ai-gateway/public-rest-api.feature` include a parity check that asserts the two surfaces return equivalent data for the same resource after case normalization. If you rely on a field in one, it's guaranteed to exist in the other.
+Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `gatewayUsage.*`) call the same service classes and pre-flight asserts on the server: `VirtualKeyService`, `GatewayBudgetService`, `GatewayUsageService`, and the scope-authorization helpers in `virtualKey.authz`. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase) and how the caller is identified (API credential vs browser session). Behaviour is identical, and the integration suite in `langwatch/src/app/api/gateway-platform/__tests__/` pins the refusals (`trace_project_required`, per-scope `permission_denied`, `group_budget_requires_clickhouse`, ...) so the two surfaces cannot drift apart again.
 
 ## OpenAPI
 
-All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas. The generated OpenAPI 3.1 spec is served at `/api/gateway/v1/openapi.json` and renders inside the platform's API-reference UI. The CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService` DTOs are hand-authored against the same schemas; a v1.1 improvement is to regenerate them from the OpenAPI output so drift fails at build time.
+All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas, which generate into the repository-wide OpenAPI 3.1 document (`docs/api-reference/openapiLangWatch.json`) rendered by the API-reference docs. The CLI's `VirtualKeysApiService` and `GatewayBudgetsApiService` DTOs are hand-authored against the same schemas; a future improvement is to regenerate them from the OpenAPI output so drift fails at build time.
 
 ## See also
 
@@ -5610,11 +5619,11 @@ Decide your scope granularity:
 
 | Model | VK per | Budget scope | Use case |
 |---|---|---|---|
-| **Per customer** | one VK per tenant | `principal` or `virtual_key` | Most SaaS apps, one account = one VK |
-| **Per seat** | one VK per user within tenant | `principal` | Per-seat billing, per-user rate limits |
+| **Per customer** | one VK per tenant | `virtual_key` | Most SaaS apps, one account = one VK |
+| **Per seat** | one VK per LangWatch user | `principal` | Internal platform teams where every seat is a real LangWatch user |
 | **Per team** | one VK per sub-org | `team`-scope budgets | Customers have their own teams/projects |
 
-For this walkthrough, assume **per-customer** model.
+For this walkthrough, assume **per-customer** model. Note that `principal` budgets target real LangWatch user accounts, which your external customers are not; for reseller tenancy the per-customer unit is the virtual key itself.
 
 ## Step 2: Configure the upstream ModelProvider once
 
@@ -5635,9 +5644,9 @@ langwatch model-providers list --format json | \
 # → mp_01HZX...
 ```
 
-## Step 3: Provision a VK when a customer signs up
+## Step 3: Provision a VK with its cap when a customer signs up
 
-Server-side code (Node.js example):
+One call mints the key AND its budget, atomically: the key can never exist for a moment without the cap you asked for. Server-side code (Node.js example):
 
 ```ts
 import { VirtualKeysApiService } from "langwatch";
@@ -5646,21 +5655,20 @@ const langwatch = new VirtualKeysApiService({
   apiKey: process.env.LANGWATCH_BACKEND_TOKEN,
 });
 
-export async function provisionCustomer(customerId: string) {
+export async function provisionCustomer(customerId: string, planLimitUsd: string) {
   const { virtual_key, secret } = await langwatch.create({
     name: `customer-${customerId}`,
-    environment: "live",
-    principal_user_id: customerId,          // audit attribution
-    scopes: [
-      { scope_type: "ORGANIZATION", scope_id: process.env.LANGWATCH_ORG_SLUG! },
-    ],
-    routing_policy_id: process.env.LANGWATCH_DEFAULT_ROUTING_POLICY_ID ?? null,
+    description: `Tenant key for ${customerId}`,
+    // scopes omitted: the key defaults to your backend token's project,
+    // which is exactly where you want the customer's traces to land.
+    budget: {
+      limit_usd: planLimitUsd, // from your plans table
+      window: "MONTH",
+      on_breach: "BLOCK",      // or WARN for grace periods
+    },
     config: {
-      models_allowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
+      modelsAllowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
       cache: { mode: "respect" },
-      policy_rules: {
-        tools: { deny: ["^shell\\.", "^filesystem\\.write"], allow: null },
-      },
     },
   });
 
@@ -5669,12 +5677,12 @@ export async function provisionCustomer(customerId: string) {
 }
 ```
 
-The VK lives at your reseller-org scope. The eligible-MP set is the union of every ModelProvider visible from that scope (the ones you configured in Step 2). If you omit `routing_policy_id`, dispatch falls back to the org's default ordering (`fallbackPriorityGlobal` then `createdAt`).
+The eligible-provider set is the union of every ModelProvider visible from the key's scopes (the ones you configured in Step 2). Pin `routing_policy_id` plus `routing_mode: "POLICY"` if you run a custom ordering; otherwise leave routing at its default.
 
 In a signup webhook:
 
 ```ts
-const { vkId, secret } = await provisionCustomer(newCustomer.id);
+const { vkId, secret } = await provisionCustomer(newCustomer.id, "25");
 await db.customers.update({
   where: { id: newCustomer.id },
   data: { langwatchVkId: vkId },
@@ -5683,35 +5691,19 @@ await db.customers.update({
 // exactly once. Your system never stores it in plaintext.
 ```
 
-## Step 4: Attach a per-customer budget
+## Step 4: Change the cap when the plan changes
 
-Tie the budget to the VK:
+The `budget` field on update upserts the key's own cap, so plan changes are one call keyed by the VK id you stored (no budget id bookkeeping):
 
 ```ts
-import { GatewayBudgetsApiService } from "langwatch";
-
-const budgets = new GatewayBudgetsApiService({
-  apiKey: process.env.LANGWATCH_BACKEND_TOKEN,
-});
-
-export async function attachCustomerBudget(vkId: string, planLimit: number) {
-  await budgets.create({
-    name: `customer-${vkId}-monthly`,
-    scope: { kind: "VIRTUAL_KEY", virtual_key_id: vkId },
-    window: "MONTH",
-    limit_usd: planLimit,             // from your plans table
-    on_breach: "BLOCK",               // or WARN for grace periods
+export async function setCustomerPlan(vkId: string, planLimitUsd: string) {
+  await langwatch.update(vkId, {
+    budget: { limit_usd: planLimitUsd, window: "MONTH" },
   });
 }
 ```
 
-When you upgrade, downgrade a customer:
-
-```ts
-await budgets.update(budgetId, { limit_usd: newPlanLimit });
-```
-
-Changes propagate to the gateway within 30 s via the `/changes` feed, no restart, no customer impact.
+Pass `budget: null` to remove the cap entirely (the spend history stays). Changes propagate to the gateway within 30 s via the `/changes` feed, no restart, no customer impact.
 
 ## Step 5: End-user makes a call
 
@@ -5730,29 +5722,42 @@ The gateway:
 
 - Authenticates the VK.
 - Checks the customer's budget.
-- Applies your `models_allowed` and `policy_rules`.
+- Applies your `modelsAllowed` allowlist.
 - Dispatches to OpenAI using **your** provider credential.
 - Meters the cost against the customer's budget.
-- Emits a LangWatch trace into your project, tagged with `principal_user_id = customerId`.
+- Emits a LangWatch trace into your project, attributed to the key.
 
-## Step 6: Bill the customer
+## Step 6: Show the customer their spend and bill them
 
-You have two options, matching two mental models:
+The read-back half of the loop is one REST call per key:
+
+```ts
+const spend = await langwatch.spend(vkId); // current UTC month by default
+// { virtual_key_id, spent_usd: "12.4531", requests: 1841, window: {...} }
+```
+
+or from a shell:
+
+```bash
+langwatch virtual-keys spend vk_01HZX... -f json
+```
+
+The number comes from the same cost path the LangWatch dashboard reads, so what you invoice matches what you see in the UI. For the enforcement view (spend against the cap), list VK-scoped budgets:
+
+```bash
+langwatch gateway-budgets list --scope-type virtual-key -f json | \
+  jq '[.budgets[] | {vk: .scope_id, spent: .spent_usd, limit: .limit_usd}]'
+```
+
+`spend_available: false` in that output means spend could not be totalled server-side; hold billing until it recovers rather than invoicing a zero.
 
 ### (a) Bill from your pricing table
 
-You define a markup over what the gateway shows you spent. Use `/api/gateway/v1/budgets` or the `gateway_budget_ledger` ClickHouse view to read per-VK spend:
-
-```bash
-langwatch gateway-budgets list --format json | \
-  jq '[.[] | select(.scope_type == "VIRTUAL_KEY") | {vk: .scope_id, spent: .spent_usd, limit: .limit_usd}]'
-```
-
-Your Stripe, billing layer reads this and invoices.
+You define a markup over what the gateway shows you spent, and your Stripe/billing layer reads the spend numbers above and invoices.
 
 ### (b) Passthrough billing
 
-For passthrough, your UI shows the same numbers you see in LangWatch + a per-customer markup or flat management fee. The BudgetLedger row is per-request and includes cost, you can stream it into your reporting.
+For passthrough, your UI shows the same numbers you see in LangWatch + a per-customer markup or flat management fee.
 
 ## Handling over-limit customers
 
@@ -5777,23 +5782,23 @@ Because the response is standard OpenAI-compatible, your error handler only need
 
 ## Rotation & revocation
 
-**Customer resets their API key in your UI** → you call `langwatch.rotate(vkId)`, get a new secret, send it to the customer. The old secret stops working within the gateway's cache TTL (~60 s).
+**Customer resets their API key in your UI** → you call `langwatch.rotate(vkId)`, get a new secret, send it to the customer. The old secret keeps authenticating for a 24 h grace window, so a client you have not reached yet does not start failing mid-rollout. The gateway's cache TTL (~60 s) is only how long the new secret takes to be accepted everywhere, not when the old one expires.
 
 **Customer cancels their subscription** → `langwatch.revoke(vkId)`. The next request returns `403 virtual_key_revoked`. If you want a grace period, schedule the revoke job for 24–48 h after cancellation instead.
 
 ## Audit: who did what
 
-Every write through your backend token is audited with `actor = "svc_<your_project_id>"`, action, target, and metadata. Filter the audit log on `resource_type = "virtualKey"` to get a per-customer provisioning history. Under **/settings/audit-log** in the LangWatch UI.
+Every write through your backend credential is audited with action, target, and before/after metadata. Scoped API keys attribute the write to the key's owning user; legacy project keys carry no user, so their writes record the machine principal `svc_<your_project_id>`. Filter the audit log on target `virtual_key` to get a per-customer provisioning history, under **/settings/audit-log** in the LangWatch UI.
 
-If you need SIEM export: the Postgres `AuditLog` table is queryable for gateway-shape rows (filter on `targetKind IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule')`). Set up a daily `pg_dump`-then-ship pipeline into your SIEM's ingestion path. There is no public REST audit-export endpoint in v1, see [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
+If you need SIEM export: query ONLY the gateway-shape `AuditLog` rows with a read-only role scoped to that table, and ship the filtered result set, never a whole-database dump (which would carry unrelated, sensitive application data). For example, a daily job running `COPY (SELECT id, "organizationId", "userId", action, "targetKind", "targetId", "createdAt" FROM "AuditLog" WHERE "organizationId" = '<your-org-id>' AND "targetKind" IN ('virtual_key', 'budget', 'model_provider', 'routing_policy', 'cache_rule') AND "createdAt" >= now() - interval '1 day') TO STDOUT WITH CSV` into your SIEM's ingestion path: an explicit column list pinned to your organization, leaving the before/after payloads out unless your SIEM genuinely needs them. There is no public REST audit-export endpoint in v1, see [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically) for the supported paths (UI CSV download, direct SQL).
 
 ## Gotchas
 
 - **Never let the customer see your backend API token.** It has `virtualKeys:create`; they'd provision more VKs charged to you.
 - **Rotate VKs when an end-user leaves your customer's org.** Otherwise the ex-user keeps spend access until the budget resets.
-- **Set `principal_user_id` at VK creation time**, not later. Audit attribution is based on this; filling it in after-the-fact doesn't retroactively re-tag old traces.
+- **Name keys after your tenant id** (`customer-<id>`) at creation time. The key's name and id are your join keys for spend read-back and audit history; `principal_user_id` is only for real LangWatch user accounts, not your external customers.
 - **Test the `402` path in your app** before go-live. Many apps have unhandled exceptions on budget breach and crash the user's flow.
-- **Budgets scoped to `virtual_key`** are the right level for per-customer enforcement. Scoping to `principal` works too but traces get messier because `principal_user_id` values from different customers can collide if you're not careful with namespacing.
+- **Budgets scoped to `virtual_key`** are the right level for per-customer enforcement, and the inline `budget` field on create/update manages exactly that budget for you.
 
 ## Rate limits at your gateway level
 
@@ -5802,7 +5807,7 @@ If you want to throttle a specific customer without moving them to a different p
 ```ts
 await langwatch.update(vkId, {
   config: {
-    rate_limits: { rpm: 60, tpm: 100000 },
+    rateLimits: { rpm: 60, tpm: 100000 },
   },
 });
 ```
@@ -9533,7 +9538,7 @@ The AI Gateway is governed by LangWatch's existing RBAC system, the same resourc
 
 ## Resources
 
-Every gateway UI, tRPC call, and REST endpoint checks one of these six resource keys:
+Every gateway UI, tRPC call, and REST endpoint checks one of these seven resource keys:
 
 | Resource | What it gates |
 |---|---|
@@ -9541,6 +9546,7 @@ Every gateway UI, tRPC call, and REST endpoint checks one of these six resource 
 | `gatewayBudgets` | Budget list, detail, drawer, create, update, archive, spend view. |
 | `modelProviders` | ModelProvider list, create, update, basic credentials, AND the **Advanced (Gateway)** tab (RPM, TPM, RPD, fallback priority, providerConfig). Same resource the platform already uses; no gateway-specific provider resource exists. |
 | `gatewayGuardrails` | Attaching, detaching guardrails to a VK (the evaluator itself is still `evaluations` scope). |
+| `gatewayCacheRules` | Cache-control rule list, detail, create, update, archive. |
 | `gatewayLogs` | Audit log list, filter, export. |
 | `gatewayUsage` | `/gateway/usage` stat tiles + time-windowed spend aggregation. |
 
@@ -9608,17 +9614,22 @@ Every `/api/gateway/v1/*` endpoint enforces the same permission as its equivalen
 | Endpoint | Permission |
 |---|---|
 | `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
-| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` (plus `virtualKeys:manage` at every requested scope) |
+| `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
+| `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` (re-scoping needs `virtualKeys:manage` at every new scope) |
 | `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
 | `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |
 | `GET /api/gateway/v1/budgets` | `gatewayBudgets:view` |
 | `POST /api/gateway/v1/budgets` | `gatewayBudgets:create` |
 | `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
-| `POST /api/gateway/v1/budgets/:id/archive` | `gatewayBudgets:delete` |
-| `POST /api/gateway/v1/virtual-keys/:id/guardrails` | `gatewayGuardrails:attach` |
-| `DELETE /api/gateway/v1/virtual-keys/:id/guardrails/:guardrailId` | `gatewayGuardrails:detach` |
-| `GET /api/gateway/v1/usage` | `gatewayUsage:view` |
+| `DELETE /api/gateway/v1/budgets/:id` | `gatewayBudgets:delete` (soft archive) |
+| `GET /api/gateway/v1/cache-rules` | `gatewayCacheRules:view` |
+| `POST /api/gateway/v1/cache-rules` | `gatewayCacheRules:create` |
+| `PATCH /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:update` |
+| `DELETE /api/gateway/v1/cache-rules/:id` | `gatewayCacheRules:delete` |
+
+Two layers apply on virtual-key writes, exactly as in the dashboard: the route's permission is the API-key ceiling, and the scopes the call touches are then checked individually (`virtualKeys:manage` on every scope at create/re-scope; the op permission on at least one existing scope for update/rotate/revoke). Guardrail attachments travel inside `config.guardrailAttachments` on create/update and require `gatewayGuardrails:attach` on the key's project; there are no separate guardrail routes. Legacy project API keys keep their historical power, full access to their own project and nothing beyond it, so org- and team-scoped provisioning requires a scoped API key with the bindings to prove it.
 
 Audit log retrieval is **not** exposed via the public REST API in v1, gateway audit rows live in the platform `AuditLog` table and are read via `/settings/audit-log` (CSV export) or via the tRPC `organization.getAuditLogs` procedure (gated on `auditLog:view`, with TeamUser ADMIN/MEMBER/VIEWER fallback for legacy admins). See [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically). The `gatewayLogs:view` permission remains in the enum for backward compatibility but is no longer wired to any endpoint.
 
@@ -9629,8 +9640,7 @@ A request with an API token that lacks the required permission returns `403 perm
   "error": {
     "type":    "permission_denied",
     "code":    "permission_denied",
-    "message": "missing permission: virtualKeys:create",
-    "param":   null
+    "message": "permission_denied: virtualKeys:manage at ORGANIZATION:org_..."
   }
 }
 ```
@@ -17064,8 +17074,9 @@ session survives rotation without re-prompting login.
 
 Click **Revoke** on any session card. The corresponding access-token +
 refresh-token Redis keys are immediately deleted. The next CLI request
-from that device will return 401, your CLI will print "Session expired
-— run `langwatch login --device`" and you'll need to re-authenticate.
+from that device will return 401. The CLI tries to refresh once, the
+refresh is refused too because the pair was deleted, and it prints
+"Session expired, run `langwatch login --device` again".
 
 **Revoke all sessions** clears every active session in one action —
 useful if you suspect a compromise or are leaving the company.
@@ -17079,8 +17090,9 @@ themselves are separate inventory items.
 
 Your IT admin can cap how long any one session stays valid:
 
-- **0 (default)**: no cap; sessions live until you revoke or until the
-  refresh token's natural 30-day TTL.
+- **0 (default)**: no cap. A session you keep using never expires: every
+  CLI call that needs it rotates the refresh token and restarts its
+  90-day window. A session nobody touches for 90 days expires on its own.
 - **N days**: refresh requests are rejected once `(now - issued_at) >
   N days`. The CLI prints "Your CLI session is older than your
   organization's policy. Please run `langwatch login` again."
@@ -31009,6 +31021,125 @@ When using OpenTelemetry with LangWatch, consider these performance implications
 
 By following these guidelines and leveraging the power of OpenTelemetry's ecosystem, you can achieve comprehensive observability of your LLM applications while maintaining compatibility with existing monitoring infrastructure.
 
+
+---
+
+# FILE: ./agent-simulations/authenticated-agents.mdx
+
+---
+title: Testing Agents Behind Authentication
+sidebarTitle: Authenticated agents
+keywords: langwatch, agent simulations, auth0, oauth2, client credentials, code agent, secrets, machine-to-machine
+description: Connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent and project secrets.
+---
+
+# Testing Agents Behind Authentication
+
+Many production agents sit behind an API that requires authentication — most commonly an **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the canonical example). LangWatch's HTTP agent type carries a *static* credential (`bearer` / `api_key` / `basic`), which is not enough when a token has to be **exchanged** first.
+
+A **custom code agent** closes that gap: a few lines of Python that fetch the token, call your API with it, and keep the credentials in your project's encrypted secret store — never in the agent's stored source.
+
+## How it fits together
+
+1. **Project secrets** hold the client ID and client secret, encrypted at rest. They are exposed to your code agent's Python as the injected `secrets` namespace.
+2. **The code agent** exchanges the credentials for an access token and calls your protected API with it.
+3. **A scenario** drives the agent like a real user and judges the answers — the agent only passes if it actually got through the auth wall.
+
+## 1. Store the credentials as project secrets
+
+In **Settings → Secrets**, create the credentials **and** the endpoint coordinates — keeping the endpoints in secrets too means the whole agent is configurable without touching its code or any API.
+
+Create **`AUTH0_CLIENT_SECRET` through the Settings → Secrets UI**, not on a command line: a secret passed as a CLI argument lands in your shell history and the process listing, and can end up in CI logs. The non-sensitive coordinates are fine to create via the CLI:
+
+```bash
+langwatch secret create AUTH0_CLIENT_ID --value "<your client id>"
+langwatch secret create AUTH0_TOKEN_URL --value "https://your-tenant.us.auth0.com/oauth/token"
+langwatch secret create AUTH0_AUDIENCE --value "https://api.your-company.internal"
+langwatch secret create AUTH0_API_URL --value "https://api.your-company.internal/chat"
+```
+
+Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted and never returned by any API.
+
+<Warning>
+  Never paste the client secret into the agent's Python. The stored code is readable by anyone with project access; the `secrets` namespace exists so the credential is stored encrypted at rest and never persisted in the agent's source. At run time it is injected into the execution's memory and sent only to your token endpoint.
+</Warning>
+
+## 2. Write the code agent
+
+Create a **code agent** with a single input `message` and a single declared output `output`: the declared output key must match the key the Python returns, or the run fails with `missing_output`. Use this Python, the reference implementation, exercised continuously against the real code-agent runtime:
+
+```python
+import requests
+
+
+class Code:
+    def __call__(self, message: str):
+        # Step 1: exchange the client credentials for an access token.
+        token_response = requests.post(
+            secrets.AUTH0_TOKEN_URL,
+            json={
+                "grant_type": "client_credentials",
+                "client_id": secrets.AUTH0_CLIENT_ID,
+                "client_secret": secrets.AUTH0_CLIENT_SECRET,
+                "audience": secrets.AUTH0_AUDIENCE,
+            },
+            timeout=10,
+            # A 307/308 redirect would re-send the POST body, credential
+            # included, to wherever the response points. Never follow one.
+            allow_redirects=False,
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json()["access_token"]
+
+        # Step 2: call the protected API with the minted token.
+        api_response = requests.post(
+            secrets.AUTH0_API_URL,
+            json={"message": message},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        api_response.raise_for_status()
+
+        return {"output": api_response.json()["reply"]}
+```
+
+Things the sandbox enforces, in the order people trip on them:
+
+- **Entry point**: `class Code` with `__call__` (no constructor arguments).
+- **`secrets` is injected** into the module globals — it is *not* the Python stdlib `secrets` module. Do **not** `import secrets`; that would shadow the injected namespace. `os.environ` is *not* populated in the sandbox.
+- **Return every declared output key**, or the run fails with `missing_output`.
+- **Available packages**: `requests`, `httpx`, `pydantic`, `langwatch`.
+- **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default) — keep explicit timeouts on both requests.
+- **Failure behavior**: `raise_for_status()` puts the URL and status code in the error — never the request body — so a rejected credential fails loudly without exposing the secret.
+
+## 3. Map the agent's input for scenarios
+
+Because everything else rides the secrets namespace, the agent has a **single input** — the conversation message — and needs exactly one mapping: `message` from the scenario's `input`. That mapping is creatable in the agent editor today.
+
+<Note>
+  Keeping the endpoint coordinates in secrets is deliberate: the alternative — static `value` mappings on extra inputs — currently cannot be created from the editor UI, only via the agents API. UI support for static value mappings is tracked in [#6371](https://github.com/langwatch/langwatch/issues/6371).
+</Note>
+
+## 4. Run a scenario against it
+
+Create a scenario whose criteria can only pass if the agent really got through the auth wall — e.g. facts that only your protected API returns — bundle it with the agent in a [suite](/agent-simulations/getting-started), and run it. The simulation transcript shows the agent's answers; the run fails if the exchange breaks.
+
+```text
+[user]      where is my order #1042?
+[assistant] Order #1042 shipped from the Rotterdam warehouse on Tuesday
+            and arrives Thursday before noon.
+```
+
+That answer exists only behind the auth wall — which is the point: the scenario passing *is* the proof that authentication works.
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| Agent answers are empty | The token exchange or API call raised — check the credentials and endpoint URLs. (Improved error surfacing is tracked in [#6340](https://github.com/langwatch/langwatch/issues/6340).) |
+| `missing_output` error | The Python returned a dict without one of the agent's declared output keys. |
+| Credential works locally but not on the platform | The secret name in `secrets.NAME` doesn't match a stored project secret, or the value was stored in a different project. |
+| Timeout | Token fetch + downstream call exceeded the 60s runner budget — check both endpoints' latency. |
 
 ---
 

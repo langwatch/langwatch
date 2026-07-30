@@ -314,6 +314,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
     tenantId: TENANT_ID,
     traceId: TRACE_ID,
     version: "2026-07-27",
+    hasSignal: true,
     occurredAtMs: 1_750_000_000_000,
     createdAtMs: 1_750_000_000_000,
     updatedAtMs: 1_750_000_000_000,
