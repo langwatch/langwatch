@@ -298,11 +298,15 @@ describe("given createClickHouseClient()", () => {
       // Release the first wave; the queued queries should now start, each
       // still capped at 2 concurrently for its own tenant.
       const firstWave = releasers.splice(0, releasers.length);
-      firstWave.forEach((release) => release());
+      firstWave.forEach((release) => {
+        release();
+      });
       await waitUntil(() => releasers.length === 4);
 
       const secondWave = releasers.splice(0, releasers.length);
-      secondWave.forEach((release) => release());
+      secondWave.forEach((release) => {
+        release();
+      });
 
       await Promise.all([...tenantAQueries, ...tenantBQueries]);
 
