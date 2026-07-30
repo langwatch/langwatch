@@ -178,7 +178,7 @@ jobs:
       # is what generates the platform-specific Prisma client via prisma's
       # postinstall hook — see packages/server/src/services/node-deps.ts.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm -C platform/app run build
+        run: pnpm --filter "@langwatch/web..." run build
         env:
           NODE_ENV: production
 

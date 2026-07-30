@@ -80,12 +80,26 @@ Feature: One workspace for every JavaScript project in the repo
     # to itself.
 
   @unit
-  Scenario: The application still gets the published SDK
+  Scenario: The application links the SDK working copy
     Given the application depends on the TypeScript SDK
     When its dependencies are installed
-    Then it resolves to the published SDK release, not the working copy
-    # Renaming the application removes the ambiguity but deliberately does not
-    # change what ships. Linking the working copy is a separate decision.
+    Then it resolves to the SDK in this repo, not a published release
+    # So an SDK change reaches the application — and the production image built
+    # from it — without a publish. Renaming the application is what removed the
+    # ambiguity that made this impossible: both projects used to be called
+    # "langwatch", so the application's dependency on the SDK was a dependency
+    # on its own name.
+
+  @unit
+  Scenario: The SDK carries its own copy of a pinned dependency
+    Given the SDK validates its own responses with a major of zod the application does not use
+    When the SDK is built
+    Then that dependency is bundled into the SDK rather than imported from the consumer
+    # This is what makes the link above survivable. The application pins zod 3
+    # and collapses every copy onto it, because zod 3 instanceof-checks its own
+    # classes and a second copy silently mis-parses. Left external, the SDK's
+    # zod-4 calls land on that v3 object and throw at first import — the whole
+    # application, not just the SDK path.
 
   # ===========================================================================
   # Shared dependency policy

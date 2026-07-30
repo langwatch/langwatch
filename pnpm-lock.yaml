@@ -726,8 +726,8 @@ importers:
         specifier: ^9.0.3
         version: 9.0.3
       langwatch:
-        specifier: 1.0.0
-        version: 1.0.0(39c904d5fe09201cccb9225c8c77ffcd)
+        specifier: workspace:*
+        version: link:../../sdks/typescript
       libphonenumber-js:
         specifier: ^1.13.7
         version: 1.13.7
@@ -18835,7 +18835,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.18.1(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.18.1)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -21674,7 +21674,7 @@ snapshots:
 
   ret@0.5.0: {}
 
-  retry-axios@2.6.0(axios@1.18.1(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.18.1):
     dependencies:
       axios: 1.18.1(debug@4.4.3)
 

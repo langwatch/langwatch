@@ -173,7 +173,7 @@
     "ioredis": "5.10.1",
     "jsonpath-plus": "^10.4.0",
     "jsonwebtoken": "^9.0.3",
-    "langwatch": "1.0.0",
+    "langwatch": "workspace:*",
     "libphonenumber-js": "^1.13.7",
     "liqe": "^3.8.7",
     "liquidjs": "^10.27.1",

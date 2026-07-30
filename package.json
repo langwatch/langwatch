@@ -43,6 +43,7 @@
     "platform/app/",
     "services/langevals/",
     "sdks/python/",
+    "sdks/typescript/",
     "mcp/typescript/",
     "scripts/",
     "skills/",
@@ -52,7 +53,6 @@
     "pnpm-workspace.yaml",
     "pnpm-lock.yaml",
     "packages/server/package.json",
-    "sdks/typescript/package.json",
     "tests/agentic-e2e/package.json"
   ],
   "scripts": {
