@@ -724,7 +724,9 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
           "--set",
           "app.dataplane.legacyAzureRead=true",
         ]),
-      ).toMatch(/legacyAzureRead is set but azureBlob is already the active provider/);
+      ).toMatch(
+        /legacyAzureRead is set but azureBlob is already the active provider/,
+      );
     });
 
     /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
@@ -738,7 +740,9 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
           "--set",
           "app.dataplane.legacyS3ReadBucket=old-bucket",
         ]),
-      ).toMatch(/legacyS3ReadBucket is set but awsS3 is already the active provider/);
+      ).toMatch(
+        /legacyS3ReadBucket is set but awsS3 is already the active provider/,
+      );
     });
 
     /** @scenario "The chart rejects a legacy read flag aimed at the active provider" */
