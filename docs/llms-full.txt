@@ -30986,12 +30986,12 @@ langwatch secret create AUTH0_API_URL --value "https://api.your-company.internal
 Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted and never returned by any API.
 
 <Warning>
-  Never paste the client secret into the agent's Python. The stored code is readable by anyone with project access — the `secrets` namespace exists so the credential lives only in the encrypted store.
+  Never paste the client secret into the agent's Python. The stored code is readable by anyone with project access; the `secrets` namespace exists so the credential is stored encrypted at rest and never persisted in the agent's source. At run time it is injected into the execution's memory and sent only to your token endpoint.
 </Warning>
 
 ## 2. Write the code agent
 
-Create a **code agent** with a single input `message` and a single declared output `output` — the declared output key must match the key the Python returns, or the run fails with `missing_output`. Use this Python — it is the reference implementation, exercised continuously against the real code-agent runtime:
+Create a **code agent** with a single input `message` and a single declared output `output`: the declared output key must match the key the Python returns, or the run fails with `missing_output`. Use this Python, the reference implementation, exercised continuously against the real code-agent runtime:
 
 ```python
 import requests
