@@ -505,7 +505,7 @@ jobs:
       - name: Check the workspace invariants (ADR-076)
         run: |
           pnpm install --frozen-lockfile --filter "@langwatch/server-cli..."
-          pnpm --filter @langwatch/server-cli exec vitest run test/workspace-invariants.test.ts
+          pnpm --filter @langwatch/server-cli run test:invariants
 
       # THE GATE. Everything below this step is annotation, not enforcement.
       #
