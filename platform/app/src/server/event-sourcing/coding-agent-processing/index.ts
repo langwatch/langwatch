@@ -3,6 +3,7 @@ import {
   clickhouseAppend,
   clickhouseReplacing,
   type FoldStateCache,
+  noFoldStateCache,
 } from "@langwatch/clickhouse";
 import {
   ConfigurationError,
@@ -135,7 +136,7 @@ export function createCodingAgentProcessingPipeline(deps: {
     key: "SessionId",
     stateVersionColumn: "Version",
     row: codingAgentSessionRow,
-    cache: deps.cache,
+    cache: deps.cache ?? noFoldStateCache<CodingAgentSessionState>(),
     // Deployed `ORDER BY (TenantId, StartedAt, SessionId)` is time-leading, so
     // the read is a seek only behind this bound; a session older than the window
     // still reads back, because a windowed miss retries unwindowed.

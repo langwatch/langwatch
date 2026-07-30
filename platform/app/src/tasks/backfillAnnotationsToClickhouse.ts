@@ -44,12 +44,15 @@ export default async function execute() {
 
     for (const [traceId, annotationIds] of Object.entries(traceMap)) {
       try {
-        await app.traces.bulkSyncAnnotations({
-          tenantId: projectId,
-          traceId,
-          annotationIds,
-          occurredAt: Date.now(),
-        });
+        await app.traces.bulkSyncAnnotations(
+          {
+            tenantId: projectId,
+            traceId,
+            annotationIds,
+            occurredAt: Date.now(),
+          },
+          { tenantId: projectId },
+        );
         projectTraces++;
         totalTraces++;
         if (totalTraces % 100 === 0) {

@@ -290,7 +290,7 @@ function buildStores(deps: SimulationProcessingPipelineDeps) {
     key: "ScenarioRunId",
     stateVersionColumn: "Version",
     row: runRowMapping,
-    cache: deps.cache ?? noFoldStateCache(),
+    cache: deps.cache ?? noFoldStateCache<SimulationRunState>(),
   });
 
   const messagesStore = clickhouseAppend<
