@@ -1,3 +1,4 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import {
   type StoredLogRecordRow,
@@ -5,9 +6,7 @@ import {
 } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { CanonicalLogRecord } from "~/server/event-sourcing.old/pipelines/log-processing/schemas/logRecord";
-import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
+import type { CanonicalLogRecord } from "~/server/event-sourcing/log-processing/schema";
 import type { CanonicalLogRecordRepository } from "./canonical-log-record.repository";
 
 const logger = createLogger(
@@ -20,7 +19,7 @@ function dedupVersion(acceptedAt: number): string {
 }
 
 function validate(record: CanonicalLogRecord, operation: string) {
-  EventUtils.validateTenantId({ tenantId: record.tenantId }, operation);
+  validateTenantId({ tenantId: record.tenantId }, operation);
   if (!/^[a-f0-9]{64}$/.test(record.recordId)) {
     throw new SecurityError(operation, "invalid RecordId", record.tenantId);
   }
@@ -192,7 +191,7 @@ export class CanonicalLogRecordClickHouseRepository
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "CanonicalLogRecordClickHouseRepository.getLogsByTraceId",
     );

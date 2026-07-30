@@ -1,4 +1,4 @@
-import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
+import { validateTenantId } from "@langwatch/clickhouse";
 
 /**
  * Resolves and validates a single tenantId for a batch of entries that
@@ -18,7 +18,7 @@ export function validateBatchTenants<T extends { tenantId: string }>(
   }
 
   const tenantId = entries[0]!.tenantId;
-  EventUtils.validateTenantId({ tenantId }, context);
+  validateTenantId({ tenantId }, context);
 
   const mixedTenant = entries.find((e) => e.tenantId !== tenantId);
   if (mixedTenant) {
