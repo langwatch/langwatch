@@ -5782,7 +5782,7 @@ Because the response is standard OpenAI-compatible, your error handler only need
 
 ## Rotation & revocation
 
-**Customer resets their API key in your UI** → you call `langwatch.rotate(vkId)`, get a new secret, send it to the customer. The old secret stops working within the gateway's cache TTL (~60 s).
+**Customer resets their API key in your UI** → you call `langwatch.rotate(vkId)`, get a new secret, send it to the customer. The old secret keeps authenticating for a 24 h grace window, so a client you have not reached yet does not start failing mid-rollout. The gateway's cache TTL (~60 s) is only how long the new secret takes to be accepted everywhere, not when the old one expires.
 
 **Customer cancels their subscription** → `langwatch.revoke(vkId)`. The next request returns `403 virtual_key_revoked`. If you want a grace period, schedule the revoke job for 24–48 h after cancellation instead.
 

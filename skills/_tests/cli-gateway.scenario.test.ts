@@ -21,7 +21,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
-const gatewayEnv = `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}${process.env.LANGWATCH_GATEWAY_GPC_ID ? `LANGWATCH_GATEWAY_GPC_ID=${process.env.LANGWATCH_GATEWAY_GPC_ID}\n` : ""}`;
+const gatewayEnv = `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`;
 
 describe("LangWatch AI Gateway CLI — Agent Usability", () => {
   it.skipIf(isCI)(

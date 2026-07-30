@@ -48,11 +48,6 @@ EXTERNAL_SERVICE_ERROR_INDICATORS = (
     "Timeout",
     "Request timed out",
     "read operation timed out",
-    # OpenAI's safety layer intermittently rejects benign example requests
-    # (observed on gpt-5-mini with forced tool_choice) with this code. An
-    # upstream moderation false-positive is an external-service condition,
-    # not an SDK regression.
-    "invalid_prompt",
 )
 
 
