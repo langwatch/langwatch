@@ -326,35 +326,23 @@ export function subtractProtectedRanges(
 }
 
 /**
- * Redact essential PII from one string and report how many spans were replaced.
- *
- * `entities` narrows the recognizers that run: pass a subset (the custom PII
- * level) to redact only those identifiers, or omit it (the essential level) to
- * run every native recognizer. Entity names are the canonical identifiers from
- * `ESSENTIAL_PII_ENTITIES` (e.g. `EMAIL_ADDRESS`, `BR_CPF`).
- *
- * `exceptPatterns` are the policy's do-not-redact exceptions (pre-anchored via
- * `compilePiiExceptPatterns`): a detected span whose entire matched text
- * matches one of them is left as it was.
+ * Collect every candidate PII span in `text`: the regex/checksum recognizers
+ * (respecting `allowed`) plus the phone detector, running each candidate
+ * through its validator/context gate and the exception veto. Vetoed spans are
+ * appended to `protectedRanges` as a side effect so the caller can shield them
+ * from later overlapping, non-excepted spans.
  */
-export function redactEssentialPiiInText({
+function collectCandidateSpans({
   text,
-  entities,
+  allowed,
   exceptPatterns,
+  protectedRanges,
 }: {
   text: string;
-  entities?: readonly string[];
-  exceptPatterns?: readonly RegExp[];
-}): PiiRedactionResult {
-  if (
-    typeof text !== "string" ||
-    text.length === 0 ||
-    text.length > MAX_SCAN_LENGTH
-  ) {
-    return { text, redactedCount: 0 };
-  }
-
-  const protectedRanges: ProtectedRange[] = [];
+  allowed: ReadonlySet<string> | null;
+  exceptPatterns: readonly RegExp[] | undefined;
+  protectedRanges: ProtectedRange[];
+}): Span[] {
   const excepted = (span: Span): boolean => {
     const veto =
       !!exceptPatterns &&
@@ -364,7 +352,6 @@ export function redactEssentialPiiInText({
     return veto;
   };
 
-  const allowed = entities ? new Set(entities) : null;
   const spans: Span[] = [];
 
   for (const recognizer of RECOGNIZERS) {
@@ -407,23 +394,27 @@ export function redactEssentialPiiInText({
     }
   }
 
-  if (spans.length === 0) return { text, redactedCount: 0 };
+  return spans;
+}
 
-  // Merge overlaps, preferring earlier-and-longer spans.
-  spans.sort((a, b) => a.start - b.start || b.end - a.end);
-  const kept: Span[] = [];
-  let lastEnd = -1;
-  for (const span of spans) {
-    if (span.start >= lastEnd) {
-      kept.push(span);
-      lastEnd = span.end;
-    }
-  }
-
-  // A kept span can still overlap a vetoed one (a phone match inside an
-  // excepted number): mask only the parts outside every protected range, so
-  // an exception always preserves its entire matched text.
-  const maskable = kept.flatMap((span) =>
+/**
+ * Rebuild `text` with every maskable span replaced by its typed marker.
+ * `spans` must already be exception-shielded (see `collectCandidateSpans`) and
+ * merged for overlaps; a kept span can still overlap a protected one (a phone
+ * match inside an excepted number), so each is further split against
+ * `protectedRanges` before masking, so an exception always preserves its
+ * entire matched text.
+ */
+function maskSpans({
+  text,
+  spans,
+  protectedRanges,
+}: {
+  text: string;
+  spans: readonly Span[];
+  protectedRanges: readonly ProtectedRange[];
+}): PiiRedactionResult {
+  const maskable = spans.flatMap((span) =>
     subtractProtectedRanges(span, protectedRanges).map((part) => ({
       ...part,
       entity: span.entity,
@@ -440,4 +431,56 @@ export function redactEssentialPiiInText({
   result += text.slice(cursor);
 
   return { text: result, redactedCount: maskable.length };
+}
+
+/**
+ * Redact essential PII from one string and report how many spans were replaced.
+ *
+ * `entities` narrows the recognizers that run: pass a subset (the custom PII
+ * level) to redact only those identifiers, or omit it (the essential level) to
+ * run every native recognizer. Entity names are the canonical identifiers from
+ * `ESSENTIAL_PII_ENTITIES` (e.g. `EMAIL_ADDRESS`, `BR_CPF`).
+ *
+ * `exceptPatterns` are the policy's do-not-redact exceptions (pre-anchored via
+ * `compilePiiExceptPatterns`): a detected span whose entire matched text
+ * matches one of them is left as it was.
+ */
+export function redactEssentialPiiInText({
+  text,
+  entities,
+  exceptPatterns,
+}: {
+  text: string;
+  entities?: readonly string[];
+  exceptPatterns?: readonly RegExp[];
+}): PiiRedactionResult {
+  if (
+    typeof text !== "string" ||
+    text.length === 0 ||
+    text.length > MAX_SCAN_LENGTH
+  ) {
+    return { text, redactedCount: 0 };
+  }
+
+  const protectedRanges: ProtectedRange[] = [];
+  const spans = collectCandidateSpans({
+    text,
+    allowed: entities ? new Set(entities) : null,
+    exceptPatterns,
+    protectedRanges,
+  });
+  if (spans.length === 0) return { text, redactedCount: 0 };
+
+  // Merge overlaps, preferring earlier-and-longer spans.
+  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  const kept: Span[] = [];
+  let lastEnd = -1;
+  for (const span of spans) {
+    if (span.start >= lastEnd) {
+      kept.push(span);
+      lastEnd = span.end;
+    }
+  }
+
+  return maskSpans({ text, spans: kept, protectedRanges });
 }
