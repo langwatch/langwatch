@@ -248,6 +248,69 @@ export class StoredObjectsRepository {
   }
 
   /**
+   * Returns every latest stored-object row for one project.
+   *
+   * This is intentionally a migration/admin surface rather than a hot-path
+   * query. Provider migration must preserve every column when it appends a
+   * newer ReplacingMergeTree version with a different storage URI.
+   */
+  async findLiveRowsByProjectPage({
+    projectId,
+    afterId,
+    limit,
+  }: {
+    projectId: string;
+    afterId?: string;
+    limit: number;
+  }): Promise<StoredObject[]> {
+    const client = await getClickHouseClientForProject(projectId);
+    if (!client) {
+      throw new Error(
+        "ClickHouse is not configured — cannot enumerate stored objects",
+      );
+    }
+
+    const result = await client.query({
+      query: `
+        SELECT
+          t.id,
+          t.project_id,
+          t.purpose,
+          t.owner_kind,
+          t.owner_id,
+          t.media_type,
+          t.size_bytes,
+          t.sha256,
+          t.storage_uri,
+          t.created_at,
+          t.inserted_at
+        FROM ${TABLE_NAME} AS t
+        WHERE t.project_id = {projectId:String}
+          AND t.id > {afterId:String}
+          AND (t.project_id, t.id, t.inserted_at) IN (
+            SELECT project_id, id, max(inserted_at)
+            FROM ${TABLE_NAME}
+            WHERE project_id = {projectId:String}
+            GROUP BY project_id, id
+          )
+        ORDER BY t.id
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { projectId, afterId: afterId ?? "", limit },
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<Record<string, unknown>>();
+    return rows.map((raw) =>
+      storedObjectSchema.parse({
+        ...raw,
+        size_bytes: Number(raw.size_bytes),
+        created_at: new Date(raw.created_at as string),
+        inserted_at: new Date(raw.inserted_at as string),
+      }),
+    );
+  }
+
+  /**
    * Sums `size_bytes` of the live rows owned by a project, optionally scoped to
    * one `purpose`, as the storage-accounting byte ledger (ADR-040).
    *

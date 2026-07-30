@@ -28,10 +28,20 @@ vi.mock("../azure-blob-driver", () => ({
     constructor(credentials: unknown) {
       driverConstructorCalls.push(credentials);
     }
+
+    async exists() {
+      return true;
+    }
   },
 }));
 
-vi.mock("../s3-driver", () => ({ S3Driver: class {} }));
+vi.mock("../s3-driver", () => ({
+  S3Driver: class {
+    async exists() {
+      return false;
+    }
+  },
+}));
 vi.mock("../local-filesystem-driver", () => ({
   LocalFilesystemDriver: class {},
 }));
@@ -45,7 +55,7 @@ function resetEnv() {
 
 describe("createStorageRegistry()", () => {
   describe("given Azure credentials arrive padded with whitespace", () => {
-    it("builds the driver from trimmed values so the URI and the endpoint agree", () => {
+    it("builds the driver lazily from trimmed values so the URI and the endpoint agree", async () => {
       resetEnv();
       // Every value padded: the container is part of "is Azure usable at all",
       // so it has to be present here, and padding it proves the same
@@ -56,7 +66,10 @@ describe("createStorageRegistry()", () => {
       mockEnv.AZURE_BLOB_CONTAINER = "  lw-container  ";
       mockEnv.AZURE_BLOB_ENDPOINT = "  https://lwacct.blob.core.windows.net  ";
 
-      createStorageRegistry({ projectId: "proj-1" });
+      const registry = createStorageRegistry({ projectId: "proj-1" });
+
+      expect(driverConstructorCalls).toHaveLength(0);
+      await registry.exists("azure-blob://lwacct/lw-container/proj-1/sha256");
 
       expect(driverConstructorCalls).toHaveLength(1);
       expect(driverConstructorCalls[0]).toMatchObject({
@@ -84,19 +97,36 @@ describe("createStorageRegistry()", () => {
      * raising, not one to swallow. Registering nothing here would surface
      * later as `Storage scheme "azure-blob" is not configured in this
      * deployment`, which contradicts their own STORED_OBJECTS_BACKEND=azure
-     * and hides the actionable message. Only storage paths construct the
-     * registry, so this never reaches a request that wasn't touching storage.
+     * and hides the actionable message. Validation is therefore delayed until
+     * an Azure URI is actually dispatched, not omitted.
      */
-    it("raises the actionable misconfiguration instead of building a driver with a blank account", () => {
+    it("raises the actionable misconfiguration when Azure is addressed instead of building a driver with a blank account", () => {
       resetEnv();
       mockEnv.STORED_OBJECTS_BACKEND = "azure";
       mockEnv.AZURE_BLOB_ACCOUNT_NAME = "   ";
       mockEnv.AZURE_BLOB_ACCOUNT_KEY = "   ";
       mockEnv.AZURE_BLOB_CONTAINER = "   ";
 
-      expect(() => createStorageRegistry({ projectId: "proj-1" })).toThrow(
-        /AZURE_BLOB_ACCOUNT_NAME/,
-      );
+      const registry = createStorageRegistry({ projectId: "proj-1" });
+
+      expect(() =>
+        registry.exists("azure-blob://acct/container/proj-1/sha256"),
+      ).toThrow(/AZURE_BLOB_ACCOUNT_NAME/);
+      expect(driverConstructorCalls).toHaveLength(0);
+    });
+
+    it("does not validate Azure while another scheme is being addressed", async () => {
+      resetEnv();
+      mockEnv.STORED_OBJECTS_BACKEND = "azure";
+      mockEnv.AZURE_BLOB_ACCOUNT_NAME = "   ";
+      mockEnv.AZURE_BLOB_ACCOUNT_KEY = "   ";
+      mockEnv.AZURE_BLOB_CONTAINER = "   ";
+
+      const registry = createStorageRegistry({ projectId: "proj-1" });
+
+      await expect(
+        registry.exists("s3://private-bucket/proj-1/sha256"),
+      ).resolves.toBe(false);
       expect(driverConstructorCalls).toHaveLength(0);
     });
   });

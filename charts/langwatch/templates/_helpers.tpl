@@ -900,11 +900,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "AZURE_BLOB_TOKEN_AUDIENCE" "fieldValues" .Values.app.dataplane.providers.azureBlob.tokenAudience) }}
 {{- end }}
 {{- if .Values.app.dataplane.legacyS3ReadBucket }}
-# S3->Azure migration: new writes go to Azure, but objects written before the
-# switch still carry s3:// URIs / bucket+key spool refs. createS3Client keeps
-# serving this bucket for those reads (it fails loud only when no S3 bucket is
-# configured at all), so pre-migration media, datasets, and staged payloads
-# stay readable. Omit on a greenfield Azure install.
+# Retains reads for persisted s3:// stored-object URIs and legacy consumers
+# that already carry an S3 bucket/key after writes switch to Azure. This does
+# not route provider-derived dataset chunks or GroupQueue durable payloads:
+# migrate every dataset and drain GroupQueue before cutover. Omit on a
+# greenfield Azure install.
 - name: S3_BUCKET_NAME
   value: {{ .Values.app.dataplane.legacyS3ReadBucket | quote }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_ENDPOINT" "fieldValues" .Values.app.dataplane.providers.awsS3.endpoint) }}
@@ -913,6 +913,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "S3_KEY_SALT" "fieldValues" .Values.app.dataplane.providers.awsS3.keySalt) }}
 {{- end }}
 {{- else }}
+- name: STORED_OBJECTS_BACKEND
+  value: "s3"
 - name: USE_S3_STORAGE
   value: "true"
 # Emit S3_BUCKET_NAME — the app/server reads this name across all

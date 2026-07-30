@@ -79,8 +79,11 @@ export function maybeAzureDriver(): AzureBlobDriver | undefined {
 /**
  * Builds a `StorageRegistry` with the S3 / local-filesystem / (optional) Azure
  * drivers wired. The `S3Driver` is projectId-scoped so per-tenant BYOC creds
- * resolve at call time. Shared by `createStoredObjectsService` and any other
- * byte path that needs the object store (e.g. the GroupQueue s3 blob tier).
+ * resolve at call time. Azure construction is deferred until an azure-blob://
+ * URI is dispatched: a globally selected but incomplete Azure configuration
+ * must not block a BYOC project whose active destination is S3. Shared by
+ * `createStoredObjectsService` and any other byte path that needs the object
+ * store (e.g. the GroupQueue s3 blob tier).
  */
 export function createStorageRegistry({
   projectId,
@@ -90,7 +93,7 @@ export function createStorageRegistry({
   return new StorageRegistry({
     s3: new S3Driver(projectId),
     file: new LocalFilesystemDriver(),
-    "azure-blob": maybeAzureDriver(),
+    "azure-blob": maybeAzureDriver,
   });
 }
 

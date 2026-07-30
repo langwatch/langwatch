@@ -155,6 +155,43 @@ const IDENTITY_SERVICE_ACCOUNT = [
   String.raw`global.serviceAccount.annotations.azure\.workload\.identity/client-id=00000000-1111-2222-3333-444444444444`,
 ];
 
+describeHelm("Helm object-storage provider selection", () => {
+  /** @scenario "Helm selects S3 and Azure symmetrically without breaking legacy S3 configuration" */
+  it("renders an explicit backend selector for both providers and keeps S3_BUCKET_NAME", () => {
+    const s3 = render([
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=awsS3",
+      "--set",
+      "app.dataplane.bucket=existing-bucket",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
+    ]);
+    const azure = render([
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=azureBlob",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountKey.value=key",
+      "--set",
+      "app.dataplane.providers.azureBlob.container.value=container",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
+    ]);
+
+    expect(s3).toContain("name: STORED_OBJECTS_BACKEND");
+    expect(s3).toContain('value: "s3"');
+    expect(s3).toContain("name: S3_BUCKET_NAME");
+    expect(s3).toContain('value: "existing-bucket"');
+    expect(azure).toContain("name: STORED_OBJECTS_BACKEND");
+    expect(azure).toContain('value: "azure"');
+  });
+});
+
 describeHelm("Helm ServiceAccount surface for cloud identity", () => {
   describe("given an install that does not opt in", () => {
     /** @scenario "Installs that do not use Azure render exactly as they did before" */
