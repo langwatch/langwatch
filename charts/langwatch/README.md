@@ -68,6 +68,9 @@ All overlays live in `examples/overlays/`:
 | `postgres-external` | External PostgreSQL (RDS, Cloud SQL) |
 | `redis-external` | External Redis (ElastiCache, Memorystore) |
 | `cold-storage-s3` | S3 cold storage tiering + backups |
+| `strict-admission` | Toggles for Pod Security Admission `restricted` / Gatekeeper / Kyverno clusters |
+
+> **Sizing notes.** The Node app and workers need roughly **2Gi to boot** (they cold-load the TS server through tsx); the `size-minimal` and `size-dev` overlays account for this, so don't trim app/worker memory below ~2Gi or they OOM at startup. **ClickHouse memory scales with ingest volume** - the chart-managed defaults in `size-minimal`/`size-dev` (1-2Gi) are for light/local use; raise `clickhouse.memory` (and `cpu`) before pushing real trace throughput, or a large ingest burst will OOM it.
 
 ### All-in-one profiles
 
@@ -122,6 +125,22 @@ For development, set `autogen.enabled: true` to auto-generate all secrets.
 | **Prometheus** | `prometheus.chartManaged: true` | Optional — for metrics collection |
 
 For a complete installation guide, visit the [documentation](https://docs.langwatch.ai/self-hosting/kubernetes-helm).
+
+### Pod security
+
+Every LangWatch pod (including the cron pods) and every bundled datastore
+(PostgreSQL, Redis, ClickHouse, Keeper) runs read-only-root, non-root at both pod and container level, with
+dropped capabilities, `RuntimeDefault` seccomp, no mounted SA token, and
+resource requests/limits on every container.
+
+A default install does **not** clear Pod Security Admission `restricted` on its
+own: three bundled components can't comply. On clusters that enforce it, add
+`examples/overlays/strict-admission.yaml`, which turns off the upstream
+Prometheus subchart, the Langy assistant (whose manager must run as root to
+give each worker its own UID — never force it non-root), and the ClickHouse
+preflight Job (it runs kubectl, so it needs a token and a writable root), plus
+the custom-metrics gateway HPA. Full details in
+[Security → Pod Security](https://docs.langwatch.ai/self-hosting/security#pod-security).
 
 ### Regenerate this table
 

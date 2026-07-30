@@ -70,10 +70,8 @@ spec:
     spec:
       # Workers do not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
-      {{- with (coalesce .Values.workers.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 8 }}
 
       {{- with (coalesce .Values.workers.nodeSelector .Values.global.scheduling.nodeSelector)}}
       nodeSelector:
@@ -107,17 +105,17 @@ spec:
       priorityClassName: {{ . | quote }}
       {{- end }}
 
+      {{- with .Values.workers.extraInitContainers}}
       initContainers:
-        {{- with .Values.workers.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
+      {{- end }}
       containers:
         {{- with .Values.workers.extraContainers}}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: {{ .Release.Name }}-workers
           securityContext:
-            {{- toYaml (coalesce .Values.workers.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           workingDir: /app/langwatch

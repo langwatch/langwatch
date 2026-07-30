@@ -54,10 +54,8 @@ spec:
           # Kubernetes API, so don't mount the SA token.
           automountServiceAccountToken: {{ $root.Values.global.automountServiceAccountToken }}
           # Pod security context
-          {{- with (coalesce $root.Values.cronjobs.podSecurityContext $root.Values.global.podSecurityContext) }}
           securityContext:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- include "langwatch.podSecurityContext" (dict "ctx" $root "component" $root.Values.cronjobs) | nindent 12 }}
           # Node selection
           {{- with (coalesce $root.Values.cronjobs.nodeSelector $root.Values.global.scheduling.nodeSelector) }}
           nodeSelector:
@@ -78,7 +76,7 @@ spec:
           containers:
             - name: {{ $root.Release.Name }}-{{ $jobName | kebabcase }}
               securityContext:
-                {{- toYaml (coalesce $root.Values.cronjobs.containerSecurityContext $root.Values.global.containerSecurityContext) | nindent 16 }}
+                {{- include "langwatch.containerSecurityContext" (dict "ctx" $root "component" $root.Values.cronjobs) | nindent 16 }}
               image: "{{ $root.Values.cronjobs.image.repository }}:{{ $root.Values.cronjobs.image.tag }}"
               imagePullPolicy: {{ $root.Values.cronjobs.image.pullPolicy }}
               env:

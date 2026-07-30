@@ -27,7 +27,13 @@ global:
     seccompProfile:
       type: RuntimeDefault
   ## @param global.containerSecurityContext [object] Default container security context (applied cluster-wide unless overridden).
+  # runAsNonRoot is also set at the pod level above; Kubernetes inherits it,
+  # but some Gatekeeper constraints (e.g. certain flavours of
+  # k8sreadonlyrootfilesystem) inspect the *container-level* field directly and
+  # deny pods that only carry it at pod level. Setting it on both keeps every
+  # policy variant happy without changing runtime behaviour.
   containerSecurityContext:
+    runAsNonRoot: true
     allowPrivilegeEscalation: false
     capabilities:
       drop:
@@ -1397,6 +1403,19 @@ prometheus:
 # Primary database for LangWatch application data
 ## @section PostgreSQL
 postgresql:
+  ## @extra postgresql.podSecurityContext Pod security context overrides.
+  ## @param postgresql.podSecurityContext [object] Layered over the image's own uid 999 base (runAsUser/runAsGroup/fsGroup, runAsNonRoot, RuntimeDefault seccomp). Keys you omit keep their hardened default.
+  podSecurityContext: {}
+  ## @param postgresql.containerSecurityContext [object] Container security context overrides. Layered over global.containerSecurityContext; keys you omit keep their hardened default.
+  containerSecurityContext: {}
+  ## @param postgresql.nodeSelector [object] Node selector. Falls back to global.scheduling.nodeSelector.
+  nodeSelector: {}
+  ## @param postgresql.tolerations [array] Tolerations. Falls back to global.scheduling.tolerations.
+  tolerations: []
+  ## @param postgresql.affinity [object] Affinity rules. Falls back to global.scheduling.affinity.
+  affinity: {}
+  ## @param postgresql.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs (socket dir, /tmp) the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+  scratchSizeLimit: 1Gi
   # Whether to manage PostgreSQL via this chart or use external instance
   ## @param postgresql.chartManaged [default: true] Manage PostgreSQL via this chart.
   chartManaged: true
@@ -1599,6 +1618,19 @@ clickhouse:
 # In-memory data store for caching and session management
 ## @section Redis
 redis:
+  ## @extra redis.podSecurityContext Pod security context overrides.
+  ## @param redis.podSecurityContext [object] Layered over the image's own uid 999 base (runAsUser/runAsGroup/fsGroup, runAsNonRoot, RuntimeDefault seccomp). Keys you omit keep their hardened default.
+  podSecurityContext: {}
+  ## @param redis.containerSecurityContext [object] Container security context overrides. Layered over global.containerSecurityContext; keys you omit keep their hardened default.
+  containerSecurityContext: {}
+  ## @param redis.nodeSelector [object] Node selector. Falls back to global.scheduling.nodeSelector.
+  nodeSelector: {}
+  ## @param redis.tolerations [array] Tolerations. Falls back to global.scheduling.tolerations.
+  tolerations: []
+  ## @param redis.affinity [object] Affinity rules. Falls back to global.scheduling.affinity.
+  affinity: {}
+  ## @param redis.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs (socket dir, /tmp) the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+  scratchSizeLimit: 1Gi
   # Whether to manage Redis via this chart or use external instance
   ## @param redis.chartManaged [default: true] Manage Redis via this chart.
   chartManaged: true
