@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
-import { TIME_LOCAL_AGGREGATE_TYPES } from "../../stores/rehydrationWindow";
 import { createMockFoldProjectionStore } from "../../services/__tests__/testHelpers";
+import { TIME_LOCAL_AGGREGATE_TYPES } from "../../stores/rehydrationWindow";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-  EvaluationAnalyticsFoldProjection,
   type EvaluationAnalyticsData,
+  EvaluationAnalyticsFoldProjection,
 } from "../evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import { EvaluationAnalyticsStore } from "../evaluation-processing/projections/evaluationAnalytics.store";
 import {
-  TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
 } from "../trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "../trace-processing/projections/traceAnalytics.store";
 import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
@@ -119,9 +119,7 @@ describe("fold projection contracts", () => {
   });
 
   describe("given the trace-analytics store commits a state", () => {
-    const context = (
-      appliedEventIds?: string[],
-    ): ProjectionStoreContext => ({
+    const context = (appliedEventIds?: string[]): ProjectionStoreContext => ({
       aggregateId: "trace-1",
       tenantId: "tenant-1" as ProjectionStoreContext["tenantId"],
       ...(appliedEventIds ? { appliedEventIds } : {}),
@@ -220,9 +218,7 @@ describe("fold projection contracts", () => {
   });
 
   describe("given the evaluation-analytics store commits a state", () => {
-    const context = (
-      appliedEventIds?: string[],
-    ): ProjectionStoreContext => ({
+    const context = (appliedEventIds?: string[]): ProjectionStoreContext => ({
       aggregateId: "eval-1",
       tenantId: "tenant-1" as ProjectionStoreContext["tenantId"],
       ...(appliedEventIds ? { appliedEventIds } : {}),

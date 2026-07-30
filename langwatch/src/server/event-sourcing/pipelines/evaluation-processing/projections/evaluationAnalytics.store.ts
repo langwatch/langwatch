@@ -171,4 +171,3 @@ export class EvaluationAnalyticsStore
     return (await this.getWithApplied(aggregateId, context)).state;
   }
 }
-

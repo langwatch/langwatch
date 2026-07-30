@@ -522,11 +522,11 @@ function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
       asNumber(record.SpanCount) > 0 ||
       asNumber(record.EarliestSpanStartMs) > 0 ||
       !["", "0"].includes(
-        asStringMap(record.Attributes)[
-          "langwatch.reserved.log_record_count"
-        ] ?? "",
+        asStringMap(record.Attributes)["langwatch.reserved.log_record_count"] ??
+          "",
       ) ||
-      String(record.Version ?? "") < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+      String(record.Version ?? "") <
+        TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 
     spanCount: asNumber(record.SpanCount),
     annotationIds: asStringArray(record.AnnotationIds),
