@@ -625,10 +625,11 @@ const presentations = {
     title: "This account's billing profile isn't active",
     describe: () => "We've been notified. Contact support to get set back up.",
   },
-  billing_currency_unavailable: {
-    // fault: provider. We couldn't confirm the billing currency, so we stopped
-    // before creating anything. Saying nothing was charged comes first.
-    title: "Couldn't confirm your billing currency",
+  billing_provider_unavailable: {
+    // fault: provider. Only raised for rate limiting or an unreachable
+    // provider, so waiting genuinely is the action — and nothing happened,
+    // which is the first thing anyone wants to know.
+    title: "Billing is busy right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
   seat_billing_unavailable: {
