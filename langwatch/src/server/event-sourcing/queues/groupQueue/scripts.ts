@@ -1705,8 +1705,10 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
  * Writing only the per-job field left both null on every entry this path creates,
  * and `movedAt ?? 0` sorts a null LAST — so the automatic, high-frequency entries
  * ended up at the bottom of the list, below every operator-moved group, with no
- * text to identify them. Additive: `replayFromDlq` deletes this key wholesale on
- * restore, and the index sweep only asks whether it is non-empty.
+ * text to identify them. Safe for both of this key's other readers either way:
+ * `replayFromDlq` deletes it wholesale on restore, and the index sweep only asks
+ * whether it is non-empty — which this script always leaves it, since the fields
+ * it writes outnumber the one it clears.
  *
  * Those two fields are group-level by definition, so several dead-lettered jobs in
  * one group share them: the list shows the MOST RECENT job's summary and time, and
