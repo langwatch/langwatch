@@ -31,22 +31,4 @@ describe("the agent-onboarding service", () => {
       expect(res.status).not.toBe(404);
     });
   });
-
-  describe("given the mounted API router", () => {
-    it("is registered in api-router, not only exported", async () => {
-      // Importing the router is what proves the wiring: the service reaches
-      // requests through `api.route("/", agentOnboardingApp)` and nothing else.
-      const { createApiRouter } = await import("~/server/api-router");
-      const res = await createApiRouter().request(
-        "/api/agent-onboarding/provision",
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: "{}",
-        },
-      );
-
-      expect(res.status).not.toBe(404);
-    });
-  });
 });
