@@ -259,7 +259,7 @@ export async function ensureLangwatchDeps(
 	// links, and the first runtime import dies minutes later inside a
 	// migration. Turn that into an install-time failure that names the
 	// packaging gap. (Exactly how 3.6.0 shipped: both .npmignore files still
-	// excluded platform/app/packages/ after runtime packages moved in.)
+	// excluded the app's packages/ after runtime packages moved in.)
 	assertWorkspaceLinksResolve(nodeModulesPath);
 
 	// Written LAST so an interrupted run never records success: any of the

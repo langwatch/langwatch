@@ -65,7 +65,6 @@ const SPECS_ROOTS = [
 const DEFAULT_TEST_ROOTS: string[] = [
   "platform/app/src",
   "platform/app/ee",
-  "platform/app/packages",
   "platform/app/scripts",
   "packages",
   "mcp/typescript/src",

@@ -37,7 +37,15 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
  * `satisfies` in `presentation.ts` had nothing to complain about. A guard that
  * only looks where the codes already are is a guard that passes forever.
  */
-const ROOTS = ["src", "ee", "packages"].map((dir) => join(PACKAGE_ROOT, dir));
+const ROOTS = [
+  join(PACKAGE_ROOT, "src"),
+  join(PACKAGE_ROOT, "ee"),
+  // The workspace packages sit at the REPO root, not under the app — they were
+  // lifted out of `platform/app/packages/` when the nine were consolidated into
+  // one tree. Pointing this at the app-local path again would make the walk
+  // silently skip them, which is the failure mode the docblock above describes.
+  join(PACKAGE_ROOT, "../../packages"),
+];
 
 /**
  * Codes the ROOT workspace package raises rather than an app-level subclass, so

@@ -255,7 +255,7 @@ if [ -f "$ROOT/langwatch/dist/client/index.html" ]; then
   # exactly the kind of check that must not be timing-dependent.
   listing="$(mktemp)"
   tar -tzf "$tarball" > "$listing"
-  if ! grep -qx "package/app/langwatch/dist/client/index.html" "$listing"; then
+  if ! grep -qx "package/app/platform/app/dist/client/index.html" "$listing"; then
     rm -f "$listing"
     echo "✗ the repo has a built platform/app/dist/client but the tarball does not ship it." >&2
     echo "  Something filtered it out after staging — check for an ignore file in the staged tree." >&2

@@ -48,7 +48,7 @@ The CLI shows a multi-select that **lists every pre-dep but does not allow de-se
 | postgres   | Prisma data store                    | `embedded-postgres` npm package (binary embed) | `~/.langwatch/postgres/` (data + binary)                  |
 | redis      | queues, caches                       | official binary build via `redis-server.zip`   | `~/.langwatch/redis/`                                     |
 | clickhouse | analytics + traces                   | langwatch/clickhouse-serverless tarball (~100MB) | `~/.langwatch/clickhouse/`                                |
-| go-gateway | AI Gateway (data plane)              | prebuilt monobinary from GH Releases           | `~/.platform/app/bin/aigateway-{os}-{arch}` |
+| go-gateway | AI Gateway (data plane)              | prebuilt monobinary from GH Releases           | `~/.langwatch/bin/aigateway-{os}-{arch}` |
 
 **Skipped:** Go toolchain (we ship monobinaries built per platform — same matrix the helm/release pipeline already builds). Pnpm (npm/pnpm workspace install handles it transitively when `npx` resolves the package).
 
@@ -133,7 +133,7 @@ The resolved port-base is persisted to `install-manifest.json.lastPortBase`. `BA
 
 ---
 
-## 6. Generated secrets and `.env` (`~/.platform/app/.env`)
+## 6. Generated secrets and `.env` (`~/.langwatch/.env`)
 
 Authoritative in code: `packages/server/src/shared/env.ts` (function `buildEnv`). Generated on **first run**, persisted, never overwritten on subsequent runs unless explicitly forced.
 
@@ -183,7 +183,7 @@ The CLI flow (smith) is:
 const runtime = await loadRuntime(); // dynamic import of services/runtime.ts, falls back to placeholder
 const ctx: RuntimeContext = { ports, paths, predeps, envFile, version };
 
-await runtime.scaffoldEnv(ctx);            // (1) write ~/.platform/app/.env if missing
+await runtime.scaffoldEnv(ctx);            // (1) write ~/.langwatch/.env if missing
 await runtime.installServices(ctx);        // (2) uv sync for langwatch_nlp + langevals (parallel)
 const handles = await runtime.startAll(ctx); // (3) spawn every service, return handles
 await runtime.waitForHealth(ctx, { timeoutMs: 60_000 }); // (4) block until every health check passes

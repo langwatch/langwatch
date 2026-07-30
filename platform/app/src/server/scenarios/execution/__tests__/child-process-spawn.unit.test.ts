@@ -34,7 +34,7 @@ vi.mock("@langwatch/observability", () => ({
 
 import fs from "fs";
 
-const PACKAGE_ROOT = "/app/langwatch";
+const PACKAGE_ROOT = "/app/platform/app";
 
 describe("resolveChildProcessSpawn", () => {
   beforeEach(() => {

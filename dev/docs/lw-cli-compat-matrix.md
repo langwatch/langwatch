@@ -132,7 +132,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 - Three REST error dialects exist server-side (see `handled-error.ts` consumers):
   flattened `{error, message, ...meta, trace:{…}}` (drops `reasons`/`traceUrl`),
   verbatim `serialize()` under `domainError`, and the new framework envelope in
-  `platform/app/packages/api/src/errors.ts`. `parseHandledError` reads all three —
+  `packages/api/src/errors.ts`. `parseHandledError` reads all three —
   including lifting dialect-1's `trace.traceId`/`trace.traceUrl` out of the nested
   block (they used to land inertly in `meta.trace`) and preserving
   `reasons`/`traceUrl` where dialects 2–3 send them.

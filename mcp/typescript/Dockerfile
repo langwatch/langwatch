@@ -18,12 +18,12 @@ COPY packages/handled-error ./packages/handled-error
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
 COPY platform/app/package.json ./platform/app/
-COPY platform/app/packages/redaction/package.json ./platform/app/packages/redaction/
-COPY platform/app/packages/ssrf/package.json ./platform/app/packages/ssrf/
-COPY platform/app/packages/api/package.json ./platform/app/packages/api/
-COPY platform/app/packages/automations/package.json ./platform/app/packages/automations/
-COPY platform/app/packages/observability/package.json ./platform/app/packages/observability/
-COPY platform/app/packages/react-rum/package.json ./platform/app/packages/react-rum/
+COPY packages/redaction/package.json ./packages/redaction/
+COPY packages/ssrf/package.json ./packages/ssrf/
+COPY packages/api/package.json ./packages/api/
+COPY packages/automations/package.json ./packages/automations/
+COPY packages/observability/package.json ./packages/observability/
+COPY packages/react-rum/package.json ./packages/react-rum/
 COPY packages/langy/package.json ./packages/langy/
 COPY packages/server/package.json ./packages/server/
 COPY sdks/typescript/package.json ./sdks/typescript/
@@ -33,8 +33,8 @@ RUN pnpm install --frozen-lockfile --filter "@langwatch/mcp-server..."
 
 # The redaction and ssrf sources the MCP server imports, copied after the
 # install so a source edit does not invalidate the dependency layer.
-COPY platform/app/packages/redaction ./platform/app/packages/redaction
-COPY platform/app/packages/ssrf ./platform/app/packages/ssrf
+COPY packages/redaction ./packages/redaction
+COPY packages/ssrf ./packages/ssrf
 
 WORKDIR /app
 COPY mcp/typescript/ ./mcp/typescript/

@@ -340,7 +340,7 @@ export function truncateJsonlToByteBudget({
  * can read the rules that scrub their report before deciding to send it.
  */
 export const REDACTION_AUDIT_URL =
-  "https://github.com/langwatch/langwatch/blob/main/langwatch/packages/redaction/src/sessionReport.ts";
+  "https://github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts";
 
 /**
  * Human-readable summary of everything the session-report redaction removes.

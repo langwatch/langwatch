@@ -76,7 +76,7 @@ describe("langwatch report help", () => {
       expect(help).toContain("provider API keys");
       expect(help).toContain("email addresses, phone numbers, credit card numbers");
       expect(help).toContain(
-        "github.com/langwatch/langwatch/blob/main/langwatch/packages/redaction/src/sessionReport.ts",
+        "github.com/langwatch/langwatch/blob/main/packages/redaction/src/sessionReport.ts",
       );
     });
   });

@@ -198,7 +198,7 @@ jobs:
           # (node_modules/@langwatch/server), so the run exercises the same
           # relocation + install path npm users get and the app tree is
           # exactly the published artifact. Booting the checkout instead
-          # masks packaging gaps: 3.6.0 shipped without platform/app/packages/*
+          # masks packaging gaps: 3.6.0 shipped without the runtime packages/*
           # (both .npmignore files still excluded the dir after runtime
           # packages moved in), every install died at first boot with
           # MODULE_NOT_FOUND, and every checkout-based smoke run passed.

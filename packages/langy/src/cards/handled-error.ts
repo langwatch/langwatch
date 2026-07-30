@@ -212,7 +212,7 @@ interface ErrorBody {
  *      `{ error: <sentence>, domainError: { code, kind, meta, traceId, reasons } }`.
  *
  *   3. THE FRAMEWORK ONE, from the new API framework
- *      (`platform/app/packages/api/src/errors.ts`): the envelope top-level —
+ *      (`packages/api/src/errors.ts`): the envelope top-level —
  *      `{ code, type, kind, message, meta, reasons, traceId, spanId, traceUrl }`,
  *      with `error` carrying the HTTP status text on unversioned routes. `meta`
  *      is a NESTED object here rather than spread, and `message` is usually the

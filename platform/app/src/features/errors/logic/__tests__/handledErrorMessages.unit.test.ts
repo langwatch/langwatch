@@ -31,7 +31,13 @@ const PACKAGE_ROOT = fileURLToPath(new URL("../../../../../", import.meta.url));
  * exactly like one declared in `src/`, so a guard that only reads `src/` is a
  * guard that passes forever for everywhere else.
  */
-const ROOTS = ["src", "ee", "packages"].map((dir) => join(PACKAGE_ROOT, dir));
+const ROOTS = [
+  join(PACKAGE_ROOT, "src"),
+  join(PACKAGE_ROOT, "ee"),
+  // Repo-root, not app-local: the workspace packages were consolidated into a
+  // single `packages/` tree. See codes.unit.test.ts for the same walk.
+  join(PACKAGE_ROOT, "../../packages"),
+];
 
 /**
  * Below this many messages, assume the extractor stopped matching rather than

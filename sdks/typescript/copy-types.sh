@@ -130,12 +130,12 @@ console.log('Wrote ' + out + ' (' + map.features.length + ' top-level features)'
 node scripts/generate-skills-bundle.mjs
 
 # Session-report redaction — the CLI ships the EXACT engine the platform uses
-# (platform/app/packages/redaction), copied verbatim so agents auditing the
+# (packages/redaction), copied verbatim so agents auditing the
 # published GitHub source read the same code that scrubs their report before it
 # is sent. The drift test in cli/commands/__tests__/report-redaction-drift
 # pins the mirror byte-for-byte; regenerate with this script after editing the
 # canonical package.
 mkdir -p src/internal/generated/redaction
 for f in markers.ts secrets.ts sessionReport.ts; do
-  cp "../../platform/app/packages/redaction/src/$f" "src/internal/generated/redaction/$f"
+  cp "../../packages/redaction/src/$f" "src/internal/generated/redaction/$f"
 done

@@ -174,7 +174,7 @@ When debugging locally, **prefer the observability stack over the log file if it
 ```
 platform/app/        # Vite app (main product)
 langwatch_server/    # Python server
-services/nlpgo/      # Go NLP engine (:5561, built as platform/app/langwatch_nlp)
+services/nlpgo/      # Go NLP engine (:5561, built as langwatch/langwatch_nlp)
 services/aigateway/  # Go AI Gateway data plane (:5563)
 charts/gateway/ # Helm sub-chart for the gateway
 sdks/python/         # Python SDK

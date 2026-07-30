@@ -116,12 +116,12 @@ COPY sdks/typescript ./sdks/typescript
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
 COPY platform/app/package.json ./platform/app/
-COPY platform/app/packages/api/package.json ./platform/app/packages/api/
-COPY platform/app/packages/automations/package.json ./platform/app/packages/automations/
-COPY platform/app/packages/observability/package.json ./platform/app/packages/observability/
-COPY platform/app/packages/react-rum/package.json ./platform/app/packages/react-rum/
-COPY platform/app/packages/redaction/package.json ./platform/app/packages/redaction/
-COPY platform/app/packages/ssrf/package.json ./platform/app/packages/ssrf/
+COPY packages/api/package.json ./packages/api/
+COPY packages/automations/package.json ./packages/automations/
+COPY packages/observability/package.json ./packages/observability/
+COPY packages/react-rum/package.json ./packages/react-rum/
+COPY packages/redaction/package.json ./packages/redaction/
+COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/handled-error/package.json ./packages/handled-error/
 COPY packages/server/package.json ./packages/server/
 COPY mcp/typescript/package.json ./mcp/typescript/
@@ -151,7 +151,7 @@ COPY platform/app/src/server/filters/types.ts            /src/platform/app/src/s
 COPY platform/app/src/server/evaluations/types.ts        /src/platform/app/src/server/evaluations/types.ts
 COPY platform/app/src/server/evaluations/evaluators.native.ts /src/platform/app/src/server/evaluations/evaluators.native.ts
 COPY platform/app/src/server/modelProviders/llmModels.json /src/platform/app/src/server/modelProviders/llmModels.json
-COPY platform/app/packages/redaction/src               /src/platform/app/packages/redaction/src
+COPY packages/redaction/src                           /src/packages/redaction/src
 COPY platform/app/src/app/api/openapiLangWatch.json      /src/platform/app/src/app/api/openapiLangWatch.json
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
 # copy-types.sh also embeds the repo-root feature-map.json (feature-map.generated.ts),

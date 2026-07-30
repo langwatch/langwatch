@@ -387,7 +387,7 @@ export class NotFoundError extends HandledError {
    *
    * This package sits UPSTREAM of every tree that enumerates codes: the app
    * (`platform/app/src/features/errors/logic/codes.ts`), the MCP server and
-   * `platform/app/packages/api` all depend on it, and none of them can be
+   * `packages/api` all depend on it, and none of them can be
    * depended on from here without inverting that edge into a cycle. There is
    * also no single union to narrow to — each consumer owns its own code list,
    * and a union of one of them would reject the others' perfectly valid codes.

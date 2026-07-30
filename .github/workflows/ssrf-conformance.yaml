@@ -44,7 +44,7 @@ jobs:
           filters: |
             ssrf:
               - 'pkg/ssrf/**'
-              - 'platform/app/packages/ssrf/**'
+              - 'packages/ssrf/**'
               - '.github/workflows/ssrf-conformance.yaml'
 
   conformance:

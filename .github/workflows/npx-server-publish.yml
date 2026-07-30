@@ -238,8 +238,8 @@ jobs:
           # Every workspace package in the checkout must ship: a missing one
           # leaves dangling pnpm links in the installed tree and the app dies
           # with MODULE_NOT_FOUND at first boot; 3.6.0 shipped exactly that
-          # way (.npmignore still excluded platform/app/packages/ after runtime
-          # packages moved in). Both root packages/* and platform/app/packages/*
+          # way (.npmignore still excluded the app's packages/ after runtime
+          # packages moved in). The root packages/* members
           # are derived from a directory listing rather than named one by one,
           # so a new package on either side is covered by this gate the day
           # it appears, with nothing to remember to add here.
@@ -247,7 +247,7 @@ jobs:
           # of the single workspace, so `--frozen-lockfile` on the end user's
           # machine checks the lockfile against its manifest and fails without
           # it. Every member's package.json must ship, this one included.
-          for pkgdir in platform/app/packages/*/ packages/*/; do
+          for pkgdir in packages/*/; do
             pkgdir="${pkgdir%/}"
             [ -f "$pkgdir/package.json" ] || continue
             required+=("package/app/$pkgdir/package.json")

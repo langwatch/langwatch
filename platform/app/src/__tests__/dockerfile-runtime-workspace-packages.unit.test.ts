@@ -10,9 +10,6 @@
  * `Cannot find module '@langwatch/<name>'` — which is exactly how
  * `@langwatch/handled-error` broke the workers entry point after it was added
  * as a root workspace package but never added to the runtime stage.
- *
- * Packages under `platform/app/packages/*` are exempt: they ride along with
- * `COPY --from=builder /app/langwatch ./langwatch`.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
