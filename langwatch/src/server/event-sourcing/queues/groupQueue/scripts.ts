@@ -1749,7 +1749,7 @@ redis.call("HSET", dlqErrorKey, "message", summary, "timestamp", ARGV[5])
 -- error hash into this very key without clearing the destination — stack
 -- included — so a group moved earlier in the same quarantine window leaves one
 -- behind, and overwriting only message/timestamp would have the dead-letter list
--- render `error` from this failure next to `errorStack` from a different one. A
+-- render "error" from this failure next to "errorStack" from a different one. A
 -- null stack is honest; a mismatched pair is worse than none. Cleared here, in
 -- the same script, so it is atomic with the summary it belongs to — and AFTER
 -- the per-job HSET above for the same reason the group-level fields are written

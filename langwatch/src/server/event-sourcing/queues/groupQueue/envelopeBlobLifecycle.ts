@@ -434,18 +434,18 @@ export class EnvelopeBlobLifecycle {
       }
       return this.classifyUnreferencedForDlq({ value, groupId });
     } catch (err) {
-      const window = unextendedRecoveryWindow({ releasesLeaseAfter });
+      const recoveryWindow = unextendedRecoveryWindow({ releasesLeaseAfter });
       logger.warn(
         {
           groupId,
           // Structured twin of the clause in the message, from the same value, so
           // an alert threshold and the sentence oncall reads cannot disagree.
-          recoveryWindowSeconds: window.seconds,
+          recoveryWindowSeconds: recoveryWindow.seconds,
           error: redactStorageUrisInText(
             err instanceof Error ? err.message : String(err),
           ),
         },
-        `Blob TTL preserve-for-DLQ failed — the dead-letter entry will outlive the body it references unless it is drained within ${window.description}`,
+        `Blob TTL preserve-for-DLQ failed — the dead-letter entry will outlive the body it references unless it is drained within ${recoveryWindow.description}`,
       );
       return "unextended";
     }
