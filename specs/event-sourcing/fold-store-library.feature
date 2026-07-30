@@ -35,6 +35,10 @@ Feature: A fold declares how its state round-trips, and nothing else
     Then the recovered state is the state that was committed
     And the record's own bookkeeping about what has already been folded comes back with it
 
+  # Superseded by ADR-101 decision 4: an unreadable record is reported as
+  # found and refused, never rebuilt inline. The remedy is an operator-run
+  # replay, not a fold-triggered rebuild.
+  @unimplemented
   Scenario: a record written under a shape this build cannot read is rebuilt
     Given a fold that has since changed the shape of the record it keeps
     And an aggregate whose record was written under the older shape
@@ -49,6 +53,10 @@ Feature: A fold declares how its state round-trips, and nothing else
     Then it starts from an empty state
     And nothing is reported as unreadable
 
+  # Superseded by ADR-101 decision 4: a fold is no longer required to be able
+  # to rebuild what it refuses — refusal is a hard error with an operator-run
+  # replay as the remedy, not a capability the fold itself must have.
+  @unimplemented
   Scenario: a fold that can refuse a record can always rebuild one
     Given any fold that decides which shapes of record it can read
     Then that fold is able to rebuild an aggregate it refuses
@@ -61,6 +69,9 @@ Feature: A fold declares how its state round-trips, and nothing else
     Then the record is recovered rather than rebuilt
     And a record of the same name carrying no such evidence is rebuilt instead
 
+  # Superseded by ADR-101 decision 4: a withdrawn shape is refused like any
+  # other unreadable record, not rebuilt inline by the fold.
+  @unimplemented
   Scenario: a shape whose records are known to be wrong is rebuilt even though it can be read
     Given a fold that has withdrawn a shape whose records recorded the wrong thing
     And an aggregate whose record was written under that withdrawn shape

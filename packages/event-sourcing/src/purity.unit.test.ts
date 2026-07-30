@@ -16,11 +16,7 @@ import { describe, expect, it } from "vitest";
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)));
 
-/**
- * Bare specifiers the package may import. Node builtins are permitted in test
- * files only — the guard below enforces that separately, because a builtin in
- * library code is usually a hidden platform assumption.
- */
+/** The manifest, read at test time — see {@link DECLARED_DEPENDENCIES}. */
 const PACKAGE_JSON = JSON.parse(
   readFileSync(join(SRC, "..", "package.json"), "utf8"),
 ) as {

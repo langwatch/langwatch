@@ -571,9 +571,11 @@ for the other kinds.
   + fire-history the report configuration and delivery surface extend.
 - [ADR-052](./052-automations-on-process-manager-substrate.md) — the durable wake,
   leased intent, and GroupQueue substrate used by automation reactions.
-- [ADR-025](./025-remove-orphan-sweep.md) — the removed self-perpetuating reactor
-  chain; the cautionary tale for why a "re-enqueue the next wait" queue-chain is
-  rejected in favour of a durable-row poll.
+- [ADR-089](./089-data-retention.md) ("Orphan sweep: added, then removed") —
+  the removed self-perpetuating reactor chain, originally its own ADR-025,
+  absorbed into 089 on 2026-07-30; the cautionary tale for why a
+  "re-enqueue the next wait" queue-chain is rejected in favour of a
+  durable-row poll.
 - [ADR-040](./040-webhook-http-request-automation-channel.md) — the webhook notify
   channel a report can target, and the precedent for putting channel/source config
   in `actionParams` rather than a new column.

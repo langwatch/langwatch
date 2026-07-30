@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-01
 
-**Status:** Accepted — but the **orphan-cleanup half** described here (the PG-side sweep of rows referencing TTL-expired traces) was **removed** on 2026-06-03; see [ADR-025](./025-remove-orphan-sweep.md). The ClickHouse-native TTL retention below remains in force; mentions of the "orphan sweep" / "orphan-cleanup" are historical.
+**Status:** Accepted — but the **orphan-cleanup half** described here (the PG-side sweep of rows referencing TTL-expired traces) was **removed** on 2026-06-03; see "Orphan sweep: added, then removed" below (originally its own ADR-025, absorbed into this document on 2026-07-30). The ClickHouse-native TTL retention below remains in force; mentions of the "orphan sweep" / "orphan-cleanup" are historical.
 
 ## Context
 
@@ -42,7 +42,8 @@ The design space had four hard constraints:
    idempotent.
 
 The orphan-cleanup half of this — PG rows referencing CH traces that TTL
-deletes — has a distinct enough shape that it gets its own ADR (ADR-023).
+deletes — has a distinct enough shape that it is addressed as its own section
+below, "Orphan sweep: added, then removed".
 
 ## Decision
 
@@ -153,6 +154,36 @@ DELETE clause. An earlier P1 had retention gated on cold storage too —
 fixed: retention reconciles whenever CH is configured, cold-storage only
 when `CLICKHOUSE_COLD_STORAGE_ENABLED=true`.
 
+### TTL anchor and ADR-099's frozen-column rule
+
+ADR-099 (written after this ADR) requires a TTL anchor to pass two tests at
+once — frozen for the row's life, and set by the platform, never the
+customer — and names `event_log`'s own TTL as the worked example of what
+happens when it doesn't: `EventOccurredAt` is customer-supplied, so a skewed
+producer clock scatters retention early or late and a future-stamped event can
+outlive its 49 days entirely. `event_log` is in the managed-table list above
+and its anchor has not changed since ADR-099 was written — the defect is
+inherited, not new, and ADR-099 is where it is tracked.
+
+`evaluation_analytics` fails the same test for a different reason: its anchor
+column, also named `OccurredAt`, is stamped from the latest event by migration
+00041 and therefore moves as an evaluation progresses (`schema-catalogue.ts`
+records this as `partitionColumnStability: "movable"`) — platform-set, but not
+frozen. `trace_analytics`'s identically-named `OccurredAt` is the contrast
+case: ADR-071 made it a write-once storage anchor, frozen thereafter, so it
+passes both tests despite the shared column name.
+
+Neither case is a new finding surfaced here — ADR-099 documents `event_log`
+directly, and the schema catalogue's own stability field documents
+`evaluation_analytics`. Both predate ADR-099's rule and neither has been
+re-anchored to comply with it; that re-anchoring is `defineTable`-era work
+under ADR-099, not a change to the per-tenant retention design decided in this
+ADR. This ADR's own rule — one TTL `DELETE` clause per table, anchored on
+whatever column its author picked — does not disagree with ADR-099's stricter
+test in principle; it simply predates it, and the two tables above are where
+the two ADRs currently disagree in practice, tracked as ADR-099 follow-up
+rather than restated here.
+
 ### Ingestion stamping
 
 Every CH repository for the 11 managed tables takes a
@@ -257,6 +288,66 @@ payload, truncated to 4KB), `organizationId` / `projectId` from input,
 from the result. Surfaced through `/settings/audit-log`. Indexed on
 `(organizationId, createdAt)` for forensics queries.
 
+### Orphan sweep: added, then removed
+
+ClickHouse-native TTL, above, drops trace rows at merge time. It does not
+touch PostgreSQL rows that reference a trace by `traceId` — `Annotation`,
+`AnnotationQueueItem`, `PublicShare`, `TriggerSent`, `PinnedTrace` — so those
+rows can outlive the trace they point at.
+
+The first answer to that gap was a per-tenant **orphan sweep**: an ingestion
+reactor seeded a self-perpetuating BullMQ chain that walked candidates and
+deleted them. That mechanism became the costly part of the system rather than
+the cheap cleanup it was meant to be:
+
+- It was the **direct trigger of the 2026-06-02 retention incident** (RC #2):
+  a `:` in the BullMQ custom jobId was rejected, `QueueWithFallback` fell back
+  to running the heavy sweep **inline on the ingestion path**, and ClickHouse
+  was hammered per trace event.
+- Containing and re-doing it consumed two follow-up efforts — a hot-fix and a
+  full groupQueue migration (PR #4524) — for a feature whose only job was
+  opportunistic cleanup of rows that are, at worst, dangling references in the
+  UI.
+
+The cost/benefit didn't hold, so on 2026-06-03 the sweep was **removed
+entirely** — this removed only the PostgreSQL traceId-reference sweep; it did
+not touch storage-level orphaned-trace cleanup (`cleanupOrphanedTraces` /
+`cleanupOrphanedHotTraces`, invoked from `server/routes/cron.ts`, which
+stays). Deleted: the `data-retention/orphan-sweep/` service, repository,
+reactor and cursor store; the `orphanSweepChainQueue`/`orphanSweepChainWorker`
+pair; and all wiring — the trace-processing reactor attach, the
+`PipelineRegistry`/`DataRetentionDependencies` plumbing, the worker
+registration, the `orphan_sweep_chain` job metric and the
+`data_retention_orphans_swept_total` counter, and
+`specs/data-retention/orphan-sweep.feature`. PR #4524 (the groupQueue
+migration) was closed unmerged, superseded by the removal.
+
+**Accepted negative.** PG rows that reference TTL-expired traces now accrue
+indefinitely: an `Annotation`/`AnnotationQueueItem` for an expired trace
+remains (may surface as an entry pointing at a trace that no longer loads); a
+`PublicShare` of an expired trace remains (the link resolves to a missing
+trace); `TriggerSent.traceId` keeps pointing at an expired trace; a
+`PinnedTrace` of an expired trace remains, its pin resolving to nothing. These
+are accepted as non-crashing phantoms; read-time handling, where worth it, is
+deliberately out of scope and tracked as follow-ups (annotation phantom tasks
++ inflated queue counts → #4529; trigger suppression on same-project
+trace-id reuse → #4530; public-share authorization not scoped to `projectId`,
+a pre-existing cross-tenant concern independent of this removal → #4531).
+Storage growth from the accrual is negligible relative to the trace volume
+that drove this retention work in the first place.
+
+**Positive.** The ingestion path can never again be coupled to a heavy
+multi-table cleanup. One fewer queue, worker, reactor and Redis cursor to
+operate. The retention story is now purely ClickHouse-native TTL, as
+documented above.
+
+**If it ever needs to come back**, prefer **read-time filtering** — skip/hide
+PG rows whose trace no longer exists, at the point of display — over a
+background deleter: it never couples to ingestion and only does work for rows
+actually read. A one-off backfill cleanup op can handle accumulated rows if
+storage ever matters. Either would earn its own ADR rather than reviving this
+section's mechanism.
+
 ## Rationale / Trade-offs
 
 **Default 49 days, not unlimited.** Default-on. Opting out is the paid
@@ -304,14 +395,17 @@ only acceptable in test fixtures; production paths always fall back to
 `PLATFORM_DEFAULT_RETENTION_DAYS`.
 
 **Neutral.** Pinning growth is unbounded — manual pins survive until
-explicitly unpinned. Since the orphan sweep was removed (ADR-025), a
-pin's `PinnedTrace` row is no longer cleaned when its trace TTLs out; it
-lingers as a stale reference. Acceptable given expected pin volume.
+explicitly unpinned. Since the orphan sweep was removed (see "Orphan sweep:
+added, then removed" above), a pin's `PinnedTrace` row is no longer cleaned
+when its trace TTLs out; it lingers as a stale reference. Acceptable given
+expected pin volume.
 
 ## References
 
-- Related ADRs: ADR-023 (orphan-sweep reactor + chain — superseded),
-  ADR-025 (orphan sweep removed), ADR-019 (repository-service layering)
+- Related ADRs: ADR-019 (repository-service layering). The orphan-sweep
+  removal was originally its own ADR (023, superseded by 025), then 025 was
+  itself absorbed as the section above on 2026-07-30 — see
+  `dev/docs/adr/README.md`'s retired-numbers table for the full chain.
 - Migration: `platform/app/src/server/clickhouse/migrations/00032_add_retention_and_size_columns.sql`
 - Code: `platform/app/src/server/data-retention/`,
   `platform/app/src/server/clickhouse/ttlReconciler.ts`,

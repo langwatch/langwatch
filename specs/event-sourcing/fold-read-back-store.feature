@@ -64,6 +64,10 @@ Feature: Fold projections read back their own state
     Then the fold recovers the committed state from its own store
     And it does not replay the aggregate's history from the event log
 
+  # Superseded by ADR-101 decision 4: an old-shape row is reported as found
+  # and refused, not rebuilt inline. The remedy is an operator-run replay
+  # (ADR-101), never a delivery-path read of event_log (ADR-098 decision 3).
+  @unimplemented
   Scenario: a stored state written under an older shape is rebuilt rather than trusted
     Given a fold that has since changed the shape of the state it stores
     And an aggregate whose committed state was written under the older shape
@@ -88,6 +92,9 @@ Feature: Fold projections read back their own state
     Then the fold reports the failure rather than starting from an empty state
     And the committed state is left as it is
 
+  # Superseded by ADR-101 decision 4: an old-shape row is refused rather than
+  # rebuilt inline, so there is no delivery-path rebuild left to retire.
+  @unimplemented
   Scenario: rebuilding an aggregate once retires it from rebuilding again
     Given an aggregate whose state was rebuilt because it had been stored under an older shape
     When a further event for that aggregate arrives
@@ -118,6 +125,10 @@ Feature: Fold projections read back their own state
     When its cached state is lost and a later event arrives
     Then that classification is still part of the aggregate's state
 
+  # Superseded by ADR-098 decision 5: the durably-persisted applied-event set
+  # (AppliedEventIds) is abolished in favour of a per-group delivery sequence
+  # — one scalar column, not an array of applied event ids.
+  @unimplemented
   Scenario: a redelivered batch after a committed write does not double-count
     Given a fold that persists its applied-event set durably next to its state
     And an aggregate whose committed state already contains a delivered batch
@@ -126,6 +137,11 @@ Feature: Fold projections read back their own state
     Then the fold recognises every event as already applied
     And the stored state is unchanged
 
+  # Superseded by ADR-098 decision 3 and ADR-101: a "deliberate rebuild"
+  # triggered inline by a fold is gone entirely — the only rebuild mechanism
+  # left is an offline, operator-run replay (ADR-101), which nothing on the
+  # delivery path can invoke.
+  @unimplemented
   Scenario: the event log is read only for a deliberate rebuild
     Given a projection whose logic version has changed
     When an operator replays the projection

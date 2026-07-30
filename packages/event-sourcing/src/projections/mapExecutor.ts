@@ -11,6 +11,7 @@
  * events down to one write.
  */
 
+import { noopMetrics } from "../ports/metrics";
 import type { Metrics } from "../ports/metrics";
 import { withSpan } from "../ports/tracing";
 import type { AppendStore, MergeStore } from "./store.types";
@@ -60,13 +61,17 @@ export interface MapExecutorDeps<Event, Record> {
 export function createMapExecutor<Event, Record>(
   deps: MapExecutorDeps<Event, Record>,
 ): { apply(delivery: MapDelivery<Event>): Promise<{ written: number }> } {
-  const metrics = deps.metrics;
-  const writeCounter = metrics?.counter({
+  // Defaulted to a no-op rather than left optional, for the reason `noopMetrics`
+  // exists: `metrics?.inc(...)` at each call site is a line someone eventually
+  // writes without the `?`, or forgets entirely, and the result is a gap in a
+  // dashboard rather than a failure.
+  const metrics = deps.metrics ?? noopMetrics;
+  const writeCounter = metrics.counter({
     name: "es_map_write_batch_total",
-    help: "Map projection batch writes, by projection and store kind.",
-    labelNames: ["projection", "storeKind"],
+    help: "Map projection batch writes, by projection, store kind and outcome.",
+    labelNames: ["projection", "storeKind", "outcome"],
   });
-  const recordsHistogram = metrics?.histogram({
+  const recordsHistogram = metrics.histogram({
     name: "es_map_records_written",
     help: "Records written per map projection batch, by store kind.",
     labelNames: ["projection", "storeKind"],
@@ -91,28 +96,38 @@ export function createMapExecutor<Event, Record>(
       };
 
       if (records.length === 0) {
-        writeCounter?.inc(labels);
-        recordsHistogram?.observe(0, labels);
+        writeCounter.inc({ ...labels, outcome: "empty" });
+        recordsHistogram.observe(0, labels);
         return { written: 0 };
       }
 
-      await withSpan(
-        "event-sourcing.map.write",
-        {
-          "event_sourcing.projection_name": deps.projectionName,
-          "event_sourcing.store_kind": deps.store.kind,
-          "event_sourcing.record_count": records.length,
-        },
-        async () => {
-          await deps.store.writeBatch(records, {
-            tenantId: delivery.tenantId,
-            retentionDays: delivery.retentionDays,
-          });
-        },
-      );
+      try {
+        await withSpan(
+          "es.map.write",
+          {
+            "es.projection": deps.projectionName,
+            "es.store_kind": deps.store.kind,
+            "es.record_count": records.length,
+          },
+          async () => {
+            await deps.store.writeBatch(records, {
+              tenantId: delivery.tenantId,
+              retentionDays: delivery.retentionDays,
+            });
+          },
+        );
+      } catch (error) {
+        // Counted on the same metric as a success, so the denominator is every
+        // attempt — the same rule `foldExecutor` states. A counter that only
+        // moves when the write landed makes a projection whose store is down
+        // look like a quiet one: its success rate reads 100% while its
+        // throughput falls to nothing, which is the shape an alert cannot see.
+        writeCounter.inc({ ...labels, outcome: "failed" });
+        throw error;
+      }
 
-      writeCounter?.inc(labels);
-      recordsHistogram?.observe(records.length, labels);
+      writeCounter.inc({ ...labels, outcome: "written" });
+      recordsHistogram.observe(records.length, labels);
 
       return { written: records.length };
     },

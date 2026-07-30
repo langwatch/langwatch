@@ -287,6 +287,80 @@ describe("fold executor", () => {
       ]);
     });
 
+    /** @scenario every failure lands on the same counter as a success, so the denominator is every attempt */
+    it("counts a failed store read", async () => {
+      const store: ReplaceStore<TestState> = {
+        kind: "replace",
+        read: async () => {
+          throw new Error("store unavailable");
+        },
+        write: async () => undefined,
+      };
+      const metrics = fakeMetrics();
+      const executor = createFoldExecutor({
+        store,
+        init,
+        apply,
+        stateVersion: "v1",
+        projectionName: "totals",
+        metrics,
+      });
+
+      await expect(executor.apply(delivery())).rejects.toThrow("store unavailable");
+
+      expect(metrics.counterCalls).toEqual([
+        { labels: { projection: "totals", kind: "failed" } },
+      ]);
+    });
+
+    it("counts a failed store write", async () => {
+      const store: ReplaceStore<TestState> = {
+        kind: "replace",
+        read: async () => ({ kind: "absent" }),
+        write: async () => {
+          throw new Error("store unavailable");
+        },
+      };
+      const metrics = fakeMetrics();
+      const executor = createFoldExecutor({
+        store,
+        init,
+        apply,
+        stateVersion: "v1",
+        projectionName: "totals",
+        metrics,
+      });
+
+      await expect(executor.apply(delivery())).rejects.toThrow("store unavailable");
+
+      expect(metrics.counterCalls).toEqual([
+        { labels: { projection: "totals", kind: "failed" } },
+      ]);
+    });
+
+    /** @scenario a fold that throws in its own apply is not the one failure nothing counts */
+    it("counts a throwing apply rather than leaving the delivery uncounted", async () => {
+      const store = fakeStore();
+      const metrics = fakeMetrics();
+      const executor = createFoldExecutor<TestState, TestEvent>({
+        store,
+        init,
+        apply: () => {
+          throw new Error("event 2 has no cost field");
+        },
+        stateVersion: "v1",
+        projectionName: "totals",
+        metrics,
+      });
+
+      await expect(executor.apply(delivery())).rejects.toThrow("no cost field");
+
+      expect(metrics.counterCalls).toEqual([
+        { labels: { projection: "totals", kind: "failed" } },
+      ]);
+      expect(store.writes).toEqual([]);
+    });
+
     it("counts a skipped-redelivery outcome without observing a batch size", async () => {
       const store = fakeStore({
         state: { total: 10, applied: [10] },

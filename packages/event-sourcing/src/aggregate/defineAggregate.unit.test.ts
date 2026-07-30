@@ -39,10 +39,19 @@ describe("defineAggregate", () => {
       ]);
     });
 
-    it("creates events whose type matches what the router dispatches on", () => {
+    it("creates events carrying the qualified type string and the given payload", () => {
       const run = buildRun().build();
+
       const event = run.events.itemCompleted({ cost: 5 });
-      expect(run.eventTypes).toContain(event.type);
+
+      // Asserted against the literal, not against `run.eventTypes`: both the
+      // creator and that list are built from the same internal `typeOf`, so
+      // comparing them can only ever pass. The literal is the half of the
+      // contract a call site actually depends on.
+      expect(event).toEqual({
+        type: "experiment_run/itemCompleted",
+        data: { cost: 5 },
+      });
     });
 
     it("applies an event through the handler declared beside its schema", () => {

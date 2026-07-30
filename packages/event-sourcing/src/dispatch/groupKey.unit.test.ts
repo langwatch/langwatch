@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import {
-  MalformedGroupKeyError,
-  parseGroupKey,
-  renderGroupKey,
-  scopeCanBatch,
-} from "./groupKey";
+// `MalformedGroupKeyError` lives in `../errors`, not in `./groupKey`. Imported
+// from the wrong module the binding is `undefined`, and `toThrow(undefined)`
+// degrades to "throws anything at all" — every malformed-key assertion below
+// would then be satisfied by an unrelated `TypeError` from a parsing bug.
+import { MalformedGroupKeyError } from "../errors";
+import { parseGroupKey, renderGroupKey, scopeCanBatch } from "./groupKey";
 import type { GroupKey } from "./groupKey.types";
 
 /**

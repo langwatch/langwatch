@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { compile, isCompiledSchema } from "zod-compiler";
 import { noopMetrics } from "../ports/metrics";
 import type { Metrics } from "../ports/metrics";
 
@@ -8,31 +9,36 @@ import type { Metrics } from "../ports/metrics";
  * Every stored fold state is decoded on read, and every event payload is
  * validated before `apply` sees it, so validation cost is paid per event on
  * the busiest streams. Interpreted zod pays that cost with a tree-walking
- * interpreter; ADR-099 already made this trade once for the storage codec,
- * choosing `zod-compiler` there because its sync-transform schemas compile to
- * generated code (2-43x over interpreted zod, per its own benchmarks) and its
- * documented fallbacks — `.check()`, async transforms, `z.custom()`,
- * `z.instanceof()`, algorithmic string formats, object intersections, dynamic
- * error maps — are features neither a column decoder nor an event payload has
- * reason to use.
+ * interpreter; `zod-compiler` compiles sync-transform schemas to generated
+ * code instead (2-43x over interpreted zod, per its own benchmarks).
  *
- * This module is that same seam for the core: the rest of the package calls
- * `compileSchema` and never imports `zod` for validation directly, so the
- * day a compiled backend is wired in, every call site benefits without a
- * change.
+ * `zod-compiler`'s `compile()` only emits AOT code once a build step has run
+ * over the schema — its Vite/webpack/esbuild/SWC plugin, or `zod-compiler
+ * generate` from the CLI. Neither runs for this package: it ships as plain
+ * TypeScript source with no bundler of its own, consumed by whatever build
+ * (or lack of one) the application uses. Called with no such step wired in,
+ * `compile()` returns the original schema object, identity-preserved and
+ * augmented with an allocation-light `.is()` guard, and its `parse`/
+ * `safeParse` delegate straight through to zod (`zod-compiler`'s own
+ * documented dev-time behaviour). That is still genuinely the real backend,
+ * not a stand-in for it: the schema handed to `compile()` here is the exact
+ * object a downstream build step would compile, so the day one is wired in,
+ * every call through this seam speeds up without a change on either side.
  *
- * **That day has not arrived yet.** `zod-compiler` is not a declared
- * dependency of this package and is not installed in this workspace.
- * Wiring it in requires either a static `import` — which makes it a hard
- * dependency the package cannot work without, the opposite of "optional" —
- * or a dynamic `import()` to load it only when present, which this
- * repository's convention bans outside the CLI's own boot path. Neither is
- * available to this change. `compileSchema` below therefore always takes the
- * fallback branch: every schema is validated through interpreted zod, and
- * every compile records that fact on the fallback metric so the gap stays
- * visible on a dashboard rather than silently costing throughput. The
- * `is`/`parse`/`safeParse` contract does not change when a backend lands —
- * only the body of the `compiled` object below does.
+ * A handful of schema shapes stay interpreted-only even with a build step,
+ * because `zod-compiler` has documented that it cannot compile them:
+ * `superRefine`/arbitrary check callbacks, `transform` (sync or async),
+ * `z.custom()`, `z.instanceof()`, algorithmic string formats (cuid, ulid,
+ * base64, jwt, ...), and a schema-level error map that is a function rather
+ * than a static string. For those, `compileSchema` below skips `compile()`
+ * entirely — there is nothing for a build step to do differently later — and
+ * validates through interpreted zod directly, recording *why* on the
+ * fallback metric so the gap stays visible on a dashboard instead of costing
+ * throughput silently. That reason is distinct from the metric firing
+ * because `compile()` itself could not be used at all (see
+ * `FALLBACK_REASON_COMPILER_UNAVAILABLE` below) — one says "this schema will
+ * never compile", the other says "the compiled backend did not take this
+ * call". The `is`/`parse`/`safeParse` contract does not change either way.
  */
 
 /**
@@ -49,10 +55,137 @@ export interface CompiledSchema<T> {
   safeParse(value: unknown): { ok: true; value: T } | { ok: false; error: unknown };
 }
 
-/** The reason a schema took the fallback branch. There is only one today —
- * see the module docblock — but the label exists so a wired-in backend can
- * report `"unsupported-feature"` etc. without a metric-shape change. */
+/**
+ * The reason a schema took the fallback branch instead of `zod-compiler`'s
+ * `compile()`.
+ *
+ * `compiler-unavailable` covers `compile()` itself failing to produce a
+ * usable compiled schema — a defensive branch, not one any schema in this
+ * package's test suite is expected to hit, but "degrade, never fail" means
+ * a future incompatible `zod-compiler` release or an exotic schema object
+ * still validates rather than throwing out of `compileSchema`.
+ *
+ * The rest name a specific construct `zod-compiler` has documented it cannot
+ * compile — see the module docblock. These are the schema's own shape, not
+ * a runtime failure, so `compile()` is never even called for them.
+ */
 const FALLBACK_REASON_COMPILER_UNAVAILABLE = "compiler-unavailable";
+const FALLBACK_REASON_CUSTOM_VALIDATOR = "custom";
+const FALLBACK_REASON_SUPER_REFINE = "superRefine";
+const FALLBACK_REASON_TRANSFORM = "transform";
+const FALLBACK_REASON_PREPROCESS = "preprocess";
+const FALLBACK_REASON_ALGORITHMIC_STRING_FORMAT = "algorithmic-string-format";
+const FALLBACK_REASON_DYNAMIC_ERROR_MAP = "dynamic-error-map";
+
+/**
+ * String check kinds zod computes algorithmically (base64 decode, JWT
+ * segment parsing, ...) rather than by regular expression. `zod-compiler`
+ * documents plain pattern-based checks (`email`, `url`, `uuid`, `regex`,
+ * `includes`, `startsWith`, `endsWith`, ...) as compiled; this list is the
+ * complement it does not, so it is deliberately short and specific rather
+ * than an "everything not in the supported list" guess.
+ */
+const ALGORITHMIC_STRING_CHECK_KINDS = new Set([
+  "cuid",
+  "cuid2",
+  "ulid",
+  "nanoid",
+  "base64",
+  "base64url",
+  "jwt",
+  "emoji",
+]);
+
+/**
+ * A minimal, internal `_def` shape covering exactly the fields the
+ * classifier below reads across zod's built-in types. Zod does not export a
+ * discriminated-union type for this — each concrete schema class types its
+ * own `_def` — so this is deliberately narrow rather than a guess at zod's
+ * full internal typing.
+ */
+interface IntrospectableDef {
+  typeName?: string;
+  innerType?: z.ZodTypeAny;
+  effect?: { type?: string };
+  schema?: z.ZodTypeAny;
+  checks?: readonly { kind?: string }[];
+  shape?: () => Record<string, z.ZodTypeAny>;
+  type?: z.ZodTypeAny;
+  errorMap?: unknown;
+}
+
+function defOf(schema: z.ZodTypeAny): IntrospectableDef {
+  // Reaching into `_def` is the same trade the module docblock already makes
+  // for the WeakMap cache: zod does not type this per-subclass shape
+  // publicly, but it is stable, documented-by-convention internal structure
+  // that `zod-compiler`'s own build-time extractor reads the same way.
+  return (schema as unknown as { _def: IntrospectableDef })._def;
+}
+
+const UNWRAPPABLE_TYPE_NAMES = new Set([
+  "ZodOptional",
+  "ZodNullable",
+  "ZodDefault",
+  "ZodBranded",
+  "ZodReadonly",
+  "ZodCatch",
+]);
+
+/**
+ * Finds the first documented `zod-compiler` fallback reason inside `schema`,
+ * or `undefined` if none is present.
+ *
+ * Walks through simple modifiers (`optional`, `nullable`, `default`, ...) and
+ * one level into `object` properties and `array` elements — enough to catch
+ * the shapes this package's aggregates and events actually use (an object of
+ * simple fields, some of them optional) without reimplementing
+ * `zod-compiler`'s own full schema walk, which is exactly the duplication
+ * this module exists to avoid.
+ */
+function findUnsupportedReason(schema: z.ZodTypeAny, depth = 0): string | undefined {
+  if (depth > 8) return undefined;
+
+  const def = defOf(schema);
+
+  if (def.typeName !== undefined && UNWRAPPABLE_TYPE_NAMES.has(def.typeName) && def.innerType) {
+    return findUnsupportedReason(def.innerType, depth + 1);
+  }
+
+  switch (def.typeName) {
+    case "ZodEffects": {
+      const effectType = def.effect?.type;
+      if (effectType === "preprocess") return FALLBACK_REASON_PREPROCESS;
+      if (effectType === "transform") return FALLBACK_REASON_TRANSFORM;
+      // "refinement" covers both refine/superRefine and z.custom()/
+      // z.instanceof() — both are implemented as `z.any().superRefine(...)`,
+      // distinguishable only by the wrapped type being the unconstrained
+      // ZodAny rather than a real schema.
+      const innerTypeName = def.schema && defOf(def.schema).typeName;
+      return innerTypeName === "ZodAny"
+        ? FALLBACK_REASON_CUSTOM_VALIDATOR
+        : FALLBACK_REASON_SUPER_REFINE;
+    }
+    case "ZodString": {
+      const algorithmic = def.checks?.find(
+        (check) => check.kind !== undefined && ALGORITHMIC_STRING_CHECK_KINDS.has(check.kind),
+      );
+      return algorithmic ? FALLBACK_REASON_ALGORITHMIC_STRING_FORMAT : undefined;
+    }
+    case "ZodObject": {
+      if (def.errorMap) return FALLBACK_REASON_DYNAMIC_ERROR_MAP;
+      const shape = def.shape?.() ?? {};
+      for (const key of Object.keys(shape)) {
+        const reason = findUnsupportedReason(shape[key] as z.ZodTypeAny, depth + 1);
+        if (reason) return reason;
+      }
+      return undefined;
+    }
+    case "ZodArray":
+      return def.type ? findUnsupportedReason(def.type, depth + 1) : undefined;
+    default:
+      return def.errorMap ? FALLBACK_REASON_DYNAMIC_ERROR_MAP : undefined;
+  }
+}
 
 /**
  * Compiled schemas, keyed by the schema object itself.
@@ -81,6 +214,33 @@ export function createCompiledSchemaCache(): CompiledSchemaCache {
 }
 
 const compiledCache: CompiledSchemaCache = createCompiledSchemaCache();
+
+function recordFallback(metrics: Metrics, reason: string): void {
+  metrics
+    .counter({
+      name: "es_schema_compile_fallback_total",
+      help: "Schemas compiled via the interpreted zod fallback instead of a compiled backend, by reason.",
+      labelNames: ["reason"],
+    })
+    .inc({ reason });
+}
+
+function interpretedSchema<T>(schema: z.ZodType<T>): CompiledSchema<T> {
+  return {
+    is(value): value is T {
+      return schema.safeParse(value).success;
+    },
+    parse(value): T {
+      return schema.parse(value);
+    },
+    safeParse(value) {
+      const result = schema.safeParse(value);
+      return result.success
+        ? { ok: true, value: result.data }
+        : { ok: false, error: result.error };
+    },
+  };
+}
 
 /**
  * Compiles `schema` into a `CompiledSchema`, or returns the one already built
@@ -115,28 +275,41 @@ export function compileSchema<T>(
   }
 
   const metrics = deps.metrics ?? noopMetrics;
-  metrics
-    .counter({
-      name: "es_schema_compile_fallback_total",
-      help: "Schemas compiled via the interpreted zod fallback instead of a compiled backend, by reason.",
-      labelNames: ["reason"],
-    })
-    .inc({ reason: FALLBACK_REASON_COMPILER_UNAVAILABLE });
+  // Defensive: the classifier reaches into zod's internal `_def` shape, so an
+  // unrecognised or malformed schema object should fall through to the real
+  // `compile()` attempt below rather than take down `compileSchema` itself.
+  let unsupportedReason: string | undefined;
+  try {
+    unsupportedReason = findUnsupportedReason(schema);
+  } catch {
+    unsupportedReason = undefined;
+  }
 
-  const compiled: CompiledSchema<T> = {
-    is(value): value is T {
-      return schema.safeParse(value).success;
-    },
-    parse(value): T {
-      return schema.parse(value);
-    },
-    safeParse(value) {
-      const result = schema.safeParse(value);
-      return result.success
-        ? { ok: true, value: result.data }
-        : { ok: false, error: result.error };
-    },
-  };
+  let compiled: CompiledSchema<T>;
+  if (unsupportedReason !== undefined) {
+    recordFallback(metrics, unsupportedReason);
+    compiled = interpretedSchema(schema);
+  } else {
+    try {
+      const backend = compile(schema);
+      if (!isCompiledSchema(backend)) {
+        throw new Error("zod-compiler did not tag the compiled schema");
+      }
+      compiled = {
+        is: (value): value is T => backend.is(value),
+        parse: (value): T => backend.parse(value),
+        safeParse(value) {
+          const result = backend.safeParse(value);
+          return result.success
+            ? { ok: true, value: result.data }
+            : { ok: false, error: result.error };
+        },
+      };
+    } catch {
+      recordFallback(metrics, FALLBACK_REASON_COMPILER_UNAVAILABLE);
+      compiled = interpretedSchema(schema);
+    }
+  }
 
   // Justified for the same reason as the read above: the map's value type
   // erases T, and this is the one place that erasure is introduced.

@@ -130,13 +130,26 @@ export function createFoldExecutor<State, Event>(
             };
           }
 
-          let state = read.kind === "found" ? read.stored.state : deps.init();
-          // The batch is applied in the order it arrived because it is one
-          // unit of work, not because this asserts any ordering guarantee —
-          // ordering across deliveries is best effort (ADR-098), and folds
-          // must stay correct regardless of the order deliveries arrive in.
-          for (const event of delivery.events) {
-            state = deps.apply(state, event);
+          let state: State;
+          try {
+            state = read.kind === "found" ? read.stored.state : deps.init();
+            // The batch is applied in the order it arrived because it is one
+            // unit of work, not because this asserts any ordering guarantee —
+            // ordering across deliveries is best effort (ADR-098), and folds
+            // must stay correct regardless of the order deliveries arrive in.
+            for (const event of delivery.events) {
+              state = deps.apply(state, event);
+            }
+          } catch (error) {
+            // `apply` and `init` are the fold's own code and are expected to be
+            // pure, but pure code still throws — a missing field, an assertion,
+            // an event shape a later deploy introduced. Counted here for the
+            // same reason as a store failure: if the only unlabelled failure in
+            // this executor is the one in the domain logic, a fold that throws
+            // on every delivery registers as a fold that stopped receiving
+            // deliveries.
+            outcomes.inc({ projection: deps.projectionName, kind: "failed" });
+            throw error;
           }
 
           const stored: StoredState<State> = {

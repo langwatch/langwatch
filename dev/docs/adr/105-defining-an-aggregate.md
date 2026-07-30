@@ -381,4 +381,8 @@ damage, then the bulk, then the cosmetics.
 - `specs/event-sourcing/pipeline-model.feature`,
   `specs/event-sourcing/fold-projection.feature`,
   `specs/event-sourcing/fold-store-library.feature` — the behaviour a converted
-  declaration must continue to satisfy.
+  declaration must continue to satisfy, except the scenarios ADR-098 and
+  ADR-101 supersede (marked `@unimplemented` in those two files: FIFO
+  ordering and inline rebuild-from-history in `fold-projection.feature`;
+  rebuild-on-refusal in `fold-store-library.feature`). For those, a converted
+  declaration must satisfy ADR-098 and ADR-101 instead.

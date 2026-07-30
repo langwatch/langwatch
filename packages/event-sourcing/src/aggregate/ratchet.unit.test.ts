@@ -56,16 +56,19 @@ describe("checkTypeStringRatchet", () => {
       ]);
     });
 
-    it("reports every missing string across multiple aggregates", () => {
+    it("reports every missing string across multiple aggregates, grouped and sorted", () => {
       const snapshot: TypeStringSnapshot = {
         trace: ["started", "ended"],
         session: ["opened", "closed"],
+        span: ["recorded"],
       };
       const current: TypeStringSnapshot = {
         trace: ["begun", "ended"],
-        session: ["opened", "closed"],
+        session: ["reopened", "shut"],
+        span: ["recorded"],
       };
       expect(checkTypeStringRatchet({ snapshot, current })).toEqual([
+        { aggregate: "session", missing: ["closed", "opened"] },
         { aggregate: "trace", missing: ["started"] },
       ]);
     });
@@ -103,11 +106,16 @@ describe("mergeSnapshot", () => {
 
     /** @scenario a merge that changes nothing produces a byte-identical result */
     it("is stable when applied again with the same current", () => {
-      const snapshot: TypeStringSnapshot = { trace: ["started"] };
-      const current: TypeStringSnapshot = { trace: ["ended", "started"] };
+      const snapshot: TypeStringSnapshot = { zeta: ["b", "a"], alpha: ["y"] };
+      const current: TypeStringSnapshot = { alpha: ["y", "x"], zeta: ["a", "b"] };
       const once = mergeSnapshot({ snapshot, current });
       const twice = mergeSnapshot({ snapshot: once, current });
-      expect(twice).toEqual(once);
+
+      // Serialised, not `toEqual`: the claim is that the committed file does not
+      // churn, and `toEqual` ignores key order, so it would pass even for a
+      // merge that reshuffled the aggregates on every run.
+      expect(JSON.stringify(twice)).toBe(JSON.stringify(once));
+      expect(Object.keys(once)).toEqual(["alpha", "zeta"]);
     });
   });
 

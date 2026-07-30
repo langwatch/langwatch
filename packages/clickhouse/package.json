@@ -1,0 +1,31 @@
+{
+  "name": "@langwatch/clickhouse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The ClickHouse storage layer: one table definition per table owning its shape, codec and query surface; one client whose retry policy the schema decides. Implements the event-sourcing store contracts without the core depending on ClickHouse (ADR-099, ADR-102, ADR-104).",
+  "license": "MIT",
+  "type": "module",
+  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/event-sourcing": "workspace:*",
+    "@clickhouse/client": "^1.23.0"
+  },
+  "peerDependencies": { "@opentelemetry/api": "^1.9.0", "zod": "^3.25.0" },
+  "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@testcontainers/clickhouse": "^12.0.4",
+    "dotenv": "^17.4.2",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.9",
+    "zod": "^3.25.76"
+  }
+}

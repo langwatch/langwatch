@@ -352,9 +352,11 @@ job-payload spool (ADR-100), and conflating the 2 lifetimes loses data:
   what the spool is for — leases refuse a delete while a job still holds one
   (`queues/groupQueue/blobDeleteLua.ts:38-41`) and expiry lazily reclaims the
   rest.
-- A **blob referenced from an event** must outlive the event's retention. The
-  event is the durable record; a reference whose target has been reclaimed is a
-  record that no longer says anything.
+- A **blob referenced from an event** is meant to outlive the event's
+  retention — the event is the durable record, and a reference whose target
+  has been reclaimed is a record that no longer says anything. The one adopter
+  that offloads to a durable blob does not yet meet this; see the retention
+  gap below.
 
 Cross-pipeline commands on high-volume streams carry references, not bodies. The
 live shape is the coding-agent span bridge: a total field-pick at the fan-out
@@ -363,6 +365,31 @@ event's scheduling identity, and the handler resolves it against the span store
 (`pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber.ts:73-78`,
 resolution at `:101-116`). A reference the seam cannot build stages the whole
 event, so the handler understands both shapes.
+
+**The other live shape bounds a payload that is itself the point, not a
+routing convenience.** An evaluator `inputs` value — the conversation, RAG
+chunks, tool outputs a run was scored against — reaches GB scale for some
+tenants, and lands verbatim in both `event_log.EventPayload` and the
+evaluation fold row. Above the inline threshold, **`EVAL_INPUTS_INLINE_MAX_BYTES`
+(1 MiB)**, the serialized inputs move to the content-addressed stored-objects
+service and both places carry a bounded marker instead — a valid JSON object,
+so every existing `JSON.stringify`/`JSON.parse` seam over the field keeps
+working, holding the object id, a 16 KiB preview and a `truncatedPreview` flag.
+The marker is resolved back to the full inputs only at API read boundaries
+(`EvaluationService.getEvaluationInputs`), never inside a fold — resolving it
+there would re-inline the fat payload on the next re-fold and defeat the bound
+this decision exists to enforce.
+
+**The retention gap.** `stored_objects` has no TTL — its migration defines
+none, and the no-retention invariant is pinned by a test — so the reference
+above does not, in practice, merely outlive the event's retention: it outlives
+the row and the event both, by an unbounded margin, persisting until the
+project itself is deleted (the stored-objects project-delete cascade is what
+eventually removes it). A reference is supposed to outlive the record that
+points to it, not outlive it indefinitely for an unrelated reason. This is
+accepted for now, not resolved: the fix is a retention-aware sweep that deletes
+an offloaded object once the row that referenced it has aged out of its own
+retention, and no such sweep exists yet.
 
 ### 9. Crossing pipelines needs a command bridge exactly when the aggregate key changes
 
@@ -581,3 +608,10 @@ ageing, one behind per-adopter redesign.
 - `specs/event-sourcing/fold-projection.feature`,
   `map-projection.feature`, `post-event-work.feature`,
   `pipeline-model.feature`, `hot-trace-fold-amplification.feature`.
+- `langwatch/src/server/app-layer/evaluations/evaluation-inputs-offload.ts`,
+  `evaluation-column-caps.ts` — decision 8's durable-reference worked example
+  and its unconditional row-cap backstop.
+- `langwatch/src/server/stored-objects/` — the content-addressed store decision
+  8's offload reuses, including the no-TTL invariant test the retention gap
+  refers to.
+- `specs/evaluations/evaluation-payload-offload.feature`.

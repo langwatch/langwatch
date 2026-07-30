@@ -187,7 +187,11 @@ describe("createMapExecutor", () => {
 
       expect(metrics.incCalls).toContainEqual({
         name: "es_map_write_batch_total",
-        labels: { projection: "spanStorage", storeKind: "append" },
+        labels: {
+          projection: "spanStorage",
+          storeKind: "append",
+          outcome: "written",
+        },
       });
     });
   });
@@ -211,8 +215,43 @@ describe("createMapExecutor", () => {
         labels: {
           projection: "traceAnalyticsRollup",
           storeKind: "merge",
+          outcome: "written",
         },
       });
+    });
+  });
+
+  describe("given a store whose writeBatch rejects, with metrics wired", () => {
+    /** @scenario a failing projection is visible on the same metric as a succeeding one */
+    it("counts the failed attempt rather than counting nothing at all", async () => {
+      const store = appendStore();
+      store.writeBatch.mockRejectedValueOnce(new Error("column store down"));
+      const metrics = fakeMetrics();
+      const executor = createMapExecutor<TestEvent, TestRecord>({
+        store,
+        map: (event) => ({ eventId: event.id }),
+        projectionName: "spanStorage",
+        metrics,
+      });
+
+      await expect(
+        executor.apply({ tenantId: "tenant-1", events: [{ id: "e1" }] }),
+      ).rejects.toThrow("column store down");
+
+      // The point is the denominator: without this the counter never moves on a
+      // failure, so a projection whose store is down reads as one that simply
+      // stopped receiving work.
+      expect(metrics.incCalls).toEqual([
+        {
+          name: "es_map_write_batch_total",
+          labels: {
+            projection: "spanStorage",
+            storeKind: "append",
+            outcome: "failed",
+          },
+        },
+      ]);
+      expect(metrics.observeCalls).toEqual([]);
     });
   });
 

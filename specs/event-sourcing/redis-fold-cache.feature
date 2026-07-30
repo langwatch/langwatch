@@ -53,21 +53,33 @@ Feature: Redis write-through cache for fold state
     Then those events are recognised as already applied
     And the aggregate reflects each event exactly once
 
+  # Superseded by ADR-098 decision 5: the applied-event set (AppliedEventIds)
+  # this scenario tracks across a retry chain is abolished in favour of a
+  # per-group delivery sequence — one scalar column, not a growing set.
   @integration
+  @unimplemented
   Scenario: A retry chain remembers everything it has applied
     Given a fold job failed after storing, and new events arrived before it retried
     When the retry applies the new events and fails again
     And the whole set is delivered once more
     Then no event is applied twice across the chain
 
+  # Superseded by ADR-098 decision 5: this "forgets" behaviour is a property
+  # of the AppliedEventIds set the decision abolishes. A per-group delivery
+  # sequence has no set to reset between batches.
   @integration
+  @unimplemented
   Scenario: A fresh delivery forgets what an acked batch applied
     Given consecutive batches for one aggregate that all succeed
     When each batch is stored
     Then the recorded event ids are only those of the most recent batch
     And the record does not grow with the number of batches
 
+  # Superseded by ADR-098 decision 5: "recognised as a retry" is a property of
+  # the AppliedEventIds set this scenario grows across siblings. A per-group
+  # delivery sequence identifies a retry by its sequence number instead.
   @integration
+  @unimplemented
   Scenario: A sibling leading a retry is still recognised as a retry
     Given a coalesced batch failed and its drained siblings were re-staged
     When a sibling is dispatched first on the next attempt
@@ -82,11 +94,14 @@ Feature: Redis write-through cache for fold state
     And the fold is not failed, because the state is durable
     And the read is counted, because the record of applied events went with it
 
-  # The scenario below documents the measured limit of cache-only folds — it is
-  # not accepted retry behaviour. A fold that persists its applied-event set
-  # durably next to its state keeps exact dedup across cache loss instead
-  # (fold-read-back-store.feature).
+  # The scenario below documents the measured limit of cache-only folds under
+  # the AppliedEventIds design — it is not accepted retry behaviour, and that
+  # whole design (including the durable escape hatch this comment used to name
+  # in fold-read-back-store.feature) is superseded by ADR-098 decision 5: a
+  # per-group delivery sequence replaces AppliedEventIds and is not lost when
+  # the cache is, because it lives on the row's delivery mark.
   @integration
+  @unimplemented
   Scenario: Losing the cached entry loses the protection
     Given a fold that keeps its applied-event set in the cache entry only
     And a fold job failed after its state was stored

@@ -44,6 +44,38 @@ different fields of one row cannot be combined without knowing which came first,
 so that is a `fold` with a `replace` store however few event types it subscribes
 to.
 
+### Every row carries an idempotency key, and `merge` is closed because it cannot
+
+A repeated write must collapse. For `append` that is a column: put an
+idempotency key in the sort key and a duplicate insert resolves to one row, the
+same way a `replace` table resolves to its newest version. Making it universal
+removes a special case rather than adding a feature — ADR-104's retry policy no
+longer needs to ask whether a particular append table happens to carry a
+per-record identity, because every one does.
+
+`merge` cannot have it. `AggregatingMergeTree` combines rows *by the sort key*,
+so a per-write identifier in that key means two writes no longer share a key and
+never combine. What survives is one row per write — an append table with a
+rollup's name. The property that makes the engine worth using is the same
+property that makes a write identifier impossible, so this is not a gap to be
+closed.
+
+**`merge` is therefore closed to new tables.** Three exist, and each leaves by
+one of two routes:
+
+| table | exit |
+| --- | --- |
+| `trace_analytics_rollup` | derive at read time, or `replace` written with the whole bucket |
+| `evaluation_analytics_rollup` | same |
+| `gateway_budget_scope_totals` | needs measuring first — it gates spend, so it is read hot, and a read-time sum over `gateway_budget_ledger_events` is a range scan on a key that leads with `(TenantId, BudgetId)`. Plausible, unproven |
+
+Both routes make the write idempotent by the same mechanism as everything else:
+a key that identifies the row, and a version that orders two writes to it. The
+cost is that a whole-bucket write must know the whole bucket, which means
+reading it back — so a rollup that leaves this way becomes a `fold`, not a `map`.
+That is the honest shape of the work, and it is why these are debt with an exit
+rather than a migration anyone can do in an afternoon.
+
 ## Context
 
 A ClickHouse table's engine decides what a correct read looks like, and nothing
