@@ -57,7 +57,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [077](./077-langy-dual-stream.md)                                 | Langy dual-stream — raw token fast-path alongside the durable event-sourced stream          | Accepted                                          |
 | [078](./078-langy-user-turn-controls.md)                          | Langy user-initiated turn controls — stop for real, continue, resume-on-refresh             | Accepted                                          |
 | [079](./079-card-selection-is-deterministic.md)                   | Card selection is deterministic — the model supplies data, never presentation (amended 2026-07-22) | Accepted                                          |
-| [081](./081-lwql-query-language.md)                               | LWQL — read-only tenant-scoped query language + service over traces and spans               | Draft                                             |
+| [081](./081-lwql-query-language.md)                               | LWQL — read-only tenant-scoped query language + service over traces and spans               | Proposed                                             |
 
 ## When to Write an ADR
 
