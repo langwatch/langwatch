@@ -283,6 +283,20 @@ const NON_JUDGED_TITLES: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+/**
+ * The first sentence of an error, for telling two error groups apart.
+ *
+ * A run that errored has no criterion to name it by, so several distinct error
+ * groups would otherwise carry the same title and read as duplicates of each
+ * other — the reader cannot tell which of three "Errored before it could be
+ * judged" rows is the one they are looking at.
+ */
+function errorHeadline(error: string): string {
+  const firstLine = error.split(/[\n.]/)[0]?.replace(/\s+/g, " ").trim() ?? "";
+  if (firstLine.length === 0) return "";
+  return firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 60)}…`;
+}
+
 function groupTitle({
   signature,
   criteria,
@@ -293,7 +307,11 @@ function groupTitle({
   if (signature.kind === "judged") {
     return criteria[0] ?? "Failed its criteria";
   }
-  return NON_JUDGED_TITLES[signature.kind] ?? "Did not complete";
+  const base = NON_JUDGED_TITLES[signature.kind] ?? "Did not complete";
+  const headline = signature.errorExample
+    ? errorHeadline(signature.errorExample)
+    : "";
+  return headline === "" ? base : `${base}: ${headline}`;
 }
 
 function clusterBlocks(evidence: ReportEvidence): Block[] {
@@ -317,8 +335,10 @@ function clusterBlocks(evidence: ReportEvidence): Block[] {
             ...(criteria.length > 1
               ? [{ label: "Also failed", body: criteria.slice(1).join("; ") }]
               : []),
-            ...(signature.errorShape
-              ? [{ label: "Error", body: signature.errorShape }]
+            // The example rather than the fingerprint: the fingerprint has had
+            // every value replaced, so a JSON error reads as bare punctuation.
+            ...(signature.errorExample
+              ? [{ label: "Error", body: signature.errorExample }]
               : []),
             { label: "Scenarios", body: scenarios },
           ],
@@ -362,7 +382,9 @@ function severityBlocks(evidence: ReportEvidence): Block[] {
               )
               .filter(Boolean)
               .join("; ") ||
-            signature.errorShape ||
+            (signature.errorExample
+              ? errorHeadline(signature.errorExample)
+              : "") ||
             "Did not complete",
         },
         {

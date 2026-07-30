@@ -384,6 +384,44 @@ describe("Feature: Run report — the conversation behind a failure", () => {
     });
   });
 
+  describe("when a run ended before it exchanged a turn", () => {
+    /** @scenario I can read the conversation behind a failure */
+    it("says why the conversation is empty rather than showing nothing", () => {
+      const html = renderReportHtml({
+        model: makeModel({
+          sections: [
+            makeSection({
+              computed: [
+                {
+                  kind: "groups",
+                  groups: [
+                    {
+                      title: "Errored before it could be judged",
+                      subtitle: "1 scenario",
+                      detail: [],
+                      transcripts: [
+                        {
+                          runId: "run-8",
+                          signatureId: "sig-8",
+                          scenarioName: "Cross-tenant access",
+                          turns: [],
+                          omittedTurns: 0,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            }),
+          ],
+        }),
+      });
+
+      expect(html).toContain("No conversation was recorded");
+      expect(html).not.toContain('<ol class="turns"></ol>');
+    });
+  });
+
   describe("when a group has no conversations kept", () => {
     /** @scenario I can read the conversation behind a failure */
     it("renders no replay section at all", () => {

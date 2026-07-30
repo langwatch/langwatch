@@ -22,6 +22,7 @@ function signatureOf(
     kind: "judged",
     unmetCriterionIds: [],
     errorShape: null,
+    errorExample: null,
     runIds: ["run_1"],
     scenarioIds: ["scenario_a"],
     ...overrides,

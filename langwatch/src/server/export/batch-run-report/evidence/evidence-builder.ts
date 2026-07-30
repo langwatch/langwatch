@@ -251,6 +251,7 @@ function buildSignatures({
       kind,
       unmetCriterionIds: [],
       errorShape,
+      errorExample: run.error ? truncateError(run.error) : null,
       runIds: [],
       scenarioIds: [],
     };
@@ -266,6 +267,17 @@ function buildSignatures({
   }
 
   return [...signatures.values()];
+}
+
+/**
+ * An error message cut to a readable length.
+ *
+ * Long enough for a stack-trace-prefixed provider error to still say what went
+ * wrong, short enough that one group's error does not become the section.
+ */
+function truncateError(error: string): string {
+  const collapsed = error.replace(/\s+/g, " ").trim();
+  return collapsed.length <= 300 ? collapsed : `${collapsed.slice(0, 300)}…`;
 }
 
 /** A run that reached a terminal state without passing. */

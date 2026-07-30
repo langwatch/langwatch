@@ -166,6 +166,13 @@ function renderTranscriptTurns(
   turns: SelectedTranscript["turns"],
   omittedTurns: number,
 ): string {
+  // A run that errored before it said anything has no turns. Opening a
+  // disclosure onto nothing reads as a rendering fault, so it says why it is
+  // empty — which is itself the finding for a run that never got started.
+  if (turns.length === 0) {
+    return '<li class="turn-gap">No conversation was recorded — this run ended before a turn was exchanged.</li>';
+  }
+
   return (
     turns
       .map((turn, position) => {

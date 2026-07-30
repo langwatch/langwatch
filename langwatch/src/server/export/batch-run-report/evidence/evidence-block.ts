@@ -74,7 +74,9 @@ function failureGroupsSection(evidence: ReportEvidence): string[] {
         (signature.unmetCriterionIds.length > 0
           ? `  unmet=[${signature.unmetCriterionIds.join(",")}]`
           : "") +
-        (signature.errorShape ? `  error="${signature.errorShape}"` : ""),
+        // The example, not the fingerprint: the fingerprint has had every value
+        // replaced, so it tells the model as little as it tells a reader.
+        (signature.errorExample ? `  error="${signature.errorExample}"` : ""),
     ),
   ];
 }

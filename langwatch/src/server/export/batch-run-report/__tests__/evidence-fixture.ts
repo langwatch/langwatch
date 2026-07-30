@@ -52,6 +52,7 @@ const FIXTURE_SIGNATURES: ReportEvidence["signatures"] = [
     kind: "judged",
     unmetCriterionIds: ["c_known"],
     errorShape: null,
+    errorExample: null,
     runIds: ["run_1"],
     scenarioIds: ["scen_1"],
   },

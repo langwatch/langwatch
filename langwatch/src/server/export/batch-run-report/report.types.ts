@@ -88,7 +88,21 @@ export interface FailureSignature {
   signatureId: string;
   kind: "judged" | "errored" | "stalled" | "cancelled";
   unmetCriterionIds: string[];
+  /**
+   * The grouping fingerprint: ids, numbers and quoted values replaced, so two
+   * errors that differ only in their particulars land in the same group. Good
+   * for identity, useless to read — a JSON error normalises to nothing but its
+   * own punctuation.
+   */
   errorShape: string | null;
+  /**
+   * One of the group's errors as it was actually reported, for a reader.
+   *
+   * Every run in a group shares a fingerprint, so any one of them describes the
+   * group; the first is taken. This is shown instead of {@link errorShape},
+   * which is why the aggressive normalisation above costs nothing.
+   */
+  errorExample: string | null;
   runIds: string[];
   scenarioIds: string[];
 }

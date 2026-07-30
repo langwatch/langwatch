@@ -164,6 +164,40 @@ describe("buildEvidence() failure grouping", () => {
     expect(errored?.runIds).toEqual(["run_3"]);
   });
 
+  /**
+   * The fingerprint replaces every quoted value, which is right for grouping
+   * and leaves a JSON error as nothing but its own punctuation. Keeping one
+   * error as it was reported is what a reader is actually shown.
+   *
+   * @scenario Infrastructure errors are separated from judged failures
+   */
+  it("keeps one readable error beside the fingerprint", () => {
+    const [signature] = buildEvidence({
+      runs: [
+        makeRun({
+          scenarioRunId: "run_json",
+          status: ScenarioRunStatus.ERROR,
+          results: {
+            verdict: Verdict.INCONCLUSIVE,
+            metCriteria: [],
+            unmetCriteria: [],
+            error: '{"message":"content flagged","code":"filtered"}',
+          },
+        }),
+      ],
+      priorRuns: [],
+      priorBatchOrder: [],
+      batchRunId: BATCH,
+      scenarioSetId: "set_1",
+      suiteName: null,
+    }).signatures;
+
+    expect(signature?.errorShape).not.toContain("content flagged");
+    expect(signature?.errorExample).toBe(
+      '{"message":"content flagged","code":"filtered"}',
+    );
+  });
+
   /** @scenario A group cannot claim a scenario that did not fail */
   it("never lists a passing run under a failure group", () => {
     expect(signatures.flatMap((it) => it.runIds)).not.toContain("run_4");

@@ -113,6 +113,7 @@ describe("the failure-grouping question", () => {
               kind: "judged",
               unmetCriterionIds: ["c_a", "c_b"],
               errorShape: null,
+              errorExample: null,
               runIds: ["run_1", "run_2"],
               scenarioIds: ["scen_1", "scen_2"],
             },

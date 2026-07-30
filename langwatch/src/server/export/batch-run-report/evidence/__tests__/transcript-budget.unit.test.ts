@@ -65,6 +65,7 @@ function signature(id: string, runIds: string[]): FailureSignature {
     kind: "judged",
     unmetCriterionIds: ["c_1"],
     errorShape: null,
+    errorExample: null,
     runIds,
     scenarioIds: runIds.map((runId) => `scen_${runId}`),
   };
