@@ -209,6 +209,56 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
     Then the job's value is restored to live staging byte-identical
     And the restored job is dispatched to its handler
 
+  # ----- the dead-letter's operator surface -----
+  # Dead-lettering used to be a rare whole-group operator action, usually followed
+  # by a replay. It is now automatic and per-job on a path documented at 100+/day,
+  # under a per-aggregate group id that is never reused — so the dead-letter's
+  # OWN accounting has to survive the quarantine window ending, or the signal that
+  # says "there is something in the dead-letter" stops meaning anything.
+
+  @integration
+  # AC-719.9 — the badge is the operator's primary signal, so it has to be able to
+  # come back down. Falsifiability: stop sweeping and it counts groups whose
+  # payload expired days ago, so it only ever goes up.
+  Scenario: the dead-letter count returns to zero once the dead-lettered payloads have expired
+    Given a group with a dead-lettered body-present job
+    When the quarantine window has passed and the operator checks the dead-letter count
+    Then the dead-letter count is zero
+    And the queue no longer tracks the expired dead-letter at all
+
+  @integration
+  # AC-719.10 — and the page agrees with the badge, because both read the same way.
+  Scenario: an expired dead-letter is no longer offered to the operator to act on
+    Given a group with a dead-lettered body-present job
+    When the quarantine window has passed and the operator lists the dead-lettered groups
+    Then the expired group is not listed
+    And the queue no longer tracks the expired dead-letter at all
+
+  @integration
+  # AC-719.11 — the false-positive guard, and the reason the predicate is what it
+  # is. Hiding a dead-letter the operator could still act on is worse than keeping
+  # a stale entry, and a group dead-lettered with nothing pending still carries the
+  # record of why it died. Falsifiability: judge liveness by recoverable jobs alone
+  # and the second example disappears from both the count and the list.
+  Scenario Outline: a dead-letter the operator can still act on is never swept away
+    Given a dead-lettered group that still has "<remaining>"
+    When the operator checks the dead-letter count and lists the dead-lettered groups
+    Then the group is counted and listed with what it still has
+    And the queue still tracks it
+
+    Examples:
+      | remaining                      |
+      | a recoverable job              |
+      | only the record of why it died |
+
+  @integration
+  # AC-719.12 — the count is a count of groups, not of sightings: the dead-letter
+  # can report the same group more than once while it is being read through.
+  Scenario: the dead-letter total counts a group once even if the scan surfaces it twice
+    Given a dead-lettered group the queue surfaces on two consecutive pages
+    When the operator checks the dead-letter count and lists the dead-lettered groups
+    Then the group is counted once and listed once
+
   # ================= #720 — blob lifetime =================
 
   @integration
@@ -263,8 +313,11 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
 #       AC-718.4c (@unimplemented, private generateStagedJobId); AC-718.5 (@unimplemented, GQ1-strip harness).
 # #719: AC-719.6 bound (drain round-trip). AC-719.8 bound (dead-lettered sibling's blob survives the batch
 #       success — coalesced-batch integration test). AC-719.7b bound (drained-sibling re-stage fallback, seam unit test
-#       with failure injection). AC-719.4/719.5/719.7 (@unimplemented — coalesced-batch / crash-injection harness
-#       gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
+#       with failure injection). AC-719.9/.10/.11/.12 bound (the dead-letter's operator surface: the count and the
+#       list sweep expired index members instead of counting them forever, keep every entry that still holds a
+#       recoverable job OR the record of why the group died, and count each group once across a paged scan —
+#       falsifiability-proven per scenario). AC-719.4/719.5/719.7 (@unimplemented — coalesced-batch /
+#       crash-injection harness gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
 # #720: AC-720.1 bound (GQ2 holder, falsifiability-proven). AC-720.2 bound (an ordinary sibling renew
 #       cannot shorten a dead-letter hold — the ORDINARY path, found in review; falsifiability-proven).
 #       AC-720.1b (@unimplemented, GQ1-forcing harness).

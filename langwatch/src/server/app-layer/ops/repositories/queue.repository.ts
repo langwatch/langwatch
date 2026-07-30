@@ -130,6 +130,15 @@ export interface QueueRepository {
     pipelineFilter?: string;
   }): Promise<{ unblockedCount: number; groupIds: string[] }>;
 
+  /**
+   * The dead-lettered groups an operator can still act on.
+   *
+   * A read that also heals: a dead-letter whose payload aged out of the
+   * quarantine window is omitted from the result AND dropped from the index it
+   * was named in, because nothing else drops it — the index has no per-member
+   * TTL and only an explicit replay removes a member. See SWEEP_DLQ_INDEX_LUA in
+   * `queue.redis.repository.ts`.
+   */
   listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]>;
 
   drainAllBlockedPreview(params: {
