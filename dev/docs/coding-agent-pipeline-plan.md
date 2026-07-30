@@ -82,7 +82,7 @@ do not re-derive them.
    `claudeCodeSpanSync.reactor.ts`, `claude-code-log-to-span.ts`, their
    pipeline registration + tests, `specs/traces-v2/claude-code-log-conversion.feature`,
    and any `CLAUDE_CODE_LOG_RETENTION_DAYS` floor. Port dogfood matrix
-   (`scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts`)
+   (`dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts`)
    and run it end-to-end. Release note: log-only installs must re-run
    `langwatch claude`. Close #5708, delete its branch.
 
@@ -124,7 +124,7 @@ files. Full dogfood only at slice 8.
   behavioural contract only),
   `specs/ai-gateway/governance/ingestion-templates-catalog.feature`
 - docs: `dev/docs/claude-code-terminal-view.md`; media assets
-- dogfood: `scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts` (slice 8)
+- dogfood: `dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts` (slice 8)
 
 ### ADAPT / REWRITE into the new pipeline (slices 1–4, 6)
 - `projections/services/coding-agent-normalization.ts` → pipeline services (slice 1)

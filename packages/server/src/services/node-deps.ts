@@ -18,7 +18,7 @@ import type { EventBus } from "./event-bus.ts";
 
 /**
  * The workspace name of the langwatch app, as declared in
- * langwatch/package.json. Used to filter the install down to the app and its
+ * platform/app/package.json. Used to filter the install down to the app and its
  * dependencies. It was plain `langwatch` until ADR-076 — the same name the
  * published TypeScript SDK uses, which is exactly why it had to change before
  * the two could live in one workspace.
@@ -50,10 +50,10 @@ export function workspaceInstallArgs(
 }
 
 /**
- * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
+ * Ensure platform/app/node_modules exists + start:prepare:files has run, both of
  * which are prerequisites for `pnpm run prisma:migrate` and `pnpm run start:app`.
  *
- * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/langwatch/) — see
+ * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/platform/app/) — see
  * services/app-dir.ts for why we relocate out of node_modules.
  */
 export async function ensureLangwatchDeps(
@@ -63,10 +63,10 @@ export async function ensureLangwatchDeps(
 	const langwatchDir = locateLangwatchDir();
 	if (!langwatchDir) throw new Error("langwatch app dir not found");
 
-	// The install now runs from the tarball ROOT, not from langwatch/. Since
+	// The install now runs from the tarball ROOT, not from platform/app/. Since
 	// ADR-076 the repo is a single pnpm workspace, so the lockfile and the
 	// workspace definition live at the root and langwatch/ is one member of it.
-	// The tree pnpm produces is unchanged — langwatch/node_modules is still
+	// The tree pnpm produces is unchanged — platform/app/node_modules is still
 	// where the app resolves from — only the directory we invoke pnpm in moved.
 	const rootDir = appRoot();
 	const nodeModulesPath = join(langwatchDir, "node_modules");
@@ -185,7 +185,7 @@ export async function ensureLangwatchDeps(
 	if (!distAlreadyBuilt) {
 		// Full prod build: start:prepare:files → build:scenario-child-process → vite build.
 		// start:prepare:files generates Prisma client, Zod types, SDK versions,
-		// langevals types (from the source committed in langevals/ts-integration/),
+		// langevals types (from the source committed in services/langevals/ts-integration/),
 		// and the mcp-server bundle. vite build emits dist/client/ for static serving.
 		// Without dist/client/, every UI route returns 404 and only /api/* works.
 		await execAndPipe(
@@ -244,7 +244,7 @@ export async function ensureLangwatchDeps(
 	}
 
 	// Workspace members living OUTSIDE langwatch/ (mcp-server, packages/*)
-	// cannot reach langwatch/node_modules by walking up, so their declared
+	// cannot reach platform/app/node_modules by walking up, so their declared
 	// peerDependencies resolve nowhere in the relocated tree. Materialize
 	// each peer as a member-local link to the app's resolved instance —
 	// the "consumer provides the peer" contract made explicit on disk.
@@ -259,7 +259,7 @@ export async function ensureLangwatchDeps(
 	// links, and the first runtime import dies minutes later inside a
 	// migration. Turn that into an install-time failure that names the
 	// packaging gap. (Exactly how 3.6.0 shipped: both .npmignore files still
-	// excluded langwatch/packages/ after runtime packages moved in.)
+	// excluded the app's packages/ after runtime packages moved in.)
 	assertWorkspaceLinksResolve(nodeModulesPath);
 
 	// Written LAST so an interrupted run never records success: any of the
@@ -379,7 +379,7 @@ export function assertWorkspaceLinksResolve(nodeModulesPath: string): void {
  *
  * Takes several roots because ADR-076 moved the store. The install root is now
  * the workspace root, so the store is at <root>/node_modules/.pnpm and
- * langwatch/node_modules holds only symlinks — checking langwatch/node_modules
+ * platform/app/node_modules holds only symlinks — checking platform/app/node_modules
  * alone reintroduced exactly the bug described above, silently, for every npx
  * user. Both are checked: the root for current trees, langwatch/ for ones
  * installed before the merge. Exported for tests.

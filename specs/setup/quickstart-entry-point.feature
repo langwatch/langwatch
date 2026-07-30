@@ -3,12 +3,12 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   I want one command that asks what I'm working on, starts only the services I need, and overrides only the URLs whose services are local
   So that my .env stays the source of truth and I don't lose state across worktrees
 
-  # Behavior is in `compose.dev.yml` + `compose.dev.migration.yml` (volume
+  # Behavior is in `infra/compose.dev.yml` + `infra/compose.dev.migration.yml` (volume
   # names + env_file overlay + host port overlay), `Makefile` (deprecation
-  # wrappers + positional MODE arg pass-through), and `scripts/dev.sh`
+  # wrappers + positional MODE arg pass-through), and `dev/scripts/dev.sh`
   # (intent-based prompt + write_overrides + fail-fast + collision detection).
   # The `write_overrides` URL rewrite scenarios are bound to
-  # `scripts/__tests__/dev-overrides.unit.bats`. End-to-end shell+docker
+  # `dev/scripts/__tests__/dev-overrides.unit.bats`. End-to-end shell+docker
   # scenarios (intent prompt UX, idempotency, cross-worktree volume sharing,
   # singleton redis, deprecation warnings) remain `@unimplemented` until a
   # docker-aware integration suite exists.
@@ -51,7 +51,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   @unit
   Scenario: frontend-only pins host-side Redis for in-process workers, no other compose
     When write_overrides is called with mode=frontend-only
-    Then langwatch/.env.dev-up contains NEXTAUTH_PROVIDER=email
+    Then platform/app/.env.dev-up contains NEXTAUTH_PROVIDER=email
     And REDIS_URL pointing at localhost:6379 (for the in-process workers)
     And it does NOT override DATABASE_URL, CLICKHOUSE_URL, or LANGWATCH_NLP_SERVICE
 
@@ -67,7 +67,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # auth/TLS. dev.sh verifies the listener with `redis-cli ... ping` (PONG)
   # before reusing it, errors out when :6379 is occupied by something
   # unverifiable, and only starts its own container when the port is free.
-  # Bound to `scripts/__tests__/dev-redis-detection.unit.bats`.
+  # Bound to `dev/scripts/__tests__/dev-redis-detection.unit.bats`.
 
   @unit
   Scenario: redis-cli PONG reply means the listener is a usable local Redis
@@ -113,7 +113,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # false-positives when this same project's redis is already running from a prior
   # run — docker compose would simply reuse it. The check now exempts this
   # project's own redis container and only fails on a foreign listener it cannot
-  # bind over. Bound to `scripts/__tests__/dev-redis-detection.unit.bats`.
+  # bind over. Bound to `dev/scripts/__tests__/dev-redis-detection.unit.bats`.
 
   @unit
   Scenario: the host-redis collision check is skipped when SKIP_HOST_REDIS_CHECK is set
@@ -168,7 +168,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   @unit
   Scenario: all-local overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL
     When write_overrides is called with mode=all-local
-    Then langwatch/.env.dev-up contains DATABASE_URL pointing at postgres:5432
+    Then platform/app/.env.dev-up contains DATABASE_URL pointing at postgres:5432
     And REDIS_URL pointing at redis:6379
     And CLICKHOUSE_URL pointing at clickhouse:8123
     And it does NOT contain LANGWATCH_NLP_SERVICE or LANGEVALS_ENDPOINT
@@ -194,16 +194,16 @@ Feature: make quickstart is the single dev environment entry point with intent-b
 
   @unit @unimplemented
   Scenario: contributor's .env is the source of truth for non-overridden values
-    Given langwatch/.env defines OPENAI_API_KEY and LANGWATCH_NLP_SERVICE
+    Given platform/app/.env defines OPENAI_API_KEY and LANGWATCH_NLP_SERVICE
     When I run "make quickstart all-local"
     Then OPENAI_API_KEY in the running container is the value from .env
     And LANGWATCH_NLP_SERVICE is the value from .env (no override for this mode)
 
   @unit
-  Scenario: write_overrides replaces langwatch/.env.dev-up — does not append
+  Scenario: write_overrides replaces platform/app/.env.dev-up — does not append
     Given a previous run wrote all-local overrides
     When write_overrides runs again with mode=frontend-only
-    Then langwatch/.env.dev-up no longer contains DATABASE_URL
+    Then platform/app/.env.dev-up no longer contains DATABASE_URL
     And it contains the frontend-only overrides NEXTAUTH_PROVIDER and REDIS_URL pointing at localhost:6379
     And the previous all-local REDIS_URL (redis:6379) was replaced, not appended
 
@@ -242,8 +242,8 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # --- Fail-fast + idempotency (#3860 AC#7) ---
 
   @unit @unimplemented
-  Scenario: quickstart errors when langwatch/.env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false
-    Given langwatch/.env contains IS_SAAS=true and BLOCK_LOCAL_HTTP_CALLS=false
+  Scenario: quickstart errors when platform/app/.env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false
+    Given platform/app/.env contains IS_SAAS=true and BLOCK_LOCAL_HTTP_CALLS=false
     When I run "make quickstart all-local"
     Then quickstart exits non-zero with a SSRF-guard error message
 

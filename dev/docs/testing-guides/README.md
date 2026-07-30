@@ -27,7 +27,7 @@ in order on any pre-prod verification pass.
 ## Flag summary
 
 Read each PR's guide for full behaviour and rollback. Registered in
-`langwatch/src/server/featureFlag/registry.ts`; verified strings only.
+`platform/app/src/server/featureFlag/registry.ts`; verified strings only.
 
 | Flag | Default | Owns | Introduced by |
 |------|---------|------|---------------|
@@ -68,7 +68,7 @@ watch for them everywhere:
 
 Every guide assumes:
 
-1. `langwatch/.env` is populated (see `langwatch/.env.example`). `BASE_HOST`
+1. `platform/app/.env` is populated (see `platform/app/.env.example`). `BASE_HOST`
    must be set — the outbox dispatcher throws at setup if it's unset because
    trigger emails render broken deep links.
 2. `pnpm install` has run.

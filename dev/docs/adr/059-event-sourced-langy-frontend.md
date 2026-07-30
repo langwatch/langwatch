@@ -189,7 +189,7 @@ Sharpen the seams the later phases build on; no behaviour change.
 - Scaffold `packages/langy` modeled on `packages/handled-error`: `private`,
   `"type": "module"`, `exports → ./src/index.ts`, `incremental` +
   per-package `tsBuildInfoFile`, `zod` as **peer** dependency; add
-  `"@langwatch/langy": "workspace:*"` to `langwatch/package.json`.
+  `"@langwatch/langy": "workspace:*"` to `platform/app/package.json`.
 - Move in, as the seed, `features/langy/stores/langyTurnPhase.ts` + its unit
   test; update the `langyStore` import.
 - Move the event schemas (`pipelines/langy-conversation-processing/schemas/
@@ -292,7 +292,7 @@ Sharpen the seams the later phases build on; no behaviour change.
   then protect, and breaks the realtime spec's no-data-on-the-channel
   invariant. Signal+cursor keeps all three properties and costs one indexed CH
   read per burst.
-- **Ship the reducers from `langwatch/src/shared` instead of a package.**
+- **Ship the reducers from `platform/app/src/shared` instead of a package.**
   Workable, but a package is the existing convention for code both the server
   and client import (`handled-error`, and the card contract now inside this
   same package), enforces the

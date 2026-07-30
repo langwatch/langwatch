@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -117,11 +117,11 @@ describe("the repo is a single pnpm workspace", () => {
 			const members = workspaceMembers();
 
 			for (const project of [
-				"langwatch",
-				"typescript-sdk",
-				"mcp-server",
+				"platform/app",
+				"sdks/typescript",
+				"mcp/typescript",
 				"skills",
-				"agentic-e2e-tests",
+				"tests/agentic-e2e",
 			]) {
 				expect(members).toContain(project);
 			}
@@ -138,8 +138,8 @@ describe("the repo is a single pnpm workspace", () => {
 	describe("when the package names are compared", () => {
 		/** @scenario The application and the SDK no longer share a package name */
 		it("gives the app the name the npx installer filters by, and the SDK its own", () => {
-			const app = readJson("langwatch/package.json").name;
-			const sdk = readJson("typescript-sdk/package.json").name;
+			const app = readJson("platform/app/package.json").name;
+			const sdk = readJson("sdks/typescript/package.json").name;
 
 			// Cross-checked against the constant the end-user install filters
 			// by, not against a literal: pnpm exits 0 on a filter that matches
@@ -151,17 +151,33 @@ describe("the repo is a single pnpm workspace", () => {
 			expect(app).not.toBe(sdk);
 		});
 
-		/** @scenario The application still gets the published SDK */
-		it("keeps the app on the published SDK rather than the working copy", () => {
-			const app = readJson("langwatch/package.json") as {
+		/** @scenario The application links the SDK working copy */
+		it("links the SDK working copy rather than a published release", () => {
+			const app = readJson("platform/app/package.json") as {
 				dependencies?: Record<string, string>;
 			};
 
-			// A `workspace:` specifier here would switch the app — and the
-			// production image built from it — onto the SDK working copy. That is
-			// a deliberate change, not one to acquire by accident.
-			expect(app.dependencies?.langwatch).toBeDefined();
-			expect(app.dependencies?.langwatch).not.toMatch(/^workspace:/);
+			// So an SDK edit reaches the app — and the production image built
+			// from it — without a publish. `linkWorkspacePackages` stays false,
+			// so this only happens for the specifier that asks for it.
+			expect(app.dependencies?.langwatch).toMatch(/^workspace:/);
+		});
+
+		/** @scenario The SDK carries its own copy of a pinned dependency */
+		it("bundles zod into the SDK instead of importing it from the consumer", () => {
+			const bundle = join(repoRoot, "sdks/typescript/dist/index.mjs");
+			if (!existsSync(bundle)) return; // dist is a build artefact, not tracked
+
+			// The link above is only survivable because of this. The app pins zod
+			// 3 and collapses every copy onto it (`resolve.dedupe: ["zod"]`, which
+			// it needs because zod 3 instanceof-checks its own classes). Left
+			// external, the SDK's zod-4 calls (`.loose()`, `z.core`) land on that
+			// v3 object and throw `z.object(...).loose is not a function` at first
+			// import — taking the whole app down, not just the SDK path.
+			const source = readFileSync(bundle, "utf8");
+			const externalZodImports = source.match(/from\s*["']zod(?:\/[^"']*)?["']/g);
+
+			expect(externalZodImports ?? []).toEqual([]);
 		});
 	});
 
@@ -290,7 +306,7 @@ describe("the repo is a single pnpm workspace", () => {
 			const root = readJson("package.json") as { files?: string[] };
 			const shipped = root.files ?? [];
 
-			// Workspace members only — `typescript-sdk/examples/*` carry a
+			// Workspace members only — `sdks/typescript/examples/*` carry a
 			// package.json but are not members, so the lockfile never mentions
 			// them and the tarball has no reason to.
 			const memberManifests = trackedManifests().filter((manifest) =>

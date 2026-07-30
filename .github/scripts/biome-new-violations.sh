@@ -34,7 +34,7 @@
 #
 # Usage: biome-new-violations.sh <head-rdjson> <base-ref> <path>...
 #   <head-rdjson>  biome --reporter=rdjson output for HEAD, paths relative to
-#                  langwatch/ (i.e. BEFORE any repo-root prefixing)
+#                  the app directory (i.e. BEFORE any repo-root prefixing)
 #   <base-ref>     e.g. origin/main
 #   <path>...      the same paths the head run was given
 
@@ -51,7 +51,18 @@ shift 2
 PATHS=("$@")
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-BIOME="$REPO_ROOT/langwatch/node_modules/.bin/biome"
+
+# The app directory, resolved per tree rather than hardcoded. PATHS are relative
+# to it, and the base tree is a checkout of the merge base -- which, across the
+# commit that moved langwatch/ to platform/app/, is laid out the OLD way. A
+# hardcoded path makes the base lint produce nothing, and the guard below then
+# exits 2 on a tree that is perfectly fine.
+app_dir() {
+  if [ -f "$1/platform/app/package.json" ]; then echo "platform/app"; else echo "langwatch"; fi
+}
+HEAD_APP="$(app_dir "$REPO_ROOT")"
+
+BIOME="$REPO_ROOT/$HEAD_APP/node_modules/.bin/biome"
 
 if [ ! -x "$BIOME" ]; then
   echo "biome not found at $BIOME -- run pnpm install at the repo root first (single workspace, ADR-076)" >&2
@@ -75,13 +86,15 @@ git worktree add --quiet --detach "$BASE_TREE" "$MERGE_BASE"
 # The base is linted under the HEAD's rules, not its own. The question is "what
 # did main already have, judged by the rules we are adopting" -- judging it by
 # main's rules would count a newly-enabled rule's entire backlog as this PR's.
-rm -f "$BASE_TREE"/langwatch/biome.json "$BASE_TREE"/langwatch/biome.jsonc
-cp "$REPO_ROOT/langwatch/biome.jsonc" "$BASE_TREE/langwatch/biome.jsonc"
+BASE_APP="$(app_dir "$BASE_TREE")"
+
+rm -f "$BASE_TREE/$BASE_APP"/biome.json "$BASE_TREE/$BASE_APP"/biome.jsonc
+cp "$REPO_ROOT/$HEAD_APP/biome.jsonc" "$BASE_TREE/$BASE_APP/biome.jsonc"
 
 # Both sides must resolve the same dependencies or the type-aware rules
 # (noFloatingPromises, noMisusedPromises) disagree for reasons that have nothing
 # to do with the diff. Symlinking is enough -- biome only reads them.
-ln -sfn "$REPO_ROOT/langwatch/node_modules" "$BASE_TREE/langwatch/node_modules"
+ln -sfn "$REPO_ROOT/$HEAD_APP/node_modules" "$BASE_TREE/$BASE_APP/node_modules"
 if [ -d "$REPO_ROOT/node_modules" ]; then
   ln -sfn "$REPO_ROOT/node_modules" "$BASE_TREE/node_modules"
 fi
@@ -89,11 +102,11 @@ fi
 # Normalize the base's formatting. --linter-enabled=false so this only rewrites
 # layout: it must not fix a lint violation, or the base would look better than
 # it is and the PR would inherit the difference as a regression.
-(cd "$BASE_TREE/langwatch" && "$BIOME" check --write --linter-enabled=false "${PATHS[@]}" >/dev/null 2>&1) || true
+(cd "$BASE_TREE/$BASE_APP" && "$BIOME" check --write --linter-enabled=false "${PATHS[@]}" >/dev/null 2>&1) || true
 
 BASE_RDJSON="$BASE_TREE/base.rdjson"
 # Biome exits non-zero whenever it reports anything, which is the normal case.
-(cd "$BASE_TREE/langwatch" && "$BIOME" check --reporter=rdjson "${PATHS[@]}" > "$BASE_RDJSON" 2>/dev/null) || true
+(cd "$BASE_TREE/$BASE_APP" && "$BIOME" check --reporter=rdjson "${PATHS[@]}" > "$BASE_RDJSON" 2>/dev/null) || true
 
 # An unreadable or empty base would make every head diagnostic look new. That
 # fails loudly rather than quietly, but the message would be nonsense, so say
@@ -148,7 +161,7 @@ jq -r '.[] | "  \(.file)\n    \(.rule): \(.base) -> \(.head)"' "$REGRESSIONS"
 echo
 echo "Each is a rule the repo already enforces on new code. Either fix it, or"
 echo "-- if the rule is genuinely wrong for this code -- scope an override in"
-echo "langwatch/biome.jsonc with a comment saying why."
+echo "platform/app/biome.jsonc with a comment saying why."
 
 # Also surface it on the run summary, so the reason is visible without opening
 # the log.

@@ -180,7 +180,7 @@ to change what ran are refused: `WORKERS_IN_PROCESS=1` is still how plain
 child, so it must not block a stack. `START_WORKERS=false` has no replacement —
 the worker stack is part of the app now, and `+workers` only moves it into its
 own lane. Repo scripts
-(`pnpm dev:haven`, `pnpm dev:workers:haven`) are rewritten to the new flags in
+(the since-removed `pnpm dev:haven` / `pnpm dev:workers:haven`) are rewritten to the new flags in
 the same change. Machine-level opt-outs of haven managing a shared server
 (`LANGWATCH_HAVEN_CH=0` and friends) are rare, deliberate, and stay env vars.
 
@@ -388,7 +388,7 @@ story, including post-mortem reads after a crash.
   `haven-cli-surface.feature`, `haven-service-selection.feature`,
   `haven-automatic-prep.feature`, and `haven-logs.feature` are new and
   normative.
-- `make haven <cmd>` passthrough, `pnpm dev:haven`, and the boxd/quickstart
+- `make haven <cmd>` passthrough and the boxd/quickstart
   docs are updated to the new spellings in the same change.
 - Anyone's shell history breaks once, with a pointer.
 
