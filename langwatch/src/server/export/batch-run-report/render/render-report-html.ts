@@ -424,11 +424,20 @@ function headlineSentence({
   passRate: PassRateFact;
   counts: RunOutcomeCounts;
 }): string {
-  if (passRate.tooFewToConclude) {
-    return `${counts.failedCount} of ${passRate.settled} settled runs failed. Too few runs to draw a conclusion from a rate.`;
-  }
   if (passRate.value === null) {
     return "No runs have settled, so there is no pass rate to state.";
+  }
+  if (passRate.inconclusiveReason === "too_few_runs") {
+    return `${counts.failedCount} of ${passRate.settled} settled runs failed. Too few runs to draw a conclusion from a rate.`;
+  }
+  if (passRate.inconclusiveReason === "spread_too_wide") {
+    // Naming the sample here would be misleading: there are plenty of runs. The
+    // rate is unquotable because the agent was inconsistent across them.
+    const spread =
+      passRate.ci95 === null
+        ? ""
+        : ` The true rate could be anywhere from ${formatRate(passRate.ci95.low)} to ${formatRate(passRate.ci95.high)}.`;
+    return `${counts.failedCount} of ${passRate.settled} settled runs failed — ${formatRate(passRate.value)}, but results varied too much across runs to quote that as the agent's rate.${spread}`;
   }
   const headline = `Pass rate ${formatRate(passRate.value)} across ${passRate.settled} settled runs`;
   if (passRate.ci95 === null) return `${headline}.`;

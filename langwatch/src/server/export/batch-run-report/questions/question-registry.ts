@@ -419,13 +419,21 @@ function trustBlocks(evidence: ReportEvidence): Block[] {
   );
   const blocks: Block[] = [];
 
-  if (evidence.passRate.tooFewToConclude) {
+  const settledLabel = `${evidence.passRate.settled} ${
+    evidence.passRate.settled === 1 ? "scenario" : "scenarios"
+  }`;
+  if (evidence.passRate.inconclusiveReason === "too_few_runs") {
     blocks.push({
       kind: "note",
       tone: "warn",
-      text: `This run settled ${evidence.passRate.settled} ${
-        evidence.passRate.settled === 1 ? "scenario" : "scenarios"
-      } — too few runs to draw a conclusion from a percentage. Read the individual outcomes instead.`,
+      text: `This run settled ${settledLabel} — too few runs to draw a conclusion from a percentage. Read the individual outcomes instead.`,
+    });
+  }
+  if (evidence.passRate.inconclusiveReason === "spread_too_wide") {
+    blocks.push({
+      kind: "note",
+      tone: "warn",
+      text: `This run settled ${settledLabel}, which is enough to measure — but the outcomes varied so much that the rate does not pin down how the agent behaves. That spread is itself the finding: it points at inconsistency rather than at a missing sample.`,
     });
   }
 

@@ -44,15 +44,30 @@ function runSection(evidence: ReportEvidence): string[] {
     `settled: ${evidence.counts.settledCount}`,
     evidence.passRate.value === null
       ? "pass rate: not yet determinable"
-      : `pass rate: ${evidence.passRate.value.toFixed(1)}% of ${evidence.passRate.settled} settled${
-          evidence.passRate.tooFewToConclude
-            ? " (TOO FEW RUNS TO CONCLUDE — do not state this as a rate)"
-            : ""
-        }`,
+      : `pass rate: ${evidence.passRate.value.toFixed(1)}% of ${evidence.passRate.settled} settled${passRateCaveat(evidence)}`,
     evidence.stillRunning
       ? "NOTE: some scenarios had not finished; these figures cover only those that had."
       : "",
   ];
+}
+
+/**
+ * Why a rate cannot be quoted, in the terms the model should repeat.
+ *
+ * Told apart because they call for opposite readings: too few runs is a gap in
+ * the evidence, while a wide spread over plenty of runs is a finding about the
+ * agent. A model told "too few runs" about twenty-one of them will write that
+ * the suite needs more scenarios, which is the wrong advice.
+ */
+function passRateCaveat(evidence: ReportEvidence): string {
+  switch (evidence.passRate.inconclusiveReason) {
+    case "too_few_runs":
+      return " (TOO FEW RUNS TO CONCLUDE — do not state this as a rate)";
+    case "spread_too_wide":
+      return " (OUTCOMES VARIED TOO WIDELY TO QUOTE AS A RATE — enough runs, but inconsistent; say the agent was inconsistent, not that the sample was small)";
+    default:
+      return "";
+  }
 }
 
 function criteriaSection(evidence: ReportEvidence): string[] {

@@ -73,9 +73,9 @@ describe("Feature: Run report — the trend sparkline", () => {
   describe("given a history of pass rates", () => {
     const spark = sparkline({
       points: [
-        { label: "batch-1", value: 0.5 },
-        { label: "batch-2", value: 0.25 },
-        { label: "batch-3", value: 0.8 },
+        { label: "batch-1", value: 50 },
+        { label: "batch-2", value: 25 },
+        { label: "batch-3", value: 80 },
       ],
     });
 
@@ -103,7 +103,7 @@ describe("Feature: Run report — the trend sparkline", () => {
   describe("given a single point", () => {
     /** @scenario The same run produces the same report twice */
     it("centres it rather than dividing by zero", () => {
-      const spark = sparkline({ points: [{ label: "batch-1", value: 1 }] });
+      const spark = sparkline({ points: [{ label: "batch-1", value: 100 }] });
       expect(spark).toContain('points="50.00,2.00"');
     });
   });
@@ -120,9 +120,22 @@ describe("Feature: Run report — the trend sparkline", () => {
   describe("given a rate to format", () => {
     /** @scenario The same run produces the same report twice */
     it("formats to one decimal place without consulting a locale", () => {
-      expect(formatRate(0.6666666)).toBe("66.7%");
-      expect(formatRate(1)).toBe("100.0%");
+      expect(formatRate(66.66666)).toBe("66.7%");
+      expect(formatRate(100)).toBe("100.0%");
       expect(formatRate(0)).toBe("0.0%");
+    });
+
+    /**
+     * The input is a percentage, the unit `passRateFrom()` and
+     * `wilsonInterval()` both produce. Reading it as a fraction multiplied a
+     * second time, so the one run big and consistent enough to quote a rate
+     * headlined "Pass rate 8000.0%".
+     *
+     * @scenario A large enough sample states its rate with a margin
+     */
+    it("takes a percentage, not a fraction", () => {
+      expect(formatRate(80)).toBe("80.0%");
+      expect(formatRate(80)).not.toBe("8000.0%");
     });
   });
 });

@@ -52,10 +52,11 @@ export function makeModel(overrides: Partial<ReportModel> = {}): ReportModel {
     tier: "verified",
     headline: {
       passRate: {
-        value: 0.8,
-        ci95: { low: 0.49, high: 0.94 },
+        value: 80,
+        ci95: { low: 49, high: 94 },
         settled: 10,
         tooFewToConclude: false,
+        inconclusiveReason: null,
       },
       counts: makeCounts(),
     },
@@ -246,7 +247,13 @@ export function makeFiguresOnlyModel(): ReportModel {
 export function makeSmallSampleModel(): ReportModel {
   return makeModel({
     headline: {
-      passRate: { value: 0.25, ci95: null, settled: 4, tooFewToConclude: true },
+      passRate: {
+        value: 25,
+        ci95: null,
+        settled: 4,
+        tooFewToConclude: true,
+        inconclusiveReason: "too_few_runs",
+      },
       counts: makeCounts({
         passedCount: 1,
         failedCount: 3,
@@ -266,6 +273,7 @@ export function makeNothingSettledModel(): ReportModel {
         ci95: null,
         settled: 0,
         tooFewToConclude: false,
+        inconclusiveReason: null,
       },
       counts: makeCounts({
         passedCount: 0,

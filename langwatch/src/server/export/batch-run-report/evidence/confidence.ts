@@ -78,6 +78,7 @@ export function buildPassRateFact({
       ci95: null,
       settled: 0,
       tooFewToConclude: true,
+      inconclusiveReason: "no_settled_runs",
     };
   }
 
@@ -85,14 +86,22 @@ export function buildPassRateFact({
     successes: passedCount,
     total: settledCount,
   });
-  const tooFewToConclude =
-    settledCount < MIN_SETTLED_FOR_CONCLUSION ||
-    (ci95 !== null && ci95.high - ci95.low > MAX_USEFUL_CI_WIDTH_POINTS);
+
+  // Order matters: with too few runs the interval is wide *because* of the
+  // sample size, so the sample is the honest thing to name. Past that, a wide
+  // interval is the agent being inconsistent rather than the run being small.
+  const inconclusiveReason =
+    settledCount < MIN_SETTLED_FOR_CONCLUSION
+      ? ("too_few_runs" as const)
+      : ci95 !== null && ci95.high - ci95.low > MAX_USEFUL_CI_WIDTH_POINTS
+        ? ("spread_too_wide" as const)
+        : null;
 
   return {
     value: (passedCount / settledCount) * 100,
     ci95,
     settled: settledCount,
-    tooFewToConclude,
+    tooFewToConclude: inconclusiveReason !== null,
+    inconclusiveReason,
   };
 }

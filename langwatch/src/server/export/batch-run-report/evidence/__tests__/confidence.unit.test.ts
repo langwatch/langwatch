@@ -95,6 +95,34 @@ describe("buildPassRateFact()", () => {
     });
   });
 
+  describe("given plenty of runs whose outcomes varied widely", () => {
+    // A real run: 10 of 21 passed. Comfortably past the sample threshold, and
+    // the interval still spans roughly 28% to 68%.
+    const fact = buildPassRateFact({ passedCount: 10, settledCount: 21 });
+
+    /**
+     * The two ways a rate becomes unquotable call for opposite reactions —
+     * run more scenarios, versus the agent is inconsistent — so calling
+     * twenty-one runs "too few" is both wrong and the wrong advice.
+     *
+     * @scenario A small sample is reported as a small sample
+     */
+    it("blames the spread rather than the sample size", () => {
+      expect(fact.tooFewToConclude).toBe(true);
+      expect(fact.inconclusiveReason).toBe("spread_too_wide");
+    });
+  });
+
+  describe("given fewer runs than can support a rate", () => {
+    /** @scenario A small sample is reported as a small sample */
+    it("blames the sample size", () => {
+      expect(
+        buildPassRateFact({ passedCount: 1, settledCount: 4 })
+          .inconclusiveReason,
+      ).toBe("too_few_runs");
+    });
+  });
+
   describe("given a run of two hundred scenarios", () => {
     const fact = buildPassRateFact({ passedCount: 190, settledCount: 200 });
 

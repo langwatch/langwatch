@@ -29,9 +29,19 @@ export interface BarSegment {
   tone: Tone;
 }
 
-/** A pass rate in 0..1 rendered as a percentage with one decimal place. */
-export function formatRate(rate: number): string {
-  return `${(rate * 100).toFixed(1)}%`;
+/**
+ * A pass rate rendered with one decimal place.
+ *
+ * The input is already a percentage in 0..100, which is the unit every producer
+ * uses: `passRateFrom()` — the one function the run-history screen and this
+ * report share — multiplies out, and `wilsonInterval()` returns its bounds the
+ * same way. This multiplied again, so a conclusive run headlined "Pass rate
+ * 8000.0%". It survived because every rate under the too-few-runs gate takes
+ * the counts-only path and never reaches here, and because the fixtures fed it
+ * fractions — asserting the right string for the wrong reason.
+ */
+export function formatRate(percentage: number): string {
+  return `${percentage.toFixed(1)}%`;
 }
 
 function coord(value: number): string {
@@ -113,7 +123,7 @@ export function passRateBar({ segments }: { segments: BarSegment[] }): string {
 
 export interface SparkPoint {
   label: string;
-  /** Pass rate in 0..1. */
+  /** Pass rate in 0..100, the unit `passRateFrom()` produces. */
   value: number;
 }
 
@@ -123,8 +133,11 @@ function sparkCoordinates({ points }: { points: SparkPoint[] }): string[] {
   return points.map((point, index) => {
     const x =
       lastIndex === 0 ? SPARK_WIDTH / 2 : (index / lastIndex) * SPARK_WIDTH;
-    const y =
-      SPARK_PADDING + (1 - Math.min(Math.max(point.value, 0), 1)) * span;
+    // Clamped against 100, not 1 — reading a percentage as a fraction pinned
+    // every point above 1% to the top of the box, so a trend that had moved
+    // drew as a flat line at full marks.
+    const fraction = Math.min(Math.max(point.value, 0), 100) / 100;
+    const y = SPARK_PADDING + (1 - fraction) * span;
     return `${coord(x)},${coord(y)}`;
   });
 }

@@ -3,6 +3,7 @@ import { renderReportHtml } from "../render-report-html";
 import { REPORT_SCRIPT } from "../report-script";
 import {
   EVERY_BLOCK,
+  makeCounts,
   makeEveryBlockModel,
   makeFiguresOnlyModel,
   makeMarkupModel,
@@ -256,6 +257,44 @@ describe("Feature: Run report — the headline", () => {
       const rate = headlineRate(renderReportHtml({ model: makeModel() }));
       expect(rate).toContain("Pass rate 80.0%");
       expect(rate).toContain("likely between 49.0% and 94.0%");
+    });
+  });
+
+  describe("when there were plenty of runs but they varied widely", () => {
+    const rate = headlineRate(
+      renderReportHtml({
+        model: makeModel({
+          headline: {
+            passRate: {
+              value: 47.6,
+              ci95: { low: 28.3, high: 67.6 },
+              settled: 21,
+              tooFewToConclude: true,
+              inconclusiveReason: "spread_too_wide",
+            },
+            counts: makeCounts({
+              passedCount: 10,
+              failedCount: 11,
+              completedCount: 21,
+              settledCount: 21,
+              totalCount: 21,
+            }),
+          },
+        }),
+      }),
+    );
+
+    /** @scenario A small sample is reported as a small sample */
+    it("does not call twenty-one runs too few", () => {
+      expect(rate).not.toContain("Too few runs");
+      expect(rate).toContain("21 settled runs");
+    });
+
+    /** @scenario A small sample is reported as a small sample */
+    it("names the inconsistency and the range it could sit in", () => {
+      expect(rate).toContain("varied too much");
+      expect(rate).toContain("28.3%");
+      expect(rate).toContain("67.6%");
     });
   });
 

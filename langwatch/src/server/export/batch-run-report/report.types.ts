@@ -148,6 +148,19 @@ export interface PassRateFact {
   ci95: { low: number; high: number } | null;
   settled: number;
   tooFewToConclude: boolean;
+  /**
+   * Why the rate cannot carry a conclusion, when it cannot.
+   *
+   * A rate is unquotable for two unrelated reasons, and they call for opposite
+   * reactions: too few runs is fixed by running more, while a spread too wide
+   * over plenty of runs means the agent is genuinely inconsistent. Saying "too
+   * few runs" about twenty-one of them is both wrong and the wrong advice.
+   */
+  inconclusiveReason:
+    | "no_settled_runs"
+    | "too_few_runs"
+    | "spread_too_wide"
+    | null;
 }
 
 export interface PriorBatchFact {

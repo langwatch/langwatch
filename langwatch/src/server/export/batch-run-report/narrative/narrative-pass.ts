@@ -25,20 +25,31 @@ const logger = createLogger("langwatch:batch-run-report:narrative");
  * @see specs/scenarios/scenario-run-report.feature
  */
 
+/**
+ * Every bound below is deliberately far above real output.
+ *
+ * `generateObject` validates the response as ONE object, so any cap here is
+ * enforced by discarding the entire report — all eleven answers — rather than
+ * the surplus. That makes a tight bound a trade of everything for nothing, and
+ * it is not hypothetical: a six-citation cap lost a complete analysis to a
+ * coverage sentence that named seven scenarios, and a 200-character cap lost
+ * another to a declined answer whose one-sentence reason ran to 205.
+ *
+ * Length is a preference about readability. Correctness is enforced elsewhere
+ * and does not depend on these numbers: citations are made safe by resolution,
+ * which drops any id not in the evidence, and group membership is expanded from
+ * the evidence rather than taken from the model. So these exist only to stop a
+ * runaway response, and sit where a runaway is still caught and real prose is
+ * never touched.
+ */
+const MAX_SENTENCE = 700;
+const MAX_PARAGRAPH = 1_500;
+
 const draftStatementSchema = z.object({
-  // A sentence naming run ids, scenario names and criteria inline routinely
-  // runs past 400 characters without being verbose — this cap only needs to
-  // rule out paragraphs, not ordinary citation-bearing prose.
-  text: z.string().max(700).describe("One plain sentence. No markdown."),
-  // Generous on purpose. Every cap in this schema is enforced by rejecting the
-  // WHOLE report — `generateObject` validates one object — so a tight bound on
-  // a legitimately variable field trades the entire analysis for nothing. It
-  // bought nothing here: coverage and trust answers name every scenario they
-  // are about, so a 15-scenario run produces a 15-citation sentence, and a cap
-  // of 6 silently turned a complete, correctly-cited report into figures only.
-  // Citations are not made safe by this number; they are made safe by
-  // resolution, which drops any id that is not in the evidence. This bound
-  // exists only to stop a runaway response, so it sits far above real output.
+  text: z
+    .string()
+    .max(MAX_SENTENCE)
+    .describe("One plain sentence. No markdown."),
   citations: z
     .array(citationSchema)
     .max(64)
@@ -48,26 +59,26 @@ const draftStatementSchema = z.object({
 });
 
 const draftGroupSchema = z.object({
-  name: z.string().max(80),
+  name: z.string().max(200),
   mechanism: z
     .string()
-    .max(400)
+    .max(MAX_PARAGRAPH)
     .describe("What the agent did wrong, in terms of its behaviour."),
   signatureIds: z
     .array(z.string())
     .min(1)
     .describe("Group ids from EVIDENCE. Membership is expanded from these."),
-  statements: z.array(draftStatementSchema).max(3).optional(),
+  statements: z.array(draftStatementSchema).max(8).optional(),
 });
 
 const draftFindingSchema = z.object({
-  headline: z.string().max(120),
+  headline: z.string().max(300),
   severity: z.enum(["critical", "high", "medium", "low"]),
   consequence: z
     .string()
-    .max(200)
+    .max(MAX_PARAGRAPH)
     .describe("What happens to someone using this agent if it ships."),
-  statements: z.array(draftStatementSchema).max(4).optional(),
+  statements: z.array(draftStatementSchema).max(8).optional(),
 });
 
 const draftArtifactSchema = z.object({
@@ -76,23 +87,19 @@ const draftArtifactSchema = z.object({
     "system_prompt_amendment",
     "guardrail_rule",
   ]),
-  title: z.string().max(80),
-  rationale: z.string().max(300),
+  title: z.string().max(200),
+  rationale: z.string().max(MAX_PARAGRAPH),
   body: z
     .string()
-    .max(4000)
+    .max(20_000)
     .describe("Copy-pasteable as it stands. Nothing else."),
-  statements: z.array(draftStatementSchema).max(3).optional(),
+  statements: z.array(draftStatementSchema).max(8).optional(),
 });
 
 const draftAnswerSchema = z.object({
   questionId: z.string(),
   declined: z.boolean(),
-  declinedReason: z.string().max(200).optional(),
-  // Bounded well above real output, for the reason given on `citations` above:
-  // these three scale with how much went wrong in the run, and a run with more
-  // distinct failure groups than the cap allows would lose its whole analysis
-  // rather than its surplus.
+  declinedReason: z.string().max(MAX_PARAGRAPH).optional(),
   statements: z.array(draftStatementSchema).max(16).optional(),
   groups: z.array(draftGroupSchema).max(48).optional(),
   findings: z.array(draftFindingSchema).max(32).optional(),
