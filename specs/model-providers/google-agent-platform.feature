@@ -22,27 +22,20 @@ Feature: Google Agent Platform as a model provider
   therefore report a working credential as unusable.
 
   @unit
-  Scenario: An Agent Platform key is checked against the endpoint that accepts it
-    Given a Google Agent Platform provider with an API key, project and location
+  Scenario: The credential is not exposed where logs or browser history could retain it
+    Given a Google Agent Platform credential
     When I check the credential
-    Then the provider is asked to generate content, not to list its models
+    Then the key does not appear in the address used to reach the provider
 
   @unit
-  Scenario: The credential travels in a header, never in the URL
-    Given a Google Agent Platform provider with an API key
+  Scenario: The project and location I entered are the ones actually checked
+    Given a Google Agent Platform credential for project "acme-123" in location "us-central1"
     When I check the credential
-    Then the key is sent as the x-goog-api-key header
-    And the key does not appear in the request URL
-
-  @unit
-  Scenario: The project and location the customer gave are the ones probed
-    Given a Google Agent Platform provider for project "acme-123" in location "us-central1"
-    When I check the credential
-    Then the request path names that project and that location
+    Then the check happens against project "acme-123" in location "us-central1"
 
   @unit
   Scenario: A key the platform accepts is valid
-    Given Agent Platform answers the generate-content request
+    Given Agent Platform accepts the credential
     When I check the credential
     Then the credential is reported as valid
 

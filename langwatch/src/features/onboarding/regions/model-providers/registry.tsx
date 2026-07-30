@@ -87,10 +87,10 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     // customer never chose, unconditionally, instead of deferring to their
     // custom models the way `vertex_ai` correctly does by omitting this.
     //
-    // The request path names the project and location, and `apiRoot` is
-    // the host that path is built from — see `AGENT_PLATFORM_HOST` in
+    // `defaultBaseUrl` is this host, static; the full request path also
+    // names the project and location, assembled per credential in
     // `providerValidation.ts`'s `google_agent_platform` probe branch, which
-    // derives from this same field rather than a second hardcoded string.
+    // reads `apiRoot` below for the host rather than repeating this string.
     defaultBaseUrl: "https://aiplatform.googleapis.com",
     apiRoot: "https://aiplatform.googleapis.com",
     icon: singleIcon(

@@ -45,7 +45,7 @@ describe("validateProviderApiKey for google_agent_platform", () => {
   });
 
   describe("given a credential to check", () => {
-    /** @scenario An Agent Platform key is checked against the endpoint that accepts it */
+    /** @scenario A key the platform accepts is valid */
     it("asks the provider to generate content rather than to list models", async () => {
       mockFetch.mockResolvedValue(generated());
 
@@ -64,7 +64,7 @@ describe("validateProviderApiKey for google_agent_platform", () => {
       expect(body.generationConfig.maxOutputTokens).toBe(1);
     });
 
-    /** @scenario The credential travels in a header, never in the URL */
+    /** @scenario The credential is not exposed where logs or browser history could retain it */
     it("sends the key as a header and keeps it out of the URL", async () => {
       mockFetch.mockResolvedValue(generated());
 
@@ -81,7 +81,7 @@ describe("validateProviderApiKey for google_agent_platform", () => {
       expect(url).not.toContain("key=");
     });
 
-    /** @scenario The project and location the customer gave are the ones probed */
+    /** @scenario The project and location I entered are the ones actually checked */
     it("builds the path from the project and location given", async () => {
       mockFetch.mockResolvedValue(generated());
 
