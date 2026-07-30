@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { QueueRunCommandData } from "~/server/event-sourcing.old/pipelines/simulation-processing/schemas/commands";
+import type { RunQueuedData } from "~/server/event-sourcing/simulation-processing/schema";
 import {
   deriveBatchRunId,
   deriveScenarioRunId,
@@ -38,15 +38,17 @@ export type SuiteRunTarget = {
   referenceId: string;
 };
 
+/** The tenant rides the dispatch context, never the command payload. */
+type QueueSimulationRun = (
+  data: RunQueuedData,
+  ctx: { readonly tenantId: string },
+) => Promise<unknown>;
+
 export class SuiteRunService {
-  constructor(
-    private readonly queueSimulationRunCommand: (
-      data: QueueRunCommandData,
-    ) => Promise<void>,
-  ) {}
+  constructor(private readonly queueSimulationRunCommand: QueueSimulationRun) {}
 
   static create(params: {
-    queueSimulationRun: (data: QueueRunCommandData) => Promise<void>;
+    queueSimulationRun: QueueSimulationRun;
   }): SuiteRunService {
     return traced(
       new SuiteRunService(params.queueSimulationRun),
@@ -166,25 +168,27 @@ export class SuiteRunService {
     const now = Date.now();
     await Promise.allSettled(
       items.map((item) =>
-        this.queueSimulationRunCommand({
-          tenantId: projectId,
-          scenarioRunId: item.scenarioRunId,
-          scenarioId: item.scenarioId,
-          batchRunId,
-          scenarioSetId: setId,
-          name: scenarioNameMap.get(item.scenarioId),
-          metadata: {
-            langwatch: { targetReferenceId: item.target.referenceId },
+        this.queueSimulationRunCommand(
+          {
+            scenarioRunId: item.scenarioRunId,
+            scenarioId: item.scenarioId,
+            batchRunId,
+            scenarioSetId: setId,
+            name: scenarioNameMap.get(item.scenarioId),
+            metadata: {
+              langwatch: { targetReferenceId: item.target.referenceId },
+            },
+            target: {
+              type: item.target.type,
+              referenceId: item.target.referenceId,
+            },
+            // The batch denominator travels with every child (ADR-072), so the
+            // suite's progress is readable from the first row that lands.
+            batchTotal: total,
+            occurredAt: now,
           },
-          target: {
-            type: item.target.type,
-            referenceId: item.target.referenceId,
-          },
-          // The batch denominator travels with every child (ADR-072), so the
-          // suite's progress is readable from the first row that lands.
-          batchTotal: total,
-          occurredAt: now,
-        }),
+          { tenantId: projectId },
+        ),
       ),
     );
 

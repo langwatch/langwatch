@@ -15,17 +15,15 @@
  * - every accepted record also lands a usage-estimate ledger row.
  *
  * Records are built by the real canonicalisation helper
- * (prepareCanonicalLogRecords), not hand-assembled, so the fixture shape can
+ * (canonicalizeLogRequest), not hand-assembled, so the fixture shape can
  * never drift from what production writes.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  type LogRedactionService,
-  prepareCanonicalLogRecords,
-} from "~/server/event-sourcing.old/pipelines/log-processing/canonicalLog";
-import type { CanonicalLogRecord } from "~/server/event-sourcing.old/pipelines/log-processing/schemas/logRecord";
+import { canonicalizeLogRequest } from "~/server/event-sourcing/log-processing/canonicalize";
+import type { LogRedactionService } from "~/server/event-sourcing/log-processing/redaction";
+import type { CanonicalLogRecord } from "~/server/event-sourcing/log-processing/schema";
 import {
   startTestContainers,
   stopTestContainers,
@@ -81,7 +79,7 @@ function otlpLogRecord({
  * returns them together in time order.
  */
 async function buildRecords(baseMs: number): Promise<CanonicalLogRecord[]> {
-  const result = await prepareCanonicalLogRecords({
+  const result = await canonicalizeLogRequest({
     tenantId,
     organizationId,
     piiRedactionLevel: "DISABLED",

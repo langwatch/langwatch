@@ -199,6 +199,11 @@ export async function sendHttpDestination({
     status: response.status,
     body: responseBody,
     responseHeaders: captureResponseHeaders(response.headers),
-    retryAfterMs: parseRetryAfterMs(response.headers?.get("retry-after")),
+    // `Retry-After` may be an HTTP date, so the delay is relative to the clock
+    // now — the response has already been read by the time it is parsed.
+    retryAfterMs: parseRetryAfterMs(
+      response.headers?.get("retry-after"),
+      Date.now(),
+    ),
   };
 }

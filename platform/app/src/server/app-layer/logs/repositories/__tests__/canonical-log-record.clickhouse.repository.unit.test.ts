@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalLogRecord } from "~/server/event-sourcing.old/pipelines/log-processing/schemas/logRecord";
+import type { CanonicalLogRecord } from "~/server/event-sourcing/log-processing/schema";
 import { CanonicalLogRecordClickHouseRepository } from "../canonical-log-record.clickhouse.repository";
 
 function record(): CanonicalLogRecord {

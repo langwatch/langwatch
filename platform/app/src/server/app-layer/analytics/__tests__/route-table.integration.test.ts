@@ -22,12 +22,10 @@ import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTimeseriesQuery } from "~/server/analytics/clickhouse/aggregation-builder";
 import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
+import type { TraceAnalyticsRow } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
-import {
-  TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
-  type TraceAnalyticsRow,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+import type { TraceAnalyticsRollupRow } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.repository";
+import { TRACE_ANALYTICS_STATE_VERSION } from "~/server/event-sourcing/trace-processing/traceAnalytics.projection";
 import {
   startTestContainers,
   stopTestContainers,
@@ -80,7 +78,7 @@ function makeSlimRow(
   return {
     tenantId,
     traceId: `slim-trace-${generate("trace").toString()}`,
-    version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+    version: TRACE_ANALYTICS_STATE_VERSION,
     occurredAtMs: bucketMs,
     createdAtMs: bucketMs,
     updatedAtMs: bucketMs,
