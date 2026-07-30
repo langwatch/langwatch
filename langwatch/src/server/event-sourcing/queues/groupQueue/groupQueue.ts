@@ -63,6 +63,7 @@ import {
 } from "./jobEnvelope";
 import { legacyStagedJobAttempt } from "./legacyStagedJobAttempt";
 import {
+  gqDrainedDlqRestagedTotal,
   gqForeignSiblingsRestagedTotal,
   gqGroupAttemptReadFailuresTotal,
   gqGroupsBlockedTotal,
@@ -1643,31 +1644,41 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       const reason = dropReasonOf(err);
       // We do not release a sibling's value, so the body outlives the drop
       // unless it was already gone.
-      const bodyPreserved = reason !== "missing_blob";
-      this.recordDrop({
-        groupId,
-        stagedJobId: sibling.stagedJobId,
-        jobDataJson: sibling.jobDataJson,
-        err,
-        reason,
-        message: "Failed to parse drained sibling job data — dropping",
-        bodyPreserved,
-      });
-      if (bodyPreserved) {
+      const bodyIsGone = reason === "missing_blob";
+      const message = "Failed to parse drained sibling job data — dropping";
+      if (!bodyIsGone) {
         // No slot to complete (already drained) — preserve the value so the
         // operator drain can recover it (#719). Unlike the dispatch site there is
         // no complete() to withhold here (touching the live slot would corrupt a
         // group this job already left), so the value has ALREADY left staging: if
         // the dead-letter write rejects, deadLetterDrainedValue re-stages the raw
         // value rather than losing it (Critical review #5853, RaiMx).
-        await this.deadLetterDrainedValue({
+        const outcome = await this.deadLetterDrainedValue({
           groupId,
           stagedJobId: sibling.stagedJobId,
           jobDataJson: sibling.jobDataJson,
           reason,
           originalScore: sibling.originalScore,
         });
+        this.recordDrainedOutcome({
+          outcome,
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          err,
+          reason,
+          message,
+        });
       } else {
+        this.recordDrop({
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          err,
+          reason,
+          message,
+          bodyPreserved: false,
+        });
         // Body genuinely gone (missing_blob) — nothing to preserve. Release the
         // stale lease NOW, mirroring the dispatch site's bodyIsGone release: the
         // success-path release no longer covers dropped siblings, so without this
@@ -1749,25 +1760,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         // stage() itself failed: the sibling never made it back into staging, so
         // nothing will dispatch it again — that is a discard, whatever the
         // re-stage intended (#5538).
-        this.recordDrop({
+        //
+        // Body intact and out of staging: dead-letter it (with the re-stage
+        // fallback) so a re-stage failure becomes recoverable, not a silent
+        // discard (#719 / RaiMx). Counted AFTER, on the outcome it reports — see
+        // recordDrainedOutcome.
+        const outcome = await this.deadLetterDrainedValue({
+          groupId,
+          stagedJobId: sibling.stagedJobId,
+          jobDataJson: sibling.jobDataJson,
+          reason: "sibling_restage_failed",
+          originalScore: sibling.originalScore,
+        });
+        this.recordDrainedOutcome({
+          outcome,
           groupId,
           stagedJobId: sibling.stagedJobId,
           jobDataJson: sibling.jobDataJson,
           err,
           reason: "sibling_restage_failed",
           message: "Failed to re-stage drained sibling after batch failure",
-          // Not released — the value is intact, it simply never got re-staged.
-          bodyPreserved: true,
-        });
-        // Body intact and out of staging: dead-letter it (with the re-stage
-        // fallback) so a re-stage failure becomes recoverable, not a silent
-        // discard (#719 / RaiMx).
-        await this.deadLetterDrainedValue({
-          groupId,
-          stagedJobId: sibling.stagedJobId,
-          jobDataJson: sibling.jobDataJson,
-          reason: "sibling_restage_failed",
-          originalScore: sibling.originalScore,
         });
         continue;
       }

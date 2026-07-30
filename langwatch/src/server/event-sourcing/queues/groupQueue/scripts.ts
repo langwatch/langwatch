@@ -1698,6 +1698,15 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
  * `dlq:{groupId}:error` is keyed by stagedJobId → reason so the dead-letter is
  * queryable by failure class; `replayFromDlq` drops it on restore (inspection
  * only). All three destination keys expire together — the quarantine window.
+ *
+ * It ALSO carries the group-level `message`/`timestamp` fields, because those are
+ * the two the operator's dead-letter list actually reads
+ * (`listDlqGroups`: `error: errorHash?.message`, `movedAt: errorHash?.timestamp`).
+ * Writing only the per-job field left both null on every entry this path creates,
+ * and `movedAt ?? 0` sorts a null LAST — so the automatic, high-frequency entries
+ * ended up at the bottom of the list, below every operator-moved group, with no
+ * text to identify them. Additive: `replayFromDlq` deletes this key wholesale on
+ * restore, and the index sweep only asks whether it is non-empty.
  */
 const WRITE_JOB_TO_DLQ_LUA = `
 local dlqJobsKey  = KEYS[1]
@@ -1710,10 +1719,17 @@ local jobDataJson = ARGV[3]
 local reason      = ARGV[4]
 local score       = tonumber(ARGV[5])
 local ttl         = tonumber(ARGV[6])
+local summary     = ARGV[7]
 
 redis.call("ZADD", dlqJobsKey, score, stagedJobId)
 redis.call("HSET", dlqDataKey, stagedJobId, jobDataJson)
 redis.call("HSET", dlqErrorKey, stagedJobId, reason)
+-- Group-level fields LAST, so a stagedJobId that literally collides with one of
+-- these schema names ("message", "timestamp") cannot redefine what the
+-- dashboard renders. The job then simply has no per-job field of its own — its
+-- reason is still readable from the summary — rather than the list showing a
+-- Redis score where an error message belongs.
+redis.call("HSET", dlqErrorKey, "message", summary, "timestamp", tostring(score))
 redis.call("SADD", dlqIndexKey, groupId)
 
 if ttl > 0 then
@@ -1739,6 +1755,41 @@ const writeJobToDlqScript = new CachedLuaScript(WRITE_JOB_TO_DLQ_LUA);
  * are a known small duplication worth unifying if a third reader appears.
  */
 export const GROUP_QUEUE_DLQ_TTL_SECONDS = 604800; // 7 days
+
+/**
+ * What the drop path was able to do about the body a dead-letter entry
+ * references — i.e. whether draining that entry will still find its bytes.
+ *
+ * Produced by `EnvelopeBlobLifecycle.preserveForDlq`, which never throws and
+ * returns quietly on several paths, so the caller used to write the entry with no
+ * way to know. Recorded on the entry (and on the drop log) so "which of these can
+ * I actually recover?" is answerable BEFORE a drain rather than by draining and
+ * watching it fail.
+ *
+ * - `extended` — the reference was pushed out to the quarantine window. For an
+ *   s3-tier ref that extends the lease bookkeeping only; the object itself is
+ *   left to the bucket lifecycle (ADR-029), which is the tier's documented
+ *   retention, not a gap.
+ * - `inline` — the value carries its own body (`e:"j"`/`e:"gz"`, or a legacy
+ *   pre-envelope value), so the entry stores the bytes verbatim and there was
+ *   nothing to extend. The common case, and fully recoverable — NOT a warning.
+ * - `unextended` — the value references a body we did not extend: a
+ *   tenant-mismatched ref, a rejected extend, or an envelope claiming an
+ *   offloaded body that yields no usable reference. The entry can outlive the
+ *   bytes, so a drain may come back `missing_blob`.
+ */
+export type DlqBodyPreservation = "extended" | "inline" | "unextended";
+
+/**
+ * The clause appended to a dead-letter entry's group-level `message`, so the
+ * operator reads the recoverability of an entry in the list they triage from.
+ */
+const DLQ_BODY_PRESERVATION_NOTE: Record<DlqBodyPreservation, string> = {
+  extended: "body kept for the quarantine window",
+  inline: "body travels with the entry",
+  unextended: "body NOT confirmed kept — a drain may fail with a missing body",
+};
+
 const refreshScript = new CachedLuaScript(REFRESH_LUA);
 const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
@@ -2071,12 +2122,14 @@ export class GroupStagingScripts {
    *
    * `nowMs` is the ZSET score the value re-dispatches with once an operator
    * drains it — passed in (never `Date.now()` in Lua) so a replay is deterministic.
+   * It is also the entry's `timestamp`, which is what the operator's list sorts on.
    */
   async writeJobToDlq({
     groupId,
     stagedJobId,
     jobDataJson,
     reason,
+    bodyPreservation,
     nowMs = Date.now(),
     ttlSeconds = GROUP_QUEUE_DLQ_TTL_SECONDS,
   }: {
@@ -2084,9 +2137,18 @@ export class GroupStagingScripts {
     stagedJobId: string;
     jobDataJson: string;
     reason: string;
+    /**
+     * Whether a drain of this entry will still find the body it references.
+     * Omitted rather than defaulted when the caller cannot say: the summary then
+     * carries the reason alone, instead of a guess an operator would read as fact.
+     */
+    bodyPreservation?: DlqBodyPreservation;
     nowMs?: number;
     ttlSeconds?: number;
   }): Promise<void> {
+    const summary = bodyPreservation
+      ? `${reason} — ${DLQ_BODY_PRESERVATION_NOTE[bodyPreservation]}`
+      : reason;
     await writeJobToDlqScript.run(
       this.redis,
       4,
@@ -2100,6 +2162,7 @@ export class GroupStagingScripts {
       reason,
       String(nowMs),
       String(ttlSeconds),
+      summary,
     );
   }
 

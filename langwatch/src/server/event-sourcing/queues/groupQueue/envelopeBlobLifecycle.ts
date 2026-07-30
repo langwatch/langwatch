@@ -11,6 +11,7 @@ import {
   decodeJobEnvelope,
   encodeJobEnvelope,
   isEnvelope,
+  readEnvelopeDescriptor,
   readEnvelopeLease,
   readEnvelopeLeaseFromHeader,
   readEnvelopeRetirement,
@@ -20,6 +21,10 @@ import {
 import { gqBlobReleaseGraceTotal } from "./metrics";
 import { hasRedisHashTag } from "./redisHashTag";
 import { RedisJobBlobStore } from "./redisJobBlobStore";
+// Type-only: the dead-letter entry's schema lives with its writer
+// (`GroupStagingScripts.writeJobToDlq`), and a type import adds no runtime edge,
+// so nothing that imports the scripts module pulls this one in.
+import type { DlqBodyPreservation } from "./scripts";
 import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore";
 
 const logger = createLogger("langwatch:event-sourcing:envelope-blob-lifecycle");
@@ -305,14 +310,14 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
-   * Push a still-referenced blob's TTL out to at least the dead-letter quarantine
-   * window (#719/#720). A body-present drop is preserved in the dead-letter for
-   * ~7 days, but the referenced blob's own backstop is shorter (`BLOB_BACKSTOP_TTL_SECONDS`,
-   * 4 days for GQ2) — so without this the dead-letter would outlive the blob it
-   * references and a drain would recover an envelope pointing at nothing.
-   * s3-tier objects have no redis TTL and are left to the bucket lifecycle.
-   * Best-effort: a failure warns and relies on the existing backstop, and never
-   * blocks the drop.
+   * Push a still-referenced blob's lifetime out to at least the dead-letter
+   * quarantine window (#719/#720), and report whether that actually happened.
+   *
+   * A body-present drop is preserved in the dead-letter for ~7 days while the
+   * blob it references is on a far shorter clock — so without this the
+   * dead-letter outlives the blob and a drain recovers an envelope pointing at
+   * nothing. s3-tier objects have no redis TTL and are left to the bucket
+   * lifecycle (ADR-029), so for that tier only the lease bookkeeping is extended.
    *
    * Uses {@link BlobLeases.holdForDlq}, which records the dead-letter as a real
    * holder for the window. `renew`/`take` cannot serve: they only extend the
@@ -320,8 +325,23 @@ export class EnvelopeBlobLifecycle {
    * `BLOB_LEASE_SET_TTL_SECONDS`/`BLOB_BACKSTOP_TTL_SECONDS` still cap the
    * *physical* Redis TTL regardless of the ttlSeconds passed to them. A bare TTL
    * bump cannot serve either: both the release-time grace helper and the
-   * maintenance sweep reclaim an *unleased* blob back to the 1-hour grace window
-   * — and the job's own `releaseLease()` runs immediately after this call.
+   * maintenance sweep reclaim an *unleased* blob back to
+   * `BLOB_RELEASE_GRACE_TTL_SECONDS` (1 hour) — and `dropStagedJob`'s own
+   * `releaseLease()` runs immediately after this call, so that reclaim is not a
+   * hypothetical, it is the next statement.
+   *
+   * That is also the FAILURE window, and it is the same hour: when this returns
+   * `unextended` the blob is not sitting on the 4-day routine backstop, it is
+   * heading for the 1-hour grace window as soon as the drop releases its lease.
+   * An operator who sees the warn below has about an hour to drain, not four
+   * days. (An earlier revision of this comment said a failure "relies on the
+   * existing backstop" of 4 days. That was wrong by ~96× post-#6028, and being
+   * wrong about it is exactly why `holdForDlq` had to take a real lease rather
+   * than bump a TTL.)
+   *
+   * Best-effort — never throws, never blocks the drop. The return value is how
+   * the caller records the true state on the dead-letter entry
+   * ({@link DlqBodyPreservation}) instead of stamping every entry as preserved.
    */
   async preserveForDlq({
     value,
@@ -331,7 +351,7 @@ export class EnvelopeBlobLifecycle {
     value: string;
     groupId: string;
     ttlSeconds: number;
-  }): Promise<void> {
+  }): Promise<DlqBodyPreservation> {
     const { lease, blobId } = readEnvelopeRetirement(value);
     try {
       if (lease) {
@@ -348,7 +368,7 @@ export class EnvelopeBlobLifecycle {
             { groupId, refProjectId: lease.ref.projectId },
             "Skipping blob TTL preserve-for-DLQ for a tenant-mismatched ref",
           );
-          return;
+          return "unextended";
         }
         await this.blobLeases.holdForDlq({
           projectId: lease.ref.projectId,
@@ -356,10 +376,14 @@ export class EnvelopeBlobLifecycle {
           tier: lease.ref.tier,
           ttlSeconds,
         });
-      } else if (blobId) {
+        return "extended";
+      }
+      if (blobId) {
         // GQ1: extend the standalone blob.
         await this.blobs.refreshTtl({ id: blobId, ttlSeconds });
+        return "extended";
       }
+      return this.classifyUnreferencedForDlq({ value, groupId });
     } catch (err) {
       logger.warn(
         {
@@ -368,9 +392,50 @@ export class EnvelopeBlobLifecycle {
             err instanceof Error ? err.message : String(err),
           ),
         },
-        "Blob TTL preserve-for-DLQ failed; relying on the backstop",
+        "Blob TTL preserve-for-DLQ failed — the dead-letter entry will outlive the body it references unless it is drained within the release grace window (~1h)",
       );
+      return "unextended";
     }
+  }
+
+  /**
+   * Classify a value {@link readEnvelopeRetirement} found no blob reference on.
+   *
+   * Two very different states land here and conflating them would either cry wolf
+   * on the common case or leave the real one silent — which is what it did:
+   *
+   * - The body travels INSIDE the staged value (`e:"j"`/`e:"gz"`, or a legacy
+   *   pre-envelope raw value). The dead-letter entry stores that value verbatim,
+   *   so there is nothing to extend and nothing at risk. Most drops are this, and
+   *   warning on them would bury the case below.
+   * - The envelope CLAIMS an offloaded body (`e:"ref"/"redis"/"s3"`) but yields no
+   *   usable reference, or will not split at all (`malformed_envelope`). Then a
+   *   reference we cannot read is the only thing between the entry and its bytes,
+   *   so nothing was extended — and this path used to `return` with no log line at
+   *   all, the one gap in `preserveForDlq` with no signal whatsoever (review #5853).
+   *
+   * A ref carrying no holder id lands here too and is reported honestly rather
+   * than held: `holdForDlq` needs only the ref, so a hold is technically
+   * reachable, but a tiered envelope without `h` is the forged/tampered shape the
+   * decode guard exists for (ADR-030 §5) and quarantining bytes on its word is a
+   * decision for its own change, not a side effect of a log fix.
+   */
+  private classifyUnreferencedForDlq({
+    value,
+    groupId,
+  }: {
+    value: string;
+    groupId: string;
+  }): DlqBodyPreservation {
+    const { format } = readEnvelopeDescriptor(value);
+    if (!isEnvelope(value) || format === "j" || format === "gz") {
+      return "inline";
+    }
+    logger.warn(
+      { groupId, envelopeFormat: format },
+      "Dead-lettering a value whose offloaded body carries no usable reference — nothing was extended, so a drain of this entry may find the body already gone",
+    );
+    return "unextended";
   }
 
   /**

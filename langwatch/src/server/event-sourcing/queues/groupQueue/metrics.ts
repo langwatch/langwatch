@@ -286,6 +286,38 @@ export const gqJobsDroppedTotal = new Counter({
 });
 
 /**
+ * A drained value's dead-letter write failed and the raw value was re-staged into
+ * the live group instead (`deadLetterDrainedValue`'s durability fallback).
+ *
+ * This is NOT a discard, and that is the whole point of counting it separately.
+ * A drained value has already left staging and owns no slot to withhold, so when
+ * the dead-letter write rejects the fallback puts the value back — the job is
+ * still there, and a later drain retries the dead-letter write. It was previously
+ * counted in `gq_jobs_dropped_total`, which was wrong twice over: it claimed a
+ * job had been thrown away when it had not, and because the re-stage hands the
+ * same value to the next drain, a job whose dead-letter write kept failing was
+ * re-counted once per drain cycle — one stuck job inflating the drop counter
+ * without bound, on the metric this series exists to make trustworthy.
+ *
+ * How to read it: a nonzero rate means dead-letter writes are failing, not that
+ * work is being lost — read it beside `gq_jobs_dropped_total`, whose
+ * `sibling_restage_failed` / decode reasons are the actual losses. A rate that
+ * climbs while the drop counter stays flat is the stuck-job signature: the same
+ * value cycling through drain → failed dead-letter → re-stage. If BOTH the
+ * dead-letter write and the re-stage fail the value is genuinely gone, and that
+ * lands in `gq_jobs_dropped_total` with `bodyPreserved: false` instead of here.
+ *
+ * Labels stay at `{queue_name, reason}`: this is a Redis-health signal on a rare
+ * path, and the routing detail an operator needs for a specific occurrence is
+ * already in the warn log beside it (groupId, stagedJobId).
+ */
+export const gqDrainedDlqRestagedTotal = new Counter({
+  name: "gq_drained_dlq_restaged_total",
+  help: "Drained values whose dead-letter write failed and were re-staged into the live group instead — a durability fallback, NOT a discard (see gq_jobs_dropped_total)",
+  labelNames: ["queue_name", "reason"] as const,
+});
+
+/**
  * A release retired a blob's LAST lease, so its expiry dropped from the 4-day
  * backstop to the release grace window.
  *
