@@ -122,6 +122,20 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
     When the workflow runs
     Then the result carries a success status
 
+  # The streamed twin of the two scenarios above, and the surface Studio
+  # actually watches: a workflow run from the editor reports progress over a
+  # stream of state-change frames, not as one return value. That path chose its
+  # closing frame by asking "did any node fail?", and a skipped End node fails
+  # nothing — so the run announced success with no result and then contradicted
+  # itself with a failure, which is the original symptom plus a second one.
+  @unit
+  Scenario: A streamed run whose only End node is skipped reports the error, not an empty success
+    Given a workflow whose only End node is fed by one branch of a condition
+    And the condition sends the run down the other branch
+    When the workflow runs and its progress is streamed
+    Then the closing frames all report the same error status
+    And no frame announces a success with no result
+
   # ============================================================================
   # Not leaking a project secret through the error surface this change opened
   # ============================================================================
@@ -252,6 +266,12 @@ Feature: Workflow agent surfaces End-node misconfiguration instead of an empty r
   #   flagged under Deployment Impact on the PR, and pinned so it stops being an
   #   unstated side effect →
   #   Scenario "A full run whose only End node is skipped by an untaken branch errors"
+  #   Scenario "A streamed run whose only End node is skipped reports the error, not an empty success"
+  #   The streamed scenario is not a duplicate of the one above it: the two run
+  #   through different engine entry points, and only the non-streamed one was
+  #   ever covered. The streamed path — the one the workflow editor watches —
+  #   still announced an empty success, so AC #1's defence-in-depth half was
+  #   absent exactly where the reported symptom is seen.
   # NOT one of #3198's ACs — surfacing engine errors is what makes an unredacted
   #   code-node traceback customer-visible, so the redaction has to land in the
   #   same change or this fix opens a secret-exfiltration path →
