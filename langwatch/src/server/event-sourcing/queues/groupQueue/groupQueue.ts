@@ -1961,6 +1961,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       gqDrainedDlqRestagedTotal.inc({ queue_name: this.queueName, reason });
       return;
     }
+    // Only a written entry has a body-preservation state; `lost` has no entry.
+    const dlqBodyPreservation =
+      outcome.branch === "dead_lettered" ? outcome.bodyPreservation : undefined;
     this.recordDrop({
       groupId,
       stagedJobId,
@@ -1969,8 +1972,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       reason,
       message,
       bodyPreserved: outcome.branch === "dead_lettered",
-      dlqBodyPreservation:
-        outcome.branch === "dead_lettered" ? outcome.bodyPreservation : undefined,
+      dlqBodyPreservation,
     });
   }
 
