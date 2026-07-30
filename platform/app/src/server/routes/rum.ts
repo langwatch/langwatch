@@ -18,6 +18,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { RUM_SESSION_HEADER, RUM_TRACES_PATH } from "@langwatch/react-rum";
 import type { Context } from "hono";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { nearestHopIp } from "~/server/http/client-ip";
 import {
   ingestBrowserTraces,
   readCappedBody,
@@ -38,9 +39,7 @@ export const rateLimitKey = (c: Context): string => {
   const session = c.req.header(RUM_SESSION_HEADER);
   if (session) return `session:${session.slice(0, 64)}`;
 
-  const hops = c.req.header("x-forwarded-for")?.split(",") ?? [];
-  const nearest = hops[hops.length - 1]?.trim();
-  return `ip:${nearest ?? "unknown"}`;
+  return `ip:${nearestHopIp(c) ?? "unknown"}`;
 };
 
 secured

@@ -275,6 +275,9 @@ model Organization {
   /// ADR-038.
   primaryIntent          OrganizationIntent?
 
+  /// Present while this org is an unclaimed, agent-provisioned workspace.
+  ephemeralAccount         EphemeralAccount?
+
   promoCode                String?
   stripeCustomerId         String?                   @unique
   currency                 Currency                  @default(EUR)
@@ -3636,4 +3639,46 @@ model BugReport {
   metadata         Json?
 
   @@index([createdAt])
+}
+
+/// An account provisioned with no identity behind it, by `npx langwatch
+/// <agent>`. Holds the two deadlines that govern it until someone claims it.
+///
+/// Every stored identifier is a keyed hash, never the raw value: the claim
+/// token so a database dump cannot be replayed into somebody else's
+/// workspace, and the fingerprint / address so a dump cannot be reversed into
+/// "which machines and networks tried LangWatch". Equality still works, which
+/// is all the abuse checks need.
+///
+/// `ingestionStopsAt` and `deleteAfter` are nulled on claim rather than
+/// shadowed by a status column, so the reaper's work list is exactly
+/// `deleteAfter <= now` and a claimed row can never match it.
+///
+/// Spec: specs/ai-governance/agent-onboarding/
+model EphemeralAccount {
+  id               String   @id @default(nanoid())
+  organizationId   String   @unique
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectId        String   @unique
+  projectSlug      String
+  projectName      String
+  /// Which coding agent provisioned it — also the ingestion key's source type.
+  agent            String
+  claimTokenHash   String   @unique
+  fingerprintHash  String?
+  ipHash           String?
+  provisionedAt    DateTime @default(now())
+  /// Null once claimed.
+  ingestionStopsAt DateTime?
+  /// Null once claimed. The reaper's work list is a query over this column.
+  deleteAfter      DateTime?
+  claimedAt        DateTime?
+  /// No FK: a claim is a historical fact that should outlive the account of
+  /// whoever made it.
+  claimedByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @default(now()) @updatedAt
+
+  @@index([deleteAfter])
+  @@index([ingestionStopsAt])
 }

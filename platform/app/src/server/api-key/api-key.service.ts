@@ -849,7 +849,12 @@ export class ApiKeyService {
     organizationId,
   }: {
     id: string;
-    callerUserId: string;
+    /**
+     * Null for a caller with no user behind it (anonymous agent provisioning).
+     * Only read on the non-admin path, where a null can never match an owner
+     * and therefore refuses — the safe direction.
+     */
+    callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
   }): Promise<ApiKey> {
