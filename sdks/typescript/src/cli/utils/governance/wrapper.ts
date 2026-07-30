@@ -15,7 +15,6 @@
  */
 
 import { spawn } from "node:child_process";
-import { SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { getCliBootstrap } from "./cli-api";
@@ -257,96 +256,15 @@ function shouldAutoLogin(): boolean {
  * tool directly. Exits the parent process with the child's exit
  * code (or 2 if the budget pre-check fired).
  */
-/**
- * Run a wrapped tool against a temporary workspace, with no account.
- *
- * A plain spawn on purpose: the login-shell dance in `runWrapped` exists to
- * re-apply gateway environment inside the child, and there is none here. The
- * telemetry reaches Claude Code through `.claude/settings.local.json`, which
- * it reads itself, so there is nothing to inject.
- */
-async function runZeroAuthWrapped(
-	tool: string,
-	args: string[],
-): Promise<never> {
-	const { ensureEphemeralAccount, installTelemetry, onboardingSummary } =
-		await import("./zero-auth-onboarding.js");
-	const { renderClaimBlock } = await import("./terminal-qr.js");
-	const { resolveControlPlaneUrl } = await import("./resolveEndpoint.js");
-	const { isAgentModeEnv } = await import("../output.js");
-
-	const endpoint = resolveControlPlaneUrl({});
-	let provisioned: Awaited<
-		ReturnType<typeof ensureEphemeralAccount>
-	>["provisioned"];
-	let reused: boolean;
-	try {
-		({ provisioned, reused } = await ensureEphemeralAccount({
-			endpoint,
-			tool,
-		}));
-	} catch (err) {
-		process.stderr.write(
-			`${(err as Error).message}\n` +
-				`  langwatch login   sign in to an existing account instead\n`,
-		);
-		process.exit(1);
-	}
-
-	const target = installTelemetry({ tool, cwd: process.cwd(), provisioned });
-
-	if (!reused) {
-		const lines = [
-			...onboardingSummary({
-				provisioned,
-				settingsPath: target.displayPath,
-			}),
-			"",
-			...(await renderClaimBlock({
-				url: provisioned.claim.url,
-				context: {
-					isAgent: isAgentModeEnv(process.env),
-					isInteractive: process.stdout.isTTY === true,
-					columns: process.stdout.columns,
-				},
-			})),
-			"",
-		];
-		process.stderr.write(`${lines.join("\n")}\n`);
-	}
-
-	const child = spawn(tool, args, {
-		stdio: "inherit",
-		shell: process.platform === "win32",
-	});
-	child.on("error", (err: NodeJS.ErrnoException) => {
-		process.stderr.write(
-			err.code === "ENOENT"
-				? `${tool} is not installed or not on PATH.\n`
-				: `failed to start ${tool}: ${err.message}\n`,
-		);
-		process.exit(127);
-	});
-	const code: number = await new Promise((resolve) => {
-		child.on("exit", (c, signal) => resolve(signal ? 1 : (c ?? 0)));
-	});
-	process.exit(code);
-}
-
 export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	let cfg = loadConfig();
 
-	// No identity at all: provision a temporary workspace and run the tool with
-	// telemetry only. This is the `npx langwatch claude` front door — no
-	// gateway, no virtual key, no provider setup, nothing to sign up for.
-	//
-	// Device-flow login is still one command away (`langwatch login`), and is
-	// what an existing account should use; it is just no longer the only way
-	// past this point, because it cannot help someone who has no account yet.
-	if (!isLoggedIn(cfg) && SOURCE_TYPE_BY_TOOL[tool]) {
-		await runZeroAuthWrapped(tool, args);
-	}
-
+	// Deliberately NOT auto-provisioning here. `langwatch onboard` can get a
+	// temporary workspace with no account, and the message below names it —
+	// but creating an account as a side effect of running a coding assistant
+	// is not something to do behind someone's back, least of all in CI or
+	// under an agent, where nobody is watching and the non-TTY contract is to
+	// exit rather than act.
 	if (!isLoggedIn(cfg)) {
 		if (!shouldAutoLogin()) {
 			// Two ways forward, and they are genuinely different: the gateway
