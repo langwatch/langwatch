@@ -62,12 +62,26 @@ import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/
 const logger = createLogger("langwatch:experiments-v3");
 
 const secured = createServiceApp({ basePath: "/api/experiments" });
-const sessionAuth = handlerManagedAuth(
-  "user session validated in-handler via getServerAuthSession",
-);
-const apiKeyAuth = handlerManagedAuth(
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
-);
+const sessionAuth = handlerManagedAuth({
+  reason: "user session validated in-handler via getServerAuthSession",
+  permissions: ["evaluations:manage"],
+  credential: "session",
+});
+// The read endpoints (runs list / status / results) and the run endpoint gate
+// on different grains, so they declare separately: a single shared policy
+// would report the coarser of the two for routes that only read.
+const apiKeyAuthRead = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["evaluations:view"],
+  credential: "apiKey",
+});
+const apiKeyAuthRun = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["evaluations:create"],
+  credential: "apiKey",
+});
 
 // Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...
 // Python SDK still calls the old routes until it is updated in a follow-up.
@@ -366,10 +380,17 @@ secured.access(sessionAuth).post("/abort", async (c) => {
 
 // ── POST /:slug/run  (CI/CD execution) ──────────────────────────────
 
-secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
+secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
-  const authResult = await authenticateRequest(c, "evaluations:manage");
+  // Starting a run CREATES a run row against an experiment that already
+  // exists; it does not administer the evaluations family. Asking for
+  // `:manage` here refused every least-privilege key that legitimately holds
+  // the create — the Langy session key among them, which stops short of
+  // `:manage` precisely because `:manage` implies the delete. `:manage` still
+  // satisfies `:create` through `hasPermissionWithHierarchy`, so narrowing the
+  // grain takes access away from nobody.
+  const authResult = await authenticateRequest(c, "evaluations:create");
   if ("error" in authResult) {
     // `authResult.body` carries the handled payload (code, permission, tips)
     // when the denial came from a handled error; `{ error }` is the fallback
@@ -546,7 +567,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
 
-secured.access(apiKeyAuth).get("/runs", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs", async (c) => {
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
     // `authResult.body` carries the handled payload (code, permission, tips)
@@ -611,7 +632,7 @@ secured.access(apiKeyAuth).get("/runs", async (c) => {
 
 // ── GET /runs/:runId (poll run status) ───────────────────────────────
 
-secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs/:runId", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");
@@ -707,7 +728,7 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
 });
 
 // ── GET /runs/:runId/results (full per-row results from ClickHouse) ──
-secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs/:runId/results", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");

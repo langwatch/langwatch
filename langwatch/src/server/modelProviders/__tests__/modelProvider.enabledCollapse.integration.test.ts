@@ -20,10 +20,9 @@ import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../modelProvider.service";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
-describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
+describe.skipIf(!hasCredentialsSecret)(
   "ModelProviderService enabled-vs-scope collapse (real DB)",
   () => {
     const ns = `mp-enabled-${nanoid(8)}`;

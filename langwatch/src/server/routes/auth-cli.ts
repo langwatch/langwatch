@@ -71,23 +71,83 @@ const logger = createLogger("langwatch:auth-cli");
 
 const secured = createServiceApp({ basePath: "/api/auth/cli" });
 
-const CLI_POLICY = handlerManagedAuth(
-  "CLI device-flow / user session validated in-handler",
-);
+const CLI_REASON = "CLI device-flow / user session validated in-handler";
+
+// The device flow authenticates the CALLER and gates on no RBAC permission.
+const CLI_POLICY = handlerManagedAuth({
+  reason: CLI_REASON,
+  permissions: [],
+  credential: "session",
+});
+// Routes that DO check a permission once the caller is resolved declare it,
+// rather than hiding behind the base policy's empty list.
+const cliIngestionSourcesAuth = handlerManagedAuth({
+  reason: CLI_REASON,
+  permissions: ["ingestionSources:view"],
+  credential: "session",
+});
+const cliActivityMonitorAuth = handlerManagedAuth({
+  reason: CLI_REASON,
+  permissions: ["activityMonitor:view"],
+  credential: "session",
+});
+// `/approve` mints a credential usable outside the UI, so it requires a
+// write-capable project permission — a view-only member cannot extract one.
+const cliApproveAuth = handlerManagedAuth({
+  reason: CLI_REASON,
+  permissions: ["project:update"],
+  credential: "session",
+});
 
 // ---------------------------------------------------------------------------
-// Constants — tunable via env if a customer ever needs longer windows.
-// Defaults match GitHub CLI / gh-style flows.
+// Constants. Defaults match GitHub CLI / gh-style flows; the refresh-token
+// idle window is tunable via env for deployments with a stricter policy.
 // ---------------------------------------------------------------------------
+
+/**
+ * Read a positive-integer override, falling back to `fallback` when unset,
+ * unparseable, or non-positive. A typo must not silently produce a session
+ * window of zero or NaN seconds.
+ */
+function positiveIntFromEnv(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    logger.warn(
+      { raw, fallback },
+      "ignoring invalid CLI token TTL override; using the default",
+    );
+    return fallback;
+  }
+  return parsed;
+}
 
 /** Lifetime of an unredeemed device_code, in seconds. */
 const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
 /** Minimum poll interval the CLI should respect. */
 const MIN_POLL_INTERVAL_SECONDS = 5;
-/** Access token lifetime. Short — refresh is the rotation path. */
+/** Access token lifetime. Short; refresh is the rotation path. */
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1h
-/** Refresh token lifetime. Long-lived but rotated on every refresh. */
-const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30; // 30d
+const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90d
+
+/**
+ * Refresh token lifetime. Rotated on every refresh, so this is how long a
+ * session survives with the CLI sitting idle, not how long the session
+ * lasts: each `langwatch <tool>` run that refreshes restarts the window.
+ * Someone who points a coding agent at LangWatch and comes back a couple
+ * of months later should still be connected, so the idle window is a
+ * quarter rather than a month.
+ *
+ * Shorten it with `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` when a stolen
+ * `~/.langwatch/config.json` needs to go stale sooner than that. Two other
+ * ceilings apply regardless: `Organization.maxSessionDurationDays` caps
+ * total session age at /refresh, and revocation takes effect on the next
+ * request because `validateAccessToken` reads Redis every time.
+ */
+const REFRESH_TOKEN_TTL_SECONDS = positiveIntFromEnv(
+  process.env.LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS,
+  DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+);
 /** Min seconds between successive /exchange polls per device_code. */
 const POLL_RATE_LIMIT_SECONDS = 4;
 
@@ -1396,7 +1456,7 @@ async function ensureGovernancePermissionOr403(
 }
 
 secured
-  .access(CLI_POLICY)
+  .access(cliIngestionSourcesAuth)
   .get("/governance/ingest/sources", async (c: Context) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
@@ -1446,7 +1506,7 @@ secured
   });
 
 secured
-  .access(CLI_POLICY)
+  .access(cliActivityMonitorAuth)
   .get("/governance/ingest/sources/:id/events", async (c: Context) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
@@ -1515,7 +1575,7 @@ secured
   });
 
 secured
-  .access(CLI_POLICY)
+  .access(cliActivityMonitorAuth)
   .get("/governance/ingest/sources/:id/health", async (c: Context) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
@@ -1850,7 +1910,7 @@ const approveRequestSchema = z.object({
   project_id: z.string().optional(),
 });
 
-secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
+secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session?.user) {
     return c.json(

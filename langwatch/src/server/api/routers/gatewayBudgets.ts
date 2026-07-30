@@ -6,36 +6,18 @@
  * flows pass a scope kind + target id; the server normalises onto
  * `scopeType` and the matching typed FK column.
  */
-
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { GatewayBudgetNotFoundError } from "~/server/gateway/errors";
+import { chRepoOrUndefined } from "~/server/gateway/clickhouseRepos";
 import {
   providerLabelFor,
   resolveProviderLabels,
 } from "~/server/gateway/providerLabels";
-import { OrganizationNotFoundError } from "../../../../ee/licensing/errors";
 
 import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-function chRepoOrUndefined() {
-  if (!isClickHouseEnabled()) return undefined;
-  return new GatewayBudgetClickHouseRepository(async (projectId) => {
-    const client = await getClickHouseClientForProject(projectId);
-    if (!client) {
-      throw new Error(
-        `ClickHouse enabled but no client for project ${projectId}`,
-      );
-    }
-    return client;
-  });
-}
 
 const scopeSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -59,7 +41,10 @@ async function requireOrgAccess(
     where: { id: organizationId },
   });
   if (!org) {
-    throw new OrganizationNotFoundError();
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "organization not found",
+    });
   }
 }
 
@@ -142,7 +127,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       );
       const detail = await service.getDetail(input.id, input.organizationId);
       if (!detail) {
-        throw new GatewayBudgetNotFoundError();
+        throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
       }
       const providerLabels = await resolveProviderLabels({
         prisma: ctx.prisma,

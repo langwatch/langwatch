@@ -275,68 +275,18 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   }
 
   /**
-   * `GET /api/gateway/v1/budgets` returns org-, team- and project-scoped
-   * budgets only — it documents that VK- and principal-scoped budgets come from
-   * "their detail pages", and no REST endpoint serves those: the org-wide
-   * listing that does include every scope is a session-authenticated tRPC
-   * procedure, the virtual-key DTO carries no budget fields, and there is no
-   * `GET /budgets/:id`. So a virtual-key budget at 100% with `on_breach: BLOCK`
-   * — actively rejecting production traffic — is structurally invisible here.
-   *
-   * That blind spot only has anything behind it if this project routes through
-   * the gateway at all: with no virtual keys there is no VK or principal
-   * traffic to block, and the scopes we CAN see are the whole picture. So probe
-   * for keys, and whenever there are any, put the uncovered scope on the
-   * record.
-   *
-   * But record it as an ADVISORY, not an error. It is not a failed check and
-   * not something the user can fix: any project that routes through the gateway
-   * would carry it on every single run, and an error that never clears is an
-   * error the reader learns to skip. A failed PROBE is different — that IS a
-   * check that did not run, so it stays an error and withholds the tick.
+   * `GET /api/gateway/v1/budgets` now returns every scope dimension —
+   * org, team, project, virtual-key, principal, and group — with live
+   * ledger spend, so a virtual-key budget at 100% with `on_breach: BLOCK`
+   * is visible here like any other. The one remaining honesty signal is
+   * `spend_available`: when the server could not total spend, the numbers
+   * are not real spend and the scan must say so instead of ticking green.
    */
-  async function uncoveredBudgetScopeGap(): Promise<
-    { kind: "error" | "advisory"; message: string } | null
-  > {
-    const unchecked = "virtual-key and principal budgets were not checked";
-    let payload: unknown;
-    try {
-      const { data, error, status } = await fetchCount("/api/gateway/v1/virtual-keys");
-      if (error) {
-        return {
-          kind: "error",
-          message: `${unchecked} (could not list virtual keys: ${formatApiErrorMessage({ error, options: { status } })})`,
-        };
-      }
-      payload = data;
-    } catch (err) {
-      return {
-        kind: "error",
-        message: `${unchecked} (could not list virtual keys: ${describeFailure(err)})`,
-      };
-    }
-    const body = payload as { data?: unknown; pagination?: { totalHits?: number } } | null;
-    const keys = Array.isArray(payload) ? payload : body?.data;
-    if (!Array.isArray(keys) || keys.length === 0) return null;
-    // The page-1 length is NOT the key count — 300 keys behind pagination would
-    // print "3". Use the reported total when there is one, and otherwise say
-    // nothing numeric rather than something false.
-    const total = body?.pagination?.totalHits;
-    const scale =
-      typeof total === "number"
-        ? `${total} virtual key${total === 1 ? "" : "s"} in this project could`
-        : "virtual keys in this project could";
-    return {
-      kind: "advisory",
-      message: `${unchecked} — this API cannot list them, and ${scale} carry them`,
-    };
-  }
-
   async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
-    const [budgets, scopeGap] = await Promise.all([
-      new GatewayBudgetsApiService({ endpoint, apiKey }).list(),
-      uncoveredBudgetScopeGap(),
-    ]);
+    const { budgets, spend_available } = await new GatewayBudgetsApiService({
+      endpoint,
+      apiKey,
+    }).list();
 
     const unreadable: string[] = [];
     const scored = budgets
@@ -349,6 +299,14 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
           unreadable.push(budget.name);
           return [];
         }
+        // GROUP rows: limit_usd is the PER-MEMBER allowance while
+        // spent_usd sums the whole group, so the comparable ceiling is
+        // limit x member_count. Without a member count (empty group) the
+        // allowance covers nobody and any spend is over it.
+        const effectiveLimit =
+          budget.scope_type === "GROUP"
+            ? limit * (budget.member_count ?? 0)
+            : limit;
         return [
           {
             name: budget.name,
@@ -358,7 +316,8 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
             // breached state, not a 0%-utilized one. Scoring it 0 and dropping
             // it below the threshold is how a BLOCK budget that rejects every
             // single request turns into a green tick.
-            utilizationPct: limit <= 0 ? 100 : Math.round((spent / limit) * 100),
+            utilizationPct:
+              effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
             spentUsd: budget.spent_usd,
             limitUsd: budget.limit_usd,
             onBreach: budget.on_breach,
@@ -367,10 +326,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       });
 
     const gaps: string[] = [];
-    if (scopeGap?.kind === "advisory") {
-      attention.advisories.budgetsAtRisk = scopeGap.message;
-    } else if (scopeGap) {
-      gaps.push(scopeGap.message);
+    if (!spend_available) {
+      gaps.push(
+        "spend could not be totalled server-side, so utilization is not real spend",
+      );
     }
     if (unreadable.length > 0) {
       gaps.push(

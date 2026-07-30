@@ -75,6 +75,7 @@
             "pages": [
               "agent-simulations/introduction",
               "agent-simulations/getting-started",
+              "agent-simulations/authenticated-agents",
               "agent-simulations/voice-agents",
               "agent-simulations/red-teaming"
             ]
@@ -1314,7 +1315,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1785363984",
+      "source": "/ci/cache/busted/1785435998",
       "destination": "/"
     },
     {

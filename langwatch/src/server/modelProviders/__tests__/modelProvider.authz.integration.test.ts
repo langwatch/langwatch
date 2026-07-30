@@ -26,10 +26,9 @@ import { prisma } from "../../db";
 import { ModelProviderScopeForbiddenError } from "../errors";
 import { ModelProviderService } from "../modelProvider.service";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
-describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
+describe.skipIf(!hasCredentialsSecret)(
   "ModelProviderService scope authz (real DB)",
   () => {
     const ns = `mp-authz-${nanoid(8)}`;
@@ -257,7 +256,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           expect(result).toBeDefined();
           // Read back directly via prisma to check the scope row landed.
           const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id, projectId: projectAId },
+            where: { id: result.id },
             include: { scopes: true },
           });
           const scopes = stored?.scopes ?? [];
@@ -273,7 +272,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Assigning a provider to an org without manage permission is denied */
         it("rejects with FORBIDDEN and does not persist", async () => {
           const before = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "anthropic" },
+            where: { organizationId, provider: "anthropic" },
           });
           await expect(
             service().updateModelProvider(
@@ -293,7 +292,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             meta: { requiredPermission: "organization:manage" },
           });
           const after = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "anthropic" },
+            where: { organizationId, provider: "anthropic" },
           });
           expect(after).toBe(before);
         });
@@ -334,7 +333,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           );
           expect(result).toBeDefined();
           const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id, projectId: projectAId },
+            where: { id: result.id },
             include: { scopes: true },
           });
           const scopes = stored?.scopes ?? [];
@@ -374,7 +373,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Adding an unauthorized team scope to an existing provider is rejected */
         it("rejects the entire mutation with no partial persistence", async () => {
           const before = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "deepseek" },
+            where: { organizationId, provider: "deepseek" },
           });
           await expect(
             service().updateModelProvider(
@@ -393,7 +392,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           ).rejects.toMatchObject({ code: "model_provider_scope_forbidden" });
 
           const after = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "deepseek" },
+            where: { organizationId, provider: "deepseek" },
           });
           expect(after).toBe(before);
         });
@@ -416,7 +415,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
           const stored = await prisma.modelProvider.findFirst({
-            where: { id: result.id, projectId: projectAId },
+            where: { id: result.id },
             include: { scopes: true },
           });
           const scopes = stored?.scopes ?? [];
@@ -452,7 +451,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           // Sanity check: both scopes persisted.
           {
             const stored = await prisma.modelProvider.findFirst({
-              where: { id: created.id, projectId: projectAId },
+              where: { id: created.id },
               include: { scopes: true },
             });
             expect(stored?.scopes).toHaveLength(2);
@@ -470,7 +469,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           );
 
           const after = await prisma.modelProvider.findFirst({
-            where: { id: created.id, projectId: projectAId },
+            where: { id: created.id },
             include: { scopes: true },
           });
           expect(after?.scopes).toHaveLength(1);
@@ -570,7 +569,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Update of a vanished id surfaces NOT_FOUND instead of silently creating */
         it("throws NOT_FOUND instead of falling through to create a new row", async () => {
           const beforeCount = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "groq" },
+            where: { organizationId, provider: "groq" },
           });
           await expect(
             service().updateModelProvider(
@@ -588,7 +587,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             // class) is what keeps this honest across the tRPC boundary.
           ).rejects.toMatchObject({ code: "model_provider_not_found" });
           const afterCount = await prisma.modelProvider.count({
-            where: { projectId: projectAId, provider: "groq" },
+            where: { organizationId, provider: "groq" },
           });
           expect(afterCount).toBe(beforeCount);
         });
@@ -670,7 +669,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
           );
 
           const remaining = await prisma.modelProvider.findFirst({
-            where: { id: mp.id, projectId: projectAId },
+            where: { id: mp.id },
             include: { scopes: true },
           });
           expect(remaining).toBeNull();
@@ -726,7 +725,7 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
 
             // Row still present
             const stillThere = await prisma.modelProvider.findFirst({
-              where: { id: mp.id, projectId: projectAId },
+              where: { id: mp.id },
             });
             expect(stillThere).not.toBeNull();
           } finally {

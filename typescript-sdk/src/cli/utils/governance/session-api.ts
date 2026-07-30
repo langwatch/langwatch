@@ -12,9 +12,12 @@
  *
  * Both refresh an expired access token once (rotating the stored pair) before
  * giving up, because access tokens live one hour and these calls typically
- * happen days after login. A refresh rejection means the session was revoked;
- * the stored tokens are dropped so the next command reports "not logged in"
- * instead of retrying a dead session forever.
+ * happen days after login. The rotation itself goes through
+ * `session-refresh.ts`, the one implementation shared with `cli-api.ts`, so
+ * concurrent CLI processes racing over a single-use refresh token resolve the
+ * same way here as everywhere else. Only a server rejection drops the stored
+ * tokens, so the next command reports "not logged in" instead of retrying a
+ * dead session forever; a network failure leaves them alone.
  *
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
@@ -24,7 +27,7 @@ import {
   loadConfig,
   saveConfig,
 } from "./config";
-import { DeviceFlowError, refresh } from "./device-flow";
+import { refreshSession as sharedRefreshSession } from "./session-refresh";
 
 export interface SessionApiOptions {
   fetchImpl?: typeof fetch;
@@ -79,33 +82,28 @@ async function refreshSession(
   cfg: GovernanceConfig,
   opts: SessionApiOptions,
 ): Promise<boolean> {
-  if (!cfg.refresh_token) return false;
-  try {
-    const rotated = await refresh(
-      {
-        baseUrl: cfg.control_plane_url,
-        fetchImpl: boundedFetch(
-          opts.fetchImpl ?? fetch,
-          opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS,
-        ),
-      },
-      cfg.refresh_token,
-    );
-    cfg.access_token = rotated.access_token;
-    cfg.refresh_token = rotated.refresh_token;
-    cfg.expires_at = Math.floor(Date.now() / 1000) + rotated.expires_in;
+  const outcome = await sharedRefreshSession(cfg, {
+    fetchImpl: boundedFetch(
+      opts.fetchImpl ?? fetch,
+      opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS,
+    ),
+  });
+  if (outcome.status === "refreshed") return true;
+
+  // Only a server rejection means the session is genuinely gone. Rotation is
+  // single-use, so a sibling CLI process that refreshed first would otherwise
+  // look like a revocation from here; the shared refresh already re-read the
+  // config and retried with whatever the sibling persisted before reporting
+  // this, so clearing now cannot wipe a live token. A network failure clears
+  // nothing: the tokens may be perfectly good.
+  if (outcome.status === "rejected") {
+    delete cfg.access_token;
+    delete cfg.refresh_token;
+    delete cfg.expires_at;
+    delete cfg.personal_project;
     saveConfig(cfg);
-    return true;
-  } catch (err) {
-    if (err instanceof DeviceFlowError && err.kind === "unauthorized") {
-      delete cfg.access_token;
-      delete cfg.refresh_token;
-      delete cfg.expires_at;
-      delete cfg.personal_project;
-      saveConfig(cfg);
-    }
-    return false;
   }
+  return false;
 }
 
 /**

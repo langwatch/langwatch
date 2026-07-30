@@ -284,8 +284,8 @@ describe("resolveWrapperPath", () => {
     });
 
     describe("when stdin is not a TTY", () => {
-      /** @scenario "Non-TTY defaults to the gateway" */
-      it("defaults to the gateway without prompting or persisting", async () => {
+      /** @scenario "Non-TTY takes the path that spends nothing" */
+      it("takes the OTLP path without prompting or persisting", async () => {
         const save = vi.fn();
         const out = await resolveWrapperPath({
           cfg: baseCfg(),
@@ -296,15 +296,29 @@ describe("resolveWrapperPath", () => {
           saveImpl: save,
           env: {},
         });
-        expect(out.mode).toBe("gateway");
+        // Nobody is there to answer, and the gateway bills the org.
+        expect(out.mode).toBe("ingestion");
         expect(out.prompted).toBe(false);
         expect(save).not.toHaveBeenCalled();
+      });
+
+      it("still honors an explicit gateway request", async () => {
+        const out = await resolveWrapperPath({
+          cfg: baseCfg(),
+          tool: "claude",
+          args: [],
+          override: "gateway",
+          isTTY: false,
+          promptImpl: neverPrompt,
+          env: {},
+        });
+        expect(out.mode).toBe("gateway");
       });
     });
 
     describe("when LANGWATCH_AUTO_LOGIN is forced on", () => {
       /** @scenario "LANGWATCH_AUTO_LOGIN skips the prompt" */
-      it("defaults to the gateway even on a TTY", async () => {
+      it("takes the OTLP path even on a TTY", async () => {
         const out = await resolveWrapperPath({
           cfg: baseCfg(),
           tool: "claude",
@@ -313,13 +327,14 @@ describe("resolveWrapperPath", () => {
           promptImpl: neverPrompt,
           env: { LANGWATCH_AUTO_LOGIN: "1" },
         });
-        expect(out.mode).toBe("gateway");
+        expect(out.mode).toBe("ingestion");
         expect(out.prompted).toBe(false);
       });
     });
 
     describe("when the user aborts the prompt", () => {
-      it("falls back to the gateway for this run without persisting", async () => {
+      /** @scenario "Cancelling the path prompt cancels the run" */
+      it("cancels the run instead of picking a path", async () => {
         const save = vi.fn();
         const abortPrompt = vi.fn(async () => ({})) as unknown as Parameters<
           typeof resolveWrapperPath
@@ -333,7 +348,8 @@ describe("resolveWrapperPath", () => {
           saveImpl: save,
           env: {},
         });
-        expect(out.mode).toBe("gateway");
+        expect(out.isAborted).toBe(true);
+        expect(out.mode).not.toBe("gateway");
         expect(out.prompted).toBe(false);
         expect(save).not.toHaveBeenCalled();
       });

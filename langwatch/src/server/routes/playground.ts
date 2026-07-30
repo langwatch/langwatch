@@ -25,9 +25,11 @@ const secured = createServiceApp({ basePath: "/api" });
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      permissions: ["playground:manage"],
+      credential: "session",
+    }),
   )
   .post("/playground", async (c) => {
     const session = await getServerAuthSession({ req: c.req.raw as any });
