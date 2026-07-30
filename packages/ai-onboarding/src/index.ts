@@ -13,10 +13,13 @@ export {
   type CreateEphemeralAccountParams,
   type EphemeralAccountRepository,
   type HandoffStore,
+  type PasskeyCredential,
+  type PasskeyRepository,
   type ProvisionedWorkspace,
   type RateLimitDecision,
   type RateLimiter,
   systemClock,
+  type WebAuthnCeremony,
   type WorkspaceProvisioner,
 } from "./app/ports.js";
 export {
@@ -57,6 +60,8 @@ export {
   EphemeralAccountNotFoundError,
   OnboardingRateLimitedError,
   OnboardingUnavailableError,
+  PasskeyChallengeMissingError,
+  PasskeyRegistrationFailedError,
 } from "./domain/errors.js";
 export { type ClaimHandoff, isHandoffExpired } from "./domain/handoff.js";
 export { subnetKey } from "./domain/net.js";
