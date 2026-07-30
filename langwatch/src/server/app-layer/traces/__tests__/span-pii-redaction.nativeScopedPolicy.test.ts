@@ -545,13 +545,7 @@ describe("OtlpSpanPiiRedactionService ingestion key id attribute", () => {
     );
   });
 
-  /**
-   * @scenario A non-ingestion trace can never retain an arbitrary value under
-   * the old langwatch.api_key.id name. That name carries no receiver-stamped
-   * guarantee any more (only langwatch.reserved.ingest_key_id does), so it
-   * stays fully covered by the sensitive-name deny-list for anything a client
-   * sends, exactly like every other api_key-named attribute.
-   */
+  /** @scenario A non-ingestion trace can never retain an arbitrary value under the old key id attribute name */
   it("still nukes an arbitrary value under the old langwatch.api_key.id name", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({ "langwatch.api_key.id": "plain text value" });

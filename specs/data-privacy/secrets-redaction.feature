@@ -55,19 +55,26 @@ Feature: Redacting secrets from traces
     Then the request is rejected with a validation error
 
   # The OTLP receiver stamps ingestion-key traces with provenance attributes,
-  # among them "langwatch.api_key.id": the opaque id of the ingestion key row,
-  # never the key material, and overwriting anything the client sent under that
-  # name. The sensitive-attribute-name deny-list would nuke it to a redaction
-  # placeholder just for containing "api_key", hiding the one field that says
-  # which key ingested the trace. The receiver-stamped id is exempt from the
-  # name rule; its value still runs through the secret value rules, so actual
-  # key material under that name is scrubbed anyway.
+  # among them the opaque id of the ingestion key row, never the key material,
+  # overwriting anything the client sent under that name. That id lives under
+  # "langwatch.reserved.ingest_key_id", not "langwatch.api_key.id": the
+  # reserved name never matches the sensitive-attribute-name deny-list (which
+  # nukes anything containing "api_key"), so the receiver-stamped id stays
+  # readable with no exemption needed. This also means "langwatch.api_key.id"
+  # itself carries no receiver-stamped guarantee any more and is fully covered
+  # by the deny-list for anything a client sends under that name, ingestion
+  # traffic or not.
   @integration
-  Scenario: The receiver-stamped ingestion key id stays readable
-    When a trace is ingested with a resource attribute "langwatch.api_key.id" carrying an opaque key id
-    Then the stored "langwatch.api_key.id" attribute still contains the key id
+  Scenario: The receiver-stamped ingestion key id stays readable under its reserved name
+    When a trace is ingested with a resource attribute "langwatch.reserved.ingest_key_id" carrying an opaque key id
+    Then the stored "langwatch.reserved.ingest_key_id" attribute still contains the key id
 
   @integration
-  Scenario: Real key material under the key id attribute name is still redacted
-    When a trace is ingested with a resource attribute "langwatch.api_key.id" carrying an "sk-lw-" API key
+  Scenario: Real key material under the reserved key id attribute is still redacted
+    When a trace is ingested with a resource attribute "langwatch.reserved.ingest_key_id" carrying an "sk-lw-" API key
+    Then the stored "langwatch.reserved.ingest_key_id" attribute is redacted
+
+  @integration
+  Scenario: A non-ingestion trace can never retain an arbitrary value under the old key id attribute name
+    When a trace is ingested with a resource attribute "langwatch.api_key.id" carrying an arbitrary value
     Then the stored "langwatch.api_key.id" attribute is redacted
