@@ -27,25 +27,47 @@ afterAll(async () => {
 let queueCounter = 0;
 
 /**
- * Hand the repository a client whose set-scan is rigged to walk `pages` in
- * order, cycling so every fresh scan sees the whole sequence. Everything else
- * goes to the real Redis, so the sweep script, the pipelines and the expiry
- * semantics are all still real — only the paging is chosen.
+ * Hand the repository a client whose set-scan is rigged to walk `pages`.
+ * Everything else goes to the real Redis, so the sweep script, the pipelines and
+ * the expiry semantics are all still real — only the paging is chosen.
  *
  * SSCAN promises only that a member present for the whole scan comes back AT
  * LEAST once, and a set resized mid-scan really does repeat members across
  * pages. Nothing makes a live Redis do it on demand, so it is rigged here
  * rather than left untested.
+ *
+ * Keyed by the CURSOR each call is handed, never by call order. A scan starts at
+ * "0" and requests every later page with the cursor the previous one returned, so
+ * cursor-keying makes each reader walk the whole sequence independently of
+ * whatever scanned before it. Ordering by call count coupled them: a second
+ * reader in one test saw the intended sequence only while the first happened to
+ * consume a whole multiple of it, so changing how many pages ANY earlier reader
+ * takes silently re-aimed the later assertion at a different sequence — and it
+ * still passed, which is the part worth designing out. A cursor the rig has no
+ * page for throws rather than improvising, for the same reason.
  */
 function withRiggedSetScan(
   real: Redis,
   pages: Array<[cursor: string, members: string[]]>,
 ): Redis {
-  let next = 0;
+  const pageForCursor = new Map<string, [cursor: string, members: string[]]>();
+  let requestedWith = "0";
+  for (const page of pages) {
+    pageForCursor.set(requestedWith, page);
+    requestedWith = page[0];
+  }
   return new Proxy(real, {
     get(target, prop) {
       if (prop === "sscan") {
-        return async () => pages[next++ % pages.length]!;
+        return async (_key: string, cursor: string) => {
+          const page = pageForCursor.get(cursor);
+          if (!page) {
+            throw new Error(
+              `Rigged set-scan has no page for cursor "${cursor}" — the rig and the reader under test disagree about the sequence`,
+            );
+          }
+          return page;
+        };
       }
       const value: unknown = Reflect.get(target, prop);
       return typeof value === "function" ? value.bind(target) : value;

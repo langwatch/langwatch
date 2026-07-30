@@ -1540,17 +1540,11 @@ export class QueueRedisRepository implements QueueRepository {
    * dead-lettered and left to expire, it never read zero again. See
    * {@link SWEEP_DLQ_INDEX_LUA}.
    *
-   * The metrics collector calls this every 2s. The sweep only removes members
-   * whose dead-letter has already expired — it does nothing for a member that
-   * is still live, so a live member is re-walked in full on every single call.
-   * Steady-state cost is therefore O(live members) per tick per queue, not
-   * something that shrinks after a first pass: a queue whose DLQ fills
-   * automatically per job under never-reused group ids (see "WHY THIS EXISTS"
-   * above) can carry a large, persistently live backlog, and this call pays
-   * the full walk for it every 2s for as long as that backlog stays live.
-   * `collect()` is single-flighted (`isCollecting`), so a slow pass skips a
-   * tick rather than stacking up — that bounds concurrency, not the size or
-   * cost of any single pass.
+   * The metrics collector calls this every 2s, and each tick pays the full walk
+   * costed on {@link scanLiveDlqGroupIds} — O(live members) per tick per queue,
+   * for as long as that backlog stays live. `collect()` is single-flighted
+   * (`isCollecting`), so a slow pass skips a tick rather than stacking up — that
+   * bounds concurrency, not the size or cost of any single pass.
    */
   private async countLiveDlqGroups(params: {
     prefix: string;
