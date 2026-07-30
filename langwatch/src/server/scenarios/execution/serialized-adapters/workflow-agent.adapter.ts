@@ -71,6 +71,40 @@ function engineErrorMessage(body: NlpErrorBody): string {
 }
 
 /**
+ * Best available reason from a NON-2xx response, read defensively because at
+ * this point we know only that the request failed, not who failed it.
+ *
+ * Three shapes are in play and any of them can arrive: nlpgo's own envelope
+ * (`error: {type, message}`, pkg/herr/http.go), the `detail` field the older
+ * Python service used, and — for a proxy or gateway that never reached the
+ * service — a body that is not JSON at all. The raw text is the last resort
+ * rather than an error so that a gateway failure is never swallowed.
+ *
+ * Returns "" when the body cannot be read; the caller appends nothing then and
+ * the status code stands on its own.
+ */
+async function httpErrorMessage(response: Response): Promise<string> {
+  let bodyStr: string;
+  try {
+    bodyStr = await response.text();
+  } catch {
+    return "";
+  }
+  try {
+    const errorBody = JSON.parse(bodyStr) as NlpErrorBody;
+    return (
+      firstNonEmpty(
+        errorBody.detail,
+        errorBody.error?.message,
+        errorBody.error?.type,
+      ) ?? bodyStr
+    );
+  } catch {
+    return bodyStr;
+  }
+}
+
+/**
  * Serialized workflow agent adapter that uses pre-fetched workflow DSL.
  * Sends execute_flow events to the NLP service. No database access required.
  */
@@ -200,27 +234,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       }
 
       if (!response.ok) {
-        let errorMessage = "";
-        try {
-          const bodyStr = await response.text();
-          try {
-            const errorBody = JSON.parse(bodyStr) as NlpErrorBody;
-            // nlpgo's non-2xx envelope is `{error: {type, message}}`
-            // (pkg/herr/http.go); `detail` is the shape the older Python
-            // service used. Read both, then fall back to the raw body so a
-            // proxy or gateway error is never swallowed either.
-            errorMessage =
-              firstNonEmpty(
-                errorBody.detail,
-                errorBody.error?.message,
-                errorBody.error?.type,
-              ) ?? bodyStr;
-          } catch {
-            errorMessage = bodyStr;
-          }
-        } catch {
-          errorMessage = "";
-        }
+        const errorMessage = await httpErrorMessage(response);
         throw new Error(
           `Workflow execution failed: HTTP ${response.status}${
             errorMessage ? ` - ${errorMessage}` : ""
