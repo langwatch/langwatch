@@ -1707,6 +1707,12 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
  * ended up at the bottom of the list, below every operator-moved group, with no
  * text to identify them. Additive: `replayFromDlq` deletes this key wholesale on
  * restore, and the index sweep only asks whether it is non-empty.
+ *
+ * Those two fields are group-level by definition, so several dead-lettered jobs in
+ * one group share them: the list shows the MOST RECENT job's summary and time, and
+ * the per-job field is where each job's own reason stays. That is the same shape
+ * the operator's whole-group `moveToDlq` writes, and a per-job dead-letter VIEW —
+ * which is what would render more than one — remains the disclosed follow-up.
  */
 const WRITE_JOB_TO_DLQ_LUA = `
 local dlqJobsKey  = KEYS[1]
@@ -1729,7 +1735,11 @@ redis.call("HSET", dlqErrorKey, stagedJobId, reason)
 -- dashboard renders. The job then simply has no per-job field of its own — its
 -- reason is still readable from the summary — rather than the list showing a
 -- Redis score where an error message belongs.
-redis.call("HSET", dlqErrorKey, "message", summary, "timestamp", tostring(score))
+--
+-- ARGV[5] verbatim rather than tostring(score): the caller already sent the
+-- millisecond epoch as a string, and Lua 5.1 formats numbers with %.14g, so
+-- round-tripping it through tonumber is a precision risk for no benefit.
+redis.call("HSET", dlqErrorKey, "message", summary, "timestamp", ARGV[5])
 redis.call("SADD", dlqIndexKey, groupId)
 
 if ttl > 0 then

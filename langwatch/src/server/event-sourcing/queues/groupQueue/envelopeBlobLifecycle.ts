@@ -337,7 +337,9 @@ export class EnvelopeBlobLifecycle {
    * days. (An earlier revision of this comment said a failure "relies on the
    * existing backstop" of 4 days. That was wrong by ~96× post-#6028, and being
    * wrong about it is exactly why `holdForDlq` had to take a real lease rather
-   * than bump a TTL.)
+   * than bump a TTL.) The DRAINED-sibling caller is the one exception, and only
+   * because it releases nothing: an unextended blob there keeps the routine
+   * backstop — longer than an hour, still short of the quarantine window.
    *
    * Best-effort — never throws, never blocks the drop. The return value is how
    * the caller records the true state on the dead-letter entry

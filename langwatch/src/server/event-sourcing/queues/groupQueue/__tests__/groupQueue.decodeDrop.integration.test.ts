@@ -1071,5 +1071,86 @@ describe.skipIf(!hasTestcontainers)(
         });
       });
     });
+
+    /**
+     * The dead-letter's operator surface, from the WRITER's side.
+     *
+     * The list reads a group-level `{message, stack, timestamp}` shape, and a
+     * job-scoped entry wrote neither `message` nor `timestamp` — so `error` and
+     * `movedAt` came back null and `(b.movedAt ?? 0) - (a.movedAt ?? 0)` sorted
+     * every automatic entry BELOW every group an operator had moved by hand, with
+     * no text to identify it. The entries this change creates are the automatic,
+     * high-frequency ones, which made them the least discoverable rows on the
+     * surface built to recover them.
+     *
+     * Lives here rather than beside the ops reader test because the fix is in this
+     * module's writer; the reader is imported unchanged.
+     */
+    describe("given a group dead-lettered automatically by a drop and an older group moved by an operator", () => {
+      describe("when the operator lists the dead-lettered groups", () => {
+        /** @scenario an automatically dead-lettered job is as visible to the operator as a hand-moved group */
+        it("describes both by why they died and when, most recent first", async () => {
+          const name = freshName();
+          const droppedGroup = `${TENANT}/dlq-listed-auto`;
+          const operatorGroup = `${TENANT}/dlq-listed-manual`;
+          const objectStore = new InMemoryObjectStore();
+
+          // An OLDER hand-moved group: blocked with a recorded error and nothing
+          // pending, carried into the dead-letter by the operator action. Its
+          // timestamp is fixed in the past so ordering is decided by the data,
+          // not by which write happened to land first.
+          const ops = new QueueRedisRepository(redis);
+          await redis.hset(`${name}:gq:group:${operatorGroup}:error`, {
+            message: "handler timed out",
+            stack: "at reactorHandler",
+            timestamp: String(1_700_000_000_000),
+          });
+          await redis.sadd(`${name}:gq:blocked`, operatorGroup);
+          await ops.moveToDlq({ queueName: name, groupId: operatorGroup });
+
+          // And the automatic one: a body-present decode failure, dead-lettered
+          // by the drop path itself.
+          await stageOffloaded({ name, groupId: droppedGroup, objectStore });
+          for (const uri of [...objectStore.store.keys()]) {
+            objectStore.store.set(uri, Buffer.from("not a valid gzip body"));
+          }
+          newQueue({
+            name,
+            processFn: async () => {},
+            consumerEnabled: true,
+            objectStore,
+          });
+          await vi.waitFor(
+            async () => {
+              expect(
+                await dlqValue(name, droppedGroup, "victim"),
+              ).not.toBeNull();
+            },
+            { timeout: 10000, interval: 100 },
+          );
+
+          const listed = await ops.listDlqGroups({ queueName: name });
+
+          // Falsifiability: write only the per-job field (as before) and the
+          // automatic row's error is null and its movedAt is null, so it sorts
+          // LAST — behind the 2023 hand-moved group — with nothing to identify it.
+          expect(listed.map((g) => g.groupId)).toEqual([
+            droppedGroup,
+            operatorGroup,
+          ]);
+          const [auto] = listed;
+          // Named by the failure class it died of, and — because this job's blob
+          // really was held for the window — by the fact that draining it should
+          // still find a body. Two distinct claims, neither implied by the other.
+          expect(auto!.error).toContain("body_unreadable");
+          expect(auto!.error).toContain("kept for the quarantine window");
+          expect(auto!.movedAt).toBeGreaterThan(1_700_000_000_000);
+          // The per-job field it always wrote is untouched by the addition.
+          expect(await dlqReason(name, droppedGroup, "victim")).toBe(
+            "body_unreadable",
+          );
+        });
+      });
+    });
   },
 );

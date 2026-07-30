@@ -248,20 +248,31 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — write f
 describe("GroupQueueProcessor drained-sibling dead-letter durability — what the discard tally counts", () => {
   const h = useSpyProcessor();
 
-  /** Fails the dead-letter write; the re-stage fallback succeeds. */
+  /**
+   * A body-PRESENT drained sibling whose dead-letter write fails and whose
+   * re-stage fallback succeeds — the put-back branch.
+   *
+   * Driven through `parseDrainedPayload`, the site the review names, NOT through
+   * `deadLetterDrainedValue` directly: the tally lives in the CALLER, so calling
+   * the inner seam would read zero discards no matter which branch it took and
+   * the assertion would be vacuous.
+   */
   function failTheDeadLetterWriteOnly(): void {
+    h.blobLifecycle.decode.mockRejectedValue(
+      new DecodeFailureError({
+        message: "unreadable to this worker",
+        reason: "body_unreadable",
+      }),
+    );
     h.blobLifecycle.preserveForDlq.mockResolvedValue("inline");
     h.scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
     h.scripts.stage.mockResolvedValue(undefined);
   }
 
-  const deadLetterOnce = async () =>
-    await (h.processor as any).deadLetterDrainedValue({
+  const drainOneSibling = async () =>
+    await (h.processor as any).parseDrainedPayload({
+      sibling: makeSibling(),
       groupId: GROUP_ID,
-      stagedJobId: "sib-1",
-      jobDataJson: RAW_VALUE,
-      reason: "sibling_restage_failed",
-      originalScore: 4242,
     });
 
   describe("given a drained job whose dead-letter write fails and is put back into the live group", () => {
@@ -271,16 +282,17 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — what th
         failTheDeadLetterWriteOnly();
         const queueName = h.queueName;
 
-        await (h.processor as any).restageDrainedSiblings(GROUP_ID, [
-          makeSibling(),
-        ]);
+        await drainOneSibling();
 
-        // The value is back in the live group — nothing was thrown away.
+        // The value is back in the live group, so nothing was thrown away.
         // Falsifiability: move recordDrop back above the dead-letter attempt (or
-        // fold the re-stage branch into it) and this reads 1.
+        // fold the put-back branch into it) and this reads 1.
         expect(await discardsCounted(queueName)).toBe(0);
-        // And the put-back is still visible, as its own event: dropping the
-        // count entirely would have traded a wrong signal for no signal.
+        // Not vacuous: the path really ran and really put the value back — a
+        // no-op parseDrainedPayload would fail both of these.
+        expect(h.scripts.stage).toHaveBeenCalledTimes(1);
+        // And the put-back stays visible as its own event: dropping the count
+        // entirely would have traded a wrong signal for no signal.
         expect(await putBacksCounted(queueName)).toBe(1);
       });
     });
@@ -294,14 +306,15 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — what th
         const queueName = h.queueName;
 
         // Three drain cycles meeting the same still-undead-letterable job — the
-        // exact shape of the unbounded inflation: the re-stage puts the value
-        // back, so the next drain finds it again.
+        // exact shape of the unbounded inflation, because the put-back hands the
+        // value to the next drain, which finds it again.
         for (let cycle = 0; cycle < 3; cycle++) {
-          await deadLetterOnce();
+          await drainOneSibling();
         }
 
         // Falsifiability: count the put-back as a discard and this reads 3 —
-        // one stuck job having tripled the queue's reported data loss.
+        // one stuck job having tripled the queue's reported data loss, with
+        // nothing bounding it.
         expect(await discardsCounted(queueName)).toBe(0);
         expect(await putBacksCounted(queueName)).toBe(3);
       });
@@ -312,6 +325,8 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — what th
     describe("when the discard tally is read", () => {
       /** @scenario a drained job that can be neither dead-lettered nor put back is counted as lost */
       it("counts the discard and records that the body did not survive", async () => {
+        // The other drained site (`restageDrainedSiblings`), where one rejecting
+        // stage() fails both the re-stage and the fallback that retries it.
         h.blobLifecycle.preserveForDlq.mockResolvedValue("inline");
         h.scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
         h.scripts.stage.mockRejectedValue(new Error("still down"));
@@ -322,13 +337,13 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — what th
           makeSibling(),
         ]);
 
-        // The counter must still move here: skipping these sites wholesale would
+        // The tally must still move here: skipping these sites wholesale would
         // satisfy the two cases above while hiding a genuine loss.
         expect(await discardsCounted(queueName)).toBe(1);
         expect(await putBacksCounted(queueName)).toBe(0);
-        // And it is recorded as a loss, not as a preserved drop — the field
-        // oncall filters on. Pre-fix this said `bodyPreserved: true`, because it
-        // was written before either attempt was made.
+        // And it is recorded as a loss, not as a preserved drop — the structured
+        // field oncall filters on. Falsifiability: pre-fix this line was written
+        // before either attempt was made and asserted `bodyPreserved: true`.
         expect(dropLog).toHaveBeenCalledWith(
           expect.objectContaining({
             stagedJobId: "sib-1",

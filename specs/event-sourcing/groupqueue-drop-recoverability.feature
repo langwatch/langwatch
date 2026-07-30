@@ -300,19 +300,20 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
   @unit
   # AC-720.3 — the dead-letter is written whether or not the body's lifetime was
   # actually extended, so the entry has to say which. An operator draining a
-  # dead-letter otherwise finds out by draining it and watching it fail.
-  # Falsifiability: report every entry as preserved and the third example reads the
-  # same as the first two.
+  # dead-letter otherwise finds out by draining it and watching it fail. Bound at
+  # the seam that DECIDES the verdict; AC-719.16 is where it is read back off the
+  # entry an operator actually looks at. Falsifiability: report every entry as
+  # preserved and the third example reads the same as the first two.
   Scenario Outline: a dead-lettered job says whether its body is still expected to be there
     Given a dead-lettered job whose body is "<body state>"
-    When the operator inspects the dead-letter before draining it
-    Then the entry says the body "<verdict>"
+    When the job is dead-lettered
+    Then the dead-letter records that the body "<verdict>"
 
     Examples:
-      | body state                              | verdict            |
-      | held for the quarantine window          | is expected        |
-      | carried inside the entry itself         | is expected        |
-      | referenced but not held for the window  | may not be there   |
+      | body state                             | verdict          |
+      | held for the quarantine window         | is expected      |
+      | carried inside the entry itself        | is expected      |
+      | referenced but not held for the window | may not be there |
 
   @unit
   # AC-720.4 — a body-present drop whose value claims an offloaded body the queue
@@ -326,9 +327,10 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
     Then the queue "<signal>"
 
     Examples:
-      | claim                                       | signal                                  |
-      | claims a stored body it cannot point at     | warns that the body may not be there    |
-      | carries its own body                        | stays quiet — nothing is at risk        |
+      | claim                                   | signal                               |
+      | claims a stored body it cannot point at | warns that the body may not be there |
+      | cannot be read at all                   | warns that the body may not be there |
+      | carries its own body                    | stays quiet — nothing is at risk     |
 
   @integration
   # AC-719.16 — the entries this change creates are the automatic, high-frequency
