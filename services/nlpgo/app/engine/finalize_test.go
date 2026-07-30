@@ -24,10 +24,8 @@ func TestFinalize_RequireEndWithNoEndNodeErrors(t *testing.T) {
 			{ID: "code", Type: dsl.ComponentCode},
 		},
 	}
-	state := newRunState(w)
+	state := newRunState(w, true)
 	require.Empty(t, state.endNodeIDs, "fixture must have no End node")
-
-	state.requireEnd = true
 
 	res := finalize(state, "trace", time.Now(), nil)
 
@@ -44,9 +42,7 @@ func TestFinalize_RequireEndWithNoEndNodeErrors(t *testing.T) {
 // @scenario "A partial run with no End node still succeeds"
 func TestFinalize_RequireEndFalseAllowsNoEndNode(t *testing.T) {
 	w := &dsl.Workflow{Nodes: []dsl.Node{{ID: "code", Type: dsl.ComponentCode}}}
-	state := newRunState(w)
-
-	state.requireEnd = false
+	state := newRunState(w, false)
 
 	res := finalize(state, "trace", time.Now(), nil)
 
@@ -69,10 +65,8 @@ func TestFinalize_RequireEndWithEndNodeThatNeverRanErrors(t *testing.T) {
 			{ID: "end", Type: dsl.ComponentEnd},
 		},
 	}
-	state := newRunState(w)
+	state := newRunState(w, true)
 	require.Equal(t, []string{"end"}, state.endNodeIDs, "fixture must have an End node")
-
-	state.requireEnd = true
 
 	res := finalize(state, "trace", time.Now(), nil)
 
@@ -92,9 +86,7 @@ func TestFinalize_RequireEndFalseAllowsEndNodeThatNeverRan(t *testing.T) {
 			{ID: "end", Type: dsl.ComponentEnd},
 		},
 	}
-	state := newRunState(w)
-
-	state.requireEnd = false
+	state := newRunState(w, false)
 
 	res := finalize(state, "trace", time.Now(), nil)
 
@@ -115,11 +107,9 @@ func TestFinalize_UsesTheEndNodeThatActuallyProducedOutput(t *testing.T) {
 			{ID: "end_b", Type: dsl.ComponentEnd},
 		},
 	}
-	state := newRunState(w)
+	state := newRunState(w, true)
 	require.Equal(t, []string{"end_a", "end_b"}, state.endNodeIDs, "both End nodes are tracked, in node order")
 	state.recordOutputs("end_b", map[string]any{"output": "from b"})
-
-	state.requireEnd = true
 
 	res := finalize(state, "trace", time.Now(), nil)
 
@@ -134,10 +124,8 @@ func TestFinalize_UsesTheEndNodeThatActuallyProducedOutput(t *testing.T) {
 // not "is the recorded map non-empty".
 func TestFinalize_EmptyEndOutputsIsStillASuccess(t *testing.T) {
 	w := &dsl.Workflow{Nodes: []dsl.Node{{ID: "end", Type: dsl.ComponentEnd}}}
-	state := newRunState(w)
+	state := newRunState(w, true)
 	state.recordOutputs("end", map[string]any{})
-
-	state.requireEnd = true
 
 	res := finalize(state, "trace", time.Now(), nil)
 

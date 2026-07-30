@@ -212,8 +212,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 	if err != nil {
 		return nil, err
 	}
-	state := newRunState(req.Workflow)
-	state.requireEnd = requireEndNode(req)
+	state := newRunState(req.Workflow, requireEndNode(req))
 	applyManualInputs(state, req)
 	started := time.Now()
 	// execute_component (req.NodeID set) dispatches ONLY the requested
@@ -1286,15 +1285,17 @@ type runState struct {
 	// see requireEndNode — so it rides here beside manualInputsTarget
 	// instead of being threaded through finalize and doneEvent.
 	//
-	// The zero value is the safe one: a throwaway runState built only to
-	// carry a `done` frame (executeEvaluationStream) never asserts an End
-	// node, which is correct — per-row results go to the batch POST, and
-	// each row's own Execute() carries this guard for real.
+	// It is a REQUIRED argument to newRunState rather than a field a caller
+	// may forget to set. That is deliberate: there are five construction
+	// sites, only two of which want it true, and a silently-defaulted false
+	// disables the guard with no signal anywhere. A sixth caller now has to
+	// answer the question.
 	requireEnd bool
 }
 
-func newRunState(w *dsl.Workflow) *runState {
+func newRunState(w *dsl.Workflow, requireEnd bool) *runState {
 	r := &runState{
+		requireEnd:    requireEnd,
 		nodes:         make(map[string]*dsl.Node, len(w.Nodes)),
 		outputs:       make(map[string]map[string]any, len(w.Nodes)),
 		states:        make(map[string]*NodeState, len(w.Nodes)),

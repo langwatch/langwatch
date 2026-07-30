@@ -103,3 +103,62 @@ func TestExecute_EndBehindTakenBranchStillSucceeds(t *testing.T) {
 	assert.Nil(t, res.Error)
 	assert.Equal(t, "success", res.Nodes["end"].Status)
 }
+
+// The STREAMING twin of the two tests above, and the gap they left: Studio's
+// execute_flow runs through ExecuteStream, not Execute, and that path chooses
+// its terminal frame by testing state.firstError. A skipped End node sets no
+// firstError — no node failed — so the success frame was emitted regardless,
+// hardcoding status:"success" while the finalize call inside it had produced
+// the unreached_end_node error and a nil result.
+//
+// Two things were wrong on the surface the issue was actually filed against:
+// Studio received {status:"success", result:null}, which IS #3198, and it
+// received a contradicting done{status:"error"} straight after — two terminal
+// states for one run, the reducer confusion evaluation.go already cites
+// CodeRabbit flagging on PR #3607.
+//
+// @scenario "A streamed run whose only End node is skipped reports the error, not an empty success"
+func TestExecuteStream_EndBehindUntakenBranchDoesNotEmitEmptySuccess(t *testing.T) {
+	eng := New(Options{})
+
+	events, err := eng.ExecuteStream(context.Background(), ExecuteRequest{
+		Workflow: endBehindUntakenBranchWorkflow(),
+		TraceID:  "t",
+	}, ExecuteStreamOptions{})
+	require.NoError(t, err, "the graph is valid — both planner guards pass")
+
+	all := drain(events)
+
+	states := filterByType(all, "execution_state_change")
+	require.NotEmpty(t, states, "the workflow-level frame Studio reduces on")
+	last, ok := states[len(states)-1].Payload["execution_state"].(map[string]any)
+	require.True(t, ok)
+
+	assert.Equal(t, "error", last["status"],
+		"a streamed run that produced no result must not report success (#3198)")
+	assert.Equal(t, "unreached_end_node", last["error_type"],
+		"and it must carry the code the control plane maps to customer copy")
+
+	// No contradicting pair: exactly one terminal verdict across both frame
+	// families. Asserted on the set of statuses rather than on a single frame,
+	// because the defect was a success frame followed by an error done frame —
+	// each of which looks correct in isolation.
+	var terminal []string
+	for _, ev := range states {
+		if es, isMap := ev.Payload["execution_state"].(map[string]any); isMap {
+			if s, isStr := es["status"].(string); isStr && (s == "success" || s == "error") {
+				terminal = append(terminal, s)
+			}
+		}
+	}
+	for _, ev := range filterByType(all, "done") {
+		if s, isStr := ev.Payload["status"].(string); isStr {
+			terminal = append(terminal, s)
+		}
+	}
+	require.NotEmpty(t, terminal)
+	for _, s := range terminal {
+		assert.Equal(t, "error", s,
+			"every terminal frame must agree; got %v", terminal)
+	}
+}
