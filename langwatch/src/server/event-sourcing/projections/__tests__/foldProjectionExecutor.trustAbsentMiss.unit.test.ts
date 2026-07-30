@@ -230,7 +230,7 @@ describe("FoldProjectionExecutor trustAbsentMiss", () => {
     });
 
     describe("when the kill-switch env is set", () => {
-      /** @scenario ES_FOLD_TRUST_ABSENT_MISS=0 restores the rescue machinery */
+      /** @scenario the kill switch restores the rescue machinery */
       it("restores the unwindowed retry and the re-fold without a code change", async () => {
         process.env.ES_FOLD_TRUST_ABSENT_MISS = "0";
         const { fold, store, eventLoaderUpTo } = makeFold({
