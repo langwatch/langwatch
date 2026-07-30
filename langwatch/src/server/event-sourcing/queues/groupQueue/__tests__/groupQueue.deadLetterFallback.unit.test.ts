@@ -212,7 +212,9 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — write f
         h.scripts.stage.mockRejectedValue(new Error("still down"));
 
         // Must resolve: the caller awaits this inside its batch loop, so a throw
-        // here would abort the remaining siblings.
+        // here would abort the remaining siblings. It resolves to the branch it
+        // took, which is what lets the caller count the right event — a rejection
+        // still fails this assertion, so the original "does not throw" is intact.
         await expect(
           (h.processor as any).deadLetterDrainedValue({
             groupId: GROUP_ID,
@@ -221,7 +223,120 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — write f
             reason: "sibling_restage_failed",
             originalScore: 4242,
           }),
-        ).resolves.toBeUndefined();
+        ).resolves.toEqual({ branch: "lost" });
+      });
+    });
+  });
+});
+
+/**
+ * What the DISCARD TALLY is allowed to count (P2 review, Aryansharma28).
+ *
+ * `gq_jobs_dropped_total` is the only evidence a reactor drop ever happened, so
+ * the one thing it must never do is count work that is still in the queue. Both
+ * drained sites used to claim the drop BEFORE attempting the dead-letter, which
+ * meant the re-stage fallback — the value going back into the live group — was
+ * counted as a discard. Worse, the re-stage hands the same value to the NEXT
+ * drain, so a dead-letter write that kept failing met the same job over and over
+ * and the tally rose once per cycle: one stuck job, unbounded inflation, on the
+ * metric this PR series exists to make trustworthy.
+ *
+ * These read the real prom-client counters, filtered to each test's own queue
+ * name, rather than asserting a call was forwarded — a forwarding assertion would
+ * pass with the increment still in the wrong branch.
+ */
+describe("GroupQueueProcessor drained-sibling dead-letter durability — what the discard tally counts", () => {
+  const h = useSpyProcessor();
+
+  /** Fails the dead-letter write; the re-stage fallback succeeds. */
+  function failTheDeadLetterWriteOnly(): void {
+    h.blobLifecycle.preserveForDlq.mockResolvedValue("inline");
+    h.scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
+    h.scripts.stage.mockResolvedValue(undefined);
+  }
+
+  const deadLetterOnce = async () =>
+    await (h.processor as any).deadLetterDrainedValue({
+      groupId: GROUP_ID,
+      stagedJobId: "sib-1",
+      jobDataJson: RAW_VALUE,
+      reason: "sibling_restage_failed",
+      originalScore: 4242,
+    });
+
+  describe("given a drained job whose dead-letter write fails and is put back into the live group", () => {
+    describe("when the discard tally is read", () => {
+      /** @scenario a discard tally does not count a job the queue put back */
+      it("counts no discard for it, and reports the put-back separately", async () => {
+        failTheDeadLetterWriteOnly();
+        const queueName = h.queueName;
+
+        await (h.processor as any).restageDrainedSiblings(GROUP_ID, [
+          makeSibling(),
+        ]);
+
+        // The value is back in the live group — nothing was thrown away.
+        // Falsifiability: move recordDrop back above the dead-letter attempt (or
+        // fold the re-stage branch into it) and this reads 1.
+        expect(await discardsCounted(queueName)).toBe(0);
+        // And the put-back is still visible, as its own event: dropping the
+        // count entirely would have traded a wrong signal for no signal.
+        expect(await putBacksCounted(queueName)).toBe(1);
+      });
+    });
+  });
+
+  describe("given a drained job the queue keeps failing to dead-letter across several cycles", () => {
+    describe("when the discard tally is read", () => {
+      /** @scenario a repeatedly failing dead-letter write does not inflate the discard tally */
+      it("counts no discard however many cycles it takes, and one put-back per cycle", async () => {
+        failTheDeadLetterWriteOnly();
+        const queueName = h.queueName;
+
+        // Three drain cycles meeting the same still-undead-letterable job — the
+        // exact shape of the unbounded inflation: the re-stage puts the value
+        // back, so the next drain finds it again.
+        for (let cycle = 0; cycle < 3; cycle++) {
+          await deadLetterOnce();
+        }
+
+        // Falsifiability: count the put-back as a discard and this reads 3 —
+        // one stuck job having tripled the queue's reported data loss.
+        expect(await discardsCounted(queueName)).toBe(0);
+        expect(await putBacksCounted(queueName)).toBe(3);
+      });
+    });
+  });
+
+  describe("given a drained job whose dead-letter write and put-back both fail", () => {
+    describe("when the discard tally is read", () => {
+      /** @scenario a drained job that can be neither dead-lettered nor put back is counted as lost */
+      it("counts the discard and records that the body did not survive", async () => {
+        h.blobLifecycle.preserveForDlq.mockResolvedValue("inline");
+        h.scripts.writeJobToDlq.mockRejectedValue(new Error("redis down"));
+        h.scripts.stage.mockRejectedValue(new Error("still down"));
+        const queueName = h.queueName;
+        const dropLog = vi.spyOn((h.processor as any).logger, "error");
+
+        await (h.processor as any).restageDrainedSiblings(GROUP_ID, [
+          makeSibling(),
+        ]);
+
+        // The counter must still move here: skipping these sites wholesale would
+        // satisfy the two cases above while hiding a genuine loss.
+        expect(await discardsCounted(queueName)).toBe(1);
+        expect(await putBacksCounted(queueName)).toBe(0);
+        // And it is recorded as a loss, not as a preserved drop — the field
+        // oncall filters on. Pre-fix this said `bodyPreserved: true`, because it
+        // was written before either attempt was made.
+        expect(dropLog).toHaveBeenCalledWith(
+          expect.objectContaining({
+            stagedJobId: "sib-1",
+            reason: "sibling_restage_failed",
+            bodyPreserved: false,
+          }),
+          expect.stringContaining("Failed to re-stage drained sibling"),
+        );
       });
     });
   });
