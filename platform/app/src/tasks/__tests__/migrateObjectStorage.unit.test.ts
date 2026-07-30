@@ -30,6 +30,7 @@ describe("migrateObjectStorage task configuration", () => {
       sourceProvider: "s3",
       targetProvider: "azure",
       writesPaused: false,
+      readsPaused: false,
       s3: { bucket: "source", region: "eu-west-1" },
       azure: {
         accountName: "destination",
@@ -37,6 +38,19 @@ describe("migrateObjectStorage task configuration", () => {
         authMode: "sharedKey",
       },
     });
+  });
+
+  it("parses independent read and write pause acknowledgements", () => {
+    const config = parseMigrationTaskConfig({
+      ...validEnvironment(),
+      OBJECT_STORAGE_MIGRATION_WRITES_PAUSED: "1",
+      OBJECT_STORAGE_MIGRATION_READS_PAUSED: "1",
+    });
+
+    expect({
+      readsPaused: config.readsPaused,
+      writesPaused: config.writesPaused,
+    }).toEqual({ readsPaused: true, writesPaused: true });
   });
 
   it("requires different source and target providers", () => {

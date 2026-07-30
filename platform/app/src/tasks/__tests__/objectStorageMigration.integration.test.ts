@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import type { StorageDriver } from "~/server/stored-objects/storage-driver";
+import { StorageRegistry } from "~/server/stored-objects/storage-registry";
 import type { StoredObject } from "~/server/stored-objects/stored-object";
 import {
   createMigrationStorageEndpoint,
@@ -74,6 +75,7 @@ const setup = ({
   datasets = [],
   queueBlockers = [],
   writesPaused = true,
+  readsPaused = true,
 }: {
   sourceProvider?: "s3" | "azure";
   destinationProvider?: "s3" | "azure";
@@ -81,6 +83,7 @@ const setup = ({
   datasets?: MigrationDataset[];
   queueBlockers?: QueueMigrationBlocker[];
   writesPaused?: boolean;
+  readsPaused?: boolean;
 } = {}) => {
   const sourceDriver = new MemoryDriver();
   const destinationDriver = new MemoryDriver();
@@ -123,6 +126,7 @@ const setup = ({
     publishStoredObject: async (row) => publisher(row),
     auditQueues: async () => queueBlockers,
     writesPaused: () => writesPaused,
+    readsPaused: () => readsPaused,
     now: () => new Date("2026-02-01T00:00:00.000Z"),
   });
   return {
@@ -164,6 +168,14 @@ const seedStoredObject = (
   state.sourceDriver.objects.set(row.storage_uri, bytes);
   return row;
 };
+
+async function readBuffer(stream: Readable): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
 
 describe("Feature: Object storage provider parity and migration", () => {
   /** @scenario A migration dry run changes no customer data */
@@ -315,6 +327,17 @@ describe("Feature: Object storage provider parity and migration", () => {
     expect(state.history).toEqual([]);
   });
 
+  /** @scenario Unpaused read traffic blocks finalization */
+  it("Unpaused read traffic blocks finalization", async () => {
+    const state = setup({ readsPaused: false, writesPaused: true });
+    seedStoredObject(state);
+
+    await expect(state.migration.finalize()).rejects.toThrow(
+      /reads.*paused|read traffic/i,
+    );
+    expect(state.history).toEqual([]);
+  });
+
   /** @scenario A dataset with no usable chunk count is reported rather than aborting the run */
   it("A dataset with no usable chunk count is reported rather than aborting the run", async () => {
     const state = setup({
@@ -414,16 +437,42 @@ describe("Feature: Object storage provider parity and migration", () => {
     }
 
     const result = await state.migration.finalize();
+    const activeRegistry = new StorageRegistry({
+      s3:
+        destinationProvider === "s3"
+          ? state.destinationDriver
+          : state.sourceDriver,
+      file: new MemoryDriver(),
+      "azure-blob":
+        destinationProvider === "azure"
+          ? state.destinationDriver
+          : state.sourceDriver,
+    });
+    const publishedRow = state.rows.get("project-1")?.[0];
+    const newBytes = Buffer.from("post-cutover-write");
+    const newUri = state.destination.storedObjectUri(
+      "project-1",
+      digest(newBytes),
+    );
+    await activeRegistry.put(newUri, newBytes, "application/octet-stream");
 
     expect(result.destinationProvider).toBe(destinationProvider);
-    expect(state.rows.get("project-1")?.[0]?.storage_uri).toBe(
+    expect(publishedRow?.storage_uri).toBe(
       state.destination.storedObjectUri(row.project_id, row.sha256),
     );
     expect(
-      state.destinationDriver.objects.has(
-        state.destination.datasetChunkUri(dataset.projectId, dataset.id, 1),
+      await readBuffer(await activeRegistry.get(publishedRow!.storage_uri)),
+    ).toEqual(Buffer.from("stored-object"));
+    expect(
+      await readBuffer(
+        await state.destination.driver.get(
+          state.destination.datasetChunkUri(dataset.projectId, dataset.id, 1),
+        ),
       ),
-    ).toBe(true);
+    ).toEqual(Buffer.from("chunk-1"));
+    expect(await readBuffer(await activeRegistry.get(newUri))).toEqual(
+      newBytes,
+    );
   });
 
   /** @scenario A failed finalization can be resumed before traffic restarts */

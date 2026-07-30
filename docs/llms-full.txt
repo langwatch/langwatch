@@ -53619,8 +53619,9 @@ Do not switch `STORED_OBJECTS_BACKEND` before copying existing data. The migrati
 pnpm run task migrateObjectStorage plan
 pnpm run task migrateObjectStorage copy
 
-# Stop app and worker writes, drain GroupQueue, then:
+# Stop all app and worker read/write traffic, drain GroupQueue, then:
 OBJECT_STORAGE_MIGRATION_WRITES_PAUSED=1 \
+OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
   pnpm run task migrateObjectStorage finalize
 
 # Switch STORED_OBJECTS_BACKEND and active credentials, then deploy while
@@ -53628,7 +53629,7 @@ OBJECT_STORAGE_MIGRATION_WRITES_PAUSED=1 \
 pnpm run task migrateObjectStorage verify
 ```
 
-`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
+`plan` is read-only. `copy` is resumable, verifies SHA-256 at the destination, and repairs a mismatched destination object. `finalize` refuses to run unless both reads and writes are explicitly paused, dataset uploads are idle, and GroupQueue has no pending, delayed, active, blocked, or staged durable references. Reads must remain paused because finalization publishes destination storage addresses before the target-provider deployment is active. It publishes newer ClickHouse stored-object rows only after the final verified copy; it does not rewrite or delete history. No phase deletes source bytes.
 
 After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provider credentials while traffic remains paused, deploy that configuration, run `verify`, then resume traffic. A global migration excludes projects with private S3 buckets; they remain on their tenant-owned S3 destination.
 
@@ -53637,6 +53638,7 @@ After `finalize` succeeds, update `STORED_OBJECTS_BACKEND` and the active provid
 | `OBJECT_STORAGE_MIGRATION_SOURCE_PROVIDER` | `s3` or `azure` |
 | `OBJECT_STORAGE_MIGRATION_TARGET_PROVIDER` | The other provider |
 | `OBJECT_STORAGE_MIGRATION_WRITES_PAUSED` | Must be `1` for `finalize` |
+| `OBJECT_STORAGE_MIGRATION_READS_PAUSED` | Must be `1` for `finalize` |
 | `OBJECT_STORAGE_MIGRATION_S3_BUCKET` | Global S3 source or destination bucket |
 | `OBJECT_STORAGE_MIGRATION_S3_ENDPOINT` | Optional custom S3 endpoint |
 | `OBJECT_STORAGE_MIGRATION_S3_REGION` | Optional S3 region. AWS uses its normal SDK region chain when omitted; custom endpoints default to `auto` |
@@ -53685,7 +53687,6 @@ The pod label and the ServiceAccount annotation are both emitted by the chart; t
 The ServiceAccount and the workload-identity label are applied to the app and the workers only. Cron pods call the app over HTTP and never touch storage themselves, so giving them a Blob-capable token would grant every cron image storage access it has no use for.
 
 The same identity must be available to any out-of-band job that writes bytes, such as the dataset backfill task; run it with the same ServiceAccount as the app and workers.
-</Warning>
 
 ## Email
 

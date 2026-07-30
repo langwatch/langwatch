@@ -5,6 +5,7 @@
  *   pnpm run task migrateObjectStorage plan
  *   pnpm run task migrateObjectStorage copy
  *   OBJECT_STORAGE_MIGRATION_WRITES_PAUSED=1 \
+ *   OBJECT_STORAGE_MIGRATION_READS_PAUSED=1 \
  *     pnpm run task migrateObjectStorage finalize
  *   pnpm run task migrateObjectStorage verify
  *
@@ -56,6 +57,7 @@ const taskConfigSchema = z
     sourceProvider: providerSchema,
     targetProvider: providerSchema,
     writesPaused: z.boolean(),
+    readsPaused: z.boolean(),
     s3: z.object({
       bucket: z.string().min(1),
       endpoint: z.string().url().optional(),
@@ -116,6 +118,7 @@ export function parseMigrationTaskConfig(
     sourceProvider: source.OBJECT_STORAGE_MIGRATION_SOURCE_PROVIDER,
     targetProvider: source.OBJECT_STORAGE_MIGRATION_TARGET_PROVIDER,
     writesPaused: source.OBJECT_STORAGE_MIGRATION_WRITES_PAUSED === "1",
+    readsPaused: source.OBJECT_STORAGE_MIGRATION_READS_PAUSED === "1",
     s3: {
       bucket: source.OBJECT_STORAGE_MIGRATION_S3_BUCKET,
       endpoint: source.OBJECT_STORAGE_MIGRATION_S3_ENDPOINT || undefined,
@@ -288,6 +291,7 @@ export function createMigrationTask({
     publishStoredObject,
     auditQueues,
     writesPaused: () => config.writesPaused,
+    readsPaused: () => config.readsPaused,
   });
 }
 
@@ -300,8 +304,30 @@ export default async function execute(phaseValue?: string): Promise<void> {
     activeEnvironment: process.env,
   });
   const repository = new StoredObjectsRepository();
-  const privateOrganizations = getPrivateS3Configs();
-  const inventory: MigrationInventory = {
+  const migration = createMigrationTask({
+    config,
+    inventory: createMigrationInventory(repository, getPrivateS3Configs()),
+    publishStoredObject: (row) =>
+      repository.insert({ projectId: row.project_id, row }),
+    auditQueues: auditQueuesForCutover,
+  });
+  const report = await runMigrationPhase(migration, phase);
+  logger.info(
+    {
+      phase,
+      report,
+      source: config.sourceProvider,
+      target: config.targetProvider,
+    },
+    "Object-storage migration phase completed",
+  );
+}
+
+function createMigrationInventory(
+  repository: StoredObjectsRepository,
+  privateOrganizations: ReadonlyMap<string, unknown>,
+): MigrationInventory {
+  return {
     listProjectsPage: async ({ afterId, limit }) => {
       const projects = await prisma.project.findMany({
         where: afterId ? { id: { gt: afterId } } : undefined,
@@ -333,44 +359,31 @@ export default async function execute(phaseValue?: string): Promise<void> {
         },
       }),
   };
-  const migration = createMigrationTask({
-    config,
-    inventory,
-    publishStoredObject: (row) =>
-      repository.insert({ projectId: row.project_id, row }),
-    auditQueues: async () => {
-      if (!connection) {
-        throw new Error(
-          "Redis is required to audit GroupQueue before migration finalization",
-        );
-      }
-      return auditGroupQueuesForStorageMigration(
-        connection as unknown as QueueAuditRedis,
-        Date.now(),
-        connection instanceof Cluster
-          ? (connection.nodes("master") as unknown as QueueAuditRedis[])
-          : [connection as unknown as QueueAuditRedis],
-      );
-    },
-  });
+}
 
-  const report =
-    phase === "plan"
-      ? await migration.plan()
-      : phase === "copy"
-        ? await migration.copy()
-        : phase === "verify"
-          ? await migration.verify()
-          : await migration.finalize();
-  logger.info(
-    {
-      phase,
-      report,
-      source: config.sourceProvider,
-      target: config.targetProvider,
-    },
-    "Object-storage migration phase completed",
+async function auditQueuesForCutover() {
+  if (!connection) {
+    throw new Error(
+      "Redis is required to audit GroupQueue before migration finalization",
+    );
+  }
+  return auditGroupQueuesForStorageMigration(
+    connection as unknown as QueueAuditRedis,
+    Date.now(),
+    connection instanceof Cluster
+      ? (connection.nodes("master") as unknown as QueueAuditRedis[])
+      : [connection as unknown as QueueAuditRedis],
   );
+}
+
+async function runMigrationPhase(
+  migration: ObjectStorageMigration,
+  phase: MigrationTaskPhase,
+) {
+  if (phase === "plan") return migration.plan();
+  if (phase === "copy") return migration.copy();
+  if (phase === "verify") return migration.verify();
+  return migration.finalize();
 }
 
 function toAzureCredentials(config: MigrationTaskConfig): AzureCredentials {

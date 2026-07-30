@@ -75,6 +75,13 @@ Feature: Object storage provider parity and migration
     Then finalization is refused with the blocking datasets identified
     And the active provider remains unchanged
 
+  @regression @integration
+  Scenario: Unpaused read traffic blocks finalization
+    Given writes are paused
+    But read traffic can still reach the source deployment
+    When the operator attempts to finalize the provider migration
+    Then finalization is refused before any destination address is published
+
   @integration
   Scenario: A dataset with no usable chunk count is reported rather than aborting the run
     Given an abandoned upload left a dataset with no chunk count
@@ -107,7 +114,7 @@ Feature: Object storage provider parity and migration
 
   @integration
   Scenario: Finalization publishes verified destination addresses without erasing history
-    Given writes are paused
+    Given reads and writes are paused
     And a stored object has verified source and destination bytes
     When the operator finalizes that stored object
     Then its newest address points to the verified destination bytes

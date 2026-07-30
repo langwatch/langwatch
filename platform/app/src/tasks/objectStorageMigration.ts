@@ -154,6 +154,7 @@ type ObjectStorageMigrationDeps = {
   publishStoredObject(row: StoredObject): Promise<void>;
   auditQueues(): Promise<QueueMigrationBlocker[]>;
   writesPaused(): boolean;
+  readsPaused(): boolean;
   now?: () => Date;
 };
 
@@ -255,6 +256,11 @@ export class ObjectStorageMigration {
     if (!this.deps.writesPaused()) {
       throw new MigrationBlockedError(
         "Finalization requires writes to be paused",
+      );
+    }
+    if (!this.deps.readsPaused()) {
+      throw new MigrationBlockedError(
+        "Finalization requires read traffic to be paused",
       );
     }
 
