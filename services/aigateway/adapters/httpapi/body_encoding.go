@@ -46,10 +46,11 @@ func prepareRequestBody(w http.ResponseWriter, r *http.Request, maxBytes int64) 
 	for i := len(encodings) - 1; i >= 0; i-- {
 		decoded, closer, err := decodeStream(encodings[i], reader, maxBytes)
 		if err != nil {
-			// The decoders already built for the outer layers hold buffers and,
-			// for zstd, a decode goroutine. Nothing installs decodedRequestBody
-			// on this path, so they have to be released here or a stream of
-			// malformed chained requests leaks them.
+			// decodedRequestBody, which owns the cleanup, is never installed on
+			// this path, so the decoders already built for the outer layers are
+			// released here instead. Closing them keeps the failure path
+			// symmetric with the success one, so a decoder that later holds
+			// something scarcer than a buffer cannot start leaking unnoticed.
 			_ = closeAll(decoders)
 			return herr.New(r.Context(), domain.ErrBadRequest, herr.M{"message": err.Error()})
 		}
