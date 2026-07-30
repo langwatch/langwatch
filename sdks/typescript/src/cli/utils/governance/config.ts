@@ -6,10 +6,10 @@
  */
 
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
 import type { PlatformToolPolicyMap } from "./platform-tool-policy";
+import { profileConfigPath, resolveProfileName } from "./profile";
 
 export interface GovernanceConfig {
   /** AI Gateway base URL (e.g. https://gateway.langwatch.ai). */
@@ -183,9 +183,12 @@ export function isCanonicalVkSecret(secret: string | undefined): boolean {
  * LANGWATCH_CLI_CONFIG for tests / non-default homes.
  */
 export function configPath(): string {
+  // An explicit file wins over everything, including a profile: tests and
+  // non-default homes set it, and a profile silently redirecting them
+  // elsewhere would be a baffling failure.
   const env = process.env.LANGWATCH_CLI_CONFIG;
   if (env) return env;
-  return path.join(os.homedir(), ".langwatch", "config.json");
+  return profileConfigPath(resolveProfileName());
 }
 
 /**

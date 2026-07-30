@@ -260,8 +260,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	let cfg = loadConfig();
 	if (!isLoggedIn(cfg)) {
 		if (!shouldAutoLogin()) {
+			// Two ways forward, and they are genuinely different: the gateway
+			// path needs an org, a virtual key and configured providers, while
+			// `onboard` needs nothing at all and gets traces flowing now.
 			process.stderr.write(
-				"Not logged in. Run `langwatch login --device` first.\n",
+				"Not logged in.\n" +
+					"  langwatch onboard        start with a temporary workspace, no signup\n" +
+					"  langwatch login --device sign in to an existing account\n",
 			);
 			process.exit(1);
 		}
