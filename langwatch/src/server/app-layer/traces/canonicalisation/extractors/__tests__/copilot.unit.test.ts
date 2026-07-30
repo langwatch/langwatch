@@ -4,7 +4,6 @@ import { CanonicalizeSpanAttributesService } from "../../canonicalizeSpanAttribu
 import { CopilotExtractor } from "../copilot";
 import { createExtractorContext } from "./_testHelpers";
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: a top-level describe block grouping the extractor's test cases — not a production function; splitting it would only scatter one unit's tests.
 describe("CopilotExtractor", () => {
   describe("when the span carries copilot-specific attributes", () => {
     /** @scenario Repository and organization context are lifted onto the canonical span */
