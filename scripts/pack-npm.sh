@@ -284,12 +284,16 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   # others was previously true only by accident (none happened to contain a
   # dir named like an exclude). Runtime source only: tests, fixtures and the
   # secret-shaped names the excludes above deliberately strip are filtered.
-  git -C "$ROOT" ls-files \
+  # -c core.quotePath=false: git quotes non-ASCII paths by default, which
+  # would never match the tar listing and read as missing source. The
+  # `|| true` keeps a fully-filtered grep (exit 1) from aborting the script
+  # under pipefail after the pack already succeeded.
+  git -C "$ROOT" -c core.quotePath=false ls-files \
       langwatch/src langwatch/ee \
       mcp-server/src \
       packages/handled-error/src packages/langy/src \
       skills scripts \
-    | grep -vE '__tests__|\.test\.|\.spec\.|(^|/)tests?/|(^|/)\.npmrc$|\.env\.example$' | sort > "$tracked"
+    | { grep -vE '__tests__|\.test\.|\.spec\.|(^|/)tests?/|(^|/)\.npmrc$|\.env\.example$' || true; } | sort > "$tracked"
   missing="$(comm -23 "$tracked" "$in_tar")"
   rm -f "$in_tar" "$tracked"
   if [ -n "$missing" ]; then
@@ -301,6 +305,15 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   fi
   echo "→ verified: tarball ships every tracked source file across the shipped trees"
 fi
+
+# The lockfile is the whole reason for the staged layout (npm strips one at
+# the package ROOT), so its presence is asserted on every pack — not only in
+# the smoke workflow.
+if ! tar -tzf "$tarball" | grep -qx "package/app/pnpm-lock.yaml"; then
+  echo "✗ the tarball ships no lockfile — the end-user install would not be reproducible." >&2
+  exit 1
+fi
+echo "→ verified: tarball ships the workspace lockfile at app/pnpm-lock.yaml"
 
 # Refuse to publish anything secret-shaped.
 #

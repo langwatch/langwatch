@@ -221,9 +221,6 @@ jobs:
           --filter "@langwatch/web..."
           --filter "langwatch-e2e-tests"
 
-      - name: Build mcp-server
-        run: pnpm --filter @langwatch/mcp-server run build
-
       # No Playwright browser/ffmpeg download: the tests launch the runner's
       # preinstalled Google Chrome via channel (E2E_BROWSER_CHANNEL below) and
       # video recording is off in CI, so no ffmpeg binary is needed.

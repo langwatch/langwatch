@@ -140,8 +140,7 @@ jobs:
       # and surfacing those here would be a different change.
       - name: Check the workspace invariants (ADR-076)
         run: >
-          pnpm --filter @langwatch/server-cli exec
-          vitest run test/workspace-invariants.test.ts
+          pnpm --filter @langwatch/server-cli run test:invariants
 
       # Same prebuild as npx-server-publish.yml: every published artifact
       # ships langwatch/dist + mcp-server/dist (the publish sanity check
