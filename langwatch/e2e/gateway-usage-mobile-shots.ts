@@ -3,6 +3,12 @@
  * shot of a gateway page this branch does not touch, to show that the
  * sub-nav's behaviour at 390px belongs to the shared section layout
  * rather than to these changes.
+ *
+ * Run it against a local stack, with the app's env loaded so the Prisma and
+ * auth imports behind the sign-in helper resolve their configuration:
+ *
+ *   QA_PASSWORD=<throwaway> QA_BASE_URL=http://localhost:5590 \
+ *     pnpm exec tsx --env-file=.env e2e/gateway-usage-mobile-shots.ts
  */
 import { chromium } from "playwright";
 
