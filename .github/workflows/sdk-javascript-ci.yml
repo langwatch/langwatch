@@ -42,6 +42,13 @@ jobs:
           filters: |
             relevant:
               - 'typescript-sdk/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config live at the repo root since ADR-076; a dependency
+              # or override change touches only these.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/sdk-javascript-ci.yml'
 
   ci:

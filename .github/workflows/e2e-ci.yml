@@ -38,6 +38,13 @@ jobs:
               - 'langwatch/**'
               - 'python-sdk/**'
               - 'agentic-e2e-tests/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config live at the repo root since ADR-076; a dependency
+              # or override change touches only these.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/e2e-ci.yml'
 
   e2e:
