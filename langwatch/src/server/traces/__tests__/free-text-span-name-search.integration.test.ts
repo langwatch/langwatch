@@ -125,7 +125,9 @@ async function searchViaCompiledFilter(query: string): Promise<string[]> {
     from: now - 60_000,
     to: now + 60_000,
   });
-  expect(compiled).not.toBeNull();
+  // A guard rather than an assertion: this is a helper, not a test body, and
+  // a null compile here means the fixture query itself is wrong.
+  if (!compiled) throw new Error(`query compiled to no filter: ${query}`);
 
   const result = await ch.query({
     query: `
@@ -134,9 +136,9 @@ async function searchViaCompiledFilter(query: string): Promise<string[]> {
       WHERE TenantId = {tenantId:String}
         AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
         AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})
-        AND (${compiled!.sql})
+        AND (${compiled.sql})
     `,
-    query_params: compiled!.params,
+    query_params: compiled.params,
     format: "JSONEachRow",
   });
   const rows = await result.json<{ TraceId: string }>();
@@ -155,8 +157,8 @@ async function searchViaLegacyList(query: string): Promise<string[]> {
   } as GetAllTracesForProjectInput;
 
   const results = await service.getAllTracesForProject(input, openProtections);
-  expect(results).not.toBeNull();
-  return results!.groups
+  if (!results) throw new Error(`legacy list returned nothing for: ${query}`);
+  return results.groups
     .flat()
     .map((t) => t.trace_id)
     .sort();
