@@ -6,14 +6,12 @@
  * the returned state props.
  */
 
-import { generate } from "@langwatch/ksuid";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { toaster } from "../ui/toaster";
 import { showSuiteRunError } from "./showSuiteRunError";
 

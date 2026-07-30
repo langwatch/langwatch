@@ -393,11 +393,11 @@ export function computeGroupSummary({
   for (const run of group.scenarioRuns) {
     if (run.totalCost != null) totalCost += run.totalCost;
     if (run.durationInMs > 0) totalDurationMs += run.durationInMs;
-    const agentLatencies = run.roleLatencies?.["Agent"];
+    const agentLatencies = run.roleLatencies?.Agent;
     if (agentLatencies) {
       allAgentLatencies.push(...agentLatencies);
     }
-    const agentCosts = run.roleCosts?.["Agent"];
+    const agentCosts = run.roleCosts?.Agent;
     if (agentCosts) {
       allAgentCosts.push(...agentCosts);
     }
