@@ -81,8 +81,11 @@ describe("LangyCapabilityRenderer follow-up chips", () => {
           .getByText("Alert me on this")
           .closest("a") as HTMLAnchorElement;
 
+        // No --start-date/--end-date in the fixture's command, so the search
+        // covered the CLI's own default last-24h window — carried here as a
+        // rolling `preset=24h` rather than silently dropped (traceExplorerLink.ts).
         expect(alert.getAttribute("href")).toBe(
-          "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22",
+          "/demo/traces?drawer.open=automation&drawer.initialSource=trace&drawer.initialFilterQuery=%22checkout+failed%22#all-traces?q=%22checkout+failed%22&preset=24h",
         );
       });
 

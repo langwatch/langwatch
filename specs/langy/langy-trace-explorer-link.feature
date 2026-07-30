@@ -15,17 +15,20 @@ Feature: Following a Langy trace search through to the Trace Explorer
 
   Rule: The link lands on the same result set, from wherever I clicked it
 
+    @unit
     Scenario: Following the link while I am already looking at traces
       Given I am on the Trace Explorer with the panel open beside it
       When I follow "View in Trace Explorer" from the card
       Then the Explorer shows the traces Langy searched
       And it does not keep showing whatever I was looking at before
 
+    @unit
     Scenario: Following the link from somewhere else in the project
       Given I am on a page other than the Trace Explorer
       When I follow "View in Trace Explorer" from the card
       Then the Explorer shows the traces Langy searched
 
+    @unit
     Scenario: The link survives long enough to be read
       When I follow "View in Trace Explorer" from the card
       Then the address stays the one I followed
@@ -33,22 +36,26 @@ Feature: Following a Langy trace search through to the Trace Explorer
 
   Rule: The link asks the question Langy asked, not a wider one
 
+    @unit
     Scenario: A search over a stated period keeps that period
       Given Langy searched a stated period
       When I follow "View in Trace Explorer" from the card
       Then the Explorer covers that same period
 
+    @unit
     Scenario: A search that stated no period keeps the period it actually covered
       Given Langy searched without naming a period
       When I follow "View in Trace Explorer" from the card
       Then the Explorer covers the period the search itself covered
       And it does not silently widen to the Explorer's usual default
 
+    @unit
     Scenario: A search narrowed to where the traces came from stays narrowed
       Given Langy searched only traces from a particular origin
       When I follow "View in Trace Explorer" from the card
       Then the Explorer shows only traces from that origin
 
+    @unit
     Scenario: A search narrowed to several origins keeps all of them
       Given Langy searched traces from more than one origin
       When I follow "View in Trace Explorer" from the card
@@ -57,6 +64,7 @@ Feature: Following a Langy trace search through to the Trace Explorer
 
   Rule: What was a phrase to Langy stays a phrase in the Explorer
 
+    @unit
     Scenario: A search phrase that reads like a filter is still a phrase
       Given Langy searched for the phrase "status:error"
       When I follow "View in Trace Explorer" from the card
@@ -65,6 +73,7 @@ Feature: Following a Langy trace search through to the Trace Explorer
 
   Rule: The card is honest about what the link can and cannot carry
 
+    @unit
     Scenario: The sample never pretends to be the whole result
       Given Langy found more traces than the card shows
       Then the card says how many it found and how many it is showing

@@ -149,6 +149,7 @@ describe("readTraceSearchQuery", () => {
 describe("asFreeTextTerm", () => {
   describe("given the CLI's free-text query", () => {
     describe("when it is turned into the Explorer's `q`", () => {
+      /** @scenario A search phrase that reads like a filter is still a phrase */
       it("parses back as free text, not as a field filter", () => {
         // This is the load-bearing claim. `status:error` was FREE TEXT to the
         // CLI. If it reached the Explorer unquoted, liqe would read it as a
@@ -189,6 +190,7 @@ describe("buildExplorerQuery", () => {
   });
 
   describe("given a search narrowed to one origin", () => {
+    /** @scenario A search narrowed to where the traces came from stays narrowed */
     it("adds an origin filter", () => {
       expect(buildExplorerQuery({ origins: ["evaluation"] })).toBe(
         "origin:evaluation",
@@ -197,6 +199,7 @@ describe("buildExplorerQuery", () => {
   });
 
   describe("given a search narrowed to several origins", () => {
+    /** @scenario A search narrowed to several origins keeps all of them */
     it("ORs them, so a trace from any one of them matches", () => {
       expect(
         buildExplorerQuery({ origins: ["evaluation", "simulation"] }),
@@ -264,6 +267,7 @@ describe("buildTraceExplorerHref", () => {
         expect(href.startsWith("/acme/traces")).toBe(true);
       });
 
+      /** @scenario A search over a stated period keeps that period */
       it("carries the query and the exact window in the fragment", () => {
         const params = fragmentParams(
           buildTraceExplorerHref({ projectSlug: "acme", search })!,
@@ -312,6 +316,7 @@ describe("buildTraceExplorerHref", () => {
       // instead fell through to the Explorer's own 30d default — a search's
       // card would say "4 traces, no errors" while the Explorer, having
       // silently widened the window, showed a completely different set.
+      /** @scenario A search that stated no period keeps the period it actually covered */
       it("carries the CLI's own default window as a rolling preset", () => {
         const params = fragmentParams(
           buildTraceExplorerHref({
