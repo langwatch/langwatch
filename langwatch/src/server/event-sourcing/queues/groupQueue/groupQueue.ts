@@ -2200,6 +2200,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * counter and the log but no `complete()`. Every path in this module that
    * discards a job routes through here, so `gq_jobs_dropped_total` is the whole
    * truth about what this queue throws away.
+   *
+   * Which cuts both ways, and the second direction is the one that got broken: a
+   * path that does NOT throw a job away must not route through here either. The
+   * drained-sibling sites called this before attempting the dead-letter, so the
+   * re-stage fallback — which puts the value back in the live group — was counted
+   * as a drop, once per drain cycle for as long as the write kept failing. They go
+   * through {@link recordDrainedOutcome} now, which counts what actually happened.
    */
   private recordDrop({
     groupId,

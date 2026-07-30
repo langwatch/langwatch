@@ -259,6 +259,89 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
     When the operator checks the dead-letter count and lists the dead-lettered groups
     Then the group is counted once and listed once
 
+  @unit
+  # AC-719.13 — THE DROP TALLY MUST NOT COUNT WORK STILL IN THE QUEUE. When the
+  # dead-letter write for a drained value fails, the value is put back into the
+  # live group — a designed durability fallback (AC-719.7b), on which nothing was
+  # thrown away. The tally used to be claimed BEFORE that attempt, so it counted a
+  # job that was still there. Falsifiability: claim the drop before the attempt
+  # again (or fold the put-back branch into it) and the tally reads 1.
+  Scenario: a discard tally does not count a job the queue put back
+    Given a drained job whose dead-letter write fails and is put back into the live group
+    When the operator reads how many jobs the queue has discarded
+    Then no discard is counted for it
+    And the put-back is reported separately so an operator can tell the two apart
+
+  @unit
+  # AC-719.14 — the unbounded-inflation case, and the reason AC-719.13 is worth a
+  # scenario of its own. A put-back value is handed to the NEXT drain, so a
+  # dead-letter write that keeps failing meets the same job over and over. One
+  # stuck job must not be able to run the discard tally up without limit.
+  # Falsifiability: count the put-back as a discard and the tally reads once per
+  # cycle instead of zero.
+  Scenario: a repeatedly failing dead-letter write does not inflate the discard tally
+    Given a drained job the queue keeps failing to dead-letter across several cycles
+    When the operator reads how many jobs the queue has discarded
+    Then no discard is counted for it
+    And the put-back is reported once per cycle
+
+  @unit
+  # AC-719.15 — the other direction, so AC-719.13 cannot be satisfied by simply
+  # never counting these sites. When the put-back ALSO fails the job really is
+  # gone, and it must be counted as a discard whose body did not survive.
+  Scenario: a drained job that can be neither dead-lettered nor put back is counted as lost
+    Given a drained job whose dead-letter write and put-back both fail
+    When the operator reads how many jobs the queue has discarded
+    Then the discard is counted for it
+    And it is recorded as a discard whose body did not survive
+
+  # ----- telling a recoverable dead-letter from one that will come back empty -----
+
+  @unit
+  # AC-720.3 — the dead-letter is written whether or not the body's lifetime was
+  # actually extended, so the entry has to say which. An operator draining a
+  # dead-letter otherwise finds out by draining it and watching it fail.
+  # Falsifiability: report every entry as preserved and the third example reads the
+  # same as the first two.
+  Scenario Outline: a dead-lettered job says whether its body is still expected to be there
+    Given a dead-lettered job whose body is "<body state>"
+    When the operator inspects the dead-letter before draining it
+    Then the entry says the body "<verdict>"
+
+    Examples:
+      | body state                              | verdict            |
+      | held for the quarantine window          | is expected        |
+      | carried inside the entry itself         | is expected        |
+      | referenced but not held for the window  | may not be there   |
+
+  @unit
+  # AC-720.4 — a body-present drop whose value claims an offloaded body the queue
+  # cannot find a reference to used to be the one path here that produced NO
+  # signal at all: no extension, no log line, and an entry that read as preserved.
+  # A never-offloaded body must NOT raise the same alarm — it is the common case
+  # and it is fully recoverable — so the two are distinguished, not merged.
+  Scenario Outline: a dead-letter whose body cannot be held is not written in silence
+    Given a dead-lettered job whose value "<claim>"
+    When the dead-letter is written
+    Then the queue "<signal>"
+
+    Examples:
+      | claim                                       | signal                                  |
+      | claims a stored body it cannot point at     | warns that the body may not be there    |
+      | carries its own body                        | stays quiet — nothing is at risk        |
+
+  @integration
+  # AC-719.16 — the entries this change creates are the automatic, high-frequency
+  # ones, and they were the least visible on the surface built to recover them:
+  # carrying no summary or time of death, they sorted BELOW every group an operator
+  # had moved by hand, with no text to identify them. Falsifiability: drop the
+  # group-level fields and the automatic entry sorts last with an empty error.
+  Scenario: an automatically dead-lettered job is as visible to the operator as a hand-moved group
+    Given a group dead-lettered automatically by a drop and an older group moved by an operator
+    When the operator lists the dead-lettered groups
+    Then both are described by why they died and when
+    And the automatic one is listed first because it happened most recently
+
   # ================= #720 — blob lifetime =================
 
   @integration
@@ -316,10 +399,17 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
 #       with failure injection). AC-719.9/.10/.11/.12 bound (the dead-letter's operator surface: the count and the
 #       list sweep expired index members instead of counting them forever, keep every entry that still holds a
 #       recoverable job OR the record of why the group died, and count each group once across a paged scan —
-#       falsifiability-proven per scenario). AC-719.4/719.5/719.7 (@unimplemented — coalesced-batch /
+#       falsifiability-proven per scenario). AC-719.13/.14/.15 bound (the discard tally counts only discards: a
+#       put-back drained value is NOT one and is reported separately, a repeatedly-failing dead-letter write cannot
+#       inflate the tally once per cycle, and a value that can be neither dead-lettered nor put back still counts as
+#       a body-gone discard — the same seam unit test with failure injection). AC-719.16 bound (an automatically
+#       dead-lettered job is as visible and as well ordered on the operator's list as a hand-moved group).
+#       AC-719.4/719.5/719.7 (@unimplemented — coalesced-batch /
 #       crash-injection harness gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
 # #720: AC-720.1 bound (GQ2 holder, falsifiability-proven). AC-720.2 bound (an ordinary sibling renew
 #       cannot shorten a dead-letter hold — the ORDINARY path, found in review; falsifiability-proven).
+#       AC-720.3/.4 bound (the entry states whether its body is still expected to be there, and the one path that
+#       could not hold a claimed body in total silence now warns — while a never-offloaded body stays quiet).
 #       AC-720.1b (@unimplemented, GQ1-forcing harness).
 # #721: AC-721.6 bound (both guard directions). AC-721.1-.5 are documentation ACs (ADR-081 + site corrections
 #       + the 00026 OCSF replay-coverage correction migration), verified by diff/review,
