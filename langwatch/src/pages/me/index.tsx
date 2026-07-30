@@ -13,6 +13,7 @@ import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
+import { ConnectYourAgentButton } from "~/components/me/ConnectYourAgentButton";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
 import {
@@ -124,6 +125,9 @@ function MyUsagePage() {
             </Text>
           </VStack>
           <Spacer />
+          {/* Renders only once the personal project has traces: exploration
+              of usage that exists, not another setup entry point. */}
+          <ConnectYourAgentButton projectId={personalProjectId} />
         </HStack>
 
         {budget.status === "exceeded" && (

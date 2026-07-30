@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -9,7 +9,7 @@ export const runExperimentCommand = async (
   slug: string,
   options: { wait?: boolean },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new ExperimentsApiService();
   const spinner = createSpinner(`Starting experiment "${slug}"...`).start();

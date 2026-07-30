@@ -567,6 +567,25 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
     case "gemini":
     case "google_gemini":
       return { api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY") };
+    // Agent Platform serves Gemini models from a path that names the project
+    // and location, so both travel with the key rather than being derived.
+    // Routing this type to an upstream is `mapProvider`'s job in the Go
+    // gateway (services/aigateway); until that lands the credential
+    // materialises but no traffic is dispatched. Validation does not go
+    // through here — see providerValidation.ts.
+    case "google_agent_platform":
+      return {
+        api_key: pick("GOOGLE_AGENT_PLATFORM_API_KEY"),
+        project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT"),
+        // `region`, not `location`: `buildProviderSlot` below lifts a
+        // slot-level region by looking up exactly that key
+        // (`pickString(credentials, "region")`), the convention every
+        // other regional provider's credentials already follow. Naming it
+        // `location` here — Google's own term, kept as the customer-facing
+        // env var name — would silently leave this provider without a
+        // slot-level region once something reads it.
+        region: pick("GOOGLE_AGENT_PLATFORM_LOCATION"),
+      };
     case "openai":
       return { api_key: pick("OPENAI_API_KEY") };
     case "deepseek":

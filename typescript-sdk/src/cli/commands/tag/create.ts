@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { PromptsApiService } from "@/client-sdk/services/prompts";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { validateTagName } from "./validation";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
@@ -16,7 +16,7 @@ export const tagCreateCommand = async (name: string): Promise<CommandResult | vo
     process.exit(1);
   }
 
-  checkApiKey();
+  await resolveCredentials();
   const service = new PromptsApiService();
   await service.createTag({ name });
   return {

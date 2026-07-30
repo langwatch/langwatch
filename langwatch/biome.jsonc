@@ -295,24 +295,17 @@
 					"complexity": {
 						"noExcessiveNestedTestSuites": "error",
 
-						// Off for test files only, on the same grounds already
-						// written for `e2e/**`: the thing this rule measures is
-						// not a function here.
-						//
-						// CLAUDE.md mandates BDD nesting — `describe("given X")`
-						// wrapping `describe("when Y")` wrapping the `it`s — so
-						// the outermost callback's length is a count of the
-						// scenarios in the file, not of anything tangled. The
-						// only way to get one under 60 lines is to split the
-						// file per scenario or flatten the structure the
-						// standard requires, and both make the suite harder to
-						// read. `noExcessiveNestedTestSuites` above is the rule
-						// that actually governs this shape, and it stays on.
-						//
-						// Severity by measured baseline, same doctrine as the
-						// block above: 2,367 findings across test files, none
-						// of which anyone intends to act on. A rule nobody acts
-						// on is noise that hides the ones they would.
+						// A `describe` callback is a suite declaration, not a
+						// function, and its length counts the cases covered —
+						// the one number a test file is meant to grow. CLAUDE.md
+						// mandates the nested `describe("given …") /
+						// describe("when …")` structure that makes the outer
+						// callback span the whole file, so every well-formed
+						// suite past ~60 lines trips this, and the only edit
+						// that satisfies it splits the file on a boundary the
+						// rule picked rather than the subject did.
+						// `noExcessiveNestedTestSuites` above is the rule that
+						// actually governs the shape of a suite.
 						"noExcessiveLinesPerFunction": "off"
 					}
 				}

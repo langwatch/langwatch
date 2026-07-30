@@ -41,6 +41,9 @@ export function usePromptTabSummary(tabId: string): PromptTabSummary {
   const { latestVersion, isOutdated } = useLatestPromptVersion({
     configId,
     currentVersion: versionNumber,
+    // One instance per open tab, all always mounted: keeping them focus-live
+    // is the N-tab query storm from #5585.
+    isLiveRefetchEnabled: false,
   });
 
   // Derived inside the selector so it returns a boolean. Returning the tab

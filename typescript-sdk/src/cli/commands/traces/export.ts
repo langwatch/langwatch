@@ -1,7 +1,8 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import fs from "fs";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
@@ -31,9 +32,9 @@ export const exportTracesCommand = async (options: {
   limit?: string;
   origin?: string;
 }): Promise<void> => {
-  checkApiKey();
+  await resolveCredentials();
 
-  const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+  const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint = resolveControlPlaneUrl();
 
   const format = options.format ?? "jsonl";

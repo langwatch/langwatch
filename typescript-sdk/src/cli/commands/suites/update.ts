@@ -4,7 +4,7 @@ import {
   SuitesApiService,
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -40,7 +40,7 @@ export const updateSuiteCommand = async (
     description?: string;
   },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new SuitesApiService();
   const spinner = createSpinner(`Updating suite "${id}"...`).start();
