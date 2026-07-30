@@ -23,13 +23,13 @@
 //   cd langwatch/e2e/code-agent
 //   NLP_SERVICE_URL=http://127.0.0.1:5599 npx vitest run auth0-code-agent.scenario.test.ts --reporter=verbose
 
-import { openai } from "@ai-sdk/openai";
-import * as scenario from "@langwatch/scenario";
 import { readFileSync } from "node:fs";
 import * as http from "node:http";
 import type { AddressInfo } from "node:net";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { openai } from "@ai-sdk/openai";
+import * as scenario from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SerializedCodeAgentAdapter } from "../../src/server/scenarios/execution/serialized-adapters/code-agent.adapter";
 
@@ -96,7 +96,9 @@ beforeAll(async () => {
       }
       res
         .writeHead(200, { "content-type": "application/json" })
-        .end(JSON.stringify({ access_token: MINTED_TOKEN, token_type: "Bearer" }));
+        .end(
+          JSON.stringify({ access_token: MINTED_TOKEN, token_type: "Bearer" }),
+        );
     });
   });
   tokenUrl = `${await listen(tokenServer)}/oauth/token`;
@@ -144,7 +146,10 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
         scenarioMappings: {
           message: { type: "source", sourceId: "scenario", path: ["input"] },
           token_url: { type: "value", value: tokenUrl },
-          audience: { type: "value", value: "https://api.acme-scenario.internal" },
+          audience: {
+            type: "value",
+            value: "https://api.acme-scenario.internal",
+          },
           api_url: { type: "value", value: apiUrl },
         },
         scenarioOutputField: "output",
