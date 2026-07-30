@@ -61,7 +61,7 @@ Feature: PR impact map comment
     Then the file is attributed to "SDKs"
 
   Scenario: Lockfiles are attributed to Deps, not to their language
-    Given a pull request changes only "langwatch/pnpm-lock.yaml"
+    Given a pull request changes only "pnpm-lock.yaml"
     When the impact map is built
     Then the file is attributed to "Deps"
     And the map does not report a change to the application

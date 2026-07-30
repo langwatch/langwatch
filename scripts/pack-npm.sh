@@ -133,6 +133,15 @@ EXCLUDES=(
   # fragments.
   --exclude=*-debug.log*
   --exclude=.vercel
+  --exclude=.next
+  --exclude=.turbo
+  --exclude=.pnpm-store
+  # The quickwit dev binary (langwatch/quickwit*) is a local download, not
+  # source — no tracked path anywhere contains the name (the old .npmignore's
+  # `!elastic/quickwit` re-include referenced a directory that no longer
+  # exists), so the bare-name exclude collides with nothing.
+  --exclude=quickwit
+  --exclude=quickwit-*
   --exclude=.sentryclirc
   --exclude=server.log
   --exclude=licenses.json
@@ -270,19 +279,27 @@ if git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   in_tar="$(mktemp)"
   tracked="$(mktemp)"
   tar -tzf "$tarball" | sed 's|^package/app/||' | sort > "$in_tar"
-  # Runtime source only: tests and their fixtures are excluded on purpose.
-  git -C "$ROOT" ls-files langwatch/src langwatch/ee \
-    | grep -vE '__tests__|\.test\.|\.spec\.' | sort > "$tracked"
+  # Every shipped SOURCE tree, not just the app's: a bare name in EXCLUDES
+  # matches at any depth in all of them, and the guard being complete for the
+  # others was previously true only by accident (none happened to contain a
+  # dir named like an exclude). Runtime source only: tests, fixtures and the
+  # secret-shaped names the excludes above deliberately strip are filtered.
+  git -C "$ROOT" ls-files \
+      langwatch/src langwatch/ee \
+      mcp-server/src \
+      packages/handled-error/src packages/langy/src \
+      skills scripts \
+    | grep -vE '__tests__|\.test\.|\.spec\.|(^|/)tests?/|(^|/)\.npmrc$|\.env\.example$' | sort > "$tracked"
   missing="$(comm -23 "$tracked" "$in_tar")"
   rm -f "$in_tar" "$tracked"
   if [ -n "$missing" ]; then
     echo "✗ the tarball is missing application source the repo tracks:" >&2
-    printf '%s\n' "$missing" | head -20 >&2
+    printf '%s\n' "$missing" | head -20 >&2 || true
     echo "  An exclude pattern in this script is too broad — a bare name in" >&2
     echo "  EXCLUDES matches at every depth, not just where it was meant." >&2
     exit 1
   fi
-  echo "→ verified: tarball ships every tracked langwatch/src and langwatch/ee file"
+  echo "→ verified: tarball ships every tracked source file across the shipped trees"
 fi
 
 # Refuse to publish anything secret-shaped.

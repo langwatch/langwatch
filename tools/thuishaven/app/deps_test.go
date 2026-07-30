@@ -111,11 +111,14 @@ func TestDepsStale(t *testing.T) {
 }
 
 // The repo is a single pnpm workspace (ADR-076): the lockfile and node_modules
-// live at the root, and langwatch/ has neither. ensureDeps used to be handed
-// langwatch/, where depsStale found no lockfile and read that as "nothing to
-// install" — so `haven up` in a fresh worktree silently installed nothing and
-// started every service against absent dependencies. Nothing failed loudly;
-// the stack just did not work.
+// live at the root, and langwatch/ has neither. ensureDeps used to trust its
+// caller to pass the root; both call sites passed langwatch/, depsStale found
+// no lockfile there and read that as "nothing to install" — so `haven up` in a
+// fresh worktree silently installed nothing and started every service against
+// absent dependencies. ensureDeps resolves the workspace root itself now, so
+// the test exercises the regression directly: hand it the WRONG directory (the
+// member, exactly what the broken call sites passed) and the install must
+// still land at the root.
 //
 // @scenario A fresh clone needs one install
 func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
@@ -134,35 +137,45 @@ func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
 	}
 
 	t.Run("given a workspace whose lockfile is only at the root", func(t *testing.T) {
-		t.Run("when staleness is judged from langwatch/, it sees nothing to do", func(t *testing.T) {
-			_, lwDir := repo(t)
-			if depsStale(lwDir) {
-				t.Fatal("depsStale(langwatch) = true; the guard below is meaningless if this ever changes")
-			}
-		})
-
-		t.Run("when staleness is judged from the root, the install is required", func(t *testing.T) {
-			root, _ := repo(t)
-			if !depsStale(root) {
-				t.Fatal("depsStale(root) = false, want true — a lockfile with no install stamp must install")
-			}
-		})
-
-		t.Run("when dependencies install, they install at the root", func(t *testing.T) {
+		t.Run("when handed the member directory, the install still runs at the root", func(t *testing.T) {
 			root, lwDir := repo(t)
+			sup := &fakeSupervisor{}
+			o := &Orchestrator{sup: sup, log: zap.NewNop()}
+			if err := o.ensureDeps(context.Background(), lwDir, true); err != nil {
+				t.Fatalf("ensureDeps: %v", err)
+			}
+			if len(sup.dirs) != 1 {
+				t.Fatalf("dirs = %v, want exactly one install", sup.dirs)
+			}
+			if sup.dirs[0] != root {
+				t.Fatalf("install ran in %q, want the workspace root %q", sup.dirs[0], root)
+			}
+		})
+
+		t.Run("when handed the root itself, the install runs there", func(t *testing.T) {
+			root, _ := repo(t)
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
 			if err := o.ensureDeps(context.Background(), root, true); err != nil {
 				t.Fatalf("ensureDeps: %v", err)
 			}
-			if len(sup.dirs) != 1 {
-				t.Fatalf("dirs = %v, want one install", sup.dirs)
+			if len(sup.dirs) != 1 || sup.dirs[0] != root {
+				t.Fatalf("dirs = %v, want one install at %q", sup.dirs, root)
 			}
-			if sup.dirs[0] != root {
-				t.Fatalf("install ran in %q, want the workspace root %q", sup.dirs[0], root)
+		})
+
+		t.Run("when no lockfile exists anywhere above, nothing installs", func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "langwatch")
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatal(err)
 			}
-			if sup.dirs[0] == lwDir {
-				t.Fatal("install ran in langwatch/, which is not the workspace root")
+			sup := &fakeSupervisor{}
+			o := &Orchestrator{sup: sup, log: zap.NewNop()}
+			if err := o.ensureDeps(context.Background(), dir, true); err != nil {
+				t.Fatalf("ensureDeps: %v", err)
+			}
+			if len(sup.dirs) != 0 {
+				t.Fatalf("dirs = %v, want no install", sup.dirs)
 			}
 		})
 	})

@@ -56790,14 +56790,12 @@ The `es-migration` tool reads documents from Elasticsearch and writes them to Cl
 # Clone the repository
 git clone https://github.com/langwatch/langwatch.git
 
-# Navigate to the langwatch workspace
-cd langwatch
-
-# Install dependencies from the langwatch pnpm workspace
+# Install dependencies — the repo is a single pnpm workspace, so one
+# install at the repo root covers everything
 pnpm install
 
 # Navigate to the migration tool
-cd packages/es-migration
+cd langwatch/packages/es-migration
 ```
 
 ### Configure

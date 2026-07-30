@@ -54,7 +54,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 BIOME="$REPO_ROOT/langwatch/node_modules/.bin/biome"
 
 if [ ! -x "$BIOME" ]; then
-  echo "biome not found at $BIOME -- run pnpm install in langwatch/ first" >&2
+  echo "biome not found at $BIOME -- run pnpm install at the repo root first (single workspace, ADR-076)" >&2
   exit 2
 fi
 
