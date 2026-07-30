@@ -176,7 +176,15 @@ jobs:
           # old `^package/(...)` anchor cannot match any path in the staged
           # layout, so it would have passed unconditionally and stopped
           # guarding anything.
-          if tar -tzf "$tarball" | grep -qE "^package/app/(go\.mod|cmd/|pkg/|services/)"; then
+          #
+          # `services/` alone is too broad post-restructure: services/langevals
+          # is Python and IS in package.json's `files[]` (deliberately shipped),
+          # so a blanket services/ match false-positives on every run. Grep for
+          # go.mod/cmd/pkg/services, then subtract the known-non-Go services/
+          # subdirs — anything left under services/ is an unlisted (and thus
+          # unreviewed) directory, which stays worth failing on.
+          if tar -tzf "$tarball" | grep -E "^package/app/(go\.mod|cmd/|pkg/|services/)" \
+              | grep -v "^package/app/services/langevals/" | grep -q .; then
             echo "✗ tarball ships Go source dirs — local-build fallback regression."
             exit 1
           fi

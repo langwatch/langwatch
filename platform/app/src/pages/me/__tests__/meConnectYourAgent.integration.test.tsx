@@ -340,7 +340,7 @@ describe("the docs guide", () => {
   it("contains the exact prompt the menu puts on the clipboard", () => {
     const docsFile = resolve(
       dirname(fileURLToPath(import.meta.url)),
-      "../../../../..",
+      "../../../../../..",
       "docs/ai-governance/explore-your-usage-with-your-own-agent.mdx",
     );
     const contents = readFileSync(docsFile, "utf-8");
