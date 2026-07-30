@@ -72,8 +72,7 @@ function importSpecifiers(source: string): string[] {
   const sideEffect = /(?:^|\n)\s*import\s*["']([^"']+)["']/g;
   const dynamicForm = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
   for (const pattern of [staticForm, sideEffect, dynamicForm]) {
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(source)) !== null) {
+    for (const match of source.matchAll(pattern)) {
       if (match[1] !== undefined) specifiers.push(match[1]);
     }
   }

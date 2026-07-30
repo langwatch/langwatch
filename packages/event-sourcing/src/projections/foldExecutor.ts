@@ -63,7 +63,7 @@ export function createFoldExecutor<State, Event>(
             retentionDays: delivery.retentionDays,
           };
 
-          let read;
+          let read: Awaited<ReturnType<typeof deps.store.read>>;
           try {
             read = await deps.store.read(delivery.key, context);
           } catch (error) {
