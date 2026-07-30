@@ -518,7 +518,9 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
         // A loader that fails the test if the executor still replays history:
         // the whole point of the always-write row is that it never needs to.
         fold.eventLoaderUpTo = async () => {
-          throw new Error("event_log must not be read — the row carries the state");
+          throw new Error(
+            "event_log must not be read — the row carries the state",
+          );
         };
         const executor = new FoldProjectionExecutor();
 
