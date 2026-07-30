@@ -51,10 +51,15 @@ end
 # and raises BadAlias. Helm charts legitimately emit them, and a raise here
 # would abort the whole hardening sweep rather than grading the manifest.
 # Older Psych has no keyword arg, hence the rescue.
+input = ARGF.read
 begin
-  docs = YAML.load_stream(ARGF.read, aliases: true)
+  docs = YAML.load_stream(input, aliases: true)
 rescue ArgumentError
-  docs = YAML.load_stream(ARGF.read)
+  # ARGF.read is a STREAM — reading it twice returns "" the second time, so the
+  # fallback must reuse the buffered input. Getting this wrong yielded zero
+  # documents and the report printed nothing, which the harness surfaced as
+  # "rendered no containers" for every workload.
+  docs = YAML.load_stream(input)
 end
 
 docs.each do |doc|
