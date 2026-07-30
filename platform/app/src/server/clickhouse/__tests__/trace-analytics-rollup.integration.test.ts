@@ -27,7 +27,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+import type { TraceAnalyticsRollupRow } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.repository";
 import {
   startTestContainers,
   stopTestContainers,

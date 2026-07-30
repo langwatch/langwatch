@@ -1,9 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { CodingAgentTraceSessionRecord } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentTraceSessions.mapProjection";
-import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
+import type { CodingAgentTraceSession } from "~/server/event-sourcing/coding-agent-processing/schema";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
 
@@ -18,7 +17,7 @@ const logger = createLogger(
  */
 export interface CodingAgentTraceSessionRepository {
   ensure(
-    records: CodingAgentTraceSessionRecord[],
+    records: CodingAgentTraceSession[],
     retentionDays?: number,
   ): Promise<void>;
 
@@ -26,7 +25,7 @@ export interface CodingAgentTraceSessionRepository {
   findByTraceId(params: {
     tenantId: string;
     traceId: string;
-  }): Promise<CodingAgentTraceSessionRecord | null>;
+  }): Promise<CodingAgentTraceSession | null>;
 }
 
 /** No-op store for deployments without ClickHouse. */
@@ -37,7 +36,7 @@ export class NullCodingAgentTraceSessionRepository
     // no-op
   }
 
-  async findByTraceId(): Promise<CodingAgentTraceSessionRecord | null> {
+  async findByTraceId(): Promise<CodingAgentTraceSession | null> {
     return null;
   }
 }
@@ -57,13 +56,13 @@ export class CodingAgentTraceSessionClickHouseRepository
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async ensure(
-    records: CodingAgentTraceSessionRecord[],
+    records: CodingAgentTraceSession[],
     retentionDays?: number,
   ): Promise<void> {
     if (records.length === 0) return;
 
     const tenantId = records[0]!.tenantId;
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.ensure",
     );
@@ -85,7 +84,7 @@ export class CodingAgentTraceSessionClickHouseRepository
       TenantId: record.tenantId,
       TraceId: record.traceId,
       SessionId: record.sessionId,
-      OccurredAt: new Date(record.occurredAtMs),
+      OccurredAt: new Date(record.occurredAt),
       UpdatedAt: now,
       _retention_days: retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     }));
@@ -131,8 +130,8 @@ export class CodingAgentTraceSessionClickHouseRepository
   }: {
     tenantId: string;
     traceId: string;
-  }): Promise<CodingAgentTraceSessionRecord | null> {
-    EventUtils.validateTenantId(
+  }): Promise<CodingAgentTraceSession | null> {
+    validateTenantId(
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
     );
@@ -169,7 +168,7 @@ export class CodingAgentTraceSessionClickHouseRepository
       tenantId,
       traceId: first.TraceId,
       sessionId: first.SessionId,
-      occurredAtMs: new Date(first.OccurredAt).getTime(),
+      occurredAt: new Date(first.OccurredAt).getTime(),
     };
   }
 }

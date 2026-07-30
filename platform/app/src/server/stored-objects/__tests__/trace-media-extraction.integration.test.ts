@@ -42,8 +42,8 @@ import {
 } from "../../app-layer/traces/edge-media-extraction";
 import { maybeSpool } from "../../app-layer/traces/edge-spool";
 import { COMMAND_INLINE_THRESHOLD } from "../../app-layer/traces/lean-for-projection";
-import type { RecordSpanCommandData } from "../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
-import type { OtlpSpan } from "../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
+import type { RecordSpanCommandData } from "~/server/app-layer/traces/ingest/recordSpanCommand";
+import type { OtlpSpan } from "~/server/app-layer/traces/ingest/otlp";
 import { extractInlineMediaFromEvent } from "../content-extractor";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";

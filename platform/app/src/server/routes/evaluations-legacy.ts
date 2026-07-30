@@ -1158,29 +1158,31 @@ async function handleEvaluatorCall(
     };
   } finally {
     await getApp()
-      .evaluations.reportEvaluation({
-        tenantId: project.id,
-        evaluationId,
-        evaluatorId,
-        evaluatorType: checkType!,
-        evaluatorName:
-          evaluatorName ?? monitor?.name ?? params.name ?? undefined,
-        traceId: params.trace_id ?? undefined,
-        isGuardrail: isGuardrail ?? undefined,
-        status: result!.status,
-        score: "score" in result! ? result!.score : undefined,
-        passed: "passed" in result! ? result!.passed : undefined,
-        label: "label" in result! ? result!.label : undefined,
-        details: "details" in result! ? result!.details : undefined,
-        costId: costId ?? null,
-        occurredAt: Date.now(),
-        error:
-          result!.status === "error"
-            ? "details" in result!
-              ? result!.details
-              : undefined
-            : undefined,
-      })
+      .evaluations.report(
+        {
+          evaluationId,
+          evaluatorId,
+          evaluatorType: checkType!,
+          evaluatorName:
+            evaluatorName ?? monitor?.name ?? params.name ?? undefined,
+          traceId: params.trace_id ?? undefined,
+          isGuardrail: isGuardrail ?? undefined,
+          status: result!.status,
+          score: "score" in result! ? result!.score : undefined,
+          passed: "passed" in result! ? result!.passed : undefined,
+          label: "label" in result! ? result!.label : undefined,
+          details: "details" in result! ? result!.details : undefined,
+          costId: costId ?? null,
+          occurredAt: Date.now(),
+          error:
+            result!.status === "error"
+              ? "details" in result!
+                ? result!.details
+                : undefined
+              : undefined,
+        },
+        { tenantId: project.id },
+      )
       .catch((eventError: unknown) => {
         captureException(toError(eventError), {
           extra: {
@@ -1312,14 +1314,16 @@ const dispatchToClickHouse = async (
   const targets = mapEsTargetsToTargets(batchEvaluation.targets ?? []);
 
   try {
-    await getApp().experimentRuns.startExperimentRun({
-      tenantId: project.id,
-      runId,
-      experimentId,
-      total: batchEvaluation.total || batchEvaluation.dataset.length,
-      targets,
-      occurredAt: Date.now(),
-    });
+    await getApp().experimentRuns.startExperimentRun(
+      {
+        runId,
+        experimentId,
+        total: batchEvaluation.total || batchEvaluation.dataset.length,
+        targets,
+        occurredAt: Date.now(),
+      },
+      { tenantId: project.id },
+    );
   } catch (error) {
     logger.error(
       { error, runId, projectId: project.id },
@@ -1331,21 +1335,23 @@ const dispatchToClickHouse = async (
   const resultPromises = [
     ...batchEvaluation.dataset.map((entry) =>
       getApp()
-        .experimentRuns.recordTargetResult({
-          tenantId: project.id,
-          runId,
-          experimentId,
-          index: entry.index,
-          targetId: entry.target_id ?? "",
-          entry: entry.entry,
-          predicted: entry.predicted ?? undefined,
-          cost: entry.cost ?? undefined,
-          duration: entry.duration ?? undefined,
-          error: entry.error ?? undefined,
-          traceId: entry.trace_id ?? undefined,
-          targets,
-          occurredAt: Date.now(),
-        })
+        .experimentRuns.recordTargetResult(
+          {
+            runId,
+            experimentId,
+            index: entry.index,
+            targetId: entry.target_id ?? "",
+            entry: entry.entry,
+            predicted: entry.predicted ?? undefined,
+            cost: entry.cost ?? undefined,
+            duration: entry.duration ?? undefined,
+            error: entry.error ?? undefined,
+            domainError: null,
+            traceId: entry.trace_id ?? undefined,
+            occurredAt: Date.now(),
+          },
+          { tenantId: project.id },
+        )
         .catch((err) => {
           logger.warn(
             {
@@ -1360,28 +1366,32 @@ const dispatchToClickHouse = async (
     ),
     ...batchEvaluation.evaluations.map((evaluation) =>
       getApp()
-        .experimentRuns.recordEvaluatorResult({
-          tenantId: project.id,
-          runId,
-          experimentId,
-          index: evaluation.index,
-          targetId: evaluation.target_id ?? "",
-          evaluatorId: evaluation.evaluator,
-          evaluatorName: evaluation.name ?? undefined,
-          status: evaluation.status,
-          score:
-            typeof evaluation.score === "number" ? evaluation.score : undefined,
-          label: evaluation.label ?? undefined,
-          passed: evaluation.passed ?? undefined,
-          details: evaluation.details ?? undefined,
-          cost: evaluation.cost ?? undefined,
-          inputs: evaluation.inputs ?? undefined,
-          duration:
-            typeof evaluation.duration === "number"
-              ? evaluation.duration
-              : undefined,
-          occurredAt: Date.now(),
-        })
+        .experimentRuns.recordEvaluatorResult(
+          {
+            runId,
+            experimentId,
+            index: evaluation.index,
+            targetId: evaluation.target_id ?? "",
+            evaluatorId: evaluation.evaluator,
+            evaluatorName: evaluation.name ?? undefined,
+            status: evaluation.status,
+            score:
+              typeof evaluation.score === "number"
+                ? evaluation.score
+                : undefined,
+            label: evaluation.label ?? undefined,
+            passed: evaluation.passed ?? undefined,
+            details: evaluation.details ?? undefined,
+            cost: evaluation.cost ?? undefined,
+            inputs: evaluation.inputs ?? undefined,
+            duration:
+              typeof evaluation.duration === "number"
+                ? evaluation.duration
+                : undefined,
+            occurredAt: Date.now(),
+          },
+          { tenantId: project.id },
+        )
         .catch((err) => {
           logger.warn(
             {
@@ -1402,14 +1412,15 @@ const dispatchToClickHouse = async (
     batchEvaluation.timestamps.stopped_at
   ) {
     try {
-      await getApp().experimentRuns.completeExperimentRun({
-        tenantId: project.id,
-        runId,
-        experimentId,
-        finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
-        stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
-        occurredAt: Date.now(),
-      });
+      await getApp().experimentRuns.completeExperimentRun(
+        {
+          runId,
+          experimentId,
+          finishedAt: batchEvaluation.timestamps.finished_at ?? undefined,
+          stoppedAt: batchEvaluation.timestamps.stopped_at ?? undefined,
+        },
+        { tenantId: project.id },
+      );
     } catch (error) {
       logger.warn(
         { error, runId, projectId: project.id },
@@ -1424,20 +1435,24 @@ const dispatchToClickHouse = async (
       const targetId = evaluation.target_id ?? "";
       const evaluationId = `local_eval_${runId}_${evaluation.evaluator}_${evaluation.index}_${targetId}`;
       return appInstance.evaluations
-        .reportEvaluation({
-          tenantId: project.id,
-          evaluationId,
-          evaluatorId: evaluation.evaluator,
-          evaluatorType: evaluation.evaluator,
-          evaluatorName: evaluation.name ?? undefined,
-          status: evaluation.status,
-          score:
-            typeof evaluation.score === "number" ? evaluation.score : undefined,
-          passed: evaluation.passed ?? undefined,
-          label: evaluation.label ?? undefined,
-          details: evaluation.details ?? undefined,
-          occurredAt: Date.now(),
-        })
+        .report(
+          {
+            evaluationId,
+            evaluatorId: evaluation.evaluator,
+            evaluatorType: evaluation.evaluator,
+            evaluatorName: evaluation.name ?? undefined,
+            status: evaluation.status,
+            score:
+              typeof evaluation.score === "number"
+                ? evaluation.score
+                : undefined,
+            passed: evaluation.passed ?? undefined,
+            label: evaluation.label ?? undefined,
+            details: evaluation.details ?? undefined,
+            occurredAt: Date.now(),
+          },
+          { tenantId: project.id },
+        )
         .catch((err) => {
           logger.warn(
             { err, evaluationId, evaluator: evaluation.evaluator },

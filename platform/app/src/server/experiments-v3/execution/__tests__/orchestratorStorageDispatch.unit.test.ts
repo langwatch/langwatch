@@ -92,7 +92,6 @@ describe("buildTargetMetadata", () => {
 
 describe("buildTargetResultDispatch", () => {
   const base = {
-    tenantId: "project-1",
     runId: "run-1",
     experimentId: "experiment-1",
     datasetEntry: { question: "q" },
@@ -162,7 +161,6 @@ describe("buildTargetResultDispatch", () => {
 
       expect(dispatch).toEqual(
         expect.objectContaining({
-          tenantId: "project-1",
           runId: "run-1",
           experimentId: "experiment-1",
           index: 2,

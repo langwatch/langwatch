@@ -1,4 +1,134 @@
-import type { CodingAgentSessionRow } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+/**
+ * How far either side of a caller's `startedAtMs` hint a session read looks —
+ * the same width the coding-agent session fold declares for its own store read.
+ */
+export const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * One converged metric unit, as it rides in the row's `MetricSeries` column
+ * (migration 00053). Mirrors the fold's metric-series fact but with the
+ * nullable attribute fields flattened to empty strings for the ClickHouse
+ * tuple; they map back to null on read-back.
+ */
+export interface CodingAgentSessionMetricSeriesRow {
+  seriesId: string;
+  metricName: string;
+  type: string;
+  decision: string;
+  language: string;
+  value: number;
+}
+
+/**
+ * The row that lands in `coding_agent_sessions` (migration 00051, extended by
+ * 00053). Field names mirror the ClickHouse columns 1:1 so the repository's
+ * record literal is a straight mapping.
+ */
+export interface CodingAgentSessionRow {
+  tenantId: string;
+  sessionId: string;
+  sessionKeySource: string;
+  version: string;
+  startedAtMs: number;
+
+  agent: string;
+  agentVersion: string;
+  /** Every trace that contributed — bounded, first-seen order. */
+  traceIds: string[];
+  finalRequestId: string;
+  userId: string;
+  terminalType: string;
+  entrypoint: string;
+
+  modelCalls: number;
+  toolCalls: number;
+  subAgents: number;
+  prompts: number;
+  promptChars: number;
+  responseChars: number;
+  /** `(name, count, failed)`, in the order they happened. */
+  steps: [string, number, boolean][];
+
+  toolCounts: Record<string, number>;
+  toolDurationMs: Record<string, number>;
+  filesTouched: string[];
+  skills: string[];
+  subAgentTypes: string[];
+  slashCommands: string[];
+  models: string[];
+  mcpServers: string[];
+  mcpTools: string[];
+
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+
+  modelCallMs: number;
+  toolMs: number;
+  ttftMsTotal: number;
+  ttftSamples: number;
+  blockedOnUserMs: number;
+  activeTimeUserSec: number;
+  activeTimeCliSec: number;
+
+  toolResultBytes: number;
+  toolInputBytes: number;
+  compactions: number;
+  compactionTokensBefore: number;
+  compactionTokensAfter: number;
+  peakContextTokens: number;
+  cacheRebuildCount: number;
+  largestCacheRebuildTokens: number;
+
+  failedTools: number;
+  errorTypes: Record<string, number>;
+  apiErrors: number;
+  rateLimited: number;
+  retriesExhausted: number;
+  retryMs: number;
+  attempts: number;
+  refusals: number;
+  refusalCategories: string[];
+  internalErrors: number;
+
+  toolsDenied: number;
+  toolsAborted: number;
+  permissionMode: string;
+  permissionChanges: number;
+  hooksBlocked: number;
+  hooksCancelled: number;
+  hookMs: number;
+
+  linesAdded: number;
+  linesRemoved: number;
+  commits: number;
+  pullRequests: number;
+  editsAccepted: number;
+  editsRejected: number;
+  languagesEdited: string[];
+  atMentions: number;
+
+  stopReason: string;
+  truncated: boolean;
+
+  // ── Read-back state (ADR-099, migration 00053) ─────────────────────────
+  // Not analytics columns — these round-trip the fold's working state so
+  // store.get() can read it back (decode the row) without replaying event_log.
+  /** The dedup set behind `subAgents`; the row keeps count + types, plus this. */
+  subAgentIds: string[];
+  /** Per-step start times, index-aligned with `steps` (dropped by the 3-tuple). */
+  stepStartedAt: number[];
+  /** Previous model call's context size, to detect the next cache rebuild. */
+  previousCallContextTokens: number;
+  /** The converged metric units the metric-fed fields are recomputed from. */
+  metricSeries: CodingAgentSessionMetricSeriesRow[];
+  /** Fold bookkeeping timestamps (createdAt/updatedAt map to CreatedAt/UpdatedAt). */
+  createdAt: number;
+  updatedAt: number;
+  lastEventOccurredAt: number;
+}
 
 /**
  * Persistence for the coding-agent session row (ADR-056, migration 00051).

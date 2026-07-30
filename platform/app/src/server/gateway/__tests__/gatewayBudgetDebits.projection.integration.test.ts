@@ -5,7 +5,7 @@
  *
  * Exercises the full write-and-read loop with REAL PG + REAL CH, NO MOCKS:
  *
- *   projection.map(span_received)      → GatewayBudgetDebitRecord
+ *   map.apply(span_received delivery)  → GatewayBudgetDebitRecord
  *     → store.append()                 → resolve budgets (PG) → insertDebit()
  *     → gateway_budget_ledger_events   (ReplacingMergeTree)
  *     → MV fires into gateway_budget_scope_totals (AggregatingMergeTree)
@@ -34,20 +34,13 @@
  * revision feed).
  */
 
-import type { GatewayBudgetDebitRecord } from "@ee/governance/projections/gatewayBudgetDebits.mapProjection";
 import { createGatewayBudgetDebitsProjection } from "@ee/governance/projections/governanceProjections.composition";
 import { createVirtualKeyLastUsedSubscriber } from "@ee/governance/subscribers/virtualKeyLastUsed.subscriber";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import {
-  createSpanReceivedEvent,
-  msToUnixNano,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
-import type {
-  SpanReceivedEvent,
-  TraceProcessingEvent,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import { canonicalSpan } from "~/server/event-sourcing/trace-processing/__tests__/fixtures";
+import type { CanonicalSpan } from "~/server/event-sourcing/trace-processing/schema";
 import {
   startTestContainers,
   stopTestContainers,
@@ -56,6 +49,9 @@ import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.reposito
 import { GatewayBudgetRepository } from "../budget.repository";
 import { GatewayBudgetService } from "../budget.service";
 import { ChangeEventRepository } from "../changeEvent.repository";
+
+/** The wire event type both the map and the subscriber subscribe to. */
+const SPAN_RECEIVED = "lw.obs.trace.span_received";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-${suffix}`;
@@ -73,37 +69,23 @@ const OTHER_USER_ID = `usr-other-${suffix}`;
 const OTHER_VK_ID = `vk_other_${suffix}`;
 
 /**
- * The projection prices a request off the span's own provider-reported tokens
- * and the per-token rates on it, so a test states a cost by stating those.
- * `pricingFor` splits the target cost evenly across the two rates, so $0.0125
- * is stated as $6.25e-6 per input token and $1.25e-5 per output token — the
- * same figure the reactor's tests asserted when they handed the fold a
- * `totalCost` directly.
+ * The canonical span carries cost and tokens as typed fields, priced upstream
+ * of the projection, so a test states a cost by stating it.
  */
 const DEFAULT_COST_USD = 0.0125;
 const INPUT_TOKENS = 1000;
 const OUTPUT_TOKENS = 500;
 
-function pricingFor(costUsd: number): Record<string, string | number> {
-  // Split the target cost evenly across the two rates so both are exercised.
-  return {
-    "gen_ai.request.model": "gpt-5-mini",
-    "gen_ai.usage.input_tokens": INPUT_TOKENS,
-    "gen_ai.usage.output_tokens": OUTPUT_TOKENS,
-    "langwatch.model.inputCostPerToken": costUsd / 2 / INPUT_TOKENS,
-    "langwatch.model.outputCostPerToken": costUsd / 2 / OUTPUT_TOKENS,
-  };
-}
-
 /**
- * One gateway span, as it arrives on the wire.
+ * One gateway span, canonicalised — what `recordSpan` commits and the map
+ * projection reads.
  *
  * `startedAtMs` defaults to now on purpose: the span's own start time is what
  * the rollup buckets `PeriodStart` from, so a debit stamped at the fixture's
- * canned 2023 timestamp would land in a period this month's budget never
- * reads and every spend assertion below would read zero.
+ * canned timestamp would land in a period this month's budget never reads and
+ * every spend assertion below would read zero.
  */
-function gatewaySpanEvent({
+function gatewaySpan({
   gatewayRequestId,
   virtualKeyId = VK_ID,
   tenantId = PROJECT_ID,
@@ -115,17 +97,26 @@ function gatewaySpanEvent({
   tenantId?: string;
   costUsd?: number;
   startedAtMs?: number;
-}): SpanReceivedEvent {
-  return createSpanReceivedEvent({
-    eventId: `evt-${nanoid()}`,
+}): CanonicalSpan {
+  return canonicalSpan({
     tenantId,
     traceId: nanoid(32),
     spanId: nanoid(16),
-    startTimeUnixNano: msToUnixNano(startedAtMs),
-    endTimeUnixNano: msToUnixNano(startedAtMs + 1234),
-    statusCode: 1,
+    startTimeUnixMs: startedAtMs,
+    endTimeUnixMs: startedAtMs + 1234,
+    occurredAt: startedAtMs,
+    statusCode: "OK",
+    model: "gpt-5-mini",
+    usage: {
+      inputTokens: INPUT_TOKENS,
+      outputTokens: OUTPUT_TOKENS,
+      reasoningTokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
+      estimated: false,
+    },
+    cost: { cost: costUsd, nonBilledCost: null },
     attributes: {
-      ...pricingFor(costUsd),
       "langwatch.virtual_key_id": virtualKeyId,
       "langwatch.gateway_request_id": gatewayRequestId,
     },
@@ -155,29 +146,26 @@ function budgetDebitsProjection(
   });
 }
 
-/** Derive one span's debit and write it, as the live per-event path does. */
+/** One span's delivery, as the live per-event path delivers it. */
 async function derive(
   projection: ReturnType<typeof budgetDebitsProjection>,
-  event: SpanReceivedEvent,
+  span: CanonicalSpan,
 ): Promise<void> {
-  const record = projection.map(event);
-  if (!record) throw new Error("gateway span derived no debit record");
-  await projection.store.append(record, {
-    aggregateId: event.aggregateId,
-    tenantId: event.tenantId,
+  const { written } = await projection.map.apply({
+    tenantId: span.tenantId,
+    events: [{ type: SPAN_RECEIVED, data: span }],
   });
+  if (written === 0) throw new Error("gateway span derived no debit record");
 }
 
-/** Derive a window of spans and write them as replay's bulk path does. */
+/** A window of spans in one delivery — the batch path a replay drives. */
 async function deriveWindow(
   projection: ReturnType<typeof budgetDebitsProjection>,
-  events: SpanReceivedEvent[],
+  spans: CanonicalSpan[],
 ): Promise<void> {
-  const records = events
-    .map((event) => projection.map(event))
-    .filter((record): record is GatewayBudgetDebitRecord => record !== null);
-  await projection.store.bulkAppend!(records, {
+  await projection.map.apply({
     tenantId: PROJECT_ID,
+    events: spans.map((span) => ({ type: SPAN_RECEIVED, data: span })),
   });
 }
 
@@ -346,7 +334,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
 
       await derive(
         budgetDebitsProjection(chRepo),
-        gatewaySpanEvent({ gatewayRequestId: `req-${suffix}-1` }),
+        gatewaySpan({ gatewayRequestId: `req-${suffix}-1` }),
       );
 
       // Read via service — this exercises the full /budget/check CH path
@@ -405,9 +393,9 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       // the gateway request id is stable — so this is the shape a redelivery
       // actually has, not the same object handed over three times.
       const reqId = `req-${suffix}-idempotent`;
-      await derive(projection, gatewaySpanEvent({ gatewayRequestId: reqId }));
-      await derive(projection, gatewaySpanEvent({ gatewayRequestId: reqId }));
-      await derive(projection, gatewaySpanEvent({ gatewayRequestId: reqId }));
+      await derive(projection, gatewaySpan({ gatewayRequestId: reqId }));
+      await derive(projection, gatewaySpan({ gatewayRequestId: reqId }));
+      await derive(projection, gatewaySpan({ gatewayRequestId: reqId }));
 
       // One request's cost, not three. If the ledger's replay guard failed
       // we would see 3 x $0.0125 here.
@@ -447,7 +435,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       Array.from({ length: N }, (_, i) =>
         derive(
           projection,
-          gatewaySpanEvent({
+          gatewaySpan({
             gatewayRequestId: `req-${suffix}-burst-${i}`,
             costUsd: PER_REQUEST_COST,
           }),
@@ -479,17 +467,17 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
      */
     it("reports the failure rather than swallowing the spend", async () => {
       const failingChRepo = {
-        insertDebit: async () => {
+        insertDebits: async () => {
           throw new Error("simulated ClickHouse insert failure");
         },
       } as unknown as GatewayBudgetClickHouseRepository;
       const projection = budgetDebitsProjection(failingChRepo);
-      const event = gatewaySpanEvent({
+      const span = gatewaySpan({
         gatewayRequestId: `req-${suffix}-ch-error`,
         costUsd: 0.0001,
       });
 
-      await expect(derive(projection, event)).rejects.toThrow(
+      await expect(derive(projection, span)).rejects.toThrow(
         "simulated ClickHouse insert failure",
       );
     }, 30_000);
@@ -504,7 +492,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       // against a healthy ledger.
       await derive(
         projection,
-        gatewaySpanEvent({
+        gatewaySpan({
           gatewayRequestId: `req-${suffix}-ch-error`,
           costUsd: 0.0001,
         }),
@@ -540,7 +528,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       for (let i = 0; i < N; i++) {
         await derive(
           projection,
-          gatewaySpanEvent({ gatewayRequestId: reqId, costUsd: 0.0001 }),
+          gatewaySpan({ gatewayRequestId: reqId, costUsd: 0.0001 }),
         );
       }
 
@@ -570,7 +558,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       await deriveWindow(
         projection,
         windowRequestIds.map((gatewayRequestId) =>
-          gatewaySpanEvent({ gatewayRequestId, costUsd: PER_REQUEST_COST }),
+          gatewaySpan({ gatewayRequestId, costUsd: PER_REQUEST_COST }),
         ),
       );
 
@@ -589,7 +577,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       await deriveWindow(
         projection,
         windowRequestIds.map((gatewayRequestId) =>
-          gatewaySpanEvent({ gatewayRequestId, costUsd: PER_REQUEST_COST }),
+          gatewaySpan({ gatewayRequestId, costUsd: PER_REQUEST_COST }),
         ),
       );
 
@@ -609,7 +597,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       await deriveWindow(
         projection,
         [...windowRequestIds, lostRequestId].map((gatewayRequestId) =>
-          gatewaySpanEvent({ gatewayRequestId, costUsd: PER_REQUEST_COST }),
+          gatewaySpan({ gatewayRequestId, costUsd: PER_REQUEST_COST }),
         ),
       );
 
@@ -637,7 +625,7 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
 
       await derive(
         projection,
-        gatewaySpanEvent({
+        gatewaySpan({
           gatewayRequestId: `req-${suffix}-cross-tenant`,
           virtualKeyId: OTHER_VK_ID,
           costUsd: 0.5,
@@ -673,10 +661,13 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       expect(before?.lastUsedAt).toBeNull();
 
       await subscriber.handle(
-        gatewaySpanEvent({
-          gatewayRequestId: `req-${suffix}-last-used`,
-        }) as unknown as TraceProcessingEvent,
-        { tenantId: PROJECT_ID, aggregateId: `trace-${suffix}` },
+        {
+          type: SPAN_RECEIVED,
+          data: gatewaySpan({
+            gatewayRequestId: `req-${suffix}-last-used`,
+          }),
+        },
+        { tenantId: PROJECT_ID, now: Date.now() },
       );
 
       const after = await prisma.virtualKey.findUnique({
@@ -690,11 +681,14 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
       const subscriber = createVirtualKeyLastUsedSubscriber({ prisma });
 
       await subscriber.handle(
-        gatewaySpanEvent({
-          gatewayRequestId: `req-${suffix}-last-used-cross`,
-          virtualKeyId: OTHER_VK_ID,
-        }) as unknown as TraceProcessingEvent,
-        { tenantId: PROJECT_ID, aggregateId: `trace-${suffix}` },
+        {
+          type: SPAN_RECEIVED,
+          data: gatewaySpan({
+            gatewayRequestId: `req-${suffix}-last-used-cross`,
+            virtualKeyId: OTHER_VK_ID,
+          }),
+        },
+        { tenantId: PROJECT_ID, now: Date.now() },
       );
 
       const other = await prisma.virtualKey.findUnique({

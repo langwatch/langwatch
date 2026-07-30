@@ -49,7 +49,7 @@ import {
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
+} from "~/server/app-layer/traces/ingest/constants";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import {
   startTestContainers,

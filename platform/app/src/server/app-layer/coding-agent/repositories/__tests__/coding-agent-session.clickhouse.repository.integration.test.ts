@@ -17,13 +17,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { CODING_AGENT_SESSION_STATE_VERSION } from "~/server/event-sourcing/coding-agent-processing/codingAgentSession.projection";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/test-utils/integration/testContainers";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session.clickhouse.repository";
+import type { CodingAgentSessionRow } from "../coding-agent-session.repository";
 import { CodingAgentTraceSessionClickHouseRepository } from "../coding-agent-trace-session.repository";
 import { SessionMetricSeriesClickHouseRepository } from "../session-metric-series.repository";
 
@@ -43,7 +43,7 @@ function sessionRow(
     tenantId,
     sessionId: `${tag}-s`,
     sessionKeySource: "provider",
-    version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+    version: CODING_AGENT_SESSION_STATE_VERSION,
     startedAtMs: baseMs,
     agent: "claude_code",
     agentVersion: "2.0.0",
@@ -379,7 +379,7 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
           TenantId: tenantId,
           SessionId: sessionId,
           StartedAt: new Date(baseMs),
-          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+          Version: CODING_AGENT_SESSION_STATE_VERSION,
         },
       ],
       format: "JSONEachRow",
@@ -404,7 +404,7 @@ describe("coding_agent_trace_sessions map (migration 00051)", () => {
           tenantId,
           traceId: `${tag}-trace-x`,
           sessionId: `${tag}-sess-x`,
-          occurredAtMs: baseMs,
+          occurredAt: baseMs,
         },
       ],
       30,

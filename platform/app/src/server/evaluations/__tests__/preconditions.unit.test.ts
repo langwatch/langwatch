@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExecuteEvaluationCommandData } from "../../event-sourcing.old/pipelines/evaluation-processing/schemas/commands";
+import type { ExecuteEvaluationInput } from "~/server/event-sourcing/evaluation-processing/services/executeEvaluation";
 import type { RAGChunk, RAGSpan, Span } from "../../tracer/types";
 import {
   buildPreconditionTraceDataFromCommand,
@@ -1511,8 +1511,8 @@ describe("buildPreconditionTraceDataFromTrace()", () => {
 
 describe("buildPreconditionTraceDataFromCommand()", () => {
   function makeCommandData(
-    overrides: Partial<ExecuteEvaluationCommandData> = {},
-  ): ExecuteEvaluationCommandData {
+    overrides: Partial<ExecuteEvaluationInput> = {},
+  ): ExecuteEvaluationInput {
     return {
       tenantId: "tenant_1",
       traceId: "trace_1",

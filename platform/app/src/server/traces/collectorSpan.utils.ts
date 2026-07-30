@@ -4,7 +4,7 @@ import type {
   OtlpKeyValue,
   OtlpResource,
   OtlpSpan,
-} from "../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
+} from "~/server/app-layer/traces/ingest/otlp";
 import type {
   CustomMetadata,
   ReservedTraceMetadata,

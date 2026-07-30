@@ -1,13 +1,12 @@
 import {
-  CODING_AGENT_SESSION_READ_WINDOW_MS,
-  type CodingAgentSessionRow,
-} from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import {
   normalizeMetricName,
   normalizeTokenType,
-} from "~/server/event-sourcing.old/pipelines/coding-agent-processing/services/coding-agent-normalization";
-import { readWindowAround } from "~/server/event-sourcing.old/projections/projectionStoreContext";
-import type { CodingAgentSessionRepository } from "./repositories/coding-agent-session.repository";
+} from "~/server/event-sourcing/coding-agent-processing/coding-agent-normalization";
+import {
+  CODING_AGENT_SESSION_READ_WINDOW_MS,
+  type CodingAgentSessionRepository,
+  type CodingAgentSessionRow,
+} from "./repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "./repositories/coding-agent-trace-session.repository";
 import type {
   SessionMetricSeriesRepository,
@@ -70,10 +69,10 @@ export class CodingAgentSessionService {
   }): Promise<CodingAgentSessionRow | null> {
     const window =
       startedAtMs !== undefined
-        ? readWindowAround({
-            anchorMs: startedAtMs,
-            widthMs: CODING_AGENT_SESSION_READ_WINDOW_MS,
-          })
+        ? {
+            fromMs: startedAtMs - CODING_AGENT_SESSION_READ_WINDOW_MS,
+            toMs: startedAtMs + CODING_AGENT_SESSION_READ_WINDOW_MS,
+          }
         : undefined;
     const row =
       (await this.sessions.findBySessionId({
@@ -113,7 +112,7 @@ export class CodingAgentSessionService {
     return this.getBySessionId({
       projectId,
       sessionId: mapping.sessionId,
-      startedAtMs: mapping.occurredAtMs,
+      startedAtMs: mapping.occurredAt,
     });
   }
 

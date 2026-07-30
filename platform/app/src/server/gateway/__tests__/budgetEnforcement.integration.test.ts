@@ -20,10 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import {
-  createSpanReceivedEvent,
-  msToUnixNano,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
+import { canonicalSpan } from "~/server/event-sourcing/trace-processing/__tests__/fixtures";
 import {
   startTestContainers,
   stopTestContainers,
@@ -50,19 +47,10 @@ const PRE_BUDGET_ID = `bdg-preutc-${suffix}`;
 /** $0.001 per request against a $0.005 ceiling: 20% a request. */
 const LIMIT_USD = "0.005";
 
-/**
- * The projection prices each request off the span's own tokens rather than
- * taking a total handed to it, so the per-request cost is expressed the way
- * the gateway expresses it: token counts and per-token rates. 100 x $5e-6 plus
- * 50 x $1e-5 is the $0.001 the ladder below is calibrated on.
- */
-const REQUEST_ATTRIBUTES = {
-  "gen_ai.request.model": "gpt-5-mini",
-  "gen_ai.usage.input_tokens": 100,
-  "gen_ai.usage.output_tokens": 50,
-  "langwatch.model.inputCostPerToken": 0.000005,
-  "langwatch.model.outputCostPerToken": 0.00001,
-} as const;
+/** The per-request cost the ladder below is calibrated on: 20% of LIMIT_USD. */
+const REQUEST_COST_USD = 0.001;
+const REQUEST_INPUT_TOKENS = 100;
+const REQUEST_OUTPUT_TOKENS = 50;
 
 /**
  * Records one gateway request's spend the way production does: derive the
@@ -86,27 +74,35 @@ async function recordRequestFor({
   // buckets `PeriodStart` from, so a debit stamped anywhere but "now" lands in
   // a period today's DAY budget never reads.
   const startedAtMs = Date.now();
-  const event = createSpanReceivedEvent({
-    eventId: `evt-${nanoid()}`,
+  const span = canonicalSpan({
     tenantId: projectId,
     traceId: nanoid(32),
     spanId: nanoid(16),
-    startTimeUnixNano: msToUnixNano(startedAtMs),
-    endTimeUnixNano: msToUnixNano(startedAtMs + 120),
-    statusCode: 1,
+    startTimeUnixMs: startedAtMs,
+    endTimeUnixMs: startedAtMs + 120,
+    occurredAt: startedAtMs,
+    statusCode: "OK",
+    model: "gpt-5-mini",
+    usage: {
+      inputTokens: REQUEST_INPUT_TOKENS,
+      outputTokens: REQUEST_OUTPUT_TOKENS,
+      reasoningTokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
+      estimated: false,
+    },
+    cost: { cost: REQUEST_COST_USD, nonBilledCost: null },
     attributes: {
-      ...REQUEST_ATTRIBUTES,
       "langwatch.virtual_key_id": virtualKeyId,
       "langwatch.gateway_request_id": `grq_${nanoid()}`,
     },
   });
 
-  const record = projection.map(event);
-  if (!record) throw new Error("gateway span derived no debit record");
-  await projection.store.append(record, {
-    aggregateId: event.aggregateId,
+  const { written } = await projection.map.apply({
     tenantId: projectId,
+    events: [{ type: "lw.obs.trace.span_received", data: span }],
   });
+  if (written === 0) throw new Error("gateway span derived no debit record");
 }
 
 describe("given a blocking budget on traffic the gateway is serving", () => {

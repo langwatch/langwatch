@@ -34,8 +34,8 @@ import { register } from "prom-client";
  */
 import { describe, expect, it, vi } from "vitest";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session.clickhouse.repository";
+import type { CodingAgentSessionRow } from "../coding-agent-session.repository";
 
 /**
  * The stamp logic reads only identity, bookkeeping timestamps and the

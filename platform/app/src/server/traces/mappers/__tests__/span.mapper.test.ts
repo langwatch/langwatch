@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
+import type { NormalizedSpan } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
 import { mapNormalizedSpanToSpan, unflattenDotNotation } from "../span.mapper";
 
 const makeSpan = (overrides: Partial<NormalizedSpan> = {}): NormalizedSpan => ({

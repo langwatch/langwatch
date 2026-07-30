@@ -4,7 +4,7 @@ import { bodyLimit } from "hono/body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/trace-processing/schema";
 import {
   captureException,
   getCurrentScope,
@@ -678,22 +678,24 @@ secured
             const status =
               evaluation.status ?? (evaluation.error ? "error" : "processed");
 
-            await app.evaluations.reportEvaluation({
-              tenantId: project.id,
-              evaluationId,
-              evaluatorId,
-              evaluatorType: "custom",
-              evaluatorName: evaluation.name,
-              traceId,
-              isGuardrail: evaluation.is_guardrail ?? undefined,
-              status,
-              score: evaluation.score ?? null,
-              passed: evaluation.passed ?? null,
-              label: evaluation.label ?? null,
-              details: evaluation.details ?? null,
-              error: evaluation.error?.message ?? null,
-              occurredAt,
-            });
+            await app.evaluations.report(
+              {
+                evaluationId,
+                evaluatorId,
+                evaluatorType: "custom",
+                evaluatorName: evaluation.name,
+                traceId,
+                isGuardrail: evaluation.is_guardrail ?? undefined,
+                status,
+                score: evaluation.score ?? null,
+                passed: evaluation.passed ?? null,
+                label: evaluation.label ?? null,
+                details: evaluation.details ?? null,
+                error: evaluation.error?.message ?? null,
+                occurredAt,
+              },
+              { tenantId: project.id },
+            );
           } catch (error) {
             rejectedEvaluations++;
             evaluationErrors.push(
