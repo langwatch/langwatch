@@ -148,6 +148,12 @@ function renderGroupDetail(detail: { label: string; body: string }[]): string {
   return `<dl class="detail">${entries}</dl>`;
 }
 
+function gapMarker(count: number): string {
+  return `<li class="turn-gap">${escapeHtml(
+    `${count} ${count === 1 ? "turn" : "turns"} not shown`,
+  )}</li>`;
+}
+
 /**
  * The turns of one conversation, with the dropped middle marked where it fell.
  *
@@ -166,9 +172,7 @@ function renderTranscriptTurns(
         const previous = turns[position - 1];
         const gap =
           previous !== undefined && turn.index > previous.index + 1
-            ? `<li class="turn-gap">${escapeHtml(
-                `${turn.index - previous.index - 1} turns not shown`,
-              )}</li>`
+            ? gapMarker(turn.index - previous.index - 1)
             : "";
         return [
           gap,
@@ -183,9 +187,7 @@ function renderTranscriptTurns(
       // A conversation whose gap is not between two kept turns (nothing after the
       // opening survived) still owes the reader the count.
       .concat(
-        omittedTurns > 0 && turns.length <= 1
-          ? `<li class="turn-gap">${escapeHtml(`${omittedTurns} turns not shown`)}</li>`
-          : "",
+        omittedTurns > 0 && turns.length <= 1 ? gapMarker(omittedTurns) : "",
       )
   );
 }

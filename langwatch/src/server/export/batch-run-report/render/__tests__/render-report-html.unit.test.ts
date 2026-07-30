@@ -343,6 +343,47 @@ describe("Feature: Run report — the conversation behind a failure", () => {
     });
   });
 
+  describe("when exactly one turn was dropped", () => {
+    /** @scenario A conversation with a dropped middle says where the gap is */
+    it("says turn rather than turns", () => {
+      const html = renderReportHtml({
+        model: makeModel({
+          sections: [
+            makeSection({
+              computed: [
+                {
+                  kind: "groups",
+                  groups: [
+                    {
+                      title: "Agent stalled",
+                      subtitle: "1 scenario",
+                      detail: [],
+                      transcripts: [
+                        {
+                          runId: "run-9",
+                          signatureId: "sig-9",
+                          scenarioName: "Refund flow",
+                          turns: [
+                            { index: 0, role: "user", content: "Hello." },
+                            { index: 2, role: "assistant", content: "Bye." },
+                          ],
+                          omittedTurns: 1,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            }),
+          ],
+        }),
+      });
+
+      expect(html).toContain("1 turn not shown");
+      expect(html).not.toContain("1 turns not shown");
+    });
+  });
+
   describe("when a group has no conversations kept", () => {
     /** @scenario I can read the conversation behind a failure */
     it("renders no replay section at all", () => {

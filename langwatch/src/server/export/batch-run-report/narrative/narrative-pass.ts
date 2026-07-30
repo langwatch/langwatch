@@ -30,9 +30,18 @@ const draftStatementSchema = z.object({
   // runs past 400 characters without being verbose — this cap only needs to
   // rule out paragraphs, not ordinary citation-bearing prose.
   text: z.string().max(700).describe("One plain sentence. No markdown."),
+  // Generous on purpose. Every cap in this schema is enforced by rejecting the
+  // WHOLE report — `generateObject` validates one object — so a tight bound on
+  // a legitimately variable field trades the entire analysis for nothing. It
+  // bought nothing here: coverage and trust answers name every scenario they
+  // are about, so a 15-scenario run produces a 15-citation sentence, and a cap
+  // of 6 silently turned a complete, correctly-cited report into figures only.
+  // Citations are not made safe by this number; they are made safe by
+  // resolution, which drops any id that is not in the evidence. This bound
+  // exists only to stop a runaway response, so it sits far above real output.
   citations: z
     .array(citationSchema)
-    .max(6)
+    .max(64)
     .describe(
       "Ids copied verbatim from EVIDENCE. Uncited sentences are discarded.",
     ),
@@ -80,10 +89,14 @@ const draftAnswerSchema = z.object({
   questionId: z.string(),
   declined: z.boolean(),
   declinedReason: z.string().max(200).optional(),
-  statements: z.array(draftStatementSchema).max(6).optional(),
-  groups: z.array(draftGroupSchema).max(8).optional(),
-  findings: z.array(draftFindingSchema).max(10).optional(),
-  artifacts: z.array(draftArtifactSchema).max(6).optional(),
+  // Bounded well above real output, for the reason given on `citations` above:
+  // these three scale with how much went wrong in the run, and a run with more
+  // distinct failure groups than the cap allows would lose its whole analysis
+  // rather than its surplus.
+  statements: z.array(draftStatementSchema).max(16).optional(),
+  groups: z.array(draftGroupSchema).max(48).optional(),
+  findings: z.array(draftFindingSchema).max(32).optional(),
+  artifacts: z.array(draftArtifactSchema).max(16).optional(),
 });
 
 export const draftReportSchema = z.object({
