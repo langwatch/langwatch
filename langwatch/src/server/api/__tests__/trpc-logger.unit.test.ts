@@ -164,6 +164,15 @@ describe("handleTrpcCallLogging", () => {
         }
       }
 
+      class ProviderBoom extends HandledError {
+        constructor() {
+          super("provider_unreachable", "the provider never answered", {
+            httpStatus: 502,
+            fault: "provider",
+          });
+        }
+      }
+
       /** @scenario "Log level follows fault attribution, not handled-ness" */
       it("logs customer-fault errors at warn, even for 5xx, and does not capture", () => {
         const log = createMockLog();
@@ -214,9 +223,44 @@ describe("handleTrpcCallLogging", () => {
 
         expect(log.error).toHaveBeenCalledWith(
           expect.objectContaining({
-            statusCode: 500,
+            // 503, not the 500 the envelope carries: tRPC v10 has no code for
+            // it, so the code-derived status understates what happened.
+            statusCode: 503,
             handledErrorCode: "platform_boom",
             handledErrorFault: "platform",
+          }),
+          "trpc call",
+        );
+        expect(capture).not.toHaveBeenCalled();
+      });
+
+      /**
+       * An upstream that never answered is not our error budget. tRPC v10
+       * cannot express 502, so without preferring the handled status every
+       * customer typo in a base URL is recorded as a LangWatch 500.
+       */
+      it("records a provider fault at its own status, not the envelope's 500", () => {
+        const log = createMockLog();
+        const capture = vi.fn();
+        const cause = new ProviderBoom();
+        const error = new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: cause.message,
+          cause,
+        });
+
+        handleTrpcCallLogging({
+          ...baseArgs,
+          result: { ok: false, error },
+          log,
+          capture,
+        });
+
+        expect(log.error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            statusCode: 502,
+            handledErrorCode: "provider_unreachable",
+            handledErrorFault: "provider",
           }),
           "trpc call",
         );

@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
 import { FileManager } from "../utils/fileManager";
-import { checkApiKey } from "../utils/apiKey";
+import { resolveCredentials } from "../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
@@ -24,7 +24,7 @@ export const createCommand = async (
     }
 
     // Check API key before doing anything else
-    checkApiKey();
+    await resolveCredentials();
 
     // Ensure project is initialized
     await ensureProjectInitialized();

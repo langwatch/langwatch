@@ -127,6 +127,51 @@ export function SetupWithAgentButton({
   size?: "sm" | "md";
 }) {
   const setup = SETUP_SURFACES[surface];
+  return (
+    <AgentActionsMenu
+      triggerLabel="Setup via Agent"
+      size={size}
+      langy={{
+        prompt: setup.langyPrompt,
+        label: "Ask Langy to set it up",
+        hint: "Langy walks you through it and does the setup with you",
+      }}
+      copy={{
+        prompt: setupAgentPrompt(surface),
+        label: "Copy a prompt for your coding agent",
+        hint: "Paste it into Claude Code, Cursor, or whatever you use",
+        copiedTitle: "Prompt copied — paste it to your coding agent",
+      }}
+      docs={{
+        href: setup.docsUrl,
+        label: `Read the ${setup.docsLabel}`,
+        hint: "The overview, and every path into the feature",
+      }}
+    />
+  );
+}
+
+/**
+ * The one agent-actions menu shell: trigger button, the Langy entry (shown
+ * only when the viewer can ask Langy), the copy-a-prompt entry with its
+ * confirmation toast, and the docs link. `SetupWithAgentButton` and the /me
+ * `ConnectYourAgentButton` are both thin configurations of this, so the two
+ * controls can never drift apart in anatomy or behavior.
+ */
+export function AgentActionsMenu({
+  triggerLabel,
+  size = "sm",
+  langy,
+  copy,
+  docs,
+}: {
+  triggerLabel: string;
+  /** Match the sibling buttons of the surface this sits in. */
+  size?: "sm" | "md";
+  langy: { prompt: string; label: string; hint: string };
+  copy: { prompt: string; label: string; hint: string; copiedTitle: string };
+  docs: { href: string; label: string; hint: string };
+}) {
   const canAsk = useCanAskLangy();
   const askLangy = useLangyStore((s) => s.askLangy);
 
@@ -134,11 +179,11 @@ export function SetupWithAgentButton({
   // confirmation rendered inside it would land in a menu that is already
   // gone. The toast also gives the clipboard-rejection path somewhere to go.
   const copyPrompt = () => {
-    void navigator.clipboard?.writeText(setupAgentPrompt(surface)).then(
+    void navigator.clipboard?.writeText(copy.prompt).then(
       () =>
         toaster.create({
           type: "success",
-          title: "Prompt copied — paste it to your coding agent",
+          title: copy.copiedTitle,
         }),
       () =>
         toaster.create({
@@ -156,7 +201,7 @@ export function SetupWithAgentButton({
             page's own buttons rather than a themed import. */}
         <Button variant="outline" size={size} aria-haspopup="menu">
           <LuSparkles size={14} />
-          Setup via Agent
+          {triggerLabel}
           <LuChevronDown size={14} />
         </Button>
       </Menu.Trigger>
@@ -165,29 +210,29 @@ export function SetupWithAgentButton({
           <Menu.Item
             value="ask-langy"
             paddingY={2}
-            onClick={() => askLangy(setup.langyPrompt)}
+            onClick={() => askLangy(langy.prompt)}
           >
-            <SetupOption
+            <AgentMenuOption
               icon={LuSparkles}
               accent
-              label="Ask Langy to set it up"
-              hint="Langy walks you through it and does the setup with you"
+              label={langy.label}
+              hint={langy.hint}
             />
           </Menu.Item>
         ) : null}
         <Menu.Item value="copy-prompt" paddingY={2} onClick={copyPrompt}>
-          <SetupOption
+          <AgentMenuOption
             icon={LuTerminal}
-            label="Copy a prompt for your coding agent"
-            hint="Paste it into Claude Code, Cursor, or whatever you use"
+            label={copy.label}
+            hint={copy.hint}
           />
         </Menu.Item>
         <Menu.Item value="docs" paddingY={2} asChild>
-          <chakra.a href={setup.docsUrl} target="_blank" rel="noreferrer">
-            <SetupOption
+          <chakra.a href={docs.href} target="_blank" rel="noreferrer">
+            <AgentMenuOption
               icon={LuBookOpen}
-              label={`Read the ${setup.docsLabel}`}
-              hint="The overview, and every path into the feature"
+              label={docs.label}
+              hint={docs.hint}
             />
           </chakra.a>
         </Menu.Item>
@@ -196,7 +241,8 @@ export function SetupWithAgentButton({
   );
 }
 
-function SetupOption({
+/** The icon + label + hint row every agent-menu entry renders. */
+function AgentMenuOption({
   icon: Icon,
   label,
   hint,

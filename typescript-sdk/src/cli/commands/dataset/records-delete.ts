@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
@@ -16,7 +16,7 @@ export const recordsDeleteCommand = async (
   slugOrId: string,
   recordIds: string[],
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (recordIds.length === 0) {
     reportCommandError({
