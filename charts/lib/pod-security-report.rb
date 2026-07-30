@@ -47,7 +47,17 @@ def resources_complete?(container)
   end
 end
 
-YAML.load_stream(ARGF.read) do |doc|
+# aliases: true — Psych 4 (Ruby 3.1+) refuses YAML anchors/aliases by default
+# and raises BadAlias. Helm charts legitimately emit them, and a raise here
+# would abort the whole hardening sweep rather than grading the manifest.
+# Older Psych has no keyword arg, hence the rescue.
+begin
+  docs = YAML.load_stream(ARGF.read, aliases: true)
+rescue ArgumentError
+  docs = YAML.load_stream(ARGF.read)
+end
+
+docs.each do |doc|
   spec = pod_spec(doc)
   next if spec.nil?
 

@@ -176,8 +176,12 @@ spec:
 
       volumes:
         - name: keeper-config
-          # Holds rendered config only (ch-config writes here); bounded like
-          # every other scratch volume, so nothing is node-backed without a limit.
+          # Written by the keeper-init container and by Keeper's own
+          # preprocessed-config dump (keeper_config-preprocessed.xml lands
+          # next to keeper_config.xml, NOT under log_storage_path on the PVC) —
+          # so this volume is load-bearing and must stay writable. ch-config
+          # does not run in the Keeper pod. Bounded like every other scratch
+          # volume, so nothing is node-backed without a limit.
           emptyDir:
             sizeLimit: 64Mi
         - name: keeper-logs

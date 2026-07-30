@@ -23,7 +23,7 @@ OVERLAYS="${CHART_DIR}/examples/overlays"
 # shellcheck source=../../lib/test-helpers.sh
 source "$(cd "$(dirname "$0")/../../lib" && pwd)/test-helpers.sh"
 
-# Temp files registered here are removed on exit, however the script leaves.
+# Temp files registered here are removed on exit, however the script exits.
 TMP_FILES=()
 cleanup_all() {
   rm -f "${TMP_FILES[@]:-}"
@@ -309,12 +309,35 @@ test_access_ingress() {
   assert_render_refuses "App path equal to a blocked prefix refuses to render" \
     "would out-match the blackhole" \
     --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal","pathType":"Prefix"}]}}]'
-  # A trailing slash would make the guard's segment test build "/api/internal//",
-  # which matches nothing — the nested path then out-matches the blackhole.
-  assert_render_refuses "Trailing-slash prefix still catches a nested path" \
-    "would out-match the blackhole" \
-    --set-json 'ingress.blockedPaths=["/api/internal/"]' \
-    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal/status","pathType":"Prefix"}]}}]'
+  # Malformed prefixes are REJECTED, not silently normalised. trimSuffix "/"
+  # stripped exactly one character, so "/api/internal//" became
+  # "/api/internal/" and the guard then compared against a prefix no request
+  # path matches — a blackhole rule that blocked nothing while an app rule for
+  # /api/internal/status out-matched it.
+  assert_render_refuses "Trailing-slash prefix is rejected" \
+    "must not end in a slash" \
+    --set-json 'ingress.blockedPaths=["/api/internal/"]'
+  assert_render_refuses "Repeated-slash prefix is rejected" \
+    "empty path segment" \
+    --set-json 'ingress.blockedPaths=["/api/internal//"]'
+  assert_render_refuses "Whitespace-padded prefix is rejected" \
+    "leading or trailing whitespace" \
+    --set-json 'ingress.blockedPaths=["/api/internal "]'
+  # ingress-nginx ranks regex locations above prefix locations, so a regex app
+  # path beats the blackhole outright and segment matching cannot see it.
+  assert_render_refuses "Regex ImplementationSpecific path is rejected" \
+    "regex metacharacters" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/(.*)","pathType":"ImplementationSpecific"}]}}]'
+  # default-backend is DEFINED as the handler for a backend with no endpoints,
+  # which is exactly how the blackhole blocks — it turns the block into a proxy.
+  assert_render_refuses "default-backend annotation is rejected" \
+    "default-backend" \
+    --set-json 'ingress.annotations={"nginx.ingress.kubernetes.io/default-backend":"svc"}'
+  # `http: {paths: []}` used to pass the guard and render an Ingress whose only
+  # rules were blackholes — a total outage that applies without error.
+  assert_render_refuses "Host with an empty paths list is rejected" \
+    "no http.paths" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[]}}]'
   assert_render_refuses "Prefix without a leading slash is rejected" \
     "must be an absolute path" --set-json 'ingress.blockedPaths=["api/internal"]'
   assert_render_refuses "A bare / prefix is rejected" \
@@ -414,6 +437,37 @@ test_backup_metrics_gate() {
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: size overlays — verify replica counts and resource sizing
 # ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: Component enable flags — Deployment, Service AND PDB must all go
+# ─────────────────────────────────────────────────────────────────────────────
+# workers.enabled had coverage; langwatch_nlp.enabled and langevals.enabled
+# shipped with none, so a dropped `{{- end }}` in either pdb.yaml would leave a
+# PodDisruptionBudget selecting a workload that no longer exists — which blocks
+# node drains — with nothing to catch it.
+test_component_toggles() {
+  sep; info "Suite: component enable flags"
+
+  local on off
+  on=$(tmpl --set autogen.enabled=true)
+  off=$(tmpl --set autogen.enabled=true \
+    --set langwatch_nlp.enabled=false --set langevals.enabled=false \
+    --set app.upstreams.nlp.name=external-nlp \
+    --set app.upstreams.langevals.name=external-langevals)
+
+  # Negative control: without it, an assertion that the objects are absent
+  # would also pass if the render silently produced nothing at all.
+  assert_contains "toggles: nlp Deployment present when enabled"       "$on"  "${RELEASE}-langwatch-nlp"
+  assert_contains "toggles: langevals Deployment present when enabled" "$on"  "${RELEASE}-langevals"
+
+  local obj
+  for obj in "${RELEASE}-langwatch-nlp" "${RELEASE}-langevals"; do
+    assert_not_contains "toggles: ${obj} fully removed when disabled" "$off" "name: ${obj}"
+  done
+
+  # The app must still render — disabling a component must not take it down.
+  assert_contains "toggles: app still renders with both disabled" "$off" "${RELEASE}-app"
+}
+
 test_size_overlays() {
   sep; info "Suite: size overlays"
 
@@ -1156,6 +1210,7 @@ main() {
   test_langwatch_endpoint
   test_backup_metrics_gate
   test_size_overlays
+  test_component_toggles
   test_pod_security
   test_infra_overlays
   test_overlay_stacking
