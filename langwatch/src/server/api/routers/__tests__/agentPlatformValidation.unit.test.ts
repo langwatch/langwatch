@@ -55,7 +55,13 @@ describe("validateProviderApiKey for google_agent_platform", () => {
       expect(url).toContain(":generateContent");
       expect(url).not.toMatch(/\/models(\?|$)/);
       expect(init.method).toBe("POST");
-      expect(init.body).toBeTruthy();
+      // Pinned, not just truthy: a body of `"x"` would pass a truthiness
+      // check while sending garbage, and `maxOutputTokens: 1` is what keeps
+      // this probe cheap rather than generating a full response on every
+      // credential check.
+      const body = JSON.parse(String(init.body));
+      expect(body.contents[0].parts[0].text).toBeTruthy();
+      expect(body.generationConfig.maxOutputTokens).toBe(1);
     });
 
     /** @scenario The credential travels in a header, never in the URL */
@@ -88,6 +94,30 @@ describe("validateProviderApiKey for google_agent_platform", () => {
       expect(sentRequest().url).toContain(
         "/projects/acme-123/locations/us-central1/",
       );
+    });
+  });
+
+  describe("given a credential missing its project or location", () => {
+    /**
+     * This is the shape `validateKeyWithCustomUrl` produced before it was
+     * fixed to preserve stored credentials rather than rebuild them from
+     * just the key and endpoint: project and location silently dropped,
+     * leaving only the key. Asserting on it here pins the walk's behavior
+     * directly, without needing a Prisma-backed test for that caller.
+     */
+    /** @scenario A credential missing its project or location is not probed at all */
+    it("is unreachable rather than reporting a verdict on the key", async () => {
+      mockFetch.mockResolvedValue(generated());
+
+      await expect(
+        validateProviderApiKey("google_agent_platform", {
+          GOOGLE_AGENT_PLATFORM_API_KEY:
+            CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+        }),
+      ).rejects.toMatchObject({ code: "provider_unreachable" });
+
+      // Nothing to ask without a project and location, so nothing was sent.
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 

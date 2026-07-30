@@ -64,3 +64,16 @@ Feature: Google Agent Platform as a model provider
     Given Agent Platform cannot be reached
     When I check the credential
     Then the failure says the provider could not be reached
+
+  # A credential re-check that only has the key — the shape produced when a
+  # caller rebuilds customKeys from a stored key and drops every other
+  # field — must not be treated as though nothing is wrong with the key.
+  # There is nothing to probe without a project and location, so this is
+  # the same "no verdict" outcome as the provider never answering, not a
+  # refusal.
+  @unit
+  Scenario: A credential missing its project or location is not probed at all
+    Given an Agent Platform credential with no project or location
+    When I check the credential
+    Then the failure says the provider could not be reached
+    And nothing was sent to the provider

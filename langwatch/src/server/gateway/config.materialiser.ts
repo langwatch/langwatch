@@ -577,7 +577,14 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
       return {
         api_key: pick("GOOGLE_AGENT_PLATFORM_API_KEY"),
         project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT"),
-        location: pick("GOOGLE_AGENT_PLATFORM_LOCATION"),
+        // `region`, not `location`: `buildProviderSlot` below lifts a
+        // slot-level region by looking up exactly that key
+        // (`pickString(credentials, "region")`), the convention every
+        // other regional provider's credentials already follow. Naming it
+        // `location` here — Google's own term, kept as the customer-facing
+        // env var name — would silently leave this provider without a
+        // slot-level region once something reads it.
+        region: pick("GOOGLE_AGENT_PLATFORM_LOCATION"),
       };
     case "openai":
       return { api_key: pick("OPENAI_API_KEY") };

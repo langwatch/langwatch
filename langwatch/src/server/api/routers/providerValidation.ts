@@ -54,9 +54,6 @@ const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
   google_agent_platform: "google_agent_platform",
 };
 
-/** Where Agent Platform serves Gemini models from. */
-const AGENT_PLATFORM_HOST = "https://aiplatform.googleapis.com";
-
 /**
  * The model a credential check asks Agent Platform to run.
  *
@@ -579,21 +576,30 @@ function buildProbeCandidates({
 
   switch (strategy) {
     case "google_agent_platform": {
-      // No project or location means no path to probe. Returning nothing
-      // rather than guessing a default leaves the walk empty, which
-      // `runProbeChain` reports as unreachable — honest, since nothing was
-      // asked — instead of inventing a verdict about the key.
-      if (!agentPlatform?.project || !agentPlatform.location) return [];
+      // No project, no location, or no host to build the path from means
+      // no path to probe. Returning nothing rather than guessing a default
+      // leaves the walk empty, which `runProbeChain` reports as
+      // unreachable — honest, since nothing was asked — instead of
+      // inventing a verdict about the key.
+      if (!agentPlatform?.project || !agentPlatform.location || !apiRoot) {
+        return [];
+      }
 
       const { project, location } = agentPlatform;
+      const host = apiRoot.replace(/\/$/, "");
 
       return [
         {
           // The key rides in a header, not `?key=`, which Agent Platform also
           // accepts: a credential in a URL reaches access logs, proxy logs and
           // browser history, and both shapes were verified to work.
+          //
+          // The global host with a region in the path was verified live
+          // against two regions (us-central1, europe-west4), both 200 — the
+          // same form every other verified shape uses, so this does not
+          // special-case a regional subdomain on top of it.
           url:
-            `${AGENT_PLATFORM_HOST}/v1/projects/${encodeURIComponent(project)}` +
+            `${host}/v1/projects/${encodeURIComponent(project)}` +
             `/locations/${encodeURIComponent(location)}/publishers/google/models/` +
             `${AGENT_PLATFORM_PROBE_MODEL}:generateContent`,
           headers: { ...headers, "x-goog-api-key": apiKey },
@@ -867,8 +873,17 @@ export async function validateKeyWithCustomUrl(
     };
   }
 
-  // Build customKeys with the retrieved API key and optional custom URL
+  // Start from what's stored, not from a blank object: a provider whose
+  // credential is more than a key plus an endpoint — Agent Platform's
+  // project and location, or any future one — had those fields silently
+  // dropped when this rebuilt customKeys from scratch. That turned "the
+  // customer edited an unrelated field" into an empty probe walk and a
+  // false "could not reach the provider", which is the exact misdiagnosis
+  // this whole area of the code exists to remove. The freshly resolved key
+  // and an explicit custom URL are layered on top, in that order, so they
+  // still win over whatever was stored.
   const customKeys: Record<string, string> = {
+    ...(storedKeys ?? {}),
     [apiKeyField]: apiKey,
   };
   if (endpointField && customBaseUrl) {

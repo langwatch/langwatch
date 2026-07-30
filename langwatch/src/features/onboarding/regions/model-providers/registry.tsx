@@ -78,10 +78,19 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "google_agent_platform",
     backendModelProviderKey: "google_agent_platform",
     label: "Google Agent Platform",
-    defaultModel: "gemini-2.5-flash",
-    // The path names the project and location, so there is no static base
-    // URL to probe — it is assembled per credential. See
-    // buildProbeCandidates' `google_agent_platform` branch.
+    // No `defaultModel`: this provider has no catalog entries (like
+    // `vertex_ai`), and `resolveProviderDefaultModel` in
+    // `components/gateway/eligibleModelProviders.ts` reads a registry
+    // default BEFORE falling back to whatever the customer actually
+    // configured. Naming a model here that isn't in the catalog would make
+    // the gateway's eligible-providers surface hand out a model string the
+    // customer never chose, unconditionally, instead of deferring to their
+    // custom models the way `vertex_ai` correctly does by omitting this.
+    //
+    // The request path names the project and location, and `apiRoot` is
+    // the host that path is built from — see `AGENT_PLATFORM_HOST` in
+    // `providerValidation.ts`'s `google_agent_platform` probe branch, which
+    // derives from this same field rather than a second hardcoded string.
     defaultBaseUrl: "https://aiplatform.googleapis.com",
     apiRoot: "https://aiplatform.googleapis.com",
     icon: singleIcon(
