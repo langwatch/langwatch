@@ -86,7 +86,9 @@ async function main() {
   const cliEntry = require("node:path").resolve(
     process.cwd(),
     "..",
-    "typescript-sdk",
+    "..",
+    "sdks",
+    "typescript",
     "dist",
     "cli",
     "index.js",
