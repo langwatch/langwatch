@@ -44,15 +44,21 @@ import {
 const SLIM_TABLE = "trace_analytics" as const;
 const ta = "ta";
 
-/** Group-by keys the slim builder serves (typed columns + Attributes reads). */
+/**
+ * Group-by keys the slim builder serves (typed columns + Attributes reads).
+ *
+ * `metadata.model` is deliberately NOT here: model group-bys need per-SPAN
+ * attribution (the legacy builder's span-model partition join) so buckets
+ * partition the ungrouped totals; slim has no span data. The router sends
+ * them to `trace_summaries`; see SLIM_TRACE_GROUP_BY_KEYS in route-table.ts.
+ */
 export type SlimGroupByKey =
   | "topics.topics"
   | "traces.trace_name"
   | "metadata.user_id"
   | "metadata.thread_id"
   | "metadata.customer_id"
-  | "metadata.labels"
-  | "metadata.model";
+  | "metadata.labels";
 
 /**
  * Slim column / Attributes-map read for a registry metric (Phase 2 hoisted
@@ -119,7 +125,6 @@ function isSlimGroupByKey(groupBy: string): groupBy is SlimGroupByKey {
     case "metadata.thread_id":
     case "metadata.customer_id":
     case "metadata.labels":
-    case "metadata.model":
       return true;
     default:
       return false;
@@ -148,8 +153,6 @@ function slimGroupByExpression(groupBy?: string): string | null {
     case "metadata.labels":
       // Slim Labels is Array(String); arrayJoin to one row per label.
       return `arrayJoin(if(empty(${ta}.Labels), [''], ${ta}.Labels))`;
-    case "metadata.model":
-      return `arrayJoin(if(empty(${ta}.Models), ['unknown'], ${ta}.Models))`;
     default: {
       const _exhaustive: never = groupBy;
       throw new Error(`Unhandled slim group-by: ${String(_exhaustive)}`);
@@ -164,7 +167,7 @@ function slimGroupByExpression(groupBy?: string): string | null {
  * `HAVING group_key != ''` clause.
  */
 function slimGroupByHandlesUnknown(groupBy?: string): boolean {
-  return groupBy === "metadata.model" || groupBy === "traces.trace_name";
+  return groupBy === "traces.trace_name";
 }
 
 // isPercentile + percentileFor are shared with eval-slim-timeseries-query.ts

@@ -157,25 +157,20 @@ describe("buildSlimTimeseriesQuery", () => {
   });
 
   describe("when grouped by metadata.model", () => {
-    const modelGrouped = buildSlimTimeseriesQuery({
-      projectId: "tenant-slim",
-      ...baseDates,
-      series: [{ metric: "performance.total_cost", aggregation: "sum" }],
-      groupBy: "metadata.model",
-      timeScale: 1440,
-    });
-
-    // Byte-for-byte the expression legacy uses in
-    // `aggregation-builder.ts`'s `metadata.model` field definition, so a
-    // routed query buckets multi-model traces identically to trace_summaries.
-    it("arrayJoins the per-trace Models[] exactly as legacy does", () => {
-      expect(modelGrouped.sql).toContain(
-        "arrayJoin(if(empty(ta.Models), ['unknown'], ta.Models))",
-      );
-    });
-
-    it("omits HAVING group_key != '' because the expression already yields 'unknown' (legacy handlesUnknown: true)", () => {
-      expect(modelGrouped.sql).not.toContain("HAVING");
+    // Model group-bys need per-SPAN attribution (the legacy builder's
+    // span-model partition join) so buckets sum exactly to the ungrouped
+    // totals. Slim has no span data: the router must never send model
+    // group-bys here, and the builder throws as the backstop.
+    it("throws: the router should have routed model group-bys to trace_summaries", () => {
+      expect(() =>
+        buildSlimTimeseriesQuery({
+          projectId: "tenant-slim",
+          ...baseDates,
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          groupBy: "metadata.model",
+          timeScale: 1440,
+        }),
+      ).toThrow(/cannot group by "metadata\.model"/);
     });
 
     it("still emits HAVING for group-bys legacy filters, e.g. topics", () => {

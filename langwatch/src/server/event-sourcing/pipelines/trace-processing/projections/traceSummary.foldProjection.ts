@@ -203,6 +203,11 @@ export function applySpanToSummary({
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
 
+  // Surface the span-derived models as trace-level metadata (primary +
+  // set) so `trace.metadata.model` is populated for API consumers and
+  // metadata filters, not just the Models column.
+  traceAttributeAccumulationService.stampModelMetadata({ attributes, models });
+
   // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
   // live in TraceNameResolutionService — see that file for the full set.
   const {
@@ -369,6 +374,13 @@ function applyLogContribution({
   if (Number.isFinite(outputTokens) && outputTokens > 0) {
     totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
   }
+
+  // Same trace-level model metadata stamp the span path applies, so
+  // log-only (Path B) traces also surface `metadata.model`.
+  traceAttributeAccumulationService.stampModelMetadata({
+    attributes: mergedAttributes,
+    models,
+  });
 
   return {
     ...state,

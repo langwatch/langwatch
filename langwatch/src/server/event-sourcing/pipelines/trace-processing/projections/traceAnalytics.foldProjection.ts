@@ -982,6 +982,10 @@ export function applySpanToAnalytics({
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
 
+  // Mirror the trace-summary fold's trace-level model metadata stamp so the
+  // slim table's Attributes stay consistent with trace_summaries.
+  traceAttributeAccumulationService.stampModelMetadata({ attributes, models });
+
   const {
     traceName,
     rootSpanStartTimeMs,
@@ -1078,6 +1082,13 @@ function applyLogContribution({
   if (Number.isFinite(outputTokens) && outputTokens > 0) {
     totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
   }
+
+  // Same trace-level model metadata stamp the span path applies, so
+  // log-only (Path B) traces also surface `metadata.model`.
+  traceAttributeAccumulationService.stampModelMetadata({
+    attributes: mergedAttributes,
+    models,
+  });
 
   return {
     ...state,
