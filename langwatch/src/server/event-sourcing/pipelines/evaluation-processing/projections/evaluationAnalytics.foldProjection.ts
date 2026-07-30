@@ -452,6 +452,13 @@ export class EvaluationAnalyticsFoldProjection
    * self-heals with no backfill migration. In steady state every row is
    * current-version, `store.get()` hits, and nothing refolds.
    *
+   * `trustAbsentMiss: true` — the store always writes (its old gate refused
+   * only a state with no identity at all, which the aggregate-id stamp made
+   * unreachable anyway), so an absent read proves the evaluation is new and
+   * the executor folds from `init()` without the unwindowed fallback scan
+   * (79,861 in 30 days, 0 recoveries) or the store-miss re-fold. The
+   * `undecodable` transitional net above is not affected.
+   *
    * `coalesceMaxBatch` — see below.
    *
    * `refoldOnOutOfOrder: false` — the derivation is order-insensitive: identity
@@ -464,6 +471,7 @@ export class EvaluationAnalyticsFoldProjection
   override options: FoldProjectionOptions = {
     eventOrdering: "acceptedAt",
     refoldOnStoreMiss: true,
+    trustAbsentMiss: true,
     refoldOnOutOfOrder: false,
     readWindow: { widthMs: EVALUATION_ANALYTICS_READ_WINDOW_MS },
     coalesceMaxBatch: EVALUATION_ANALYTICS_COALESCE_MAX_BATCH,

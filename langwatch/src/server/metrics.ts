@@ -519,6 +519,27 @@ export const incrementEsFoldReadWindowFallbackTotal = (
   outcome: "recovered" | "absent",
 ) => esFoldReadWindowFallbackTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_fold_absent_miss_trusted_total");
+const esFoldAbsentMissTrustedTotal = new Counter({
+  name: "es_fold_absent_miss_trusted_total",
+  help: "Absent store misses a trustAbsentMiss fold answered from init(), by which recovery mechanism was skipped",
+  labelNames: ["projection_name", "skipped"] as const,
+});
+
+/**
+ * The direct measure of what `trustAbsentMiss` saves — each increment is one
+ * ClickHouse read that no longer happens. `fallback_read` — the unwindowed
+ * fallback scan of the fold's own backing table. `refold` — the `event_log`
+ * history replay under `refoldOnStoreMiss`. Their pre-change steady state was
+ * ~290/min and ~180/min respectively; if this counter goes quiet while
+ * `es_fold_read_window_fallback_total` climbs again, the option was disabled
+ * (env kill-switch) or dropped from the fold.
+ */
+export const incrementEsFoldAbsentMissTrustedTotal = (
+  projectionName: string,
+  skipped: "fallback_read" | "refold",
+) => esFoldAbsentMissTrustedTotal.labels(projectionName, skipped).inc();
+
 register.removeSingleMetric("es_reactor_collapsed_total");
 const esReactorCollapsedTotal = new Counter({
   name: "es_reactor_collapsed_total",

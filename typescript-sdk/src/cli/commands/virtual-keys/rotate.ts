@@ -37,7 +37,7 @@ export const rotateVirtualKeyCommand = async (
         console.log();
         console.log(`  ${chalk.green(secret)}`);
         console.log();
-        console.log(chalk.gray("Prefix: ") + `${virtual_key.prefix}...${virtual_key.last_four}`);
+        console.log(chalk.gray("Prefix: ") + `${virtual_key.display_prefix}...`);
         const detailUrl = virtualKeyDetailUrl(virtual_key.id);
         if (detailUrl) {
           console.log(chalk.gray("View in UI: ") + chalk.cyan(detailUrl));

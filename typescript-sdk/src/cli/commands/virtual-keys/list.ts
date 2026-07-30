@@ -10,7 +10,7 @@ import type { CommandResult } from "../../utils/output";
 /**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The list model
- * carries no secrets — only `prefix`/`last_four`, exactly what the human table
+ * carries no secrets — only `display_prefix`, exactly what the human table
  * shows — so the raw list is safe to hand to a machine caller.
  */
 export const listVirtualKeysCommand = async (): Promise<CommandResult | void> => {
@@ -31,7 +31,7 @@ export const listVirtualKeysCommand = async (): Promise<CommandResult | void> =>
           console.log();
           console.log(chalk.gray("No virtual keys yet."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch virtual-keys create --name "my-key" --scope ORG:<slug>'));
+          console.log(chalk.cyan('  langwatch virtual-keys create --name "my-key"'));
           return;
         }
 
@@ -40,16 +40,17 @@ export const listVirtualKeysCommand = async (): Promise<CommandResult | void> =>
         const tableData = keys.map((vk) => ({
           ID: vk.id,
           Name: vk.name,
-          Env: vk.environment === "live" ? chalk.yellow("live") : chalk.gray("test"),
-          Status: vk.status === "ACTIVE" ? chalk.green("active") : chalk.red("revoked"),
-          Prefix: `${vk.prefix}...${vk.last_four}`,
+          Status: vk.status === "active" ? chalk.green("active") : chalk.red("revoked"),
+          Prefix: `${vk.display_prefix}...`,
           Scopes: vk.scopes.map(formatScope).join(", ") || chalk.gray("—"),
+          Routing: vk.routing_mode.toLowerCase(),
+          Purpose: vk.purpose === "langy" ? chalk.magenta("langy") : "user",
           "Last used": vk.last_used_at ? new Date(vk.last_used_at).toLocaleDateString() : chalk.gray("—"),
         }));
 
         formatTable({
           data: tableData,
-          headers: ["ID", "Name", "Env", "Status", "Prefix", "Scopes", "Last used"],
+          headers: ["ID", "Name", "Status", "Prefix", "Scopes", "Routing", "Purpose", "Last used"],
           colorMap: {
             Name: chalk.cyan,
             ID: chalk.gray,

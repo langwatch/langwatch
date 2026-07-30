@@ -6,35 +6,13 @@
 import { z } from "zod";
 
 import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+  chRepoOrUndefined,
+  spendRepoOrUndefined,
+} from "~/server/gateway/clickhouseRepos";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
-import { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-async function resolveClient(projectId: string) {
-  const client = await getClickHouseClientForProject(projectId);
-  if (!client) {
-    throw new Error(
-      `ClickHouse enabled but no client for project ${projectId}`,
-    );
-  }
-  return client;
-}
-
-export function chRepoOrUndefined() {
-  if (!isClickHouseEnabled()) return undefined;
-  return new GatewayBudgetClickHouseRepository(resolveClient);
-}
-
-export function spendRepoOrUndefined() {
-  if (!isClickHouseEnabled()) return undefined;
-  return new GatewayVirtualKeySpendRepository(resolveClient);
-}
 
 export const gatewayUsageRouter = createTRPCRouter({
   summary: protectedProcedure

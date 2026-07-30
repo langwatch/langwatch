@@ -5,6 +5,7 @@
  * into complete ClickHouse SQL queries.
  */
 
+import { MAX_PROCESSED_SPANS } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
 import { snakeCase } from "../../../utils/stringCasing";
 import type { FilterField } from "../../filters/types";
 import { isZeroWhenAbsentSeries, type SeriesInputType } from "../registry";
@@ -22,6 +23,7 @@ import { translateAllFilters } from "./filter-translator";
 import {
   buildMetricAlias,
   type MetricTranslation,
+  nonBilledCostExpression,
   translateMetric,
   translatePipelineAggregation,
 } from "./metric-translator";
@@ -250,6 +252,161 @@ interface GroupByExpression {
   requiredJoins: CHTable[];
   usesArrayJoin?: boolean;
   handlesUnknown?: boolean;
+  /**
+   * Model grouping attributes additive metrics (cost, tokens) per SPAN via the
+   * span-model partition join (see buildSpanModelPartitionJoin), so per-model
+   * buckets sum exactly to the ungrouped totals instead of counting each
+   * multi-model trace once per model it touched.
+   */
+  spanModelPartitioned?: boolean;
+}
+
+/**
+ * Alias for the span-model partition subquery joined by model group-bys.
+ * Distinct from `ss` (the generic stored_spans JOIN used by filters/metrics)
+ * so both can coexist in one query.
+ */
+const SPAN_MODEL_ALIAS = "smd";
+
+/**
+ * A span's model bucket: response model > request model > 'unknown'.
+ * Mirrors SpanCostService.extractModelsFromSpan (which the fold and the
+ * ADR-034 rollup use), so a span's bucket matches the model its cost was
+ * attributed to at fold time.
+ */
+const SPAN_MODEL_KEY_EXPR = `multiIf(SpanAttributes['gen_ai.response.model'] != '', SpanAttributes['gen_ai.response.model'], SpanAttributes['gen_ai.request.model'] != '', SpanAttributes['gen_ai.request.model'], 'unknown')`;
+
+/**
+ * Redundant-usage gate: mirrors SpanCostService.isTokenAccumulationSkipped.
+ * A span marked as a duplicate usage copy (e.g. codex's lower-level response
+ * span echoing the turn rollup) contributed nothing to the trace totals, so
+ * it must contribute nothing to the per-model buckets either, otherwise the
+ * bucket sum overshoots the ungrouped total.
+ */
+const SPAN_NOT_SKIPPED = `SpanAttributes['langwatch.reserved.skip_token_accumulation'] != 'true'`;
+
+/**
+ * Span token read mirroring SpanCostService.extractTokenMetrics:
+ * `Math.max(0, coerceToNumber(value) ?? 0)`.
+ */
+function spanTokenReadExpr(attrKey: string): string {
+  return `greatest(coalesce(toFloat64OrNull(SpanAttributes['${attrKey}']), 0), 0)`;
+}
+
+/**
+ * Span cache/reasoning token read mirroring SpanCostService.extractCacheTokens:
+ * the first strictly-positive value among the candidate keys, else 0.
+ */
+function spanFirstPositiveExpr(attrKeys: string[]): string {
+  const branches = attrKeys
+    .map(
+      (key) =>
+        `coalesce(toFloat64OrNull(SpanAttributes['${key}']), 0) > 0, toFloat64OrNull(SpanAttributes['${key}'])`,
+    )
+    .join(", ");
+  return `multiIf(${branches}, 0)`;
+}
+
+/**
+ * Build the LEFT JOIN that partitions a trace's additive metrics across the
+ * models its spans actually used: one joined row per (trace, span model).
+ *
+ * Two aggregation levels:
+ *   1. Per (trace, span, model): `max()` per contribution collapses the rare
+ *      duplicate stored_spans rows a redelivered SpanReceivedEvent leaves
+ *      before the ReplacingMergeTree merge, without the banned `LIMIT 1 BY`
+ *      pattern (see aggregation-builder-dedup-safety.unit.test.ts).
+ *   2. Per (trace, model): `sum()` of the span contributions: the bucket's
+ *      share of the trace totals.
+ *
+ * `Cost`/`NonBilledCost` are the fold-parity per-span columns (migration
+ * 00037, computed by the same SpanCostService as the trace totals). Rows
+ * stored before that migration carry NULL cost, so grouped COST attribution
+ * degrades to 0 for that history while token attribution (read from
+ * SpanAttributes, which always existed) stays exact.
+ *
+ * The HAVING keeps `'unknown'` rows only when they carry a real contribution:
+ * a trace whose model-less spans contributed nothing must NOT mint a spurious
+ * `unknown` bucket. A trace with NO surviving rows at all (log-only, genuinely
+ * model-less, or nothing but zero-contribution model-less spans) falls back to
+ * trace-level attribution in the group-by expression and the CTE columns.
+ */
+function buildSpanModelPartitionJoin(spanTimeFilter: string): string {
+  const ts = tableAliases.trace_summaries;
+  const smd = SPAN_MODEL_ALIAS;
+  const contribution = (expr: string) =>
+    `max(if(${SPAN_NOT_SKIPPED}, ${expr}, 0))`;
+  // TraceSpanCount = spans of the trace visible to THIS scan, computed as a
+  // window over the per-bucket groups BEFORE the zero-suppression filter (a
+  // suppressed model-less bucket still holds real spans, e.g. the root).
+  // spanModelPartitionMissExpr compares it against ts.SpanCount to detect an
+  // incomplete scan (spans outside the StartTime envelope) and fall back to
+  // whole-trace attribution instead of shipping a partial partition.
+  return `LEFT JOIN (
+        SELECT *
+        FROM (
+          SELECT
+            TenantId,
+            TraceId,
+            SpanModelKey,
+            sum(SpanCost) AS SpanModelCost,
+            sum(SpanNonBilledCost) AS SpanModelNonBilledCost,
+            sum(SpanPromptTokens) AS SpanModelPromptTokens,
+            sum(SpanCompletionTokens) AS SpanModelCompletionTokens,
+            sum(SpanCacheReadTokens) AS SpanModelCacheReadTokens,
+            sum(SpanCacheWriteTokens) AS SpanModelCacheWriteTokens,
+            sum(SpanReasoningTokens) AS SpanModelReasoningTokens,
+            sum(count()) OVER (PARTITION BY TenantId, TraceId) AS TraceSpanCount
+          FROM (
+            SELECT
+              TenantId,
+              TraceId,
+              SpanId,
+              ${SPAN_MODEL_KEY_EXPR} AS SpanModelKey,
+              ${contribution("coalesce(Cost, 0)")} AS SpanCost,
+              ${contribution("coalesce(NonBilledCost, 0)")} AS SpanNonBilledCost,
+              ${contribution(spanTokenReadExpr("gen_ai.usage.input_tokens"))} AS SpanPromptTokens,
+              ${contribution(spanTokenReadExpr("gen_ai.usage.output_tokens"))} AS SpanCompletionTokens,
+              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cached_tokens"]))} AS SpanCacheReadTokens,
+              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.cache_creation.input_tokens"]))} AS SpanCacheWriteTokens,
+              ${contribution(spanFirstPositiveExpr(["gen_ai.usage.reasoning_tokens"]))} AS SpanReasoningTokens
+            FROM stored_spans
+            WHERE TenantId = {tenantId:String} ${spanTimeFilter}
+            GROUP BY TenantId, TraceId, SpanId, SpanModelKey
+          )
+          GROUP BY TenantId, TraceId, SpanModelKey
+        )
+        WHERE SpanModelKey != 'unknown'
+          OR SpanModelCost > 0
+          OR SpanModelNonBilledCost > 0
+          OR SpanModelPromptTokens > 0
+          OR SpanModelCompletionTokens > 0
+          OR SpanModelCacheReadTokens > 0
+          OR SpanModelCacheWriteTokens > 0
+          OR SpanModelReasoningTokens > 0
+      ) ${smd} ON ${ts}.TenantId = ${smd}.TenantId AND ${ts}.TraceId = ${smd}.TraceId`;
+}
+
+/**
+ * Condition under which a model-grouped trace falls back to WHOLE-TRACE
+ * attribution under its primary model (`Models[1]`, or `'unknown'`), keeping
+ * every trace an exact single-bucket partition instead of a wrong multi-bucket
+ * one. True when:
+ *
+ *   - the span-model join found nothing (log-only traces, spans not stored);
+ *   - the trace is past the fold's MAX_PROCESSED_SPANS cap: the fold FREEZES
+ *     cost/token totals at the cap while stored_spans keeps every span, so
+ *     span-level sums would EXCEED the frozen ungrouped totals;
+ *   - the scan saw fewer spans than the fold counted (ts.SpanCount): spans
+ *     outside the StartTime envelope (long-lived traces, clock skew) would
+ *     otherwise produce a PARTIAL partition that silently drops their share.
+ *     The fold does not count synthetic spans while stored_spans keeps them,
+ *     so the scan count can only ever be >= the fold count on a complete scan.
+ */
+function spanModelPartitionMissExpr(): string {
+  const ts = tableAliases.trace_summaries;
+  const smd = SPAN_MODEL_ALIAS;
+  return `(${smd}.SpanModelKey IS NULL OR ${smd}.SpanModelKey = '' OR ${ts}.SpanCount > ${MAX_PROCESSED_SPANS} OR ${smd}.TraceSpanCount < ${ts}.SpanCount)`;
 }
 
 /**
@@ -297,16 +454,22 @@ const groupByExpressions: Partial<
     usesArrayJoin: true,
   }),
 
-  // Use trace-level Models array instead of span-level model to avoid
-  // double-counting trace metrics. When joining stored_spans, non-LLM spans
-  // (without a model) would create "unknown" entries that duplicate the
-  // trace's TotalPromptTokenCount/TotalCost across model groups.
-  // trace_summaries.Models only contains actual LLM models, matching ES behavior.
+  // Per-SPAN attribution via the span-model partition join (LEFT JOIN `smd`,
+  // one row per (trace, span model)). The former `arrayJoin(Models)` over
+  // trace-level totals attributed each trace's WHOLE cost/token totals to
+  // EVERY model the trace touched, so multi-model traces multiplied their
+  // cost by the number of models used (~2.9x observed on a real multi-agent
+  // session). Buckets come from each span's own model (response > request,
+  // mirroring SpanCostService.extractModelsFromSpan); traces with no
+  // span-model rows (log-only traces, or spans outside the scan window) fall
+  // back to their primary model `Models[1]`, or `'unknown'` when the trace
+  // genuinely has no model, so they keep a single, exactly-partitioned
+  // bucket instead of vanishing.
   "metadata.model": () => ({
-    column: `arrayJoin(if(empty(${tableAliases.trace_summaries}.Models), ['unknown'], ${tableAliases.trace_summaries}.Models))`,
+    column: `if(${spanModelPartitionMissExpr()}, if(empty(${tableAliases.trace_summaries}.Models), 'unknown', ${tableAliases.trace_summaries}.Models[1]), ${SPAN_MODEL_ALIAS}.SpanModelKey)`,
     requiredJoins: [],
-    usesArrayJoin: true,
     handlesUnknown: true,
+    spanModelPartitioned: true,
   }),
 
   "metadata.span_type": () => ({
@@ -596,12 +759,14 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   let usesArrayJoin = false;
   let groupByHandlesUnknown = false;
   let groupByRequiresSpans = false;
+  let spanModelPartitioned = false;
   if (input.groupBy) {
     const groupByExpr = getGroupByExpression(input.groupBy, input.groupByKey);
     groupByColumn = groupByExpr.column;
     usesArrayJoin = groupByExpr.usesArrayJoin ?? false;
     groupByHandlesUnknown = groupByExpr.handlesUnknown ?? false;
     groupByRequiresSpans = groupByExpr.requiredJoins.includes("stored_spans");
+    spanModelPartitioned = groupByExpr.spanModelPartitioned ?? false;
     for (const join of groupByExpr.requiredJoins) {
       allJoins.add(join);
     }
@@ -657,12 +822,16 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const filterWhere =
     filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : "";
 
-  // When using arrayJoin for grouping (like labels) or span-level groupBy (like model),
-  // we need a CTE approach to avoid trace duplication affecting counts. The CTE deduplicates
+  // When using arrayJoin for grouping (like labels), span-level groupBy (like
+  // span_type), or the span-partitioned model grouping, we need a CTE approach
+  // to avoid trace duplication affecting counts. The CTE deduplicates
   // (TraceId, group_key) pairs and preserves metrics per trace for accurate aggregation.
   // Without this, joining stored_spans causes each trace to be counted once per span.
-  if ((usesArrayJoin || groupByRequiresSpans) && groupByColumn) {
-    return buildArrayJoinTimeseriesQuery(
+  if (
+    (usesArrayJoin || groupByRequiresSpans || spanModelPartitioned) &&
+    groupByColumn
+  ) {
+    return buildArrayJoinTimeseriesQuery({
       input,
       groupByColumn,
       groupByHandlesUnknown,
@@ -670,9 +839,10 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       joinClauses,
       baseWhere,
       filterWhere,
-      allTranslationParams,
+      filterParams: allTranslationParams,
       timeZone,
-    );
+      spanModelPartitioned,
+    });
   }
 
   // Separate simple and subquery metrics
@@ -1179,17 +1349,29 @@ function replaceColumnWithAlias(
  * or span-level grouping (model, span_type).
  * This prevents trace duplication from affecting aggregate counts.
  */
-function buildArrayJoinTimeseriesQuery(
-  input: TimeseriesQueryInput,
-  groupByColumn: string,
-  groupByHandlesUnknown: boolean,
-  metricTranslations: MetricTranslation[],
-  joinClauses: string,
-  baseWhere: string,
-  filterWhere: string,
-  filterParams: Record<string, unknown>,
-  timeZone: string,
-): BuiltQuery {
+function buildArrayJoinTimeseriesQuery({
+  input,
+  groupByColumn,
+  groupByHandlesUnknown,
+  metricTranslations,
+  joinClauses,
+  baseWhere,
+  filterWhere,
+  filterParams,
+  timeZone,
+  spanModelPartitioned = false,
+}: {
+  input: TimeseriesQueryInput;
+  groupByColumn: string;
+  groupByHandlesUnknown: boolean;
+  metricTranslations: MetricTranslation[];
+  joinClauses: string;
+  baseWhere: string;
+  filterWhere: string;
+  filterParams: Record<string, unknown>;
+  timeZone: string;
+  spanModelPartitioned?: boolean;
+}): BuiltQuery {
   const ts = tableAliases.trace_summaries;
 
   // Build date truncation for CTE
@@ -1296,27 +1478,71 @@ function buildArrayJoinTimeseriesQuery(
   const traceColumnWrapper = (col: string) =>
     hasEvalMixWithTrace ? `any(${col})` : col;
   // IMPORTANT: When adding a new trace-level column to metric-translator.ts, it
-  // MUST also be added to this CTE select list AND to DEDUP_FIELD_MAPPINGS
+  // MUST also be added to this CTE select list AND to dedupSubstitutions()
   // (consumed by transformMetricForDedup below). The simple-path
   // buildMixedEvalTimeseriesQuery uses dynamic column extraction via
   // extractTraceAggregationColumn, but this arrayJoin path still uses the
   // hard-coded approach. Missing the update here will make the new column
   // silently return null (or throw) when combined with an arrayJoin groupBy.
   // TODO(#3115): port this path to extractTraceAggregationColumn for parity.
-  cteSelectExprs.push(
-    `${traceColumnWrapper(`${ts}.TotalCost`)} AS trace_total_cost`,
+  //
+  // For the span-partitioned model grouping, the additive (span-attributable)
+  // columns carry the (trace, model) bucket's OWN share from the `smd` join
+  // instead of the whole-trace value, so the outer sums partition exactly.
+  // Traces without a joined smd row (log-only traces, spans outside the scan
+  // window) keep the trace-level value: the group-by expression gives those
+  // traces exactly one bucket, so whole-trace attribution stays a partition.
+  // Non-additive trace-level columns (duration, TTFT, tokens/second) keep
+  // whole-trace attribution in every bucket the trace touched.
+  const smdMiss = spanModelPartitionMissExpr();
+  const partitionedOrTrace = (bucketExpr: string, traceExpr: string) =>
+    spanModelPartitioned
+      ? `if(${smdMiss}, ${traceExpr}, ${bucketExpr})`
+      : traceExpr;
+  // The effective non-billed cost (column + legacy-marker fallback) is only
+  // materialized when a requested metric reads it, because the fallback reads
+  // the wide ts.Attributes map and would otherwise widen the dedup subquery
+  // for every grouped query.
+  const needsNonBilledCost = simpleMetrics.some((m) =>
+    m.selectExpression.includes("NonBilledCost"),
+  );
+  // Bucket-level non-billed cost mirrors nonBilledCostExpression's precedence
+  // exactly: the fold-time per-span split wins; the legacy all-or-nothing
+  // `langwatch.cost.non_billable` trace marker only kicks in when the
+  // trace-level NonBilledCost column is NULL (rows folded before the column
+  // existed). The marker classifies the WHOLE trace as bundled, so under it
+  // every bucket's non-billed share equals the bucket's cost, keeping the
+  // buckets an exact partition of the trace expression.
+  const bucketNonBilledExpr = needsNonBilledCost
+    ? `if(${ts}.NonBilledCost IS NULL AND ${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${SPAN_MODEL_ALIAS}.SpanModelCost, ${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost)`
+    : `${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost`;
+  const needsCacheTokenColumns = simpleMetrics.some(
+    (m) =>
+      m.selectExpression.includes("langwatch.reserved.cache_read_tokens") ||
+      m.selectExpression.includes("langwatch.reserved.cache_creation_tokens") ||
+      m.selectExpression.includes("langwatch.reserved.reasoning_tokens"),
   );
   cteSelectExprs.push(
-    `${traceColumnWrapper(`${ts}.NonBilledCost`)} AS trace_non_billed_cost`,
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCost`, `${ts}.TotalCost`))} AS trace_total_cost`,
+  );
+  cteSelectExprs.push(
+    `${traceColumnWrapper(
+      partitionedOrTrace(
+        bucketNonBilledExpr,
+        needsNonBilledCost
+          ? nonBilledCostExpression(ts)
+          : `${ts}.NonBilledCost`,
+      ),
+    )} AS trace_non_billed_cost`,
   );
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TotalDurationMs`)} AS trace_duration_ms`,
   );
   cteSelectExprs.push(
-    `${traceColumnWrapper(`${ts}.TotalPromptTokenCount`)} AS trace_prompt_tokens`,
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelPromptTokens`, `${ts}.TotalPromptTokenCount`))} AS trace_prompt_tokens`,
   );
   cteSelectExprs.push(
-    `${traceColumnWrapper(`${ts}.TotalCompletionTokenCount`)} AS trace_completion_tokens`,
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCompletionTokens`, `${ts}.TotalCompletionTokenCount`))} AS trace_completion_tokens`,
   );
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TokensPerSecond`)} AS trace_tokens_per_second`,
@@ -1324,6 +1550,34 @@ function buildArrayJoinTimeseriesQuery(
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TimeToFirstTokenMs`)} AS trace_time_to_first_token_ms`,
   );
+  if (needsCacheTokenColumns) {
+    // toFloat64 wraps the UInt64 attribute read so both if() branches share a
+    // supertype with the smd join's Float64 sums.
+    cteSelectExprs.push(
+      `${traceColumnWrapper(
+        partitionedOrTrace(
+          `${SPAN_MODEL_ALIAS}.SpanModelCacheReadTokens`,
+          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens']))`,
+        ),
+      )} AS trace_cache_read_tokens`,
+    );
+    cteSelectExprs.push(
+      `${traceColumnWrapper(
+        partitionedOrTrace(
+          `${SPAN_MODEL_ALIAS}.SpanModelCacheWriteTokens`,
+          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens']))`,
+        ),
+      )} AS trace_cache_write_tokens`,
+    );
+    cteSelectExprs.push(
+      `${traceColumnWrapper(
+        partitionedOrTrace(
+          `${SPAN_MODEL_ALIAS}.SpanModelReasoningTokens`,
+          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens']))`,
+        ),
+      )} AS trace_reasoning_tokens`,
+    );
+  }
 
   // When pre-aggregating eval metrics per-trace, emit each eval metric's full
   // expression (without its alias) as a `<alias>__per_trace` column inside the
@@ -1417,6 +1671,15 @@ function buildArrayJoinTimeseriesQuery(
     [...cteSelectExprs, filterWhere, joinClauses],
   );
 
+  // The span-model partition join fans each trace out into one row per model
+  // its spans used; it rides ALONGSIDE any generic filter/metric JOINs, whose
+  // per-span fan-out the CTE's DISTINCT / GROUP BY collapses as before.
+  const cteJoinClauses = spanModelPartitioned
+    ? [joinClauses, buildSpanModelPartitionJoin(SPAN_TIME_FILTER_BOTH_PERIODS)]
+        .filter(Boolean)
+        .join("\n")
+    : joinClauses;
+
   // CTE body: use GROUP BY when pre-aggregating eval metrics per trace,
   // otherwise fall back to SELECT DISTINCT for backward-compatible behavior.
   let cteBody: string;
@@ -1427,7 +1690,7 @@ function buildArrayJoinTimeseriesQuery(
       SELECT
         ${cteSelectExprs.join(",\n        ")}
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
-      ${joinClauses}
+      ${cteJoinClauses}
       WHERE ${baseWhere}
         ${filterWhere}
       GROUP BY ${cteGroupByCols.join(", ")}
@@ -1437,7 +1700,7 @@ function buildArrayJoinTimeseriesQuery(
       SELECT DISTINCT
         ${cteSelectExprs.join(",\n        ")}
       FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
-      ${joinClauses}
+      ${cteJoinClauses}
       WHERE ${baseWhere}
         ${filterWhere}
     `;
@@ -2210,53 +2473,78 @@ function buildPipelineMetricCTE(
       )`;
 }
 
-/** Maps source field names to their corresponding CTE column names */
-const DEDUP_FIELD_MAPPINGS: Record<string, string> = {
-  TotalCost: "trace_total_cost",
-  NonBilledCost: "trace_non_billed_cost",
-  TotalDurationMs: "trace_duration_ms",
-  TotalPromptTokenCount: "trace_prompt_tokens",
-  TotalCompletionTokenCount: "trace_completion_tokens",
-  TokensPerSecond: "trace_tokens_per_second",
-  TimeToFirstTokenMs: "trace_time_to_first_token_ms",
-};
-
-/** Aggregation patterns and their transformation logic */
-const AGGREGATION_HANDLERS: Array<{
-  pattern: RegExp;
-  transform: (col: string, expr: string) => string | null;
-}> = [
-  {
-    pattern: /\bsum\s*\(/,
-    transform: (col) => `sum(${col})`,
-  },
-  {
-    pattern: /\bavg\s*\(/,
-    transform: (col) => `avg(${col})`,
-  },
-  {
-    pattern: /\bmin\s*\(/,
-    transform: (col) => `min(${col})`,
-  },
-  {
-    pattern: /\bmax\s*\(/,
-    transform: (col) => `max(${col})`,
-  },
-  {
-    pattern: /\bquantileTDigest\s*\(/,
-    transform: (col, expr) => {
-      const match = expr.match(/quantileTDigest\s*\(\s*([\d.]+)\s*\)/);
-      return match ? `quantileTDigest(${match[1]})(${col})` : null;
+/**
+ * Ordered (source expression -> CTE column) rewrites applied by
+ * transformMetricForDedup. COMPOSITE expressions come first, longest first,
+ * so a metric like total_tokens (prompt + completion) has EVERY term rewritten
+ * against its CTE column, preserving the metric's arithmetic.
+ *
+ * The previous implementation replaced the whole aggregation argument with the
+ * FIRST matching column, which silently collapsed composite metrics: grouped
+ * total_tokens returned prompt_tokens only, grouped cost_billed returned the
+ * un-subtracted total cost, and grouped cost_non_billed returned the total.
+ *
+ * `bare: true` entries are single column references rewritten with the
+ * boundary-safe replaceColumnWithAlias; composite entries are exact literals
+ * produced by the same string builders metric-translator uses, so plain
+ * split/join substitution is safe.
+ */
+function dedupSubstitutions(): Array<{
+  source: string;
+  cteColumn: string;
+  bare?: boolean;
+}> {
+  const ts = tableAliases.trace_summaries;
+  return [
+    // Composites first: the non-billed fallback references TotalCost and
+    // Attributes, and the cache/reasoning reads reference Attributes, so they
+    // must be rewritten before the bare columns they contain.
+    { source: nonBilledCostExpression(ts), cteColumn: "trace_non_billed_cost" },
+    {
+      source: `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens'])`,
+      cteColumn: "trace_cache_read_tokens",
     },
-  },
-  {
-    pattern: /\bquantileExact\s*\(/,
-    transform: (col, expr) => {
-      const match = expr.match(/quantileExact\s*\(\s*([\d.]+)\s*\)/);
-      return match ? `quantileExact(${match[1]})(${col})` : null;
+    {
+      source: `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens'])`,
+      cteColumn: "trace_cache_write_tokens",
     },
-  },
-];
+    {
+      source: `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens'])`,
+      cteColumn: "trace_reasoning_tokens",
+    },
+    { source: `${ts}.TotalCost`, cteColumn: "trace_total_cost", bare: true },
+    {
+      source: `${ts}.NonBilledCost`,
+      cteColumn: "trace_non_billed_cost",
+      bare: true,
+    },
+    {
+      source: `${ts}.TotalDurationMs`,
+      cteColumn: "trace_duration_ms",
+      bare: true,
+    },
+    {
+      source: `${ts}.TotalPromptTokenCount`,
+      cteColumn: "trace_prompt_tokens",
+      bare: true,
+    },
+    {
+      source: `${ts}.TotalCompletionTokenCount`,
+      cteColumn: "trace_completion_tokens",
+      bare: true,
+    },
+    {
+      source: `${ts}.TokensPerSecond`,
+      cteColumn: "trace_tokens_per_second",
+      bare: true,
+    },
+    {
+      source: `${ts}.TimeToFirstTokenMs`,
+      cteColumn: "trace_time_to_first_token_ms",
+      bare: true,
+    },
+  ];
+}
 
 /**
  * Map an evaluation metric's conditional aggregation (e.g. `avgIf`, `sumIf`)
@@ -2310,7 +2598,9 @@ function stripSelectExpressionAlias(
 /**
  * Transform a metric expression to work with deduplicated trace data.
  * count() becomes uniqExact(trace_id) to count distinct traces.
- * Sum/avg of trace-level values use the CTE columns.
+ * Trace-level column references are rewritten to their CTE columns, keeping
+ * the metric's aggregation AND its arithmetic intact: a composite metric
+ * like total_tokens (prompt + completion) keeps both terms.
  */
 function transformMetricForDedup(
   selectExpression: string,
@@ -2330,21 +2620,29 @@ function transformMetricForDedup(
     return `uniqExact(trace_id) AS ${alias}`;
   }
 
-  // Find matching field and apply aggregation transformation
-  for (const [fieldName, cteColumn] of Object.entries(DEDUP_FIELD_MAPPINGS)) {
-    if (!selectExpression.includes(fieldName)) continue;
-
-    for (const handler of AGGREGATION_HANDLERS) {
-      if (!handler.pattern.test(selectExpression)) continue;
-
-      const transformed = handler.transform(cteColumn, selectExpression);
-      if (!transformed) continue;
-
-      // Preserve coalesce wrapper if present
-      const hasCoalesce = /\bcoalesce\s*\(/.test(selectExpression);
-      const result = hasCoalesce ? `coalesce(${transformed}, 0)` : transformed;
-      return `${result} AS ${alias}`;
+  // Rewrite every known trace-level reference to its CTE column. Composite
+  // sources are substituted before the bare columns they contain (see
+  // dedupSubstitutions). @regression: the previous first-match logic dropped
+  // all but one term of composite metrics (total_tokens == prompt_tokens).
+  let rewritten = selectExpression;
+  for (const { source, cteColumn, bare } of dedupSubstitutions()) {
+    if (!rewritten.includes(source)) continue;
+    rewritten = bare
+      ? replaceColumnWithAlias(rewritten, source, cteColumn)
+      : rewritten.split(source).join(cteColumn);
+  }
+  if (rewritten !== selectExpression) {
+    // A partial rewrite would emit SQL referencing the `ts` alias outside its
+    // scope; fail loudly so a new metric-translator column gets added to the
+    // CTE select list + dedupSubstitutions instead of shipping silent nulls.
+    const ts = tableAliases.trace_summaries;
+    if (new RegExp(`(?<![\\w.])${ts}\\.`).test(rewritten)) {
+      throw new Error(
+        `transformMetricForDedup could not fully rewrite "${selectExpression}" for the grouped CTE. ` +
+          `Add the missing trace-level column to the arrayJoin CTE select list and dedupSubstitutions in aggregation-builder.ts.`,
+      );
     }
+    return rewritten;
   }
 
   // Handle evaluation metrics that reference evaluation_runs columns (es.Passed, es.Score, etc.)
@@ -2813,5 +3111,6 @@ export const __testOnly__ = {
   extractTraceAggregationColumn,
   replaceColumnWithAlias,
   hasEvalMixedWithTraceMetrics,
-  __testOnly_DEDUP_FIELD_MAPPINGS: DEDUP_FIELD_MAPPINGS,
+  transformMetricForDedup,
+  dedupSubstitutions,
 };

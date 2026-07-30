@@ -267,7 +267,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/payload-capture.feature",
   "specs/ai-gateway/policy-rules.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
-  "specs/ai-gateway/public-rest-api.feature",
   "specs/ai-gateway/rate-limits.feature",
   "specs/ai-gateway/rbac-legacy-admin-fallback.feature",
   "specs/ai-gateway/self-hosting/gateway-finds-its-control-plane.feature",
