@@ -70,6 +70,34 @@ const requiredDirs = Object.entries(appPkg.dependencies ?? {})
   .filter((dir): dir is string => dir !== undefined);
 
 describe("Dockerfile runtime stage", () => {
+  describe("when the runtime stage assembles its node_modules", () => {
+    it("copies the workspace store before the app tree", () => {
+      // Since ADR-076 the install root is /app, so pnpm's virtual store lives
+      // at /app/node_modules/.pnpm and EVERY entry in langwatch/node_modules
+      // is a symlink into it. Omitting this copy builds a clean image whose
+      // container dies on its first import — there is no build error to catch
+      // it, which is how it shipped broken once already.
+      const storeCopy = stage.search(
+        /COPY --from=builder \/app\/node_modules\s+\.\/node_modules/,
+      );
+      const appCopy = stage.search(
+        /COPY --from=builder \/app\/langwatch\s+\.\/langwatch/,
+      );
+
+      expect(
+        storeCopy,
+        "runtime stage must COPY /app/node_modules",
+      ).toBeGreaterThan(-1);
+      expect(appCopy, "runtime stage must COPY /app/langwatch").toBeGreaterThan(
+        -1,
+      );
+      expect(
+        storeCopy,
+        "the store copy must precede the app copy — the app tree is symlinks into it",
+      ).toBeLessThan(appCopy);
+    });
+  });
+
   describe("when the app depends on a root-level workspace package", () => {
     it("finds the root workspace packages the app depends on", () => {
       // Guards the guard: if this list ever empties, the assertions below

@@ -1,7 +1,7 @@
 {
   "name": "@langwatch/server",
   "version": "3.9.0",
-  "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
+  "description": "Run LangWatch locally with one command \u2014 `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
   "license": "Apache-2.0",
   "homepage": "https://langwatch.ai",
   "repository": {
@@ -58,7 +58,7 @@
     "build": "pnpm -r --filter \"!@langwatch/server\" build",
     "build:app": "pnpm --filter @langwatch/web... build",
     "build:cli": "pnpm --filter @langwatch/server-cli build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --filter \"./packages/*\" test",
     "test:unit": "pnpm --filter @langwatch/web test:unit",
     "test:integration": "pnpm --filter @langwatch/web test:integration",
     "test:e2e": "pnpm --filter @langwatch/web test:e2e",

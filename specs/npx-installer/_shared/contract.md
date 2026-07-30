@@ -34,7 +34,7 @@ This is parity with `make dev-full` from the dev tree, but for an end-user, **wi
 | BDD specs                      | `/specs/npx-installer/`                     |
 | CI workflows                   | `/.github/workflows/npx-server-*.yml`       |
 
-Existing `langwatch` (next.js app) becomes a workspace dep of `@langwatch/server`.
+The app — `@langwatch/web` since ADR-076, a Vite app in `langwatch/` — ships inside `@langwatch/server`'s tarball under `app/`, one workspace with the CLI.
 
 ---
 

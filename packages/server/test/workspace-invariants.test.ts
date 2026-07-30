@@ -1,7 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+	APP_PACKAGE_NAME,
+	workspaceInstallArgs,
+} from "../src/services/node-deps";
 
 /**
  * The invariants ADR-076 established, asserted against the repo itself.
@@ -20,11 +24,21 @@ function readJson(relPath: string): Record<string, unknown> {
 	return JSON.parse(readFileSync(join(repoRoot, relPath), "utf8"));
 }
 
+function gitLsFiles(pattern: string): string[] {
+	return execFileSync("git", ["ls-files", pattern], {
+		cwd: repoRoot,
+		encoding: "utf8",
+	})
+		.split("\n")
+		.filter(Boolean);
+}
+
 /**
- * The `packages:` list from pnpm-workspace.yaml. Read with a line scan rather
- * than a YAML parser: it is a flat list of quoted strings, and this package
- * ships as the published CLI, so a parser dependency added for one test would
- * travel into the npm artifact with it.
+ * The `packages:` list from pnpm-workspace.yaml. A line scan rather than a
+ * YAML parser: the list is flat quoted strings, and pulling in a parser as a
+ * devDependency for one test buys nothing over twelve lines that fail loudly —
+ * an empty result fails both the member-count assertion and the sanity check
+ * below.
  */
 function workspaceMembers(): string[] {
 	const lines = readFileSync(
@@ -47,29 +61,53 @@ function workspaceMembers(): string[] {
 	return members;
 }
 
+/** The keys of the root `overrides:` block, same line-scan approach. */
+function rootOverrideKeys(): string[] {
+	const lines = readFileSync(
+		join(repoRoot, "pnpm-workspace.yaml"),
+		"utf8",
+	).split("\n");
+	const start = lines.findIndex((l) => l.trimEnd() === "overrides:");
+	if (start === -1) return [];
+
+	const keys: string[] = [];
+	for (const line of lines.slice(start + 1)) {
+		if (line.trim() === "" || line.trimStart().startsWith("#")) continue;
+		if (!/^\s/.test(line)) break; // next top-level key
+		const m = /^\s+"?([^"]+?)"?:/.exec(line);
+		if (m?.[1]) keys.push(m[1]);
+	}
+	return keys;
+}
+
 /** Every package.json the repo tracks, excluding installed dependencies. */
 function trackedManifests(): string[] {
-	return execFileSync("git", ["ls-files", "*package.json"], {
-		cwd: repoRoot,
-		encoding: "utf8",
-	})
-		.split("\n")
-		.filter(Boolean)
-		.filter((p) => !p.includes("node_modules"));
+	return gitLsFiles("*package.json").filter(
+		(p) => !p.includes("node_modules"),
+	);
+}
+
+/** Directory of a manifest, "" for the root one. */
+function manifestDir(manifest: string): string {
+	return manifest.replace(/\/?package\.json$/, "");
+}
+
+/** Whether dir is a workspace member per the `packages:` globs. */
+function isWorkspaceMember(dir: string): boolean {
+	if (dir === "") return false;
+	return workspaceMembers().some((glob) =>
+		glob.endsWith("/*")
+			? dir.startsWith(`${glob.slice(0, -2)}/`) &&
+				!dir.slice(glob.length - 1).includes("/")
+			: dir === glob,
+	);
 }
 
 describe("the repo is a single pnpm workspace", () => {
 	describe("when the lockfiles are counted", () => {
 		/** @scenario The repo holds one lockfile */
 		it("finds exactly one, at the repo root", () => {
-			const lockfiles = execFileSync("git", ["ls-files", "*pnpm-lock.yaml"], {
-				cwd: repoRoot,
-				encoding: "utf8",
-			})
-				.split("\n")
-				.filter(Boolean);
-
-			expect(lockfiles).toEqual(["pnpm-lock.yaml"]);
+			expect(gitLsFiles("*pnpm-lock.yaml")).toEqual(["pnpm-lock.yaml"]);
 		});
 	});
 
@@ -89,27 +127,26 @@ describe("the repo is a single pnpm workspace", () => {
 			}
 		});
 
-		/** @scenario A fresh clone needs one install */
+		/** @scenario The repo holds one lockfile */
 		it("keeps the workspace definition at the repo root and nowhere else", () => {
-			const definitions = execFileSync(
-				"git",
-				["ls-files", "*pnpm-workspace.yaml"],
-				{ cwd: repoRoot, encoding: "utf8" },
-			)
-				.split("\n")
-				.filter(Boolean);
-
-			expect(definitions).toEqual(["pnpm-workspace.yaml"]);
+			expect(gitLsFiles("*pnpm-workspace.yaml")).toEqual([
+				"pnpm-workspace.yaml",
+			]);
 		});
 	});
 
 	describe("when the package names are compared", () => {
 		/** @scenario The application and the SDK no longer share a package name */
-		it("gives the app and the SDK different names", () => {
+		it("gives the app the name the npx installer filters by, and the SDK its own", () => {
 			const app = readJson("langwatch/package.json").name;
 			const sdk = readJson("typescript-sdk/package.json").name;
 
-			expect(app).toBe("@langwatch/web");
+			// Cross-checked against the constant the end-user install filters
+			// by, not against a literal: pnpm exits 0 on a filter that matches
+			// nothing, so a rename that misses node-deps.ts turns every npx
+			// first boot into a silent no-op that fails minutes later inside a
+			// migration. This is the only assertion tying the two together.
+			expect(app).toBe(APP_PACKAGE_NAME);
 			expect(sdk).toBe("langwatch");
 			expect(app).not.toBe(sdk);
 		});
@@ -128,42 +165,120 @@ describe("the repo is a single pnpm workspace", () => {
 		});
 	});
 
-	describe("when a member declares dependency overrides", () => {
-		/** @scenario Security overrides are declared once */
-		it("finds none, because pnpm would ignore them", () => {
-			const offenders = trackedManifests()
-				.filter((p) => p !== "package.json")
-				.filter((p) => {
-					const pkg = readJson(p) as { pnpm?: { overrides?: unknown } };
-					return pkg.pnpm?.overrides !== undefined;
-				});
+	describe("when a member carries install configuration of its own", () => {
+		/** @scenario No project keeps a dependency rule that no longer applies */
+		it("finds no member holding dependency rules pnpm would ignore", () => {
+			// pnpm honours these only in the workspace ROOT manifest: the whole
+			// `pnpm` block (overrides, packageExtensions, onlyBuiltDependencies,
+			// patchedDependencies, ...) and yarn-style `resolutions`. One left in
+			// a member looks like an active pin and does nothing — which is
+			// exactly how the six old roots drifted apart.
+			const offenders: string[] = [];
+			for (const manifest of trackedManifests()) {
+				if (manifest === "package.json") continue;
+				const pkg = readJson(manifest) as {
+					pnpm?: Record<string, unknown>;
+					resolutions?: Record<string, unknown>;
+				};
+				for (const key of Object.keys(pkg.pnpm ?? {})) {
+					offenders.push(`${manifest}: pnpm.${key}`);
+				}
+				if (pkg.resolutions !== undefined) {
+					offenders.push(`${manifest}: resolutions`);
+				}
+			}
+			expect(offenders).toEqual([]);
+		});
 
-			// pnpm honours `pnpm.overrides` only in the workspace root manifest.
-			// One left in a member looks like an active pin and does nothing —
-			// which is exactly how the six old roots drifted apart.
+		/** @scenario No project keeps a dependency rule that no longer applies */
+		it("finds no .npmrc outside the repo root", () => {
+			// An .npmrc is read from the install root, which is the repo root
+			// now. A member one is dead config that still READS as active —
+			// skills/.npmrc held a release-age exemption for @langwatch/scenario
+			// that silently stopped applying the day the roots merged.
+			expect(gitLsFiles("*.npmrc")).toEqual([".npmrc"]);
+		});
+	});
+
+	describe("when the root overrides are read", () => {
+		/** @scenario A pin that suits one project is not forced onto the others */
+		it("carries no unconditional pin for the packages the projects disagree on", () => {
+			// Three projects legitimately sit on three zod majors (app 3.x,
+			// SDK 4.0, MCP server 4.3), and the SDK's OTel logs pins are older
+			// than the app's stack. Each was deliberately NOT carried into the
+			// root list — as a direct dependency, the owning project's own
+			// declaration governs it. An unconditional root pin (a bare package
+			// name, no `@range` selector) would drag every project onto one
+			// version; a future merge adding one back must fail here.
+			const disputed = [
+				"zod",
+				"@opentelemetry/api-logs",
+				"@opentelemetry/sdk-logs",
+			];
+			const unconditional = rootOverrideKeys().filter(
+				(k) => !k.replace(/^@/, "").includes("@"),
+			);
+
+			// Guards the guard: the parser returning nothing would pass
+			// vacuously. The alignment block genuinely holds unconditional keys.
+			expect(unconditional.length).toBeGreaterThan(3);
+
+			for (const name of disputed) {
+				expect(unconditional, `root overrides pin ${name} for every project`)
+					.not.toContain(name);
+			}
+		});
+	});
+
+	describe("when a member depends on an internal package", () => {
+		/** @scenario A shared internal package is reachable from every project */
+		it("resolves every internal dependency to the working copy", () => {
+			// Generalised over every member and every internal name, because the
+			// invariant is about the workspace, not about one pair: any member
+			// declaring a dependency on a package that lives in this repo must
+			// take the working copy. The one documented exception is `langwatch`
+			// — the published SDK — which the app consumes from the registry on
+			// purpose (see "keeps the app on the published SDK" above).
+			const internalNames = new Set(
+				trackedManifests()
+					.map((m) => readJson(m).name)
+					.filter((n): n is string => typeof n === "string"),
+			);
+
+			const offenders: string[] = [];
+			let internalDepsSeen = 0;
+			for (const manifest of trackedManifests()) {
+				const dir = manifestDir(manifest);
+				if (!isWorkspaceMember(dir)) continue;
+				const pkg = readJson(manifest) as {
+					dependencies?: Record<string, string>;
+					devDependencies?: Record<string, string>;
+				};
+				for (const [name, spec] of Object.entries({
+					...pkg.dependencies,
+					...pkg.devDependencies,
+				})) {
+					if (!internalNames.has(name) || name === "langwatch") continue;
+					internalDepsSeen++;
+					if (!spec.startsWith("workspace:")) {
+						offenders.push(`${manifest}: ${name} -> ${spec}`);
+					}
+				}
+			}
+
+			// Guards the guard: zero internal dependencies found would mean the
+			// scan is broken, not that the repo is clean.
+			expect(internalDepsSeen).toBeGreaterThan(5);
 			expect(offenders).toEqual([]);
 		});
 	});
 
-	describe("when an internal package is depended on", () => {
-		/** @scenario A shared internal package is reachable from every project */
-		it("resolves to the working copy rather than a published version", () => {
-			const mcp = readJson("mcp-server/package.json") as {
-				dependencies?: Record<string, string>;
-				devDependencies?: Record<string, string>;
-			};
-			const declared = {
-				...mcp.dependencies,
-				...mcp.devDependencies,
-			};
-
-			expect(declared["@langwatch/handled-error"]).toMatch(/^workspace:/);
-		});
-	});
-
 	describe("when the published package manifest is read", () => {
-		/** @scenario The published package carries a lockfile */
-		it("ships the workspace definition and the lockfile", () => {
+		it("stages the workspace definition and the lockfile into the file list", () => {
+			// Necessary, not sufficient: `files` drives what pack-npm.sh stages,
+			// but npm deletes a root lockfile no matter what the manifest asks —
+			// the guarantee that one actually ships lives in the packing script's
+			// own assertions and the smoke job's tar check.
 			const root = readJson("package.json") as { files?: string[] };
 
 			expect(root.files).toContain("pnpm-workspace.yaml");
@@ -178,16 +293,9 @@ describe("the repo is a single pnpm workspace", () => {
 			// Workspace members only — `typescript-sdk/examples/*` carry a
 			// package.json but are not members, so the lockfile never mentions
 			// them and the tarball has no reason to.
-			const memberManifests = trackedManifests().filter((manifest) => {
-				const dir = manifest.replace(/\/?package\.json$/, "");
-				if (dir === "") return false;
-				return workspaceMembers().some((glob) =>
-					glob.endsWith("/*")
-						? dir.startsWith(`${glob.slice(0, -2)}/`) &&
-							!dir.slice(glob.length - 1).includes("/")
-						: dir === glob,
-				);
-			});
+			const memberManifests = trackedManifests().filter((manifest) =>
+				isWorkspaceMember(manifestDir(manifest)),
+			);
 
 			expect(memberManifests.length).toBeGreaterThan(5);
 
@@ -196,9 +304,7 @@ describe("the repo is a single pnpm workspace", () => {
 			for (const manifest of memberManifests) {
 				// Compare against a directory prefix that definitely ends in "/",
 				// so a `files` entry of `langwatch` cannot be read as shipping
-				// `langwatch-something/package.json`. (This previously wrote
-				// `f.replace(/\/$/, "/")`, which replaces a trailing slash with a
-				// trailing slash and therefore did nothing at all.)
+				// `langwatch-something/package.json`.
 				const covered = shipped.some(
 					(f) =>
 						manifest === f ||
@@ -209,19 +315,20 @@ describe("the repo is a single pnpm workspace", () => {
 		});
 	});
 
-	describe("when the packing script is inspected", () => {
-		/** @scenario The published layout is not a mirror of the repository layout */
-		it("assembles a staging tree instead of packing the repo in place", () => {
-			const script = readFileSync(
-				join(repoRoot, "scripts", "pack-npm.sh"),
-				"utf8",
-			);
-
-			expect(existsSync(join(repoRoot, "scripts", "pack-npm.sh"))).toBe(true);
-			// npm strips a lockfile at the package ROOT, so the artifact has to be
-			// staged one directory down for it to ship at all.
-			expect(script).toContain("STAGE=");
-			expect(script).toMatch(/APP="\$STAGE\/app"/);
+	describe("when the end-user install arguments are built", () => {
+		/** @scenario The install still refuses to drift from the lockfile */
+		it("pins both install passes to the lockfile and to the app's closure", () => {
+			// Both invariants an `npx @langwatch/server` first boot depends on:
+			// --frozen-lockfile makes the install reproducible-or-failed, and the
+			// `...` filter keeps the SDK, skills compiler and test suites off the
+			// end user's machine. This PR rewrote these argv twice; they are the
+			// most likely thing to lose in a refactor.
+			for (const prod of [true, false]) {
+				const args = workspaceInstallArgs("/some/root", { prod });
+				expect(args).toContain("--frozen-lockfile");
+				expect(args).toContain(`${APP_PACKAGE_NAME}...`);
+				expect(args).toContain(prod ? "--prod" : "--prod=false");
+			}
 		});
 	});
 });
