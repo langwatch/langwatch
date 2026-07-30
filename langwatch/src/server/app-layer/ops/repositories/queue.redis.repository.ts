@@ -269,8 +269,16 @@ return count
  * DO NOT "SIMPLIFY" THIS TO `EXPIRE dlqIndexKey`. It is not the same fix and it
  * is wrong: the set holds many members with independent deadlines, so a single
  * EXPIRE drops ALL of them the moment the oldest ages out — live dead-letters
- * included. Redis has no per-member expiry, which is exactly why the readers
- * are authoritative and the set heals behind them instead.
+ * included. A SET has no per-member expiry — true, but not the reason to stop
+ * looking: a deadline-scored ZSET (`ZREMRANGEBYSCORE key -inf <now>` to prune,
+ * `ZCARD` to count) is the standard structure for exactly this, and this module
+ * already uses it — `blobLeases.ts`'s `COUNT_LIVE_LUA` is this index's
+ * structural twin (blobLeases.ts:109: "member is a holder identity and its
+ * score is an absolute Redis-time deadline"). Converting is DEFERRED (#6362),
+ * not rejected: the live production key `{queue}:gq:dlq` is already a SET, so a
+ * deploy that `ZADD`s it would fail `WRONGTYPE` — the migration needs a new key
+ * name and a read-both window, not a type change in place. Until then, the
+ * readers stay authoritative and the set heals behind them.
  *
  * LIVENESS PREDICATE — a member is dropped only when BOTH `dlq:{groupId}:jobs`
  * and `dlq:{groupId}:error` hold nothing, i.e. Redis has nothing left for it.

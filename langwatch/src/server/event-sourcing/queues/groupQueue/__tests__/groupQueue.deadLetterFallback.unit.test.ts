@@ -294,6 +294,15 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — what th
         // And the put-back stays visible as its own event: dropping the count
         // entirely would have traded a wrong signal for no signal.
         expect(await putBacksCounted(queueName)).toBe(1);
+        // The reason label matters as much as the count: a put-back mislabelled
+        // under some other reason would still pass every assertion above, and
+        // gq_jobs_dropped_total's reason is already pinned elsewhere in this
+        // directory — this counter's should be too.
+        const restagedSamples = (
+          await gqDrainedDlqRestagedTotal.get()
+        ).values.filter((v) => v.labels.queue_name === queueName);
+        expect(restagedSamples).toHaveLength(1);
+        expect(restagedSamples[0]!.labels.reason).toBe("body_unreadable");
       });
     });
   });
@@ -352,6 +361,34 @@ describe("GroupQueueProcessor drained-sibling dead-letter durability — what th
           }),
           expect.stringContaining("Failed to re-stage drained sibling"),
         );
+      });
+    });
+  });
+
+  describe("given a drained job whose dead-letter write succeeds", () => {
+    describe("when the discard tally is read", () => {
+      /** @scenario a successful dead-letter write is counted as a discard and never as a put-back */
+      it("counts the discard and does not also count a put-back", async () => {
+        h.blobLifecycle.decode.mockRejectedValue(
+          new DecodeFailureError({
+            message: "unreadable to this worker",
+            reason: "body_unreadable",
+          }),
+        );
+        h.blobLifecycle.preserveForDlq.mockResolvedValue("inline");
+        h.scripts.writeJobToDlq.mockResolvedValue(undefined);
+        const queueName = h.queueName;
+
+        await drainOneSibling();
+
+        // This IS the discard: the write actually succeeded, so recordDrop must
+        // fire and the put-back branch must stay silent for it.
+        // Falsifiability: remove recordDrainedOutcome's recordDrop call on the
+        // dead_lettered branch (or route it into gqDrainedDlqRestagedTotal
+        // instead, as the restaged branch does) and this reads 0 while
+        // putBacksCounted below reads 1 for a write that never failed.
+        expect(await discardsCounted(queueName)).toBe(1);
+        expect(await putBacksCounted(queueName)).toBe(0);
       });
     });
   });

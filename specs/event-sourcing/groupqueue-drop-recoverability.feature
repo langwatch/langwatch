@@ -295,6 +295,19 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
     Then the discard is counted for it
     And it is recorded as a discard whose body did not survive
 
+  @unit
+  # AC-719.17 — the positive control AC-719.13-.15 need: a dead-letter write that
+  # actually SUCCEEDS is the real discard, and it must never also be reported as a
+  # put-back — they are mutually exclusive readings of one attempt. Falsifiability:
+  # drop the recordDrop call from the dead_lettered branch (or route it into the
+  # put-back counter instead) and the discard reads 0 while the put-back total
+  # climbs to 1 for a write that never failed.
+  Scenario: a successful dead-letter write is counted as a discard and never as a put-back
+    Given a drained job whose dead-letter write succeeds
+    When the operator reads how many jobs the queue has discarded
+    Then the discard is counted for it
+    And no put-back is reported for it
+
   # ----- telling a recoverable dead-letter from one that will come back empty -----
 
   @unit
@@ -404,8 +417,10 @@ Feature: GroupQueue drop recoverability — preserve, name, keep the blob
 #       falsifiability-proven per scenario). AC-719.13/.14/.15 bound (the discard tally counts only discards: a
 #       put-back drained value is NOT one and is reported separately, a repeatedly-failing dead-letter write cannot
 #       inflate the tally once per cycle, and a value that can be neither dead-lettered nor put back still counts as
-#       a body-gone discard — the same seam unit test with failure injection). AC-719.16 bound (an automatically
-#       dead-lettered job is as visible and as well ordered on the operator's list as a hand-moved group).
+#       a body-gone discard — the same seam unit test with failure injection). AC-719.17 bound (the positive control:
+#       a dead-letter write that succeeds is itself counted as the discard and never as a put-back — same seam unit
+#       test). AC-719.16 bound (an automatically dead-lettered job is as visible and as well ordered on the
+#       operator's list as a hand-moved group).
 #       AC-719.4/719.5/719.7 (@unimplemented — coalesced-batch /
 #       crash-injection harness gaps, same class 5821 deferred; the no-slot sites are WIRED + typecheck-clean).
 # #720: AC-720.1 bound (GQ2 holder, falsifiability-proven). AC-720.2 bound (an ordinary sibling renew

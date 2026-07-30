@@ -1,5 +1,13 @@
 import type { Redis } from "ioredis";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
@@ -63,6 +71,18 @@ beforeEach(() => {
   queueName = `{test/dlq-heal-${queueCounter}}`;
   prefix = `${queueName}:gq:`;
   scripts = new GroupStagingScripts(redis, queueName);
+});
+
+afterEach(async () => {
+  // Scoped to this suite's own counter-tagged namespace — never a global
+  // flushall, which would race with parallel integration suites on the shared
+  // persistent test Redis (see groupQueue.decodeDrop.integration.test.ts).
+  // Without this, the three tests that never expire their own keys (everything
+  // except the two "quarantine window has passed" cases) leave DLQ entries
+  // sitting on the real 7-day GROUP_QUEUE_DLQ_TTL_SECONDS with nothing to
+  // delete them.
+  const keys = await redis.keys("{test/dlq-heal-*");
+  if (keys.length > 0) await redis.del(...keys);
 });
 
 /**
@@ -145,7 +165,7 @@ async function dlqCount(): Promise<number> {
  */
 describe("given a group with a dead-lettered body-present job", () => {
   describe("when the quarantine window has passed and the operator checks the dead-letter count", () => {
-    /** @scenario "the dead-letter count returns to zero once the dead-lettered payloads have expired" */
+    /** @scenario the dead-letter count returns to zero once the dead-lettered payloads have expired */
     it("counts nothing and stops naming the group as dead-lettered", async () => {
       await deadLetterOneBodyPresentJob();
       expect(await dlqCount()).toBe(1);
@@ -163,7 +183,7 @@ describe("given a group with a dead-lettered body-present job", () => {
   });
 
   describe("when the quarantine window has passed and the operator lists the dead-lettered groups", () => {
-    /** @scenario "an expired dead-letter is no longer offered to the operator to act on" */
+    /** @scenario an expired dead-letter is no longer offered to the operator to act on */
     it("omits the group and stops naming it as dead-lettered", async () => {
       await deadLetterOneBodyPresentJob();
       expect(await repo.listDlqGroups({ queueName })).toHaveLength(1);
@@ -180,7 +200,7 @@ describe("given a group with a dead-lettered body-present job", () => {
 
 describe("given a dead-lettered group that still has a recoverable job", () => {
   describe("when the operator checks the dead-letter count and lists the dead-lettered groups", () => {
-    /** @scenario "a dead-letter the operator can still act on is never swept away" */
+    /** @scenario a dead-letter the operator can still act on is never swept away */
     it("counts it, lists it with its job, and keeps naming it", async () => {
       await deadLetterOneBodyPresentJob();
 
@@ -195,7 +215,7 @@ describe("given a dead-lettered group that still has a recoverable job", () => {
 
 describe("given a dead-lettered group that still has only the record of why it died", () => {
   describe("when the operator checks the dead-letter count and lists the dead-lettered groups", () => {
-    /** @scenario "a dead-letter the operator can still act on is never swept away" */
+    /** @scenario a dead-letter the operator can still act on is never swept away */
     it("counts it, lists it with its failure record, and keeps naming it", async () => {
       await deadLetterAStaleBlock();
       // Nothing to replay — the whole reason "no recoverable jobs" cannot be
@@ -215,7 +235,7 @@ describe("given a dead-lettered group that still has only the record of why it d
 
 describe("given a dead-lettered group the queue surfaces on two consecutive pages", () => {
   describe("when the operator checks the dead-letter count and lists the dead-lettered groups", () => {
-    /** @scenario "the dead-letter total counts a group once even if the scan surfaces it twice" */
+    /** @scenario the dead-letter total counts a group once even if the scan surfaces it twice */
     it("counts the group once and lists it once", async () => {
       await deadLetterOneBodyPresentJob();
       const pagedRepo = new QueueRedisRepository(
