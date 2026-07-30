@@ -3,7 +3,8 @@
  *
  * Collects LIVE-WRITE evidence for ALL THREE governance write paths
  * end-to-end: it posts fresh traffic and waits for the projections (ADR-075
- * Class C) to land their rows. It never runs a replay —
+ * Class C, retired; ground now ADR-098) to land their rows. It never runs a
+ * replay —
  * rebuild coverage lives in the projection integration tests:
  *   - gatewayBudgetDebits.mapProjection → gateway_budget_ledger_events
  *   - governanceKpis.mapProjection      → governance_kpis

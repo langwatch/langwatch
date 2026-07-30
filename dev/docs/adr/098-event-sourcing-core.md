@@ -154,9 +154,12 @@ A projection is a read model and nothing else. It emits no effects.
   back.
 
 The datasource does not enter into it. A fold over Postgres is a fold; a map
-into ClickHouse is a map. `withProjection` is abolished, and its 6 mounts become
-folds with a `replace` store (ADR-099) — one registry, one executor, one replay
-path per kind.
+into ClickHouse is a map. One registry, one executor and one replay path per
+kind, and there is no third kind.
+
+State belongs to whatever accumulates it, which is a projection or a process
+manager. A pipeline may declare several, or none — so state is never a property
+of the event vocabulary itself (ADR-105 §3).
 
 `map` combined with a `merge` store is the only pairing that is not idempotent
 under redelivery, because the engine adds rather than replaces. Such a
@@ -231,60 +234,53 @@ Read-layer dedup in ClickHouse is a different mechanism and stays: it resolves
 which of several committed versions of a row a query should see, not which order
 a fold applies events in (ADR-099).
 
-### 5. Redelivery is caught by delivery identity, not by an event-time watermark
+### 5. Redelivery needs no guard, because a fold is a function of the set of its events
 
-A projection row records the delivery it last applied. Each staged job carries a
-monotonic per-group sequence, and the row keeps the last one it applied. A
-redelivered job carries the same sequence and is skipped. That is one comparison
-against one scalar column, constant-sized regardless of how many events the
-aggregate has.
+There is no sequence column on a projection row, no last-applied event id, and
+no skip branch in the fold executor. A redelivered job is applied again, and
+applying it again reaches the state it already had.
 
-**That sequence does not exist yet.** GroupQueue's counters are all statistics —
-total pending, completed, per-job-name — and none of them is a per-group
-monotonic stamp on a job. Adding one is a precondition of this decision, not a
-property to be assumed, and it comes with a constraint the queue has already
-learned: a scalar counter that is incremented on stage and decremented on
-completion drifts, which is why the pending count is derived from a sorted set
-rather than an `INCR`/`DECR` pair (`queues/groupQueue/scripts.ts:88`). The
-sequence here is not that shape — it is assigned once at stage time, never
-decremented, and read back with the job — but the distinction has to be built
-deliberately rather than inherited.
+That is a requirement on the fold, not a hope about the queue. Decision 4 already
+demands that state be a function of the *set* of events rather than of their
+order; this decision says the same word literally. A set does not count
+multiplicity, so every field must be idempotent as well as commutative:
 
-Two properties are required of it. It must be assigned inside the same atomic
-staging script that inserts the job, so a job cannot exist without one or share
-one with a sibling. And it must be monotone per group only: a global sequence
-would serialise staging across every group in the tenant, which is the
-contention the group key exists to avoid.
-
-**It must be delivery identity, not an event-time watermark.** A mark of
-`(occurredAt, eventId)` with a skip-if-at-or-below test cannot distinguish the
-two things that arrive below it:
-
-| what arrived | correct response |
+| admissible field | why re-applying is a no-op |
 | --- | --- |
-| the same event again, after a retry | skip |
-| a *different*, older event, arriving late | apply |
+| `max` / `min` | the second application compares equal |
+| set union | the member is already present |
+| monotone rank (with a generation where ranks tie) | the rank does not advance |
+| last-write-wins carrying **its own** stamp | the stamp is unchanged, so the write does not win twice |
+| first-write-frozen | already set |
 
-Decision 4 establishes that late arrivals are normal. A watermark would
-therefore discard them silently, and would do so most often on the highest-volume
-path, where many events race for one aggregate. Dedup keys on the delivery
-because a delivery is the only thing that genuinely repeats.
+`+=` is not on that list and is banned in fold state. A delta is an **item row**
+keyed by its natural key — the `ReplacingMergeTree` collapses the redelivery to
+one row — and the total is derived at read time over those rows (ADR-103). Most
+pipelines already do this; the ones that did not were the entire reason a dedup
+mechanism looked necessary.
+
+**The property is checked, not asserted.** `checkOrderInvariance` sweeps every
+permutation of the event set *and* the re-application of each event, and reports
+`duplication` distinctly from `order` because the remedies differ: an ordering
+failure wants a stamp or a rank, a duplication failure wants item rows. Every
+fold calls it over a realistic event set in its own unit tests.
+
+**The queue's per-group sequence stays where it is.** It is assigned in the same
+atomic staging script that inserts the job, it is monotone per group, and it is
+what a durable effect's `messageKey` and the dispatch-plane's observability are
+built from. What it is not, any more, is a projection column: a guard on the row
+would be a guard against a hazard the fold is required not to have, and carrying
+it would have let a non-idempotent fold pass review.
 
 Event-id comparison, where it is used, is bytewise
 (`utils/compareOrdinal.ts:11-14`). Never `localeCompare`: ICU collation inverts
 base62 KSUIDs at the `Z` → `a` step, so 2 workers would order the same pair
 differently and neither would agree with ClickHouse's byte ordering of a
-`String` column. The last applied event id is kept as a scalar column for a
-different purpose — it is the read-side tie-break inside a dedup `ORDER BY`,
-where a total deterministic order is all that is required.
+`String` column. The last applied event id survives only as a read-side
+tie-break inside a dedup `ORDER BY`, where a total deterministic order is all
+that is required.
 
 The `AppliedEventIds` arrays are abolished.
-
-**This mechanism is temporary by design.** Monotone and last-write-wins fields
-are already idempotent — applying them twice changes nothing. Only a running
-total in the row is not. Once an aggregate's totals are derived at read time
-over the item rows (ADR-103), that fold has no non-idempotent field left, and
-its dedup requirement disappears with it.
 
 ### 6. A read has 3 outcomes, and undecodable is not genesis
 
@@ -447,22 +443,19 @@ aggregate's maximum event time, so one backdated event made every later batch
 look backdated too, which is where the quadratic behaviour came from rather than
 from any single replay's size.
 
-**Why delivery identity, not a bounded ring of recent event ids?** A ring makes
-correctness depend on a window: a redelivery older than the ring is
-double-applied and nothing detects it. The window would then have to be tuned
-against the queue's retry ladder, and any change to the ladder silently changes
-the correctness bound. A delivery sequence has no window — it is exact for the
-only thing that genuinely repeats, it is one scalar regardless of aggregate
-size, and it replaces an array that reached 6 figures of elements and leaked
-into query `ORDER BY` clauses as a progress heuristic.
-
-**Why not an event-time watermark, which is one fewer moving part?** Because
-decision 4 makes late arrival normal rather than exceptional, and a watermark
-cannot tell a late arrival from a redelivery — both sort below it. Skipping
-everything at or below the mark would discard genuinely new events, silently,
-and most often on the aggregates with the most producers racing for them. The
-failure would look like under-counted spans on the busiest traces, which is
-indistinguishable from ordinary sampling loss.
+**Why no dedup mechanism at all, rather than a good one?** Every candidate makes
+correctness depend on machinery outside the fold. A bounded ring of recent event
+ids has a window, so a redelivery older than the ring is double-applied and
+nothing detects it, and the window then has to be tuned against the queue's
+retry ladder. An event-time watermark cannot tell a late arrival from a
+redelivery — decision 4 makes late arrival normal, so the watermark would
+silently discard genuinely new events, most often on the aggregates with the
+most producers racing for them. A per-row delivery sequence has neither flaw,
+but it buys idempotence for a fold that has not earned it: with the guard in
+place a `+=` field passes review, and the guard is the only thing standing
+between it and a double count on the first retry. Removing the guard makes the
+requirement structural, and `checkOrderInvariance`'s duplication sweep makes it
+checkable.
 
 **Why does an undecodable row throw rather than skip the event?** Skipping is
 also wrong, but it is wrong recoverably: the aggregate falls behind and the
@@ -513,7 +506,8 @@ place a stake-bearing effect can live.
   that into a cache miss.
 - **4 ClickHouse tables shed an `Array(String)` column**, and one dedup
   `ORDER BY` sheds a tie-break key that its own docblock describes as weakly
-  discriminating.
+  discriminating. No table gains a replacement column: decision 5 removes the
+  dedup requirement rather than relocating it.
 - **Cross-pipeline wiring gains a rule with a test attached to it.** "Bridge
   when the key changes" is checkable from a pipeline definition; the previous
   answer was per-case judgement, which is how a bridge becomes either a missing
@@ -542,16 +536,17 @@ adopter still depends on the mechanism being removed for continuity.
    typed state in its own row to reconstruct its accumulator from a plain
    read-back, per decision 3. This is a per-adopter code change with its own
    review and rollout, not a wait for data to age.
-5. **The delivery mark** is added to every fold row and the executor prefers it
-   over the applied-id list. The array keeps being written alongside it only
-   until the read that still depends on it — the dedup `ORDER BY` tie-break at
+5. **Every remaining `+=` field becomes item rows.** A fold that still
+   accumulates a delta in its own state is converted to item rows keyed by their
+   natural key with the total derived at read (ADR-103), and the conversion is
+   proved by `checkOrderInvariance` reporting no `duplication` counterexample.
+   This is the whole of decision 5's migration: there is nothing to add to a
+   row, only something to stop keeping in one.
+6. **The applied-id lists** are dropped once the one read that still depends on
+   them — the dedup `ORDER BY` tie-break at
    `coding-agent-session.clickhouse.repository.ts:458` — is moved onto the
-   delivery mark instead. That is a dual-write on one column pair while the
-   read moves, not `AppliedEventIds` continuing on as a supported mechanism.
-6. **The applied-id lists** are dropped once step 5's read has moved off them
-   and retention has aged out every row whose only dedup evidence is the array
-   — after the delivery mark has been deployed for longer than the shortest
-   relevant retention window, not before.
+   table's own version column, and retention has aged out every row whose only
+   dedup evidence is the array.
 7. **The refold path is removed** once every adopter identified in step 4 has
    shipped its redesign. `refoldOnStoreMiss`, `refoldsOnMiss`, `eventLoaderUpTo`
    and the streaming refold are deleted, and both runtime assertions that made

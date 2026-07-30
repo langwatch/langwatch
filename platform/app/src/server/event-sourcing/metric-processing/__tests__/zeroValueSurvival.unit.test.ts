@@ -1,7 +1,7 @@
 import type { AppendStore, BatchContext } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import { metric } from "../aggregate";
-import { createMetricDataPointStorageProjection } from "../projections/metricDataPointStorage";
+import { createMetricProcessingProjections } from "../index";
 import { buildMetricRollups } from "../rollup/buildRollups";
 import type { CanonicalMetricDataPoint } from "../schema";
 import { gaugeMetric, point, prepare, requestForMetric } from "./fixtures";
@@ -63,7 +63,11 @@ describe("zero-value survival", () => {
           written.push([...records]);
         },
       };
-      const projection = createMetricDataPointStorageProjection({ store });
+      const { metricDataPointStorage } = createMetricProcessingProjections({
+        metricDataPointStore: store,
+        metricSeriesCatalogStore: store,
+        metricTimeRollupStore: store,
+      });
 
       const result = await prepare({
         request: requestForMetric({
@@ -74,7 +78,7 @@ describe("zero-value survival", () => {
       });
       const canonical = result.accepted[0]!.dataPoint;
 
-      const outcome = await projection.apply({
+      const outcome = await metricDataPointStorage.apply({
         tenantId: canonical.tenantId,
         events: [metric.events.dataPointReceived(canonical)],
       });

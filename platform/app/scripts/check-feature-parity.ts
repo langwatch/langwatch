@@ -66,10 +66,19 @@ const REPO_ROOT = resolve(__dirname, "../../..");
  * against them, so binding one was reported as a typo. A spec tree the checker
  * cannot see is the same "0/0, all bound ✓" trap a `.feature` file with no tags
  * falls into, one directory up.
+ *
+ * `python-sdk/specs` was missing for the same reason, discovered later: every
+ * scenario under it — fully tagged `@unit` / `@integration` in every file —
+ * bound nothing and was invisible to this check, not because the behaviour
+ * was untested but because nothing in `python-sdk` carried the `@scenario`
+ * annotation this checker looks for. Adding the root did not make those files
+ * pass; it made the gap visible. See `LEGACY_UNBOUND` for the files that
+ * surfaced already in that state.
  */
 const SPECS_ROOTS = [
   resolve(REPO_ROOT, "specs"),
   resolve(REPO_ROOT, "sdks/typescript/specs"),
+  resolve(REPO_ROOT, "sdks/python/specs"),
 ] as const;
 
 /**
@@ -193,6 +202,24 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-plan-progress.feature",
   "specs/langy/langy-projection-independent-reactions.feature",
   "specs/langy/langy-turn-recovery.feature",
+
+  // Surfaced by adding `python-sdk/specs` to SPECS_ROOTS. Every scenario in
+  // these three files carries a `@unit` / `@integration` tag, so they were
+  // never inert — they were invisible, the same trap `typescript-sdk/specs`
+  // fell into above. Unlike that case, the behaviour these describe is not
+  // untested: `python-sdk/tests/experiment/test_with_target.py`,
+  // `test_with_target_integration.py`, and the two
+  // `test_server_run_results.py` files (experiment + workflow) have a test
+  // method or class for nearly every scenario here — e.g.
+  // `TestTargetBasics.test_target_creates_dataset_entry` for "target creates
+  // dataset entry per target". What's missing is the `@scenario` annotation
+  // this checker reads, not the test. Binding them means editing
+  // `python-sdk/tests/`, which is out of scope for the change that added
+  // this root — tracked here rather than claimed as `@unimplemented`, which
+  // would be false.
+  "python-sdk/specs/evaluation/with_target.feature",
+  "python-sdk/specs/experiment/server_run_results.feature",
+  "python-sdk/specs/workflow/server_run_results.feature",
 ];
 
 /**
@@ -248,7 +275,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/cli-login.feature",
   "specs/ai-gateway/governance/cli-tool-mode-policy.feature",
   "specs/ai-gateway/governance/compliance-baseline.feature",
-  "specs/ai-gateway/governance/event-log-durability.feature",
   "specs/ai-gateway/governance/feature-flag-gating.feature",
   "specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature",
   "specs/ai-gateway/governance/governance-home-routing.feature",
@@ -340,7 +366,6 @@ const LEGACY_INERT: string[] = [
   "specs/automations/process-manager-dispatch.feature",
   "specs/automations/spam-prevention.feature",
   "specs/automations/webhook-http-action.feature",
-  "specs/batch-evaluation-results/experiment-cost-folding.feature",
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
   "specs/ci/no-committed-screenshots.feature",

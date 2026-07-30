@@ -221,6 +221,42 @@ function float64(): ColumnDef<number> {
   });
 }
 
+/**
+ * The widths ClickHouse emits as JSON numbers rather than strings. `uint64` is
+ * not one of them — a 64-bit value exceeds `Number.MAX_SAFE_INTEGER`, so it
+ * crosses the wire as a string and decodes to `bigint`.
+ */
+function smallUint(bits: 8 | 16 | 32): ColumnDef<number> {
+  const chType = `UInt${bits}`;
+  const max = 2 ** bits - 1;
+  const schema = z
+    .number()
+    .int()
+    .min(0)
+    .max(max, { message: `value does not fit ${chType}` });
+  return finalize({
+    chType,
+    schema,
+    decode: (cell) => schema.parse(cell),
+    encode: (value) => value,
+    frozen: false,
+    platformControlled: false,
+    nullable: false,
+  });
+}
+
+function uint8(): ColumnDef<number> {
+  return smallUint(8);
+}
+
+function uint16(): ColumnDef<number> {
+  return smallUint(16);
+}
+
+function uint32(): ColumnDef<number> {
+  return smallUint(32);
+}
+
 function boolean(): ColumnDef<boolean> {
   const schema = z.boolean();
   return finalize({
@@ -328,6 +364,25 @@ function dateTime64(precision: number): ColumnDef<Date> {
   const codec = dateTime64Codec(precision);
   return finalize({
     chType: `DateTime64(${precision})`,
+    schema: codec.schema,
+    decode: (cell) => codec.schema.parse(cell),
+    encode: codec.encode,
+    frozen: false,
+    platformControlled: false,
+    nullable: false,
+  });
+}
+
+/**
+ * A plain ClickHouse `DateTime` column — second precision, no time role.
+ * Shares `dateTime64Codec(0)`'s decode/encode, so its wire bytes are
+ * identical to `dateTime64(0)`; only `chType` differs, matching a migration
+ * that declares the column as `DateTime` rather than `DateTime64(0)`.
+ */
+function dateTime(): ColumnDef<Date> {
+  const codec = dateTime64Codec(0);
+  return finalize({
+    chType: "DateTime",
     schema: codec.schema,
     decode: (cell) => codec.schema.parse(cell),
     encode: codec.encode,
@@ -566,23 +621,43 @@ function json<T>(inner: z.ZodType<T>): ColumnDef<T> {
 const TIME_ROLE_PRECISION = 3;
 
 /**
+ * Wraps a base `Date` codec with one of the 4 ADR-099 roles: stamps
+ * `timeRole` and looks up the role's fixed `frozen`/`platformControlled`
+ * pair, so every representation of a role (`dateTime64` today, `epochMillis`
+ * below) states the flags once instead of at each wire form.
+ */
+const TIME_ROLE_FLAGS: Record<
+  TimeRole,
+  { readonly frozen: boolean; readonly platformControlled: boolean }
+> = {
+  occurredAt: { frozen: false, platformControlled: false },
+  acceptedAt: { frozen: true, platformControlled: true },
+  lastAcceptedAt: { frozen: false, platformControlled: true },
+  writtenAt: { frozen: false, platformControlled: true },
+};
+
+function withTimeRole(base: ColumnDef<Date>, role: TimeRole): ColumnDef<Date> {
+  const flags = TIME_ROLE_FLAGS[role];
+  return finalize({
+    chType: base.chType,
+    schema: base.schema,
+    decode: base.decode,
+    encode: base.encode,
+    timeRole: role,
+    frozen: flags.frozen,
+    platformControlled: flags.platformControlled,
+    nullable: false,
+  });
+}
+
+/**
  * The customer's process sets this and it moves — never frozen, never
  * platform-controlled. Structurally ineligible for a partition key, a TTL
  * anchor, or a dedup-subquery bound (ADR-099); `defineTable` reads
  * `timeRole`/`frozen`/`platformControlled` to enforce that.
  */
 function occurredAt(precision: number = TIME_ROLE_PRECISION): ColumnDef<Date> {
-  const base = dateTime64(precision);
-  return finalize({
-    chType: base.chType,
-    schema: base.schema,
-    decode: base.decode,
-    encode: base.encode,
-    timeRole: "occurredAt",
-    frozen: false,
-    platformControlled: false,
-    nullable: false,
-  });
+  return withTimeRole(dateTime64(precision), "occurredAt");
 }
 
 /**
@@ -592,17 +667,7 @@ function occurredAt(precision: number = TIME_ROLE_PRECISION): ColumnDef<Date> {
  * dedup-subquery bound (ADR-099).
  */
 function acceptedAt(precision: number = TIME_ROLE_PRECISION): ColumnDef<Date> {
-  const base = dateTime64(precision);
-  return finalize({
-    chType: base.chType,
-    schema: base.schema,
-    decode: base.decode,
-    encode: base.encode,
-    timeRole: "acceptedAt",
-    frozen: true,
-    platformControlled: true,
-    nullable: false,
-  });
+  return withTimeRole(dateTime64(precision), "acceptedAt");
 }
 
 /**
@@ -614,17 +679,7 @@ function acceptedAt(precision: number = TIME_ROLE_PRECISION): ColumnDef<Date> {
 function lastAcceptedAt(
   precision: number = TIME_ROLE_PRECISION,
 ): ColumnDef<Date> {
-  const base = dateTime64(precision);
-  return finalize({
-    chType: base.chType,
-    schema: base.schema,
-    decode: base.decode,
-    encode: base.encode,
-    timeRole: "lastAcceptedAt",
-    frozen: false,
-    platformControlled: true,
-    nullable: false,
-  });
+  return withTimeRole(dateTime64(precision), "lastAcceptedAt");
 }
 
 /**
@@ -632,27 +687,104 @@ function lastAcceptedAt(
  * this is the `ReplacingMergeTree` version column (ADR-099).
  */
 function writtenAt(precision: number = TIME_ROLE_PRECISION): ColumnDef<Date> {
-  const base = dateTime64(precision);
+  return withTimeRole(dateTime64(precision), "writtenAt");
+}
+
+/**
+ * A UInt64 wire value carrying epoch milliseconds, decoded to `Date` — the
+ * representation `event_log`'s deployed DDL uses (migration
+ * `00002_create_schema.sql:24,28,35`): `EventTimestamp` and `EventOccurredAt`
+ * are both `UInt64`, and the partition expression
+ * `toYearWeek(toDateTime64(EventOccurredAt / 1000, 3))` feeds `EventOccurredAt
+ * / 1000` to `toDateTime64`, which takes seconds — so the stored integer is
+ * milliseconds, confirmed independently by the write path
+ * (`eventStoreUtils.ts`'s `eventToRecord`/`recordToEvent`, which round-trip
+ * both columns through `Date.now()`-scale `timestampMs` values, never
+ * `Date.now() / 1000`).
+ *
+ * ClickHouse's JSON formats send every UInt64 as a wire string regardless of
+ * its magnitude — same reason as `uint64()` — so decode starts from a string
+ * and rejects anything that is not one. A `Date`'s internal time value tops
+ * out at 8.64e15ms (ECMA-262), inside `Number.MAX_SAFE_INTEGER` but not the
+ * same bound, so a wire value is checked against both: one that cannot be
+ * represented as a safe JS integer, or one that is safe but still outside
+ * the range `Date` can hold, throws rather than silently truncating or
+ * producing an `Invalid Date`.
+ */
+function epochMillis(): ColumnDef<Date> {
+  const schema = z.string().transform((raw, ctx) => {
+    if (!UINT64_PATTERN.test(raw)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `"${raw}" is not a valid UInt64 wire value`,
+      });
+      return z.NEVER;
+    }
+    const asBigInt = BigInt(raw);
+    if (asBigInt > BigInt(Number.MAX_SAFE_INTEGER)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `"${raw}" exceeds Number.MAX_SAFE_INTEGER and cannot decode to a Date without precision loss`,
+      });
+      return z.NEVER;
+    }
+    const date = new Date(Number(asBigInt));
+    if (Number.isNaN(date.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `"${raw}" is outside the range a Date can represent`,
+      });
+      return z.NEVER;
+    }
+    return date;
+  });
   return finalize({
-    chType: base.chType,
-    schema: base.schema,
-    decode: base.decode,
-    encode: base.encode,
-    timeRole: "writtenAt",
+    chType: "UInt64",
+    schema,
+    decode: (cell) => schema.parse(cell),
+    encode: (value) => value.getTime().toString(),
     frozen: false,
-    platformControlled: true,
+    platformControlled: false,
     nullable: false,
   });
+}
+
+/**
+ * The 4 role builders above, built on `epochMillis()` instead of
+ * `dateTime64()` — identical role, identical `frozen`/`platformControlled`
+ * flags, identical eligibility to anchor a partition, a TTL or a version;
+ * only the wire form differs. Exists because a deployed migration is
+ * immutable and `event_log` already shipped its time roles as `UInt64`
+ * (ADR-099).
+ */
+function occurredAtEpochMillis(): ColumnDef<Date> {
+  return withTimeRole(epochMillis(), "occurredAt");
+}
+
+function acceptedAtEpochMillis(): ColumnDef<Date> {
+  return withTimeRole(epochMillis(), "acceptedAt");
+}
+
+function lastAcceptedAtEpochMillis(): ColumnDef<Date> {
+  return withTimeRole(epochMillis(), "lastAcceptedAt");
+}
+
+function writtenAtEpochMillis(): ColumnDef<Date> {
+  return withTimeRole(epochMillis(), "writtenAt");
 }
 
 /** The full set of `ch.*` column builders. See the module docblock. */
 export const ch = {
   string,
+  uint8,
+  uint16,
+  uint32,
   uint64,
   int64,
   float64,
   boolean,
   dateTime64,
+  dateTime,
   date,
   map,
   array,
@@ -664,4 +796,9 @@ export const ch = {
   acceptedAt,
   lastAcceptedAt,
   writtenAt,
+  epochMillis,
+  occurredAtEpochMillis,
+  acceptedAtEpochMillis,
+  lastAcceptedAtEpochMillis,
+  writtenAtEpochMillis,
 };

@@ -114,6 +114,33 @@ deploy. The alternative — validating on the first delivery — moves the failu
 into production and makes it a per-aggregate error rather than a build error, at
 which point some aggregates have already been written wrongly.
 
+**How much of the table `.build()` can actually decide today, which is less than
+all of it.** A mount descriptor has four properties and the pipeline declaration
+only knows three of them:
+
+- `projection` and `store` are known exactly — the first from which mount was
+  used, the second read off the store's own `kind`, never inferred.
+- `idempotency` is known exactly, from a `merge` store's required field.
+- `scope` is known for a fold and only for a fold: `.withFold` exists only after
+  `.id()`, and `.id()` *is* the fold's lane (ADR-105 decision 4), so
+  `aggregate` is a structural fact rather than an assumption. For a map it is
+  not known at all.
+- `collapse` is known for nothing. There is no step that declares it.
+
+Both unknowns are dispatch-plane properties (ADR-100) assigned outside the
+package that holds the declaration. So the rules `.build()` genuinely enforces
+are the ones reachable without them — decisively, `merge` refused outright, plus
+the two fold rules that the chain's own types already make unreachable, checked
+again as a backstop. `fold + collapse: "latest"` and `scope: "event" + collapse:
+"batch"` remain decidable only by calling the checker directly with explicit
+values, which is what the checker's own tests do.
+
+This is recorded rather than quietly accepted because the gap is invisible from
+the outside: a pipeline that builds is not thereby a pipeline whose lane and
+collapse have been checked. Closing it means the dispatch plane declaring those
+two properties where the mount can see them, and until that happens, decision 3
+is true of two rules out of four.
+
 ### 4. `collapse` distinguishes two things that are opposites
 
 `batch` and `latest` are not variants. `batch` hands the handler every event in

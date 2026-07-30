@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { metric, metricAggregateId } from "../aggregate";
+import { metric } from "../aggregate";
 import { point } from "./fixtures";
 
 describe("the metric aggregate (ADR-105)", () => {
-  it("derives the event type string from the aggregate name and event key", () => {
-    expect(metric.eventTypes).toEqual(["metric/dataPointReceived"]);
+  it("derives the dotted event type string already persisted in event_log", () => {
+    expect(metric.eventTypes).toEqual(["lw.obs.metric.data_point_received"]);
   });
 
   it("names pointId as the aggregate id, since a point is its own aggregate", () => {
     const canonical = point({ timeUnixMs: 1_000 });
-    expect(metricAggregateId(canonical)).toBe(canonical.pointId);
+    expect(metric.id(canonical)).toBe(canonical.pointId);
   });
 
   describe("the recordDataPoint command", () => {
@@ -22,7 +22,7 @@ describe("the metric aggregate (ADR-105)", () => {
       );
 
       expect(events).toHaveLength(1);
-      expect(events[0]!.type).toBe("metric/dataPointReceived");
+      expect(events[0]!.type).toBe("lw.obs.metric.data_point_received");
       expect(events[0]!.data).toEqual(canonical);
       // The zero value in the input survives untouched into the emitted event.
       expect(events[0]!.data.valueDouble).toBe(0);
@@ -33,7 +33,7 @@ describe("the metric aggregate (ADR-105)", () => {
     it("is total over an unrecognised event type — returns state unchanged", () => {
       const state = metric.init();
       const next = metric.apply(state, {
-        type: "metric/somethingUnknown",
+        type: "lw.obs.metric.something_unknown",
         data: {},
       });
       expect(next).toEqual(state);

@@ -1,15 +1,39 @@
+import { ch, defineTable, replacing } from "@langwatch/clickhouse";
 import { describe, expect, it } from "vitest";
 import { logRecordsTable, logUsageEstimatesTable } from "../table";
 
 describe("logRecordsTable", () => {
-  it("declares an append store, since RecordId already gives its sort key per-record identity", () => {
-    expect(logRecordsTable.merge).toEqual({ kind: "append" });
+  it("declares the deployed ReplacingMergeTree(DedupVersion), so a redelivery is retry-safe", () => {
+    expect(logRecordsTable.merge).toEqual({
+      kind: "replacing",
+      version: "DedupVersion",
+    });
   });
 
   it("anchors its partition and TTL on AcceptedAt — frozen and platform-controlled", () => {
     const description = logRecordsTable.describe();
     expect(description.partition.column).toBe("AcceptedAt");
     expect(description.ttl?.anchor).toBe("AcceptedAt");
+  });
+
+  describe("given the deployed anchor, which is the customer-supplied TimeUnixMs", () => {
+    it("is refused by defineTable, which is why the declaration cannot mirror the deployment", () => {
+      expect(() =>
+        defineTable({
+          name: "log_records_as_deployed",
+          merge: replacing({ version: "WrittenAt" }),
+          sortKey: ["TenantId", "TimeUnixMs"],
+          partition: { by: "toYearWeek(TimeUnixMs)", column: "TimeUnixMs" },
+          tenant: ["TenantId"],
+          ttl: { anchor: "TimeUnixMs" },
+          columns: {
+            TenantId: ch.string(),
+            TimeUnixMs: ch.occurredAt(),
+            WrittenAt: ch.writtenAt(),
+          },
+        }),
+      ).toThrow(/partition column "TimeUnixMs" is not frozen/);
+    });
   });
 
   it("keeps RecordId in its sort key, so a redelivered record's row collapses at merge", () => {
@@ -46,11 +70,19 @@ describe("logRecordsTable", () => {
       logRecordsTable.columns.TimeUnixNano.decode("1700000000123456789"),
     ).toBe(1_700_000_000_123_456_789n);
   });
+
+  it("gives DedupVersion the writtenAt role, which is what lets it be the merge version", () => {
+    expect(logRecordsTable.columns.DedupVersion.chType).toBe("UInt64");
+    expect(logRecordsTable.columns.DedupVersion.timeRole).toBe("writtenAt");
+  });
 });
 
 describe("logUsageEstimatesTable", () => {
-  it("declares an append store for the same reason as log_records", () => {
-    expect(logUsageEstimatesTable.merge).toEqual({ kind: "append" });
+  it("declares the deployed ReplacingMergeTree(DedupVersion), like log_records", () => {
+    expect(logUsageEstimatesTable.merge).toEqual({
+      kind: "replacing",
+      version: "DedupVersion",
+    });
   });
 
   it("anchors its partition and TTL on AcceptedAt, matching the deployed migration exactly", () => {

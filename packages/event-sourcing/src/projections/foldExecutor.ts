@@ -5,29 +5,18 @@ import { withSpan } from "../ports/tracing";
 import type { ReplaceStore, StoreContext, StoredState } from "./store.types";
 
 /**
- * Executes a fold against its `ReplaceStore` (ADR-098 §3, §5, §6, §7).
+ * Executes a fold against its `ReplaceStore` (ADR-098 §3, §6, §7).
  *
- * This is the one place a fold's read-decide-write cycle happens. Everything
- * it enforces exists because getting it wrong corrupts state silently rather
- * than failing loudly: reading `undecodable` as genesis overwrites live
- * aggregates, skipping the redelivery check double-applies a retried job, and
- * reading the event log here (which this module never does) would make a
- * "projection" secretly a second write path with its own consistency story.
+ * This is the one place a fold's read-decide-write cycle happens. Nothing here
+ * guards against redelivery: a fold is a function of the set of events it has
+ * seen, so applying the same delivery twice reaches the same state (ADR-098
+ * §5). `checkOrderInvariance` is where that property is enforced.
  */
 
-/**
- * One unit of work: a batch of events for one aggregate, plus the identity the
- * executor needs to tell a retry from a new delivery.
- *
- * `deliverySeq` is assigned when the job is staged onto the group, not derived
- * from anything about the events themselves — it is what lets the executor
- * recognise a redelivered job without inspecting event content.
- */
+/** One unit of work: a batch of events for one aggregate. */
 export interface FoldDelivery<Event> {
   readonly key: string;
   readonly tenantId: string;
-  /** Monotonic per-group sequence assigned when the job was staged. */
-  readonly deliverySeq: number;
   readonly events: readonly Event[];
   readonly retentionDays?: number;
 }
@@ -43,16 +32,6 @@ export interface FoldExecutorDeps<State, Event> {
 }
 
 /**
- * `skipped-redelivery` is a distinct outcome, not a variant of `applied` with a
- * zero count, so a caller cannot mistake "nothing new happened" for "nothing
- * happened because this batch was empty" — the two have different operational
- * meanings and different alerting thresholds.
- */
-export type FoldOutcome =
-  | { readonly kind: "applied"; readonly events: number }
-  | { readonly kind: "skipped-redelivery"; readonly deliverySeq: number };
-
-/**
  * Builds the executor for one fold. One instance per projection: the metric
  * handles it resolves are shared across every delivery that projection
  * receives, which is why the projection name is fixed at construction rather
@@ -60,7 +39,7 @@ export type FoldOutcome =
  */
 export function createFoldExecutor<State, Event>(
   deps: FoldExecutorDeps<State, Event>,
-): { apply(delivery: FoldDelivery<Event>): Promise<FoldOutcome> } {
+): { apply(delivery: FoldDelivery<Event>): Promise<{ events: number }> } {
   const metrics = deps.metrics ?? noopMetrics;
   const outcomes = metrics.counter({
     name: "es_fold_apply_outcomes_total",
@@ -74,7 +53,7 @@ export function createFoldExecutor<State, Event>(
   });
 
   return {
-    async apply(delivery: FoldDelivery<Event>): Promise<FoldOutcome> {
+    async apply(delivery: FoldDelivery<Event>): Promise<{ events: number }> {
       return withSpan(
         "es.fold.apply",
         { "es.projection": deps.projectionName, "es.key": delivery.key },
@@ -88,11 +67,9 @@ export function createFoldExecutor<State, Event>(
           try {
             read = await deps.store.read(delivery.key, context);
           } catch (error) {
-            // Failures are counted on the same metric as successes, so the
-            // denominator is every attempt. Counting only the outcomes that
-            // returned would make a failing projection look like a quiet one:
-            // its success rate would read 100% while its throughput fell to
-            // nothing, which is the shape an alert cannot see.
+            // Failures land on the same counter as successes, so the
+            // denominator is every attempt: otherwise a projection whose store
+            // is down reads as one that is merely quiet.
             outcomes.inc({ projection: deps.projectionName, kind: "failed" });
             throw error;
           }
@@ -102,8 +79,7 @@ export function createFoldExecutor<State, Event>(
               projection: deps.projectionName,
               kind: "undecodable",
             });
-            // The single most dangerous mistake available in this design: an
-            // undecodable row is never genesis. Treating it as absent would
+            // An undecodable row is never genesis. Treating it as absent would
             // fold the next event onto a fresh accumulator and write that over
             // live state, so the first deploy that changed this fold's shape
             // would silently reset every aggregate it touched.
@@ -116,45 +92,23 @@ export function createFoldExecutor<State, Event>(
             });
           }
 
-          if (
-            read.kind === "found" &&
-            read.stored.deliverySeq >= delivery.deliverySeq
-          ) {
-            outcomes.inc({
-              projection: deps.projectionName,
-              kind: "skipped-redelivery",
-            });
-            return {
-              kind: "skipped-redelivery",
-              deliverySeq: delivery.deliverySeq,
-            };
-          }
-
           let state: State;
           try {
             state = read.kind === "found" ? read.stored.state : deps.init();
-            // The batch is applied in the order it arrived because it is one
-            // unit of work, not because this asserts any ordering guarantee —
-            // ordering across deliveries is best effort (ADR-098), and folds
-            // must stay correct regardless of the order deliveries arrive in.
+            // Applied in arrival order because the batch is one unit of work,
+            // not because any order is guaranteed (ADR-098).
             for (const event of delivery.events) {
               state = deps.apply(state, event);
             }
           } catch (error) {
-            // `apply` and `init` are the fold's own code and are expected to be
-            // pure, but pure code still throws — a missing field, an assertion,
-            // an event shape a later deploy introduced. Counted here for the
-            // same reason as a store failure: if the only unlabelled failure in
-            // this executor is the one in the domain logic, a fold that throws
-            // on every delivery registers as a fold that stopped receiving
-            // deliveries.
+            // The fold's own code throws too, and it is counted for the same
+            // reason a store failure is.
             outcomes.inc({ projection: deps.projectionName, kind: "failed" });
             throw error;
           }
 
           const stored: StoredState<State> = {
             state,
-            deliverySeq: delivery.deliverySeq,
             version: deps.stateVersion,
           };
           try {
@@ -168,7 +122,7 @@ export function createFoldExecutor<State, Event>(
           batchSize.observe(delivery.events.length, {
             projection: deps.projectionName,
           });
-          return { kind: "applied", events: delivery.events.length };
+          return { events: delivery.events.length };
         },
       );
     },

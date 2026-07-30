@@ -64,6 +64,21 @@ export type TableRow<Columns extends ColumnMap> = {
   [K in keyof Columns]: Columns[K] extends ColumnDef<infer T> ? T : never;
 };
 
+/**
+ * A named exemption from one of `defineTable`'s structural-role checks, for
+ * a deployed table whose partition column, TTL anchor or `ReplacingMergeTree`
+ * version genuinely fails the rule and cannot be re-keyed without a migration
+ * (ADR-099 "Known debt this does not fix yet"). `column` still carries its
+ * TRUE role — declaring a false one to slip past the guard is the defect this
+ * exists to replace — and `reason` is the one sentence a reviewer reads to
+ * know why. Scoped to one column: a table with two violating columns needs
+ * two entries, never a single table-wide switch.
+ */
+export interface StructuralDebt {
+  readonly column: string;
+  readonly reason: string;
+}
+
 /** The facts a drift test compares against migration DDL (ADR-099). */
 export interface TableDescription {
   readonly name: string;
@@ -87,6 +102,12 @@ export interface TableDefinitionArgs<Columns extends ColumnMap> {
   readonly tenant: readonly (keyof Columns & string)[];
   readonly ttl?: { readonly anchor: keyof Columns & string };
   readonly columns: Columns;
+  /**
+   * Per-column exemptions from the frozen-and-platform-controlled rule and
+   * the writtenAt version rule (see `StructuralDebt`). Every check this
+   * bypasses still runs, unweakened, for every column not named here.
+   */
+  readonly structuralDebt?: readonly StructuralDebt[];
 }
 
 export interface TableDefinition<Columns extends ColumnMap>
@@ -95,6 +116,14 @@ export interface TableDefinition<Columns extends ColumnMap>
   readonly columnNames: readonly (keyof Columns & string)[];
   /** A zod schema for the row shape, decoded through each column's schema. */
   readonly rowSchema: z.ZodType<TableRow<Columns>>;
+  /**
+   * `columns`, in `columnNames` order, as the codec wants them —
+   * `createRowCodec().encodeRows`/`decodeRows` take a positional array, not
+   * the name-keyed `columns` map. Computed once here rather than by every
+   * store adapter and repository re-deriving it from `columnNames` and
+   * `columns`.
+   */
+  readonly wireColumns: readonly AnyColumnDef[];
   describe(): TableDescription;
 }
 
@@ -130,6 +159,10 @@ export function defineTable<Columns extends ColumnMap>(
 
   const columnsByName = def.columns as Record<string, AnyColumnDef | undefined>;
   const columnNames = Object.keys(def.columns) as (keyof Columns & string)[];
+  // `Object.values` enumerates in the same order as `Object.keys` for the
+  // same object (both follow string-key insertion order), so this lines up
+  // with `columnNames` positionally without re-indexing by name.
+  const wireColumns = Object.values(def.columns) as AnyColumnDef[];
 
   if (def.sortKey.length === 0) {
     fail("declares an empty sort key — every table needs an ordering column");
@@ -149,6 +182,22 @@ export function defineTable<Columns extends ColumnMap>(
     }
   }
 
+  const structuralDebt = def.structuralDebt ?? [];
+  const structuralDebtByColumn = new Map<string, StructuralDebt>();
+  for (const entry of structuralDebt) {
+    if (!(entry.column in def.columns)) {
+      fail(`structural debt names undeclared column "${entry.column}"`);
+    }
+    if (entry.reason.trim().length === 0) {
+      fail(`structural debt on column "${entry.column}" needs a reason`);
+    }
+    if (structuralDebtByColumn.has(entry.column)) {
+      fail(`structural debt on column "${entry.column}" is declared twice`);
+    }
+    structuralDebtByColumn.set(entry.column, entry);
+  }
+  const usedStructuralDebtColumns = new Set<string>();
+
   const requireFrozenAndPlatformControlled = (
     columnName: string,
     purpose: string,
@@ -158,14 +207,17 @@ export function defineTable<Columns extends ColumnMap>(
       fail(`${purpose} names undeclared column "${columnName}"`);
       return;
     }
-    if (!column.frozen || !column.platformControlled) {
-      fail(
-        `${purpose} "${columnName}" is not frozen and platform-controlled ` +
-          `(the acceptedAt role) — occurredAt is customer-supplied and moves, ` +
-          `so using it here would make part count, partition spread and ` +
-          `retention untrusted inputs`,
-      );
+    if (column.frozen && column.platformControlled) return;
+    if (structuralDebtByColumn.has(columnName)) {
+      usedStructuralDebtColumns.add(columnName);
+      return;
     }
+    fail(
+      `${purpose} "${columnName}" is not frozen and platform-controlled ` +
+        `(the acceptedAt role) — occurredAt is customer-supplied and moves, ` +
+        `so using it here would make part count, partition spread and ` +
+        `retention untrusted inputs`,
+    );
   };
 
   requireFrozenAndPlatformControlled(def.partition.column, "partition column");
@@ -180,10 +232,24 @@ export function defineTable<Columns extends ColumnMap>(
     if (!versionColumn) {
       fail(`replacing version names undeclared column "${versionColumnName}"`);
     } else if (versionColumn.timeRole !== "writtenAt") {
+      if (structuralDebtByColumn.has(versionColumnName)) {
+        usedStructuralDebtColumns.add(versionColumnName);
+      } else {
+        fail(
+          `replacing version column "${versionColumnName}" is not a writtenAt ` +
+            `column — a version that does not move on every write cannot select ` +
+            `a version on collision`,
+        );
+      }
+    }
+  }
+
+  for (const entry of structuralDebt) {
+    if (!usedStructuralDebtColumns.has(entry.column)) {
       fail(
-        `replacing version column "${versionColumnName}" is not a writtenAt ` +
-          `column — a version that does not move on every write cannot select ` +
-          `a version on collision`,
+        `structural debt names column "${entry.column}", which is not this ` +
+          `table's partition column, TTL anchor or replacing version — remove ` +
+          `the unused exemption`,
       );
     }
   }
@@ -210,6 +276,7 @@ export function defineTable<Columns extends ColumnMap>(
   return {
     ...def,
     columnNames,
+    wireColumns,
     rowSchema,
     describe,
   };

@@ -2,16 +2,22 @@
 
 /**
  * Batch inserts on the two governance stream repositories (ADR-075 Class
- * C). A replay rebuilds a window event by event, so both projections write
+ * C, retired; ground now ADR-098). A replay rebuilds a window event by
+ * event, so both projections write
  * through `bulkAppend` rather than issuing one INSERT per span.
  *
  * The interesting property is tenancy: the ClickHouse client is resolved
  * PER TENANT, so a batch that mixes tenants would have to pick one client
  * and write another tenant's audit rows through it. That is rejected, not
  * guessed at.
+ *
+ * Both repositories write through `@langwatch/clickhouse`'s positional
+ * codec (ADR-104), so assertions here read the wire array by column
+ * position rather than a JSON object's field names.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import type { ClickHouseClient } from "@langwatch/clickhouse";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GovernanceKpisClickHouseRepository } from "../governanceKpis.clickhouse.repository";
 import {
   type GovernanceOcsfEventInput,
@@ -30,9 +36,14 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
+const FAKE_NOW = "2026-01-01T00:00:00.000Z";
+const WRITTEN_AT_WIRE = "2026-01-01 00:00:00.000";
+
 function fakeClient() {
   const insert = vi.fn().mockResolvedValue(undefined);
-  const resolveClient = vi.fn().mockResolvedValue({ insert });
+  const resolveClient = vi
+    .fn()
+    .mockReturnValue({ insert } as unknown as ClickHouseClient);
   return { insert, resolveClient };
 }
 
@@ -53,6 +64,40 @@ function kpiRow(
     ...overrides,
   };
 }
+
+const KPI_COLUMN_NAMES = [
+  "TenantId",
+  "SourceId",
+  "HourBucket",
+  "TraceId",
+  "EventId",
+  "SourceType",
+  "SpendUsd",
+  "PromptTokens",
+  "CompletionTokens",
+  "CreatedAt",
+  "LastEventOccurredAt",
+];
+
+const kpiRowWire = (
+  overrides: Partial<{
+    eventId: string;
+    tenantId: string;
+    lastEventOccurredAtWire: string;
+  }> = {},
+): unknown[] => [
+  overrides.tenantId ?? "gov-project-1",
+  "is-1",
+  "2023-11-14 22:13:20",
+  "aaaa0000000000000000000000000001",
+  overrides.eventId ?? "bbbb0000000000a1",
+  "claude_compliance",
+  1,
+  "10",
+  "5",
+  WRITTEN_AT_WIRE,
+  overrides.lastEventOccurredAtWire ?? "2023-11-14 22:13:20.500",
+];
 
 function ocsfRow(
   overrides: Partial<GovernanceOcsfEventInput> = {},
@@ -77,7 +122,66 @@ function ocsfRow(
   };
 }
 
+const OCSF_COLUMN_NAMES = [
+  "TenantId",
+  "OcsfSchemaVersion",
+  "EventId",
+  "TraceId",
+  "SourceId",
+  "SourceType",
+  "ClassUid",
+  "CategoryUid",
+  "ActivityId",
+  "TypeUid",
+  "SeverityId",
+  "EventTime",
+  "ActorUserId",
+  "ActorEmail",
+  "ActorEnduserId",
+  "ActionName",
+  "TargetName",
+  "AnomalyAlertId",
+  "RawOcsfJson",
+  "CreatedAt",
+  "LastUpdatedAt",
+];
+
+const ocsfRowWire = (
+  overrides: Partial<{ eventId: string; tenantId: string }> = {},
+): unknown[] => [
+  overrides.tenantId ?? "gov-project-1",
+  "1.1.0",
+  overrides.eventId ?? "bbbb0000000000a1",
+  "aaaa0000000000000000000000000001",
+  "is-1",
+  "claude_compliance",
+  6003,
+  6,
+  6,
+  600306,
+  1,
+  "2023-11-14 22:13:20.500",
+  "user-42",
+  "",
+  "",
+  "chat.completion",
+  "claude-sonnet-4",
+  "",
+  "{}",
+  WRITTEN_AT_WIRE,
+  WRITTEN_AT_WIRE,
+];
+
 describe("GovernanceKpisClickHouseRepository.insertContributions", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(FAKE_NOW));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("given rows that all belong to one tenant", () => {
     it("resolves that tenant's client once and writes every row in one insert", async () => {
       const { insert, resolveClient } = fakeClient();
@@ -91,7 +195,32 @@ describe("GovernanceKpisClickHouseRepository.insertContributions", () => {
       expect(resolveClient).toHaveBeenCalledTimes(1);
       expect(resolveClient).toHaveBeenCalledWith("gov-project-1");
       expect(insert).toHaveBeenCalledTimes(1);
-      expect(insert.mock.calls[0]![0].values).toHaveLength(2);
+      expect(insert).toHaveBeenCalledWith({
+        tenantId: "gov-project-1",
+        table: "governance_kpis",
+        rows: [
+          kpiRowWire({ eventId: "bbbb0000000000a1" }),
+          kpiRowWire({ eventId: "bbbb0000000000a2" }),
+        ],
+        columns: KPI_COLUMN_NAMES,
+        target: { kind: "replacing" },
+      });
+    });
+
+    /** @scenario governance_kpis's HourBucket and LastEventOccurredAt still encode to the same wire values */
+    it("still encodes HourBucket and LastEventOccurredAt to the same wire strings as their old acceptedAt/writtenAt declarations did", async () => {
+      const { insert, resolveClient } = fakeClient();
+      const repository = new GovernanceKpisClickHouseRepository(resolveClient);
+
+      await repository.insertContributions([kpiRow()]);
+
+      const [row] = insert.mock.calls[0]![0].rows;
+      expect(row[KPI_COLUMN_NAMES.indexOf("HourBucket")]).toBe(
+        "2023-11-14 22:13:20",
+      );
+      expect(row[KPI_COLUMN_NAMES.indexOf("LastEventOccurredAt")]).toBe(
+        "2023-11-14 22:13:20.500",
+      );
     });
 
     it("sends the span id as EventId so migration 00063's key can dedup the row", async () => {
@@ -102,7 +231,8 @@ describe("GovernanceKpisClickHouseRepository.insertContributions", () => {
         kpiRow({ eventId: "bbbb0000000000a1" }),
       ]);
 
-      expect(insert.mock.calls[0]![0].values[0].EventId).toBe(
+      const [row] = insert.mock.calls[0]![0].rows;
+      expect(row[KPI_COLUMN_NAMES.indexOf("EventId")]).toBe(
         "bbbb0000000000a1",
       );
     });
@@ -116,7 +246,8 @@ describe("GovernanceKpisClickHouseRepository.insertContributions", () => {
       const { eventId: _dropped, ...withoutEventId } = kpiRow();
       await repository.insertContribution(withoutEventId);
 
-      expect(insert.mock.calls[0]![0].values[0].EventId).toBe("");
+      const [row] = insert.mock.calls[0]![0].rows;
+      expect(row[KPI_COLUMN_NAMES.indexOf("EventId")]).toBe("");
     });
   });
 
@@ -149,6 +280,15 @@ describe("GovernanceKpisClickHouseRepository.insertContributions", () => {
 });
 
 describe("GovernanceOcsfEventsClickHouseRepository.insertEvents", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(FAKE_NOW));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("given rows that all belong to one tenant", () => {
     it("writes every audit row in one insert", async () => {
       const { insert, resolveClient } = fakeClient();
@@ -162,10 +302,19 @@ describe("GovernanceOcsfEventsClickHouseRepository.insertEvents", () => {
       ]);
 
       expect(insert).toHaveBeenCalledTimes(1);
-      expect(insert.mock.calls[0]![0].values).toHaveLength(2);
+      expect(insert).toHaveBeenCalledWith({
+        tenantId: "gov-project-1",
+        table: "governance_ocsf_events",
+        rows: [
+          ocsfRowWire({ eventId: "bbbb0000000000a1" }),
+          ocsfRowWire({ eventId: "bbbb0000000000a2" }),
+        ],
+        columns: OCSF_COLUMN_NAMES,
+        target: { kind: "replacing" },
+      });
     });
 
-    it("leaves LastUpdatedAt to the column default, so a re-derived row supersedes the one it re-derives", async () => {
+    it("stamps LastUpdatedAt with one shared write instant per batch, so a re-derived row still supersedes the one it replaces", async () => {
       const { insert, resolveClient } = fakeClient();
       const repository = new GovernanceOcsfEventsClickHouseRepository(
         resolveClient,
@@ -173,8 +322,9 @@ describe("GovernanceOcsfEventsClickHouseRepository.insertEvents", () => {
 
       await repository.insertEvents([ocsfRow()]);
 
-      expect(insert.mock.calls[0]![0].values[0]).not.toHaveProperty(
-        "LastUpdatedAt",
+      const [row] = insert.mock.calls[0]![0].rows;
+      expect(row[OCSF_COLUMN_NAMES.indexOf("LastUpdatedAt")]).toBe(
+        WRITTEN_AT_WIRE,
       );
     });
   });

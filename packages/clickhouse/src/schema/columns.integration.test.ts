@@ -3,6 +3,7 @@ import { foldStateTable } from "../__tests__/integration/fixtures";
 import { readTestClickHouseInfo, uniqueId, uniqueTenant } from "../__tests__/integration/testClickHouse";
 import { createClickHouseClient, type ClickHouseClient } from "../client/clickhouseClient";
 import { createRowCodec } from "../codec/rowCodec";
+import { bindIdentifiers } from "../query/identifiers";
 import type { ColumnMap } from "./columns";
 
 /**
@@ -10,11 +11,11 @@ import type { ColumnMap } from "./columns";
  * not fit a JS `number` past 2^53 (ADR-099) — a fake transport can return
  * whatever string a test hands it, so it cannot prove the real driver's JSON
  * parsing round-trips a value that large without first coercing it through a
- * `number`. This exercises `test_fold_state`'s `DeliverySeq` column directly
- * through the client and codec, bypassing `replaceStore` — its
- * `StoredState.deliverySeq` contract is a plain `number` (ADR-098's
- * redelivery guard fits comfortably below 2^53), so this precision guarantee
- * has to be proven one layer down, at the column itself.
+ * `number`. This exercises `test_fold_state`'s `Count` column directly through
+ * the client and codec, bypassing `clickhouseReplacing`: that fixture's fold
+ * state declares `count` a `z.number()`, so the derived row mapping narrows the
+ * column on the way back, and the precision guarantee has to be proven one
+ * layer down, at the column itself.
  */
 describe("given ch.uint64() against a live ClickHouse", () => {
   let client: ClickHouseClient;
@@ -40,8 +41,8 @@ describe("given ch.uint64() against a live ClickHouse", () => {
     const row = {
       TenantId: tenantId,
       Key: key,
-      State: { value: "uint64-probe" },
-      DeliverySeq: aboveDoublePrecision,
+      Value: "uint64-probe",
+      Count: aboveDoublePrecision,
       StateVersion: "v1",
       WrittenAt: now,
       AcceptedAt: now,
@@ -55,21 +56,23 @@ describe("given ch.uint64() against a live ClickHouse", () => {
       target: { kind: "replacing" },
     });
 
+    const names = bindIdentifiers();
     const result = await client.query({
       tenantId,
-      sql: `SELECT DeliverySeq FROM ${foldStateTable.name}
-            WHERE TenantId = {tenantId:String} AND Key = {key:String}`,
-      params: { tenantId, key },
+      sql:
+        `SELECT ${names.of("Count")} FROM ${names.of(foldStateTable.name)} ` +
+        `WHERE ${names.of("TenantId")} = {tenantId:String} AND ${names.of("Key")} = {key:String}`,
+      params: { ...names.params, tenantId, key },
     });
-    const [decoded] = codec.decodeRows<{ DeliverySeq: bigint }>({
-      columns: [columns.DeliverySeq!],
-      columnNames: ["DeliverySeq"],
+    const [decoded] = codec.decodeRows<{ Count: bigint }>({
+      columns: [columns.Count!],
+      columnNames: ["Count"],
       header: result.header,
       rows: result.rows,
     });
 
     expect(decoded).toBeDefined();
-    expect(decoded!.DeliverySeq).toBe(aboveDoublePrecision);
-    expect(typeof decoded!.DeliverySeq).toBe("bigint");
+    expect(decoded!.Count).toBe(aboveDoublePrecision);
+    expect(typeof decoded!.Count).toBe("bigint");
   });
 });

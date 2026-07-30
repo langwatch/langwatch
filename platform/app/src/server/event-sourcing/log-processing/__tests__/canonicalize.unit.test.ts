@@ -330,5 +330,40 @@ describe("canonicalizeLogRequest", () => {
         second.accepted[0]!.record.recordId,
       );
     });
+
+    /** @scenario The same batch sent twice is stored once */
+    it("derives the same TimeUnixMs on a redelivery of a record carrying no timestamp", async () => {
+      // TimeUnixMs is in the deployed sort key, so a redelivery deriving a
+      // different one writes a second row for the same RecordId and bills the
+      // tenant twice. Every input to it has to be inside the hashed payload —
+      // and the record's own arrival time is not.
+      const log = { body: { stringValue: "no timestamps at all" } };
+      const first = await canonicalizeLogRequest({
+        tenantId: "project_test",
+        organizationId: "organization_test",
+        request: request([log]),
+        piiRedactionLevel: "DISABLED",
+        redactionService: noRedaction,
+        acceptedAt: 1_700_000_000_000,
+      });
+      const second = await canonicalizeLogRequest({
+        tenantId: "project_test",
+        organizationId: "organization_test",
+        request: request([structuredClone(log)]),
+        piiRedactionLevel: "DISABLED",
+        redactionService: noRedaction,
+        acceptedAt: 1_700_000_999_999,
+      });
+
+      expect(first.accepted[0]!.record.recordId).toBe(
+        second.accepted[0]!.record.recordId,
+      );
+      expect(first.accepted[0]!.record.timeUnixMs).toBe(
+        second.accepted[0]!.record.timeUnixMs,
+      );
+      expect(first.accepted[0]!.record.occurredAt).toBe(
+        second.accepted[0]!.record.occurredAt,
+      );
+    });
   });
 });

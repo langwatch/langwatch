@@ -1,13 +1,8 @@
 /**
- * OTLP number coercion.
- *
- * Every helper here draws a hard line between "absent" and "present but
- * zero": OTLP carries `0` as a legitimate observation (a gauge reading of
- * zero watts is data; a counter that has not moved yet is data), so every
- * check below is `!== undefined && !== null`, never a truthiness check.
- * `Number(0) || fallback` and `value ? value : fallback` both silently turn a
- * real zero into "nothing was sent" — that is the one bug class this module
- * exists to make structurally hard to write.
+ * OTLP number coercion, drawing a hard line between "absent" and "present but
+ * zero": OTLP carries `0` as a legitimate observation, so every check here is
+ * `!== undefined && !== null`, never a truthiness check. `Number(0) ||
+ * fallback` silently turns a real zero into "nothing was sent".
  */
 
 import { isRecord, type UnknownRecord } from "./serialization";

@@ -16,7 +16,8 @@ the distinction out loud:
   opens on breach and resolves on recovery. Stored as a `Trigger` with a non-null
   `customGraphId` FK, evaluated by the real-time activity subscriber plus the
   scheduled `graphAlertSweep` process manager for absence and recovery
-  (ADR-034 Ph 5; the K8s `/api/cron/triggers` sweep was removed).
+  (ADR-099, successor to the retired ADR-034, Ph 5; the K8s
+  `/api/cron/triggers` sweep was removed).
 
 Customers keep asking for a **third** shape neither covers: *"every Monday 09:00,
 post my evals dashboard to #quality"*, *"daily 07:00, the top-5 error traces from
@@ -54,7 +55,8 @@ Two capabilities are missing entirely:
 As with ADR-040, most of the framework exists: the provider registry
 (`src/automations/providers/`), the Liquid engine + its two render contexts
 (ADR-036), the Block Kit allowlist and proposed native chart/table blocks
-(ADR-041), the ADR-052 process-manager substrate, the fire-history surface
+(ADR-041), the ADR-098 process-manager substrate (successor to the retired
+ADR-052), the fire-history surface
 (`TriggerSent` + `ViewAutomationDrawer.tsx`), and the analytics service
 (`AnalyticsService.getTimeseries`). This ADR's job is to *compose* them into a
 schedule-triggered kind, and to design the one primitive that does not yet exist —
@@ -386,8 +388,9 @@ guarantee lives in the scheduler*, so every future consumer inherits it.
   *possible*, but a stampede of stale fires is worse than a gap.
 
 Why not the K8s `/api/cron/triggers` sweep: it was project-blind, coarse
-(3-minute), and has since been removed (ADR-034 Ph 5 — the graph-alert cron is
-gone). 60 s granularity is ample for calendar reports.
+(3-minute), and has since been removed (ADR-099, successor to the retired
+ADR-034, Ph 5 — the graph-alert cron is gone). 60 s granularity is ample for
+calendar reports.
 
 ---
 
@@ -408,8 +411,9 @@ and the global worker concurrency cap applies), collects the results, then rende
 dispatches — reusing the durability and back-pressure the graph-alert path rides.
 Supplementary levers:
 
-- **Prefer the rollup tables** (ADR-034) — a weekly digest is fine at coarse
-  buckets, and the rollup is cheaper than the slim scan.
+- **Prefer the rollup tables** (ADR-099, successor to the retired ADR-034) —
+  a weekly digest is fine at coarse buckets, and the rollup is cheaper than
+  the slim scan.
 - **Reuse the 30 s cache** — if a report and a dashboard view coincide, the second
   is free.
 - **Per-project concurrency cap** on report generation, and **jitter the dispatch**
@@ -436,7 +440,7 @@ patterns PR #5015 built for alerts (`draftReducer.ts` `SET_SOURCE`,
   the `previousPeriod` series).
 - **Channel + template + preview**: unchanged notify pipeline — pick
   email/Slack/webhook, pick or customize the template, preview against real recent
-  data via the ADR-037 pane.
+  data via the ADR-098 pane.
 - **Copywriting** (per `copywriting.md`): the card says *what it does* ("A scheduled
   summary of a dashboard, posted on a calendar you choose"), never *how*.
 
@@ -447,11 +451,12 @@ patterns PR #5015 built for alerts (`draftReducer.ts` `SET_SOURCE`,
 A report "fire" is a scheduled send — it reuses the existing fire-history surface.
 The per-slot `TriggerSent`/`ReportSent` claim is the delivery ledger;
 `ViewAutomationDrawer.tsx`'s "Recent fires" panel lists report sends keyed on the
-scheduled slot, with the rendered summary and any template-health warnings
-(ADR-037). When the channel is the webhook (ADR-040), each attempt also lands in
-`WebhookDelivery` with the same drill-down. A render failure falls back to the
-default template and surfaces in the operator activity tab, as ADR-036 specifies
-for the other kinds.
+scheduled slot with the rendered summary. Surfacing template-health warnings
+there (ADR-098) was specified, never built. When the channel is the webhook
+(ADR-040), each attempt also lands in `WebhookDelivery` with the same
+drill-down. A render failure falls back to the default template; surfacing
+that in an operator activity tab, as ADR-036 specifies for the other kinds,
+was likewise never built.
 
 ---
 
@@ -538,7 +543,8 @@ for the other kinds.
 - **A new generic calendar-scheduling primitive** — the `ScheduledJob` table, a
   single `SchedulerService` due-scan, a `SchedulerRegistry`, a cron+timezone
   representation, a framework-level per-slot at-most-once claim, and a catch-up
-  policy — enters the platform alongside ADR-052's process managers.
+  policy — enters the platform alongside ADR-098's process managers
+  (successor to the retired ADR-052).
   It is the first per-entity, timezone-aware calendar schedule and it is
   *report-agnostic*: future scheduled work (weekly rollups, retention reports)
   registers a `targetType` + handler and inherits cross-pod leasing, durability, and
@@ -567,10 +573,11 @@ for the other kinds.
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid engine +
   the two render contexts the report's third context joins; fall-back-to-default and
   test-fire discipline the report reuses.
-- [ADR-037](./037-automation-operator-surfaces.md) — authoring drawer + live preview
-  + fire-history the report configuration and delivery surface extend.
-- [ADR-052](./052-automations-on-process-manager-substrate.md) — the durable wake,
-  leased intent, and GroupQueue substrate used by automation reactions.
+- [ADR-098](./098-event-sourcing-core.md) — successor to two retired ADRs
+  this doc cited: ADR-037 (authoring drawer + live preview + fire-history the
+  report configuration and delivery surface extend) and ADR-052 (the durable
+  wake, leased intent, and GroupQueue substrate used by automation
+  reactions).
 - [ADR-089](./089-data-retention.md) ("Orphan sweep: added, then removed") —
   the removed self-perpetuating reactor chain, originally its own ADR-025,
   absorbed into 089 on 2026-07-30; the cautionary tale for why a
@@ -582,8 +589,9 @@ for the other kinds.
 - [ADR-041](./041-modern-block-kit-notification-template-suite.md) — the native
   `data_visualization` (chart) and `table` blocks the report renders into, and the
   incoming-webhook probe / host-lock constraint the report inherits.
-- [ADR-034](./034-event-sourced-analytics-materialization.md) — the slim/rollup
-  analytics tables `getTimeseries` reads; report queries prefer the rollup.
+- [ADR-099](./099-projection-storage-and-table-definition.md) — successor to
+  the retired ADR-034; the slim/rollup analytics tables `getTimeseries`
+  reads, report queries prefer the rollup.
 - PR #5015 (`feat(automations): graph alerts in automations drawer + Liquid template
   wiring`) — the kind-aware drawer, `graphAlert` sub-shape, and
   `graph-trigger-evaluation.service.ts` this report generalizes.

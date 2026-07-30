@@ -33,6 +33,7 @@ export {
 export type {
   MergeIdempotency,
   MergeStrategy,
+  StructuralDebt,
   TableDefinition,
   TableDefinitionArgs,
   TableDescription,
@@ -75,11 +76,30 @@ export type {
   TenantTarget,
 } from "./client/tenantRouting";
 
-export { AppendStoreConfigurationError, createAppendStore } from "./stores/appendStore";
-export type { AppendStoreArgs } from "./stores/appendStore";
+export {
+  AppendStoreConfigurationError,
+  clickhouseAppend,
+} from "./stores/appendStore";
+export type { ClickHouseAppendArgs } from "./stores/appendStore";
 
 export {
-  createReplaceStore,
+  clickhouseReplacing,
   ReplaceStoreConfigurationError,
 } from "./stores/replaceStore";
-export type { ReplaceStoreArgs } from "./stores/replaceStore";
+export type {
+  ClickHouseReplacingArgs,
+  FoldStateCache,
+} from "./stores/replaceStore";
+
+export { bindIdentifiers } from "./query/identifiers";
+export type { BoundIdentifiers } from "./query/identifiers";
+
+export {
+  deriveAppendMapping,
+  deriveRowMapping,
+  RowMappingError,
+} from "./stores/rowMapping";
+export type { RowContext, RowMapping } from "./stores/rowMapping";
+
+export { eventLogTable } from "./tables/eventLog";
+export type { EventLogRow } from "./tables/eventLog";

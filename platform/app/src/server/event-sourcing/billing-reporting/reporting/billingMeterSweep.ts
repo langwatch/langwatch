@@ -1,9 +1,12 @@
-import { createLogger } from "@langwatch/observability";
 import {
   getBillingMonth,
   getPreviousBillingMonth,
 } from "@ee/billing/services/billableEventsQuery";
-import { BILLING_GRACE_PERIOD_DAYS, BILLING_METER_SWEEP_INTERVAL_MS } from "../constants";
+import { createLogger } from "@langwatch/observability";
+import {
+  BILLING_GRACE_PERIOD_DAYS,
+  BILLING_METER_SWEEP_INTERVAL_MS,
+} from "../constants";
 import type { ReportUsageForMonthData } from "./reportUsageForMonth";
 
 const logger = createLogger("langwatch:billing-reporting:meter-sweep");
@@ -12,47 +15,21 @@ export const BILLING_METER_SWEEP_NAME = "billingMeterSweep" as const;
 
 export interface BillingMeterSweepDeps {
   /**
-   * Organizations whose month total must be re-read and reported. Must
-   * include every organization that could have unreported usage in that
-   * month — an organization missing from this set is one the safety net
-   * cannot rescue. Read per month rather than once, because the grace window
-   * sweeps the previous month too and its candidate set is not the current
-   * month's.
-   *
-   * Unchanged by this rewrite: `~/server/app-layer/billing/
-   * billingReportingCandidates.service.ts`, outside this pipeline's
-   * directory, already satisfies this contract and already carries its own
-   * `@scenario "The organizations to report are every one that could owe usage"`
-   * binding.
+   * Organizations whose month total must be re-read and reported. Must include
+   * every organization that could have unreported usage in that month — one
+   * missing from this set is one the safety net cannot rescue. Read per month,
+   * because the grace window's candidate set is not the current month's.
    */
   readonly listOrganizationsToReport: (
     params: Pick<ReportUsageForMonthData, "billingMonth">,
   ) => Promise<string[]>;
-  /**
-   * Dispatches the reporting command. Wired to the same function the poke
-   * uses (`index.ts` binds both to one `reportUsageForMonth` closure), so a
-   * sweep dispatch collapses into a pending poke dispatch through the
-   * command's own group-key deduplication (`dispatchOptions.ts`'s
-   * `reportUsageForMonthGroupKey`) once a real dispatcher exists.
-   */
+  /** Bound to the same `reportUsageForMonth` closure the poke uses, so a sweep
+   *  dispatch collapses into a pending poke dispatch on the command's own
+   *  group key. */
   readonly dispatchReport: (data: ReportUsageForMonthData) => Promise<void>;
-  /**
-   * Records that this tick ran, exactly once per tick.
-   *
-   * KNOWN GAP: the pre-rewrite sweep ran as a durable process-manager intent
-   * (`event-sourcing.old`'s `withProcessManager`), whose outbox gave it
-   * at-least-once delivery independent of this pipeline's own code — a crash
-   * mid-tick left an intent row for the outbox to retry, not a lost tick. No
-   * process-manager or outbox primitive exists in `@langwatch/event-sourcing`
-   * yet (only `defineAggregate`, the fold/map executors and the store
-   * contracts are exported — see `index.ts`'s docblock), so this rewrite
-   * cannot faithfully reproduce that durability property; it can only
-   * guarantee the property this task calls out explicitly — that the sweep
-   * runs *on a schedule*, never depending on an event arriving. `recordTick`
-   * is deliberately narrow (no arguments, no return value to persist) so
-   * whatever durable bookkeeping the eventual scheduler mount needs is that
-   * mount's decision, not this function's.
-   */
+  /** Records that this tick ran, exactly once per tick. Deliberately narrow —
+   *  no arguments, nothing to persist — so what durable bookkeeping the
+   *  scheduler mount needs stays that mount's decision. */
   readonly recordTick: () => Promise<void>;
   readonly now?: () => number;
 }
@@ -71,15 +48,10 @@ export function billingMonthsForSweep(now: Date): string[] {
 }
 
 /**
- * The scheduled sweep (ADR-098): the durability guarantee behind the
- * per-event poke. It is a SCHEDULED guarantee, not a per-event one — it wakes
- * on `BILLING_METER_SWEEP_INTERVAL_MS`, reads the two months it owes, and
- * dispatches a report for every candidate organization, regardless of
- * whether any billable event has occurred since the last run. It exists only
- * for the two cases the poke structurally cannot cover: a poke whose
- * dispatch failed every retry, and an organization whose last billable event
- * of the month is its last event ever (nothing pokes again, so nothing
- * re-reads the total).
+ * The scheduled sweep (ADR-098): the durability guarantee behind the poke. It
+ * wakes on `BILLING_METER_SWEEP_INTERVAL_MS`, reads the two months it owes, and
+ * dispatches a report for every candidate organization regardless of whether
+ * any billable event has occurred since the last run.
  */
 export function runBillingMeterSweep(deps: BillingMeterSweepDeps) {
   return async (): Promise<void> => {
@@ -87,7 +59,8 @@ export function runBillingMeterSweep(deps: BillingMeterSweepDeps) {
     const months = billingMonthsForSweep(new Date(startedAt));
 
     let dispatched = 0;
-    const failures: Array<{ organizationId: string; billingMonth: string }> = [];
+    const failures: Array<{ organizationId: string; billingMonth: string }> =
+      [];
     /** Raised after the loop, first one wins — see the throw at the bottom. */
     const raise: Error[] = [];
 
@@ -100,9 +73,12 @@ export function runBillingMeterSweep(deps: BillingMeterSweepDeps) {
       // tail for good.
       let organizationIds: string[];
       try {
-        organizationIds = await deps.listOrganizationsToReport({ billingMonth });
+        organizationIds = await deps.listOrganizationsToReport({
+          billingMonth,
+        });
       } catch (error) {
-        const failure = error instanceof Error ? error : new Error(String(error));
+        const failure =
+          error instanceof Error ? error : new Error(String(error));
         raise.push(failure);
         logger.error(
           { billingMonth, error: failure.message },
@@ -164,27 +140,25 @@ export function runBillingMeterSweep(deps: BillingMeterSweepDeps) {
       throw firstFailure;
     }
 
-    logger.debug({ months, dispatched }, "billing meter sweep dispatched usage reports");
+    logger.debug(
+      { months, dispatched },
+      "billing meter sweep dispatched usage reports",
+    );
   };
 }
 
-/**
- * Describes how the sweep must be mounted, for a future scheduler — no
- * process-manager/scheduler runtime exists in `@langwatch/event-sourcing`
- * yet (see `index.ts`'s docblock), so this stays a plain descriptor. The
- * pre-existing, generic `~/server/app-layer/scheduler/scheduler.service.ts`
- * (outside this pipeline's directory, not wired here) is the most likely home
- * for it: it already gives at-least-once, claim-based execution to
- * unrelated recurring jobs, which is exactly the shape "runs `run()` every
- * `intervalMs`, retries a thrown tick" needs.
- */
+/** How the sweep is mounted: run `run()` every `intervalMs`, retry a thrown
+ *  tick. `~/server/app-layer/scheduler/scheduler.service.ts` already gives
+ *  exactly that to unrelated recurring jobs. */
 export interface BillingMeterSweepMount {
   readonly name: typeof BILLING_METER_SWEEP_NAME;
   readonly intervalMs: number;
   readonly run: () => Promise<void>;
 }
 
-export function createBillingMeterSweepMount(deps: BillingMeterSweepDeps): BillingMeterSweepMount {
+export function createBillingMeterSweepMount(
+  deps: BillingMeterSweepDeps,
+): BillingMeterSweepMount {
   return {
     name: BILLING_METER_SWEEP_NAME,
     intervalMs: BILLING_METER_SWEEP_INTERVAL_MS,

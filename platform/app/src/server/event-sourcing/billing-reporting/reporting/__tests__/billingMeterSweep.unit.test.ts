@@ -36,7 +36,9 @@ type MockedSweepDeps = {
   [K in keyof BillingMeterSweepDeps]: ReturnType<typeof vi.fn>;
 } & BillingMeterSweepDeps;
 
-function makeDeps(overrides: Partial<BillingMeterSweepDeps> = {}): MockedSweepDeps {
+function makeDeps(
+  overrides: Partial<BillingMeterSweepDeps> = {},
+): MockedSweepDeps {
   return {
     listOrganizationsToReport: vi.fn().mockResolvedValue(["org-1"]),
     dispatchReport: vi.fn().mockResolvedValue(undefined),
@@ -55,7 +57,9 @@ describe("runBillingMeterSweep", () => {
     /** @scenario "Scheduled sweep re-reports usage without any new events" */
     it("records the tick once and dispatches a fresh report for every candidate organization", async () => {
       const deps = makeDeps({
-        listOrganizationsToReport: vi.fn().mockResolvedValue(["org-1", "org-2"]),
+        listOrganizationsToReport: vi
+          .fn()
+          .mockResolvedValue(["org-1", "org-2"]),
       });
 
       await runBillingMeterSweep(deps)();
@@ -78,9 +82,13 @@ describe("runBillingMeterSweep", () => {
 
       await runBillingMeterSweep(deps)();
 
-      expect(billingMonthsForSweep(new Date(FOURTH_OF_MONTH))).toEqual(["2026-03"]);
+      expect(billingMonthsForSweep(new Date(FOURTH_OF_MONTH))).toEqual([
+        "2026-03",
+      ]);
       expect(deps.dispatchReport).toHaveBeenCalledTimes(1);
-      expect(deps.dispatchReport).toHaveBeenCalledWith(expect.objectContaining({ billingMonth: "2026-03" }));
+      expect(deps.dispatchReport).toHaveBeenCalledWith(
+        expect.objectContaining({ billingMonth: "2026-03" }),
+      );
     });
   });
 
@@ -91,8 +99,12 @@ describe("runBillingMeterSweep", () => {
 
       await runBillingMeterSweep(deps)();
 
-      expect(deps.dispatchReport).toHaveBeenCalledWith(expect.objectContaining({ billingMonth: "2026-03" }));
-      expect(deps.dispatchReport).toHaveBeenCalledWith(expect.objectContaining({ billingMonth: "2026-02" }));
+      expect(deps.dispatchReport).toHaveBeenCalledWith(
+        expect.objectContaining({ billingMonth: "2026-03" }),
+      );
+      expect(deps.dispatchReport).toHaveBeenCalledWith(
+        expect.objectContaining({ billingMonth: "2026-02" }),
+      );
     });
   });
 
@@ -104,11 +116,15 @@ describe("runBillingMeterSweep", () => {
         .mockRejectedValueOnce(new Error("queue unavailable"))
         .mockResolvedValue(undefined);
       const deps = makeDeps({
-        listOrganizationsToReport: vi.fn().mockResolvedValue(["org-1", "org-2"]),
+        listOrganizationsToReport: vi
+          .fn()
+          .mockResolvedValue(["org-1", "org-2"]),
         dispatchReport,
       });
 
-      await expect(runBillingMeterSweep(deps)()).rejects.toThrow(/failed to dispatch 1 of 2/);
+      await expect(runBillingMeterSweep(deps)()).rejects.toThrow(
+        /failed to dispatch 1 of 2/,
+      );
 
       expect(dispatchReport).toHaveBeenCalledTimes(2);
       // Tick bookkeeping is not skipped by the failure.
@@ -120,10 +136,14 @@ describe("runBillingMeterSweep", () => {
     /** @scenario "A sweep that cannot dispatch every report is retried" */
     it("raises so the tick is retried", async () => {
       const deps = makeDeps({
-        listOrganizationsToReport: vi.fn().mockRejectedValue(new Error("database unavailable")),
+        listOrganizationsToReport: vi
+          .fn()
+          .mockRejectedValue(new Error("database unavailable")),
       });
 
-      await expect(runBillingMeterSweep(deps)()).rejects.toThrow("database unavailable");
+      await expect(runBillingMeterSweep(deps)()).rejects.toThrow(
+        "database unavailable",
+      );
       expect(deps.dispatchReport).not.toHaveBeenCalled();
     });
   });
@@ -136,20 +156,30 @@ describe("runBillingMeterSweep", () => {
       // close out — is attempted at all.
       const listOrganizationsToReport = vi
         .fn()
-        .mockImplementation(async ({ billingMonth }: { billingMonth: string }) => {
-          if (billingMonth === "2026-03") {
-            throw new Error("candidate store unavailable");
-          }
-          return ["org-late"];
-        });
-      const deps = makeDeps({ now: () => FIRST_OF_MONTH, listOrganizationsToReport });
+        .mockImplementation(
+          async ({ billingMonth }: { billingMonth: string }) => {
+            if (billingMonth === "2026-03") {
+              throw new Error("candidate store unavailable");
+            }
+            return ["org-late"];
+          },
+        );
+      const deps = makeDeps({
+        now: () => FIRST_OF_MONTH,
+        listOrganizationsToReport,
+      });
 
-      await expect(runBillingMeterSweep(deps)()).rejects.toThrow("candidate store unavailable");
+      await expect(runBillingMeterSweep(deps)()).rejects.toThrow(
+        "candidate store unavailable",
+      );
 
       expect(listOrganizationsToReport).toHaveBeenCalledTimes(2);
       expect(deps.dispatchReport).toHaveBeenCalledTimes(1);
       expect(deps.dispatchReport).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: "org-late", billingMonth: "2026-02" }),
+        expect.objectContaining({
+          organizationId: "org-late",
+          billingMonth: "2026-02",
+        }),
       );
     });
 
@@ -157,17 +187,25 @@ describe("runBillingMeterSweep", () => {
     it("records the tick even though the tick failed", async () => {
       const deps = makeDeps({
         now: () => FIRST_OF_MONTH,
-        listOrganizationsToReport: vi.fn().mockRejectedValue(new Error("candidate store unavailable")),
+        listOrganizationsToReport: vi
+          .fn()
+          .mockRejectedValue(new Error("candidate store unavailable")),
       });
 
-      await expect(runBillingMeterSweep(deps)()).rejects.toThrow("candidate store unavailable");
+      await expect(runBillingMeterSweep(deps)()).rejects.toThrow(
+        "candidate store unavailable",
+      );
       expect(deps.recordTick).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("given tick bookkeeping fails", () => {
     it("completes the tick anyway", async () => {
-      const deps = makeDeps({ recordTick: vi.fn().mockRejectedValue(new Error("bookkeeping unavailable")) });
+      const deps = makeDeps({
+        recordTick: vi
+          .fn()
+          .mockRejectedValue(new Error("bookkeeping unavailable")),
+      });
 
       await expect(runBillingMeterSweep(deps)()).resolves.toBeUndefined();
       expect(deps.dispatchReport).toHaveBeenCalledTimes(1);

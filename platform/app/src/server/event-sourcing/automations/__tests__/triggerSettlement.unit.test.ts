@@ -1,21 +1,22 @@
+import { checkOrderInvariance } from "@langwatch/event-sourcing";
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import type { MatchRecordedData } from "../aggregate";
+import { type MatchRecordedData, triggerAggregate } from "../aggregate";
 import {
   addPending,
+  digestBatchKey,
   drainDue,
   MAX_PENDING_MATCHES,
   settleBoundary,
-  triggerSettlementDefinition,
-} from "../process-managers/triggerSettlement";
-import {
-  INITIAL_TRIGGER_SETTLEMENT_STATE,
   type TriggerSettlementState,
-} from "../process-managers/triggerSettlement.types";
+  triggerSettlement,
+} from "../process-managers/triggerSettlement";
 
-const initialState = (): TriggerSettlementState => INITIAL_TRIGGER_SETTLEMENT_STATE;
+const initialState = (): TriggerSettlementState => triggerSettlement.init();
 
-const match = (overrides: Partial<MatchRecordedData> = {}): MatchRecordedData => ({
+const match = (
+  overrides: Partial<MatchRecordedData> = {},
+): MatchRecordedData => ({
   triggerId: "trigger-1",
   traceId: "trace-1",
   action: TriggerAction.SEND_EMAIL,
@@ -26,11 +27,26 @@ const match = (overrides: Partial<MatchRecordedData> = {}): MatchRecordedData =>
 });
 
 const context = (overrides: Partial<{ at: number; now: number }> = {}) => ({
-  key: "trigger-1",
+  processKey: "trigger-1",
   tenantId: "project-1",
   at: overrides.at ?? 1_000,
   now: overrides.now ?? overrides.at ?? 1_000,
 });
+
+const recordMatch = (
+  state: TriggerSettlementState,
+  data: MatchRecordedData,
+  ctx: ReturnType<typeof context>,
+) =>
+  triggerSettlement.evolve(
+    state,
+    triggerAggregate.events.matchRecorded(data),
+    triggerSettlement.intents,
+    ctx,
+  )!;
+
+const wake = (state: TriggerSettlementState, ctx: ReturnType<typeof context>) =>
+  triggerSettlement.onWake!(state, triggerSettlement.intents, ctx);
 
 describe("trigger settlement process", () => {
   describe("given a trace is already pending", () => {
@@ -62,7 +78,6 @@ describe("trigger settlement process", () => {
               settleWindowBucket: "30000-0",
             },
           },
-          overflowFlushed: 0,
         };
 
         expect(drainDue(state, 1_000).boundaries).toEqual([
@@ -86,7 +101,6 @@ describe("trigger settlement process", () => {
               settleWindowBucket: "30000-0",
             },
           },
-          overflowFlushed: 0,
         };
 
         expect(drainDue(state, 1_000).settledMatches).toEqual([
@@ -111,7 +125,6 @@ describe("trigger settlement process", () => {
               settleWindowBucket: "30000-0",
             },
           },
-          overflowFlushed: 0,
         };
 
         expect(drainDue(state, 1_000).nextBoundary).toBe(2_000);
@@ -123,36 +136,79 @@ describe("trigger settlement process", () => {
     describe("when later activity arrives in a new settle window", () => {
       it("creates a fresh persist intent for the later round", () => {
         const persistMatch = () =>
-          match({ action: TriggerAction.ADD_TO_DATASET, actionClass: "persist" });
+          match({
+            action: TriggerAction.ADD_TO_DATASET,
+            actionClass: "persist",
+          });
 
-        const firstRound = triggerSettlementDefinition.evolve(
-          "matchRecorded",
+        const firstRound = recordMatch(
           initialState(),
           persistMatch(),
           context({ at: 1_000 }),
-        )!;
-        const firstWake = triggerSettlementDefinition.onWake!(
-          firstRound.state,
-          context({ at: 31_000 }),
         );
-        const secondRound = triggerSettlementDefinition.evolve(
-          "matchRecorded",
+        const firstWake = wake(firstRound.state, context({ at: 31_000 }));
+        const secondRound = recordMatch(
           firstWake.state,
           persistMatch(),
           context({ at: 31_001 }),
-        )!;
-        const secondWake = triggerSettlementDefinition.onWake!(
-          secondRound.state,
-          context({ at: 61_001 }),
         );
+        const secondWake = wake(secondRound.state, context({ at: 61_001 }));
 
-        expect(firstWake.intents?.map((intent) => intent.messageKey)).toEqual([
+        expect(firstWake.intents.map((intent) => intent.messageKey)).toEqual([
           "persist:trace-1:30000-0",
         ]);
-        expect(secondWake.intents?.map((intent) => intent.messageKey)).toEqual([
+        expect(secondWake.intents.map((intent) => intent.messageKey)).toEqual([
           "persist:trace-1:30000-1",
         ]);
       });
+    });
+  });
+
+  describe("given the same intent is minted twice from the same payload", () => {
+    it("computes the identical message key, so a redelivery collapses", () => {
+      const first = triggerSettlement.intents.notifyDigest({
+        triggerId: "trigger-1",
+        traceIds: ["b", "a"],
+        boundary: 1_000,
+      });
+      const retried = triggerSettlement.intents.notifyDigest({
+        triggerId: "trigger-1",
+        traceIds: ["a", "b"],
+        boundary: 1_000,
+      });
+
+      expect(retried.messageKey).toBe(first.messageKey);
+      expect(first.intentType).toBe("triggerSettlement/notifyDigest");
+    });
+  });
+
+  describe("given a matchRecorded event is delivered twice", () => {
+    it("lands on the same state both times — nothing in it accumulates", () => {
+      const once = recordMatch(initialState(), match(), context({ at: 1_000 }));
+      const twice = recordMatch(once.state, match(), context({ at: 1_000 }));
+
+      expect(twice.state).toEqual(once.state);
+      expect(twice.nextWakeAt).toBe(once.nextWakeAt);
+    });
+  });
+
+  describe("given several matches arrive in any order, with any of them redelivered", () => {
+    it("reaches the same durable state every time", () => {
+      const ctx = context({ at: 1_000 });
+      const report = checkOrderInvariance({
+        init: () => triggerSettlement.init(),
+        apply: (state: TriggerSettlementState, data: MatchRecordedData) =>
+          recordMatch(state, data, ctx).state,
+        events: [
+          match({ traceId: "trace-a" }),
+          match({ traceId: "trace-b", actionClass: "persist" }),
+          match({ traceId: "trace-c", traceDebounceMs: 0 }),
+          match({ traceId: "trace-a", notificationCadence: "immediate" }),
+        ],
+      });
+
+      expect(report.invariant).toBe(true);
+      expect(report.duplicatesChecked).toBe(4);
     });
   });
 
@@ -172,14 +228,15 @@ describe("trigger settlement process", () => {
         );
 
         const next = addPending(
-          { pendingMatches, overflowFlushed: 0 },
+          { pendingMatches },
           match({ traceId: "newest" }),
           MAX_PENDING_MATCHES + 1,
         );
 
-        expect(Object.keys(next.state.pendingMatches)).toHaveLength(MAX_PENDING_MATCHES);
+        expect(Object.keys(next.state.pendingMatches)).toHaveLength(
+          MAX_PENDING_MATCHES,
+        );
         expect(next.state.pendingMatches["trace-0"]).toBeUndefined();
-        expect(next.state.overflowFlushed).toBe(1);
         expect(next.flushed).toEqual([
           {
             traceId: "trace-0",
@@ -200,32 +257,36 @@ describe("trigger settlement process", () => {
             {
               settleDueAt: index,
               dispatchDueAt: index === 0 ? 1_000 : index,
-              actionClass: index === 0 ? ("persist" as const) : ("notify" as const),
+              actionClass:
+                index === 0 ? ("persist" as const) : ("notify" as const),
               settleWindowBucket: "30000-0",
             },
           ]),
         );
 
-        const evolution = triggerSettlementDefinition.evolve(
-          "matchRecorded",
-          { pendingMatches, overflowFlushed: 4 },
+        const evolution = recordMatch(
+          { pendingMatches },
           match({ traceId: "newest" }),
           context({ at: MAX_PENDING_MATCHES + 1 }),
-        )!;
+        );
 
         // trace-0 (oldest, persist-class) flushes to an immediate persist
-        // intent with its settle-window identity; the log intent records the
-        // running flush count. Nothing is discarded.
+        // intent carrying its settle-window identity; the log intent names the
+        // flushed traces. Nothing is discarded.
         expect(evolution.intents).toEqual([
           {
             messageKey: "persist:trace-0:30000-0",
-            intentType: "persistMatch",
-            payload: { triggerId: "trigger-1", traceId: "trace-0" },
+            intentType: "triggerSettlement/persistMatch",
+            payload: {
+              triggerId: "trigger-1",
+              traceId: "trace-0",
+              settleWindowBucket: "30000-0",
+            },
           },
           {
-            messageKey: "overflow:5",
-            intentType: "logOverflow",
-            payload: { triggerId: "trigger-1", flushed: 1, totalFlushed: 5 },
+            messageKey: `overflow:${digestBatchKey(["trace-0"])}`,
+            intentType: "triggerSettlement/logOverflow",
+            payload: { triggerId: "trigger-1", traceIds: ["trace-0"] },
           },
         ]);
       });
@@ -235,16 +296,19 @@ describe("trigger settlement process", () => {
   describe("given a match delivered late, well after its own occurredAt", () => {
     describe("when the process schedules its boundary", () => {
       it("schedules from wall-clock now, never from the stale event time", () => {
-        // occurredAt (`at`) is far in the past; `now` is the actual handling
-        // time. Scheduling from `at` alone would compute a boundary already
-        // behind the present and dispatch immediately as a singleton,
-        // defeating the coalescing the settle window exists for.
-        const evolution = triggerSettlementDefinition.evolve(
-          "matchRecorded",
+        // Scheduling from `at` alone would compute a boundary already behind
+        // the present and dispatch immediately as a singleton, defeating the
+        // coalescing the settle window exists for.
+        const evolution = recordMatch(
           initialState(),
           match({ traceDebounceMs: 0, notificationCadence: "immediate" }),
-          { key: "trigger-1", tenantId: "project-1", at: 1_000, now: 100_000 },
-        )!;
+          {
+            processKey: "trigger-1",
+            tenantId: "project-1",
+            at: 1_000,
+            now: 100_000,
+          },
+        );
 
         expect(settleBoundary(evolution.state)).toBe(100_000);
       });

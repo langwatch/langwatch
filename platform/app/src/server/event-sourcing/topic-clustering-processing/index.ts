@@ -1,22 +1,28 @@
-/**
- * `topic-clustering-processing` — the `topic_clustering` aggregate, its
- * three fold projections, and its scheduling process manager (ADR-098,
- * ADR-105).
- *
- * Everything below is pure declaration and pure domain logic: the aggregate
- * and its commands (`aggregate.ts`), the run-status/run-history/topic-model
- * folds (`projections/`), the daily-wake process manager
- * (`process-manager/`), and the dispatch-plane descriptors that name where
- * each of those belongs (`groupKey.ts`, `mount.ts`). `tables.ts` proposes a
- * ClickHouse-backed store shape for the three folds but does not construct
- * one — see its module docblock for why concrete store wiring (and the
- * Postgres-vs-ClickHouse question behind it) is left to the composition
- * root, which does not exist yet for this pipeline. No pipeline builder
- * mounts any of this together either, for the same reason: nothing in
- * `@langwatch/event-sourcing` yet composes a fold/command/process-manager
- * set into a runnable pipeline (ADR-102's composition root). This module is
- * therefore the complete set of what CAN be built without one.
- */
+import type { ClickHouseClient, TableDefinition } from "@langwatch/clickhouse";
+import { clickhouseReplacing } from "@langwatch/clickhouse";
+import type {
+  FoldProjection,
+  GroupKey,
+  Metrics,
+  Mount,
+} from "@langwatch/event-sourcing";
+import {
+  ConfigurationError,
+  createFoldExecutor,
+  validateMount,
+} from "@langwatch/event-sourcing";
+import { topicClustering } from "./aggregate";
+import { topicClusteringProcess } from "./process";
+import { topicClusteringRunHistory } from "./projections/runHistory";
+import { topicClusteringRunStatus } from "./projections/runStatus";
+import { topicModel } from "./projections/topicModel";
+import {
+  type FoldStateColumns,
+  foldStateRow,
+  topicClusteringRunHistoryTable,
+  topicClusteringRunStatusTable,
+  topicModelTable,
+} from "./tables";
 
 export {
   recordClusteringRunCompletedIdempotencyKey,
@@ -25,46 +31,23 @@ export {
   recordTopicsIdempotencyKey,
   requestClusteringIdempotencyKey,
   type TopicClusteringAggregate,
-  type TopicClusteringEventKey,
   topicClustering,
-  topicClusteringAggregateId,
-  topicClusteringEventKeyOf,
 } from "./aggregate";
-export {
-  topicClusteringCommandGroupKey,
-  topicClusteringProcessGroupKey,
-  topicClusteringRunHistoryGroupKey,
-  topicClusteringRunStatusGroupKey,
-  topicModelGroupKey,
-} from "./groupKey";
-export {
-  assertTopicClusteringMountsAreLegal,
-  topicClusteringRunHistoryMount,
-  topicClusteringRunStatusMount,
-  topicModelMount,
-} from "./mount";
 export type {
-  TopicClusteringBootstrapRequest,
   TopicClusteringDispatchPorts,
-} from "./process-manager/dispatchPorts";
-export type {
   TopicClusteringRunIntentPayload,
   TopicClusteringScheduleState,
-} from "./process-manager/schedule";
+} from "./process";
 export {
-  evolveRequested,
-  evolveRunCompleted,
-  evolveRunFailed,
   initTopicClusteringScheduleState,
   nextDailySlot,
   onTopicClusteringWake,
   TOPIC_CLUSTERING_PROCESS_NAME,
   TOPIC_CLUSTERING_STALE_RUN_MS,
-  topicClusteringIntentSchemas,
-  topicClusteringProcessDefinition,
+  topicClusteringProcess,
   topicClusteringRunIntentPayloadSchema,
   topicClusteringScheduleStateSchema,
-} from "./process-manager/schedule";
+} from "./process";
 export type {
   RunHistoryEntry,
   RunHistoryOutcome,
@@ -72,11 +55,11 @@ export type {
   RunHistoryViewEntry,
 } from "./projections/runHistory";
 export {
-  applyRunHistoryEvent,
   deriveRunHistoryView,
   initRunHistoryState,
   RUN_HISTORY_LIMIT,
   runHistoryStateSchema,
+  topicClusteringRunHistory,
 } from "./projections/runHistory";
 export type {
   RunStatusState,
@@ -84,10 +67,10 @@ export type {
   TerminalOutcome,
 } from "./projections/runStatus";
 export {
-  applyRunStatusEvent,
   deriveRunStatusView,
   initRunStatusState,
   runStatusStateSchema,
+  topicClusteringRunStatus,
 } from "./projections/runStatus";
 export type {
   ProjectedTopic,
@@ -95,9 +78,9 @@ export type {
   TopicModelView,
 } from "./projections/topicModel";
 export {
-  applyTopicModelEvent,
   deriveTopicModelView,
   initTopicModelState,
+  topicModel,
   topicModelStateSchema,
 } from "./projections/topicModel";
 export {
@@ -140,3 +123,123 @@ export {
   topicClusteringRunStatusTable,
   topicModelTable,
 } from "./tables";
+
+/** One lane per project everywhere: the aggregate is the project's clustering
+ * stream, and every fold, command and the process manager mirror it 1:1. */
+function projectScope(tenantId: string) {
+  return {
+    kind: "aggregate",
+    aggregateType: topicClustering.name,
+    aggregateId: tenantId,
+  } as const;
+}
+
+export function topicClusteringCommandGroupKey(args: {
+  tenantId: string;
+}): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "command" },
+    scope: projectScope(args.tenantId),
+  };
+}
+
+export function topicClusteringProcessGroupKey(args: {
+  tenantId: string;
+}): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "processManager", name: topicClusteringProcess.name },
+    scope: projectScope(args.tenantId),
+  };
+}
+
+export function topicClusteringFoldGroupKey(args: {
+  tenantId: string;
+  projection: string;
+}): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "fold", name: args.projection },
+    scope: projectScope(args.tenantId),
+  };
+}
+
+/** Refused at composition, never at the first delivery (ADR-106). */
+function legalMount(projection: string, mount: Mount): Mount {
+  const violations = validateMount(mount);
+  if (violations.length > 0) {
+    throw new ConfigurationError(
+      `topic-clustering-processing's ${projection} mount is illegal: ${violations
+        .map((violation) => `${violation.rule} — ${violation.message}`)
+        .join("; ")}`,
+      { pipeline: "topic_clustering_processing", projection, violations },
+    );
+  }
+  return mount;
+}
+
+export interface TopicClusteringProcessingDeps {
+  readonly client: ClickHouseClient;
+  readonly metrics?: Metrics;
+}
+
+/** All three folds share one table shape — the whole state in one JSON column,
+ * keyed by project — so they share one mount, one lane shape and one store. */
+function projectFold<State>(
+  projection: FoldProjection<State>,
+  table: TableDefinition<FoldStateColumns<State>>,
+  deps: TopicClusteringProcessingDeps,
+) {
+  return {
+    projection,
+    mount: legalMount(projection.name, {
+      projection: "fold",
+      store: "replace",
+      scope: "aggregate",
+      collapse: "batch",
+    }),
+    groupKey: (args: { tenantId: string }): GroupKey =>
+      topicClusteringFoldGroupKey({ ...args, projection: projection.name }),
+    executor: createFoldExecutor({
+      store: clickhouseReplacing<State, FoldStateColumns<State>>({
+        client: deps.client,
+        table,
+        version: projection.version,
+        key: "ProjectId",
+        stateVersionColumn: "StateVersion",
+        row: foldStateRow<State>(),
+      }),
+      init: projection.init,
+      apply: projection.apply,
+      stateVersion: projection.version,
+      projectionName: projection.name,
+      metrics: deps.metrics,
+    }),
+  };
+}
+
+/** The whole topology: one aggregate, three folds, one process manager. */
+export function topicClusteringProcessing(deps: TopicClusteringProcessingDeps) {
+  return {
+    aggregate: topicClustering,
+    commandGroupKey: topicClusteringCommandGroupKey,
+    process: {
+      definition: topicClusteringProcess,
+      groupKey: topicClusteringProcessGroupKey,
+    },
+    folds: {
+      topicClusteringRunStatus: projectFold(
+        topicClusteringRunStatus,
+        topicClusteringRunStatusTable,
+        deps,
+      ),
+      topicClusteringRunHistory: projectFold(
+        topicClusteringRunHistory,
+        topicClusteringRunHistoryTable,
+        deps,
+      ),
+      topicModel: projectFold(topicModel, topicModelTable, deps),
+    },
+  };
+}

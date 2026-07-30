@@ -20,61 +20,17 @@ import type { PreconditionTraceData } from "~/server/filters/precondition-matche
 import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { extractErrorMessage } from "~/utils/captureError";
-import { type EvaluationEvent, evaluationAggregate } from "../aggregate";
+import { type EvaluationEvent, evaluation } from "../aggregate";
 
 /**
- * The `executeEvaluation` orchestration — the pure half is
- * `evaluationAggregate.commands.report`; everything above it (fetch a
- * monitor, sample, check preconditions, run the evaluator, record cost,
- * offload oversized inputs) is I/O this function performs before ever
- * deciding an event. This is deliberately NOT one of `evaluationAggregate`'s
- * declared `commands` (`CommandDef.handle` is synchronous and pure — see
- * `aggregate.ts`'s docblock on `report`); it is application-layer
- * orchestration that calls the aggregate's pure command once it has already
- * decided the outcome. The OLD pipeline's own comment drew the identical
- * line: "executeEvaluation is NOT [a pure defineCommand] — it's a complex
- * command with DI... and stays as a manual class." This is that same
- * separation, kept, not blurred — a command that ran the evaluator, wrote
- * billing, wrote S3 and decided sampling in one place was flagged in review
- * as the shape to avoid; this function is where that necessarily I/O-heavy
- * work belongs, and `evaluationAggregate.commands` stays exactly two
- * one-line pass-throughs.
+ * The orchestration around `evaluation.commands.report`: fetch the monitor,
+ * sample, check preconditions, run the evaluator, record cost, offload
+ * oversized inputs — all I/O, all before an event is decided, none of it
+ * expressible in a command handler, which is synchronous and pure.
  *
- * === Defect #1 — a genuine failure must surface, never be recorded as done ===
- *
- * The dispatch loop that calls this once per monitor
- * (`evaluationTrigger`, `trace-processing/process-manager/`) is out of this
- * pipeline's directory and already durable (ADR-075's leased-outbox
- * conversion — see `specs/monitors/evaluation-dispatch-durability.feature`).
- * What belongs to THIS pipeline is not letting its own command handler
- * quietly defeat that durability from the inside: the OLD
- * `ExecuteEvaluationCommand.handle` caught EVERY exception — including ones
- * that are not `isCustomerFixable` — and converted all of them into a
- * `reported` event with `status: "error"`, returning normally rather than
- * throwing. That manufactures false finality: a transient infrastructure
- * failure (a network blip calling `evaluationExecution.executeForTrace`, a
- * downstream outage) gets permanently recorded as a completed, errored
- * evaluation that nothing will ever retry, forfeiting the very at-least-once
- * redelivery the caller's queue exists to provide — the evaluation looks
- * "done" (with a result) rather than "not yet attempted successfully".
- *
- * This rewrite keeps the SAME three-way classification the old code already
- * drew (`isCustomerFixable` below is unchanged) but acts on it differently:
- *
- * 1. **The evaluator's own normal result is `status: "error"`.** Not an
- *    exception — `evaluationExecution.executeForTrace` returned successfully
- *    with an error verdict (e.g. a malformed trace the evaluator could
- *    reason about and reject). This is a legitimate, non-exceptional
- *    business outcome and is reported as such, unchanged from before.
- * 2. **A customer-fixable failure** (`isCustomerFixable`) is a business
- *    decision, not a fault of ours — reported as `skipped`, and the caller
- *    is never asked to retry something a retry cannot fix.
- * 3. **Anything else thrown** is a genuine, unclassified failure. It is
- *    re-thrown, not swallowed — the caller's retry mechanism gets to try
- *    again, and if it exhausts its budget the failure surfaces as a failure,
- *    per `specs/monitors/evaluation-dispatch-durability.feature`'s "An
- *    evaluation that could not be requested is visible" scenario (the same
- *    principle applied one layer further in).
+ * A failure that is not customer-fixable is re-thrown, never recorded as a
+ * permanent `error` result: recording it manufactures finality for something a
+ * retry might fix (specs/monitors/evaluation-dispatch-durability.feature).
  */
 
 const logger = createLogger(
@@ -115,12 +71,9 @@ export type ExecuteEvaluationInput = z.infer<
 
 /**
  * A failure the customer can resolve themselves (provider disabled, missing
- * credentials, an oversized evaluator payload) rather than one we have to
- * fix. Unchanged from the old pipeline — see its own comment there for why
- * this reads `HandledError.fault === "customer"` rather than
- * `HandledError.isHandled(error)` (which would also downgrade a genuine
- * platform-fault `EvaluatorExecutionError`, hiding an outage behind a benign
- * skip).
+ * credentials, an oversized payload). Keyed on `fault === "customer"`, not on
+ * `isHandled`: a platform-fault `HandledError` is an outage, and downgrading
+ * it to a skip would hide one.
  */
 function isCustomerFixable(error: unknown): error is HandledError {
   return HandledError.isHandled(error) && error.fault === "customer";
@@ -149,11 +102,8 @@ export interface ExecuteEvaluationDeps {
   ) => Promise<Record<string, string> | null>;
   /**
    * Offloads oversized evaluator inputs to durable object storage before the
-   * event is built (ADR-098 decision 8) — the durable-reference pattern, not
-   * inlining. Returns the inputs unchanged (inline) or a stored-object
-   * marker; the aggregate never distinguishes the two (see `aggregate.ts`'s
-   * `EvaluationState.inputs` doc). Absent means today's un-offloaded
-   * behaviour, matching the old pipeline's fail-open default.
+   * event is built, returning either the inputs unchanged or a stored-object
+   * marker. Absent means no offload — the fail-open default.
    */
   offloadInputs?: (args: {
     projectId: string;
@@ -186,8 +136,8 @@ async function buildReportedEvent(
         })
       : (result.inputs ?? null);
 
-  return evaluationAggregate.commands.report.handle(
-    evaluationAggregate.init(),
+  return evaluation.commands.report.handle(
+    evaluation.init(),
     {
       evaluationId: input.evaluationId,
       evaluatorId: input.evaluatorId,
@@ -206,7 +156,7 @@ async function buildReportedEvent(
       errorDetails: result.errorDetails ?? null,
       costId: result.costId ?? null,
     },
-    evaluationAggregate.events,
+    evaluation.events,
   );
 }
 

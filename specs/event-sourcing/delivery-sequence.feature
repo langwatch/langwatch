@@ -1,22 +1,22 @@
 @unit
 Feature: Every staged job carries a sequence that identifies the delivery
-  A projection has to tell a retry from a genuinely new arrival, and it cannot
-  do that by looking at the events. A retry carries the same events; so does a
-  redelivery after a crash. Event time cannot separate them either, because a
-  late arrival also sorts below whatever was applied last, and late arrivals are
-  normal — the stream is unordered before it reaches us.
+  What genuinely repeats in this system is the delivery, not the event. So each
+  job is stamped, when it is staged, with a number that increases within its own
+  group. That number names one delivery: a durable effect's message key is built
+  from it, and the dispatch plane's observability reads it off the envelope
+  without decoding the job.
 
-  What genuinely repeats is the delivery. So each job is stamped, when it is
-  staged, with a number that increases within its own group. A projection
-  records the last one it applied; a job presenting that number again has
-  already been applied and is skipped.
+  It is deliberately not a projection column. A fold is required to be a
+  function of the SET of the events it has seen, so re-applying a delivery
+  reaches the state it already had and there is nothing to skip (ADR-098
+  decision 5). A per-row guard would have bought idempotence for a fold that had
+  not earned it.
 
-  Two properties make it work, and both are about the stamp rather than the
-  events. It is assigned inside the same atomic step that inserts the job, so a
-  job cannot exist without one or share one with a sibling. And a retry presents
-  the number it was first given rather than a fresh one — a retry that looked
-  new would be applied twice, which is the entire failure the stamp exists to
-  prevent. (ADR-098.)
+  Two properties make the stamp work, and both are about the stamp rather than
+  the events. It is assigned inside the same atomic step that inserts the job,
+  so a job cannot exist without one or share one with a sibling. And a retry
+  presents the number it was first given rather than a fresh one, so the message
+  key it feeds is stable across attempts. (ADR-098.)
 
   Background:
     Given a queue that groups work by tenant, lane and aggregate

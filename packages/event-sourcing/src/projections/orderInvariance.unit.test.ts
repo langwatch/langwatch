@@ -2,33 +2,35 @@ import { describe, expect, it } from "vitest";
 import { checkOrderInvariance } from "./orderInvariance";
 
 /**
- * The harness exists to catch folds that only look order-invariant. Each test
- * below is a fold shape that is either genuinely safe (commutative
- * accumulator, monotone-by-rank) or genuinely unsafe (last-write-wins with no
- * timestamp, a fold that mutates the event it is handed) — the assertions are
- * on which side of that line the harness places each one.
+ * The harness exists to catch folds that only look like a function of the set
+ * of their events. Each test below is a fold shape that is either genuinely
+ * safe (max, set-union, monotone-by-rank) or genuinely unsafe (last-write-wins
+ * with no stamp, a running total, a fold that mutates the event it is handed)
+ * — the assertions are on which side of that line the harness places each one.
  */
 
 interface Reading {
+  readonly id: string;
   readonly value: number;
 }
 
 describe("checkOrderInvariance", () => {
-  describe("given a commutative accumulator fold", () => {
+  describe("given a fold whose every field is idempotent and commutative", () => {
     const events: Reading[] = [
-      { value: 3 },
-      { value: -1 },
-      { value: 7 },
-      { value: 2 },
+      { id: "a", value: 3 },
+      { id: "b", value: -1 },
+      { id: "c", value: 7 },
+      { id: "d", value: 2 },
     ];
 
-    /** @scenario a fold that only accumulates is unaffected by order */
+    /** @scenario a fold whose fields keep a maximum or a set membership is unaffected by order */
     it("reports invariant across every permutation", () => {
       const report = checkOrderInvariance({
-        init: () => ({ sum: 0, count: 0, max: -Infinity }),
+        init: () => ({ ids: [] as string[], max: -Infinity }),
         apply: (state, event: Reading) => ({
-          sum: state.sum + event.value,
-          count: state.count + 1,
+          ids: state.ids.includes(event.id)
+            ? state.ids
+            : [...state.ids, event.id].sort(),
           max: Math.max(state.max, event.value),
         }),
         events,
@@ -38,6 +40,45 @@ describe("checkOrderInvariance", () => {
       expect(report.counterexample).toBeUndefined();
       // 4 events, exhaustive: 4! permutations, identity counted once.
       expect(report.permutationsChecked).toBe(24);
+    });
+
+    /** @scenario re-delivering an event a fold has already seen changes nothing */
+    it("reports invariant when each event is delivered a second time", () => {
+      const report = checkOrderInvariance({
+        init: () => ({ ids: [] as string[], max: -Infinity }),
+        apply: (state, event: Reading) => ({
+          ids: state.ids.includes(event.id)
+            ? state.ids
+            : [...state.ids, event.id].sort(),
+          max: Math.max(state.max, event.value),
+        }),
+        events,
+      });
+
+      expect(report.invariant).toBe(true);
+      expect(report.duplicatesChecked).toBe(4);
+    });
+  });
+
+  describe("given a fold that adds each event to a running total", () => {
+    const events: Reading[] = [
+      { id: "a", value: 3 },
+      { id: "b", value: 4 },
+    ];
+
+    /** @scenario a running total is caught, because a retried delivery would double it */
+    it("finds a duplication counterexample even though every order agrees", () => {
+      const report = checkOrderInvariance({
+        init: () => ({ sum: 0 }),
+        apply: (state, event: Reading) => ({ sum: state.sum + event.value }),
+        events,
+      });
+
+      expect(report.invariant).toBe(false);
+      expect(report.cause).toBe("duplication");
+      // The disagreeing ordering is the identity ordering with one event
+      // delivered again — the shape a retry actually takes.
+      expect(report.counterexample?.orderB).toEqual([0, 1, 0]);
     });
   });
 
@@ -58,7 +99,9 @@ describe("checkOrderInvariance", () => {
       const report = checkOrderInvariance({
         init: () => ({ status: "queued" as StatusEvent["status"], rank: -1 }),
         apply: (state, event: StatusEvent) =>
-          event.rank > state.rank ? { status: event.status, rank: event.rank } : state,
+          event.rank > state.rank
+            ? { status: event.status, rank: event.rank }
+            : state,
         events,
       });
 
@@ -67,7 +110,10 @@ describe("checkOrderInvariance", () => {
   });
 
   describe("given a last-write-wins field with no timestamp on the event", () => {
-    const events: Reading[] = [{ value: 1 }, { value: 2 }];
+    const events: Reading[] = [
+      { id: "a", value: 1 },
+      { id: "b", value: 2 },
+    ];
 
     /** @scenario a field that simply overwrites is caught as order-dependent */
     it("finds an order counterexample", () => {
@@ -80,7 +126,9 @@ describe("checkOrderInvariance", () => {
       expect(report.invariant).toBe(false);
       expect(report.cause).toBe("order");
       expect(report.counterexample).toBeDefined();
-      expect(report.counterexample?.orderA).not.toEqual(report.counterexample?.orderB);
+      expect(report.counterexample?.orderA).not.toEqual(
+        report.counterexample?.orderB,
+      );
     });
   });
 
@@ -103,19 +151,26 @@ describe("checkOrderInvariance", () => {
 
       expect(report.invariant).toBe(false);
       expect(report.cause).toBe("mutation");
-      expect(report.counterexample?.orderA).toEqual(report.counterexample?.orderB);
+      expect(report.counterexample?.orderA).toEqual(
+        report.counterexample?.orderB,
+      );
       expect(report.permutationsChecked).toBe(1);
     });
   });
 
   describe("given more events than the exhaustive threshold", () => {
-    const events: Reading[] = Array.from({ length: 8 }, (_unused, i) => ({ value: i }));
+    const events: Reading[] = Array.from({ length: 8 }, (_unused, i) => ({
+      id: String(i),
+      value: i,
+    }));
 
     /** @scenario a large event set is sampled rather than exhaustively permuted */
     it("checks no more permutations than the configured cap", () => {
       const report = checkOrderInvariance({
-        init: () => ({ sum: 0 }),
-        apply: (state, event: Reading) => ({ sum: state.sum + event.value }),
+        init: () => ({ max: -Infinity }),
+        apply: (state, event: Reading) => ({
+          max: Math.max(state.max, event.value),
+        }),
         events,
         maxPermutations: 15,
       });
@@ -123,13 +178,32 @@ describe("checkOrderInvariance", () => {
       expect(report.permutationsChecked).toBeLessThanOrEqual(15);
       expect(report.invariant).toBe(true);
     });
+
+    /** @scenario the duplication sweep covers every event, however many there are */
+    it("checks every event's re-delivery even when permutations are sampled", () => {
+      const report = checkOrderInvariance({
+        init: () => ({ max: -Infinity }),
+        apply: (state, event: Reading) => ({
+          max: Math.max(state.max, event.value),
+        }),
+        events,
+        maxPermutations: 15,
+      });
+
+      expect(report.duplicatesChecked).toBe(8);
+    });
   });
 
   describe("given a deterministic fold checked twice", () => {
-    const events: Reading[] = Array.from({ length: 7 }, (_unused, i) => ({ value: i * i }));
+    const events: Reading[] = Array.from({ length: 7 }, (_unused, i) => ({
+      id: String(i),
+      value: i * i,
+    }));
     const args = {
-      init: () => ({ sum: 0 }),
-      apply: (state: { sum: number }, event: Reading) => ({ sum: state.sum + event.value }),
+      init: () => ({ max: -Infinity }),
+      apply: (state: { max: number }, event: Reading) => ({
+        max: Math.max(state.max, event.value),
+      }),
       events,
     };
 
@@ -152,7 +226,9 @@ describe("checkOrderInvariance", () => {
 
       const report = checkOrderInvariance({
         init: () => ({ value: 0 as number | null | undefined }),
-        apply: (_state, event) => ({ value: event.makeNull ? null : undefined }),
+        apply: (_state, event) => ({
+          value: event.makeNull ? null : undefined,
+        }),
         events,
       });
 

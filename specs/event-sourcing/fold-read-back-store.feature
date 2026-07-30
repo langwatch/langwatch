@@ -126,8 +126,8 @@ Feature: Fold projections read back their own state
     Then that classification is still part of the aggregate's state
 
   # Superseded by ADR-098 decision 5: the durably-persisted applied-event set
-  # (AppliedEventIds) is abolished in favour of a per-group delivery sequence
-  # — one scalar column, not an array of applied event ids.
+  # (AppliedEventIds) is abolished and nothing replaces it. Double-counting is
+  # ruled out by every fold field being idempotent, not by remembering.
   @unimplemented
   Scenario: a redelivered batch after a committed write does not double-count
     Given a fold that persists its applied-event set durably next to its state

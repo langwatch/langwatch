@@ -28,8 +28,6 @@ export async function teardown(): Promise<void> {
   // Nothing to stop: a native local ClickHouse is the always-on dev
   // instance, and a container started with `.withReuse()` is left running
   // for the next run, same as `langwatch/vitest.integration.config.ts`'s own
-  // globalSetup. Fixture tables and their rows are left in place too — rows
-  // are scoped by a unique tenant id per test, so leftovers from this run are
-  // invisible to the next one, and re-running `CREATE TABLE IF NOT EXISTS`
-  // next time is a cheap no-op.
+  // globalSetup. Fixture tables and their rows are left in place too — the
+  // next run drops and recreates them (see `FIXTURE_TABLE_DDL`).
 }

@@ -58,8 +58,8 @@ runtime, and their tests. It is a source-only workspace package in the shape
 ["src"]`, `emitDeclarationOnly`, peer-dep'd on `zod` so it compiles against the
 app's own copy.
 
-`langwatch/src/server/event-sourcing/pipelines/` becomes
-`langwatch/src/server/pipelines/`. It is the application.
+The 13 pipelines stay in the app, one flat directory each, at
+`langwatch/src/server/event-sourcing/<name>/`. They are the application.
 
 The root `pnpm-workspace.yaml:2` already lists `packages/*`, so the package is
 resolved there without change. The app is its own workspace and must name the
@@ -169,30 +169,33 @@ Counting inverted imports separately — core modules importing from `pipelines/
 gives 59 statements, and the same concentration holds: 44 are in the 2
 composition roots and travel with them, 15 are the leaks above.
 
-### 5. A pipeline is one file, in layers, with dependencies pointing downward
+### 5. A pipeline is one file, and it is the whole topology
 
-Each of the 13 pipelines owns a directory with `commands/`, `projections/`,
-`subscribers/`, `process-manager/` and `schemas/` beneath a single `pipeline.ts`.
-That file states the whole topology and nothing else: a `Deps` interface naming
-every collaborator as a type, then one function that calls `definePipeline` and
-registers each member by constructing it from an imported factory.
-`pipelines/trace-processing/pipeline.ts` is the reference — 341 lines, its deps
-interface at line 77, its builder at line 176, and every mount below that a
-factory call rather than an injected value.
+Each pipeline owns a flat directory whose `index.ts` holds one `definePipeline`
+chain — its vocabulary, its identity, its members and the store each member
+writes to (ADR-105). That file is the answer to "what does this pipeline do",
+and it is the only file in the directory that names a ClickHouse client.
 
-The rule that makes the file readable is that a mounted member is *constructed
-there*, not passed in. A pipeline whose projections arrive through `Deps` states
-its wiring somewhere else, and the one file stops being the answer to "what does
-this pipeline do". The single acknowledged exception is enterprise members: `ee/`
-cannot be imported unconditionally from an open-source pipeline file, so the 5
-enterprise mounts in `trace-processing` cross as injected values behind an
-`if` guard. That exception is scoped to the OSS/EE boundary and is not a
-precedent for injecting anything else.
+The rule that keeps it readable is that a member is *declared there*, in the
+chain, rather than constructed elsewhere and passed in. A pipeline whose
+projections arrive through a `Deps` interface has stated its wiring somewhere
+else, and the one file stops being the answer. What `deps` carries is
+collaborators — a client, a cache, a notifier, a feature flag — never members.
 
-Dependencies point downward only. `pipeline.ts` may import from its own
-subdirectories, from `@langwatch/event-sourcing`, and from another pipeline's
-`commands/` or `schemas/` when it dispatches across pipelines. A `projections/`
-file may not import `pipeline.ts`.
+The single acknowledged exception is enterprise members: `ee/` cannot be
+imported unconditionally from an open-source pipeline file, so enterprise mounts
+cross as injected values behind an `if` guard. That exception is scoped to the
+OSS/EE boundary and is not a precedent for injecting anything else.
+
+Handler bodies live in sibling files — `recordSpan.command.ts`,
+`traceSummary.projection.ts`, `traceSettlement.process.ts` — and dependencies
+point downward only: a sibling may import `events.ts` and `schema.ts`, never
+`index.ts`.
+
+A pipeline may import another pipeline's **command input schema** in order to
+dispatch to it. It may never import another pipeline's events: a projection
+subscribes only to its own vocabulary, and work crossing a pipeline boundary
+crosses as a command (ADR-098 §9, ADR-105 §4).
 
 ### 6. The composition root is application code and assembles stores from repositories
 

@@ -54,7 +54,9 @@ const {
   };
 });
 
-vi.mock("@langwatch/observability", () => ({ createLogger: vi.fn(() => createMockLogger()) }));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: vi.fn(() => createMockLogger()),
+}));
 
 // Disable the org-level TtlCache so tests don't share cached org data across runs.
 vi.mock("~/server/utils/ttlCache", () => ({
@@ -79,18 +81,33 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   }),
 }));
 
-import { reportUsageForMonth } from "../reportUsageForMonth";
 import type { ReportUsageForMonthData } from "../reportUsageForMonth";
+import { reportUsageForMonth } from "../reportUsageForMonth";
 
-function makeData(organizationId = "org-1", billingMonth = "2026-02"): ReportUsageForMonthData {
-  return { organizationId, billingMonth, tenantId: organizationId, occurredAt: Date.now() };
+function makeData(
+  organizationId = "org-1",
+  billingMonth = "2026-02",
+): ReportUsageForMonthData {
+  return {
+    organizationId,
+    billingMonth,
+    tenantId: organizationId,
+    occurredAt: Date.now(),
+  };
 }
 
 function makeOrg({
   stripeCustomerId = "cus_123",
   hasSubscription = true,
-}: { stripeCustomerId?: string | null; hasSubscription?: boolean } = {}) {
-  return { id: "org-1", stripeCustomerId, subscriptions: hasSubscription ? [{ id: "sub-1" }] : [] };
+}: {
+  stripeCustomerId?: string | null;
+  hasSubscription?: boolean;
+} = {}) {
+  return {
+    id: "org-1",
+    stripeCustomerId,
+    subscriptions: hasSubscription ? [{ id: "sub-1" }] : [],
+  };
 }
 
 function makeDeps() {
@@ -125,7 +142,9 @@ describe("reportUsageForMonth", () => {
 
   describe("given org has no stripeCustomerId", () => {
     it("does nothing", async () => {
-      mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg({ stripeCustomerId: null }));
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        makeOrg({ stripeCustomerId: null }),
+      );
 
       await reportUsageForMonth(makeData(), makeDeps());
 
@@ -135,7 +154,9 @@ describe("reportUsageForMonth", () => {
 
   describe("given org has no active subscription", () => {
     it("does nothing", async () => {
-      mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg({ hasSubscription: false }));
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(
+        makeOrg({ hasSubscription: false }),
+      );
 
       await reportUsageForMonth(makeData(), makeDeps());
 
@@ -188,7 +209,9 @@ describe("reportUsageForMonth", () => {
       expect(mockReportUsageDelta).toHaveBeenCalledWith(
         expect.objectContaining({
           stripeCustomerId: "cus_123",
-          events: expect.arrayContaining([expect.objectContaining({ value: 50 })]),
+          events: expect.arrayContaining([
+            expect.objectContaining({ value: 50 }),
+          ]),
         }),
       );
       expect(mockBillingCheckpoints.writeIntent).toHaveBeenCalledWith({
@@ -202,7 +225,9 @@ describe("reportUsageForMonth", () => {
         billingMonth: "2026-02",
         lastReportedTotal: 150,
       });
-      expect(mockSelfDispatch).toHaveBeenCalledWith(expect.objectContaining({ organizationId: "org-1" }));
+      expect(mockSelfDispatch).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1" }),
+      );
     });
   });
 
@@ -216,7 +241,11 @@ describe("reportUsageForMonth", () => {
       await reportUsageForMonth(makeData(), makeDeps());
 
       expect(mockReportUsageDelta).toHaveBeenCalledWith(
-        expect.objectContaining({ events: expect.arrayContaining([expect.objectContaining({ value: 50 })]) }),
+        expect.objectContaining({
+          events: expect.arrayContaining([
+            expect.objectContaining({ value: 50 }),
+          ]),
+        }),
       );
       expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
         organizationId: "org-1",
@@ -242,7 +271,10 @@ describe("reportUsageForMonth", () => {
       expect(mockReportUsageDelta).toHaveBeenCalledWith(
         expect.objectContaining({
           events: expect.arrayContaining([
-            expect.objectContaining({ value: 100, identifier: expect.stringContaining("from:100:to:200") }),
+            expect.objectContaining({
+              value: 100,
+              identifier: expect.stringContaining("from:100:to:200"),
+            }),
           ]),
         }),
       );
@@ -258,12 +290,16 @@ describe("reportUsageForMonth", () => {
         consecutiveFailures: 0,
       });
       mockQueryBillableEventsTotal.mockResolvedValue(150);
-      mockReportUsageDelta.mockResolvedValue([{ reported: false, error: "meter_event_invalid" }]);
+      mockReportUsageDelta.mockResolvedValue([
+        { reported: false, error: "meter_event_invalid" },
+      ]);
 
       await reportUsageForMonth(makeData(), makeDeps());
 
       expect(mockSelfDispatch).not.toHaveBeenCalled();
-      expect(mockBillingCheckpoints.clearPendingAndIncrementFailures).toHaveBeenCalledWith({
+      expect(
+        mockBillingCheckpoints.clearPendingAndIncrementFailures,
+      ).toHaveBeenCalledWith({
         organizationId: "org-1",
         billingMonth: "2026-02",
         consecutiveFailures: 1,
@@ -283,7 +319,9 @@ describe("reportUsageForMonth", () => {
       mockQueryBillableEventsTotal.mockResolvedValue(10);
       mockReportUsageDelta.mockRejectedValue(new Error("Stripe rate limit"));
 
-      await expect(reportUsageForMonth(makeData(), makeDeps())).resolves.toBeUndefined();
+      await expect(
+        reportUsageForMonth(makeData(), makeDeps()),
+      ).resolves.toBeUndefined();
 
       expect(mockSelfDispatch).toHaveBeenCalled();
       expect(mockBillingCheckpoints.incrementFailures).toHaveBeenCalledWith({
@@ -298,9 +336,13 @@ describe("reportUsageForMonth", () => {
 
   describe("given an unexpected error resolving the organization", () => {
     it("catches it and captures the exception, without throwing", async () => {
-      mockOrganizations.getOrganizationForBilling.mockRejectedValue(new Error("database offline"));
+      mockOrganizations.getOrganizationForBilling.mockRejectedValue(
+        new Error("database offline"),
+      );
 
-      await expect(reportUsageForMonth(makeData(), makeDeps())).resolves.toBeUndefined();
+      await expect(
+        reportUsageForMonth(makeData(), makeDeps()),
+      ).resolves.toBeUndefined();
       expect(mockCaptureException).toHaveBeenCalled();
     });
   });

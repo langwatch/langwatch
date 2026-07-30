@@ -107,7 +107,8 @@ event. An alert lands as an `AnomalyAlert` row.
 
 Post-event work in general is expressed as an **event subscriber**, a
 **projection**, or a **process manager**, and nothing else — see
-[ADR-075](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md).
+[ADR-098](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/098-event-sourcing-core.md)
+(successor to the retired ADR-075).
 Subscribers and process managers run on the live event path only;
 replay never re-runs them. Projections are the substrate for anything
 someone later reads as fact, precisely because replay does rebuild

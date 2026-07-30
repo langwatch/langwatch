@@ -111,6 +111,18 @@ Feature: A fold declares how its state round-trips, and nothing else
     Then each is written exactly as it would have been on its own
     And each carries its own customer's retention and its own folding bookkeeping
 
+  Scenario: a composite engine key is bound column by column, never collapsed to one
+    Given a fold whose aggregate is identified by more than one column
+    When its state is read back
+    Then every part of that identity is bound separately in the lookup
+    And two aggregates sharing one part are never read as the same record
+
+  Scenario: a partition anchor cannot be re-stamped on every write
+    Given a record column that anchors where the record is partitioned and when it expires
+    When a fold declares that the platform should stamp it on every write
+    Then the declaration is refused before anything is ever written
+    And the fold is told to carry the value in its own state and freeze it on first write
+
   Scenario: recent state is served ahead of the store without any fold arranging it
     Given a fold whose state was committed moments ago
     When the fold recovers that aggregate's state

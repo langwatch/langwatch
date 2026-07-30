@@ -1,14 +1,14 @@
 /**
- * A harness a fold's own test suite calls to check order-invariance (ADR-098
- * §4).
+ * A harness a fold's own test suite calls to check that it is a function of the
+ * SET of its events (ADR-098 §4, §5).
  *
- * Delivery order is best effort: telemetry and scenario events are stamped in
- * a customer's process and cross a network before we ever see them, so no
- * queue discipline on our side can make the stream arrive in event order.
- * What keeps a fold correct under that is that it is ORDER-INVARIANT — folding
- * the same events in any order lands on the same state. That is a property to
- * be checked, not a comment above the `apply` function, and this package's own
- * folds had never actually had it checked. This module is the check.
+ * Two properties, one check. Delivery order is best effort — telemetry is
+ * stamped in a customer's process and crosses a network before we see it — so
+ * folding the same events in any order must land on the same state. Delivery
+ * count is best effort too: a retried job re-delivers events already applied,
+ * and since no row carries a sequence to skip on, re-applying an event must
+ * land on the same state as well. Both are properties to be checked, not
+ * comments above the `apply` function.
  */
 
 export interface OrderInvarianceReport {
@@ -21,6 +21,11 @@ export interface OrderInvarianceReport {
    * elements, or because `maxPermutations` was capped down to it).
    */
   readonly permutationsChecked: number;
+  /**
+   * How many re-application orderings were folded and compared. Each is the
+   * identity ordering with one event delivered a second time.
+   */
+  readonly duplicatesChecked: number;
   /**
    * Present only when `invariant` is false. Two orderings — given as indices
    * into `events` — that folded to different states. Reproduce the failure by
@@ -44,13 +49,19 @@ export interface OrderInvarianceReport {
    * next fold. A permutation sweep cannot validate a fold like that, because
    * every run corrupts the fixture the next run depends on, so this is
    * reported as its own failure mode rather than folded into `"order"`.
+   *
+   * `"duplication"` — re-applying one event moved the state. The fold holds a
+   * delta accumulator or something else not idempotent, and a retried delivery
+   * would corrupt it. The fix is never a sequence column: the delta becomes an
+   * item row keyed by its natural key and the total becomes a query over those
+   * rows (ADR-103).
    */
-  readonly cause?: "order" | "mutation";
+  readonly cause?: "order" | "mutation" | "duplication";
 }
 
 /**
- * Folds `events`, in several orders, through `apply` and reports whether every
- * order reaches the same state.
+ * Folds `events` in several orders, and again with each event duplicated, and
+ * reports whether every one of them reaches the same state.
  *
  * `events.length <= 5` checks all `n!` permutations (capped by
  * `maxPermutations`). Above that, exhaustive enumeration is infeasible, so the
@@ -59,6 +70,9 @@ export interface OrderInvarianceReport {
  * once, pass on retry, and teach whoever hit it that re-running is a valid
  * response to red CI; a fixed seed makes a failure reproduce every time it is
  * run, on any machine.
+ *
+ * The duplication sweep is exhaustive regardless of `n`: it is linear, and the
+ * one non-idempotent field in a fold is exactly the field a sample would miss.
  */
 export function checkOrderInvariance<State, Event>(args: {
   init: () => State;
@@ -80,8 +94,6 @@ export function checkOrderInvariance<State, Event>(args: {
   const fold = (order: readonly number[]): State => {
     let state = deepClone(seed);
     for (const index of order) {
-      // `index` always falls inside `events` — every order folded here is
-      // built from `identity`, which enumerates `events`' own indices.
       state = apply(state, events[index]!);
     }
     return state;
@@ -93,6 +105,7 @@ export function checkOrderInvariance<State, Event>(args: {
     return {
       invariant: false,
       permutationsChecked: 1,
+      duplicatesChecked: 0,
       counterexample: { orderA: identity, orderB: identity },
       cause: "mutation",
     };
@@ -111,20 +124,35 @@ export function checkOrderInvariance<State, Event>(args: {
       return {
         invariant: false,
         permutationsChecked: checked,
+        duplicatesChecked: 0,
         counterexample: { orderA: identity, orderB: order },
         cause: "order",
       };
     }
   }
 
-  return { invariant: true, permutationsChecked: checked };
+  let duplicatesChecked = 0;
+  for (const index of identity) {
+    // Appended rather than inserted beside the original: that is the shape a
+    // retry takes.
+    const order = [...identity, index];
+    const result = fold(order);
+    duplicatesChecked++;
+    if (!equalsFn(result, referenceA)) {
+      return {
+        invariant: false,
+        permutationsChecked: checked,
+        duplicatesChecked,
+        counterexample: { orderA: identity, orderB: order },
+        cause: "duplication",
+      };
+    }
+  }
+
+  return { invariant: true, permutationsChecked: checked, duplicatesChecked };
 }
 
-/**
- * All `n!` permutations of `[0, n)`, identity first. Only called for `n <= 5`
- * (120 permutations at the worst case), so the recursive generation is never
- * asked to hold more in memory than a fold's own test suite already tolerates.
- */
+/** All `n!` permutations of `[0, n)`, identity first. Only called for `n <= 5`. */
 function allPermutations(n: number): number[][] {
   if (n <= 1) return [Array.from({ length: n }, (_unused, i) => i)];
   const results: number[][] = [];
@@ -148,11 +176,7 @@ function allPermutations(n: number): number[][] {
   return results;
 }
 
-/**
- * A fixed seed for the deterministic sampler below. Any constant works — the
- * only requirement is that it never changes, so the same fold examined twice
- * samples the same orderings both times.
- */
+/** Fixed so the same fold examined twice samples the same orderings. */
 const SAMPLE_SEED = 0x2f6e2b1;
 
 /** mulberry32: a small deterministic PRNG. Not cryptographic — it exists only

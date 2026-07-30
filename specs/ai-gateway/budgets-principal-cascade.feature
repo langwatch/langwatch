@@ -78,11 +78,11 @@ Feature: AI Gateway — Per-user (PRINCIPAL) budgets in the strictest-wins casca
   # ============================================================================
 
   @bdd @phase-1b @principal-cascade @trace-fold
-  Scenario: Trace-fold reactor writes one ledger row per applicable budget INCLUDING PRINCIPAL
+  Scenario: Trace-fold map projection writes one ledger row per applicable budget INCLUDING PRINCIPAL
     Given alice has a $50/month PRINCIPAL budget
     And the org/team/project/VK budgets in the background apply
     When a finalised trace is processed for an alice-attributed request costing $0.42
-    Then the trace-fold reactor writes 5 rows to `gateway_budget_ledger_events`
+    Then the trace-fold map projection writes 5 rows to `gateway_budget_ledger_events`
     And each row carries the same `GatewayRequestId` (idempotency key)
     And the PRINCIPAL row has `BudgetId` matching alice's principal budget and `SpendUSD = 0.42`
 

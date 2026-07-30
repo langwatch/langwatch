@@ -161,48 +161,37 @@ describe("generateItemProjectionId", () => {
 describe("mapTargetResult", () => {
   /** @scenario "An item that reports its own cost keeps that figure" */
   it("keeps the cost the item reported itself", () => {
-    const record = mapTargetResult({ tenantId: "tenant-1", data: targetData });
-    expect(record.targetCost).toBe(0.02);
-    expect(record.resultType).toBe("target");
-    expect(record.rowIndex).toBe(0);
-    expect(record.occurredAt).toBe(targetData.occurredAt);
+    const row = mapTargetResult(targetData);
+    expect(row.TargetCost).toBe(0.02);
+    expect(row.ResultType).toBe("target");
+    expect(row.RowIndex).toBe(0);
+    expect(row.OccurredAt).toEqual(new Date(targetData.occurredAt));
   });
 
   /** @scenario "A repeated item result does not inflate the run" */
-  it("re-derives the same projectionId for a redelivered event", () => {
-    const first = mapTargetResult({ tenantId: "tenant-1", data: targetData });
-    const second = mapTargetResult({
-      tenantId: "tenant-1",
-      data: { ...targetData },
-    });
-    expect(first.projectionId).toBe(second.projectionId);
+  it("produces an identical row for a redelivered event", () => {
+    expect(mapTargetResult(targetData)).toEqual(
+      mapTargetResult({ ...targetData }),
+    );
   });
 
   it("clamps a negative duration to zero rather than rejecting it", () => {
-    const record = mapTargetResult({
-      tenantId: "tenant-1",
-      data: { ...targetData, duration: -50 },
-    });
-    expect(record.targetDurationMs).toBe(0);
+    expect(mapTargetResult({ ...targetData, duration: -50 }).TargetDurationMs)
+      .toBe(0);
   });
 });
 
 describe("mapEvaluatorResult", () => {
   it("encodes a passed verdict as 1", () => {
-    const record = mapEvaluatorResult({
-      tenantId: "tenant-1",
-      data: evaluatorData,
-    });
-    expect(record.passed).toBe(1);
-    expect(record.score).toBe(0.8);
-    expect(record.resultType).toBe("evaluator");
+    const row = mapEvaluatorResult(evaluatorData);
+    expect(row.Passed).toBe(1);
+    expect(row.Score).toBe(0.8);
+    expect(row.ResultType).toBe("evaluator");
   });
 
   it("encodes an unknown verdict as null, not 0", () => {
-    const record = mapEvaluatorResult({
-      tenantId: "tenant-1",
-      data: { ...evaluatorData, passed: undefined },
-    });
-    expect(record.passed).toBeNull();
+    expect(
+      mapEvaluatorResult({ ...evaluatorData, passed: undefined }).Passed,
+    ).toBeNull();
   });
 });

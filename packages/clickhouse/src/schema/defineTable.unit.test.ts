@@ -226,3 +226,143 @@ describe("given an empty tenant list", () => {
     ).toThrow(/declares no tenant columns/);
   });
 });
+
+/**
+ * `structuralDebt` is the exemption ADR-099's guard needs for the three
+ * deployed tables whose structural column genuinely fails the rule and
+ * cannot be re-keyed without a migration. It never weakens the guard for a
+ * table, or a column, that does not name itself here.
+ */
+describe("given a table that names known structural debt for its partition column", () => {
+  /** @scenario a partition column exempted as structural debt compiles and keeps its true role */
+  it("builds successfully and the column still reports its true, non-structural role", () => {
+    const table = defineTable({
+      ...validTableArgs(),
+      partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
+      structuralDebt: [
+        {
+          column: "OccurredAt",
+          reason: "customer-supplied event time anchors the partition; re-key pending",
+        },
+      ],
+    });
+
+    expect(table.columns.OccurredAt!.timeRole).toBe("occurredAt");
+    expect(table.columns.OccurredAt!.frozen).toBe(false);
+    expect(table.columns.OccurredAt!.platformControlled).toBe(false);
+  });
+});
+
+describe("given a table that names known structural debt for its replacing version", () => {
+  /** @scenario a replacing version exempted as structural debt compiles and keeps its true role */
+  it("builds successfully and the column still reports its true, non-writtenAt role", () => {
+    const table = defineTable({
+      ...validTableArgs(),
+      merge: replacing({ version: "OccurredAt" }),
+      structuralDebt: [
+        {
+          column: "OccurredAt",
+          reason:
+            "version carries business time, not our write clock, but still orders two versions of this row correctly",
+        },
+      ],
+    });
+
+    expect(table.merge).toEqual({ kind: "replacing", version: "OccurredAt" });
+    expect(table.columns.OccurredAt!.timeRole).toBe("occurredAt");
+  });
+});
+
+describe("given a customer-supplied partition column and no structuralDebt", () => {
+  /** @scenario a table that does not opt in is still refused for a customer-supplied partition column */
+  it("is refused, exactly as before the exemption mechanism existed", () => {
+    expect(() =>
+      defineTable({
+        ...validTableArgs(),
+        partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
+      }),
+    ).toThrow(TableDefinitionError);
+  });
+});
+
+describe("given a replacing version that is not writtenAt and no structuralDebt", () => {
+  /** @scenario a table that does not opt in is still refused for a version column that is not writtenAt */
+  it("is refused, exactly as before the exemption mechanism existed", () => {
+    expect(() =>
+      defineTable({
+        ...validTableArgs(),
+        merge: replacing({ version: "OccurredAt" }),
+      }),
+    ).toThrow(TableDefinitionError);
+  });
+});
+
+describe("given a structuralDebt entry with a blank reason", () => {
+  /** @scenario an exemption with no reason is refused */
+  it("is refused", () => {
+    expect(() =>
+      defineTable({
+        ...validTableArgs(),
+        partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
+        structuralDebt: [{ column: "OccurredAt", reason: "   " }],
+      }),
+    ).toThrow(/needs a reason/);
+  });
+});
+
+describe("given a structuralDebt entry naming a column the table never declared", () => {
+  /** @scenario an exemption naming a column the table never declared is refused */
+  it("is refused", () => {
+    expect(() =>
+      defineTable({
+        ...validTableArgs(),
+        structuralDebt: [{ column: "MissingColumn", reason: "does not exist" }],
+      }),
+    ).toThrow(/structural debt names undeclared column "MissingColumn"/);
+  });
+});
+
+describe("given a structuralDebt entry for a column that anchors nothing", () => {
+  /** @scenario an exemption for a column that anchors nothing is refused */
+  it("is refused as an unused exemption", () => {
+    expect(() =>
+      defineTable({
+        ...validTableArgs(),
+        structuralDebt: [{ column: "TraceId", reason: "not actually structural" }],
+      }),
+    ).toThrow(/is not this table's partition column, TTL anchor or replacing version/);
+  });
+});
+
+describe("given a structuralDebt entry that exempts a different column than the one violating the rule", () => {
+  /** @scenario one column's exemption does not excuse a different column's structural violation */
+  it("still refuses the table for its actual violating partition column", () => {
+    expect(() =>
+      defineTable({
+        ...validTableArgs(),
+        partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
+        structuralDebt: [
+          {
+            column: "UpdatedAt",
+            reason: "placeholder — UpdatedAt already passes on its own, so this excuses nothing",
+          },
+        ],
+      }),
+    ).toThrow(/partition column "OccurredAt" is not frozen and platform-controlled/);
+  });
+});
+
+describe("given the same column named twice in structuralDebt", () => {
+  it("is refused", () => {
+    expect(() =>
+      defineTable({
+        ...validTableArgs(),
+        partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
+        structuralDebt: [
+          { column: "OccurredAt", reason: "first" },
+          { column: "OccurredAt", reason: "second" },
+        ],
+      }),
+    ).toThrow(/structural debt on column "OccurredAt" is declared twice/);
+  });
+});

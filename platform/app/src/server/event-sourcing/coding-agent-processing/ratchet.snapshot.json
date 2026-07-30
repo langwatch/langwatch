@@ -1,0 +1,7 @@
+{
+	"coding_agent_session": [
+		"coding_agent_session/logFactsContributed",
+		"coding_agent_session/metricFactsContributed",
+		"coding_agent_session/spanFactsContributed"
+	]
+}

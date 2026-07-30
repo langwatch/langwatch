@@ -3,12 +3,26 @@
  * durable events into its operational state, as one pure module (ADR-059 §1),
  * exactly like `turnFold.ts` for the per-turn document.
  *
- * The server's `LangyConversationStateFoldProjection` delegates every handler
- * here; a browser spine fold (ADR-059 Phase 4, client half) will call the same
- * function. NOTE the state deliberately models the server-only columns
- * (RunToken, PendingHandoffToken) — they are part of the fold's truth — but
- * they never ride the client wire: the tail read serves only the turn
- * vocabulary, and any future spine wire schema must exclude them explicitly.
+ * `src/server/event-sourcing/langy-conversation-processing/` (ADR-098/105
+ * greenfield rewrite) wires this function directly into a
+ * `@langwatch/event-sourcing` fold executor as its `apply`; a browser spine
+ * fold (ADR-059 Phase 4, client half) will call the same function. NOTE the
+ * state deliberately models the server-only columns (RunToken,
+ * PendingHandoffToken) — they are part of the fold's truth — but they never
+ * ride the client wire: the tail read serves only the turn vocabulary, and
+ * any future spine wire schema must exclude them explicitly.
+ *
+ * Fixed here (not in the server pipeline — this module is the shared browser
+ * contract, so a fix here is a fix for both sides at once): `LastActivityAt`
+ * is now a monotone bump (`latestActivity`) instead of a bare assignment —
+ * bare assignment let a late-arriving event, which is normal under
+ * ADR-098's best-effort delivery, move the timestamp BACKWARDS, and the
+ * liveness subscriber computes staleness directly from it. `AGENT_RESPONDED`
+ * now carries the same turn-identity guard its failure sibling
+ * (`AGENT_RESPONSE_FAILED`) already had — without it, a late `agent_responded`
+ * for a turn a newer `agent_turn_accepted` had already superseded could clear
+ * the newer turn's `CurrentTurnId` and stamp it IDLE/FAILED out from under
+ * itself.
  */
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
@@ -198,6 +212,21 @@ function nextStatus(
     : proposed;
 }
 
+/**
+ * Monotone bump for `LastActivityAt` — ADR-098 decision 4's "monotone by
+ * rank" kind, applied to a timestamp field rather than a status enum: the
+ * rank IS the numeric value, and `max` is the join. Every handler below
+ * routes its activity bump through this rather than assigning
+ * `event.occurredAt` bare, which is how a late-arriving event (normal under
+ * best-effort delivery, ADR-098 decision 4) used to move the conversation's
+ * last-activity timestamp BACKWARDS — and the liveness subscriber computes
+ * staleness directly from this field, so a regressed value reads as "gone
+ * quiet" and can kill a turn that is still running.
+ */
+function latestActivity(current: number | null, occurredAt: number): number {
+  return current === null ? occurredAt : Math.max(current, occurredAt);
+}
+
 /** Fold ONE spine event onto the conversation state. Pure and total. */
 export function foldLangyConversationState<
   S extends LangyConversationStateFoldState,
@@ -222,7 +251,7 @@ export function foldLangyConversationState<
         Title: title,
         TitleSource: titleSource,
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
-        LastActivityAt: state.LastActivityAt ?? event.occurredAt,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
         // First-writer-wins: the runToken is minted once at creation and never
         // rotated, so an already-set value survives a (retried) started event.
         RunToken: state.RunToken ?? event.data.runToken ?? null,
@@ -239,7 +268,7 @@ export function foldLangyConversationState<
         TitleSource:
           state.Title == null ? LANGY_TITLE_SOURCE.USER : state.TitleSource,
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.IDLE),
-        LastActivityAt: state.LastActivityAt ?? event.occurredAt,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
         RunToken: state.RunToken ?? event.data.runToken,
       };
     }
@@ -266,7 +295,7 @@ export function foldLangyConversationState<
         TitleSource: titleSource,
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
         MessageCount: state.MessageCount + 1,
-        LastActivityAt: event.occurredAt,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED: {
@@ -275,7 +304,7 @@ export function foldLangyConversationState<
         ConversationId: state.ConversationId || event.data.conversationId,
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.IDLE),
         MessageCount: state.MessageCount + 1,
-        LastActivityAt: event.occurredAt,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED: {
@@ -284,7 +313,7 @@ export function foldLangyConversationState<
         ConversationId: state.ConversationId || event.data.conversationId,
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.RUNNING),
         CurrentTurnId: event.data.turnId,
-        LastActivityAt: event.occurredAt,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
       };
     }
     // Tool calls are DURABLE, meaningful transitions (an audit of what the
@@ -296,7 +325,7 @@ export function foldLangyConversationState<
       return {
         ...state,
         ConversationId: state.ConversationId || event.data.conversationId,
-        LastActivityAt: event.occurredAt,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED: {
@@ -317,25 +346,42 @@ export function foldLangyConversationState<
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.FAILED),
         CurrentTurnId: null,
         LastError: event.data.error,
-        LastActivityAt: event.occurredAt,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED: {
       const failed = event.data.outcome === "failed";
+      // Guarded exactly like AGENT_RESPONSE_FAILED's sibling branch above —
+      // its failure twin already refused to let a stale terminal regress the
+      // conversation, but this success/stop terminal had no such guard at
+      // all: a late agent_responded for a turn a NEWER agent_turn_accepted
+      // had already superseded would set CurrentTurnId back to null and
+      // stamp the newer, still-running turn as IDLE/FAILED out from under
+      // it. The message itself still happened — MessageCount and activity
+      // reflect it regardless — but only the turn that is CURRENTLY in
+      // flight may have its status/error/current-turn bookkeeping touched.
+      const isCurrentTurn = event.data.turnId === state.CurrentTurnId;
       return {
         ...state,
         ConversationId: state.ConversationId || event.data.conversationId,
-        // The final answer is one message on the conversation.
+        // The final answer is one message on the conversation, whichever
+        // turn it belongs to.
         MessageCount: state.MessageCount + 1,
-        Status: nextStatus(
-          state,
-          failed
-            ? LANGY_CONVERSATION_STATUS.FAILED
-            : LANGY_CONVERSATION_STATUS.IDLE,
-        ),
-        CurrentTurnId: null,
-        LastError: failed ? (event.data.error ?? "unknown error") : null,
-        LastActivityAt: event.occurredAt,
+        Status: isCurrentTurn
+          ? nextStatus(
+              state,
+              failed
+                ? LANGY_CONVERSATION_STATUS.FAILED
+                : LANGY_CONVERSATION_STATUS.IDLE,
+            )
+          : state.Status,
+        CurrentTurnId: isCurrentTurn ? null : state.CurrentTurnId,
+        LastError: isCurrentTurn
+          ? failed
+            ? (event.data.error ?? "unknown error")
+            : null
+          : state.LastError,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED: {
@@ -346,6 +392,23 @@ export function foldLangyConversationState<
         ArchivedAt: event.occurredAt,
       };
     }
+    // FLAGGED, not fixed: `Title`/`IsShared`/`SharedAt`/`SharedById` are bare
+    // overwrites, ordered by whatever order this batch happened to apply
+    // events in — not a declared lattice, not a stamped LWW. `Title` is
+    // largely protected in practice by the TitleSource rank lattice above
+    // (derived < auto < user, user sticky), but two USER-initiated renames
+    // racing within the same delivery batch have no tie-break, and
+    // IsShared/SharedAt/SharedById have no rank concept at all. A correct
+    // fix needs a per-field `asOf` stamp per ADR-098 decision 4 — ordered on
+    // our own accept time, never on `occurredAt` — which the portable event
+    // shape this fold receives does not currently carry (only `occurredAt`;
+    // see the module docblock). Widening it is a real, boundary-crossing
+    // change (server AND browser both construct this event shape), so it is
+    // deliberately left as a flagged gap rather than guessed at here: two
+    // metadata updates racing within one delivery is a narrow edge case
+    // (a user can only issue one rename at a time from one client), unlike
+    // the turn-identity and activity-timestamp defects fixed elsewhere in
+    // this file, which fire on ordinary out-of-order delivery.
     case LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED: {
       const next = { ...state };
       next.ConversationId = state.ConversationId || event.data.conversationId;
@@ -377,7 +440,7 @@ export function foldLangyConversationState<
         CurrentTurnId: null,
         PendingHandoffToken: event.data.token,
         PendingHandoffTurnId: event.data.turnId,
-        LastActivityAt: event.occurredAt,
+        LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
       };
     }
     // ADR-048: the next turn threaded the pending token to a fresh worker.

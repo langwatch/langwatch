@@ -13,17 +13,40 @@ Feature: A fold must reach the same state whatever order it sees events in
   depending on which delivery happened to arrive first, and nothing downstream
   can tell that it did.
 
+  Set means set, not sequence: it does not count multiplicity either. A retried
+  job re-delivers events already applied, and no row carries a sequence to skip
+  on, so re-applying an event must land on the same state as well. That rules
+  out a running total in fold state — a delta belongs in an item row keyed by
+  its natural key, with the total derived at read time.
+
   This is checked rather than asserted. Every fold that previously claimed its
   accumulators commuted carried that claim in a comment, and on most of them the
-  claim had never been tested. (ADR-098.)
+  claim had never been tested. (ADR-098, ADR-103.)
 
   Background:
     Given a fold that folds a series of events into a state
 
-  Scenario: a fold that only accumulates is unaffected by order
-    Given every field either counts, sums, or keeps the largest value it has seen
+  Scenario: a fold whose fields keep a maximum or a set membership is unaffected by order
+    Given every field either keeps the largest value it has seen or a set of what it has seen
     When the same events are folded in different orders
     Then every order reaches the same final state
+
+  Scenario: re-delivering an event a fold has already seen changes nothing
+    Given a fold whose every field is idempotent as well as commutative
+    When one of its events is delivered a second time
+    Then the final state is the state it had already reached
+
+  Scenario: a running total is caught, because a retried delivery would double it
+    Given a field that adds each event's value to a total it keeps in its own state
+    When the check runs
+    Then it reports the fold as duplication-sensitive
+    And it distinguishes that from an ordering disagreement, because the remedies differ
+
+  Scenario: the duplication sweep covers every event, however many there are
+    Given far more events than could be permuted in reasonable time
+    When the check runs
+    Then every event's re-delivery is still examined
+    And it reports how many it examined
 
   Scenario: a fold whose status only ever moves forward is unaffected by order
     Given a status that can advance but never retreat

@@ -13,20 +13,20 @@ Feature: Online-evaluator infinite-loop prevention
   # event-sourcing groups, starving every other tenant.
   #
   # Design: a numeric "causality depth" counter that increments at every
-  # evaluator-workflow boundary. The reactor refuses to dispatch when
+  # evaluator-workflow boundary. The process manager refuses to dispatch when
   # the inbound span carries depth >= 1.
   #
   # Single guarantee: nlpgo's BaggageAttributeProcessor stamps
   # `langwatch.reserved.causality_depth = N+1` on EVERY span emitted
   # during an evaluator run, via a context baggage entry that propagates
-  # automatically through child spans and goroutines. The TS reactor
+  # automatically through child spans and goroutines. The TS process manager
   # then reads the inbound span's attribute and skips dispatch when
   # depth >= 1.
   #
   # A fresh app-origin span (depth 0) arriving later on the same trace
   # DOES dispatch normally — only eval-emitted spans are blocked.
   #
-  # Origin is NOT hardcoded in the reactor. It remains a
+  # Origin is NOT hardcoded in the process manager. It remains a
   # user-configurable precondition matcher (default UI precondition
   # `origin=application`, customer can remove). Depth is the sole
   # hard signal.
@@ -36,13 +36,13 @@ Feature: Online-evaluator infinite-loop prevention
 
   Background:
     Given the trace-processing pipeline is running
-    And the evaluationTrigger reactor processes trace events
+    And the evaluationTrigger process manager processes trace events
 
   @integration @unit @loop-prevention @depth-direct
   Scenario: Incoming span with causality_depth=1 does not trigger evaluations
     Given a span_received event arrives with attribute "langwatch.reserved.causality_depth" = "1"
     And the project has an enabled ON_MESSAGE monitor with no preconditions
-    When the evaluationTrigger reactor fires for this event
+    When the evaluationTrigger process manager fires for this event
     Then no executeEvaluation command is dispatched
     And the loop-blocked counter is incremented with reason="depth_direct"
 
@@ -50,23 +50,23 @@ Feature: Online-evaluator infinite-loop prevention
   Scenario: Incoming span with causality_depth=0 still triggers evaluations
     Given a span_received event arrives with attribute "langwatch.reserved.causality_depth" = "0"
     And the project has an enabled ON_MESSAGE monitor with no preconditions
-    When the evaluationTrigger reactor fires for this event
+    When the evaluationTrigger process manager fires for this event
     Then one executeEvaluation command is dispatched per monitor
 
   @integration @unit @loop-prevention @depth-missing
   Scenario: Incoming span with no causality_depth attribute is treated as depth 0
     Given a span_received event arrives with no "langwatch.reserved.causality_depth" attribute
     And the project has an enabled ON_MESSAGE monitor with no preconditions
-    When the evaluationTrigger reactor fires for this event
+    When the evaluationTrigger process manager fires for this event
     Then one executeEvaluation command is dispatched per monitor
 
   @integration @loop-prevention @depth-direct
   Scenario: Causality guard is per-span — fresh app activity still re-triggers
-    Given a span_received event arrives with depth=0 and the reactor dispatches evaluation
+    Given a span_received event arrives with depth=0 and the process manager dispatches evaluation
     And a second span_received event arrives on the same trace with depth=1
-    And the reactor blocks dispatch for the depth=1 event
+    And the process manager blocks dispatch for the depth=1 event
     When a third span_received event arrives on the same trace with depth=0
-    Then the reactor dispatches evaluation again for the third event
+    Then the process manager dispatches evaluation again for the third event
     # The guard is per-span, not per-trace. New legitimate app activity on
     # an already-evaluated trace must still trigger evaluation — only the
     # evaluator's own emitted spans (depth>=1) are blocked.
@@ -78,7 +78,7 @@ Feature: Online-evaluator infinite-loop prevention
     Then the attribute survives stripping
     And the emitted span_received event carries the depth attribute
     # The original 2026-05-11 fix was silently disabled in production
-    # because recordSpan's strip nuked the very attribute the reactor
+    # because recordSpan's strip nuked the very attribute the process manager
     # uses for loop detection. The fix adds a narrow passthrough
     # allowlist; this scenario pins the attribute name as load-bearing.
 
@@ -86,7 +86,7 @@ Feature: Online-evaluator infinite-loop prevention
   Scenario: LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD bypasses depth check
     Given the env var "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD" is set to "1"
     And a span_received event arrives with depth=1
-    When the evaluationTrigger reactor fires
+    When the evaluationTrigger process manager fires
     Then executeEvaluation IS dispatched (guard bypassed)
     And a warning is logged that the guard is disabled
 

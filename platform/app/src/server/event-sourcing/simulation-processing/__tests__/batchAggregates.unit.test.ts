@@ -8,38 +8,46 @@ import { simulationRunsTable } from "../table";
 /**
  * @see specs/event-sourcing/simulation-run-aggregate.feature
  *
- * These are structural regression tests over the generated SQL, the same
- * level the old pipeline's own regression test for this defect class used
- * (`repositories/__tests__/simulationRunState.dedup-safety.unit.test.ts`):
- * ClickHouse itself is the only thing that can execute a GROUP BY, so a unit
- * test proves the query is SHAPED correctly, not that the server returns the
- * right rows. `decodeBatchAggregateRows`'s own tests below are the
- * behavioural half — they prove this module's own code (not ClickHouse's)
- * reconstructs the right JS values from what a correctly-shaped query would
- * return.
+ * Structural regression tests over the generated SQL: only ClickHouse can
+ * execute a GROUP BY, so a unit test proves the query is shaped correctly.
+ * `decodeBatchAggregateRows`'s own tests are the behavioural half.
  */
+
+/** Substitutes each bound `Identifier` back in, so a shape is readable. */
+function readable(query: {
+  sql: string;
+  params: Record<string, unknown>;
+}): string {
+  return query.sql.replace(/\{(id\d+):Identifier\}/g, (_match, key: string) =>
+    String(query.params[key]),
+  );
+}
+
 describe("buildBatchAggregateQuery", () => {
   const built = buildBatchAggregateQuery({
     tenantId: "tenant-1",
     batchRunIds: ["batch-1", "batch-2"],
   });
+  const sql = readable(built);
+
+  it("binds every table and column name rather than interpolating it", () => {
+    expect(built.sql).not.toContain("simulation_runs");
+    expect(built.sql).not.toContain("BatchRunId");
+    expect(Object.values(built.params)).toContain("simulation_runs");
+  });
 
   /** @scenario "The batch aggregate query dedups on the table's own declared engine key" */
   it("groups the dedup subquery by exactly the table's declared sort key", () => {
     expect(simulationRunsTable.sortKey).toEqual(["TenantId", "ScenarioRunId"]);
-    expect(built.sql).toMatch(/GROUP BY TenantId, ScenarioRunId\s*\)/);
+    expect(sql).toMatch(/GROUP BY TenantId, ScenarioRunId\s*\)/);
   });
 
   it("does not group the dedup subquery by BatchRunId or ScenarioSetId", () => {
-    // Isolate the dedup subquery (inside the IN (...) clause) before
-    // asserting on it, so a BatchRunId appearing in the OUTER scope (which
-    // is correct and expected) cannot make this assertion a false negative.
-    const dedupSubquery = built.sql.slice(
-      built.sql.indexOf("IN ("),
-      built.sql.indexOf(
-        ")",
-        built.sql.indexOf("GROUP BY TenantId, ScenarioRunId"),
-      ) + 1,
+    // Isolate the dedup subquery first, so a BatchRunId in the outer scope —
+    // which is correct — cannot make this a false negative.
+    const dedupSubquery = sql.slice(
+      sql.indexOf("IN ("),
+      sql.indexOf(")", sql.indexOf("GROUP BY TenantId, ScenarioRunId")) + 1,
     );
     expect(dedupSubquery).not.toMatch(/BatchRunId/);
     expect(dedupSubquery).not.toMatch(/ScenarioSetId/);
@@ -47,31 +55,33 @@ describe("buildBatchAggregateQuery", () => {
 
   /** @scenario "A batch id filter narrows the outer query, not the dedup subquery" */
   it("places the batch id predicate outside the dedup subquery", () => {
-    const dedupEnd = built.sql.indexOf(
+    const dedupEnd = sql.indexOf(
       ")",
-      built.sql.indexOf("GROUP BY TenantId, ScenarioRunId"),
+      sql.indexOf("GROUP BY TenantId, ScenarioRunId"),
     );
-    const batchIdPredicateIndex = built.sql.indexOf(
+    const batchIdPredicateIndex = sql.indexOf(
       "BatchRunId IN {batchRunIds:Array(String)}",
     );
 
     expect(batchIdPredicateIndex).toBeGreaterThan(dedupEnd);
   });
 
-  it("binds the batch ids and tenant id as query parameters, not string-interpolated", () => {
-    expect(built.params).toEqual({
+  it("binds the batch ids, tenant id and status lists as query parameters", () => {
+    expect(built.params).toMatchObject({
       tenantId: "tenant-1",
       batchRunIds: ["batch-1", "batch-2"],
+      failStatuses: ["FAILURE", "ERROR", "STALLED"],
+      runningStatuses: ["PENDING", "QUEUED", "IN_PROGRESS"],
     });
     expect(built.sql).not.toContain("batch-1");
+    expect(built.sql).not.toContain("STALLED");
   });
 
   it("scopes the dedup subquery to the same tenant as the outer query", () => {
-    const occurrences =
-      built.sql.match(/TenantId = \{tenantId:String\}/g) ?? [];
+    const occurrences = sql.match(/TenantId = \{tenantId:String\}/g) ?? [];
     // Once in the outer WHERE, once in the dedup subquery's own WHERE — a
-    // dedup subquery missing this predicate would compare this tenant's
-    // rows against every tenant's rows.
+    // dedup subquery missing this predicate would compare this tenant's rows
+    // against every tenant's rows.
     expect(occurrences.length).toBe(2);
   });
 });
@@ -79,9 +89,6 @@ describe("buildBatchAggregateQuery", () => {
 describe("decodeBatchAggregateRows", () => {
   /** @scenario "One run's several stored versions count as a single row" */
   it("reports one aggregate row per batch, matching what a correct dedup produces", () => {
-    // Simulates the wire result a correctly-deduped, correctly-grouped query
-    // returns for a batch with 3 runs landed against a total of 5: one row
-    // per BatchRunId, never one row per run version.
     const rows = decodeBatchAggregateRows([
       ["batch-1", "5", "3", "2", "1", "0", "0"],
     ]);

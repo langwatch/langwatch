@@ -10,10 +10,10 @@ Feature: Applying a delivery to a fold is one governed read-decide-write cycle
   silent, population-wide reset: every existing aggregate starts over from a
   fresh accumulator, stamped as current, with no trace of what it replaced.
 
-  The same cycle also carries the tenancy and retention a delivery belongs to
-  through to the store, and recognises a delivery that has already been
-  applied by its sequence rather than by guessing from its contents, so a
-  retried delivery is a safe no-op regardless of what it carries. (ADR-098.)
+  The same cycle carries the tenancy and retention a delivery belongs to
+  through to the store. It does not try to recognise a redelivery at all: a
+  fold is required to be a function of the set of events it has seen, so
+  applying a delivery again reaches the state it already had. (ADR-098.)
 
   Background:
     Given a fold declared with a genesis state and a rule for applying an event to it
@@ -31,12 +31,11 @@ Feature: Applying a delivery to a fold is one governed read-decide-write cycle
     Then the new events are applied on top of the stored state
     And what the stored state already held is carried forward into the result
 
-  Scenario: a redelivered job is recognised by sequence, not skipped by content
-    Given an aggregate whose stored state already reflects a particular delivery's sequence
-    When a delivery carrying that same sequence, or an earlier one, arrives again with different events inside it
-    Then it is skipped as a redelivery
-    And nothing is written to the store
-    And the events it carries play no part in that decision
+  Scenario: a redelivered job is applied again and reaches the same state
+    Given an aggregate whose stored state already reflects a delivery
+    When that same delivery arrives again
+    Then it is applied rather than skipped
+    And the state written is the state that was already there
 
   Scenario: a shape change never overwrites unreadable state with a fresh accumulator
     Given a stored row for this aggregate that the current build cannot read
@@ -58,11 +57,10 @@ Feature: Applying a delivery to a fold is one governed read-decide-write cycle
     Then both the read and the write are made in that tenant and retention
     And that context comes from the delivery itself, not from anything reconstructed later
 
-  Scenario: an applied delivery is distinguishable from a skipped one on the dashboard
+  Scenario: an applied delivery is counted with its batch size
     Given a fold that reports its outcomes to a dashboard
-    When one delivery is applied and another is skipped as a redelivery
-    Then the applied delivery is counted on its own and the size of its batch is recorded
-    And the skipped delivery is counted separately, with no batch size recorded for it
+    When a delivery is applied
+    Then it is counted as applied and the size of its batch is recorded
 
   Scenario: every failure lands on the same counter as a success, so the denominator is every attempt
     Given a fold whose store cannot be reached

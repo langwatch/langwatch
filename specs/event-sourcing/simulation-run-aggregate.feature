@@ -96,15 +96,25 @@ Feature: The simulation_run aggregate, rewritten onto the new event-sourcing pac
     When its queued event is delivered afterwards
     Then the run is still shown as failed rather than queued again
 
-  Scenario: A snapshot older than the latest applied one is ignored
-    Given a run with a snapshot already applied
-    When an older snapshot is folded on top
-    Then the run's messages are unchanged
+  Scenario: A redelivered message does not duplicate the run's transcript
+    Given a message already recorded for a run
+    When the same message is delivered again
+    Then the run's transcript still shows that message once
+
+  Scenario: A message that has only started carries no transcript row yet
+    Given a message whose start was announced but whose content has not arrived
+    When the run's transcript is read
+    Then the message is absent rather than present and blank
 
   Scenario: A run measured under a retired event type keeps its cost on replay
     Given a run whose cost was recorded by a retired, unrecognised event type
     When that retired event is folded again
     Then the cost already on the state is kept rather than reset
+
+  Scenario: A run's state is the same whatever order its events arrive in
+    Given a run's whole event set
+    When the events are folded in every order, and again with one delivered twice
+    Then the run's state is the same every time
 
   # ---------------------------------------------------------------------------
   # ADR-103 — a run's totals are a query, not a counter

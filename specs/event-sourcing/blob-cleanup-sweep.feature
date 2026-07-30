@@ -98,7 +98,7 @@ Feature: Blob-cleanup sweep
   # ============================================================================
 
   # - No scheduler runtime exists yet in @langwatch/event-sourcing (only
-  #   defineAggregate, the fold/map executors, the store contracts and the
+  #   definePipeline, the fold/map executors, the store contracts and the
   #   group-key descriptor are exported). This pipeline exposes a plain
   #   { name, intervalMs, run } descriptor for a future scheduler to mount —
   #   see index.ts's module docblock.

@@ -77,7 +77,8 @@ function buildIdentifier({
  * 1. Checks skip conditions (org exists, has Stripe customer, active subscription, SEAT_EVENT pricing)
  * 2. Two-phase checkpoint protocol: write pending -> call Stripe -> confirm
  * 3. Self-dispatches when delta > 0 for convergence loop
- * 4. Circuit-breaker on consecutive failures (stops self-dispatch after MAX_CONSECUTIVE_FAILURES)
+ * 4. Circuit-breaker on consecutive failures (pauses self-dispatch after MAX_CONSECUTIVE_FAILURES,
+ *    but still attempts Stripe every call so an independent poke/sweep tick can recover)
  *
  * Error handling: never propagates to framework. All errors caught internally.
  * The framework sees every job as "successful" — the handler owns all retry logic.
@@ -205,8 +206,15 @@ export class ReportUsageForMonthCommand
     const lastReportedTotal = checkpoint?.lastReportedTotal ?? 0;
     const consecutiveFailures = checkpoint?.consecutiveFailures ?? 0;
 
-    // Circuit-breaker: stop self-dispatch after too many consecutive failures
-    if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+    // Circuit-breaker: consecutiveFailures crossing the threshold must never
+    // skip the Stripe attempt below — only skipping would make confirm() (the
+    // sole place the counter resets to 0) unreachable, silently ending this
+    // organization's invoicing forever. It only pauses this call's own
+    // immediate self-dispatch retry (see `return !circuitTripped` below); the
+    // next independently-triggered poke/sweep still attempts Stripe, so
+    // recovery is automatic once Stripe succeeds again.
+    const circuitTripped = consecutiveFailures >= MAX_CONSECUTIVE_FAILURES;
+    if (circuitTripped) {
       logger.error(
         {
           organizationId,
@@ -214,9 +222,8 @@ export class ReportUsageForMonthCommand
           consecutiveFailures,
         },
         "ALARM: circuit-breaker tripped — consecutive failures exceeded threshold, " +
-          "stopping self-dispatch. Manual investigation required.",
+          "self-dispatch paused but Stripe still attempted. Manual investigation required.",
       );
-      return false;
     }
 
     let targetTotal: number;
@@ -376,7 +383,11 @@ export class ReportUsageForMonthCommand
         consecutiveFailures: consecutiveFailures + 1,
       });
 
-      return true;
+      // Only self-dispatch (an immediate, un-throttled retry) while the
+      // breaker has not tripped; once tripped, the next independent
+      // poke/sweep tick attempts Stripe again instead of stacking another
+      // immediate retry on top of 5+ already-failed ones.
+      return !circuitTripped;
     }
   }
 }

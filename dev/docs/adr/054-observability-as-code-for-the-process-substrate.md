@@ -4,8 +4,8 @@
 
 **Status:** Accepted
 
-**Extends:** ADR-042 (local observability stack), ADR-049/051/052 (the
-process-manager substrate and its domains).
+**Extends:** ADR-042 (local observability stack), ADR-049/051/098 (the
+process-manager substrate and its domains; 098 succeeds the retired ADR-052).
 
 ## Context
 

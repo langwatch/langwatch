@@ -1,21 +1,11 @@
 import { z } from "zod";
 
 /**
- * The canonical log record's shape (specs/otlp/canonical-log-ingestion.feature).
- *
- * One log line, post-policy: structure intact (a structured body stays
- * structured, never flattened to a string), scopes distinct (resource, scope
- * and record attributes never merge), severity carrying both its number and
- * its text. `recordId` is a content hash of everything below except itself, so
- * two deliveries of the same wire record always produce the same row
- * (`aggregate.ts`'s aggregate id, and the redelivery story in `store.ts`).
- *
- * This is a straight carry-over of the old pipeline's
- * `schemas/logRecord.ts:canonicalLogRecordSchema` — ADR-105 replaces the
- * *ceremony* around an event (four declaration sites, a `typeGuards.ts`, a
- * `z.infer` alias file), not the row shape a log record actually needs. The
- * row shape is domain content, and domain content does not get thinner just
- * because the declaration mechanism around it changed.
+ * One log line, post-policy: structure intact, scopes distinct, severity
+ * carrying both its number and its text
+ * (specs/otlp/canonical-log-ingestion.feature). `recordId` is a content hash of
+ * everything below except itself, so two deliveries of the same wire record
+ * always produce the same row.
  */
 
 const logCorrelationSourceSchema = z.enum([
@@ -29,16 +19,6 @@ export type LogCorrelationSource = z.infer<typeof logCorrelationSourceSchema>;
 const logProviderKindSchema = z.enum(["generic", "claude_code", "codex"]);
 export type LogProviderKind = z.infer<typeof logProviderKindSchema>;
 
-/**
- * Declared locally rather than imported from the (not yet converted)
- * trace-processing pipeline. ADR-102 decision 5: a pipeline's dependencies
- * point downward, to `@langwatch/event-sourcing` and to another *converted*
- * pipeline's `commands/`/`schemas/` — never sideways into a pipeline still
- * living in `event-sourcing.old/`. Once trace-processing converts and needs
- * the same enum, this collapses into whatever shared home that conversion
- * gives it; duplicating a three-value enum is a smaller cost than a
- * dependency on code scheduled for deletion.
- */
 export const piiRedactionLevelSchema = z.enum([
   "STRICT",
   "ESSENTIAL",
@@ -95,14 +75,7 @@ export const canonicalLogRecordSchema = z.object({
   flags: z.number().int().nonnegative(),
   eventName: z.string(),
   providerKind: logProviderKindSchema,
-  /**
-   * Deliberately always "". This once carried the claude span-kind
-   * (model/tool/turn) that a log-to-span converter classified logs by; that
-   * converter belongs to the coding-agent pipeline's own normalization now,
-   * not to the generic log pipeline. The column stays because the deployed
-   * `log_records` table has it (migration `00050`); this pipeline never
-   * populates it.
-   */
+  /** Always "": classifying by coding-agent span kind is that pipeline's job. */
   providerEventKind: z.string(),
   providerEventSequence: z.string(),
   providerSessionId: z.string(),

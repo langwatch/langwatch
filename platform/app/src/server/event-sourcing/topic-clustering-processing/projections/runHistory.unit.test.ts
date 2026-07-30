@@ -7,17 +7,18 @@ import { topicClustering } from "../aggregate";
 import { mintManualRunId, mintScheduledRunId } from "../runIdentity";
 import type { RunCompletedData, RunFailedData } from "../schema";
 import {
-  applyRunHistoryEvent,
   deriveRunHistoryView,
   initRunHistoryState,
   RUN_HISTORY_LIMIT,
+  type RunHistoryState,
+  topicClusteringRunHistory,
 } from "./runHistory";
 
-// Built through `topicClustering.events.*` — see `runStatus.unit.test.ts`'s
-// identical note for why this never hand-types a `topic_clustering/...`
-// literal.
+const PROJECT_ID = "project-1";
+
 const runStarted = (runId: string) =>
   topicClustering.events.runStarted({
+    projectId: PROJECT_ID,
     runId,
     page: 1,
     occurredAt: 1_700_000_000_000,
@@ -25,9 +26,10 @@ const runStarted = (runId: string) =>
 
 const runCompleted = (
   runId: string,
-  overrides: Partial<Omit<RunCompletedData, "runId">> = {},
+  overrides: Partial<Omit<RunCompletedData, "runId" | "projectId">> = {},
 ) =>
   topicClustering.events.runCompleted({
+    projectId: PROJECT_ID,
     runId,
     page: 1,
     mode: "batch",
@@ -40,9 +42,10 @@ const runCompleted = (
 
 const runFailed = (
   runId: string,
-  overrides: Partial<Omit<RunFailedData, "runId">> = {},
+  overrides: Partial<Omit<RunFailedData, "runId" | "projectId">> = {},
 ) =>
   topicClustering.events.runFailed({
+    projectId: PROJECT_ID,
     runId,
     page: 1,
     error: "boom",
@@ -50,13 +53,16 @@ const runFailed = (
     ...overrides,
   });
 
+const apply = (state: RunHistoryState, event: AggregateEvent) =>
+  topicClusteringRunHistory.apply(state, event);
+
 describe("topicClusteringRunHistory fold", () => {
   /** @scenario Each finished run appears once in the run history */
   it("shows one entry for a run, carrying when it ran and its outcome", () => {
     const runId = mintManualRunId(1_700_000_000_000);
     let state = initRunHistoryState();
-    state = applyRunHistoryEvent(state, runStarted(runId));
-    state = applyRunHistoryEvent(
+    state = apply(state, runStarted(runId));
+    state = apply(
       state,
       runCompleted(runId, { tracesProcessed: 12, topicsCount: 4 }),
     );
@@ -72,22 +78,27 @@ describe("topicClusteringRunHistory fold", () => {
   });
 
   /** @scenario A multi-page run is one history entry */
-  it("accumulates a multi-page run's counts into a single entry", () => {
+  it("totals a multi-page run's per-page traces into a single entry", () => {
     const runId = mintManualRunId(1_700_000_000_000);
     let state = initRunHistoryState();
-    state = applyRunHistoryEvent(state, runStarted(runId));
-    state = applyRunHistoryEvent(
+    state = apply(state, runStarted(runId));
+    state = apply(
       state,
-      runCompleted(runId, { tracesProcessed: 4, nextSearchAfter: [1, "t1"] }),
+      runCompleted(runId, {
+        page: 1,
+        tracesProcessed: 4,
+        nextSearchAfter: [1, "t1"],
+      }),
     );
-    state = applyRunHistoryEvent(
+    state = apply(
       state,
-      runCompleted(runId, { tracesProcessed: 6, nextSearchAfter: [2, "t2"] }),
+      runCompleted(runId, {
+        page: 2,
+        tracesProcessed: 6,
+        nextSearchAfter: [2, "t2"],
+      }),
     );
-    state = applyRunHistoryEvent(
-      state,
-      runCompleted(runId, { tracesProcessed: 2 }),
-    );
+    state = apply(state, runCompleted(runId, { page: 3, tracesProcessed: 2 }));
 
     const view = deriveRunHistoryView(state);
     expect(view).toHaveLength(1);
@@ -101,14 +112,15 @@ describe("topicClusteringRunHistory fold", () => {
   /** @scenario A failed run keeps its guidance without raw error detail */
   it("carries an errorCode but never a raw error message", () => {
     const runId = mintManualRunId(1_700_000_000_000);
-    const state = applyRunHistoryEvent(
-      initRunHistoryState(),
-      runFailed(runId, {
-        errorCode: "model_provider_not_configured",
-        isUserActionable: true,
-      }),
+    const view = deriveRunHistoryView(
+      apply(
+        initRunHistoryState(),
+        runFailed(runId, {
+          errorCode: "model_provider_not_configured",
+          isUserActionable: true,
+        }),
+      ),
     );
-    const view = deriveRunHistoryView(state);
     expect(view[0]).toMatchObject({
       outcome: "failed",
       errorCode: "model_provider_not_configured",
@@ -122,10 +134,7 @@ describe("topicClusteringRunHistory fold", () => {
   /** @scenario A run that is still working appears as running */
   it("shows the newest entry as running while it has no terminal event", () => {
     const runId = mintManualRunId(1_700_000_000_000);
-    const state = applyRunHistoryEvent(
-      initRunHistoryState(),
-      runStarted(runId),
-    );
+    const state = apply(initRunHistoryState(), runStarted(runId));
     expect(deriveRunHistoryView(state)[0]?.outcome).toBe("running");
   });
 
@@ -136,23 +145,22 @@ describe("topicClusteringRunHistory fold", () => {
       const newer = mintScheduledRunId(Date.UTC(2026, 6, 18, 9, 30, 0));
 
       let state = initRunHistoryState();
-      state = applyRunHistoryEvent(state, runStarted(older));
-      // The older run never gets a terminal event — exactly the abandonment case.
-      state = applyRunHistoryEvent(state, runStarted(newer));
+      state = apply(state, runStarted(older));
+      // The older run never gets a terminal event — the abandonment case.
+      state = apply(state, runStarted(newer));
 
       const view = deriveRunHistoryView(state);
-      const olderEntry = view.find((e) => e.runId === older);
-      const newerEntry = view.find((e) => e.runId === newer);
-      expect(olderEntry?.outcome).toBe("abandoned");
-      expect(newerEntry?.outcome).toBe("running");
+      expect(view.find((entry) => entry.runId === older)?.outcome).toBe(
+        "abandoned",
+      );
+      expect(view.find((entry) => entry.runId === newer)?.outcome).toBe(
+        "running",
+      );
     });
 
     it("does not abandon the newest run relative to itself", () => {
       const runId = mintManualRunId(1_700_000_000_000);
-      const state = applyRunHistoryEvent(
-        initRunHistoryState(),
-        runStarted(runId),
-      );
+      const state = apply(initRunHistoryState(), runStarted(runId));
       expect(deriveRunHistoryView(state)[0]?.outcome).toBe("running");
     });
   });
@@ -162,14 +170,10 @@ describe("topicClusteringRunHistory fold", () => {
     let state = initRunHistoryState();
     for (let i = 0; i < RUN_HISTORY_LIMIT + 10; i++) {
       const runId = mintScheduledRunId(Date.UTC(2026, 0, 1 + i, 9, 0, 0));
-      state = applyRunHistoryEvent(
-        state,
-        runCompleted(runId, { tracesProcessed: i }),
-      );
+      state = apply(state, runCompleted(runId, { tracesProcessed: i }));
     }
     const view = deriveRunHistoryView(state);
     expect(view).toHaveLength(RUN_HISTORY_LIMIT);
-    // The newest runs (highest i) survive; the oldest are evicted.
     expect(view[0]?.tracesProcessed).toBe(RUN_HISTORY_LIMIT + 9);
     expect(view.at(-1)?.tracesProcessed).toBe(10);
   });
@@ -179,11 +183,13 @@ describe("topicClusteringRunHistory fold", () => {
       const manual = mintManualRunId(1_700_000_000_000);
       const scheduled = mintScheduledRunId(Date.UTC(2026, 6, 17, 9, 30, 0));
       let state = initRunHistoryState();
-      state = applyRunHistoryEvent(state, runStarted(manual));
-      state = applyRunHistoryEvent(state, runStarted(scheduled));
+      state = apply(state, runStarted(manual));
+      state = apply(state, runStarted(scheduled));
       const view = deriveRunHistoryView(state);
-      expect(view.find((e) => e.runId === manual)?.trigger).toBe("manual");
-      expect(view.find((e) => e.runId === scheduled)?.trigger).toBe(
+      expect(view.find((entry) => entry.runId === manual)?.trigger).toBe(
+        "manual",
+      );
+      expect(view.find((entry) => entry.runId === scheduled)?.trigger).toBe(
         "scheduled",
       );
     });
@@ -191,20 +197,29 @@ describe("topicClusteringRunHistory fold", () => {
 
   describe("order invariance (ADR-098 decision 4)", () => {
     /** @scenario A multi-page run is one history entry */
-    it("reaches the same state regardless of the order a run's pages are delivered in", () => {
+    it("reaches the same state under every order and every re-delivery of a run's pages", () => {
       const runId = mintManualRunId(1_700_000_000_000);
       const events: AggregateEvent[] = [
         runStarted(runId),
-        runCompleted(runId, { tracesProcessed: 4, nextSearchAfter: [1, "t1"] }),
-        runCompleted(runId, { tracesProcessed: 6, nextSearchAfter: [2, "t2"] }),
-        runCompleted(runId, { tracesProcessed: 2 }),
+        runCompleted(runId, {
+          page: 1,
+          tracesProcessed: 4,
+          nextSearchAfter: [1, "t1"],
+        }),
+        runCompleted(runId, {
+          page: 2,
+          tracesProcessed: 6,
+          nextSearchAfter: [2, "t2"],
+        }),
+        runCompleted(runId, { page: 3, tracesProcessed: 2 }),
       ];
       const report = checkOrderInvariance({
         init: initRunHistoryState,
-        apply: applyRunHistoryEvent,
+        apply,
         events,
       });
       expect(report.invariant).toBe(true);
+      expect(report.duplicatesChecked).toBe(events.length);
     });
 
     /** @scenario A run abandoned by the scheduler is not shown as running forever */
@@ -218,20 +233,15 @@ describe("topicClusteringRunHistory fold", () => {
       ];
       const report = checkOrderInvariance({
         init: initRunHistoryState,
-        apply: applyRunHistoryEvent,
+        apply,
         events,
       });
       expect(report.invariant).toBe(true);
 
-      // Also confirm the converged view (not just the raw fold state) agrees
-      // regardless of order — the property that actually matters to a reader.
-      const forward = events.reduce(
-        applyRunHistoryEvent,
-        initRunHistoryState(),
-      );
+      const forward = events.reduce(apply, initRunHistoryState());
       const backward = [...events]
         .reverse()
-        .reduce(applyRunHistoryEvent, initRunHistoryState());
+        .reduce(apply, initRunHistoryState());
       expect(deriveRunHistoryView(forward)).toEqual(
         deriveRunHistoryView(backward),
       );
@@ -245,7 +255,7 @@ describe("topicClusteringRunHistory fold", () => {
       );
       const report = checkOrderInvariance({
         init: initRunHistoryState,
-        apply: applyRunHistoryEvent,
+        apply,
         events,
         maxPermutations: 40,
       });

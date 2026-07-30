@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createEvaluateGraphHandler,
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
-  graphAlertSweepDefinition,
   type GraphAlertSweepPorts,
+  graphAlertSweep,
 } from "../process-managers/graphAlertSweep";
 
 vi.mock("@langwatch/observability", () => ({
@@ -15,32 +15,68 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
+function intentContext() {
+  return {
+    processName: "graphAlertSweep",
+    tenantId: "__global__",
+    processKey: "graphAlertSweep",
+    messageKey: "sweep:10000",
+    attempt: 1,
+  };
+}
+
 describe("graph alert sweep process", () => {
   describe("when the process manager is built", () => {
     it("declares a scheduled singleton wake every thirty seconds", () => {
-      expect(graphAlertSweepDefinition.schedule).toEqual({
-        everyMs: GRAPH_ALERT_SWEEP_INTERVAL_MS,
-      });
+      expect(graphAlertSweep.kind).toBe("schedule");
+      expect(graphAlertSweep.everyMs).toBe(GRAPH_ALERT_SWEEP_INTERVAL_MS);
     });
 
-    it("subscribes to no pipeline events", () => {
-      expect(graphAlertSweepDefinition.eventTypes).toEqual([]);
+    it("derives its one intent type from the intents map's own key", () => {
+      expect(graphAlertSweep.intentTypes).toEqual([
+        "graphAlertSweep/evaluateGraph",
+      ]);
     });
   });
 
   describe("given the scheduled process wakes", () => {
     it("emits exactly one evaluateGraph intent keyed on the wake instant", () => {
-      const wake = graphAlertSweepDefinition.onWake!(
+      const wake = graphAlertSweep.onWake(
         { lastSweepAt: null },
-        { key: "graphAlertSweep", tenantId: "__global__", at: 10_000, now: 10_000 },
+        graphAlertSweep.intents,
+        {
+          processKey: "graphAlertSweep",
+          tenantId: "__global__",
+          at: 10_000,
+          now: 10_000,
+        },
       );
 
       expect(wake).toEqual({
         state: { lastSweepAt: 10_000 },
         intents: [
-          { messageKey: "sweep:10000", intentType: "evaluateGraph", payload: { scheduledFor: 10_000 } },
+          {
+            messageKey: "sweep:10000",
+            intentType: "graphAlertSweep/evaluateGraph",
+            payload: { scheduledFor: 10_000 },
+          },
         ],
       });
+    });
+
+    it("carries no wake instant of its own — the schedule owns the cadence", () => {
+      const wake = graphAlertSweep.onWake(
+        graphAlertSweep.init(),
+        graphAlertSweep.intents,
+        {
+          processKey: "graphAlertSweep",
+          tenantId: "__global__",
+          at: 10_000,
+          now: 10_000,
+        },
+      );
+
+      expect("nextWakeAt" in wake).toBe(false);
     });
   });
 
@@ -49,20 +85,18 @@ describe("graph alert sweep process", () => {
       const evaluateGraphTrigger = vi.fn().mockResolvedValue(undefined);
       const ports: GraphAlertSweepPorts = {
         decideSweepCandidates: vi.fn().mockResolvedValue([
-          { triggerId: "trigger-1", projectId: "project-1", reason: "heartbeat" as const },
+          {
+            triggerId: "trigger-1",
+            projectId: "project-1",
+            reason: "heartbeat" as const,
+          },
         ]),
         evaluateGraphTrigger,
       };
 
       await createEvaluateGraphHandler(ports)(
         { scheduledFor: 10_000 },
-        {
-          processName: "graphAlertSweep",
-          tenantId: "__global__",
-          processKey: "graphAlertSweep",
-          messageKey: "sweep:10000",
-          attempt: 1,
-        },
+        intentContext(),
       );
 
       expect(evaluateGraphTrigger).toHaveBeenCalledWith({
@@ -79,8 +113,16 @@ describe("graph alert sweep process", () => {
         .mockResolvedValueOnce(undefined);
       const ports: GraphAlertSweepPorts = {
         decideSweepCandidates: vi.fn().mockResolvedValue([
-          { triggerId: "trigger-1", projectId: "project-1", reason: "heartbeat" as const },
-          { triggerId: "trigger-2", projectId: "project-1", reason: "heartbeat" as const },
+          {
+            triggerId: "trigger-1",
+            projectId: "project-1",
+            reason: "heartbeat" as const,
+          },
+          {
+            triggerId: "trigger-2",
+            projectId: "project-1",
+            reason: "heartbeat" as const,
+          },
         ]),
         evaluateGraphTrigger,
       };
@@ -88,13 +130,7 @@ describe("graph alert sweep process", () => {
       await expect(
         createEvaluateGraphHandler(ports)(
           { scheduledFor: 10_000 },
-          {
-            processName: "graphAlertSweep",
-            tenantId: "__global__",
-            processKey: "graphAlertSweep",
-            messageKey: "sweep:10000",
-            attempt: 1,
-          },
+          intentContext(),
         ),
       ).resolves.toBeUndefined();
 

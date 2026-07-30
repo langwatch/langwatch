@@ -32,13 +32,11 @@ The file name is `NNN-short-title.md` and the `# ADR-NNN:` heading inside must m
 | [019](./019-repository-service-layering.md) | Repository-service layering for project configuration access | Accepted |
 | [020](./020-cascading-default-models.md) | Cascading default models with one policy attached to N scopes | Accepted |
 | [021](./021-multi-scope-targeting-and-tenancy.md) | Multi-scope targeting and single-organization tenancy enforcement | Accepted |
-| [027](./027-typed-dispatcherror-contract.md) | Typed `DispatchError` contract for dispatch endpoints | Accepted |
 | [028](./028-visibility-blur-teaser-redaction.md) | Plan-based visibility windows via stateless service-layer teaser redaction | Proposed |
 | [031](./031-trigger-email-abuse-protections.md) | Trigger email abuse protections — test-fire lockdown, hourly cap, unsubscribe | Accepted |
 | [032](./032-datasets-s3-jsonl.md) | Dataset content moves to S3 as chunked JSONL | Accepted |
 | [033](./033-langy-worker-network-isolation-under-gvisor.md) | Langy worker network isolation under gVisor | Draft |
 | [036](./036-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
-| [037](./037-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
 | [038](./038-intent-forked-onboarding-governance-vs-llmops.md) | Onboarding forks on a first-class Organization intent | Accepted |
 | [040](./040-webhook-http-request-automation-channel.md) | Webhook (generic HTTP request) automation channel | Proposed |
 | [041](./041-modern-block-kit-notification-template-suite.md) | Modern Block Kit notification template suite | Proposed |
@@ -74,7 +72,7 @@ The file name is `NNN-short-title.md` and the `# ADR-NNN:` heading inside must m
 | [102](./102-package-topology-and-composition.md) | The core is a package, the pipelines are the application | Accepted |
 | [103](./103-runs-aggregates-are-queries.md) | A run's totals are a query; a run's liveness is a process manager | Accepted |
 | [104](./104-clickhouse-client.md) | One ClickHouse client, and the schema decides whether a write may be retried | Accepted |
-| [105](./105-defining-an-aggregate.md) | An aggregate is one declaration — events, commands and types are derived from it | Accepted |
+| [105](./105-defining-a-pipeline.md) | A pipeline is one declaration — events, commands, projections and types derive from it | Accepted |
 
 39 numbers (002, 006, 007, 014, 015, 022, 023, 024, 026, 029, 030, 034, 035,
 039, 046, 048, 049, 051, 052, 056, 059, 066, 068, 069, 071–075, 080–085, 088,
@@ -88,6 +86,11 @@ rotted into a duplicate of ground an ADR in the 098–105 series already
 covered, so each was absorbed as a section of that ADR (089 and 098
 respectively) rather than replaced by a corpus-wide renumbering. Same rule —
 not relisted above — and they share the table below.
+
+A third pair — 027 and 037 — were retired the same day for a different
+reason again: not a duplicate of newer ground, but built on a mechanism
+deleted out from under them (reactors, `ReactorOutbox`). Same rule — not
+relisted above — and they share the table below.
 
 ## Retired ADR Numbers
 
@@ -121,17 +124,19 @@ Both were absorbed as sections of the ADR they duplicated and deleted.
 | 024 | Cold-path tiered storage for retention-managed tables | [099](./099-projection-storage-and-table-definition.md) |
 | 025 | Remove the PG orphan sweep entirely | [089](./089-data-retention.md) — absorbed as the "Orphan sweep: added, then removed" section |
 | 026 | Per-trigger dispatch timing — cadence and trace-readiness debounce | [098](./098-event-sourcing-core.md) |
+| 027 | Typed `DispatchError` contract for `.withOutbox` reactors | [045](./045-domain-errors-handled-boundary.md) |
 | 029 | GroupQueue content-addressed tiered payload store | [100](./100-dispatch-plane-group-keys.md) |
 | 030 | GroupQueue blob-handling hardening | [100](./100-dispatch-plane-group-keys.md) |
 | 034 | Event-sourced analytics materialization — slim + rollup ClickHouse tables | [099](./099-projection-storage-and-table-definition.md) |
 | 035 | Persist-class actions ride the settle stage (trace-readiness debounce) | [098](./098-event-sourcing-core.md) |
+| 037 | Automation operator surfaces — authoring drawer & dispatch-health view | [098](./098-event-sourcing-core.md) |
 | 039 | Outbox heartbeat primitive | [098](./098-event-sourcing-core.md) |
 | 046 | Event-sourced Langy conversations | [098](./098-event-sourcing-core.md) |
 | 048 | Langy worker shutdown-handoff — checkpoint on SIGTERM, resume on the next worker | [098](./098-event-sourcing-core.md) |
 | 049 | Langy pilots Postgres operational state and projection-independent reactions | [099](./099-projection-storage-and-table-definition.md) |
 | 051 | Event-sourced topic clustering scheduling via the process manager | [098](./098-event-sourcing-core.md) |
 | 052 | Automations on a dedicated process-manager pipeline | [098](./098-event-sourcing-core.md) |
-| 056 | Coding-agent pipeline with a session aggregate | [105](./105-defining-an-aggregate.md) |
+| 056 | Coding-agent pipeline with a session aggregate | [105](./105-defining-a-pipeline.md) |
 | 059 | Event-sourced Langy frontend — shared projections in `packages/langy` | [098](./098-event-sourcing-core.md) |
 | 066 | `event_log` off the per-item hot path — read-back fold store + append coalescing | [099](./099-projection-storage-and-table-definition.md) |
 | 068 | One windowed ClickHouse read with a measured fallback (`queryWindowed`) | [104](./104-clickhouse-client.md) |

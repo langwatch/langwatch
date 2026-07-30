@@ -4,14 +4,12 @@ Feature: A monitor that should run is never quietly skipped
   So that a gap in my results means my traces changed, not that a worker
   restarted at the wrong moment
 
-  # See dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md
+  # See dev/docs/adr/098-event-sourcing-core.md
   #
   # Online evaluation execution is already durable — evaluationTrigger
   # dispatches an ExecuteEvaluationCommand onto the GroupQueue, which retries.
-  # The gap is one step earlier: the dispatch itself is a reactor, so if it is
-  # lost, no command is ever enqueued, nothing retries, and no error is raised
-  # anywhere. The trace simply has no evaluation, indistinguishable from a
-  # trace the monitor legitimately declined.
+  # evaluationTrigger is a process manager with a leased outbox, so a lost
+  # dispatch is retried rather than swallowed instead of being lost silently.
   #
   # The same applies to customEvaluationSync, which reports evaluations the
   # same way.
@@ -23,11 +21,10 @@ Feature: A monitor that should run is never quietly skipped
   # Companion: evaluation-trigger-skips-derived-and-stale-traces.feature
   # (which traces SHOULD be skipped), online-evaluator-loop-prevention.feature.
   #
-  # ADR-075's Class D conversion has landed: the dispatch is a process manager
-  # with a leased outbox, so a lost dispatch is retried rather than swallowed.
-  # The scenarios that conversion made true are bound. The two still marked
-  # @unimplemented are not — a thread-idle wait surviving a restart, and a
-  # decline being reported with its reason, are both still unobservable.
+  # The scenarios the process-manager conversion made true are bound. The two
+  # still marked @unimplemented are not — a thread-idle wait surviving a
+  # restart, and a decline being reported with its reason, are both still
+  # unobservable.
 
   Background:
     Given an enabled monitor that evaluates matching traces
@@ -98,7 +95,7 @@ Feature: A monitor that should run is never quietly skipped
   # time, so an SDK that exports in batches after a long job, a client whose
   # clock runs behind, or a backlogged pipeline all reach it holding a result
   # the customer genuinely computed. Whether that decline should exist at all
-  # is ADR-075's open classification question; that it must not be silent is
+  # is an open classification question; that it must not be silent is
   # not in question — a dropped result is indistinguishable from an evaluation
   # that never ran.
   @unit

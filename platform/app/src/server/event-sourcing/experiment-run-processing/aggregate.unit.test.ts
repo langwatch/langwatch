@@ -1,10 +1,6 @@
 import { checkOrderInvariance } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
-import {
-  experimentRun,
-  experimentRunAggregateId,
-  parseExperimentRunAggregateId,
-} from "./aggregate";
+import { experimentRun, parseExperimentRunAggregateId } from "./aggregate";
 import type { RunStartedData, TargetResultData } from "./schema";
 
 const baseStarted: RunStartedData = {
@@ -32,13 +28,29 @@ function targetResult(
 
 describe("experimentRun aggregate", () => {
   describe("given events are declared", () => {
-    it("derives one type string per event, qualified by the aggregate name", () => {
+    it("derives the dotted type strings already in the event log", () => {
       expect([...experimentRun.eventTypes].sort()).toEqual([
-        "experiment_run/completed",
-        "experiment_run/evaluatorResultRecorded",
-        "experiment_run/started",
-        "experiment_run/targetResultRecorded",
+        "lw.experiment_run.completed",
+        "lw.experiment_run.evaluator_result",
+        "lw.experiment_run.started",
+        "lw.experiment_run.target_result",
       ]);
+    });
+
+    it("extracts the composite aggregate id from any event's payload", () => {
+      expect(experimentRun.id(baseStarted)).toBe("exp-1:run-1");
+      expect(experimentRun.id(targetResult())).toBe("exp-1:run-1");
+    });
+
+    it("parses the composite back for the store's two-column read", () => {
+      expect(parseExperimentRunAggregateId("exp-1:run-1")).toEqual({
+        experimentId: "exp-1",
+        runId: "run-1",
+      });
+      expect(parseExperimentRunAggregateId("run-1")).toEqual({
+        experimentId: "",
+        runId: "run-1",
+      });
     });
   });
 
@@ -54,73 +66,99 @@ describe("experimentRun aggregate", () => {
       expect(state.experimentId).toBe("exp-1");
     });
 
-    it("takes the larger total across a redelivered/duplicated started event (ADR-103 decision 3)", () => {
-      let state = experimentRun.init();
-      state = experimentRun.apply(
-        state,
-        experimentRun.events.started({ ...baseStarted, total: 4 }),
+    it("takes the larger total across a redelivered started event", () => {
+      const higherLast = [4, 10].reduce(
+        (state, total) =>
+          experimentRun.apply(
+            state,
+            experimentRun.events.started({ ...baseStarted, total }),
+          ),
+        experimentRun.init(),
       );
-      state = experimentRun.apply(
-        state,
-        experimentRun.events.started({ ...baseStarted, total: 10 }),
+      const higherFirst = [10, 4].reduce(
+        (state, total) =>
+          experimentRun.apply(
+            state,
+            experimentRun.events.started({ ...baseStarted, total }),
+          ),
+        experimentRun.init(),
       );
-      expect(state.total).toBe(10);
 
-      // Order does not matter — max is commutative.
-      let reordered = experimentRun.init();
-      reordered = experimentRun.apply(
-        reordered,
-        experimentRun.events.started({ ...baseStarted, total: 10 }),
-      );
-      reordered = experimentRun.apply(
-        reordered,
-        experimentRun.events.started({ ...baseStarted, total: 4 }),
-      );
-      expect(reordered.total).toBe(10);
+      expect(higherLast.total).toBe(10);
+      expect(higherFirst.total).toBe(10);
     });
 
-    it("keeps the first started timestamp rather than a later one", () => {
-      let state = experimentRun.init();
-      state = experimentRun.apply(
-        state,
-        experimentRun.events.started({ ...baseStarted, occurredAt: 500 }),
-      );
-      state = experimentRun.apply(
-        state,
-        experimentRun.events.started({ ...baseStarted, occurredAt: 999 }),
+    it("keeps the earliest started timestamp rather than the last one seen", () => {
+      const state = [999, 500].reduce(
+        (acc, occurredAt) =>
+          experimentRun.apply(
+            acc,
+            experimentRun.events.started({ ...baseStarted, occurredAt }),
+          ),
+        experimentRun.init(),
       );
       expect(state.startedAt).toBe(500);
     });
+
+    it("keeps the first declaration of a target rather than a later rewrite", () => {
+      const first = experimentRun.apply(
+        experimentRun.init(),
+        experimentRun.events.started({
+          ...baseStarted,
+          targets: [{ id: "t1", name: "First", type: "prompt" }],
+        }),
+      );
+      const next = experimentRun.apply(
+        first,
+        experimentRun.events.started({
+          ...baseStarted,
+          targets: [
+            { id: "t1", name: "Second", type: "prompt" },
+            { id: "t0", name: "Other", type: "prompt" },
+          ],
+        }),
+      );
+
+      expect(next.targets).toEqual([
+        { id: "t0", name: "Other", type: "prompt" },
+        { id: "t1", name: "First", type: "prompt" },
+      ]);
+    });
   });
 
-  describe("when a target result is recorded", () => {
-    it("merges its targets and leaves every other field alone", () => {
+  describe("when a result is recorded", () => {
+    it("moves no state at all — every count is a read-time query", () => {
       const started = experimentRun.apply(
         experimentRun.init(),
         experimentRun.events.started(baseStarted),
       );
-      const next = experimentRun.apply(
-        started,
-        experimentRun.events.targetResultRecorded(
-          targetResult({
-            targets: [{ id: "t1", name: "Target 1", type: "prompt" }],
+
+      expect(
+        experimentRun.apply(
+          started,
+          experimentRun.events.targetResult(targetResult()),
+        ),
+      ).toEqual(started);
+      expect(
+        experimentRun.apply(
+          started,
+          experimentRun.events.evaluatorResult({
+            runId: "run-1",
+            experimentId: "exp-1",
+            index: 0,
+            targetId: "t1",
+            evaluatorId: "ev1",
+            status: "processed",
+            score: 0.9,
+            passed: true,
+            occurredAt: 3_000,
           }),
         ),
-      );
-      expect(next.targets).toEqual([
-        { id: "t1", name: "Target 1", type: "prompt" },
-      ]);
-      expect(next.total).toBe(started.total);
-      expect(next.startedAt).toBe(started.startedAt);
+      ).toEqual(started);
     });
 
-    it("has no counter field to increment — ADR-103 decision 1 moved every count to a read-time query", () => {
-      // The old fold's `ExperimentRunStateData` carried `CompletedCount`,
-      // `FailedCount`, `Progress` and seven more incremented fields. None of
-      // them exist on this state's schema at all, so there is nothing here
-      // for a redelivery to double-count or a dropped update to under-count.
-      const state = experimentRun.init();
-      expect(Object.keys(state).sort()).toEqual(
+    it("has no counter field to increment", () => {
+      expect(Object.keys(experimentRun.init()).sort()).toEqual(
         [
           "experimentId",
           "finishedAt",
@@ -132,30 +170,6 @@ describe("experimentRun aggregate", () => {
           "workflowVersionId",
         ].sort(),
       );
-    });
-  });
-
-  describe("when an evaluator result is recorded", () => {
-    it("leaves state unchanged — every old effect of this event is now a read-time query (totals.ts)", () => {
-      const state = experimentRun.apply(
-        experimentRun.init(),
-        experimentRun.events.started(baseStarted),
-      );
-      const next = experimentRun.apply(
-        state,
-        experimentRun.events.evaluatorResultRecorded({
-          runId: "run-1",
-          experimentId: "exp-1",
-          index: 0,
-          targetId: "t1",
-          evaluatorId: "ev1",
-          status: "processed",
-          score: 0.9,
-          passed: true,
-          occurredAt: 3_000,
-        }),
-      );
-      expect(next).toEqual(state);
     });
   });
 
@@ -174,8 +188,28 @@ describe("experimentRun aggregate", () => {
       expect(state.stoppedAt).toBeNull();
     });
 
+    it("does not blank a known finish time when a later completed omits it", () => {
+      const finished = experimentRun.apply(
+        experimentRun.init(),
+        experimentRun.events.completed({
+          runId: "run-1",
+          experimentId: "exp-1",
+          finishedAt: 5_000,
+        }),
+      );
+      const afterRedelivery = experimentRun.apply(
+        finished,
+        experimentRun.events.completed({
+          runId: "run-1",
+          experimentId: "exp-1",
+        }),
+      );
+
+      expect(afterRedelivery.finishedAt).toBe(5_000);
+    });
+
     /** @scenario "Run-level facts survive with no items" */
-    it("reports the experiment, the targets, the expected total and stopped status with no item ever recorded", () => {
+    it("reports the experiment, targets, expected total and stopped status with no item recorded", () => {
       const started = experimentRun.apply(
         experimentRun.init(),
         experimentRun.events.started({
@@ -187,8 +221,6 @@ describe("experimentRun aggregate", () => {
           occurredAt: 1_000,
         }),
       );
-      // No targetResultRecorded / evaluatorResultRecorded event is ever
-      // applied — the run is stopped before any item completes.
       const stopped = experimentRun.apply(
         started,
         experimentRun.events.completed({
@@ -210,88 +242,45 @@ describe("experimentRun aggregate", () => {
   });
 
   describe("order-invariance (ADR-098 decision 4)", () => {
-    it("reaches the same state in any order for started, completed, and distinct-target results", () => {
-      const events = [
-        experimentRun.events.started(baseStarted),
-        experimentRun.events.targetResultRecorded(
-          targetResult({
+    it("reaches the same state under every ordering and every re-delivery", () => {
+      const report = checkOrderInvariance({
+        init: experimentRun.init,
+        apply: experimentRun.apply,
+        events: [
+          experimentRun.events.started({
+            ...baseStarted,
+            targets: [
+              { id: "t1", name: "T1", type: "prompt" },
+              { id: "t2", name: "T2", type: "prompt" },
+            ],
+          }),
+          experimentRun.events.started({ ...baseStarted, total: 10 }),
+          experimentRun.events.targetResult(targetResult({ targetId: "t1" })),
+          experimentRun.events.targetResult(
+            targetResult({ targetId: "t2", index: 1 }),
+          ),
+          experimentRun.events.evaluatorResult({
+            runId: "run-1",
+            experimentId: "exp-1",
+            index: 0,
             targetId: "t1",
-            targets: [{ id: "t1", name: "T1", type: "prompt" }],
+            evaluatorId: "ev1",
+            status: "processed",
+            score: 0.9,
+            passed: true,
+            occurredAt: 3_000,
           }),
-        ),
-        experimentRun.events.targetResultRecorded(
-          targetResult({
-            targetId: "t2",
-            index: 1,
-            targets: [{ id: "t2", name: "T2", type: "prompt" }],
+          experimentRun.events.completed({
+            runId: "run-1",
+            experimentId: "exp-1",
+            finishedAt: 9_000,
+            stoppedAt: null,
           }),
-        ),
-        experimentRun.events.completed({
-          runId: "run-1",
-          experimentId: "exp-1",
-          finishedAt: 9_000,
-          stoppedAt: null,
-        }),
-      ];
-
-      const report = checkOrderInvariance({
-        init: experimentRun.init,
-        apply: experimentRun.apply,
-        events,
+        ],
       });
 
+      expect(report.counterexample).toBeUndefined();
       expect(report.invariant).toBe(true);
-    });
-
-    it("is NOT order-invariant when two events disagree about the same target id — a documented, inherited limitation", () => {
-      // `aggregate.ts`'s module docblock names this gap rather than claiming
-      // full order-invariance: `mergeTargets` is last-write-wins keyed by
-      // delivery order, not by a per-field stamp (ADR-099's `asOf`), because
-      // the domain guarantee — one `targetResult` per dataset row — is what
-      // makes it safe in the cases that actually occur. This test proves the
-      // boundary of that guarantee rather than leaving it unverified.
-      const events = [
-        experimentRun.events.targetResultRecorded(
-          targetResult({
-            targets: [{ id: "t1", name: "First", type: "prompt" }],
-          }),
-        ),
-        experimentRun.events.targetResultRecorded(
-          targetResult({
-            targets: [{ id: "t1", name: "Second", type: "prompt" }],
-          }),
-        ),
-      ];
-
-      const report = checkOrderInvariance({
-        init: experimentRun.init,
-        apply: experimentRun.apply,
-        events,
-      });
-
-      expect(report.invariant).toBe(false);
-      expect(report.cause).toBe("order");
-    });
-  });
-
-  describe("aggregate id", () => {
-    it("round-trips through the experimentId:runId composite key", () => {
-      const id = experimentRunAggregateId({
-        experimentId: "exp-1",
-        runId: "run-1",
-      });
-      expect(id).toBe("exp-1:run-1");
-      expect(parseExperimentRunAggregateId(id)).toEqual({
-        experimentId: "exp-1",
-        runId: "run-1",
-      });
-    });
-
-    it("parses a key with no separator as a bare runId, mirroring the old parser", () => {
-      expect(parseExperimentRunAggregateId("run-1")).toEqual({
-        experimentId: "",
-        runId: "run-1",
-      });
     });
   });
 
@@ -303,12 +292,12 @@ describe("experimentRun aggregate", () => {
         experimentRun.events,
       );
       expect(event).toEqual({
-        type: "experiment_run/started",
+        type: "lw.experiment_run.started",
         data: baseStarted,
       });
     });
 
-    it("recordTargetResult emits a targetResultRecorded event", () => {
+    it("recordTargetResult emits a targetResult event", () => {
       const input = targetResult();
       const [event] = experimentRun.commands.recordTargetResult.handle(
         experimentRun.init(),
@@ -316,7 +305,7 @@ describe("experimentRun aggregate", () => {
         experimentRun.events,
       );
       expect(event).toEqual({
-        type: "experiment_run/targetResultRecorded",
+        type: "lw.experiment_run.target_result",
         data: input,
       });
     });

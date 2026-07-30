@@ -1,67 +1,41 @@
 import {
-  type AnyWireColumn,
+  bindIdentifiers,
   type ClickHouseClient,
   ch,
   createRowCodec,
 } from "@langwatch/clickhouse";
-import { EXPERIMENT_RUN_ITEMS_TABLE_NAME } from "./itemsTable";
+import { experimentRunItemsTable } from "./table";
 
 /**
  * "A run's totals are a query over its items, never counters on the run row"
- * (ADR-103 decision 1) — this is that query, and this pipeline's worked
- * example for it. Everything `aggregate.ts`'s old counterpart used to
- * increment (`Progress`, `CompletedCount`, `FailedCount`, `TotalDurationMs`,
- * `AvgScoreBps`, `PassRateBps`, `TotalScoreSum`, `ScoreCount`, `PassedCount`,
- * `GradedCount`) is computed here instead, from `experiment_run_items`,
- * every time it is asked for. There is no cache and nothing to invalidate —
- * a late item changes the answer on the very next call (the "A late item
- * changes the run immediately" scenario in
- * `specs/experiments-v3/experiment-run-aggregates.feature`), because there
- * is no stored total to have gone stale.
+ * (ADR-103 decision 1). There is no cache and nothing to invalidate: a late
+ * item changes the answer on the very next call.
  *
- * `totalDirectCost` sums only what the items themselves recorded
- * (`TargetCost` + `EvaluationCost`) — the "an item that reports its own cost
- * keeps that figure" half of ADR-103's cost story. It deliberately does
- * **not** implement "an item with no cost of its own is priced from its
- * trace" or the even split across targets sharing one trace: that logic
- * reads `experiments-v3/execution`'s trace-cost lookup
- * (`splitTraceCostAcrossTargets`/`fetchTraceCosts`), which lives outside
- * this pipeline's directory and is unchanged by this rewrite. A caller
- * wanting the full customer-facing total adds the trace-priced remainder on
- * top of this function's result, the same layering
- * `enrichRunsWithBreakdownAndCosts` already does today.
+ * `totalDirectCost` sums only what the items recorded for themselves. Pricing
+ * an item from its trace, and splitting one trace's cost across the targets
+ * that share it, lives in `experiments-v3/execution` and layers on top.
  *
- * ## Query shape
- *
- * `experiment_run_items` is `ReplacingMergeTree(OccurredAt)` — unmerged
- * duplicate versions of one `ProjectionId` (a redelivery) can coexist until
- * the next background merge, so this aggregate deliberately deduplicates
- * before counting, following `dev/docs/best_practices/clickhouse-queries.md`'s
- * IN-tuple pattern rather than a bare `GROUP BY`: the inner subquery picks
- * the latest `OccurredAt` per `(TenantId, RunId, ProjectionId)`, and the outer
- * scope aggregates only rows that match it. `occurredAtRange`, when supplied,
- * is applied to the **outer** scope only, for partition pruning — never to
- * the inner dedup scope, because `OccurredAt` is written from the event's own
- * `data.occurredAt` and nothing in this table's contract guarantees it is the
- * same value across every redelivery of a logical item (the doc's own rule:
- * "leave the dedup scope unbounded on that column").
+ * The dedup subquery picks the latest `OccurredAt` per item, so an unmerged
+ * redelivery cannot inflate a count. `occurredAtRange` bounds the outer scope
+ * only, for partition pruning — never the dedup scope, because nothing
+ * guarantees `OccurredAt` is identical across a logical item's redeliveries.
  */
 
 export interface ExperimentRunTotals {
   readonly completedCount: number;
   readonly failedCount: number;
-  /** `completedCount + failedCount` — one reading of the same query, never a separate one (ADR-103 decision 4). */
+  /** `completedCount + failedCount`, one reading of the same query. */
   readonly progress: number;
-  /** `null` when no target result carried a duration, distinct from a total of 0. */
+  /** `null` when no item carried a duration, distinct from a total of 0. */
   readonly totalDurationMs: number | null;
   /** `null` until at least one evaluator result carries a score. */
   readonly avgScoreBps: number | null;
-  /** `null` until at least one evaluator result carries a graded (`passed`) verdict. */
+  /** `null` until at least one evaluator result carries a graded verdict. */
   readonly passRateBps: number | null;
   readonly scoreCount: number;
   readonly gradedCount: number;
   readonly passedCount: number;
-  /** Sum of `TargetCost` + `EvaluationCost` over the run's items — see the module docblock for what this excludes. */
+  /** `TargetCost` + `EvaluationCost` over the run's items. */
   readonly totalDirectCost: number;
 }
 
@@ -81,38 +55,81 @@ type SummaryColumnName = keyof typeof SUMMARY_COLUMNS;
 const SUMMARY_COLUMN_NAMES = Object.keys(
   SUMMARY_COLUMNS,
 ) as readonly SummaryColumnName[];
-const SUMMARY_WIRE_COLUMNS: readonly AnyWireColumn[] = SUMMARY_COLUMN_NAMES.map(
+const SUMMARY_WIRE_COLUMNS = SUMMARY_COLUMN_NAMES.map(
   (name) => SUMMARY_COLUMNS[name],
 );
 type SummaryRow = { readonly [K in SummaryColumnName]: bigint | number };
 
-function buildSql(args: { readonly boundOccurredAt: boolean }): string {
-  const outerRange = args.boundOccurredAt
-    ? "AND t.OccurredAt >= {occurredAtFrom:DateTime64(3)} AND t.OccurredAt <= {occurredAtTo:DateTime64(3)} "
+interface TotalsQuery {
+  readonly sql: string;
+  readonly params: Record<string, unknown>;
+}
+
+export function buildExperimentRunTotalsQuery(args: {
+  readonly tenantId: string;
+  readonly runId: string;
+  readonly experimentId: string;
+  readonly occurredAtRange?: { readonly from: Date; readonly to: Date };
+}): TotalsQuery {
+  const names = bindIdentifiers();
+  const table = names.of(experimentRunItemsTable.name);
+  type Column = keyof typeof experimentRunItemsTable.columns & string;
+  const at = (prefix: string, name: Column) => `${prefix}${names.of(name)}`;
+  const col = (name: Column) => at("t.", name);
+  const keyList = (prefix: string) =>
+    experimentRunItemsTable.sortKey.map((name) => at(prefix, name)).join(", ");
+  const scope = (prefix: string) =>
+    `WHERE ${at(prefix, "TenantId")} = {tenantId:String} ` +
+    `AND ${at(prefix, "RunId")} = {runId:String} ` +
+    `AND ${at(prefix, "ExperimentId")} = {experimentId:String}`;
+
+  const outerRange = args.occurredAtRange
+    ? `AND ${col("OccurredAt")} >= {occurredAtFrom:DateTime64(3)} ` +
+      `AND ${col("OccurredAt")} <= {occurredAtTo:DateTime64(3)} `
     : "";
 
-  return (
-    "SELECT " +
-    "countIf(t.ResultType = 'target' AND (t.TargetError IS NULL OR t.TargetError = '')) AS completedCount, " +
-    "countIf(t.ResultType = 'target' AND t.TargetError IS NOT NULL AND t.TargetError != '') AS failedCount, " +
-    "sumIf(t.TargetDurationMs, t.ResultType = 'target' AND t.TargetDurationMs IS NOT NULL) AS durationSumMs, " +
-    "countIf(t.ResultType = 'target' AND t.TargetDurationMs IS NOT NULL) AS durationCount, " +
-    "sumIf(round(t.Score * 10000), t.ResultType = 'evaluator' AND t.EvaluationStatus = 'processed' AND t.Score IS NOT NULL) AS scoreSumBps, " +
-    "countIf(t.ResultType = 'evaluator' AND t.EvaluationStatus = 'processed' AND t.Score IS NOT NULL) AS scoreCount, " +
-    "countIf(t.ResultType = 'evaluator' AND t.EvaluationStatus = 'processed' AND t.Passed IS NOT NULL) AS gradedCount, " +
-    "countIf(t.ResultType = 'evaluator' AND t.EvaluationStatus = 'processed' AND t.Passed = 1) AS passedCount, " +
-    "sumIf(t.TargetCost, t.ResultType = 'target' AND t.TargetCost IS NOT NULL) + " +
-    "sumIf(t.EvaluationCost, t.ResultType = 'evaluator' AND t.EvaluationCost IS NOT NULL) AS totalDirectCost " +
-    `FROM ${EXPERIMENT_RUN_ITEMS_TABLE_NAME} AS t ` +
-    "WHERE t.TenantId = {tenantId:String} AND t.RunId = {runId:String} AND t.ExperimentId = {experimentId:String} " +
+  const isTarget = `${col("ResultType")} = 'target'`;
+  const isGraded =
+    `${col("ResultType")} = 'evaluator' AND ${col("EvaluationStatus")} = 'processed'`;
+  const errored =
+    `${col("TargetError")} IS NOT NULL AND ${col("TargetError")} != ''`;
+
+  const sql =
+    `SELECT ` +
+    `countIf(${isTarget} AND NOT (${errored})) AS completedCount, ` +
+    `countIf(${isTarget} AND ${errored}) AS failedCount, ` +
+    `sumIf(${col("TargetDurationMs")}, ${isTarget} AND ${col("TargetDurationMs")} IS NOT NULL) AS durationSumMs, ` +
+    `countIf(${isTarget} AND ${col("TargetDurationMs")} IS NOT NULL) AS durationCount, ` +
+    `sumIf(round(${col("Score")} * 10000), ${isGraded} AND ${col("Score")} IS NOT NULL) AS scoreSumBps, ` +
+    `countIf(${isGraded} AND ${col("Score")} IS NOT NULL) AS scoreCount, ` +
+    `countIf(${isGraded} AND ${col("Passed")} IS NOT NULL) AS gradedCount, ` +
+    `countIf(${isGraded} AND ${col("Passed")} = 1) AS passedCount, ` +
+    `sumIf(${col("TargetCost")}, ${isTarget} AND ${col("TargetCost")} IS NOT NULL) + ` +
+    `sumIf(${col("EvaluationCost")}, ${col("ResultType")} = 'evaluator' AND ${col("EvaluationCost")} IS NOT NULL) AS totalDirectCost ` +
+    `FROM ${table} AS t ` +
+    `${scope("t.")} ` +
     outerRange +
-    "AND (t.TenantId, t.RunId, t.ProjectionId, t.OccurredAt) IN (" +
-    "SELECT TenantId, RunId, ProjectionId, max(OccurredAt) " +
-    `FROM ${EXPERIMENT_RUN_ITEMS_TABLE_NAME} ` +
-    "WHERE TenantId = {tenantId:String} AND RunId = {runId:String} AND ExperimentId = {experimentId:String} " +
-    "GROUP BY TenantId, RunId, ProjectionId" +
-    ")"
-  );
+    `AND (${keyList("t.")}, ${col("OccurredAt")}) IN (` +
+    `SELECT ${keyList("")}, max(${names.of("OccurredAt")}) ` +
+    `FROM ${table} ` +
+    `${scope("")} ` +
+    `GROUP BY ${keyList("")})`;
+
+  return {
+    sql,
+    params: {
+      ...names.params,
+      tenantId: args.tenantId,
+      runId: args.runId,
+      experimentId: args.experimentId,
+      ...(args.occurredAtRange
+        ? {
+            occurredAtFrom: args.occurredAtRange.from.toISOString(),
+            occurredAtTo: args.occurredAtRange.to.toISOString(),
+          }
+        : {}),
+    },
+  };
 }
 
 export interface DeriveExperimentRunTotalsArgs {
@@ -127,29 +144,17 @@ export interface DeriveExperimentRunTotalsArgs {
 export async function deriveExperimentRunTotals(
   args: DeriveExperimentRunTotalsArgs,
 ): Promise<ExperimentRunTotals> {
-  const codec = createRowCodec();
-  const boundOccurredAt = args.occurredAtRange !== undefined;
-
+  const query = buildExperimentRunTotalsQuery(args);
   const result = await args.client.query({
     tenantId: args.tenantId,
-    sql: buildSql({ boundOccurredAt }),
-    params: {
-      tenantId: args.tenantId,
-      runId: args.runId,
-      experimentId: args.experimentId,
-      ...(args.occurredAtRange
-        ? {
-            occurredAtFrom: args.occurredAtRange.from.toISOString(),
-            occurredAtTo: args.occurredAtRange.to.toISOString(),
-          }
-        : {}),
-    },
+    sql: query.sql,
+    params: query.params,
   });
 
   const row = result.rows[0];
   if (!row) return emptyTotals();
 
-  const [decoded] = codec.decodeRows<SummaryRow>({
+  const [decoded] = createRowCodec().decodeRows<SummaryRow>({
     columns: SUMMARY_WIRE_COLUMNS,
     columnNames: SUMMARY_COLUMN_NAMES,
     header: result.header,
@@ -176,7 +181,7 @@ export async function deriveExperimentRunTotals(
     scoreCount,
     gradedCount,
     passedCount,
-    totalDirectCost: decoded.totalDirectCost as number,
+    totalDirectCost: Number(decoded.totalDirectCost),
   };
 }
 

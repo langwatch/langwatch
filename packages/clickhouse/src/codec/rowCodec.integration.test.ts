@@ -24,7 +24,7 @@ describe("given a live column type change", () => {
     client = createClient({ url });
     await client.command({
       query: `
-        CREATE TABLE ${tableName}
+        CREATE TABLE {table:Identifier}
         (
           TenantId String,
           AcceptedAt DateTime64(3),
@@ -34,11 +34,15 @@ describe("given a live column type change", () => {
         PARTITION BY toYearWeek(AcceptedAt)
         ORDER BY (TenantId, AcceptedAt)
       `,
+      query_params: { table: tableName },
     });
   });
 
   afterAll(async () => {
-    await client.command({ query: `DROP TABLE IF EXISTS ${tableName}` });
+    await client.command({
+      query: "DROP TABLE IF EXISTS {table:Identifier}",
+      query_params: { table: tableName },
+    });
     await client.close();
   });
 
@@ -66,7 +70,8 @@ describe("given a live column type change", () => {
     // finishes on this replica, instead of the polling loop `system.mutations`
     // would otherwise need.
     await client.command({
-      query: `ALTER TABLE ${tableName} MODIFY COLUMN Value Int32`,
+      query: "ALTER TABLE {table:Identifier} MODIFY COLUMN Value Int32",
+      query_params: { table: tableName },
       clickhouse_settings: { mutations_sync: "1" },
     });
 
@@ -90,8 +95,15 @@ async function readOneRow(args: {
   valueColumn: WireColumn<string>;
 }): Promise<Record<string, unknown>> {
   const resultSet = await args.client.query({
-    query: `SELECT TenantId, Value FROM ${args.tableName} WHERE TenantId = {tenantId:String}`,
-    query_params: { tenantId: args.tenantId },
+    query:
+      "SELECT {tenantColumn:Identifier}, {valueColumn:Identifier} FROM {table:Identifier} " +
+      "WHERE {tenantColumn:Identifier} = {tenantId:String}",
+    query_params: {
+      table: args.tableName,
+      tenantColumn: "TenantId",
+      valueColumn: "Value",
+      tenantId: args.tenantId,
+    },
     format: "JSONCompactEachRowWithNamesAndTypes",
   });
   const parsed = await resultSet.json<unknown[]>();

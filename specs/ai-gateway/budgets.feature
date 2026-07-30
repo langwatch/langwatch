@@ -3,7 +3,7 @@ Feature: AI Gateway — Budgets
   # Four scenarios below are bound to budget.service.unit.test.ts. The
   # remaining @unimplemented scenarios are split between two unbindable
   # categories: (1) gateway data-plane behaviour (HTTP 402 on debit,
-  # /budget/check materialised view, ClickHouse ledger reactor, monthly
+  # /budget/check materialised view, ClickHouse ledger map projection, monthly
   # window reset, timezone handling) — implemented in Go and out of
   # scope for the TS parity check; and (2) UI page-level rendering
   # (budget detail drawer, banners, list columns, audit history) — needs
@@ -33,7 +33,7 @@ Feature: AI Gateway — Budgets
   Spend is derived from traces. The gateway emits one OTel span per request
   carrying gen_ai.usage.* + langwatch.virtual_key_id + langwatch.gateway_request_id.
   The trace-processing pipeline enriches the span with cost (pricing catalog ×
-  tokens), and a dedicated reactor writes one row per applicable budget to
+  tokens), and a dedicated map projection writes one row per applicable budget to
   gateway_budget_ledger_events in ClickHouse. An AggregatingMergeTree
   materialised view (gateway_budget_scope_totals) rolls up spend per (scope,
   scope_id, window, period_start). /budget/check reads from the materialised
@@ -158,7 +158,7 @@ Feature: AI Gateway — Budgets
     And the emitted span carries langwatch.virtual_key_id, gen_ai.usage.input_tokens,
       gen_ai.usage.output_tokens, and a resolved gen_ai.request.model
     And the project has three applicable budgets: org-monthly, team-monthly, project-daily
-    When the trace lands in ClickHouse and the gatewayBudgetSync reactor runs
+    When the trace lands in ClickHouse and the gatewayBudgetSync map projection runs
     Then gateway_budget_ledger_events has three rows keyed by
       (TenantId, BudgetId, GatewayRequestId)
     And each row's AmountUSD equals the enriched cost for the span
@@ -176,7 +176,7 @@ Feature: AI Gateway — Budgets
     Given a gateway request completes with provider-reported usage
       { prompt_tokens: 1000, completion_tokens: 500 }
     And the control plane's pricing catalog has per-token costs for the resolved model
-    When the span is enriched and the reactor writes to gateway_budget_ledger_events
+    When the span is enriched and the map projection writes to gateway_budget_ledger_events
     Then AmountUSD is derived from provider tokens × unit cost
     And the gateway's pre-request cost estimate is used only for pre-flight
       budget-check gating, never for the ledger

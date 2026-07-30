@@ -452,23 +452,76 @@ describe("ReportUsageForMonthCommand", () => {
   // Circuit-breaker
   // ========================================================================
 
-  describe("given 5 consecutive failures (circuit-breaker threshold)", () => {
-    it("does NOT self-dispatch and logs alarm", async () => {
+  describe("given consecutiveFailures at circuit-breaker threshold (5) and Stripe fails again", () => {
+    it("still attempts Stripe, but pauses self-dispatch", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
       mockBillingCheckpoints.getCheckpoint.mockResolvedValue({
         lastReportedTotal: 100,
         pendingReportedTotal: null,
         consecutiveFailures: 5,
       });
+      mockQueryBillableEventsTotal.mockResolvedValue(150);
+      mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
+      mockReportUsageDelta.mockRejectedValue(new Error("Stripe rate limit"));
+      mockBillingCheckpoints.incrementFailures.mockResolvedValue(undefined);
       const handler = await createHandler();
 
       const result = await handler.handle(makeCommand());
 
       expect(result).toEqual([]);
-      // No ClickHouse query, no Stripe call, no self-dispatch
-      expect(mockQueryBillableEventsTotal).not.toHaveBeenCalled();
-      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+
+      // Circuit-breaker must never skip the attempt itself — only
+      // confirm() (reached via a successful call) resets the counter, so
+      // skipping here would latch the org out of invoicing forever.
+      expect(mockQueryBillableEventsTotal).toHaveBeenCalled();
+      expect(mockReportUsageDelta).toHaveBeenCalled();
+
+      expect(mockBillingCheckpoints.incrementFailures).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        lastReportedTotal: 100,
+        pendingReportedTotal: 150,
+        consecutiveFailures: 6,
+      });
+
+      // The immediate self-dispatch retry stays paused while tripped.
       expect(mockSelfDispatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given consecutiveFailures above circuit-breaker threshold and Stripe succeeds", () => {
+    it("still attempts Stripe, resets the counter, and resumes self-dispatch", async () => {
+      mockOrganizations.getOrganizationForBilling.mockResolvedValue(makeOrg());
+      mockBillingCheckpoints.getCheckpoint.mockResolvedValue({
+        lastReportedTotal: 100,
+        pendingReportedTotal: null,
+        consecutiveFailures: 7,
+      });
+      mockQueryBillableEventsTotal.mockResolvedValue(150);
+      mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
+      mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
+      mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
+      mockSelfDispatch.mockResolvedValue(undefined);
+      const handler = await createHandler();
+
+      const result = await handler.handle(makeCommand());
+
+      expect(result).toEqual([]);
+
+      // A later, independent invocation still reaches Stripe even though a
+      // prior run tripped the breaker.
+      expect(mockQueryBillableEventsTotal).toHaveBeenCalled();
+      expect(mockReportUsageDelta).toHaveBeenCalled();
+
+      // confirm() is the only place consecutiveFailures resets to 0 —
+      // reaching it here proves the org is not permanently latched out.
+      expect(mockBillingCheckpoints.confirm).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: "2026-02",
+        lastReportedTotal: 150,
+      });
+
+      expect(mockSelfDispatch).toHaveBeenCalled();
     });
   });
 

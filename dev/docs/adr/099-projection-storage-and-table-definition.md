@@ -248,6 +248,40 @@ Existing tables declare a role mapping (`acceptedAt: "StartedAt"`) so the rules
 apply to today's column names; the canonical names are used by new tables and by
 any table being re-keyed anyway.
 
+### A deployed table that breaks the rule declares the debt, rather than lying about the role
+
+The rule above is correct and the tables that break it are already deployed, so
+for a while there was no way to declare them at all. What happened next is the
+part worth recording: three separate migrations each mislabelled a column to get
+past the guard — a customer-supplied instant declared `acceptedAt`, a
+business-time version declared `writtenAt`, a plain `DateTime` borrowing a role
+it does not have. Each declaration compiled, each said something false, and the
+guard was silently disarmed for exactly the tables that needed it most.
+
+A binary guard against an immutable schema does not produce compliance. It
+produces a lie at the point of least resistance, and the lie is invisible
+afterwards.
+
+So a table may name a column and a reason:
+
+```ts
+structuralDebt: [{ column: "EventOccurredAt", reason: "…" }]
+```
+
+The column then declares its **true** role, and only that column, on that table,
+is spared. Everything else stays armed. Three properties keep it from becoming a
+general escape hatch, and all three are checked at construction: a `reason` is
+required and may not be blank; an exemption naming an undeclared column or the
+same column twice fails; and an exemption for a column that is not actually the
+table's partition column, TTL anchor or replacing version is refused as
+**unused** — so one cannot be pre-staged, and it can only exist where a deployed
+constraint genuinely forces it.
+
+This is the shape decision "merge is closed" already uses: named adopters, a
+stated reason, no open-ended allowlist. It changes nothing on the wire. The
+declaration stops asserting something untrue, which means the debt list below is
+now greppable from the code rather than maintained by hand.
+
 ### Partition-column stability decides where a predicate may go
 
 `stability: "frozen"` puts the time predicate on both the outer scope and the
@@ -381,6 +415,11 @@ These are live defects the decision does not retroactively repair. Each needs a
 re-key — create new, backfill, `EXCHANGE TABLES` — because deployed migrations
 are immutable, so none of them is a code-only change.
 
+Three of them now carry a `structuralDebt` entry in their table definition, so
+the code says what it is doing instead of mislabelling a role to compile. That
+does not shorten this list; it makes each item findable by grepping
+`structuralDebt` rather than by trusting this document to stay current.
+
 - **`event_log` partitions and expires on customer-supplied `EventOccurredAt`,
   with `DEFAULT 0`.** The highest-consequence item, and the one whose fix is
   cheapest to describe: `CreatedAt` is already in the table.
@@ -406,6 +445,21 @@ are immutable, so none of them is a code-only change.
   table above. A correct re-key gives it an `AcceptedAt` column, moves the
   partition expression and the `ReplacingMergeTree` version onto it, and leaves
   `OccurredAt` as a plain display column.
+- **`governance_kpis` elects a business-time column as its `ReplacingMergeTree`
+  version.** `LastEventOccurredAt` is `TraceSummaryData.occurredAt`
+  (`migrations/00065_governance_kpis_event_grain.sql:26`) — customer-supplied, so
+  it cannot reliably break a tie between two versions of a row. The read side
+  already pays for this: `spendSpikeAnomalyEvaluator.service.ts` has to spell its
+  tie-break as `argMax(SpendUsd, (LastEventOccurredAt, SpendUsd))` to get a
+  deterministic answer. A re-key moves the version onto a platform-set stamp and
+  lets that read revert to the ordinary form.
+- **`dspy_steps` partitions on a value taken from a request body.**
+  `CreatedAt` anchors `toYearWeek(CreatedAt)` and is set from
+  `param.timestamps.created_at` at `routes/misc.ts:1164`. It is frozen — the
+  upsert preserves the first write — but a caller chooses it, so a caller
+  controls partition spread and part count directly. This is the same failure
+  mode as `event_log`'s, reached through an authenticated write path rather than
+  through telemetry.
 - **`AppliedEventIds` remains load-bearing in a read path.**
   `coding-agent-session.clickhouse.repository.ts:458` puts
   `length(AppliedEventIds) DESC` in a dedup `ORDER BY` as a tie-break. That

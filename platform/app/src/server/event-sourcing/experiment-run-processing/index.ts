@@ -1,114 +1,306 @@
-/**
- * `experiment-run-processing` — the `experiment_run` aggregate, rewritten
- * onto `@langwatch/event-sourcing` and `@langwatch/clickhouse` (ADR-098,
- * ADR-099, ADR-100, ADR-103, ADR-105, ADR-106).
- *
- * ADR-103 names this pipeline as the worked example for "a run's totals are
- * a query": `experiment_run` state (`aggregate.ts`) holds only what belongs
- * to the run itself — which experiment, which targets, when it started,
- * stopped or finished — and every count, sum and rate a customer sees is
- * computed at read time from `experiment_run_items` (`totals.ts`), never
- * accumulated on the run row. There is nothing here for a redelivery to
- * double-count or a dropped update to under-count, because there is no
- * counter left to drift.
- *
- * Module map:
- * - `schema.ts` — the state shape and event payloads (no ClickHouse).
- * - `aggregate.ts` — the one `defineAggregate` declaration (events,
- *   commands) plus the composite aggregate-id helpers.
- * - `table.ts` / `store.ts` — the `experiment_runs` fold row: a hand-rolled
- *   `ReplaceStore`, because the deployed table is wide and per-field, not
- *   the single-JSON-blob shape `@langwatch/clickhouse`'s `createReplaceStore`
- *   expects (see `store.ts`'s module docblock).
- * - `itemsTable.ts` / `itemsStore.ts` / `itemsMapping.ts` — the
- *   `experiment_run_items` map projection: a hand-rolled `AppendStore`,
- *   because `OccurredAt` plays two structurally incompatible roles on the
- *   deployed table (ADR-099's own named debt for this table) that no
- *   `defineTable` declaration can honestly represent (see `itemsTable.ts`).
- *   `itemsMapping.ts` also closes this task's `ProjectionId` investigation:
- *   the old id hash omitted `ExperimentId`, which is the live data-loss
- *   defect ADR-103 names; this rewrite's hash includes it.
- * - `groupKey.ts` / `mount.ts` — the dispatch-plane descriptors (ADR-100)
- *   and the ADR-106 mount check for both projections.
- * - `totals.ts` — the derived-totals query.
- *
- * ## What this module does not include
- *
- * There is no `pipeline.ts` and no composition-root wiring — matching every
- * other pipeline already converted under this tree
- * (`log-processing/projection.ts`'s docblock states the same thing): ADR-102's
- * static pipeline builder has not been rewritten yet, so nothing in this
- * directory mounts onto a live dispatch runtime. What is exported below is
- * what a future composition root needs.
- *
- * There is no process manager. The old pipeline's `experimentRunExecution`
- * liveness process (ADR-103 decisions 5-6, `specs/experiments-v3/
- * experiment-run-liveness.feature`) is not reproduced here: `@langwatch/
- * event-sourcing`'s `src/index.ts` exports no process-manager primitive
- * today (no `defineProcess`, no durable-state port, no intent/outbox
- * types), so there is nothing in the package for this rewrite to build
- * against. This is flagged in this task's final report rather than answered
- * with a bespoke, package-external process-manager mechanism.
- */
-
-export {
-  type ExperimentRunAggregate,
-  experimentRun,
-  experimentRunAggregateId,
-  parseExperimentRunAggregateId,
-} from "./aggregate";
-export {
-  experimentRunResultStorageGroupKey,
-  experimentRunStateGroupKey,
-  renderExperimentRunResultStorageGroupKey,
-  renderExperimentRunStateGroupKey,
-} from "./groupKey";
-export {
+import {
+  bindIdentifiers,
+  type ClickHouseClient,
+  clickhouseAppend,
+  createRowCodec,
+  deriveRowMapping,
+} from "@langwatch/clickhouse";
+import {
+  type AggregateEvent,
+  createFoldExecutor,
+  createMapExecutor,
+  defineMapProjection,
+  type Metrics,
+  type ReplaceStore,
+  type StateRead,
+  type StoreContext,
+  type StoredState,
+} from "@langwatch/event-sourcing";
+import { experimentRun, parseExperimentRunAggregateId } from "./aggregate";
+import {
+  type ExperimentRunItemRecord,
   generateItemProjectionId,
   mapEvaluatorResult,
   mapTargetResult,
 } from "./itemsMapping";
-export {
-  createExperimentRunItemsStore,
-  type ExperimentRunItemsStoreArgs,
-} from "./itemsStore";
+import { type ExperimentRunState, experimentRunStateSchema } from "./schema";
+import {
+  type ExperimentRunsRow,
+  experimentRunItemsTable,
+  experimentRunsTable,
+} from "./table";
 
-export {
-  EXPERIMENT_RUN_ITEMS_TABLE_NAME,
-  type ExperimentRunItemsRow,
-  experimentRunItemsColumnNames,
-  experimentRunItemsColumns,
-} from "./itemsTable";
-export {
-  assertExperimentRunProcessingMountsAreLegal,
-  experimentRunResultStorageMount,
-  experimentRunStateMount,
-} from "./mount";
-export {
-  createExperimentRunResultStorageProjection,
-  createExperimentRunStateProjection,
-  type ExperimentRunSourceEvent,
-} from "./projection";
-export {
-  type EvaluatorResultData,
-  type ExperimentRunItemRecord,
-  type ExperimentRunState,
-  type ExperimentRunTarget,
-  evaluatorResultDataSchema,
-  experimentRunStateSchema,
-  experimentRunTargetSchema,
-  initExperimentRunState,
-  type RunCompletedData,
-  type RunStartedData,
-  runCompletedDataSchema,
-  runStartedDataSchema,
-  type TargetResultData,
-  targetResultDataSchema,
-} from "./schema";
-export {
-  createExperimentRunsStore,
-  type ExperimentRunsStoreArgs,
-} from "./store";
-export { type ExperimentRunsRow, experimentRunsTable } from "./table";
+export { experimentRun } from "./aggregate";
 
-export { deriveExperimentRunTotals, type ExperimentRunTotals } from "./totals";
+const FOLD_PROJECTION_NAME = "experimentRunState";
+const MAP_PROJECTION_NAME = "experimentRunItems";
+const DEFAULT_RETENTION_DAYS = 308;
+const READ_YOUR_WRITES_SETTINGS = { select_sequential_consistency: 1 } as const;
+
+const runRowMapping = deriveRowMapping<
+  ExperimentRunState,
+  typeof experimentRunsTable.columns
+>({
+  table: experimentRunsTable,
+  state: experimentRunStateSchema,
+  key: "RunId",
+  tenant: "TenantId",
+  stateVersionColumn: "Version",
+  fill: {
+    ProjectionId: (state) => `${state.experimentId}:${state.runId}`,
+    CreatedAt: () => new Date(),
+  },
+});
+
+function decodeTargets(cell: string): ExperimentRunState["targets"] {
+  try {
+    const parsed: unknown = JSON.parse(cell);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // Display data, not identity: a degraded read beats failing the version
+    // gate on a row written before this pipeline.
+    return [];
+  }
+}
+
+/**
+ * The `experiment_runs` store.
+ *
+ * `clickhouseReplacing` is not used here, and this is the only reason: it
+ * binds ONE key column, while this aggregate's id is the composite
+ * `experimentId:runId` and the deployed engine key is
+ * `(TenantId, RunId, ExperimentId)`. Reading on `RunId` alone would collapse
+ * two experiments that share a run slug, which run slugs routinely do. The
+ * mapping, the identifier binding and the codec are all the package's.
+ */
+function createExperimentRunsStore(args: {
+  readonly client: ClickHouseClient;
+  readonly version: string;
+}): ReplaceStore<ExperimentRunState> {
+  const { client, version } = args;
+  const codec = createRowCodec();
+  const columns = experimentRunsTable.columns;
+  const wireColumns = experimentRunsTable.columnNames.map(
+    (name) => columns[name],
+  );
+  const versionIndex = experimentRunsTable.columnNames.indexOf("Version");
+
+  const names = bindIdentifiers();
+  const readSql =
+    `SELECT ${names.list(experimentRunsTable.columnNames)} ` +
+    `FROM ${names.of(experimentRunsTable.name)} ` +
+    `WHERE ${names.of("TenantId")} = {tenantId:String} ` +
+    `AND ${names.of("RunId")} = {runId:String} ` +
+    `AND ${names.of("ExperimentId")} = {experimentId:String} ` +
+    `ORDER BY ${names.of("UpdatedAt")} DESC LIMIT 1`;
+
+  return {
+    kind: "replace",
+
+    async read(key, context): Promise<StateRead<ExperimentRunState>> {
+      const { experimentId, runId } = parseExperimentRunAggregateId(key);
+      const result = await client.query({
+        tenantId: context.tenantId,
+        sql: readSql,
+        params: {
+          ...names.params,
+          tenantId: context.tenantId,
+          runId,
+          experimentId,
+        },
+        settings: READ_YOUR_WRITES_SETTINGS,
+      });
+
+      const row = result.rows[0];
+      if (!row) return { kind: "absent" };
+
+      // The gate runs on the version cell alone, before anything else is
+      // decoded: an old shape must never reach this build's decoders.
+      let storedVersion: string | undefined;
+      try {
+        storedVersion = columns.Version.decode(row[versionIndex]);
+      } catch (cause) {
+        return { kind: "undecodable", storedVersion: undefined, cause };
+      }
+      if (storedVersion !== version) {
+        return { kind: "undecodable", storedVersion };
+      }
+
+      try {
+        const [decoded] = codec.decodeRows<ExperimentRunsRow>({
+          columns: wireColumns,
+          columnNames: experimentRunsTable.columnNames,
+          header: result.header,
+          rows: [row],
+        });
+        if (!decoded) return { kind: "undecodable", storedVersion };
+        return {
+          kind: "found",
+          stored: {
+            state: {
+              ...runRowMapping.fromRow(decoded),
+              targets: decodeTargets(decoded.Targets),
+            },
+            version: storedVersion,
+          },
+        };
+      } catch (cause) {
+        return { kind: "undecodable", storedVersion, cause };
+      }
+    },
+
+    async write(
+      key: string,
+      stored: StoredState<ExperimentRunState>,
+      context: StoreContext,
+    ): Promise<void> {
+      const writtenAt = new Date();
+      const row = runRowMapping.toRow(stored.state, {
+        tenantId: context.tenantId,
+        key,
+        version: stored.version,
+        writtenAt,
+        retentionDays: context.retentionDays ?? DEFAULT_RETENTION_DAYS,
+      });
+      // Two columns the derived mapping cannot produce: `Targets` is a JSON
+      // cell, and `StartedAt` is the partition column, so it cannot hold the
+      // null a run that has not started carries in state.
+      row.Targets = JSON.stringify(stored.state.targets);
+      if (stored.state.startedAt === null) row.StartedAt = writtenAt;
+
+      await client.insert({
+        tenantId: context.tenantId,
+        table: experimentRunsTable.name,
+        rows: codec.encodeRows({
+          columns: wireColumns,
+          columnNames: experimentRunsTable.columnNames,
+          rows: [row],
+        }),
+        columns: experimentRunsTable.columnNames,
+        target: { kind: "replacing" },
+      });
+    },
+  };
+}
+
+/** One item row per result event, never read back into any fold (ADR-098 §2). */
+export const experimentRunItems = defineMapProjection({
+  name: MAP_PROJECTION_NAME,
+  aggregate: experimentRun,
+  handle: {
+    targetResult: mapTargetResult,
+    evaluatorResult: mapEvaluatorResult,
+  },
+});
+
+export type ExperimentRunCommandName = keyof typeof experimentRun.commands;
+
+export interface ExperimentRunPipelineDeps {
+  readonly client: ClickHouseClient;
+  readonly metrics?: Metrics;
+}
+
+export interface ApplyExperimentRunCommandArgs<
+  Command extends ExperimentRunCommandName,
+> {
+  readonly tenantId: string;
+  readonly command: Command;
+  /** Parsed against the named command's own `input` schema before `handle`. */
+  readonly input: unknown;
+  readonly retentionDays?: number;
+}
+
+export interface ExperimentRunPipeline {
+  readonly aggregate: typeof experimentRun;
+  applyExperimentRunCommand<Command extends ExperimentRunCommandName>(
+    args: ApplyExperimentRunCommandArgs<Command>,
+  ): Promise<{ events: number }>;
+  storeItems(delivery: {
+    readonly tenantId: string;
+    readonly events: readonly AggregateEvent[];
+    readonly retentionDays?: number;
+  }): Promise<{ written: number }>;
+}
+
+/** Mounts this pipeline's two projections, each beside the store it writes to. */
+export function createExperimentRunPipeline(
+  deps: ExperimentRunPipelineDeps,
+): ExperimentRunPipeline {
+  const runStore = createExperimentRunsStore({
+    client: deps.client,
+    version: experimentRun.stateVersion,
+  });
+
+  const itemsStore = clickhouseAppend<
+    ExperimentRunItemRecord,
+    typeof experimentRunItemsTable.columns
+  >({
+    client: deps.client,
+    table: experimentRunItemsTable,
+    toRow: (record, context) => ({
+      ...record,
+      TenantId: context.tenantId,
+      ProjectionId: generateItemProjectionId({
+        tenantId: context.tenantId,
+        experimentId: record.ExperimentId,
+        runId: record.RunId,
+        index: record.RowIndex,
+        targetId: record.TargetId,
+        resultType: record.ResultType === "evaluator" ? "evaluator" : "target",
+        evaluatorId: record.EvaluatorId,
+      }),
+      CreatedAt: new Date(),
+      _retention_days: context.retentionDays ?? DEFAULT_RETENTION_DAYS,
+    }),
+  });
+
+  const fold = createFoldExecutor<ExperimentRunState, AggregateEvent>({
+    store: runStore,
+    init: experimentRun.init,
+    apply: experimentRun.apply,
+    stateVersion: experimentRun.stateVersion,
+    projectionName: FOLD_PROJECTION_NAME,
+    metrics: deps.metrics,
+  });
+
+  const items = createMapExecutor<AggregateEvent, ExperimentRunItemRecord>({
+    store: itemsStore,
+    map: experimentRunItems.map,
+    projectionName: MAP_PROJECTION_NAME,
+    metrics: deps.metrics,
+  });
+
+  return {
+    aggregate: experimentRun,
+
+    /**
+     * Reads current state, lets the named command decide which events to try,
+     * folds them and writes the result back. The executor re-reads before it
+     * writes, so a row this build cannot decode fails there rather than being
+     * folded onto genesis here.
+     */
+    async applyExperimentRunCommand(args) {
+      const command = experimentRun.commands[args.command];
+      const input = command.input.parse(args.input);
+      const key = experimentRun.id(input);
+
+      const read = await runStore.read(key, {
+        tenantId: args.tenantId,
+        retentionDays: args.retentionDays,
+      });
+      const state =
+        read.kind === "found" ? read.stored.state : experimentRun.init();
+
+      return fold.apply({
+        key,
+        tenantId: args.tenantId,
+        events: command.handle(state, input, experimentRun.events),
+        retentionDays: args.retentionDays,
+      });
+    },
+
+    storeItems(delivery) {
+      return items.apply(delivery);
+    },
+  };
+}

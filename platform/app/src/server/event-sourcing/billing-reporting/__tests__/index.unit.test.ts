@@ -19,7 +19,9 @@ const { createMockLogger } = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("@langwatch/observability", () => ({ createLogger: vi.fn(() => createMockLogger()) }));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: vi.fn(() => createMockLogger()),
+}));
 
 vi.mock("~/server/utils/ttlCache", () => ({
   TtlCache: class {
@@ -35,7 +37,9 @@ vi.mock("~/server/utils/ttlCache", () => ({
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
-  withScope: vi.fn((cb: (scope: Record<string, unknown>) => void) => cb({ setTag: vi.fn(), setExtra: vi.fn() })),
+  withScope: vi.fn((cb: (scope: Record<string, unknown>) => void) =>
+    cb({ setTag: vi.fn(), setExtra: vi.fn() }),
+  ),
 }));
 
 vi.mock("~/server/organizations/resolveOrganizationId", () => ({
@@ -44,9 +48,13 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
 
 import { createBillingReportingPipeline } from "..";
 
-function makeDeps(overrides: Partial<Parameters<typeof createBillingReportingPipeline>[0]> = {}) {
+function makeDeps(
+  overrides: Partial<Parameters<typeof createBillingReportingPipeline>[0]> = {},
+) {
   return {
-    organizations: { getOrganizationForBilling: vi.fn().mockResolvedValue(null) },
+    organizations: {
+      getOrganizationForBilling: vi.fn().mockResolvedValue(null),
+    },
     billingCheckpoints: {
       getCheckpoint: vi.fn(),
       writeIntent: vi.fn(),
@@ -114,16 +122,26 @@ describe("createBillingReportingPipeline", () => {
       const getCheckpoint = vi
         .fn()
         // First attempt: healthy, triggers a transient failure and a self-dispatch.
-        .mockResolvedValueOnce({ lastReportedTotal: 0, pendingReportedTotal: null, consecutiveFailures: 0 })
+        .mockResolvedValueOnce({
+          lastReportedTotal: 0,
+          pendingReportedTotal: null,
+          consecutiveFailures: 0,
+        })
         // Second attempt (the self-dispatch): the breaker is now tripped, so
         // THIS call no longer self-dispatches again once it fails too — it
         // still attempts Stripe (the fix's escape path; see
         // reportUsageForMonth.unit.test.ts for that behaviour in isolation),
         // and the mock's static rejection stops the chain here rather than
         // this test's mocks recursing forever.
-        .mockResolvedValueOnce({ lastReportedTotal: 0, pendingReportedTotal: null, consecutiveFailures: 5 });
+        .mockResolvedValueOnce({
+          lastReportedTotal: 0,
+          pendingReportedTotal: null,
+          consecutiveFailures: 5,
+        });
       const queryBillableEventsTotal = vi.fn().mockResolvedValue(10);
-      const reportUsageDelta = vi.fn().mockRejectedValue(new Error("Stripe rate limit"));
+      const reportUsageDelta = vi
+        .fn()
+        .mockRejectedValue(new Error("Stripe rate limit"));
 
       const pipeline = createBillingReportingPipeline(
         makeDeps({

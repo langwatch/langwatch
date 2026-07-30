@@ -1,6 +1,5 @@
 import { defineAggregate } from "@langwatch/event-sourcing";
 import {
-  type ExperimentRunState,
   type ExperimentRunTarget,
   evaluatorResultDataSchema,
   experimentRunStateSchema,
@@ -10,174 +9,110 @@ import {
   targetResultDataSchema,
 } from "./schema";
 
-/**
- * The `experiment_run` aggregate (ADR-105).
- *
- * One declaration replaces the old pipeline's four-site event declaration —
- * `schemas/constants.ts` (type strings, versions), `schemas/events.ts`
- * (payload + envelope + `z.infer`), `schemas/typeGuards.ts` (259 lines of
- * `event.type === CONSTANT` narrowing this pipeline no longer needs) and
- * `commands.ts` (`defineCommand` call sites). Everything nameable — the event
- * type string, the union, the router's `eventTypes` list, the typed
- * creators — is derived from the declaration below.
- *
- * === `evaluatorResultRecorded`'s apply is a no-op, on purpose ===
- *
- * Every effect the old fold gave this event was an incremented counter:
- * `TotalScoreSum`/`ScoreCount`/`PassedCount`/`GradedCount` and the two
- * derived `AvgScoreBps`/`PassRateBps` fields
- * (`event-sourcing.old/.../experimentRunState.foldProjection.ts:218-254`).
- * ADR-103 decision 1 retires every one of them to a read-time query over
- * `experiment_run_items` (`totals.ts`) — "a run's totals are a query over its
- * items, never counters on the run row." So this fold's state has nothing
- * left to compute from `evaluatorResultRecorded`. It stays a declared event
- * — with an identity `apply` — because the `experimentRunResultStorage` map
- * projection (`items.ts`) mounts on this same aggregate's event union and
- * needs it routed.
- *
- * === Order-invariance, and the one field that is not (ADR-098 decision 4) ===
- *
- * `total` is `Math.max` — commutative. `startedAt`/`finishedAt`/`stoppedAt`
- * are each written by an event that occurs at most once per run in practice
- * (`started`, `completed`), so first-write-wins/plain-overwrite converge
- * regardless of arrival order for the same reason the old fold's docblock
- * gave: there is never a second write to order against.
- *
- * `targets` is the exception, carried forward with the same caveat the old
- * fold's docblock stated rather than silently dropped: it is a keyed
- * last-write-wins merge (`mergeTargets` below), which is order-INVARIANT only
- * because each target id is, in practice, written once — one `targetResult`
- * per dataset row. Two events genuinely updating the same target id would
- * disagree depending on delivery order. This is inherited, not introduced —
- * closing it for real needs a per-field `asOf` stamp (ADR-099's prescribed
- * fix for exactly this shape), which is a real design change beyond this
- * rewrite's scope and is flagged rather than silently claimed as fixed.
- */
+/** The earlier of two observations, either of which may be unknown. */
+function earliest(
+  existing: number | null,
+  incoming: number | null | undefined,
+): number | null {
+  if (incoming == null) return existing;
+  return existing === null ? incoming : Math.min(existing, incoming);
+}
 
 /**
- * Merges `incoming` targets into `existing`, keyed by id, last-write-wins.
- * See the module docblock's "Order-invariance" section for the one case this
- * does not cover.
- *
- * Sorted by `id` before returning rather than left in `Map` insertion order.
- * `checkOrderInvariance` caught the reason this matters: two events touching
- * *different*, non-conflicting target ids converge on the same resulting
- * *set* regardless of delivery order, but `Map` iteration order is insertion
- * order, so the resulting *array* did not — `[t1, t2]` folded one way,
- * `[t2, t1]` the other, and a plain array comparison treats those as
- * different states. Sorting removes that nondeterminism for free; it does
- * not touch the actual last-write-wins semantics the module docblock's
- * caveat is about (two events disagreeing about the *same* id).
+ * The run's declared targets, keyed by id and sorted. First declaration wins,
+ * so a redelivered `started` cannot rewrite a target's metadata, and sorting
+ * keeps two deliveries that declare different targets from producing arrays
+ * that differ only in order.
  */
 function mergeTargets(
   existing: readonly ExperimentRunTarget[],
   incoming: readonly ExperimentRunTarget[],
 ): ExperimentRunTarget[] {
-  if (incoming.length === 0) return [...existing];
   const byId = new Map(existing.map((target) => [target.id, target] as const));
-  for (const target of incoming) byId.set(target.id, target);
+  for (const target of incoming) {
+    if (!byId.has(target.id)) byId.set(target.id, target);
+  }
   return [...byId.values()].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
   );
 }
 
 /**
- * Not pinned. `defineAggregate` derives `stateVersion` as a hash of
- * `experimentRunStateSchema`, which differs from the old fold's hand-typed
- * `"2025-02-01"` stamp — correctly: this state is a genuine narrowing (eleven
- * counter fields gone), not a byte-compatible re-declaration of the old row.
- * ADR-105 decision 4's "every existing fold pins at cutover" rule protects a
- * fold that is *replacing* a live one; this pipeline is not yet wired into
- * any composition root (no `pipeline.ts`/dispatch wiring exists for it, same
- * as every other pipeline already converted under this tree — see
- * `log-processing/projection.ts`'s docblock), so there is no live traffic for
- * an unpinned version to break yet. Pinning becomes the correct move at the
- * point something actually cuts this pipeline over — see this task's final
- * report for why that point has not been reached here.
+ * The `experiment_run` fold: which experiment, which targets, when it started
+ * and how it ended. Every count, sum and rate a customer sees is a query over
+ * `experiment_run_items` (`totals.ts`), never a counter here — there is
+ * nothing left for a redelivery to double-count (ADR-103 decision 1).
+ *
+ * `targetResult` and `evaluatorResult` therefore move no state at all. They
+ * stay declared because the item-storage map projection subscribes to them.
  */
-export const experimentRun = defineAggregate("experiment_run")
-  .state(experimentRunStateSchema, initExperimentRunState)
-  .events({
+export const experimentRun = defineAggregate({
+  name: "experiment_run",
+  prefix: "lw",
+  state: experimentRunStateSchema,
+  init: initExperimentRunState,
+  // RunId slugs are not unique across experiments, so the id is the composite.
+  id: (data) => `${data.experimentId}:${data.runId}`,
+
+  events: {
     started: {
       data: runStartedDataSchema,
-      apply: (state: ExperimentRunState, data): ExperimentRunState => ({
+      apply: (state, data) => ({
         ...state,
         runId: data.runId,
         experimentId: data.experimentId,
-        workflowVersionId: data.workflowVersionId ?? state.workflowVersionId,
+        workflowVersionId: state.workflowVersionId ?? data.workflowVersionId ?? null,
         total: Math.max(state.total, data.total),
         targets: mergeTargets(state.targets, data.targets),
-        startedAt: state.startedAt ?? data.occurredAt,
+        startedAt: earliest(state.startedAt, data.occurredAt),
       }),
     },
 
-    targetResultRecorded: {
+    targetResult: {
       data: targetResultDataSchema,
-      apply: (state: ExperimentRunState, data): ExperimentRunState => ({
-        ...state,
-        targets: mergeTargets(state.targets, data.targets ?? []),
-      }),
+      apply: (state) => state,
     },
 
-    /** See the module docblock — every old effect of this event is now a read-time query. */
-    evaluatorResultRecorded: {
+    evaluatorResult: {
       data: evaluatorResultDataSchema,
-      apply: (state: ExperimentRunState): ExperimentRunState => state,
+      apply: (state) => state,
     },
 
     completed: {
       data: runCompletedDataSchema,
-      apply: (state: ExperimentRunState, data): ExperimentRunState => ({
+      apply: (state, data) => ({
         ...state,
-        finishedAt: data.finishedAt ?? null,
-        stoppedAt: data.stoppedAt ?? null,
+        runId: state.runId || data.runId,
+        experimentId: state.experimentId || data.experimentId,
+        finishedAt: earliest(state.finishedAt, data.finishedAt),
+        stoppedAt: earliest(state.stoppedAt, data.stoppedAt),
       }),
     },
-  })
-  .commands({
+  },
+
+  commands: {
     start: {
       input: runStartedDataSchema,
       handle: (_state, input, events) => [events.started(input)],
     },
     recordTargetResult: {
       input: targetResultDataSchema,
-      handle: (_state, input, events) => [events.targetResultRecorded(input)],
+      handle: (_state, input, events) => [events.targetResult(input)],
     },
     recordEvaluatorResult: {
       input: evaluatorResultDataSchema,
-      handle: (_state, input, events) => [
-        events.evaluatorResultRecorded(input),
-      ],
+      handle: (_state, input, events) => [events.evaluatorResult(input)],
     },
     complete: {
       input: runCompletedDataSchema,
       handle: (_state, input, events) => [events.completed(input)],
     },
-  })
-  .build();
+  },
+});
 
 export type ExperimentRunAggregate = typeof experimentRun;
 
-/**
- * The composite aggregate id, `${experimentId}:${runId}` — unchanged from the
- * old pipeline's `utils/compositeKey.ts`. `runId` slugs are not globally
- * unique (the same slug can appear across different experiments), so the
- * composite is what makes the id unique.
- *
- * Kept as a sibling function rather than a declaration field, matching
- * `log-processing/aggregate.ts`'s `logRecordAggregateId`: the shipped
- * `defineAggregate` (`packages/event-sourcing/src/aggregate/defineAggregate.ts`)
- * has no `.aggregateId()` step — see that file's docblock for the same
- * discrepancy against ADR-105's illustrative example.
- */
-export function experimentRunAggregateId(args: {
-  readonly experimentId: string;
-  readonly runId: string;
-}): string {
-  return `${args.experimentId}:${args.runId}`;
-}
-
-/** The inverse of {@link experimentRunAggregateId}. */
+/** The inverse of {@link experimentRun.id}, for the store's two-column read. */
 export function parseExperimentRunAggregateId(compositeKey: string): {
   experimentId: string;
   runId: string;

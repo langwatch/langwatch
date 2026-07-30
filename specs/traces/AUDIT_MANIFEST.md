@@ -19,9 +19,10 @@ This PR adds the manifest only — no `.feature` files are modified. Phase 1 sol
 > evidence behind their UPDATE / DUPLICATE / KEEP classification:
 > `evaluationTrigger.reactor.ts`, `originGate.reactor.ts`,
 > `projectMetadata.reactor.ts` and the matching `*.reactor.unit.test.ts`
-> ranges. [ADR-075](../../dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md)
-> retired the reactor as a concept and deleted the whole `reactors/`
-> directory, so those paths and every line number attached to them are dead.
+> ranges. ADR-075 (folded into [ADR-098](../../dev/docs/adr/098-event-sourcing-core.md)
+> by dev/docs/adr/README.md) retired the reactor as a concept and deleted the
+> whole `reactors/` directory, so those paths and every line number attached
+> to them are dead.
 >
 > **The classifications themselves still stand** — they were judgments about
 > scenarios, not about files — but the audit trail behind them has to be

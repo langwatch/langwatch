@@ -6,39 +6,48 @@ import {
   recordTopicsIdempotencyKey,
   requestClusteringIdempotencyKey,
   topicClustering,
-  topicClusteringAggregateId,
-  topicClusteringEventKeyOf,
 } from "./aggregate";
 
 describe("topicClustering aggregate", () => {
   describe("given events are declared", () => {
-    it("derives a type string per event, qualified by the aggregate", () => {
+    it("derives the dotted type strings already in the event log", () => {
       expect([...topicClustering.eventTypes].sort()).toEqual([
-        "topic_clustering/requested",
-        "topic_clustering/runCompleted",
-        "topic_clustering/runFailed",
-        "topic_clustering/runStarted",
-        "topic_clustering/topicsRecorded",
+        "lw.obs.topic_clustering.requested",
+        "lw.obs.topic_clustering.run_completed",
+        "lw.obs.topic_clustering.run_failed",
+        "lw.obs.topic_clustering.run_started",
+        "lw.obs.topic_clustering.topics_recorded",
       ]);
     });
 
-    it("creates events carrying the qualified type string and the given payload", () => {
-      const event = topicClustering.events.runStarted({
+    it("creates events carrying that type string and the given payload", () => {
+      const data = {
+        projectId: "project-1",
         runId: "run-1",
         page: 1,
         occurredAt: 1700000000000,
+      };
+      expect(topicClustering.events.runStarted(data)).toEqual({
+        type: "lw.obs.topic_clustering.run_started",
+        data,
       });
-      expect(event).toEqual({
-        type: "topic_clustering/runStarted",
-        data: { runId: "run-1", page: 1, occurredAt: 1700000000000 },
-      });
+    });
+
+    it("extracts the aggregate id from any event's payload — one stream per project", () => {
+      expect(
+        topicClustering.id({
+          projectId: "project-1",
+          trigger: "manual",
+          occurredAt: 1700000000000,
+        }),
+      ).toBe("project-1");
     });
 
     it("leaves state untouched for a type it was not built with", () => {
       const state = topicClustering.init();
       expect(
         topicClustering.apply(state, {
-          type: "topic_clustering/added_later",
+          type: "lw.obs.topic_clustering.added_later",
           data: {},
         }),
       ).toEqual(state);
@@ -47,95 +56,72 @@ describe("topicClustering aggregate", () => {
 
   describe("given commands are declared", () => {
     it("requestClustering emits a requested event carrying its input verbatim", () => {
-      const input = { trigger: "manual" as const, occurredAt: 1700000000000 };
-      const emitted = topicClustering.commands.requestClustering.handle(
-        topicClustering.init(),
-        input,
-        topicClustering.events,
-      );
-      expect(emitted).toEqual([topicClustering.events.requested(input)]);
+      const input = {
+        projectId: "project-1",
+        trigger: "manual" as const,
+        occurredAt: 1700000000000,
+      };
+      expect(
+        topicClustering.commands.requestClustering.handle(
+          topicClustering.init(),
+          input,
+          topicClustering.events,
+        ),
+      ).toEqual([topicClustering.events.requested(input)]);
     });
 
     it("recordTopics emits a topicsRecorded event carrying its input verbatim", () => {
       const input = {
+        projectId: "project-1",
         mode: "replace" as const,
         source: "clustering" as const,
         dedupeKey: "run:run-1:page-1",
         topics: [],
         occurredAt: 1700000000000,
       };
-      const emitted = topicClustering.commands.recordTopics.handle(
-        topicClustering.init(),
-        input,
-        topicClustering.events,
-      );
-      expect(emitted).toEqual([topicClustering.events.topicsRecorded(input)]);
-    });
-  });
-
-  describe("topicClusteringAggregateId", () => {
-    it("is the project id — one clustering stream per project", () => {
-      expect(topicClusteringAggregateId({ tenantId: "project-1" })).toBe(
-        "project-1",
-      );
-    });
-  });
-
-  describe("topicClusteringEventKeyOf", () => {
-    it("recovers the short event key from a full derived type string", () => {
-      expect(topicClusteringEventKeyOf("topic_clustering/requested")).toBe(
-        "requested",
-      );
-      expect(topicClusteringEventKeyOf("topic_clustering/runCompleted")).toBe(
-        "runCompleted",
-      );
-    });
-
-    it("returns undefined for a type string from a different aggregate", () => {
-      expect(topicClusteringEventKeyOf("trace/spanRecorded")).toBeUndefined();
-    });
-
-    it("round-trips every declared event type back to its own key", () => {
-      for (const type of topicClustering.eventTypes) {
-        const key = topicClusteringEventKeyOf(type);
-        expect(key).toBeDefined();
-        expect(`${topicClustering.name}/${key}`).toBe(type);
-      }
+      expect(
+        topicClustering.commands.recordTopics.handle(
+          topicClustering.init(),
+          input,
+          topicClustering.events,
+        ),
+      ).toEqual([topicClustering.events.topicsRecorded(input)]);
     });
   });
 
   describe("command idempotency keys", () => {
     /**
-     *      * Bound here rather than on `AssignTopicCommand` itself (out of scope —
-     * a different aggregate, `trace`, in a different pipeline directory) to
-     * pin the SAME property on every command in THIS aggregate: two calls
-     * asserting the identical fact must produce the identical key, so a
-     * redelivery collapses in `event_log` instead of appending a permanent
-     * duplicate the way the unfixed `AssignTopicCommand` once did.
+     * Two calls asserting the identical fact must produce the identical key, so
+     * a redelivery collapses in `event_log` rather than appending a permanent
+     * duplicate.
+     * @scenario A redelivered trace assignment collapses to one recorded event
      */
-    /** @scenario A redelivered trace assignment collapses to one recorded event */
     it("requestClustering: two bootstrap requests always collapse to the same key", () => {
-      const first = requestClusteringIdempotencyKey({
-        trigger: "bootstrap",
-        occurredAt: 1700000000000,
-      });
-      const second = requestClusteringIdempotencyKey({
-        trigger: "bootstrap",
-        occurredAt: 1700086400000,
-      });
-      expect(first).toBe(second);
+      expect(
+        requestClusteringIdempotencyKey({
+          trigger: "bootstrap",
+          occurredAt: 1700000000000,
+        }),
+      ).toBe(
+        requestClusteringIdempotencyKey({
+          trigger: "bootstrap",
+          occurredAt: 1700086400000,
+        }),
+      );
     });
 
     it("requestClustering: two manual requests at different instants get different keys", () => {
-      const first = requestClusteringIdempotencyKey({
-        trigger: "manual",
-        occurredAt: 1700000000000,
-      });
-      const second = requestClusteringIdempotencyKey({
-        trigger: "manual",
-        occurredAt: 1700000005000,
-      });
-      expect(first).not.toBe(second);
+      expect(
+        requestClusteringIdempotencyKey({
+          trigger: "manual",
+          occurredAt: 1700000000000,
+        }),
+      ).not.toBe(
+        requestClusteringIdempotencyKey({
+          trigger: "manual",
+          occurredAt: 1700000005000,
+        }),
+      );
     });
 
     it("recordClusteringRunStarted: redelivering the same page collapses", () => {
@@ -176,7 +162,7 @@ describe("topicClustering aggregate", () => {
       ).not.toBe(recordTopicsIdempotencyKey({ dedupeKey: "seed:v1" }));
     });
 
-    it("keys never carry a redundant tenantId prefix — event_log's own sort key already scopes it", () => {
+    it("keys never carry a redundant tenantId prefix — event_log's sort key already scopes it", () => {
       expect(recordTopicsIdempotencyKey({ dedupeKey: "seed:v1" })).not.toMatch(
         /tenant/i,
       );

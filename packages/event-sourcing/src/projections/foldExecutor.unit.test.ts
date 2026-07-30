@@ -3,8 +3,8 @@ import { UndecodableStateError } from "../errors";
 import type {
   CounterHandle,
   HistogramHandle,
-  Metrics,
   MetricLabels,
+  Metrics,
 } from "../ports/metrics";
 import { createFoldExecutor } from "./foldExecutor";
 import type { FoldDelivery } from "./foldExecutor";
@@ -18,24 +18,30 @@ import type {
 /**
  * The executor is the one place a fold's read-decide-write cycle happens, so
  * these tests are about the decisions that cycle makes on behalf of every fold
- * mounted onto it: genesis vs. found vs. undecodable, redelivery dedup by
- * sequence rather than event time, and that a batch is applied as the unit it
- * arrived as.
+ * mounted onto it: genesis vs. found vs. undecodable, that a batch is applied
+ * as the unit it arrived as, and that a redelivery is simply applied again —
+ * the fold is a function of the set of events, so nothing needs skipping.
  */
 
 interface TestState {
-  readonly total: number;
-  readonly applied: readonly number[];
+  readonly highest: number;
+  readonly seen: readonly number[];
 }
 
 type TestEvent = number;
 
 function init(): TestState {
-  return { total: 0, applied: [] };
+  return { highest: 0, seen: [] };
 }
 
+/** Set-union and max: idempotent and commutative, the admissible fold shape. */
 function apply(state: TestState, event: TestEvent): TestState {
-  return { total: state.total + event, applied: [...state.applied, event] };
+  return {
+    highest: Math.max(state.highest, event),
+    seen: state.seen.includes(event)
+      ? state.seen
+      : [...state.seen, event].sort((a, b) => a - b),
+  };
 }
 
 function fakeStore(
@@ -47,7 +53,9 @@ function fakeStore(
     kind: "replace",
     writes,
     async read(): Promise<StateRead<TestState>> {
-      return stored === undefined ? { kind: "absent" } : { kind: "found", stored };
+      return stored === undefined
+        ? { kind: "absent" }
+        : { kind: "found", stored };
     },
     async write(_key, next: StoredState<TestState>): Promise<void> {
       stored = next;
@@ -83,11 +91,12 @@ function fakeMetrics(): Metrics & {
   };
 }
 
-function delivery(overrides: Partial<FoldDelivery<TestEvent>> = {}): FoldDelivery<TestEvent> {
+function delivery(
+  overrides: Partial<FoldDelivery<TestEvent>> = {},
+): FoldDelivery<TestEvent> {
   return {
     key: "trace-1",
     tenantId: "tenant-1",
-    deliverySeq: 1,
     events: [1, 2, 3],
     ...overrides,
   };
@@ -108,9 +117,9 @@ describe("fold executor", () => {
 
       const outcome = await executor.apply(delivery());
 
-      expect(outcome).toEqual({ kind: "applied", events: 3 });
+      expect(outcome).toEqual({ events: 3 });
       expect(store.writes).toEqual([
-        { state: { total: 6, applied: [1, 2, 3] }, deliverySeq: 1, version: "v1" },
+        { state: { highest: 3, seen: [1, 2, 3] }, version: "v1" },
       ]);
     });
   });
@@ -119,8 +128,7 @@ describe("fold executor", () => {
     /** @scenario a later delivery folds onto the existing state, not a fresh one */
     it("applies the batch on top of the stored state", async () => {
       const store = fakeStore({
-        state: { total: 10, applied: [10] },
-        deliverySeq: 1,
+        state: { highest: 10, seen: [10] },
         version: "v1",
       });
       const executor = createFoldExecutor({
@@ -131,21 +139,17 @@ describe("fold executor", () => {
         projectionName: "totals",
       });
 
-      const outcome = await executor.apply(delivery({ deliverySeq: 2, events: [5] }));
+      const outcome = await executor.apply(delivery({ events: [5] }));
 
-      expect(outcome).toEqual({ kind: "applied", events: 1 });
+      expect(outcome).toEqual({ events: 1 });
       expect(store.writes).toEqual([
-        { state: { total: 15, applied: [10, 5] }, deliverySeq: 2, version: "v1" },
+        { state: { highest: 10, seen: [5, 10] }, version: "v1" },
       ]);
     });
 
-    /** @scenario a redelivered job is recognised by sequence, not skipped by content */
-    it("skips a redelivered job carrying the same sequence, without writing", async () => {
-      const store = fakeStore({
-        state: { total: 10, applied: [10] },
-        deliverySeq: 2,
-        version: "v1",
-      });
+    /** @scenario a redelivered job is applied again and reaches the same state */
+    it("re-applies a redelivered batch rather than skipping it", async () => {
+      const store = fakeStore();
       const executor = createFoldExecutor({
         store,
         init,
@@ -154,41 +158,29 @@ describe("fold executor", () => {
         projectionName: "totals",
       });
 
-      const outcome = await executor.apply(delivery({ deliverySeq: 2, events: [999] }));
+      await executor.apply(delivery());
+      await executor.apply(delivery());
 
-      expect(outcome).toEqual({ kind: "skipped-redelivery", deliverySeq: 2 });
-      expect(store.writes).toEqual([]);
-    });
-
-    it("skips a delivery whose sequence is lower than the stored one, without writing", async () => {
-      const store = fakeStore({
-        state: { total: 10, applied: [10] },
-        deliverySeq: 5,
-        version: "v1",
-      });
-      const executor = createFoldExecutor({
-        store,
-        init,
-        apply,
-        stateVersion: "v1",
-        projectionName: "totals",
-      });
-
-      const outcome = await executor.apply(delivery({ deliverySeq: 3, events: [999] }));
-
-      expect(outcome).toEqual({ kind: "skipped-redelivery", deliverySeq: 3 });
-      expect(store.writes).toEqual([]);
+      // Two writes, one state: nothing is skipped, and nothing needs to be.
+      expect(store.writes).toHaveLength(2);
+      expect(store.writes[0]).toEqual(store.writes[1]);
     });
   });
 
   describe("given an undecodable stored row", () => {
     /** @scenario a shape change never overwrites unreadable state with a fresh accumulator */
     it("throws UndecodableStateError instead of treating the row as genesis", async () => {
-      const store: ReplaceStore<TestState> & { writes: StoredState<TestState>[] } = {
+      const store: ReplaceStore<TestState> & {
+        writes: StoredState<TestState>[];
+      } = {
         kind: "replace",
         writes: [],
         async read(): Promise<StateRead<TestState>> {
-          return { kind: "undecodable", storedVersion: "v0", cause: new Error("bad shape") };
+          return {
+            kind: "undecodable",
+            storedVersion: "v0",
+            cause: new Error("bad shape"),
+          };
         },
         async write(_key, stored): Promise<void> {
           store.writes.push(stored);
@@ -202,7 +194,9 @@ describe("fold executor", () => {
         projectionName: "totals",
       });
 
-      await expect(executor.apply(delivery())).rejects.toThrow(UndecodableStateError);
+      await expect(executor.apply(delivery())).rejects.toThrow(
+        UndecodableStateError,
+      );
       await expect(executor.apply(delivery())).rejects.toMatchObject({
         context: {
           projectionName: "totals",
@@ -233,14 +227,18 @@ describe("fold executor", () => {
         projectionName: "totals",
       });
 
-      await expect(executor.apply(delivery())).rejects.toThrow("store unavailable");
+      await expect(executor.apply(delivery())).rejects.toThrow(
+        "store unavailable",
+      );
     });
   });
 
   describe("given a context object on the delivery", () => {
     /** @scenario the store sees the tenant and retention the delivery carried */
     it("passes tenantId and retentionDays through to the store call", async () => {
-      const read = vi.fn(async (): Promise<StateRead<TestState>> => ({ kind: "absent" }));
+      const read = vi.fn(
+        async (): Promise<StateRead<TestState>> => ({ kind: "absent" }),
+      );
       const write = vi.fn(async (): Promise<void> => undefined);
       const store: ReplaceStore<TestState> = { kind: "replace", read, write };
       const executor = createFoldExecutor({
@@ -253,18 +251,21 @@ describe("fold executor", () => {
 
       await executor.apply(delivery({ retentionDays: 30 }));
 
-      const expectedContext: StoreContext = { tenantId: "tenant-1", retentionDays: 30 };
+      const expectedContext: StoreContext = {
+        tenantId: "tenant-1",
+        retentionDays: 30,
+      };
       expect(read).toHaveBeenCalledWith("trace-1", expectedContext);
       expect(write).toHaveBeenCalledWith(
         "trace-1",
-        expect.objectContaining({ deliverySeq: 1, version: "v1" }),
+        expect.objectContaining({ version: "v1" }),
         expectedContext,
       );
     });
   });
 
   describe("when reporting metrics", () => {
-    /** @scenario an applied delivery is distinguishable from a skipped one on the dashboard */
+    /** @scenario an applied delivery is counted with its batch size */
     it("counts an applied outcome and observes the batch size", async () => {
       const store = fakeStore();
       const metrics = fakeMetrics();
@@ -306,7 +307,9 @@ describe("fold executor", () => {
         metrics,
       });
 
-      await expect(executor.apply(delivery())).rejects.toThrow("store unavailable");
+      await expect(executor.apply(delivery())).rejects.toThrow(
+        "store unavailable",
+      );
 
       expect(metrics.counterCalls).toEqual([
         { labels: { projection: "totals", kind: "failed" } },
@@ -331,7 +334,9 @@ describe("fold executor", () => {
         metrics,
       });
 
-      await expect(executor.apply(delivery())).rejects.toThrow("store unavailable");
+      await expect(executor.apply(delivery())).rejects.toThrow(
+        "store unavailable",
+      );
 
       expect(metrics.counterCalls).toEqual([
         { labels: { projection: "totals", kind: "failed" } },
@@ -359,30 +364,6 @@ describe("fold executor", () => {
         { labels: { projection: "totals", kind: "failed" } },
       ]);
       expect(store.writes).toEqual([]);
-    });
-
-    it("counts a skipped-redelivery outcome without observing a batch size", async () => {
-      const store = fakeStore({
-        state: { total: 10, applied: [10] },
-        deliverySeq: 5,
-        version: "v1",
-      });
-      const metrics = fakeMetrics();
-      const executor = createFoldExecutor({
-        store,
-        init,
-        apply,
-        stateVersion: "v1",
-        projectionName: "totals",
-        metrics,
-      });
-
-      await executor.apply(delivery({ deliverySeq: 5 }));
-
-      expect(metrics.counterCalls).toEqual([
-        { labels: { projection: "totals", kind: "skipped-redelivery" } },
-      ]);
-      expect(metrics.histogramCalls).toEqual([]);
     });
   });
 });

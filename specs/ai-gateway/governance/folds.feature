@@ -35,7 +35,7 @@ Feature: Governance derived streams atop the unified observability store
 
   Companion: receiver-shapes.feature,
   event-log-durability.feature, anomaly-detection.feature.
-  See dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md.
+  See dev/docs/adr/098-event-sourcing-core.md (formerly ADR-075, folded in by dev/docs/adr/README.md).
 
   Background:
     Given the unified observability substrate is live

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TerminalDispatchError } from "../dispatchError";
+import { TerminalDispatchError } from "../intentDispatch";
+import type { TriggerDispatchPorts } from "../process-managers/triggerSettlement.intentHandlers";
 import {
   createLogOverflowHandler,
   createNotifyDigestHandler,
   createPersistMatchHandler,
 } from "../process-managers/triggerSettlement.intentHandlers";
-import type { TriggerDispatchPorts } from "../process-managers/triggerSettlement.dispatchPorts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -16,7 +16,9 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-function context(overrides: Partial<{ attempt: number; messageKey: string }> = {}) {
+function context(
+  overrides: Partial<{ attempt: number; messageKey: string }> = {},
+) {
   return {
     processName: "triggerSettlement",
     tenantId: "project-1",
@@ -54,7 +56,7 @@ describe("trigger settlement intent handlers", () => {
     it("logs the committed flush count", async () => {
       await expect(
         createLogOverflowHandler()(
-          { triggerId: "trigger-1", flushed: 2, totalFlushed: 7 },
+          { triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"] },
           context(),
         ),
       ).resolves.toBeUndefined();
@@ -64,7 +66,9 @@ describe("trigger settlement intent handlers", () => {
   describe("notifyDigest handler", () => {
     describe("given the trigger was deleted or deactivated since the match", () => {
       it("drops without confirming or sending", async () => {
-        const { ports } = makePorts({ triggerIsActive: vi.fn().mockResolvedValue(false) });
+        const { ports } = makePorts({
+          triggerIsActive: vi.fn().mockResolvedValue(false),
+        });
 
         await createNotifyDigestHandler(ports)(
           { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
@@ -86,7 +90,11 @@ describe("trigger settlement intent handlers", () => {
         });
 
         await createNotifyDigestHandler(ports)(
-          { triggerId: "trigger-1", traceIds: ["trace-1", "trace-filtered"], boundary: 1_000 },
+          {
+            triggerId: "trigger-1",
+            traceIds: ["trace-1", "trace-filtered"],
+            boundary: 1_000,
+          },
           context(),
         );
 
@@ -103,7 +111,9 @@ describe("trigger settlement intent handlers", () => {
 
     describe("given every candidate trace already carries a send claim", () => {
       it("sends nothing and never calls the dispatch port", async () => {
-        const { ports } = makePorts({ isSendClaimed: vi.fn().mockResolvedValue(true) });
+        const { ports } = makePorts({
+          isSendClaimed: vi.fn().mockResolvedValue(true),
+        });
 
         await createNotifyDigestHandler(ports)(
           { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
@@ -155,7 +165,9 @@ describe("trigger settlement intent handlers", () => {
         const { ports } = makePorts({
           sendNotifyDigest: vi
             .fn()
-            .mockRejectedValue(new TerminalDispatchError("all recipients suppressed")),
+            .mockRejectedValue(
+              new TerminalDispatchError("all recipients suppressed"),
+            ),
         });
 
         await expect(
@@ -172,7 +184,9 @@ describe("trigger settlement intent handlers", () => {
     describe("given the dispatch port fails with a plain, retryable error", () => {
       it("rethrows for the outbox to retry with backoff", async () => {
         const { ports } = makePorts({
-          sendNotifyDigest: vi.fn().mockRejectedValue(new Error("provider timeout")),
+          sendNotifyDigest: vi
+            .fn()
+            .mockRejectedValue(new Error("provider timeout")),
         });
 
         await expect(
@@ -187,7 +201,9 @@ describe("trigger settlement intent handlers", () => {
     describe("given claimSend fails after a successful send", () => {
       it("swallows the claim failure rather than retrying and double-sending", async () => {
         const { ports } = makePorts({
-          claimSend: vi.fn().mockRejectedValue(new Error("claim store unavailable")),
+          claimSend: vi
+            .fn()
+            .mockRejectedValue(new Error("claim store unavailable")),
         });
 
         await expect(
@@ -205,10 +221,16 @@ describe("trigger settlement intent handlers", () => {
   describe("persistMatch handler", () => {
     describe("given the trace was already claimed", () => {
       it("skips without re-confirming or running the action", async () => {
-        const { ports } = makePorts({ isSendClaimed: vi.fn().mockResolvedValue(true) });
+        const { ports } = makePorts({
+          isSendClaimed: vi.fn().mockResolvedValue(true),
+        });
 
         await createPersistMatchHandler(ports)(
-          { triggerId: "trigger-1", traceId: "trace-1" },
+          {
+            triggerId: "trigger-1",
+            traceId: "trace-1",
+            settleWindowBucket: "30000-0",
+          },
           context(),
         );
 
@@ -227,11 +249,19 @@ describe("trigger settlement intent handlers", () => {
         });
 
         await createPersistMatchHandler(ports)(
-          { triggerId: "trigger-1", traceId: "trace-1" },
+          {
+            triggerId: "trigger-1",
+            traceId: "trace-1",
+            settleWindowBucket: "30000-0",
+          },
           context({ messageKey: "persist:trace-1:30000-0" }),
         );
         await createPersistMatchHandler(ports)(
-          { triggerId: "trigger-1", traceId: "trace-1" },
+          {
+            triggerId: "trigger-1",
+            traceId: "trace-1",
+            settleWindowBucket: "30000-0",
+          },
           context({ messageKey: "persist:trace-1:30000-1" }),
         );
 
@@ -250,7 +280,11 @@ describe("trigger settlement intent handlers", () => {
 
         await expect(
           createPersistMatchHandler(ports)(
-            { triggerId: "trigger-1", traceId: "trace-1" },
+            {
+              triggerId: "trigger-1",
+              traceId: "trace-1",
+              settleWindowBucket: "30000-0",
+            },
             context(),
           ),
         ).resolves.toBeUndefined();

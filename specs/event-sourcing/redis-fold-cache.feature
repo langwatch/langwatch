@@ -53,9 +53,9 @@ Feature: Redis write-through cache for fold state
     Then those events are recognised as already applied
     And the aggregate reflects each event exactly once
 
-  # Superseded by ADR-098 decision 5: the applied-event set (AppliedEventIds)
-  # this scenario tracks across a retry chain is abolished in favour of a
-  # per-group delivery sequence — one scalar column, not a growing set.
+  # Superseded by ADR-098 decision 5: there is no applied-event set and no
+  # replacement for it. A fold is a function of the set of its events, so a
+  # retry re-applies and reaches the same state.
   @integration
   @unimplemented
   Scenario: A retry chain remembers everything it has applied
@@ -75,9 +75,9 @@ Feature: Redis write-through cache for fold state
     Then the recorded event ids are only those of the most recent batch
     And the record does not grow with the number of batches
 
-  # Superseded by ADR-098 decision 5: "recognised as a retry" is a property of
-  # the AppliedEventIds set this scenario grows across siblings. A per-group
-  # delivery sequence identifies a retry by its sequence number instead.
+  # Superseded by ADR-098 decision 5: nothing needs to recognise a retry. Every
+  # fold field is idempotent, so a sibling re-applied out of a retry chain
+  # changes nothing.
   @integration
   @unimplemented
   Scenario: A sibling leading a retry is still recognised as a retry
@@ -96,10 +96,8 @@ Feature: Redis write-through cache for fold state
 
   # The scenario below documents the measured limit of cache-only folds under
   # the AppliedEventIds design — it is not accepted retry behaviour, and that
-  # whole design (including the durable escape hatch this comment used to name
-  # in fold-read-back-store.feature) is superseded by ADR-098 decision 5: a
-  # per-group delivery sequence replaces AppliedEventIds and is not lost when
-  # the cache is, because it lives on the row's delivery mark.
+  # whole design is superseded by ADR-098 decision 5: nothing about correctness
+  # depends on a cached applied-event set, because there is no set to lose.
   @integration
   @unimplemented
   Scenario: Losing the cached entry loses the protection

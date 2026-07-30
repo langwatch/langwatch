@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
 import { TriggerAction } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import { triggerAggregate } from "../aggregate";
+
+const MATCH_RECORDED = "lw.automation.trigger.match_recorded";
 
 function matchInput() {
   return {
@@ -15,9 +17,14 @@ function matchInput() {
 
 describe("trigger aggregate", () => {
   describe("given the aggregate is declared", () => {
-    it("derives its name and one matchRecorded event type", () => {
+    it("derives the dotted event type already committed to the log", () => {
       expect(triggerAggregate.name).toBe("trigger");
-      expect(triggerAggregate.eventTypes).toEqual(["trigger/matchRecorded"]);
+      expect(triggerAggregate.eventTypes).toEqual([MATCH_RECORDED]);
+      expect(triggerAggregate.eventType("matchRecorded")).toBe(MATCH_RECORDED);
+    });
+
+    it("extracts the aggregate id from any event payload", () => {
+      expect(triggerAggregate.id(matchInput())).toBe("trigger-1");
     });
   });
 
@@ -31,7 +38,7 @@ describe("trigger aggregate", () => {
       );
 
       expect(events).toHaveLength(1);
-      expect(events[0]).toEqual({ type: "trigger/matchRecorded", data: input });
+      expect(events[0]).toEqual({ type: MATCH_RECORDED, data: input });
     });
   });
 
@@ -39,7 +46,7 @@ describe("trigger aggregate", () => {
     it("leaves state unchanged — this aggregate has no accumulator", () => {
       const state = triggerAggregate.init();
       const next = triggerAggregate.apply(state, {
-        type: "trigger/matchRecorded",
+        type: MATCH_RECORDED,
         data: matchInput(),
       });
 
@@ -51,7 +58,7 @@ describe("trigger aggregate", () => {
     it("returns state unchanged rather than throwing", () => {
       const state = triggerAggregate.init();
       const next = triggerAggregate.apply(state, {
-        type: "trigger/someFutureEvent",
+        type: "lw.automation.trigger.some_future_event",
         data: {},
       });
 

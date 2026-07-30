@@ -5,11 +5,16 @@ import {
   uniqueId,
   uniqueTenant,
 } from "../__tests__/integration/testClickHouse";
-import { foldStateTable, type FoldState } from "../__tests__/integration/fixtures";
+import {
+  FOLD_STATE_SCHEMA,
+  foldStateTable,
+  type FoldState,
+} from "../__tests__/integration/fixtures";
 import { createClickHouseClient, type ClickHouseClient } from "../client/clickhouseClient";
 import { createRowCodec } from "../codec/rowCodec";
+import { bindIdentifiers } from "../query/identifiers";
 import type { ColumnMap } from "../schema/columns";
-import { createReplaceStore } from "./replaceStore";
+import { clickhouseReplacing } from "./replaceStore";
 
 const foldStateColumns = foldStateTable.columns as ColumnMap;
 
@@ -22,12 +27,12 @@ const EXPECTED_VERSION = "v1";
  * (`uniqueTenant`/`uniqueId`), so the tests below can run in any order, and
  * alongside every other file in the suite, without seeing each other's rows.
  */
-describe("given createReplaceStore against a live ClickHouse", () => {
+describe("given clickhouseReplacing against a live ClickHouse", () => {
   let client: ClickHouseClient;
   // `OPTIMIZE TABLE ... FINAL` returns no result set, which the package's
   // own client (built for query/insert with a fixed read format) is not
   // shaped for — the raw driver runs administrative statements like this one
-  // directly, the same way `fixtures.ts`'s DDL does.
+  // directly, binding the table name as a query parameter all the same.
   let driver: DriverClient;
 
   beforeAll(() => {
@@ -42,15 +47,20 @@ describe("given createReplaceStore against a live ClickHouse", () => {
   });
 
   function buildStore() {
-    return createReplaceStore({
+    return clickhouseReplacing<FoldState, typeof foldStateTable.columns>({
       client,
       table: foldStateTable,
-      tenantIdColumn: "TenantId",
-      keyColumn: "Key",
-      stateColumn: "State",
-      deliverySeqColumn: "DeliverySeq",
+      version: EXPECTED_VERSION,
+      key: "Key",
       stateVersionColumn: "StateVersion",
-      expectedVersion: EXPECTED_VERSION,
+      state: FOLD_STATE_SCHEMA,
+    });
+  }
+
+  function commandOnFoldState(statement: string): Promise<unknown> {
+    return driver.command({
+      query: statement,
+      query_params: { table: foldStateTable.name },
     });
   }
 
@@ -58,48 +68,37 @@ describe("given createReplaceStore against a live ClickHouse", () => {
     const store = buildStore();
     const tenantId = uniqueTenant();
     const key = uniqueId("key");
+    const state: FoldState = { value: "first", count: 1, acceptedAt: Date.now() };
 
-    await store.write(key, { state: { value: "v1" }, deliverySeq: 1, version: EXPECTED_VERSION }, {
-      tenantId,
-    });
+    await store.write(key, { state, version: EXPECTED_VERSION }, { tenantId });
     const result = await store.read(key, { tenantId });
 
     expect(result).toEqual({
       kind: "found",
-      stored: { state: { value: "v1" }, deliverySeq: 1, version: EXPECTED_VERSION },
+      stored: { state, version: EXPECTED_VERSION },
     });
   });
 
-  it("does not advance the read state when the same delivery is written twice", async () => {
+  it("reads back the same state when the same delivery is written twice", async () => {
     const store = buildStore();
     const tenantId = uniqueTenant();
     const key = uniqueId("key");
 
-    // First delivery of an event that computes state {value: "applied-once"}
-    // at deliverySeq 5.
-    await store.write(
-      key,
-      { state: { value: "applied-once" }, deliverySeq: 5, version: EXPECTED_VERSION },
-      { tenantId },
-    );
+    // A fold is a function of the SET of its events, so a redelivery
+    // recomputes the identical state and writes it again. There is no
+    // sequence column to skip on — that is what makes the redelivery safe.
+    const stored = {
+      state: { value: "applied-once", count: 5, acceptedAt: Date.now() },
+      version: EXPECTED_VERSION,
+    };
+    await store.write(key, stored, { tenantId });
     const afterFirst = await store.read(key, { tenantId });
 
-    // A retry redelivers the same event. Recomputing from the same input
-    // produces the same output — this is what makes the redelivery safe, not
-    // anything this store does — so it writes the identical state at the
-    // identical deliverySeq.
-    await store.write(
-      key,
-      { state: { value: "applied-once" }, deliverySeq: 5, version: EXPECTED_VERSION },
-      { tenantId },
-    );
+    await store.write(key, stored, { tenantId });
     const afterRedelivery = await store.read(key, { tenantId });
 
     expect(afterRedelivery).toEqual(afterFirst);
-    expect(afterRedelivery).toMatchObject({
-      kind: "found",
-      stored: { state: { value: "applied-once" }, deliverySeq: 5 },
-    });
+    expect(afterRedelivery).toEqual({ kind: "found", stored });
   });
 
   describe("given two versions of one row written directly to the table", () => {
@@ -114,11 +113,11 @@ describe("given createReplaceStore against a live ClickHouse", () => {
         const row = {
           TenantId: tenantId,
           Key: key,
-          State: state,
-          DeliverySeq: 1n,
+          Value: state.value,
+          Count: BigInt(state.count),
           StateVersion: EXPECTED_VERSION,
           WrittenAt: writtenAt,
-          AcceptedAt: writtenAt,
+          AcceptedAt: new Date(state.acceptedAt),
         };
         const rows = codec.encodeRows({
           columns,
@@ -134,27 +133,29 @@ describe("given createReplaceStore against a live ClickHouse", () => {
         });
       }
 
-      async function undedupedStates(): Promise<string[]> {
+      async function undedupedValues(): Promise<string[]> {
+        const names = bindIdentifiers();
         const result = await client.query({
           tenantId,
-          sql: `SELECT State FROM ${foldStateTable.name}
-                WHERE TenantId = {tenantId:String} AND Key = {key:String}`,
-          params: { tenantId, key },
+          sql:
+            `SELECT ${names.of("Value")} FROM ${names.of(foldStateTable.name)} ` +
+            `WHERE ${names.of("TenantId")} = {tenantId:String} AND ${names.of("Key")} = {key:String}`,
+          params: { ...names.params, tenantId, key },
         });
-        const decoded = codec.decodeRows<{ State: FoldState }>({
-          columns: [foldStateColumns.State!],
-          columnNames: ["State"],
+        const decoded = codec.decodeRows<{ Value: string }>({
+          columns: [foldStateColumns.Value!],
+          columnNames: ["Value"],
           header: result.header,
           rows: result.rows,
         });
-        return decoded.map((row) => row.State.value).sort();
+        return decoded.map((row) => row.Value).sort();
       }
 
       // ClickHouse's own background merge scheduler is free to collapse two
       // small parts within milliseconds — nothing about a plain insert keeps
       // "before any merge" observable on a live server. `SYSTEM STOP MERGES`
       // makes that window deterministic instead of racing it.
-      await driver.command({ query: `SYSTEM STOP MERGES ${foldStateTable.name}` });
+      await commandOnFoldState("SYSTEM STOP MERGES {table:Identifier}");
       try {
         // Recent timestamps, not a fixed past date: `AcceptedAt` also anchors
         // the table's TTL (`TTL AcceptedAt + INTERVAL 30 DAY`), and TTL
@@ -163,19 +164,21 @@ describe("given createReplaceStore against a live ClickHouse", () => {
         // entirely instead of merely deduping it.
         const olderAt = new Date();
         const newerAt = new Date(olderAt.getTime() + 1000);
-        await insertVersion({ value: "older" }, olderAt);
-        await insertVersion({ value: "newer" }, newerAt);
+        const acceptedAt = olderAt.getTime();
+        await insertVersion({ value: "older", count: 1, acceptedAt }, olderAt);
+        const newer: FoldState = { value: "newer", count: 2, acceptedAt };
+        await insertVersion(newer, newerAt);
 
-        expect(await undedupedStates()).toEqual(["newer", "older"]);
+        expect(await undedupedValues()).toEqual(["newer", "older"]);
 
         const dedupedBeforeMerge = await store.read(key, { tenantId });
-        expect(dedupedBeforeMerge).toMatchObject({
+        expect(dedupedBeforeMerge).toEqual({
           kind: "found",
-          stored: { state: { value: "newer" } },
+          stored: { state: newer, version: EXPECTED_VERSION },
         });
 
-        await driver.command({ query: `SYSTEM START MERGES ${foldStateTable.name}` });
-        await driver.command({ query: `OPTIMIZE TABLE ${foldStateTable.name} FINAL` });
+        await commandOnFoldState("SYSTEM START MERGES {table:Identifier}");
+        await commandOnFoldState("OPTIMIZE TABLE {table:Identifier} FINAL");
 
         // The generated read is a point lookup ordered by version, not a scan
         // that depends on a merge having collapsed the parts — this assertion
@@ -185,9 +188,9 @@ describe("given createReplaceStore against a live ClickHouse", () => {
 
         // The merge did physically collapse the two rows into one, though —
         // the point of the assertion above is that the read did not need it to.
-        expect(await undedupedStates()).toEqual(["newer"]);
+        expect(await undedupedValues()).toEqual(["newer"]);
       } finally {
-        await driver.command({ query: `SYSTEM START MERGES ${foldStateTable.name}` });
+        await commandOnFoldState("SYSTEM START MERGES {table:Identifier}");
       }
     });
   });

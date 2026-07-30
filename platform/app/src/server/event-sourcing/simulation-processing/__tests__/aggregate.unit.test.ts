@@ -1,6 +1,8 @@
+import { checkOrderInvariance } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
-import { outranksStoredTerminal, simulationRun } from "../aggregate";
+import { simulationRun } from "../aggregate";
 import { initSimulationRunState, type SimulationRunState } from "../schema";
+import { outranksStoredTerminal } from "../status";
 
 /**
  * @see specs/event-sourcing/simulation-run-aggregate.feature
@@ -15,7 +17,10 @@ function fold(
   );
 }
 
+const RUN_ID = "run-1";
+
 const BASE_QUEUED = {
+  scenarioRunId: RUN_ID,
   scenarioId: "scenario-1",
   batchRunId: "batch-1",
   scenarioSetId: "set-1",
@@ -23,6 +28,7 @@ const BASE_QUEUED = {
 };
 
 const BASE_STARTED = {
+  scenarioRunId: RUN_ID,
   scenarioId: "scenario-1",
   batchRunId: "batch-1",
   scenarioSetId: "set-1",
@@ -31,18 +37,56 @@ const BASE_STARTED = {
 
 describe("simulation_run aggregate", () => {
   describe("given the aggregate declaration", () => {
-    it("derives every event's type string from the aggregate name", () => {
+    it("derives the dotted type strings already in the event log", () => {
       expect([...simulationRun.eventTypes].sort()).toEqual(
         [
-          "simulation_run/queued",
-          "simulation_run/started",
-          "simulation_run/messageSnapshot",
-          "simulation_run/textMessageStart",
-          "simulation_run/textMessageEnd",
-          "simulation_run/finished",
-          "simulation_run/metricsRecorded",
-          "simulation_run/cancelRequested",
-          "simulation_run/deleted",
+          "lw.simulation_run.queued",
+          "lw.simulation_run.started",
+          "lw.simulation_run.message_snapshot",
+          "lw.simulation_run.text_message_start",
+          "lw.simulation_run.text_message_end",
+          "lw.simulation_run.finished",
+          "lw.simulation_run.metrics_recorded",
+          "lw.simulation_run.cancel_requested",
+          "lw.simulation_run.deleted",
+        ].sort(),
+      );
+    });
+
+    it("extracts the aggregate id from any event's own payload", () => {
+      expect(simulationRun.id(BASE_QUEUED)).toBe(RUN_ID);
+      expect(simulationRun.id({ scenarioRunId: "run-2", occurredAt: 1 })).toBe(
+        "run-2",
+      );
+    });
+
+    it("holds nothing that grows with the run's work", () => {
+      expect(Object.keys(simulationRun.init()).sort()).toEqual(
+        [
+          "archivedAt",
+          "batchRunId",
+          "batchTotal",
+          "cancellationRequestedAt",
+          "description",
+          "durationMs",
+          "error",
+          "finishedAt",
+          "metCriteria",
+          "metadata",
+          "name",
+          "queuedAt",
+          "reasoning",
+          "roleCosts",
+          "roleLatencies",
+          "scenarioId",
+          "scenarioRunId",
+          "scenarioSetId",
+          "startedAt",
+          "status",
+          "totalCost",
+          "traceIds",
+          "unmetCriteria",
+          "verdict",
         ].sort(),
       );
     });
@@ -56,12 +100,17 @@ describe("simulation_run aggregate", () => {
     it("keeps a run cancelled when a success arrives afterwards", () => {
       const cancelledFirst = fold([
         simulationRun.events.queued(BASE_QUEUED),
-        simulationRun.events.finished({ status: "CANCELLED", occurredAt: 10 }),
+        simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
+          status: "CANCELLED",
+          occurredAt: 10,
+        }),
       ]);
 
       const withLateSuccess = simulationRun.apply(
         cancelledFirst,
         simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
           results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
           occurredAt: 20,
         }),
@@ -76,6 +125,7 @@ describe("simulation_run aggregate", () => {
       const succeededFirst = fold([
         simulationRun.events.queued(BASE_QUEUED),
         simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
           results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
           occurredAt: 10,
         }),
@@ -83,7 +133,11 @@ describe("simulation_run aggregate", () => {
 
       const withLateCancel = simulationRun.apply(
         succeededFirst,
-        simulationRun.events.finished({ status: "CANCELLED", occurredAt: 20 }),
+        simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
+          status: "CANCELLED",
+          occurredAt: 20,
+        }),
       ) as SimulationRunState;
 
       expect(withLateCancel.status).toBe("CANCELLED");
@@ -94,6 +148,7 @@ describe("simulation_run aggregate", () => {
       const firstFinish = fold([
         simulationRun.events.queued(BASE_QUEUED),
         simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
           results: {
             verdict: "success",
             reasoning: "first",
@@ -107,6 +162,7 @@ describe("simulation_run aggregate", () => {
       const afterSecond = simulationRun.apply(
         firstFinish,
         simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
           results: {
             verdict: "success",
             reasoning: "second",
@@ -125,12 +181,17 @@ describe("simulation_run aggregate", () => {
     it("takes a stalled run back to successful when a real outcome lands", () => {
       const stalled = fold([
         simulationRun.events.queued(BASE_QUEUED),
-        simulationRun.events.finished({ status: "STALLED", occurredAt: 10 }),
+        simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
+          status: "STALLED",
+          occurredAt: 10,
+        }),
       ]);
 
       const recovered = simulationRun.apply(
         stalled,
         simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
           results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
           occurredAt: 20,
         }),
@@ -143,7 +204,11 @@ describe("simulation_run aggregate", () => {
     it("leaves a cancelled run cancelled when started is delivered late", () => {
       const cancelled = fold([
         simulationRun.events.queued(BASE_QUEUED),
-        simulationRun.events.finished({ status: "CANCELLED", occurredAt: 10 }),
+        simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
+          status: "CANCELLED",
+          occurredAt: 10,
+        }),
       ]);
 
       const afterLateStart = simulationRun.apply(
@@ -155,23 +220,11 @@ describe("simulation_run aggregate", () => {
       expect(afterLateStart.finishedAt).toBe(10);
     });
 
-    it("compares generation before rank, so a higher generation always wins", () => {
-      // Forward-compatibility for a rerun mechanism ADR-098 decision 4 names
-      // and ADR-103 decision 6 says is latent — ambiguous today because
-      // nothing bumps generation yet, so this exercises the comparison
-      // function directly rather than a reachable event path.
-      expect(
-        outranksStoredTerminal(
-          { generation: 0, status: "CANCELLED" },
-          { generation: 1, status: "FAILURE" },
-        ),
-      ).toBe(true);
-      expect(
-        outranksStoredTerminal(
-          { generation: 1, status: "CANCELLED" },
-          { generation: 0, status: "SUCCESS" },
-        ),
-      ).toBe(false);
+    it("ranks a cancel above an observed outcome and a stall below one", () => {
+      expect(outranksStoredTerminal("SUCCESS", "CANCELLED")).toBe(true);
+      expect(outranksStoredTerminal("CANCELLED", "SUCCESS")).toBe(false);
+      expect(outranksStoredTerminal("STALLED", "FAILURE")).toBe(true);
+      expect(outranksStoredTerminal("SUCCESS", "FAILURE")).toBe(false);
     });
   });
 
@@ -183,7 +236,11 @@ describe("simulation_run aggregate", () => {
     it("stays failed when a queued event is delivered after finished", () => {
       const failed = fold([
         simulationRun.events.queued(BASE_QUEUED),
-        simulationRun.events.finished({ status: "ERROR", occurredAt: 10 }),
+        simulationRun.events.finished({
+          scenarioRunId: RUN_ID,
+          status: "ERROR",
+          occurredAt: 10,
+        }),
       ]);
 
       const afterLateQueue = simulationRun.apply(
@@ -194,34 +251,12 @@ describe("simulation_run aggregate", () => {
       expect(afterLateQueue.status).toBe("ERROR");
     });
 
-    /** @scenario "A snapshot older than the latest applied one is ignored" */
-    it("ignores a snapshot older than the latest one already applied", () => {
-      const withSnapshot = simulationRun.apply(
-        initSimulationRunState(),
-        simulationRun.events.messageSnapshot({
-          messages: [{ id: "m1", role: "user", content: "hello" }],
-          traceIds: [],
-          occurredAt: 100,
-        }),
-      ) as SimulationRunState;
-
-      const afterOlderSnapshot = simulationRun.apply(
-        withSnapshot,
-        simulationRun.events.messageSnapshot({
-          messages: [{ id: "m0", role: "user", content: "stale" }],
-          traceIds: [],
-          occurredAt: 50,
-        }),
-      ) as SimulationRunState;
-
-      expect(afterOlderSnapshot.messages).toEqual(withSnapshot.messages);
-    });
-
     /** @scenario "A run measured under a retired event type keeps its cost on replay" */
     it("no-ops on an event type it was not built to handle", () => {
       const measured = simulationRun.apply(
         initSimulationRunState(),
         simulationRun.events.metricsRecorded({
+          scenarioRunId: RUN_ID,
           traceIds: ["trace-1"],
           totalCost: 1.5,
           roleCosts: { agent: [1.5] },
@@ -230,9 +265,9 @@ describe("simulation_run aggregate", () => {
       ) as SimulationRunState;
 
       const afterRetiredEvent = simulationRun.apply(measured, {
-        type: "simulation_run/metricsComputed",
+        type: "lw.simulation_run.metrics_computed",
         data: {
-          scenarioRunId: "x",
+          scenarioRunId: RUN_ID,
           traceId: "t",
           totalCost: 0,
           roleCosts: {},
@@ -243,10 +278,79 @@ describe("simulation_run aggregate", () => {
       expect(afterRetiredEvent).toEqual(measured);
       expect(afterRetiredEvent.totalCost).toBe(1.5);
     });
+
+    /**
+     * The fold carries no delivery sequence, so every field has to be
+     * idempotent and commutative on its own (ADR-098 §5). The set below is a
+     * whole run: queued, started, both message modes, a measurement, a cancel
+     * request, two competing terminal declarations, and a delete.
+     */
+    /** @scenario "A run's state is the same whatever order its events arrive in" */
+    it("reaches the same state under every ordering and every re-delivery", () => {
+      const report = checkOrderInvariance({
+        init: simulationRun.init,
+        apply: simulationRun.apply,
+        events: [
+          simulationRun.events.queued({ ...BASE_QUEUED, batchTotal: 4 }),
+          simulationRun.events.started(BASE_STARTED),
+          simulationRun.events.messageSnapshot({
+            scenarioRunId: RUN_ID,
+            messages: [{ id: "m1", role: "user", content: "hello" }],
+            traceIds: ["trace-1"],
+            status: "IN_PROGRESS",
+            occurredAt: 50,
+          }),
+          simulationRun.events.textMessageStart({
+            scenarioRunId: RUN_ID,
+            messageId: "m2",
+            role: "assistant",
+            messageIndex: 1,
+            occurredAt: 60,
+          }),
+          simulationRun.events.textMessageEnd({
+            scenarioRunId: RUN_ID,
+            messageId: "m2",
+            role: "assistant",
+            content: "hi",
+            traceId: "trace-2",
+            messageIndex: 1,
+            occurredAt: 70,
+          }),
+          simulationRun.events.metricsRecorded({
+            scenarioRunId: RUN_ID,
+            traceIds: ["trace-1", "trace-2"],
+            totalCost: 1.5,
+            roleCosts: { agent: [1.5] },
+            roleLatencies: { agent: [200] },
+          }),
+          simulationRun.events.cancelRequested({
+            scenarioRunId: RUN_ID,
+            occurredAt: 120,
+          }),
+          simulationRun.events.finished({
+            scenarioRunId: RUN_ID,
+            results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+            occurredAt: 130,
+          }),
+          simulationRun.events.finished({
+            scenarioRunId: RUN_ID,
+            status: "CANCELLED",
+            occurredAt: 140,
+          }),
+          simulationRun.events.deleted({
+            scenarioRunId: RUN_ID,
+            occurredAt: 200,
+          }),
+        ],
+      });
+
+      expect(report.counterexample).toBeUndefined();
+      expect(report.invariant).toBe(true);
+    });
   });
 
   // ---------------------------------------------------------------------
-  // ADR-103 — batch total travels with the run, established once
+  // ADR-103 — a run's totals are a query, not a counter
   // ---------------------------------------------------------------------
   describe("given ADR-103's batch denominator", () => {
     /** @scenario "Every run declares the batch total it was dispatched against" */
@@ -284,6 +388,7 @@ describe("simulation_run aggregate", () => {
       );
       expect(state.status).toBe("QUEUED");
       expect(state.scenarioId).toBe("scenario-1");
+      expect(state.scenarioRunId).toBe(RUN_ID);
     });
   });
 });

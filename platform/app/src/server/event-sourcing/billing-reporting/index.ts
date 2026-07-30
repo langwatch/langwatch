@@ -1,108 +1,35 @@
 /**
- * The billing-reporting pipeline (ADR-098, ADR-099, ADR-100, ADR-102,
- * ADR-105, ADR-106), rewritten onto `@langwatch/event-sourcing` and
- * `@langwatch/clickhouse` from `event-sourcing.old/pipelines/billing-reporting/`
- * (read-only reference; this is a rewrite of behaviour, not a port of code).
+ * The billing-reporting pipeline (ADR-098, ADR-099, ADR-100, ADR-102).
  *
- * @see specs/licensing/billing-meter-dispatch.feature — the contract.
+ * @see specs/licensing/billing-meter-dispatch.feature
  *
- * ## What this pipeline does
- *
- * Two independent triggers keep an organization's month total accurate:
- *
- *   - The **meter** (`meter/`) records every billable event — one row per
- *     event, deduplicated so a redelivery cannot double-bill — from the 4
- *     pipelines that produce billable usage.
- *   - The **poke** (`reporting/billingMeterPoke.ts`) reacts to a billable
- *     event landing and asks for that organization's current month to be
- *     re-read and reported. The fast path.
- *   - The **sweep** (`reporting/billingMeterSweep.ts`) re-reads and
- *     re-reports on an hourly clock regardless of whether anything poked.
- *     The guarantee: the only thing that recovers a poke whose dispatch
- *     failed every retry, and the only thing that catches an organization
- *     whose last billable event of the month is its last event ever.
- *   - **`reportUsageForMonth`** (`reporting/reportUsageForMonth.ts`) is what
- *     both triggers dispatch: it reads the month's meter total as a level,
- *     diffs it against a two-phase Postgres checkpoint, and reports the delta
- *     to Stripe.
- *
- * ## The two guarantees this rewrite must not regress
- *
- *   1. **The sweep is a SCHEDULED guarantee, not a per-event outbox.** It
- *      must run on its own clock, never depending on an event arriving.
- *      `runBillingMeterSweep` (`reporting/billingMeterSweep.ts`) is a plain
- *      function of "what time is it, and what do I owe" — nothing about it
- *      is keyed to any specific event's delivery.
- *   2. **`billable_events` is keyed on a deduplication hash, so a redelivery
- *      cannot double-bill.** The table's merge strategy is
- *      `ReplacingMergeTree(UpdatedAt)`, its identity leads with
- *      `DeduplicationKeyHash`, and the read side counts `countDistinct`
- *      rather than `count(*)` — see `meter/billableEventsTable.ts` and
- *      `meter/billableEventsMeter.mapProjection.ts`'s docblocks for exactly
- *      how the write path preserves this.
- *
- * A third correctness property was found and fixed during review, not
- * carried over from the reference implementation: the pre-rewrite
- * `reportUsageForMonth`'s failure counter could latch an organization out of
- * invoicing permanently (`getCheckpoint`'s `consecutiveFailures` gated the
- * Stripe attempt itself, and `confirm()` — the only place it resets — is
- * reachable only through a successful attempt). `reporting/
- * reportUsageForMonth.ts` never skips the attempt; only the immediate,
- * un-throttled self-dispatch retry pauses once tripped, so the next
- * independent poke or sweep tick keeps probing Stripe at a safe cadence and
- * recovers automatically. See that file's docblock.
- *
- * ## A significant, deliberate gap: no mounting runtime exists yet
- *
- * `@langwatch/event-sourcing`'s `src/index.ts` exports `defineAggregate`, the
- * fold and map executors, the store contracts, the dispatch-plane group-key
- * descriptor/renderer, and the schema compiler. It does **not** export (and,
- * checked directly against `src/`, does not yet implement) a pipeline
- * builder, an event-subscriber runtime, a process-manager runtime, a
- * command bus, or a scheduler — the primitives `event-sourcing.old`'s
- * `definePipeline().withCommandInstance()` / `.withProcessManager()` used to
- * mount the poke, the sweep and the command. Nor is `packages/event-sourcing/
- * src/mount/validateMount.ts` (ADR-106) re-exported, so this pipeline's mount
- * descriptors (documented in `meter/billableEventsMeter.mapProjection.ts`)
- * cannot be checked by the library today.
- *
- * This is not something this pipeline can paper over by inventing a fake
- * `definePipeline`-shaped API that doesn't exist in the package — that would
- * be guessing at an unimplemented surface, which is exactly what "rewrite,
- * don't port" and "stop and report rather than choosing" rule out. Instead:
- *
- *   - The **meter** is fully real: a working `AppendStore` (ADR-099) over a
- *     `defineTable` declaration, executed by `createMapExecutor` from
- *     `@langwatch/event-sourcing`. Nothing about it is a stub.
- *   - The **poke**, the **sweep** and **`reportUsageForMonth`** are complete,
- *     independently testable, plain functions with every business rule from
- *     the feature file preserved — the debounce/dedup shape a queue must
- *     apply is captured in `reporting/dispatchOptions.ts` so it is not lost,
- *     even though nothing here can enforce it yet.
- *   - `createBillingReportingPipeline` below assembles them into one object.
- *     It is deliberately not called a "pipeline" in the `event-sourcing.old`
- *     sense (no `.commands` / `.processManagers` maps) because that shape
- *     does not exist to build.
- *
- * Whoever wires the real mounts — a subscriber runtime, a process-manager
- * runtime or the existing generic `~/server/app-layer/scheduler/
- * scheduler.service.ts`, and the 4 source pipelines' own composition sites
- * for the poke — does so from outside this directory. `createPokeMount` and
- * `createSweepMount`'s docblocks say exactly what each expects.
+ * The **meter** records every billable event, one deduplicated row each. The
+ * **poke** is the losable fast path; the **sweep** re-reports hourly whether or
+ * not anything poked, and is the guarantee. Both dispatch
+ * `reportUsageForMonth`, which reads the month total as a LEVEL.
  */
 
-import type { ClickHouseClient } from "@langwatch/clickhouse";
-import type { UsageReportingService } from "@ee/billing/services/usageReportingService";
 import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "@ee/billing/services/billableEventsQuery";
+import type { UsageReportingService } from "@ee/billing/services/usageReportingService";
+import {
+  type ClickHouseClient,
+  clickhouseAppend,
+  deriveAppendMapping,
+} from "@langwatch/clickhouse";
+import type { AppendStore, BatchContext } from "@langwatch/event-sourcing";
+import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 import type { BillingCheckpointService } from "~/server/app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { resolveOrganizationId as resolveOrganizationIdDefault } from "~/server/organizations/resolveOrganizationId";
 
+import { BILLING_REPORTING_PIPELINE_NAME } from "./constants";
 import {
   BILLABLE_EVENT_TYPES,
+  type BillableEventMeterRecord,
+  billableEventMeterRecordSchema,
   createBillableEventsMeterProjection,
-} from "./meter/billableEventsMeter.mapProjection";
-import { createBillableEventsMeterStore } from "./meter/billableEventsMeter.store";
+} from "./meter/billableEventsMeter";
 import { billableEventsTable } from "./meter/billableEventsTable";
 import {
   type BillingMeterPokeMount,
@@ -114,10 +41,15 @@ import {
   createBillingMeterSweepMount,
 } from "./reporting/billingMeterSweep";
 import { reportUsageForMonthDispatchOptions } from "./reporting/dispatchOptions";
-import { type ReportUsageForMonthData, reportUsageForMonth } from "./reporting/reportUsageForMonth";
+import {
+  type ReportUsageForMonthData,
+  reportUsageForMonth,
+} from "./reporting/reportUsageForMonth";
 
-export { BILLING_GRACE_PERIOD_DAYS, BILLING_REPORTING_PIPELINE_NAME } from "./constants";
-export { billableEventsTable } from "./meter/billableEventsTable";
+export {
+  BILLING_GRACE_PERIOD_DAYS,
+  BILLING_REPORTING_PIPELINE_NAME,
+} from "./constants";
 export {
   BILLABLE_EVENT_TYPES,
   type BillableEventMeterRecord,
@@ -127,11 +59,8 @@ export {
   extractDeduplicationKey,
   mapBillableEvent,
   renderBillableEventsMeterGroupKey,
-} from "./meter/billableEventsMeter.mapProjection";
-export {
-  type BillableEventsMeterStoreDeps,
-  createBillableEventsMeterStore,
-} from "./meter/billableEventsMeter.store";
+} from "./meter/billableEventsMeter";
+export { billableEventsTable } from "./meter/billableEventsTable";
 export {
   type BillableEventForPoke,
   type BillingMeterPokeDeps,
@@ -160,29 +89,133 @@ export {
   reportUsageForMonth,
 } from "./reporting/reportUsageForMonth";
 
+const logger = createLogger(
+  "langwatch:billing-reporting:billable-events-meter",
+);
+
 export interface BillingReportingPipelineDeps {
-  readonly organizations: Pick<OrganizationService, "getOrganizationForBilling">;
+  readonly organizations: Pick<
+    OrganizationService,
+    "getOrganizationForBilling"
+  >;
   readonly billingCheckpoints: BillingCheckpointService;
-  /** Read per dispatch: usage reporting is SaaS-only, absent from a self-hosted build entirely. */
+  /** Read per dispatch: usage reporting is SaaS-only, absent from a
+   *  self-hosted build entirely. */
   readonly getUsageReportingService: () => UsageReportingService | undefined;
   readonly queryBillableEventsTotal: typeof QueryBillableEventsTotalFn;
-  readonly resolveOrganizationId?: (projectId: string) => Promise<string | undefined>;
-  /** See `meter/billableEventsMeter.store.ts`'s docblock for the known gap this port names. */
+  readonly resolveOrganizationId?: (
+    projectId: string,
+  ) => Promise<string | undefined>;
+  /**
+   * Resolves the `@langwatch/clickhouse` client for an organization's
+   * ClickHouse target. No function with this signature exists yet —
+   * `~/server/clickhouse/clickhouseClient.ts` hands back a raw
+   * `@clickhouse/client` instead — so the composition root owes the bridge.
+   */
   readonly getClickHouseClientForOrganization: (
     organizationId: string,
   ) => Promise<ClickHouseClient | null>;
   readonly isSaas: boolean;
 }
 
+/** One billable-events row, once the batch's organization and tenant are
+ *  attached. Both are batch-level, so they are merged in per `writeBatch`
+ *  rather than carried on every record. */
+const billableEventRowSchema = billableEventMeterRecordSchema.extend({
+  organizationId: z.string(),
+  tenantId: z.string(),
+});
+type BillableEventRow = z.infer<typeof billableEventRowSchema>;
+
+const toBillableEventRow = deriveAppendMapping({
+  table: billableEventsTable,
+  record: billableEventRowSchema,
+  fill: { UpdatedAt: () => new Date() },
+});
+
 /**
- * Assembles the billing-reporting pipeline's pieces from their dependencies.
- * See this file's module docblock for what "assembles" does and does not mean
- * today.
+ * The meter's store. The organization is resolved once per batch, not once per
+ * record: every record in one `writeBatch` shares a `BatchContext.tenantId`, so
+ * it shares an organization too. `clickhouseAppend` needs one fixed client at
+ * construction while the resolver hands back a different client per
+ * organization, so the inner stores are memoised by client instance —
+ * organizations sharing one ClickHouse target share one store.
  */
-export function createBillingReportingPipeline(deps: BillingReportingPipelineDeps) {
-  // Bound once so the poke, the sweep and the command's own convergence loop
-  // all dispatch through the identical closure — there is exactly one
-  // `reportUsageForMonth` in this pipeline, never a copy per caller.
+function createBillableEventsMeterStore(deps: {
+  readonly resolveOrganizationId: (
+    projectId: string,
+  ) => Promise<string | undefined>;
+  readonly getClickHouseClientForOrganization: (
+    organizationId: string,
+  ) => Promise<ClickHouseClient | null>;
+}): AppendStore<BillableEventMeterRecord> {
+  const innerStores = new WeakMap<
+    ClickHouseClient,
+    AppendStore<BillableEventRow>
+  >();
+
+  const innerStoreFor = (
+    client: ClickHouseClient,
+  ): AppendStore<BillableEventRow> => {
+    const existing = innerStores.get(client);
+    if (existing) return existing;
+    const built = clickhouseAppend({
+      client,
+      table: billableEventsTable,
+      toRow: toBillableEventRow,
+    });
+    innerStores.set(client, built);
+    return built;
+  };
+
+  return {
+    kind: "append",
+
+    async writeBatch(
+      records: readonly BillableEventMeterRecord[],
+      context: BatchContext,
+    ): Promise<void> {
+      if (records.length === 0) return;
+
+      const organizationId = await deps.resolveOrganizationId(context.tenantId);
+      if (!organizationId) {
+        logger.warn(
+          { projectId: context.tenantId },
+          "orphan project detected, has no organization -- skipping billable event insert",
+        );
+        return;
+      }
+
+      const client =
+        await deps.getClickHouseClientForOrganization(organizationId);
+      if (!client) {
+        logger.debug(
+          "ClickHouse not configured, skipping billable event insert",
+        );
+        return;
+      }
+
+      await innerStoreFor(client).writeBatch(
+        records.map((record) => ({
+          ...record,
+          organizationId,
+          tenantId: context.tenantId,
+        })),
+        context,
+      );
+    },
+  };
+}
+
+/**
+ * The pipeline's whole topology in one place: the meter with its store built at
+ * the mount, and the two triggers that both dispatch through one bound
+ * `reportUsageForMonth` closure — never a copy per caller, which is what lets a
+ * sweep dispatch collapse into a pending poke's.
+ */
+export function createBillingReportingPipeline(
+  deps: BillingReportingPipelineDeps,
+) {
   const dispatch = (data: ReportUsageForMonthData): Promise<void> =>
     reportUsageForMonth(data, {
       organizations: deps.organizations,
@@ -192,28 +225,27 @@ export function createBillingReportingPipeline(deps: BillingReportingPipelineDep
       selfDispatch: (next) => dispatch(next),
     });
 
+  const meterStore = createBillableEventsMeterStore({
+    resolveOrganizationId:
+      deps.resolveOrganizationId ?? resolveOrganizationIdDefault,
+    getClickHouseClientForOrganization: deps.getClickHouseClientForOrganization,
+  });
+
   return {
+    name: BILLING_REPORTING_PIPELINE_NAME,
+
     meter: {
       table: billableEventsTable,
       eventTypes: BILLABLE_EVENT_TYPES,
-      createStore: () =>
-        createBillableEventsMeterStore({
-          resolveOrganizationId: deps.resolveOrganizationId ?? resolveOrganizationIdDefault,
-          getClickHouseClientForOrganization: deps.getClickHouseClientForOrganization,
-        }),
-      createProjection: (store: ReturnType<typeof createBillableEventsMeterStore>) =>
-        createBillableEventsMeterProjection({ store }),
+      store: meterStore,
+      projection: createBillableEventsMeterProjection({ store: meterStore }),
     },
 
     reportUsageForMonth: dispatch,
     dispatchOptions: reportUsageForMonthDispatchOptions,
 
-    /**
-     * Called once per source pipeline (trace, evaluation, experiment-run,
-     * simulation processing), each with its own subset of
-     * `BILLABLE_EVENT_TYPES` — the poke is mounted on all 4, and each mount's
-     * `eventTypes` is only the slice that pipeline actually produces.
-     */
+    /** Called once per source pipeline, each with its own slice of
+     *  `BILLABLE_EVENT_TYPES` — the poke is mounted on all 4. */
     createPokeMount: (eventTypes: readonly string[]): BillingMeterPokeMount =>
       createBillingMeterPokeMount({
         eventTypes,
@@ -222,14 +254,6 @@ export function createBillingReportingPipeline(deps: BillingReportingPipelineDep
         dispatchReport: dispatch,
       }),
 
-    /**
-     * `listOrganizationsToReport` and `recordTick` are supplied by whoever
-     * mounts this — `~/server/app-layer/billing/
-     * billingReportingCandidates.service.ts` already implements the former
-     * unchanged; the latter has no existing implementation (see
-     * `reporting/billingMeterSweep.ts`'s `BillingMeterSweepDeps.recordTick`
-     * docblock for why).
-     */
     createSweepMount: (
       sweepDeps: Omit<BillingMeterSweepDeps, "dispatchReport">,
     ): BillingMeterSweepMount =>

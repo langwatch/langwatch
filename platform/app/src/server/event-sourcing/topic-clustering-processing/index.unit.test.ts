@@ -1,71 +1,86 @@
+import type { ClickHouseClient } from "@langwatch/clickhouse";
 import { describe, expect, it } from "vitest";
-import * as pipeline from "./index";
+import {
+  topicClustering,
+  topicClusteringCommandGroupKey,
+  topicClusteringProcessGroupKey,
+  topicClusteringProcessing,
+} from "./index";
 
-/**
- * A smoke test over the barrel: every named export the module docblock
- * promises must actually resolve to something, and the aggregate + mounts
- * built from module-load-time composition must not throw.
- */
-describe("topic-clustering-processing index", () => {
-  it("exports the aggregate, built without throwing", () => {
-    expect(pipeline.topicClustering.name).toBe("topic_clustering");
-    expect(pipeline.topicClustering.eventTypes.length).toBe(5);
+/** Never called: these tests exercise composition, not I/O. */
+const client = {} as ClickHouseClient;
+
+describe("topic-clustering-processing composition", () => {
+  it("mounts the aggregate, three folds and the process manager without throwing", () => {
+    const pipeline = topicClusteringProcessing({ client });
+
+    expect(pipeline.aggregate.name).toBe("topic_clustering");
+    expect(Object.keys(pipeline.folds).sort()).toEqual([
+      "topicClusteringRunHistory",
+      "topicClusteringRunStatus",
+      "topicModel",
+    ]);
+    expect(pipeline.process.definition.name).toBe("topicClustering");
   });
 
-  it("exports working fold init/apply pairs", () => {
-    expect(pipeline.initRunStatusState()).toBeDefined();
-    expect(pipeline.initRunHistoryState()).toBeDefined();
-    expect(pipeline.initTopicModelState()).toBeDefined();
+  it("mounts every fold as an aggregate-scoped, batching replace store", () => {
+    const pipeline = topicClusteringProcessing({ client });
+
+    for (const fold of Object.values(pipeline.folds)) {
+      expect(fold.mount).toEqual({
+        projection: "fold",
+        store: "replace",
+        scope: "aggregate",
+        collapse: "batch",
+      });
+    }
   });
 
-  it("exports mounts that pass validation", () => {
-    expect(() => pipeline.assertTopicClusteringMountsAreLegal()).not.toThrow();
-  });
+  it("gives every lane of one project the same aggregate scope", () => {
+    const pipeline = topicClusteringProcessing({ client });
+    const scope = {
+      kind: "aggregate",
+      aggregateType: "topic_clustering",
+      aggregateId: "project-1",
+    };
 
-  it("exports group key builders that produce typed descriptors", () => {
-    const key = pipeline.topicClusteringRunStatusGroupKey({
-      tenantId: "project-1",
-    });
-    expect(key).toEqual({
+    expect(
+      pipeline.folds.topicClusteringRunStatus.groupKey({
+        tenantId: "project-1",
+      }),
+    ).toEqual({
       tenantId: "project-1",
       lane: { kind: "fold", name: "topicClusteringRunStatus" },
-      scope: {
-        kind: "aggregate",
-        aggregateType: "topic_clustering",
-        aggregateId: "project-1",
-      },
+      scope,
+    });
+    expect(topicClusteringCommandGroupKey({ tenantId: "project-1" })).toEqual({
+      tenantId: "project-1",
+      lane: { kind: "command" },
+      scope,
+    });
+    expect(topicClusteringProcessGroupKey({ tenantId: "project-1" })).toEqual({
+      tenantId: "project-1",
+      lane: { kind: "processManager", name: "topicClustering" },
+      scope,
     });
   });
 
-  it("exports ClickHouse table declarations", () => {
-    expect(pipeline.topicClusteringRunStatusTable.name).toBe(
-      "topic_clustering_run_status",
+  it("gives each fold its own state version, derived from its own schema", () => {
+    const pipeline = topicClusteringProcessing({ client });
+    const versions = Object.values(pipeline.folds).map(
+      (fold) => fold.projection.version,
     );
-    expect(pipeline.topicClusteringRunHistoryTable.name).toBe(
-      "topic_clustering_run_history",
-    );
-    expect(pipeline.topicModelTable.name).toBe("topic_clustering_topic_model");
+    expect(new Set(versions).size).toBe(versions.length);
   });
 
-  it("exports the process manager definition, built without throwing", () => {
-    expect(pipeline.topicClusteringProcessDefinition.name).toBe(
-      "topicClustering",
-    );
-    expect(
-      [...pipeline.topicClusteringProcessDefinition.eventTypes].sort(),
-    ).toEqual(["requested", "runCompleted", "runFailed"]);
-  });
+  it("subscribes every fold only to events the aggregate declares", () => {
+    const pipeline = topicClusteringProcessing({ client });
+    const declared = new Set<string>(topicClustering.eventTypes);
 
-  it("exports the idempotency-key helpers", () => {
-    expect(
-      pipeline.requestClusteringIdempotencyKey({
-        trigger: "bootstrap",
-        occurredAt: 1,
-      }),
-    ).toBe("topic_clustering:bootstrap");
-  });
-
-  it("exports runIdentity helpers", () => {
-    expect(pipeline.mintManualRunId(1)).toBe("manual-1");
+    for (const fold of Object.values(pipeline.folds)) {
+      for (const eventType of fold.projection.eventTypes) {
+        expect(declared.has(eventType)).toBe(true);
+      }
+    }
   });
 });

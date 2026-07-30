@@ -4,28 +4,128 @@
  * All queries scope to project_id first (tenant isolation) per
  * dev/docs/best_practices/clickhouse-queries.md.
  */
-import { SpanKind } from "@opentelemetry/api";
-import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import {
+  bindIdentifiers,
+  type ClickHouseClient,
+  ch,
+  createRowCodec,
+  defineTable,
+  replacing,
+  type TableRow,
+} from "@langwatch/clickhouse";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { StoredObject } from "./stored-object";
 import { storedObjectSchema } from "./stored-object";
 
-const TABLE_NAME = "stored_objects" as const;
+/**
+ * `stored_objects` (migration 00023). `created_at` and `inserted_at` are both
+ * stamped from the same `new Date()` at write time in
+ * `stored-objects.service.ts` — never from caller input — so `created_at`
+ * genuinely carries the `acceptedAt` role (frozen: the row is content-
+ * addressed by `(project_id, id)` and never re-written with a different
+ * value) and `inserted_at` is the `ReplacingMergeTree` version column.
+ */
+const table = defineTable({
+  name: "stored_objects",
+  merge: replacing({ version: "inserted_at" }),
+  sortKey: ["project_id", "id"],
+  partition: { by: "toYYYYMM(created_at)", column: "created_at" },
+  tenant: ["project_id"],
+  columns: {
+    id: ch.string(),
+    project_id: ch.string(),
+    purpose: ch.lowCardinality(ch.string()),
+    owner_kind: ch.lowCardinality(ch.string()),
+    owner_id: ch.string(),
+    media_type: ch.string(),
+    size_bytes: ch.uint64(),
+    sha256: ch.string(),
+    storage_uri: ch.string(),
+    created_at: ch.acceptedAt(),
+    inserted_at: ch.writtenAt(),
+  },
+});
 
-const tracer = getLangWatchTracer("langwatch.stored-objects.repository");
+type Row = TableRow<typeof table.columns>;
+
+const codec = createRowCodec();
+const names = bindIdentifiers();
+
+const ID_STORAGE_URI_COLUMNS = {
+  id: ch.string(),
+  storage_uri: ch.string(),
+} as const;
+const ID_STORAGE_URI_NAMES = Object.keys(
+  ID_STORAGE_URI_COLUMNS,
+) as (keyof typeof ID_STORAGE_URI_COLUMNS)[];
+const ID_STORAGE_URI_WIRE = ID_STORAGE_URI_NAMES.map(
+  (name) => ID_STORAGE_URI_COLUMNS[name],
+);
+type IdStorageUriRow = { readonly id: string; readonly storage_uri: string };
+
+const SUM_COLUMNS = {
+  total_bytes: ch.uint64(),
+  object_count: ch.uint64(),
+} as const;
+const SUM_COLUMN_NAMES = Object.keys(
+  SUM_COLUMNS,
+) as (keyof typeof SUM_COLUMNS)[];
+const SUM_WIRE_COLUMNS = SUM_COLUMN_NAMES.map((name) => SUM_COLUMNS[name]);
+type SumRow = { readonly total_bytes: bigint; readonly object_count: bigint };
+
+function toRow(row: StoredObject): Row {
+  return {
+    id: row.id,
+    project_id: row.project_id,
+    purpose: row.purpose,
+    owner_kind: row.owner_kind,
+    owner_id: row.owner_id,
+    media_type: row.media_type,
+    // `size_bytes` is `UInt64` in the DDL and decodes to `bigint`, but
+    // `StoredObject.size_bytes` stays a JS `number` (pre-existing narrowing —
+    // see the migration report). A blob past 2^53 bytes loses precision here,
+    // same as before this migration.
+    size_bytes: BigInt(row.size_bytes),
+    sha256: row.sha256,
+    storage_uri: row.storage_uri,
+    created_at: row.created_at,
+    inserted_at: row.inserted_at,
+  };
+}
+
+function fromRow(row: Row): StoredObject {
+  return storedObjectSchema.parse({
+    id: row.id,
+    project_id: row.project_id,
+    purpose: row.purpose,
+    owner_kind: row.owner_kind,
+    owner_id: row.owner_id,
+    media_type: row.media_type,
+    size_bytes: Number(row.size_bytes),
+    sha256: row.sha256,
+    storage_uri: row.storage_uri,
+    created_at: row.created_at,
+    inserted_at: row.inserted_at,
+  });
+}
 
 /**
  * ClickHouse repository for stored_objects rows.
  *
- * Clients are resolved at call time via `getClickHouseClientForProject` so
- * per-tenant private ClickHouse routing is always respected.
+ * The client is injected as `resolveClient(tenantId)` from the composition
+ * root (ADR-104) rather than resolved per call inside the repository.
  */
 export class StoredObjectsRepository {
-  /**
-   * Inserts a single stored_objects row.
-   *
-   * Wrapped in a CLIENT span so ClickHouse latency is visible in traces.
-   */
+  constructor(
+    private readonly resolveClient: (tenantId: string) => ClickHouseClient,
+    // ADR-104: the new client exposes query/insert/stream only, no DDL or
+    // mutation execution. deleteByProject/deleteByIds issue
+    // `ALTER TABLE ... DELETE`, which has no home there yet, so they keep
+    // resolving the legacy client. See the migration report.
+    private readonly legacyResolveClient?: ClickHouseClientResolver,
+  ) {}
+
+  /** Inserts a single stored_objects row. */
   async insert({
     projectId,
     row,
@@ -33,63 +133,27 @@ export class StoredObjectsRepository {
     projectId: string;
     row: StoredObject;
   }): Promise<void> {
-    return tracer.withActiveSpan(
-      "StoredObjectsRepository.insert",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "clickhouse",
-          "db.operation": "INSERT",
-          "tenant.id": projectId,
-          "stored_object.id": row.id,
-          "stored_object.purpose": row.purpose,
-        },
-      },
-      async () => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot insert stored object",
-          );
-        }
-
-        await client.insert({
-          table: TABLE_NAME,
-          values: [
-            {
-              id: row.id,
-              project_id: row.project_id,
-              purpose: row.purpose,
-              owner_kind: row.owner_kind,
-              owner_id: row.owner_id,
-              media_type: row.media_type,
-              size_bytes: row.size_bytes,
-              sha256: row.sha256,
-              storage_uri: row.storage_uri,
-              created_at: row.created_at,
-              inserted_at: row.inserted_at,
-            },
-          ],
-          format: "JSONEachRow",
-          // wait_for_async_insert=1: surface insert errors synchronously to
-          // the caller. Without this, async_insert acknowledges immediately
-          // and a later batching/network failure is dropped silently — the
-          // service would then return success while no row was written. We
-          // already pay for a storage PUT before the insert, so making the
-          // insert synchronous is the only way the compensating-cleanup
-          // path (delete bytes if insert fails) can fire reliably.
-          clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-        });
-      },
-    );
+    const encodedRows = codec.encodeRows({
+      columns: table.wireColumns,
+      columnNames: table.columnNames,
+      rows: [toRow(row)],
+    });
+    const client = this.resolveClient(projectId);
+    await client.insert({
+      tenantId: projectId,
+      table: table.name,
+      rows: encodedRows,
+      columns: table.columnNames,
+      target: { kind: "replacing" },
+    });
   }
 
   /**
    * Returns the stored_objects row with the given id, or null if not found.
    *
    * Uses the scalar-subquery single-row dedup pattern recommended by
-   * dev/docs/best_practices/clickhouse-queries.md for ReplacingMergeTree.
-   * The table's version column is `inserted_at`.
+   * dev/docs/best_practices/clickhouse-queries.md. The table's version
+   * column is `inserted_at`.
    */
   async findById({
     projectId,
@@ -98,164 +162,78 @@ export class StoredObjectsRepository {
     projectId: string;
     id: string;
   }): Promise<StoredObject | null> {
-    return tracer.withActiveSpan(
-      "StoredObjectsRepository.findById",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "clickhouse",
-          "db.operation": "SELECT",
-          "tenant.id": projectId,
-          "stored_object.id": id,
-        },
-      },
-      async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot find stored object by id",
-          );
-        }
+    const client = this.resolveClient(projectId);
+    const result = await client.query({
+      tenantId: projectId,
+      sql: `
+        SELECT ${names.list(table.columnNames)}
+        FROM ${names.of(table.name)} AS t
+        WHERE t.project_id = {projectId:String}
+          AND t.id = {id:String}
+          AND t.inserted_at = (
+            SELECT max(s.inserted_at)
+            FROM ${names.of(table.name)} AS s
+            WHERE s.project_id = {projectId:String}
+              AND s.id = {id:String}
+          )
+        LIMIT 1
+      `,
+      params: { ...names.params, projectId, id },
+    });
 
-        // Scalar-subquery dedup: inner reads only (project_id, id, inserted_at)
-        // to find max(inserted_at), outer reads the full row for that version.
-        const result = await client.query({
-          query: `
-            SELECT
-              t.id           AS id,
-              t.project_id   AS project_id,
-              t.purpose      AS purpose,
-              t.owner_kind   AS owner_kind,
-              t.owner_id     AS owner_id,
-              t.media_type   AS media_type,
-              t.size_bytes   AS size_bytes,
-              t.sha256       AS sha256,
-              t.storage_uri  AS storage_uri,
-              t.created_at   AS created_at,
-              t.inserted_at  AS inserted_at
-            FROM ${TABLE_NAME} AS t
-            WHERE t.project_id = {projectId:String}
-              AND t.id = {id:String}
-              AND t.inserted_at = (
-                SELECT max(s.inserted_at)
-                FROM ${TABLE_NAME} AS s
-                WHERE s.project_id = {projectId:String}
-                  AND s.id = {id:String}
-              )
-            LIMIT 1
-          `,
-          query_params: { projectId, id },
-          format: "JSONEachRow",
-        });
-
-        const rows = await result.json<Record<string, unknown>>();
-
-        span.setAttribute("result.found", rows.length > 0);
-
-        if (rows.length === 0) {
-          return null;
-        }
-
-        const raw = rows[0]!;
-        return storedObjectSchema.parse({
-          id: raw.id,
-          project_id: raw.project_id,
-          purpose: raw.purpose,
-          owner_kind: raw.owner_kind,
-          owner_id: raw.owner_id,
-          media_type: raw.media_type,
-          size_bytes: Number(raw.size_bytes),
-          sha256: raw.sha256,
-          storage_uri: raw.storage_uri,
-          created_at: new Date(raw.created_at as string),
-          inserted_at: new Date(raw.inserted_at as string),
-        });
-      },
-    );
+    const [row] = codec.decodeRows<Row>({
+      columns: table.wireColumns,
+      columnNames: table.columnNames,
+      header: result.header,
+      rows: result.rows,
+    });
+    return row ? fromRow(row) : null;
   }
 
   /**
    * Streams (id, storage_uri) pairs for every live row owned by the project.
    *
-   * Used by `deleteOwnedBy` to enumerate the bytes that need to be
-   * deleted from the storage backend before the rows themselves are removed.
-   * Uses the scalar-subquery dedup pattern so ReplacingMergeTree-soft-deleted
-   * tombstones are filtered out before the cascade tries to delete bytes that
-   * may already be gone.
+   * Used by `deleteOwnedBy` to enumerate the bytes that need to be deleted
+   * from the storage backend before the rows themselves are removed. No
+   * `created_at` (partition) predicate is possible here — cascade-delete
+   * needs every row that has ever existed for this project, including very
+   * old objects sitting in cold S3 partitions.
    */
   async findAllByProject({
     projectId,
   }: {
     projectId: string;
   }): Promise<Array<{ id: string; storage_uri: string }>> {
-    return tracer.withActiveSpan(
-      "StoredObjectsRepository.findAllByProject",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "clickhouse",
-          "db.operation": "SELECT",
-          "tenant.id": projectId,
-        },
-      },
-      async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot enumerate stored objects",
-          );
-        }
+    const client = this.resolveClient(projectId);
+    const result = await client.query({
+      tenantId: projectId,
+      sql: `
+        SELECT id, storage_uri
+        FROM ${names.of(table.name)} AS t
+        WHERE t.project_id = {projectId:String}
+          AND (t.project_id, t.id, t.inserted_at) IN (
+            SELECT project_id, id, max(inserted_at)
+            FROM ${names.of(table.name)}
+            WHERE project_id = {projectId:String}
+            GROUP BY project_id, id
+          )
+      `,
+      params: { ...names.params, projectId },
+    });
 
-        // Project-scoped enumeration. Two notes on cost:
-        //
-        //   1. Dedup uses the IN-tuple pattern, not a correlated scalar
-        //      subquery — the inner GROUP BY runs once and produces the
-        //      (id, max(inserted_at)) set, then the outer matches against
-        //      it. The previous correlated form (`inserted_at = (SELECT
-        //      max(s.inserted_at) WHERE s.id = t.id)`) re-ran the inner
-        //      query for every row.
-        //   2. No `created_at` (partition) predicate is possible here —
-        //      cascade-delete needs every row that has ever existed for
-        //      this project, including very old objects sitting in cold
-        //      S3 partitions. The scan is bounded by `project_id IN
-        //      ORDER BY` so it walks only that project's granules within
-        //      each partition, but the partition fan-out itself is
-        //      unavoidable. Run sparingly; this is a project-deletion
-        //      cascade, not a hot path.
-        const result = await client.query({
-          query: `
-            SELECT
-              t.id          AS id,
-              t.storage_uri AS storage_uri
-            FROM ${TABLE_NAME} AS t
-            WHERE t.project_id = {projectId:String}
-              AND (t.project_id, t.id, t.inserted_at) IN (
-                SELECT project_id, id, max(inserted_at)
-                FROM ${TABLE_NAME}
-                WHERE project_id = {projectId:String}
-                GROUP BY project_id, id
-              )
-          `,
-          query_params: { projectId },
-          format: "JSONEachRow",
-        });
-
-        const rows = await result.json<{ id: string; storage_uri: string }>();
-        span.setAttribute("result.count", rows.length);
-        return rows;
-      },
-    );
+    return codec.decodeRows<IdStorageUriRow>({
+      columns: ID_STORAGE_URI_WIRE,
+      columnNames: ID_STORAGE_URI_NAMES,
+      header: result.header,
+      rows: result.rows,
+    });
   }
 
   /**
-   * Sums `size_bytes` of the live rows owned by a project, optionally scoped to
-   * one `purpose`, as the storage-accounting byte ledger (ADR-096).
-   *
-   * Dedup uses the IN-tuple `(project_id, id, max(inserted_at))` pattern so
-   * only the latest version of each content-addressed row is counted - never
-   * summing across stale ReplacingMergeTree versions. project_id is the first
-   * predicate for tenant isolation and to keep the scan on the project's
-   * granules.
+   * Sums `size_bytes` of the live rows owned by a project, optionally scoped
+   * to one `purpose`, as the storage-accounting byte ledger. Dedup uses the
+   * IN-tuple `(project_id, id, max(inserted_at))` pattern so only the latest
+   * version of each content-addressed row is counted.
    */
   async sumSizeBytesByProject({
     projectId,
@@ -264,134 +242,65 @@ export class StoredObjectsRepository {
     projectId: string;
     purpose?: string;
   }): Promise<{ totalBytes: number; objectCount: number }> {
-    return tracer.withActiveSpan(
-      "StoredObjectsRepository.sumSizeBytesByProject",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "clickhouse",
-          "db.operation": "SELECT",
-          "tenant.id": projectId,
-          ...(purpose ? { "stored_object.purpose": purpose } : {}),
-        },
-      },
-      async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured - cannot sum stored object sizes",
-          );
-        }
+    const client = this.resolveClient(projectId);
+    const purposePredicate = purpose ? "AND t.purpose = {purpose:String}" : "";
+    const innerPurposePredicate = purpose ? "AND purpose = {purpose:String}" : "";
 
-        const purposePredicate = purpose
-          ? "AND t.purpose = {purpose:String}"
-          : "";
-        const innerPurposePredicate = purpose
-          ? "AND purpose = {purpose:String}"
-          : "";
+    const result = await client.query({
+      tenantId: projectId,
+      sql: `
+        SELECT
+          sum(t.size_bytes) AS total_bytes,
+          count()           AS object_count
+        FROM ${names.of(table.name)} AS t
+        WHERE t.project_id = {projectId:String}
+          ${purposePredicate}
+          AND (t.project_id, t.id, t.inserted_at) IN (
+            SELECT project_id, id, max(inserted_at)
+            FROM ${names.of(table.name)}
+            WHERE project_id = {projectId:String}
+              ${innerPurposePredicate}
+            GROUP BY project_id, id
+          )
+      `,
+      params: purpose
+        ? { ...names.params, projectId, purpose }
+        : { ...names.params, projectId },
+    });
 
-        const result = await client.query({
-          query: `
-            SELECT
-              sum(t.size_bytes) AS total_bytes,
-              count()           AS object_count
-            FROM ${TABLE_NAME} AS t
-            WHERE t.project_id = {projectId:String}
-              ${purposePredicate}
-              AND (t.project_id, t.id, t.inserted_at) IN (
-                SELECT project_id, id, max(inserted_at)
-                FROM ${TABLE_NAME}
-                WHERE project_id = {projectId:String}
-                  ${innerPurposePredicate}
-                GROUP BY project_id, id
-              )
-          `,
-          query_params: purpose ? { projectId, purpose } : { projectId },
-          format: "JSONEachRow",
-        });
-
-        const rows = await result.json<{
-          total_bytes: string | number | null;
-          object_count: string | number | null;
-        }>();
-        const raw = rows[0];
-        const totalBytes =
-          raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
-        const objectCount =
-          raw?.object_count != null ? Number(raw.object_count) : 0;
-        span.setAttribute("stored_objects.total_bytes", totalBytes);
-        span.setAttribute("stored_objects.object_count", objectCount);
-        return { totalBytes, objectCount };
-      },
-    );
+    const [row] = codec.decodeRows<SumRow>({
+      columns: SUM_WIRE_COLUMNS,
+      columnNames: SUM_COLUMN_NAMES,
+      header: result.header,
+      rows: result.rows,
+    });
+    return {
+      totalBytes: row ? Number(row.total_bytes) : 0,
+      objectCount: row ? Number(row.object_count) : 0,
+    };
   }
 
   /**
-   * Deletes every stored_objects row for a project (and optionally a single
-   * owner) via ClickHouse ALTER TABLE DELETE.
-   *
-   * ALTER TABLE DELETE is an async mutation in ClickHouse — the SELECT-side
-   * effect is immediate (rows disappear from query results once the mutation
-   * is queued), but the actual disk reclamation runs in the background.
-   * Callers do NOT need to wait for the mutation to finalize; the rows are
-   * not observable through `findById` / `findAllByProject` after this call.
-   *
-   * This is irreversible at the data-plane level: callers MUST have already
-   * deleted the underlying bytes from the storage backend before invoking
-   * this method, otherwise the byte content orphans in S3/disk with no row
-   * pointing at it.
+   * Deletes every stored_objects row for a project via ClickHouse
+   * `ALTER TABLE DELETE`. Callers MUST have already deleted the underlying
+   * bytes from the storage backend before invoking this method.
    */
   async deleteByProject({ projectId }: { projectId: string }): Promise<void> {
-    return tracer.withActiveSpan(
-      "StoredObjectsRepository.deleteByProject",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "clickhouse",
-          "db.operation": "DELETE",
-          "tenant.id": projectId,
-        },
-      },
-      async () => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot delete stored objects",
-          );
-        }
-
-        await client.exec({
-          query: `
-            ALTER TABLE ${TABLE_NAME}
-            DELETE WHERE project_id = {projectId:String}
-          `,
-          query_params: { projectId },
-          clickhouse_settings: {
-            // Wait until the mutation is at least submitted before we
-            // consider the call done; we do NOT wait for finalization
-            // (that can take minutes on big partitions). The follow-up
-            // SELECT in tests uses FINAL or polls for the SELECT-side
-            // visibility flip.
-            mutations_sync: "1",
-          },
-        });
-      },
-    );
+    const client = await this.requireLegacyClient(projectId);
+    await client.exec({
+      query: `
+        ALTER TABLE ${table.name}
+        DELETE WHERE project_id = {projectId:String}
+      `,
+      query_params: { projectId },
+      clickhouse_settings: { mutations_sync: "1" },
+    });
   }
 
   /**
    * Deletes a specific subset of stored-objects rows by id within a project.
-   *
-   * Used by `deleteOwnedBy` to remove ONLY the rows whose underlying byte
-   * deletes succeeded. Rows whose byte-delete failed are intentionally left
-   * behind as retryable tombstones — the operator can re-run the cascade,
-   * and the lingering rows still point at the leaked `storage_uri` so the
-   * GC sweep knows what to chase. Dropping those rows along with the
-   * succeeded ones would lose the address of the orphaned bytes
-   * irrecoverably (Sergio review 2026-05-20).
-   *
-   * Same caveats as `deleteByProject`: callers MUST have already deleted
-   * the underlying bytes for the ids passed here.
+   * Rows whose byte-delete failed are intentionally left behind as
+   * retryable tombstones — see the docstring on `deleteByProject`.
    */
   async deleteByIds({
     projectId,
@@ -401,34 +310,27 @@ export class StoredObjectsRepository {
     ids: string[];
   }): Promise<void> {
     if (ids.length === 0) return;
-    return tracer.withActiveSpan(
-      "StoredObjectsRepository.deleteByIds",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "clickhouse",
-          "db.operation": "DELETE",
-          "tenant.id": projectId,
-          "stored_objects.ids_count": ids.length,
-        },
-      },
-      async () => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot delete stored objects",
-          );
-        }
-        await client.exec({
-          query: `
-            ALTER TABLE ${TABLE_NAME}
-            DELETE WHERE project_id = {projectId:String}
-              AND id IN ({ids:Array(String)})
-          `,
-          query_params: { projectId, ids },
-          clickhouse_settings: { mutations_sync: "1" },
-        });
-      },
-    );
+    const client = await this.requireLegacyClient(projectId);
+    await client.exec({
+      query: `
+        ALTER TABLE ${table.name}
+        DELETE WHERE project_id = {projectId:String}
+          AND id IN ({ids:Array(String)})
+      `,
+      query_params: { projectId, ids },
+      clickhouse_settings: { mutations_sync: "1" },
+    });
+  }
+
+  // ADR-104: the new client has no DDL/mutation method (query/insert/stream
+  // only), so the two `ALTER TABLE ... DELETE` mutations above stay on the
+  // legacy client until one grows there. See the migration report.
+  private async requireLegacyClient(projectId: string) {
+    if (!this.legacyResolveClient) {
+      throw new Error(
+        "StoredObjectsRepository delete methods require a legacy client resolver — the new ClickHouse client has no DDL/mutation method (ADR-104)",
+      );
+    }
+    return this.legacyResolveClient(projectId);
   }
 }

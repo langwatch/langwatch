@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appendLogTable } from "../__tests__/integration/fixtures";
 import { readTestClickHouseInfo, uniqueTenant } from "../__tests__/integration/testClickHouse";
 import { createClickHouseClient, type ClickHouseClient } from "../client/clickhouseClient";
-import { createAppendStore } from "./appendStore";
+import { bindIdentifiers } from "../query/identifiers";
+import { clickhouseAppend } from "./appendStore";
 
 interface LogRecord {
   readonly acceptedAt: Date;
@@ -17,7 +18,7 @@ interface LogRecord {
  * collapses a duplicate row, which is exactly the fact this file's second
  * test rests on.
  */
-describe("given createAppendStore against a live ClickHouse", () => {
+describe("given clickhouseAppend against a live ClickHouse", () => {
   let client: ClickHouseClient;
   let driver: DriverClient;
 
@@ -33,7 +34,7 @@ describe("given createAppendStore against a live ClickHouse", () => {
   });
 
   function buildStore() {
-    return createAppendStore<LogRecord, typeof appendLogTable.columns>({
+    return clickhouseAppend<LogRecord, typeof appendLogTable.columns>({
       client,
       table: appendLogTable,
       toRow: (record, context) => ({
@@ -45,10 +46,13 @@ describe("given createAppendStore against a live ClickHouse", () => {
   }
 
   async function countRows(tenantId: string): Promise<number> {
+    const names = bindIdentifiers();
     const result = await client.query({
       tenantId,
-      sql: `SELECT count() AS c FROM ${appendLogTable.name} WHERE TenantId = {tenantId:String}`,
-      params: { tenantId },
+      sql:
+        `SELECT count() AS c FROM ${names.of(appendLogTable.name)} ` +
+        `WHERE ${names.of("TenantId")} = {tenantId:String}`,
+      params: { ...names.params, tenantId },
       format: "JSONEachRow",
     });
     // JSONEachRow returns objects, not codec-shaped arrays — read directly
@@ -83,7 +87,10 @@ describe("given createAppendStore against a live ClickHouse", () => {
     // regardless of merge state, unlike the `ReplacingMergeTree` in
     // `replaceStore.integration.test.ts`, so this assertion is meaningful
     // specifically because it runs after `OPTIMIZE ... FINAL`, not despite it.
-    await driver.command({ query: `OPTIMIZE TABLE ${appendLogTable.name} FINAL` });
+    await driver.command({
+      query: "OPTIMIZE TABLE {table:Identifier} FINAL",
+      query_params: { table: appendLogTable.name },
+    });
 
     expect(await countRows(tenantId)).toBe(2);
   });

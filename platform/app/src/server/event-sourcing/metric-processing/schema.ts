@@ -1,15 +1,10 @@
 import { z } from "zod";
 
 /**
- * The canonical shapes this pipeline moves data through: a metric data
- * point's kind, its canonicalised, lossless payload, and the derived rows
- * this pipeline's projections produce.
- *
- * Integer and UInt64 fields are decimal strings, not `number`. A JS number
+ * Integer and UInt64 fields are decimal strings, not `number`: a JS number
  * cannot represent every OTLP int64/fixed64 value past 2^53, while a decimal
- * string both survives JSON (the event payload's wire form) and is exactly
- * what a ClickHouse Int64/UInt64 column's JSON codec accepts on the way back
- * out (`@langwatch/clickhouse`'s `ch.uint64()`/`ch.int64()`).
+ * string survives JSON and is what a ClickHouse Int64/UInt64 column's codec
+ * accepts on the way back out.
  */
 
 export const metricKindSchema = z.enum([

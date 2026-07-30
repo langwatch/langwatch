@@ -8,18 +8,12 @@ import {
 import { isRecord, type UnknownRecord } from "./serialization";
 
 /**
- * The canonical view of every value-carrying OTLP field, in the exact form
- * the queryable row stores. The canonical payload that PointId hashes is
- * rendered from this same view, so a point's identity can never disagree with
- * its own persisted content.
+ * The canonical view of every value-carrying OTLP field, in the exact form the
+ * queryable row stores. PointId hashes a payload rendered from this same view,
+ * so a point's identity can never disagree with its persisted content.
  *
- * **Zero-value contract.** A gauge or sum data point whose value is `0` is a
- * real observation, not an absent one, and every presence check below must
- * treat it that way. `hasInt`/`hasDouble` test `!== undefined && !== null`
- * — never `Boolean(value)` or `value ?? fallback` on the raw field — so
- * `{ asDouble: 0 }` reports `valueType: "double"`, `valueDouble: 0`, and
- * survives every downstream fold (rollup `addStats`, `gaugeLast`) intact.
- * This is deliberate and load-bearing: a falsy check here is how a real zero
+ * A data point whose value is `0` is a real observation, so `hasInt`/`hasDouble`
+ * test `!== undefined && !== null`; a falsy check here is how a real zero
  * silently becomes "no value was sent".
  */
 export interface CanonicalPointValues {

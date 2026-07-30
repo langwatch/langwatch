@@ -141,6 +141,27 @@ describe("ch.dateTime64", () => {
   });
 });
 
+describe("ch.dateTime", () => {
+  const col = ch.dateTime();
+
+  it("declares a plain DateTime type, no time role", () => {
+    expect(col.chType).toBe("DateTime");
+    expect(col.timeRole).toBeUndefined();
+    expect(col.frozen).toBe(false);
+    expect(col.platformControlled).toBe(false);
+  });
+
+  /** @scenario ch.dateTime() encodes and decodes identically to a DateTime64(0) column, only the declared type differs */
+  it("encodes and decodes the same wire value as ch.dateTime64(0)", () => {
+    const original = new Date(Date.UTC(2024, 0, 15, 10, 30, 0));
+    const dateTime64Zero = ch.dateTime64(0);
+
+    const wire = col.encode(original);
+    expect(wire).toBe(dateTime64Zero.encode(original));
+    expect(col.decode(wire)).toEqual(dateTime64Zero.decode(wire));
+  });
+});
+
 describe("ch.date", () => {
   const col = ch.date();
 
@@ -342,6 +363,114 @@ describe("time roles", () => {
       expect(ch.acceptedAt().chType).toBe("DateTime64(3)");
       expect(ch.lastAcceptedAt().chType).toBe("DateTime64(3)");
       expect(ch.writtenAt().chType).toBe("DateTime64(3)");
+    });
+  });
+});
+
+describe("ch.epochMillis", () => {
+  const col = ch.epochMillis();
+
+  it("declares a UInt64 column", () => {
+    expect(col.chType).toBe("UInt64");
+  });
+
+  describe("given a wire value", () => {
+    /** @scenario an epoch-millisecond wire value round-trips to the same instant */
+    it("round-trips a known epoch millisecond value through the UInt64 wire form", () => {
+      const wire = col.encode(new Date(Date.UTC(2024, 0, 15, 10, 30, 0, 123)));
+      expect(wire).toBe("1705314600123");
+      expect(col.decode(wire)).toEqual(new Date(Date.UTC(2024, 0, 15, 10, 30, 0, 123)));
+    });
+
+    /** @scenario encoding a Date produces the exact epoch-millisecond wire string */
+    it("encodes the epoch and the instant it decodes back to agree", () => {
+      const original = new Date(Date.UTC(2024, 5, 1, 0, 0, 0, 0));
+      expect(col.decode(col.encode(original))).toEqual(original);
+    });
+
+    it("decodes the Unix epoch", () => {
+      expect(col.decode("0")).toEqual(new Date(0));
+    });
+  });
+
+  describe("given a malformed cell", () => {
+    it("throws on a negative value", () => {
+      expect(() => col.decode("-1")).toThrow();
+    });
+
+    it("throws on a non-numeric string", () => {
+      expect(() => col.decode("not-a-number")).toThrow();
+    });
+
+    it("throws when handed a JS number instead of the wire string", () => {
+      expect(() => col.decode(1_700_000_000_000)).toThrow();
+    });
+  });
+
+  describe("given a value that does not fit safely in a JS number", () => {
+    /** @scenario decoding a UInt64 beyond Number.MAX_SAFE_INTEGER throws instead of losing precision */
+    it("throws rather than silently rounding", () => {
+      const beyondSafeInteger = (BigInt(Number.MAX_SAFE_INTEGER) + 1n).toString();
+      expect(() => col.decode(beyondSafeInteger)).toThrow();
+    });
+
+    it("throws on a value inside the safe-integer range but outside Date's own range", () => {
+      // Date's time value tops out at 8.64e15ms; Number.MAX_SAFE_INTEGER is
+      // 9,007,199,254,740,991 — a value between the two is a safe integer
+      // but still not a representable Date.
+      expect(() => col.decode("9000000000000001")).toThrow();
+    });
+  });
+});
+
+describe("epoch-millisecond time roles", () => {
+  describe("given occurredAtEpochMillis", () => {
+    it("carries the same role and flags as occurredAt, wired as UInt64", () => {
+      const col = ch.occurredAtEpochMillis();
+      expect(col.chType).toBe("UInt64");
+      expect(col.timeRole).toBe("occurredAt");
+      expect(col.frozen).toBe(false);
+      expect(col.platformControlled).toBe(false);
+    });
+  });
+
+  describe("given acceptedAtEpochMillis", () => {
+    /** @scenario a UInt64-backed acceptedAt column is still frozen and platform-controlled */
+    it("carries the same role and flags as acceptedAt, wired as UInt64", () => {
+      const col = ch.acceptedAtEpochMillis();
+      expect(col.chType).toBe("UInt64");
+      expect(col.timeRole).toBe("acceptedAt");
+      expect(col.frozen).toBe(true);
+      expect(col.platformControlled).toBe(true);
+    });
+  });
+
+  describe("given lastAcceptedAtEpochMillis", () => {
+    it("carries the same role and flags as lastAcceptedAt, wired as UInt64", () => {
+      const col = ch.lastAcceptedAtEpochMillis();
+      expect(col.chType).toBe("UInt64");
+      expect(col.timeRole).toBe("lastAcceptedAt");
+      expect(col.frozen).toBe(false);
+      expect(col.platformControlled).toBe(true);
+    });
+  });
+
+  describe("given writtenAtEpochMillis", () => {
+    /** @scenario a UInt64-backed writtenAt column is still platform-controlled and moving */
+    it("carries the same role and flags as writtenAt, wired as UInt64", () => {
+      const col = ch.writtenAtEpochMillis();
+      expect(col.chType).toBe("UInt64");
+      expect(col.timeRole).toBe("writtenAt");
+      expect(col.frozen).toBe(false);
+      expect(col.platformControlled).toBe(true);
+    });
+  });
+
+  describe("given a decode/encode round trip through any of the four", () => {
+    it("agrees with the plain epochMillis codec, because the role wrapper only adds flags", () => {
+      const original = new Date(Date.UTC(2026, 6, 30, 12, 0, 0, 0));
+      const wire = ch.acceptedAtEpochMillis().encode(original);
+      expect(ch.epochMillis().decode(wire)).toEqual(original);
     });
   });
 });

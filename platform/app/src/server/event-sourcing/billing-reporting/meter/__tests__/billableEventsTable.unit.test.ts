@@ -27,7 +27,10 @@ describe("billableEventsTable", () => {
   });
 
   it("is a ReplacingMergeTree versioned on UpdatedAt, matching the real table's merge strategy", () => {
-    expect(billableEventsTable.merge).toEqual({ kind: "replacing", version: "UpdatedAt" });
+    expect(billableEventsTable.merge).toEqual({
+      kind: "replacing",
+      version: "UpdatedAt",
+    });
   });
 
   it("is tenant-scoped by both TenantId and OrganizationId, matching the schema catalogue", () => {

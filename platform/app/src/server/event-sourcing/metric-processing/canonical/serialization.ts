@@ -16,15 +16,9 @@ export const isRecord = (value: unknown): value is UnknownRecord =>
 /**
  * Deterministic JSON: object keys sort, array order is preserved (arrays are
  * positionally meaningful in OTLP; objects are not). Every non-JSON-native
- * value OTLP can hand us gets a stable, lossless encoding rather than being
- * dropped or coerced:
- *
- * - `undefined` -> a sentinel object, so a present-but-undefined field is
- *   distinguishable from an absent key.
- * - `bigint` -> its decimal string.
- * - non-finite `number` (NaN, +-Infinity) -> a sentinel carrying its string
- *   form, since `JSON.stringify` would otherwise silently emit `null`.
- * - `Uint8Array` -> base64.
+ * value gets a stable, lossless encoding — `undefined` and non-finite numbers
+ * become sentinels rather than the `null` `JSON.stringify` would emit, `bigint`
+ * its decimal string, `Uint8Array` base64.
  */
 export function stableStringify(value: unknown): string {
   const seen = new WeakSet<object>();

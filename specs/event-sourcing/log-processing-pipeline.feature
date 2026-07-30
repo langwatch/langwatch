@@ -25,7 +25,7 @@ Feature: The log pipeline is one content-addressed aggregate, mapped straight to
   projection land in, and what mount shape the projection is allowed to take.
 
   Background:
-    Given the log aggregate, declared with one event and one command
+    Given the log pipeline, declared with one event, one command and one projection
 
   Scenario: A log record's aggregate id is its own content hash
     Given a canonical log record

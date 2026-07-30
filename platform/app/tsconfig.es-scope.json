@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.tsgo.json",
+  "include": [
+    "src/server/event-sourcing/simulation-processing/**/*.ts",
+    "src/server/event-sourcing/experiment-run-processing/**/*.ts"
+  ],
+  "exclude": []
+}

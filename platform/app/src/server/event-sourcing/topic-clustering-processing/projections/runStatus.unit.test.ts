@@ -7,36 +7,41 @@ import { topicClustering } from "../aggregate";
 import { mintManualRunId, mintScheduledRunId } from "../runIdentity";
 import type { RequestedData, RunCompletedData, RunFailedData } from "../schema";
 import {
-  applyRunStatusEvent,
   deriveRunStatusView,
   initRunStatusState,
+  type RunStatusState,
+  topicClusteringRunStatus,
 } from "./runStatus";
 
-// Built through `topicClustering.events.*`, the aggregate's own derived
-// creators — never a hand-typed `{ type: "topic_clustering/...", data }`
-// literal, so a rename in `aggregate.ts` fails these fixtures at the
-// compiler rather than at a mismatched string silently never dispatching.
+const PROJECT_ID = "project-1";
+
+// Built through the aggregate's own derived creators, never a hand-typed
+// `{ type: "...", data }` literal, so a rename fails at the compiler rather
+// than at a string that silently never dispatches.
 const requested = (
   overrides: Partial<Pick<RequestedData, "trigger" | "occurredAt">> = {},
 ) =>
   topicClustering.events.requested({
+    projectId: PROJECT_ID,
     trigger: "manual",
     occurredAt: 1_700_000_000_000,
     ...overrides,
   });
 
-const runStarted = (runId: string) =>
+const runStarted = (runId: string, page = 1) =>
   topicClustering.events.runStarted({
+    projectId: PROJECT_ID,
     runId,
-    page: 1,
+    page,
     occurredAt: 1_700_000_000_000,
   });
 
 const runCompleted = (
   runId: string,
-  overrides: Partial<Omit<RunCompletedData, "runId">> = {},
+  overrides: Partial<Omit<RunCompletedData, "runId" | "projectId">> = {},
 ) =>
   topicClustering.events.runCompleted({
+    projectId: PROJECT_ID,
     runId,
     page: 1,
     mode: "batch",
@@ -49,9 +54,10 @@ const runCompleted = (
 
 const runFailed = (
   runId: string,
-  overrides: Partial<Omit<RunFailedData, "runId">> = {},
+  overrides: Partial<Omit<RunFailedData, "runId" | "projectId">> = {},
 ) =>
   topicClustering.events.runFailed({
+    projectId: PROJECT_ID,
     runId,
     page: 1,
     error: "boom",
@@ -59,10 +65,13 @@ const runFailed = (
     ...overrides,
   });
 
+const apply = (state: RunStatusState, event: AggregateEvent) =>
+  topicClusteringRunStatus.apply(state, event);
+
 describe("topicClusteringRunStatus fold", () => {
   describe("given a request event", () => {
     it("records the last requested time and trigger", () => {
-      const state = applyRunStatusEvent(
+      const state = apply(
         initRunStatusState(),
         requested({ trigger: "manual" }),
       );
@@ -71,11 +80,8 @@ describe("topicClusteringRunStatus fold", () => {
     });
 
     it("ignores a request whose occurredAt is not newer than what is already recorded", () => {
-      const afterNewer = applyRunStatusEvent(
-        applyRunStatusEvent(
-          initRunStatusState(),
-          requested({ occurredAt: 2_000 }),
-        ),
+      const afterNewer = apply(
+        apply(initRunStatusState(), requested({ occurredAt: 2_000 })),
         requested({ occurredAt: 1_000, trigger: "bootstrap" }),
       );
       expect(afterNewer.lastRequestedAt).toBe(2_000);
@@ -87,44 +93,45 @@ describe("topicClusteringRunStatus fold", () => {
     /** @scenario A run in progress is visible while it is still working */
     it("shows the run in progress once it has started but not finished", () => {
       const runId = mintManualRunId(1_700_000_000_000);
-      const state = applyRunStatusEvent(
-        initRunStatusState(),
-        runStarted(runId),
+      const view = deriveRunStatusView(
+        apply(initRunStatusState(), runStarted(runId)),
       );
-      const view = deriveRunStatusView(state);
       expect(view.isRunInProgress).toBe(true);
       expect(view.inProgressRunId).toBe(runId);
       expect(view.lastRun).toBeNull();
     });
 
     /** @scenario A large backlog is processed page by page through durable cursors */
-    it("keeps the run in progress and accumulates counts across continuation pages", () => {
+    it("keeps the run in progress and records each page's traces under its own page", () => {
       const runId = mintManualRunId(1_700_000_000_000);
       let state = initRunStatusState();
-      state = applyRunStatusEvent(state, runStarted(runId));
-      state = applyRunStatusEvent(
+      state = apply(state, runStarted(runId));
+      state = apply(
         state,
-        runCompleted(runId, { tracesProcessed: 4, nextSearchAfter: [1, "t1"] }),
+        runCompleted(runId, {
+          page: 1,
+          tracesProcessed: 4,
+          nextSearchAfter: [1, "t1"],
+        }),
       );
-      state = applyRunStatusEvent(
+      state = apply(
         state,
-        runCompleted(runId, { tracesProcessed: 6, nextSearchAfter: [2, "t2"] }),
+        runCompleted(runId, {
+          page: 2,
+          tracesProcessed: 6,
+          nextSearchAfter: [2, "t2"],
+        }),
       );
 
-      const view = deriveRunStatusView(state);
-      expect(view.isRunInProgress).toBe(true);
-      expect(state.currentRunTracesSeen).toBe(10);
-      expect(state.currentRunPagesSeen).toBe(2);
+      expect(deriveRunStatusView(state).isRunInProgress).toBe(true);
+      expect(state.currentRunPages).toEqual({ 1: 4, 2: 6 });
     });
 
     it("settles as completed once the final page (no continuation cursor) lands", () => {
       const runId = mintManualRunId(1_700_000_000_000);
       let state = initRunStatusState();
-      state = applyRunStatusEvent(state, runStarted(runId));
-      state = applyRunStatusEvent(
-        state,
-        runCompleted(runId, { tracesProcessed: 10 }),
-      );
+      state = apply(state, runStarted(runId));
+      state = apply(state, runCompleted(runId, { tracesProcessed: 10 }));
 
       const view = deriveRunStatusView(state);
       expect(view.isRunInProgress).toBe(false);
@@ -139,7 +146,7 @@ describe("topicClusteringRunStatus fold", () => {
 
     it("settles as skipped when the gate declined and no traces were processed", () => {
       const runId = mintManualRunId(1_700_000_000_000);
-      const state = applyRunStatusEvent(
+      const state = apply(
         initRunStatusState(),
         runCompleted(runId, {
           tracesProcessed: 0,
@@ -154,12 +161,15 @@ describe("topicClusteringRunStatus fold", () => {
     it("settles as failed and zeroes the counts, keeping the raw error only in state", () => {
       const runId = mintManualRunId(1_700_000_000_000);
       let state = initRunStatusState();
-      state = applyRunStatusEvent(state, runStarted(runId));
-      state = applyRunStatusEvent(
+      state = apply(state, runStarted(runId));
+      state = apply(
         state,
-        runCompleted(runId, { tracesProcessed: 5, nextSearchAfter: [1, "t1"] }),
+        runCompleted(runId, {
+          tracesProcessed: 5,
+          nextSearchAfter: [1, "t1"],
+        }),
       );
-      state = applyRunStatusEvent(
+      state = apply(
         state,
         runFailed(runId, {
           error: "internal stack trace, never shown to a customer",
@@ -175,8 +185,6 @@ describe("topicClusteringRunStatus fold", () => {
         topicsCount: 0,
         subtopicsCount: 0,
       });
-      // The raw message is in state (operator-facing) but the view never
-      // surfaces it — only errorCode/isErrorUserActionable are customer-safe.
       expect(state.currentRunTerminal?.errorMessage).toContain("stack trace");
       expect(view.lastRun).not.toHaveProperty("errorMessage");
     });
@@ -184,15 +192,16 @@ describe("topicClusteringRunStatus fold", () => {
     /** @scenario A failure the user can fix shows guidance, not a stack trace */
     it("marks a user-actionable failure so the settings page can show guidance", () => {
       const runId = mintManualRunId(1_700_000_000_000);
-      const state = applyRunStatusEvent(
-        initRunStatusState(),
-        runFailed(runId, {
-          error: "no default model configured",
-          errorCode: "model_provider_not_configured",
-          isUserActionable: true,
-        }),
+      const view = deriveRunStatusView(
+        apply(
+          initRunStatusState(),
+          runFailed(runId, {
+            error: "no default model configured",
+            errorCode: "model_provider_not_configured",
+            isUserActionable: true,
+          }),
+        ),
       );
-      const view = deriveRunStatusView(state);
       expect(view.lastRun?.errorCode).toBe("model_provider_not_configured");
       expect(view.lastRun?.isErrorUserActionable).toBe(true);
     });
@@ -205,50 +214,59 @@ describe("topicClusteringRunStatus fold", () => {
       const newer = mintScheduledRunId(Date.UTC(2026, 6, 18, 9, 30, 0));
 
       let state = initRunStatusState();
-      state = applyRunStatusEvent(state, runStarted(older));
-      state = applyRunStatusEvent(
+      state = apply(state, runStarted(older));
+      state = apply(
         state,
         runCompleted(older, {
+          page: 1,
           tracesProcessed: 999,
           nextSearchAfter: [1, "t1"],
         }),
       );
-      // The newer run starts before the older one's stale continuation page
-      // is (re)delivered — legal under best-effort ordering.
-      state = applyRunStatusEvent(state, runStarted(newer));
-      // A stale straggler from the superseded older run arrives late.
-      state = applyRunStatusEvent(
+      // The newer run starts before the older one's stale continuation page is
+      // (re)delivered — legal under best-effort ordering.
+      state = apply(state, runStarted(newer));
+      state = apply(
         state,
         runCompleted(older, {
+          page: 2,
           tracesProcessed: 111,
           nextSearchAfter: [2, "t2"],
         }),
       );
 
       expect(state.currentRunId).toBe(newer);
-      // The stale page's 111 traces must never land on the newer run.
-      expect(state.currentRunTracesSeen).toBe(0);
+      expect(state.currentRunPages).toEqual({});
     });
   });
 
   describe("order invariance (ADR-098 decision 4)", () => {
     /** @scenario A large backlog is processed page by page through durable cursors */
-    it("reaches the same state regardless of the order a run's pages are delivered in", () => {
+    it("reaches the same state under every order and every re-delivery of a run's pages", () => {
       const runId = mintManualRunId(1_700_000_000_000);
       const events: AggregateEvent[] = [
         runStarted(runId),
-        runCompleted(runId, { tracesProcessed: 4, nextSearchAfter: [1, "t1"] }),
-        runCompleted(runId, { tracesProcessed: 6, nextSearchAfter: [2, "t2"] }),
-        runCompleted(runId, { tracesProcessed: 2 }),
+        runCompleted(runId, {
+          page: 1,
+          tracesProcessed: 4,
+          nextSearchAfter: [1, "t1"],
+        }),
+        runCompleted(runId, {
+          page: 2,
+          tracesProcessed: 6,
+          nextSearchAfter: [2, "t2"],
+        }),
+        runCompleted(runId, { page: 3, tracesProcessed: 2 }),
       ];
 
       const report = checkOrderInvariance({
         init: initRunStatusState,
-        apply: applyRunStatusEvent,
+        apply,
         events,
       });
 
       expect(report.invariant).toBe(true);
+      expect(report.duplicatesChecked).toBe(events.length);
     });
 
     it("reaches the same state regardless of the order two competing requests are delivered in", () => {
@@ -260,7 +278,7 @@ describe("topicClusteringRunStatus fold", () => {
 
       const report = checkOrderInvariance({
         init: initRunStatusState,
-        apply: applyRunStatusEvent,
+        apply,
         events,
       });
       expect(report.invariant).toBe(true);
@@ -272,40 +290,34 @@ describe("topicClusteringRunStatus fold", () => {
       const events: AggregateEvent[] = [
         runStarted(older),
         runCompleted(older, {
+          page: 1,
           tracesProcessed: 999,
           nextSearchAfter: [1, "t1"],
         }),
         runStarted(newer),
         runCompleted(older, {
+          page: 2,
           tracesProcessed: 111,
           nextSearchAfter: [2, "t2"],
         }),
-        runCompleted(newer, { tracesProcessed: 7 }),
+        runCompleted(newer, { page: 1, tracesProcessed: 7 }),
       ];
 
       const report = checkOrderInvariance({
         init: initRunStatusState,
-        apply: applyRunStatusEvent,
+        apply,
         events,
       });
       expect(report.invariant).toBe(true);
     });
 
     /**
-     * A documented BOUNDARY, not a passing property. `currentRunTerminal`
-     * is "sticky-once": whichever terminal event a run's row sees FIRST
-     * wins, so if a single run somehow produced both a completion and a
-     * failure, which one sticks would genuinely depend on delivery order.
-     * The fold does not — and cannot, from inside `apply` alone — rule
-     * this out; what rules it out is an operational invariant one layer up
-     * (the process manager only ever calls ONE of
-     * recordClusteringRunCompleted/recordClusteringRunFailed for a given
-     * page — `process-manager/schedule.ts`'s `evolveRunCompleted`/
-     * `evolveRunFailed` are mutually exclusive per intent). This test
-     * exists so that boundary is visible and pinned, rather than silently
-     * assumed: it asserts the harness DOES find a counterexample here, so
-     * a future change that removes the process manager's mutual-exclusion
-     * guarantee fails loudly here first, not in production.
+     * A pinned boundary, not a passing property. The terminal outcome is
+     * frozen on first write, so a run reporting BOTH a completion and a
+     * failure would settle differently depending on which arrived first.
+     * Nothing inside `apply` can rule that out; the process manager's
+     * mutual exclusion does. This fails loudly here first if that ever stops
+     * holding.
      */
     it("is order-dependent ONLY for the operationally-impossible case of a run reporting both outcomes", () => {
       const runId = mintManualRunId(1_700_000_000_000);
@@ -317,7 +329,7 @@ describe("topicClusteringRunStatus fold", () => {
 
       const report = checkOrderInvariance({
         init: initRunStatusState,
-        apply: applyRunStatusEvent,
+        apply,
         events,
       });
       expect(report.invariant).toBe(false);

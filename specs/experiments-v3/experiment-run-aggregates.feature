@@ -1,7 +1,7 @@
 Feature: Experiment run totals are derived from its items
-  An experiment run records the facts that belong to the run itself — what was
-  run, against what, and when it started, stopped or finished. Its counts,
-  costs and scores are computed from the run's items at read time. (ADR-072.)
+  An experiment run records the details that belong to the run itself — what
+  was run, against what, and when it started, stopped or finished. Its counts,
+  costs and scores are computed from the run's items at read time. (ADR-103.)
   Scenarios marked @unimplemented are the parts of that ADR the read path has
   not taken over yet; each one names what still stands in the way.
 
@@ -11,11 +11,21 @@ Feature: Experiment run totals are derived from its items
   # --- What the run itself holds ---
 
   @unit
-  Scenario: Run-level facts survive with no items
+  Scenario: Run-level details survive with no items
     Given an experiment run that was started and then stopped before any item completed
     When the user opens the run
     Then the experiment, the targets and the expected total are reported
     And the run is reported as stopped
+
+  # `experiment_runs` is partitioned by the run's start, so a start that moves
+  # files one run in two partitions, and a ReplacingMergeTree never collapses
+  # two versions that landed in different ones.
+  @unit
+  Scenario: A run's start time is frozen at the first start it observed
+    Given an experiment run that was started
+    When a further started event arrives carrying an earlier time
+    Then the run still reports the start time it was first given
+    And the stored row is never stamped from the clock of whoever wrote it
 
   # --- Derivation ---
 
@@ -27,19 +37,15 @@ Feature: Experiment run totals are derived from its items
     And the total cost and duration are summed from those items
     And the average score and pass rate are computed from the graded items
 
-  # The run's counts ARE folded incrementally
-  # (`CompletedCount`/`FailedCount`/`TotalScoreSum` `+= 1` as each result
-  # arrives), which is correct: the executor recognises a redelivered event from
-  # the applied-event-id watermark and skips it, so the increment happens once
-  # per event rather than once per delivery.
-  #
-  # That watermark used to live only on the Redis fold-cache entry, leaving one
-  # window where a retry could re-apply a result the durable row already held —
-  # a cold cache. `Progress` is what the run page renders as `{progress}/{total}`,
-  # so the drift showed as "11/10" beside ten items, and with
-  # `refoldOnOutOfOrder: false` nothing ever re-derived it. Migration 00064 gives
-  # `experiment_runs` an `AppliedEventIds` column and the store a
-  # `getWithApplied`, so the watermark survives cache loss.
+  # The run row keeps no counters at all — no `CompletedCount`, no
+  # `TotalScoreSum`, no applied-event-id watermark (ADR-098 decision 5;
+  # ADR-103 decision 1). Each item is its own row keyed by its natural
+  # identity, so a redelivered result collapses onto the same row instead of
+  # adding a second one, and the run's counts are a query over those rows at
+  # read time. There is nothing to re-derive on a cold cache, because there is
+  # nothing cached to fall behind: the "11/10"-beside-ten-items drift this once
+  # produced was a property of the old incremental counter, not of the item
+  # rows that replaced it.
   @unit
   Scenario: A repeated item result does not inflate the run
     Given an experiment run with one completed item

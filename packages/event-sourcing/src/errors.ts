@@ -1,27 +1,8 @@
 /**
- * The package's error taxonomy.
- *
- * The rule the repository applies (`dev/docs/best_practices/error-handling.md`,
- * ADR-045) is that a `HandledError` is raised only when the cause is known
- * *and* the caller can act on it; everything else stays a plain `Error` and
- * degrades to a generic failure with a trace id.
- *
- * Applied here, that means **the core raises no `HandledError`**. Its callers
- * are our own workers, not a customer request, and none of the failures below
- * has a customer-facing remedy: a misconfigured projection is fixed by changing
- * code, and an undecodable row is fixed by an operator running a replay. Coding
- * them as handled would promise a caller an action it does not have, and would
- * ship internal detail through a REST boundary that serialises handled errors
- * verbatim.
- *
- * Handled errors belong where a customer request is being served — the
- * ClickHouse client's error mapping (ADR-104) and the application's read paths.
- * When the store adapters land here they will map infrastructure failures to
- * plain errors and let the boundary classify them.
- *
- * What these errors do carry is structure. Every one exposes a `context` object
- * that goes to the log line as fields, so the failure is queryable by attribute
- * rather than by matching on message prose.
+ * The core raises no `HandledError`: its callers are workers, and none of these
+ * failures has a customer-facing remedy (ADR-045). Every error carries a
+ * `context` object that reaches the log line as fields, so a failure is
+ * queryable by attribute rather than by matching on message prose.
  */
 
 export type ErrorContext = Readonly<Record<string, unknown>>;

@@ -53,7 +53,7 @@ builder throws on a mismatch.
   group key.
 - `enqueue.filter` runs at fan-out, before a job is staged, so a declined event
   costs nothing. `enqueue.stage` swaps the staged payload for a claim-check
-  reference (ADR-069).
+  reference (ADR-069, retired; ground now ADR-098).
 - `disabled` is the compile-time off switch; `killSwitch` is the per-tenant
   runtime one.
 
@@ -174,7 +174,7 @@ content is not copied into Postgres.
 
 ## What no longer exists
 
-The reactor is retired (ADR-075). `ReactorDefinition`, `ReactorContext`,
+The reactor is retired (ADR-075, retired; ground now ADR-098). `ReactorDefinition`, `ReactorContext`,
 `ReactorOptions` and `withReactor` are gone, as are the earlier fold-bound
 `withSubscriber` and the `withOutbox` primitive before it. The builder's whole
 surface is `withName`, `withAggregateType`, `withProjection`,

@@ -22,7 +22,7 @@ import type { TableDefinition, TableRow } from "../schema/defineTable";
 import { createRowCodec, type AnyWireColumn, type WireCodec } from "../codec/rowCodec";
 
 /**
- * Thrown at construction when a `createAppendStore` call targets a table this
+ * Thrown at construction when a `clickhouseAppend` call targets a table this
  * adapter cannot serve — before any record is ever written.
  */
 export class AppendStoreConfigurationError extends Error {
@@ -32,8 +32,8 @@ export class AppendStoreConfigurationError extends Error {
   }
 }
 
-/** What `createAppendStore` needs to wire an `AppendStore<Rec>` onto one table. */
-export interface AppendStoreArgs<
+/** What `clickhouseAppend` needs to wire an `AppendStore<Rec>` onto one table. */
+export interface ClickHouseAppendArgs<
   Rec,
   Columns extends ColumnMap,
 > {
@@ -61,10 +61,10 @@ export interface AppendStoreArgs<
  * exactly what `MergeStore` — not this adapter — requires at the type level
  * (ADR-099).
  */
-export function createAppendStore<
+export function clickhouseAppend<
   Rec,
   Columns extends ColumnMap,
->(args: AppendStoreArgs<Rec, Columns>): AppendStore<Rec> {
+>(args: ClickHouseAppendArgs<Rec, Columns>): AppendStore<Rec> {
   const { client, table, toRow } = args;
   const codec = args.codec ?? createRowCodec();
 
@@ -72,7 +72,7 @@ export function createAppendStore<
   if (merge.kind === "aggregating") {
     throw new AppendStoreConfigurationError(
       `append store for table "${table.name}": table declares merge kind "aggregating", ` +
-        `but createAppendStore only adopts "append" or "replacing" tables (ADR-099) — ` +
+        `but clickhouseAppend only adopts "append" or "replacing" tables (ADR-099) — ` +
         `an aggregating table combines rows on merge, which is not idempotent under ` +
         `redelivery, and needs a declared idempotency story a MergeStore adapter enforces`,
     );
@@ -90,9 +90,7 @@ export function createAppendStore<
       ? { kind: "append", perRecordIdentity: false }
       : { kind: "replacing" };
 
-  const wireColumns: AnyWireColumn[] = table.columnNames.map(
-    (name) => (table.columns as ColumnMap)[name]!,
-  );
+  const wireColumns: readonly AnyWireColumn[] = table.wireColumns;
 
   return {
     kind: "append",

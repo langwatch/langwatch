@@ -74,6 +74,14 @@ function createFakeClient(
   };
 }
 
+/** Substitutes each bound `Identifier` back in, so a shape is readable. */
+function readable(call: QueryOptions): string {
+  return call.sql.replace(
+    /\{(id\d+):Identifier\}/g,
+    (_match, key: string) => String((call.params as Record<string, unknown>)[key]),
+  );
+}
+
 describe("deriveExperimentRunTotals", () => {
   describe("given a run with no items", () => {
     it("reports zero counts and null rates rather than throwing", async () => {
@@ -231,7 +239,8 @@ describe("deriveExperimentRunTotals", () => {
         runId: "run-1",
         experimentId: "exp-1",
       });
-      expect(call.sql).toContain("TenantId = {tenantId:String}");
+      expect(call.sql).not.toContain("experiment_run_items");
+      expect(readable(call)).toContain("TenantId = {tenantId:String}");
     });
 
     /** @scenario "A repeated item result does not inflate the run" */
@@ -245,7 +254,7 @@ describe("deriveExperimentRunTotals", () => {
         experimentId: "exp-1",
       });
 
-      const sql = client.queryCalls[0]!.sql;
+      const sql = readable(client.queryCalls[0]!);
       expect(sql).toContain("GROUP BY TenantId, RunId, ProjectionId");
       expect(sql).toMatch(/IN \(/);
     });
@@ -264,7 +273,7 @@ describe("deriveExperimentRunTotals", () => {
         },
       });
 
-      const sql = client.queryCalls[0]!.sql;
+      const sql = readable(client.queryCalls[0]!);
       const innerSubquery = sql.slice(sql.indexOf("IN ("));
       expect(sql).toContain("t.OccurredAt >= {occurredAtFrom:DateTime64(3)}");
       expect(innerSubquery).not.toContain("occurredAtFrom");

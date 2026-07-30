@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  type ClickHouseClient,
+  ch,
+  createRowCodec,
+  defineTable,
+  replacing,
+  type TableRow,
+} from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 /**
  * GovernanceKpisClickHouseRepository — write side of the
@@ -13,16 +21,62 @@ import { createLogger } from "@langwatch/observability";
  * standard IN-tuple dedup pattern when pre-merge state matters.
  *
  * Spec: specs/ai-gateway/governance/folds.feature
- * Migration: 00021_create_governance_kpis.sql
+ * Migrations: 00031_create_governance_kpis.sql,
+ *             00065_governance_kpis_event_grain.sql (EventId + sort key)
  */
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { assertSingleTenantBatch } from "./singleTenantBatch";
-
-const TABLE_NAME = "governance_kpis" as const;
 
 const logger = createLogger(
   "langwatch:governance:governance-kpis-clickhouse-repository",
 );
+
+/**
+ * `HourBucket` is a plain `DateTime`, no ADR-099 time role — `ch.dateTime()`
+ * matches the deployed DDL exactly. It anchors the partition anyway: it is
+ * part of this row's own sort-key identity, so it never moves once written,
+ * even though customer event timing (not the platform) decides its value.
+ *
+ * `LastEventOccurredAt` is the `ReplacingMergeTree` version but carries the
+ * contributing span's own `occurredAt` (migration 00063), not our write
+ * clock — its true role is `occurredAt`. Both are registered below as
+ * structural debt this table cannot re-key without a migration (ADR-099).
+ */
+const table = defineTable({
+  name: "governance_kpis",
+  merge: replacing({ version: "LastEventOccurredAt" }),
+  sortKey: ["TenantId", "SourceId", "HourBucket", "TraceId", "EventId"],
+  partition: { by: "toYYYYMM(HourBucket)", column: "HourBucket" },
+  tenant: ["TenantId"],
+  structuralDebt: [
+    {
+      column: "HourBucket",
+      reason:
+        "HourBucket is a plain DateTime derived from customer event time and anchors the partition; it is frozen only because it is part of this row's own sort-key identity, not because the platform set it",
+    },
+    {
+      column: "LastEventOccurredAt",
+      reason:
+        "LastEventOccurredAt is the contributing span's own occurredAt (customer time), not our write clock, but migration 00063's per-span key makes it order two versions of the same row correctly anyway",
+    },
+  ],
+  columns: {
+    TenantId: ch.string(),
+    SourceId: ch.string(),
+    HourBucket: ch.dateTime(),
+    TraceId: ch.string(),
+    EventId: ch.string(),
+    SourceType: ch.lowCardinality(ch.string()),
+    SpendUsd: ch.float64(),
+    PromptTokens: ch.uint64(),
+    CompletionTokens: ch.uint64(),
+    CreatedAt: ch.dateTime64(3),
+    LastEventOccurredAt: ch.occurredAt(),
+  },
+});
+
+type Row = TableRow<typeof table.columns>;
+
+const codec = createRowCodec();
 
 export interface GovernanceKpiContribution {
   tenantId: string;
@@ -36,7 +90,8 @@ export interface GovernanceKpiContribution {
    *
    * Part of the sorting key since migration 00063, which is what makes a
    * re-derivation collapse onto the row it re-derives instead of adding a
-   * second one. Optional so pre-ADR-075 writers (the retired reactor,
+   * second one. Optional so pre-ADR-075 (retired; ground now ADR-098)
+   * writers (the retired reactor,
    * whose rows are trace-grained) still type-check; those rows carry the
    * column's `''` default and keep deduping among themselves at trace
    * grain. New writers MUST set it.
@@ -48,18 +103,27 @@ export interface GovernanceKpiContribution {
   lastEventOccurredAt: Date;
 }
 
-/** Row shape on the wire; field names match the ClickHouse columns exactly. */
-function toRow(row: GovernanceKpiContribution) {
+/**
+ * `LastEventOccurredAt` is the ReplacingMergeTree version despite its
+ * registered structural debt: identical on re-derivation of the same span (a
+ * content-identical tie is harmless) and strictly later on a genuine
+ * re-report (so the newer report wins). `CreatedAt` carries no such
+ * contract, so it takes one shared write instant per batch instead of being
+ * left to the column's own `DEFAULT now64(3)` — the positional wire form
+ * has no way to omit a declared column and fall back to a server default.
+ */
+function toRow(row: GovernanceKpiContribution, writtenAt: Date): Row {
   return {
     TenantId: row.tenantId,
     SourceId: row.sourceId,
-    SourceType: row.sourceType,
     HourBucket: row.hourBucket,
     TraceId: row.traceId,
     EventId: row.eventId ?? "",
+    SourceType: row.sourceType,
     SpendUsd: row.spendUsd,
-    PromptTokens: row.promptTokens,
-    CompletionTokens: row.completionTokens,
+    PromptTokens: BigInt(Math.round(row.promptTokens)),
+    CompletionTokens: BigInt(Math.round(row.completionTokens)),
+    CreatedAt: writtenAt,
     LastEventOccurredAt: row.lastEventOccurredAt,
   };
 }
@@ -76,32 +140,13 @@ function assertInsertable(
 }
 
 export class GovernanceKpisClickHouseRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  constructor(
+    private readonly resolveClient: (tenantId: string) => ClickHouseClient,
+  ) {}
 
   async insertContribution(row: GovernanceKpiContribution): Promise<void> {
     assertInsertable(row, "insertContribution");
-    try {
-      const client = await this.resolveClient(row.tenantId);
-      await client.insert({
-        table: TABLE_NAME,
-        values: [toRow(row)],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      logger.error(
-        {
-          tenantId: row.tenantId,
-          sourceId: row.sourceId,
-          traceId: row.traceId,
-          error: errorMessage,
-        },
-        "Failed to insert governance_kpis contribution",
-      );
-      throw error;
-    }
+    await this.insertRows([row]);
   }
 
   /**
@@ -115,26 +160,42 @@ export class GovernanceKpisClickHouseRepository {
   async insertContributions(rows: GovernanceKpiContribution[]): Promise<void> {
     if (rows.length === 0) return;
     for (const row of rows) assertInsertable(row, "insertContributions");
+    await this.insertRows(rows);
+  }
 
+  private async insertRows(rows: GovernanceKpiContribution[]): Promise<void> {
     const tenantId = assertSingleTenantBatch(
       rows,
-      "GovernanceKpisClickHouseRepository.insertContributions",
+      "GovernanceKpisClickHouseRepository",
     );
 
+    const writtenAt = new Date();
+    const encodedRows = codec.encodeRows({
+      columns: table.wireColumns,
+      columnNames: table.columnNames,
+      rows: rows.map((row) => toRow(row, writtenAt)),
+    });
+
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.resolveClient(tenantId);
       await client.insert({
-        table: TABLE_NAME,
-        values: rows.map(toRow),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+        tenantId,
+        table: table.name,
+        rows: encodedRows,
+        columns: table.columnNames,
+        // Retryable: LastEventOccurredAt is the replacing version, so a
+        // redelivered batch collapses at merge instead of duplicating
+        // (ADR-104 §2).
+        target: { kind: "replacing" },
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
       logger.error(
-        { tenantId, rowCount: rows.length, error: errorMessage },
-        "Failed to insert governance_kpis contribution batch",
+        {
+          tenantId,
+          rowCount: rows.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to insert governance_kpis contribution(s)",
       );
       throw error;
     }

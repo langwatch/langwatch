@@ -6,9 +6,10 @@ import { describe, expect, it } from "vitest";
 import { topicClustering } from "../aggregate";
 import type { TopicModelEntry, TopicsRecordedData } from "../schema";
 import {
-  applyTopicModelEvent,
   deriveTopicModelView,
   initTopicModelState,
+  type TopicModelState,
+  topicModel,
 } from "./topicModel";
 
 function topic(
@@ -27,19 +28,23 @@ function topic(
   };
 }
 
-// Built through `topicClustering.events.topicsRecorded` — see
-// `runStatus.unit.test.ts`'s identical note for why this never hand-types a
-// `topic_clustering/...` literal.
+// Built through the aggregate's own derived creator, never a hand-typed type
+// string — see `runStatus.unit.test.ts`'s identical note.
 const recorded = (overrides: Partial<TopicsRecordedData> = {}) =>
   topicClustering.events.topicsRecorded({
+    projectId: "project-1",
     mode: "replace",
     source: "clustering",
+    dedupeKey: "run:run-1:page-1",
     topics: [],
     occurredAt: 1_000,
     ...overrides,
   });
 
-function topicIds(state: ReturnType<typeof initTopicModelState>): string[] {
+const apply = (state: TopicModelState, event: AggregateEvent) =>
+  topicModel.apply(state, event);
+
+function topicIds(state: TopicModelState): string[] {
   return deriveTopicModelView(state)
     .topics.map((t) => t.id)
     .sort();
@@ -49,25 +54,22 @@ describe("topicModel fold", () => {
   /** @scenario A batch clustering run replaces the topic model through the stream */
   it("replaces the model wholesale on a replace-mode event", () => {
     let state = initTopicModelState();
-    state = applyTopicModelEvent(
+    state = apply(
       state,
       recorded({ topics: [topic("a"), topic("b")], occurredAt: 1_000 }),
     );
-    state = applyTopicModelEvent(
-      state,
-      recorded({ topics: [topic("c")], occurredAt: 2_000 }),
-    );
+    state = apply(state, recorded({ topics: [topic("c")], occurredAt: 2_000 }));
     expect(topicIds(state)).toEqual(["c"]);
   });
 
   /** @scenario An incremental clustering run extends the model */
   it("merge-mode upserts into the existing model without dropping other topics", () => {
     let state = initTopicModelState();
-    state = applyTopicModelEvent(
+    state = apply(
       state,
       recorded({ topics: [topic("a"), topic("b")], occurredAt: 1_000 }),
     );
-    state = applyTopicModelEvent(
+    state = apply(
       state,
       recorded({ mode: "merge", topics: [topic("c")], occurredAt: 2_000 }),
     );
@@ -76,14 +78,14 @@ describe("topicModel fold", () => {
 
   it("merge-mode updates an existing topic's fields, keeping its id", () => {
     let state = initTopicModelState();
-    state = applyTopicModelEvent(
+    state = apply(
       state,
       recorded({
         topics: [topic("a", { name: "old-name" })],
         occurredAt: 1_000,
       }),
     );
-    state = applyTopicModelEvent(
+    state = apply(
       state,
       recorded({
         mode: "merge",
@@ -103,15 +105,15 @@ describe("topicModel fold", () => {
       topics: [topic("a"), topic("b")],
       occurredAt: 1_000,
     });
-    state = applyTopicModelEvent(state, event);
+    state = apply(state, event);
     const once = deriveTopicModelView(state);
-    state = applyTopicModelEvent(state, event);
+    state = apply(state, event);
     expect(deriveTopicModelView(state)).toEqual(once);
   });
 
   describe("firstRecordedAt", () => {
     it("takes an explicit firstRecordedAt over the event's own occurredAt", () => {
-      const state = applyTopicModelEvent(
+      const state = apply(
         initTopicModelState(),
         recorded({
           topics: [topic("a", { firstRecordedAt: 500 })],
@@ -123,11 +125,11 @@ describe("topicModel fold", () => {
 
     it("preserves an already-projected topic's firstRecordedAt across an update", () => {
       let state = initTopicModelState();
-      state = applyTopicModelEvent(
+      state = apply(
         state,
         recorded({ topics: [topic("a")], occurredAt: 1_000 }),
       );
-      state = applyTopicModelEvent(
+      state = apply(
         state,
         recorded({
           mode: "merge",
@@ -141,7 +143,7 @@ describe("topicModel fold", () => {
     });
 
     it("falls back to the event's occurredAt for a genuinely new topic", () => {
-      const state = applyTopicModelEvent(
+      const state = apply(
         initTopicModelState(),
         recorded({ topics: [topic("a")], occurredAt: 1_000 }),
       );
@@ -166,13 +168,10 @@ describe("topicModel fold", () => {
         recorded({ topics: [topic("a"), topic("d")], occurredAt: 3_000 }),
         recorded({ topics: [topic("a"), topic("b")], occurredAt: 1_000 }),
       ];
-      const forward = t3ReplaceFirst.reduce(
-        applyTopicModelEvent,
-        initTopicModelState(),
-      );
+      const forward = t3ReplaceFirst.reduce(apply, initTopicModelState());
       const backward = [...t3ReplaceFirst]
         .reverse()
-        .reduce(applyTopicModelEvent, initTopicModelState());
+        .reduce(apply, initTopicModelState());
 
       expect(topicIds(forward)).toEqual(["a", "d"]);
       expect(topicIds(backward)).toEqual(["a", "d"]);
@@ -186,13 +185,10 @@ describe("topicModel fold", () => {
         recorded({ mode: "merge", topics: [topic("x")], occurredAt: 4_000 }),
         recorded({ topics: [topic("a"), topic("d")], occurredAt: 3_000 }),
       ];
-      const forward = events.reduce(
-        applyTopicModelEvent,
-        initTopicModelState(),
-      );
+      const forward = events.reduce(apply, initTopicModelState());
       const backward = [...events]
         .reverse()
-        .reduce(applyTopicModelEvent, initTopicModelState());
+        .reduce(apply, initTopicModelState());
 
       expect(topicIds(forward)).toEqual(["a", "d", "x"]);
       expect(deriveTopicModelView(forward)).toEqual(
@@ -205,13 +201,10 @@ describe("topicModel fold", () => {
         recorded({ topics: [topic("a"), topic("d")], occurredAt: 3_000 }),
         recorded({ mode: "merge", topics: [topic("x")], occurredAt: 1_000 }),
       ];
-      const forward = events.reduce(
-        applyTopicModelEvent,
-        initTopicModelState(),
-      );
+      const forward = events.reduce(apply, initTopicModelState());
       const backward = [...events]
         .reverse()
-        .reduce(applyTopicModelEvent, initTopicModelState());
+        .reduce(apply, initTopicModelState());
 
       expect(topicIds(forward)).toEqual(["a", "d"]);
       expect(deriveTopicModelView(forward)).toEqual(
@@ -223,7 +216,7 @@ describe("topicModel fold", () => {
   describe("the seed guard — documented exception (see module docblock)", () => {
     /** @scenario Existing topics are seeded into the stream on service start */
     it("applies a seed normally when the model is still empty", () => {
-      const state = applyTopicModelEvent(
+      const state = apply(
         initTopicModelState(),
         recorded({
           source: "seed",
@@ -237,11 +230,11 @@ describe("topicModel fold", () => {
     /** @scenario A late duplicate seed can never remove recorded topics */
     it("no-ops a seed once the model has any topics, regardless of the seed's own occurredAt", () => {
       let state = initTopicModelState();
-      state = applyTopicModelEvent(
+      state = apply(
         state,
         recorded({ topics: [topic("a")], occurredAt: 5_000 }),
       );
-      state = applyTopicModelEvent(
+      state = apply(
         state,
         // A seed carrying a LATER occurredAt than the real clustering event —
         // still must not run, because the guard is content-gated, not
@@ -273,11 +266,11 @@ describe("topicModel fold", () => {
       });
 
       const seedFirst = [seedAt9000, clusteringAt5000].reduce(
-        applyTopicModelEvent,
+        apply,
         initTopicModelState(),
       );
       const clusteringFirst = [clusteringAt5000, seedAt9000].reduce(
-        applyTopicModelEvent,
+        apply,
         initTopicModelState(),
       );
 
@@ -294,7 +287,7 @@ describe("topicModel fold", () => {
       ];
       const report = checkOrderInvariance({
         init: initTopicModelState,
-        apply: applyTopicModelEvent,
+        apply,
         events,
       });
       expect(report.invariant).toBe(true);
@@ -310,7 +303,7 @@ describe("topicModel fold", () => {
       ];
       const report = checkOrderInvariance({
         init: initTopicModelState,
-        apply: applyTopicModelEvent,
+        apply,
         events,
         maxPermutations: 24,
       });
@@ -337,7 +330,7 @@ describe("topicModel fold", () => {
       ];
       const report = checkOrderInvariance({
         init: initTopicModelState,
-        apply: applyTopicModelEvent,
+        apply,
         events,
       });
       expect(report.invariant).toBe(true);

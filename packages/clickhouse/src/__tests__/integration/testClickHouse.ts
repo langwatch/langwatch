@@ -91,7 +91,10 @@ async function startContainer(): Promise<string> {
 async function ensureTestDatabase(baseUrl: string): Promise<string> {
   const root = createClient({ url: rootUrl(baseUrl) });
   try {
-    await root.command({ query: `CREATE DATABASE IF NOT EXISTS ${TEST_DATABASE}` });
+    await root.command({
+      query: "CREATE DATABASE IF NOT EXISTS {database:Identifier}",
+      query_params: { database: TEST_DATABASE },
+    });
   } finally {
     await root.close();
   }

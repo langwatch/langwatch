@@ -5,7 +5,7 @@ import type {
 } from "../client/clickhouseClient";
 import { ch } from "../schema/columns";
 import { aggregating, append, defineTable, replacing } from "../schema/defineTable";
-import { AppendStoreConfigurationError, createAppendStore } from "./appendStore";
+import { AppendStoreConfigurationError, clickhouseAppend } from "./appendStore";
 
 interface SpanRecord {
   readonly spanId: string;
@@ -77,7 +77,7 @@ function toSpanRow(record: SpanRecord, context: { tenantId: string }) {
   };
 }
 
-describe("given createAppendStore()", () => {
+describe("given clickhouseAppend()", () => {
   describe("when the table declares an aggregating merge strategy", () => {
     it("throws at construction rather than at the first write", () => {
       const rollupTable = defineTable({
@@ -94,7 +94,7 @@ describe("given createAppendStore()", () => {
       });
 
       expect(() =>
-        createAppendStore<{ total: number }, typeof rollupTable.columns>({
+        clickhouseAppend<{ total: number }, typeof rollupTable.columns>({
           client: createFakeClient(),
           table: rollupTable,
           toRow: (record, context) => ({
@@ -110,7 +110,7 @@ describe("given createAppendStore()", () => {
   describe("when writing a non-empty batch to a plain append() table", () => {
     it("issues exactly one insert for the whole batch, marked not retry-safe", async () => {
       const client = createFakeClient();
-      const store = createAppendStore<SpanRecord, typeof spansTable.columns>({
+      const store = clickhouseAppend<SpanRecord, typeof spansTable.columns>({
         client,
         table: spansTable,
         toRow: toSpanRow,
@@ -134,7 +134,7 @@ describe("given createAppendStore()", () => {
 
     it("carries every record's own values, in the order given", async () => {
       const client = createFakeClient();
-      const store = createAppendStore<SpanRecord, typeof spansTable.columns>({
+      const store = clickhouseAppend<SpanRecord, typeof spansTable.columns>({
         client,
         table: spansTable,
         toRow: toSpanRow,
@@ -159,7 +159,7 @@ describe("given createAppendStore()", () => {
   describe("when writing a batch to a replacing table keyed per record", () => {
     it("marks the write retry-safe, since a duplicate collapses at merge", async () => {
       const client = createFakeClient();
-      const store = createAppendStore<SpanRecord, typeof idempotencyKeyedSpansTable.columns>({
+      const store = clickhouseAppend<SpanRecord, typeof idempotencyKeyedSpansTable.columns>({
         client,
         table: idempotencyKeyedSpansTable,
         toRow: (record, context) => ({
@@ -177,7 +177,7 @@ describe("given createAppendStore()", () => {
   describe("when writeBatch is called with an empty array", () => {
     it("skips the insert entirely", async () => {
       const client = createFakeClient();
-      const store = createAppendStore<SpanRecord, typeof spansTable.columns>({
+      const store = clickhouseAppend<SpanRecord, typeof spansTable.columns>({
         client,
         table: spansTable,
         toRow: toSpanRow,
@@ -197,7 +197,7 @@ describe("given createAppendStore()", () => {
           throw new Error("insert failed");
         },
       };
-      const store = createAppendStore<SpanRecord, typeof spansTable.columns>({
+      const store = clickhouseAppend<SpanRecord, typeof spansTable.columns>({
         client: failingClient,
         table: spansTable,
         toRow: toSpanRow,

@@ -1,62 +1,140 @@
+import { clickhouseAppend, type ClickHouseClient } from "@langwatch/clickhouse";
+import {
+    ConfigurationError,
+    definePipeline,
+    validateMount,
+    type AppendStore,
+    type GroupKey,
+    type Mount,
+} from "@langwatch/event-sourcing";
+import {
+    DEFAULT_RETENTION_DAYS,
+    toCanonicalLogRecord,
+    toLogRecordRow,
+    toLogUsageEstimateRow,
+    type StampedLogRecord,
+} from "./canonicalLogStorage.projection";
+import { LOG_PIPELINE_NAME, LOG_PIPELINE_PREFIX, logProcessingEvents } from "./events";
+import { recordCanonicalLog } from "./recordCanonicalLog.command";
+import { canonicalLogRecordSchema, type CanonicalLogRecord } from "./schema";
+import { DEFAULT_LOG_SHARD_COUNT, logRecordShard } from "./shards";
+import { logRecordsTable, logUsageEstimatesTable } from "./table";
+
+/** One lane per record: a content-addressed aggregate never reads state back. */
+export function logRecordCommandGroupKey(args: {
+  tenantId: string;
+  recordId: string;
+}): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "command", name: "recordCanonicalLog" },
+    scope: {
+      kind: "aggregate",
+      aggregateType: LOG_PIPELINE_NAME,
+      aggregateId: args.recordId,
+    },
+  };
+}
+
+/** A bounded hashed shard, so a delivery's writes coalesce (ADR-100 decision 2). */
+export function canonicalLogStorageGroupKey(args: {
+  tenantId: string;
+  recordId: string;
+  shardCount?: number;
+}): GroupKey {
+  const shardCount = args.shardCount ?? DEFAULT_LOG_SHARD_COUNT;
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "map", name: "canonicalLogStorage" },
+    scope: {
+      kind: "partition",
+      parts: [String(logRecordShard(args.recordId, shardCount))],
+    },
+  };
+}
+
 /**
- * `log-processing` — the canonical OTLP log pipeline (ADR-098, ADR-099,
- * ADR-100, ADR-105, ADR-106; specs/otlp/canonical-log-ingestion.feature).
- *
- * A greenfield rewrite of `event-sourcing.old/pipelines/log-processing/`
- * onto `@langwatch/event-sourcing` and `@langwatch/clickhouse`: one
- * `defineAggregate` declaration replaces the old `schemas/` directory, the
- * dispatch-plane group key is a checked descriptor rather than a hand-joined
- * string, the map projection's mount is validated against ADR-106's legality
- * table at composition, and the store is built from a `defineTable`
- * declaration instead of a hand-written repository wrapper.
- *
- * What this file exports is the composition surface a future
- * `pipeline.ts` / composition root needs — this rewrite does not itself
- * build `definePipeline`/`withMapProjection`/a command bus, none of which
- * exist yet in `@langwatch/event-sourcing` (verified against its
- * `src/index.ts`, per this task's instruction to read the real API rather
- * than guess it). See `aggregate.ts`'s docblock for the corresponding gap in
- * `defineAggregate` itself (no `aggregateId` extractor, despite ADR-105's own
- * example showing one).
+ * The mount is a function of the store the executor actually runs on, not a
+ * literal restating it: `collapse: batch` because the shard scope exists so a
+ * delivery gathers several records into one bulk write.
  */
+export function canonicalLogStorageMount(
+  store: AppendStore<CanonicalLogRecord>,
+): Mount {
+  return {
+    projection: "map",
+    store: store.kind,
+    scope: "partition",
+    collapse: "batch",
+  };
+}
 
-export { logRecord, logRecordAggregateId } from "./aggregate";
+/** Refuses an illegal mount at composition, not on the first delivery (ADR-106). */
+function assertMountIsLegal(mount: Mount): Mount {
+  const violations = validateMount(mount);
+  if (violations.length > 0) {
+    throw new ConfigurationError(
+      `log-processing's canonicalLogStorage mount is illegal: ${violations
+        .map((v) => `${v.rule} — ${v.message}`)
+        .join("; ")}`,
+      { pipeline: LOG_PIPELINE_NAME, projection: "canonicalLogStorage", violations },
+    );
+  }
+  return mount;
+}
 
-export {
-  type CanonicalAnyValue,
-  type CanonicalAttribute,
-  type CanonicalizationResult,
-  canonicalizeLogRequest,
-  type LogRedactionService,
-  MAX_CANONICAL_LOG_PAYLOAD_BYTES,
-  type PreparedCanonicalLogRecord,
-} from "./canonicalize";
-export {
-  canonicalLogStorageGroupKey,
-  DEFAULT_LOG_SHARD_COUNT,
-  logRecordCommandGroupKey,
-  logRecordShard,
-  MAX_LOG_SHARD_COUNT,
-  MIN_LOG_SHARD_COUNT,
-  resolveLogShardCount,
-} from "./groupKey";
-export {
-  assertCanonicalLogStorageMountIsLegal,
-  canonicalLogStorageMount,
-} from "./mount";
-export { createCanonicalLogStorageProjection } from "./projection";
-export {
-  checkLogProcessingRatchet,
-  currentLogProcessingTypeStrings,
-  LOG_PROCESSING_TYPE_STRING_SNAPSHOT,
-} from "./ratchet";
-export {
-  type CanonicalLogRecord,
-  canonicalLogRecordSchema,
-  type LogCorrelationSource,
-  type LogProviderKind,
-  type PIIRedactionLevel,
-  piiRedactionLevelSchema,
-} from "./schema";
-export { createCanonicalLogStore } from "./store";
-export { logRecordsTable, logUsageEstimatesTable } from "./table";
+/**
+ * `log_records` is authoritative and `log_usage_estimates` is the billing
+ * ledger, and ClickHouse has no cross-table transaction: a failure in either
+ * rejects the whole batch, and the retry re-sends rows each table collapses on
+ * its own `RecordId`.
+ */
+function createCanonicalLogStore(
+  client: ClickHouseClient,
+): AppendStore<CanonicalLogRecord> {
+  const records = clickhouseAppend({
+    client,
+    table: logRecordsTable,
+    toRow: toLogRecordRow,
+  });
+  const usage = clickhouseAppend({
+    client,
+    table: logUsageEstimatesTable,
+    toRow: toLogUsageEstimateRow,
+  });
+
+  return {
+    kind: "append",
+    async writeBatch(batch, context) {
+      const writtenAt = new Date();
+      const stamped: StampedLogRecord[] = batch.map((record) => ({
+        ...record,
+        writtenAt,
+        dedupVersion: BigInt(writtenAt.getTime()),
+        retentionDays: context.retentionDays ?? DEFAULT_RETENTION_DAYS,
+      }));
+      await Promise.all([
+        records.writeBatch(stamped, context),
+        usage.writeBatch(stamped, context),
+      ]);
+    },
+  };
+}
+
+export function createLogProcessingPipeline(deps: {
+  readonly client: ClickHouseClient;
+}) {
+  const store = createCanonicalLogStore(deps.client);
+  assertMountIsLegal(canonicalLogStorageMount(store));
+
+  return definePipeline(LOG_PIPELINE_NAME)
+    .prefix(LOG_PIPELINE_PREFIX)
+    .events(logProcessingEvents)
+    .withCommand("recordCanonicalLog", (c) =>
+      c.input(canonicalLogRecordSchema).handle(recordCanonicalLog),
+    )
+    .withMap("canonicalLogStorage", (m) =>
+      m.on({ recordReceived: toCanonicalLogRecord }).store(store),
+    )
+    .build();
+}

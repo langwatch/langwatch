@@ -1,14 +1,15 @@
 import { renderGroupKey } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import {
-  canonicalLogStorageGroupKey,
-  DEFAULT_LOG_SHARD_COUNT,
-  logRecordCommandGroupKey,
-  logRecordShard,
-  MAX_LOG_SHARD_COUNT,
-  MIN_LOG_SHARD_COUNT,
-  resolveLogShardCount,
-} from "../groupKey";
+    canonicalLogStorageGroupKey,
+    logRecordCommandGroupKey,
+} from "../index";
+import {
+    DEFAULT_LOG_SHARD_COUNT,
+    logRecordShard,
+    MAX_LOG_SHARD_COUNT,
+    MIN_LOG_SHARD_COUNT,
+} from "../shards";
 
 describe("log-processing group keys", () => {
   describe("given the command lane", () => {
@@ -26,6 +27,27 @@ describe("log-processing group keys", () => {
           aggregateId: "a".repeat(64),
         },
       });
+    });
+
+    /** @scenario A log record's aggregate id is its own content hash */
+    it("scopes the command lane to exactly the record's own recordId, however the record reached it", () => {
+      // There is no separate "derive the aggregate id" step any more — a
+      // content-addressed pipeline has no fold to key, so the recordId a
+      // caller supplies is the aggregate id, unchanged (ADR-105 decision 4).
+      // Its stability across redeliveries is `recordId`'s own contract,
+      // covered where it is produced: canonicalize.unit.test.ts.
+      const recordId = "b".repeat(64);
+      const first = logRecordCommandGroupKey({ tenantId: "tenant-1", recordId });
+      const second = logRecordCommandGroupKey({
+        tenantId: "tenant-1",
+        recordId: "b".repeat(64),
+      });
+      expect(first.scope).toEqual({
+        kind: "aggregate",
+        aggregateType: "log",
+        aggregateId: recordId,
+      });
+      expect(second.scope).toEqual(first.scope);
     });
 
     it("renders to a key that carries the tenant, so two tenants never share a lane", () => {
@@ -121,22 +143,28 @@ describe("log-processing group keys", () => {
     });
   });
 
-  describe("given a configured shard count", () => {
-    it("falls back to the default when unset", () => {
-      expect(resolveLogShardCount(undefined)).toBe(DEFAULT_LOG_SHARD_COUNT);
+  describe("given the configured shard bounds", () => {
+    it("clamps a request below the minimum up, and one above the maximum down", () => {
+      expect(logRecordShard("a".repeat(64), 0)).toBeLessThan(
+        MIN_LOG_SHARD_COUNT + 1,
+      );
+      const shard = logRecordShard("a".repeat(64), 100_000);
+      expect(shard).toBeGreaterThanOrEqual(0);
+      expect(shard).toBeLessThan(MAX_LOG_SHARD_COUNT);
     });
 
-    it("clamps below the minimum", () => {
-      expect(resolveLogShardCount("0")).toBe(MIN_LOG_SHARD_COUNT);
-    });
-
-    it("clamps above the maximum", () => {
-      expect(resolveLogShardCount("100000")).toBe(MAX_LOG_SHARD_COUNT);
-    });
-
-    it("falls back to the default for a non-numeric value", () => {
-      expect(resolveLogShardCount("not-a-number")).toBe(
-        DEFAULT_LOG_SHARD_COUNT,
+    it("defaults the projection lane's shard count when the caller names none", () => {
+      expect(
+        canonicalLogStorageGroupKey({
+          tenantId: "tenant-1",
+          recordId: "d".repeat(64),
+        }),
+      ).toEqual(
+        canonicalLogStorageGroupKey({
+          tenantId: "tenant-1",
+          recordId: "d".repeat(64),
+          shardCount: DEFAULT_LOG_SHARD_COUNT,
+        }),
       );
     });
   });
