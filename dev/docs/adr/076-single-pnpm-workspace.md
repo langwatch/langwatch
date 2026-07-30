@@ -47,15 +47,15 @@ stay vulnerable in another, and nothing announced the gap.
 them. `typescript-sdk` could not depend on either.
 
 Blocking the merge outright: **the application and the SDK had the same package
-name.** `langwatch/package.json` was `langwatch@3.7.0`; `typescript-sdk/package.json`
+name.** `platform/app/package.json` was `langwatch@3.7.0`; `sdks/typescript/package.json`
 was `langwatch@1.0.0`. pnpm rejects duplicate names in one workspace. The
 collision had already produced a latent oddity — the application declared
 `"langwatch": "1.0.0"`, a dependency on its own name, which resolved to the
 published SDK only because the two lived in different workspaces.
 
 The hard constraint on any change is the published `@langwatch/server` tarball.
-It ships the application's source plus `langwatch/pnpm-lock.yaml`, and runs
-`pnpm -C langwatch install --frozen-lockfile` on the end user's machine at first
+It ships the application's source plus `platform/app/pnpm-lock.yaml`, and runs
+`pnpm -C platform/app install --frozen-lockfile` on the end user's machine at first
 boot (`packages/server/src/services/node-deps.ts`). Removing the application's
 lockfile breaks `npx @langwatch/server` for every end user.
 
@@ -92,16 +92,16 @@ The nesting is not cosmetic — it is the entire reason the artifact works.
 **npm deletes `pnpm-lock.yaml` from the package root unconditionally**, the same
 hardcoded rule that eats `.npmrc`. The exclusion is root-only: a lockfile one
 directory down ships fine. The old layout only worked by accident of shape —
-the lockfile lived at `langwatch/pnpm-lock.yaml`, already a subdirectory. A
+the lockfile lived at `platform/app/pnpm-lock.yaml`, already a subdirectory. A
 single workspace puts it at the package root, where npm removes it, leaving the
 end user's first boot with nothing for `--frozen-lockfile` to check.
 
 Nesting costs nothing on the consuming side because the CLI already locates the
-application by walking up for `langwatch/package.json`
+application by walking up for `platform/app/package.json`
 (`locatePackageSource()` in `packages/server/src/services/app-dir.ts`), so it
 finds `app/` by itself and every downstream path resolves unchanged.
 
-`scripts/pack-npm.sh` becomes the assembler. It reads `files` from
+`dev/scripts/pack-npm.sh` becomes the assembler. It reads `files` from
 `package.json` — still the single source of truth for *what* ships — and decides
 only *where* it lands. The two `.npmignore` files are deleted; their trimming
 rules move into one explicit exclude list next to the copy that applies them.
@@ -110,7 +110,7 @@ rules move into one explicit exclude list next to the copy that applies them.
 
 Three alternatives for the tarball were rejected before landing on staging.
 
-Generating a standalone `langwatch/pnpm-lock.yaml` at pack time preserves the
+Generating a standalone `platform/app/pnpm-lock.yaml` at pack time preserves the
 end-user boot path byte-for-byte, but reintroduces two lockfiles that can
 disagree, with the disagreement only observable in a published artifact — the
 worst place to find it.
@@ -143,7 +143,7 @@ ADR, not a packaging change.
 Merging the override lists was the fiddliest part, and there were more lists
 than the workspace files suggested. pnpm reads overrides from **both**
 `pnpm-workspace.yaml` and the root `package.json`'s `pnpm` field, and
-`langwatch/package.json` and `typescript-sdk/package.json` each carried a
+`platform/app/package.json` and `sdks/typescript/package.json` each carried a
 second, larger block that was live only while those directories were install
 roots. Merged naively they go silently dead — pnpm ignores a `pnpm` field in a
 non-root member — which would have quietly dropped around fifty pins, most of

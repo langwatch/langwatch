@@ -193,7 +193,7 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 	}
 }
 
-// Up is the launcher hook `pnpm dev:haven` runs in portless mode.
+// Up is the launcher hook `make haven up` runs in portless mode.
 func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
 	// Bootstrap is part of up, not a command: a fresh machine installs portless,
 	// trusts the CA, and starts the proxy right here (each step idempotent).
@@ -605,7 +605,7 @@ func (o *Orchestrator) runIngestScript(ctx context.Context, p UpParams, retryCmd
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a
 // loopback collector endpoint. The complete overlay matters for seeders that
-// write both Postgres and ClickHouse; inheriting langwatch/.env would silently
+// write both Postgres and ClickHouse; inheriting platform/app/.env would silently
 // target the primary checkout instead of this worktree's isolated databases.
 func (o *Orchestrator) liveSeedEnv(p UpParams, retryCmd string) ([]string, error) {
 	slug, err := o.resolveSlug(p)

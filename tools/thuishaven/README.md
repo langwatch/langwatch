@@ -202,7 +202,7 @@ telemetry fan-out, holds the cross-worktree registry (`~/.langwatch/portless/
 registry/*.json`), and **reaps** stacks whose launcher has exited or whose
 heartbeat has gone stale (`HAVEN_IDLE_TTL`) — pulling routes down with them.
 
-The resolved config lands in `langwatch/.env.portless`, which every TS entry
+The resolved config lands in `platform/app/.env.portless`, which every TS entry
 point loads **last with `override: true`** so it beats anything pinned in `.env`
 (that repo runs `dotenv.config({ override: true })`).
 
@@ -229,7 +229,7 @@ registry, and dashboard stay the same.
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API
   tokens exist on every worktree and every machine. See the doc comment at
-  the top of `langwatch/prisma/seed.ts` for the exact values (admin email +
+  the top of `platform/app/prisma/seed.ts` for the exact values (admin email +
   password, ingestion key `sk-lw-local-development-key` (override
   `LANGWATCH_LOCAL_API_KEY`), a private full-access personal access token,
   and a public ingestion-only token).

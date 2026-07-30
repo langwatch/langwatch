@@ -92,7 +92,7 @@ export function installSkillToWorkDir({
 
 const cliDistPath = path.resolve(
 	__dirname,
-	"../../../typescript-sdk/dist/cli/index.js",
+	"../../../sdks/typescript/dist/cli/index.js",
 );
 
 /**

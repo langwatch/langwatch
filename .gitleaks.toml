@@ -24,4 +24,4 @@ useDefault = true
 [[allowlists]]
 description = "Stripe catalog lookupKeys are public price handles, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''langwatch/ee/billing/stripe/stripeCatalog\.json''']
+paths = ['''platform/app/ee/billing/stripe/stripeCatalog\.json''']

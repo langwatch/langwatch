@@ -14,17 +14,17 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
 
   Scenario: langwatch-app-ci stub matches real workflow job names
     Given langwatch-app-ci.yml defines jobs "typecheck", "test-unit", "test-integration", "lint", "build"
-    When a PR does not touch langwatch/ files
+    When a PR does not touch platform/app/ files
     Then langwatch-app-ci-unmodified.yml reports success for the same job names
 
   Scenario: mcp-javascript-ci stub matches real workflow job names
     Given mcp-javascript-ci.yml defines jobs "typecheck", "build_and_test"
-    When a PR does not touch mcp-server/ files
+    When a PR does not touch mcp/typescript/ files
     Then mcp-javascript-ci-unmodified.yml reports success for the same job names
 
   Scenario: sdk-javascript-ci stub matches real workflow job names
     Given sdk-javascript-ci.yml defines jobs "ci", "e2e"
-    When a PR does not touch typescript-sdk/ files
+    When a PR does not touch sdks/typescript/ files
     Then sdk-javascript-ci-unmodified.yml reports success for the same job names
 
   # ============================================================================
@@ -32,7 +32,7 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   # ============================================================================
 
   Scenario: e2e-ci has a complementary stub
-    Given e2e-ci.yml triggers on langwatch/, python-sdk/, and agentic-e2e-tests/ changes
+    Given e2e-ci.yml triggers on platform/app/, sdks/python/, and tests/agentic-e2e/ changes
     When a PR does not touch those directories
     Then e2e-ci-unmodified.yml reports success for all e2e-ci job names
 

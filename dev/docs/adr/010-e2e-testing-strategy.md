@@ -39,7 +39,7 @@ We maintain a small set (5-10) of Playwright E2E tests that cover the core happy
 - Run an evaluation
 - Navigate between major sections
 
-These tests live in `agentic-e2e-tests/` and run on a schedule or before releases — not on every PR. They exist to catch catastrophic regressions, not to verify individual features.
+These tests live in `tests/agentic-e2e/` and run on a schedule or before releases — not on every PR. They exist to catch catastrophic regressions, not to verify individual features.
 
 We will not generate new E2E tests per feature. Existing tests that are stable can remain; flaky or low-value tests should be removed rather than healed.
 
@@ -63,7 +63,7 @@ We will not generate new E2E tests per feature. Existing tests that are stable c
 ## Consequences
 
 - The `/e2e` skill is removed. The orchestration workflow uses `/browser-test` instead.
-- The `agentic-e2e-tests/` directory remains for the stable happy-path suite.
+- The `tests/agentic-e2e/` directory remains for the stable happy-path suite.
 - Feature files no longer need `@e2e` tags (they can still use `@integration` and `@unit`).
 - The testing philosophy doc is updated to reflect this two-tier approach.
 - The playwright agent definitions (`playwright-test-planner`, `playwright-test-generator`, `playwright-test-healer`) remain available for ad-hoc use but are not part of the standard workflow.

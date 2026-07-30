@@ -13,7 +13,7 @@ Two recent PRs surfaced an architectural tension around resolving project defaul
 
 Both PRs touched the same files with different conventions, so the codebase needed a written rule for where this kind of logic lives.
 
-The de-facto convention in `langwatch/src/server/app-layer/projects/` already follows the service-and-repository split: `project.service.ts` holds the business layer, and `repositories/project.repository.ts` is a pure data interface (with `NullProjectRepository` and `ProjectPrismaRepository` implementations). The convention was never written down.
+The de-facto convention in `platform/app/src/server/app-layer/projects/` already follows the service-and-repository split: `project.service.ts` holds the business layer, and `repositories/project.repository.ts` is a pure data interface (with `NullProjectRepository` and `ProjectPrismaRepository` implementations). The convention was never written down.
 
 ## Decision
 
@@ -41,5 +41,5 @@ Concretely:
 
 - PR #1174 — initial proposal to centralize via a resolution-aware repository
 - PR #3537 — service-layer `resolveDefaultModel` (canonical)
-- `langwatch/src/server/app-layer/projects/` — de-facto convention this ADR codifies
+- `platform/app/src/server/app-layer/projects/` — de-facto convention this ADR codifies
 - `dev/docs/adr/TEMPLATE.md` — template used for this file
