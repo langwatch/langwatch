@@ -1,30 +1,28 @@
 import { Box, IconButton } from "@chakra-ui/react";
 import { CopyIcon } from "lucide-react";
-import { Highlight, type PrismTheme } from "prism-react-renderer";
+import type React from "react";
+import { useEffect, useState } from "react";
+import {
+  codeToHtml,
+  codeToHtmlDark,
+} from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
 import { toaster } from "../ui/toaster";
-import { monokaiTheme } from "./monokaiTheme";
-// `./prismLanguages` imports `./prismGlobal` first (which assigns the global
-// Prism instance) and then registers the bash / python / diff / javascript /
-// typescript grammars onto it. Importing the instance from the same module
-// keeps a single source of truth for the global assignment.
-import { Prism } from "./prismGlobal";
-import "./prismLanguages";
 
 export const RenderCode = ({
   code,
   language,
   style: propsStyle = {},
-  theme = monokaiTheme,
+  colorMode = "dark",
 }: {
   code: string;
   language: string;
   style?: React.CSSProperties;
   /**
-   * Override the prism theme. Defaults to monokai (dark) for backwards
-   * compatibility with existing call sites; pass an explicit theme to follow
-   * the user's color mode.
+   * Which Shiki theme to render with. Defaults to dark for backwards
+   * compatibility with existing call sites; pass the app's own color mode to
+   * follow it instead.
    */
-  theme?: PrismTheme;
+  colorMode?: "light" | "dark";
 }) => {
   const handleCopy = () => {
     navigator.clipboard
@@ -41,8 +39,21 @@ export const RenderCode = ({
       });
   };
 
+  const [html, setHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const highlight = colorMode === "dark" ? codeToHtmlDark : codeToHtml;
+    void highlight({ code, lang: language }).then((result) => {
+      if (!cancelled) setHtml(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [code, language, colorMode]);
+
   return (
-    <Box position="relative" className="group">
+    <Box position="relative" className="group" style={propsStyle}>
       <IconButton
         aria-label="Copy code"
         // eslint-disable-next-line react/no-children-prop
@@ -57,19 +68,20 @@ export const RenderCode = ({
           opacity: 1,
         }}
       />
-      <Highlight prism={Prism} theme={theme} code={code} language={language}>
-        {({ style, tokens, getLineProps, getTokenProps }) => (
-          <pre style={{ ...style, whiteSpace: "pre-wrap", ...propsStyle }}>
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line })}>
-                {line.map((token, key) => (
-                  <span key={key} {...getTokenProps({ token })} />
-                ))}
-              </div>
-            ))}
-          </pre>
-        )}
-      </Highlight>
+      {html ? (
+        // `display: contents` keeps this host div invisible to layout so
+        // Shiki's own <pre> is what callers' surrounding CSS sees.
+        <Box
+          display="contents"
+          css={{ "& pre": { margin: 0, whiteSpace: "pre-wrap" } }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : (
+        // Fallback while Shiki loads — plain unhighlighted text.
+        <Box as="pre" margin={0} whiteSpace="pre-wrap">
+          {code}
+        </Box>
+      )}
     </Box>
   );
 };
