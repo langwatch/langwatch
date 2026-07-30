@@ -116,13 +116,18 @@ export type SubscriberHandlerMap<Events extends EventSchemaMap> = {
  * the two ways a redelivery of the same logical intent computes a different
  * key and both dispatch.
  */
+/**
+ * `messageKey` and `deliver` are methods rather than arrow properties on
+ * purpose. A registry keyed by `IntentMap` erases the payload to
+ * `z.ZodTypeAny`, and under `strictFunctionTypes` an arrow property is
+ * checked contravariantly — so no concrete intent would ever be assignable
+ * to the erased map. Method syntax is checked bivariantly, which is what
+ * lets a pipeline hand its own intents to the generic surface.
+ */
 export interface IntentDef<Payload extends z.ZodTypeAny> {
   readonly payload: Payload;
-  readonly messageKey: (payload: z.infer<Payload>) => string;
-  readonly deliver: (
-    payload: z.infer<Payload>,
-    ctx: HandlerContext,
-  ) => void | Promise<void>;
+  messageKey(payload: z.infer<Payload>): string;
+  deliver(payload: z.infer<Payload>, ctx: HandlerContext): void | Promise<void>;
 }
 
 export type IntentMap = Record<string, IntentDef<z.ZodTypeAny>>;
