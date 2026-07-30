@@ -292,9 +292,16 @@ const NON_JUDGED_TITLES: Record<string, string> = {
  * judged" rows is the one they are looking at.
  */
 function errorHeadline(error: string): string {
-  const firstLine = error.split(/[\n.]/)[0]?.replace(/\s+/g, " ").trim() ?? "";
+  // Ends the sentence on a full stop, not on any dot: errors name methods, and
+  // splitting inside `langy.continueConversation` truncates the heading before
+  // it reaches the part that says what went wrong.
+  const firstLine =
+    error
+      .split(/\n|\.(?:\s|$)/)[0]
+      ?.replace(/\s+/g, " ")
+      .trim() ?? "";
   if (firstLine.length === 0) return "";
-  return firstLine.length <= 60 ? firstLine : `${firstLine.slice(0, 60)}…`;
+  return firstLine.length <= 80 ? firstLine : `${firstLine.slice(0, 80)}…`;
 }
 
 function groupTitle({

@@ -129,4 +129,60 @@ describe("the failure-grouping question", () => {
       );
     });
   });
+
+  describe("given several groups that all errored", () => {
+    const clusters = QUESTION_REGISTRY.find(
+      (question) => question.id === "present.clusters",
+    )!;
+
+    function erroredGroupTitles(errors: string[]): (string | undefined)[] {
+      const blocks = clusters.computed(
+        evidenceFixture({
+          signatures: errors.map((error, index) => ({
+            signatureId: `s_${index}`,
+            kind: "errored" as const,
+            unmetCriterionIds: [],
+            errorShape: "<shape>",
+            errorExample: error,
+            runIds: [`run_${index}`],
+            scenarioIds: [`scen_${index}`],
+          })),
+        }),
+      );
+      return blocks[0]?.kind === "groups"
+        ? blocks[0].groups.map((group) => group.title)
+        : [];
+    }
+
+    /**
+     * An errored run has no criterion to be named by, so without this every
+     * error group carries one title and the rows read as duplicates.
+     *
+     * @scenario Infrastructure errors are separated from judged failures
+     */
+    it("tells them apart by their error", () => {
+      const titles = erroredGroupTitles([
+        "AI_APICallError: content was flagged",
+        "Attacker model returned no content",
+      ]);
+
+      expect(new Set(titles).size).toBe(2);
+      expect(titles[0]).toContain("content was flagged");
+      expect(titles[1]).toContain("Attacker model returned no content");
+    });
+
+    /**
+     * Errors name methods, and ending the heading at the first dot cuts it
+     * before the part that says what went wrong.
+     *
+     * @scenario Infrastructure errors are separated from judged failures
+     */
+    it("does not end the heading inside a dotted method name", () => {
+      const [title] = erroredGroupTitles([
+        "Error: Langy langy.continueConversation -> 409 conflict",
+      ]);
+
+      expect(title).toContain("langy.continueConversation");
+    });
+  });
 });
