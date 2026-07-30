@@ -15685,7 +15685,7 @@ Open the trace. You should see:
 - `langwatch.cost.usd`, derived by the receiver's `canonicalCostExtractor` from the
   upstream-emitted `gen_ai.usage.*` + `gen_ai.response.model`.
 - `langwatch.user.id`, `langwatch.project.id`, `langwatch.template.id`,
-  `langwatch.reserved.ingest_key_id`, `langwatch.source = "claude_code"`, all
+  `langwatch.ingest_key_id`, `langwatch.source = "claude_code"`, all
   receiver-stamped post-auth (authoritative attribution + template provenance), with
   `langwatch.origin = "coding_agent"` (derived from the source: a CLI coding
   assistant becomes `coding_agent`, any other ingest source becomes `ai_tool`).
@@ -15753,7 +15753,7 @@ receiver:
    entirely and lands raw.
 6. **Post-auth re-stamps** the closed `protectedTemplateAttributeKeys` (and, for
    org-authored OTTL, the tier-of-trust additions covering cost, tokens, model) as
-   receiver-authoritative, including `langwatch.reserved.ingest_key_id` and
+   receiver-authoritative, including `langwatch.ingest_key_id` and
    `langwatch.origin` provenance (derived from the key's source: `coding_agent`
    for a CLI assistant, `ai_tool` otherwise). If the OTTL tried to write any of those
    keys, the original value is restored and an audit row
@@ -15773,7 +15773,7 @@ The `protectedTemplateAttributeKeys` closed list:
   `langwatch.project.id`, `langwatch.tenant.id`, virtual-key shapes,
   ingestion-source shapes, governance shapes.
 - `langwatch.template.id`, receiver-stamped provenance.
-- `langwatch.reserved.ingest_key_id`, receiver-stamped provenance (the ingestion key
+- `langwatch.ingest_key_id`, receiver-stamped provenance (the ingestion key
   that landed the trace). Lives under the reserved namespace rather than
   `langwatch.api_key.id` so the redaction pipeline's secret-name deny-list never has
   to special-case it.

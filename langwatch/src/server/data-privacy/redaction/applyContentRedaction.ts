@@ -97,15 +97,13 @@ export function redactStringNative({
  * field-name deny-list. Otherwise the value runs through the normal native
  * passes (secrets value-scan + essential PII).
  *
- * There is deliberately no exemption list here. An earlier version exempted
- * `langwatch.api_key.id` by name so the OTLP receiver's stamped ingestion-key
- * id (see ingestKeyProvenance.utils.ts) would stay readable — but the receiver
- * only overwrites that attribute for ingest-key traffic; an ordinary project
- * API key can submit an arbitrary value under the exact same name, and a
- * name-based exemption can't tell the two apart. The receiver now stamps the
- * id under `langwatch.reserved.ingest_key_id` instead, a name the sensitive-key
- * pattern never matches, so it needs no special case and `langwatch.api_key.id`
- * itself stays fully covered by the deny-list for anything a client sends.
+ * There is deliberately no exemption list, and a name must never be added to
+ * one. The deny-list is keyed on the attribute NAME, which any client can set:
+ * exempting a name trusts every payload that claims it, not just the trusted
+ * producer the exemption was written for. A system-generated value that needs
+ * to stay readable gets a name the deny-list does not match in the first place
+ * (see `PROVENANCE_ATTR_API_KEY_ID` in ingestKeyProvenance.utils.ts), so no
+ * client can pick that lock by guessing the exempt name.
  */
 export function redactAttributeNative({
   key,

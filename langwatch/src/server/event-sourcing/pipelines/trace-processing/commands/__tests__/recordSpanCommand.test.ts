@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  PROVENANCE_ATTR_API_KEY_ID,
+  stampIngestKeyProvenanceOnTraceRequest,
+} from "@ee/governance/services/ingestKeyProvenance.utils";
 import { type Command, createTenantId } from "../../../../";
 import type {
   PIIRedactionLevel,
@@ -380,6 +384,30 @@ describe("RecordSpanCommand", () => {
         expect(command.data.span.attributes[0]!.key).toBe(
           "langwatch.reserved.something",
         );
+      });
+    });
+
+    describe("when the receiver has stamped ingest-key provenance", () => {
+      /** @scenario Receiver-stamped ingestion key id survives the reserved strip */
+      it("keeps every stamped provenance attribute on the emitted resource", async () => {
+        const command = createMockCommand("project-123", "trace-1", "span-1");
+        const request = {
+          resourceSpans: [{ resource: command.data.resource }],
+        };
+        stampIngestKeyProvenanceOnTraceRequest(request, {
+          apiKeyId: "key_abc",
+          sourceType: "claude_code",
+          organizationId: "org_1",
+        });
+        command.data.resource = request.resourceSpans[0]!.resource;
+
+        const events = await handler.handle(command);
+
+        const emitted = events[0]!.data.resource!.attributes;
+        const stampedId = emitted.find(
+          (a) => a.key === PROVENANCE_ATTR_API_KEY_ID,
+        );
+        expect(stampedId?.value.stringValue).toBe("key_abc");
       });
     });
 

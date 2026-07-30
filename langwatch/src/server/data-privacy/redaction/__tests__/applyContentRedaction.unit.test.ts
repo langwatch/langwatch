@@ -101,7 +101,7 @@ describe("redactAttributeNative", () => {
   describe("given the receiver-stamped ingestion key id attribute", () => {
     it("keeps an opaque key id readable under its reserved name", () => {
       const { text } = redactAttributeNative({
-        key: "langwatch.reserved.ingest_key_id",
+        key: "langwatch.ingest_key_id",
         value: "key_abc123def456",
         policy: policy({}),
       });
@@ -110,7 +110,7 @@ describe("redactAttributeNative", () => {
 
     it("still scrubs actual key material under that name via the value rules", () => {
       const { text } = redactAttributeNative({
-        key: "langwatch.reserved.ingest_key_id",
+        key: "langwatch.ingest_key_id",
         value: "sk-lw-" + "a".repeat(40),
         policy: policy({}),
       });

@@ -518,29 +518,29 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
 });
 
 describe("OtlpSpanPiiRedactionService ingestion key id attribute", () => {
-  /** @scenario The receiver-stamped ingestion key id stays readable under its reserved name */
+  /** @scenario The receiver-stamped ingestion key id stays readable */
   it("keeps the receiver-stamped key id readable", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({
-      "langwatch.reserved.ingest_key_id": "key_abc123def456",
+      "langwatch.ingest_key_id": "key_abc123def456",
     });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.reserved.ingest_key_id")).toBe(
+    expect(attr(span, "langwatch.ingest_key_id")).toBe(
       "key_abc123def456",
     );
   });
 
-  /** @scenario Real key material under the reserved key id attribute is still redacted */
+  /** @scenario Real key material under the ingestion key id attribute is still redacted */
   it("scrubs actual key material under that attribute name", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({
-      "langwatch.reserved.ingest_key_id": "sk-lw-" + "a".repeat(40),
+      "langwatch.ingest_key_id": "sk-lw-" + "a".repeat(40),
     });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.reserved.ingest_key_id")).toContain(
+    expect(attr(span, "langwatch.ingest_key_id")).toContain(
       "[SECRET]",
     );
-    expect(attr(span, "langwatch.reserved.ingest_key_id")).not.toContain(
+    expect(attr(span, "langwatch.ingest_key_id")).not.toContain(
       "sk-lw-",
     );
   });

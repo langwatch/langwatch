@@ -369,7 +369,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
 
       // Receiver-authoritative provenance stamp for ingestion-key traces.
       // Overwrites any payload-supplied provenance keys (langwatch.source /
-      // langwatch.reserved.ingest_key_id / langwatch.origin /
+      // langwatch.ingest_key_id / langwatch.origin /
       // langwatch.organization_id / langwatch.template.id) — even a
       // malicious upstream cannot forge a different source / key / org
       // identity onto its own traces.
