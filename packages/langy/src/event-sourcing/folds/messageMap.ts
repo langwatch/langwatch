@@ -4,12 +4,12 @@
  * client half, retired; ground now ADR-098) the browser's local message list.
  */
 import { LANGY_CONVERSATION_EVENT_TYPES } from "../../constants";
+import type { LangyMessagePart, LangyMessageRole } from "../../json";
 import type {
   LangyAgentRespondedEventData,
   LangyMessageImportedEventData,
   LangyMessageRecordedEventData,
 } from "../contracts/events";
-import type { LangyMessagePart, LangyMessageRole } from "../../json";
 
 export interface LangyMessageProjectionRecord {
   ConversationId: string;

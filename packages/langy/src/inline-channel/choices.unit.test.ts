@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   deriveLangyChoicesLockState,
+  type LangyChoicesTimelineEntry,
   langyChoiceSelectionSchema,
   renderLangyChoiceSelectionText,
-  type LangyChoicesTimelineEntry,
 } from "./choices";
 
 describe("langyChoiceSelectionSchema", () => {
@@ -145,12 +145,13 @@ describe("deriveLangyChoicesLockState", () => {
   describe("when two questions exist and one is answered", () => {
     it("binds the answer to its exact question, never the other", () => {
       const timeline = [question("q1"), question("q2"), selection("q2")];
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q2", timeline }),
-      ).toEqual({ status: "answered", optionIds: ["staging"] });
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q1", timeline }),
-      ).toEqual({ status: "superseded" });
+      expect(deriveLangyChoicesLockState({ blockId: "q2", timeline })).toEqual({
+        status: "answered",
+        optionIds: ["staging"],
+      });
+      expect(deriveLangyChoicesLockState({ blockId: "q1", timeline })).toEqual({
+        status: "superseded",
+      });
     });
   });
 

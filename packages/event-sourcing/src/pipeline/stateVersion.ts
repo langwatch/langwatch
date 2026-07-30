@@ -234,7 +234,8 @@ function fnv1a(value: string, seed: number): number {
 function hashNormalised(normalised: string): string {
   const first = fnv1a(normalised, FNV_OFFSET_BASIS);
   const second = fnv1a(normalised, FNV_OFFSET_BASIS ^ SECOND_SEED);
-  const hex = first.toString(16).padStart(8, "0") + second.toString(16).padStart(8, "0");
+  const hex =
+    first.toString(16).padStart(8, "0") + second.toString(16).padStart(8, "0");
   return hex.slice(0, 12);
 }
 

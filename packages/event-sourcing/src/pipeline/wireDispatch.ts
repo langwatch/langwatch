@@ -16,9 +16,12 @@ export function resolveDispatch<Handler>(args: {
     resolved.set(args.typeOf(key), handler);
   }
   if (resolved.size === 0) {
-    throw new ConfigurationError(`${args.what} "${args.owner}" declares no handlers`, {
-      owner: args.owner,
-    });
+    throw new ConfigurationError(
+      `${args.what} "${args.owner}" declares no handlers`,
+      {
+        owner: args.owner,
+      },
+    );
   }
   return resolved;
 }

@@ -3,10 +3,14 @@ import { z } from "zod";
 import type {
   CounterHandle,
   HistogramHandle,
-  Metrics,
   MetricLabels,
+  Metrics,
 } from "../ports/metrics";
-import { compileSchema, createCompiledSchemaCache, timeValidation } from "./compiled";
+import {
+  compileSchema,
+  createCompiledSchemaCache,
+  timeValidation,
+} from "./compiled";
 
 /**
  * `compileSchema` is the seam the rest of the package validates through
@@ -117,7 +121,10 @@ describe("compileSchema", () => {
       const schema = z.custom<`id-${string}`>(
         (value) => typeof value === "string" && value.startsWith("id-"),
       );
-      const compiled = compileSchema(schema, { metrics: fakeMetrics(), cache: createCompiledSchemaCache() });
+      const compiled = compileSchema(schema, {
+        metrics: fakeMetrics(),
+        cache: createCompiledSchemaCache(),
+      });
 
       expect(compiled.is("id-123")).toBe(true);
       expect(compiled.is("nope")).toBe(false);
@@ -133,7 +140,9 @@ describe("compileSchema", () => {
 
       expect(metrics.counterCalls).toEqual([
         {
-          spec: expect.objectContaining({ name: "es_schema_compile_fallback_total" }),
+          spec: expect.objectContaining({
+            name: "es_schema_compile_fallback_total",
+          }),
           labels: { reason: "custom" },
         },
       ]);
@@ -173,8 +182,14 @@ describe("compileSchema", () => {
 
   describe("given a compiled schema and the same schema validated by interpreted zod directly", () => {
     const AGREEMENT_SCHEMAS: { label: string; schema: z.ZodTypeAny }[] = [
-      { label: "object with primitives", schema: z.object({ name: z.string(), age: z.number() }) },
-      { label: "coerced number", schema: z.object({ count: z.coerce.number() }) },
+      {
+        label: "object with primitives",
+        schema: z.object({ name: z.string(), age: z.number() }),
+      },
+      {
+        label: "coerced number",
+        schema: z.object({ count: z.coerce.number() }),
+      },
       {
         label: "custom validator (documented fallback)",
         schema: z.custom<`id-${string}`>(
@@ -200,10 +215,14 @@ describe("compileSchema", () => {
     ];
 
     describe.each(AGREEMENT_SCHEMAS)("for $label", ({ schema }) => {
-      const compiled = compileSchema(schema, { cache: createCompiledSchemaCache() });
+      const compiled = compileSchema(schema, {
+        cache: createCompiledSchemaCache(),
+      });
 
       /** @scenario the compiled path and interpreted zod accept and reject the same values */
-      it.each(AGREEMENT_VALUES)("agrees with interpreted zod for %j", (value) => {
+      it.each(
+        AGREEMENT_VALUES,
+      )("agrees with interpreted zod for %j", (value) => {
         const interpreted = schema.safeParse(value);
         expect(compiled.is(value)).toBe(interpreted.success);
         expect(compiled.safeParse(value).ok).toBe(interpreted.success);

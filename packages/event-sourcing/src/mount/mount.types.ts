@@ -26,7 +26,12 @@ export const STORE_KINDS = ["append", "replace", "merge"] as const;
 export type StoreKind = (typeof STORE_KINDS)[number];
 
 /** How wide a lane is (ADR-100). */
-export const SCOPE_KINDS = ["aggregate", "event", "partition", "global"] as const;
+export const SCOPE_KINDS = [
+  "aggregate",
+  "event",
+  "partition",
+  "global",
+] as const;
 export type ScopeKind = (typeof SCOPE_KINDS)[number];
 
 /**
@@ -71,8 +76,14 @@ export type Mount = {
   readonly scope: ScopeKind;
   readonly collapse: CollapseKind;
 } & (
-  | { readonly store: Exclude<StoreKind, "merge">; readonly idempotency?: undefined }
-  | { readonly store: Extract<StoreKind, "merge">; readonly idempotency: Idempotency }
+  | {
+      readonly store: Exclude<StoreKind, "merge">;
+      readonly idempotency?: undefined;
+    }
+  | {
+      readonly store: Extract<StoreKind, "merge">;
+      readonly idempotency: Idempotency;
+    }
 );
 
 /**

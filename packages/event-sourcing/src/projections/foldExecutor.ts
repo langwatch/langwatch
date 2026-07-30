@@ -1,6 +1,6 @@
 import { UndecodableStateError } from "../errors";
-import { noopMetrics } from "../ports/metrics";
 import type { Metrics } from "../ports/metrics";
+import { noopMetrics } from "../ports/metrics";
 import { withSpan } from "../ports/tracing";
 import type { ReplaceStore, StoreContext, StoredState } from "./store.types";
 

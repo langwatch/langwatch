@@ -287,4 +287,4 @@ export interface BuiltPipeline<
   aggregateIdFor(eventType: string, payload: unknown): string;
 }
 
-export type { ReplaceStore, AppendStore, MergeStore };
+export type { AppendStore, MergeStore, ReplaceStore };

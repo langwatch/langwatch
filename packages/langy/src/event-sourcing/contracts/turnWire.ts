@@ -14,8 +14,8 @@ import { z } from "zod";
 
 import { LANGY_CONVERSATION_EVENT_TYPES } from "../../constants";
 import {
-  langyAgentResponseFailedEventDataSchema,
   langyAgentRespondedEventDataSchema,
+  langyAgentResponseFailedEventDataSchema,
   langyAgentTurnAcceptedEventDataSchema,
   langyPlanUpdatedEventDataSchema,
   langyToolCallFailedEventDataSchema,

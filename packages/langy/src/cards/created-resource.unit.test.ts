@@ -7,8 +7,8 @@
  *      "A write card never claims success on a result that names nothing"
  */
 import { describe, expect, it } from "vitest";
-import { SCHEMA_BY_CARD_KIND, namesCreatedResource } from "./schemas.js";
 import { parseCliResult } from "./registry.js";
+import { namesCreatedResource, SCHEMA_BY_CARD_KIND } from "./schemas.js";
 import { parseCliToolResult, toCliToolResult } from "./tool-result.js";
 
 describe("namesCreatedResource", () => {
@@ -62,9 +62,9 @@ describe("namesCreatedResource", () => {
 describe("reading a create result as a created-resource card", () => {
   describe("when the result names no resource", () => {
     it("refuses the card schema", () => {
-      expect(
-        SCHEMA_BY_CARD_KIND.resourceCreated.safeParse([]).success,
-      ).toBe(false);
+      expect(SCHEMA_BY_CARD_KIND.resourceCreated.safeParse([]).success).toBe(
+        false,
+      );
     });
 
     it("fails to parse as a create result", () => {

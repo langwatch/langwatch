@@ -99,7 +99,8 @@ describe("package purity", () => {
       for (const file of libraryFiles) {
         for (const specifier of importSpecifiers(readFileSync(file, "utf8"))) {
           if (isRelative(specifier)) continue;
-          if (DECLARED_DEPENDENCIES.includes(packageNameOf(specifier))) continue;
+          if (DECLARED_DEPENDENCIES.includes(packageNameOf(specifier)))
+            continue;
           violations.push(`${file.slice(SRC.length + 1)} -> ${specifier}`);
         }
       }
@@ -111,7 +112,10 @@ describe("package purity", () => {
       const violations: string[] = [];
       for (const file of libraryFiles) {
         for (const specifier of importSpecifiers(readFileSync(file, "utf8"))) {
-          if (specifier.startsWith("~/") || specifier.includes("/langwatch/src/")) {
+          if (
+            specifier.startsWith("~/") ||
+            specifier.includes("/langwatch/src/")
+          ) {
             violations.push(`${file.slice(SRC.length + 1)} -> ${specifier}`);
           }
         }
@@ -130,7 +134,8 @@ describe("package purity", () => {
         for (const specifier of importSpecifiers(readFileSync(file, "utf8"))) {
           if (isRelative(specifier)) continue;
           if (ALLOWED_BARE_IMPORTS_IN_TESTS.includes(specifier)) continue;
-          if (DECLARED_DEPENDENCIES.includes(packageNameOf(specifier))) continue;
+          if (DECLARED_DEPENDENCIES.includes(packageNameOf(specifier)))
+            continue;
           violations.push(`${file.slice(SRC.length + 1)} -> ${specifier}`);
         }
       }

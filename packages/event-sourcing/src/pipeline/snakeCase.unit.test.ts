@@ -11,7 +11,9 @@ describe("toSnakeCase / CamelToSnake", () => {
   describe("given an ordinary camelCase identifier", () => {
     it("inserts an underscore before each capital", () => {
       expect(toSnakeCase("spanReceived")).toBe("span_received");
-      expectTypeOf<CamelToSnake<"spanReceived">>().toEqualTypeOf<"span_received">();
+      expectTypeOf<
+        CamelToSnake<"spanReceived">
+      >().toEqualTypeOf<"span_received">();
     });
 
     it("leaves an already-lowercase identifier alone", () => {

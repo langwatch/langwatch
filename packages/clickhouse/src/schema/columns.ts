@@ -306,8 +306,16 @@ function dateTime64Codec(precision: number) {
       });
       return z.NEVER;
     }
-    const [, yearStr, monthStr, dayStr, hourStr, minuteStr, secondStr, fraction] =
-      match;
+    const [
+      ,
+      yearStr,
+      monthStr,
+      dayStr,
+      hourStr,
+      minuteStr,
+      secondStr,
+      fraction,
+    ] = match;
     if (
       yearStr === undefined ||
       monthStr === undefined ||
@@ -405,7 +413,11 @@ function date(): ColumnDef<Date> {
       return z.NEVER;
     }
     const [, yearStr, monthStr, dayStr] = match;
-    if (yearStr === undefined || monthStr === undefined || dayStr === undefined) {
+    if (
+      yearStr === undefined ||
+      monthStr === undefined ||
+      dayStr === undefined
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `"${raw}" is missing a required Date component`,
@@ -555,7 +567,11 @@ function enum_<const M extends Record<string, number>>(
   const labels = entries.map(([label]) => label);
   const [first, ...rest] = labels;
   if (first === undefined) {
-    throw new ColumnDecodeError("Enum", mapping, "an enum needs at least one member");
+    throw new ColumnDecodeError(
+      "Enum",
+      mapping,
+      "an enum needs at least one member",
+    );
   }
   const width = entries.some(([, ordinal]) => ordinal > 127 || ordinal < -128)
     ? 16

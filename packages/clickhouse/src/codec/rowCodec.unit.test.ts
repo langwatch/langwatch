@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  createRowCodec,
-  WireShapeMismatchError,
   type AnyWireColumn,
+  createRowCodec,
   type WireColumn,
+  WireShapeMismatchError,
 } from "./rowCodec.js";
 
 const idColumn: WireColumn<string> = {
@@ -59,7 +59,7 @@ describe("given a row codec", () => {
           columnNames,
           header,
           rows: [["trace-1", "3"]],
-        })
+        }),
       ).toThrow(WireShapeMismatchError);
     });
   });
@@ -75,7 +75,7 @@ describe("given a row codec", () => {
           columnNames,
           header,
           rows: [["trace-1", "3"]],
-        })
+        }),
       ).toThrow(/"Int64".*"UInt64"/);
     });
   });
@@ -90,7 +90,7 @@ describe("given a row codec", () => {
           columnNames,
           header: undefined,
           rows: [["trace-1"]],
-        })
+        }),
       ).toThrow(WireShapeMismatchError);
     });
   });

@@ -85,7 +85,7 @@ function validateHeader(args: {
 
   if (header.names.length !== columnNames.length) {
     throw new WireShapeMismatchError(
-      `server returned ${header.names.length} columns ([${header.names.join(", ")}]) but ${columnNames.length} were declared ([${columnNames.join(", ")}])`
+      `server returned ${header.names.length} columns ([${header.names.join(", ")}]) but ${columnNames.length} were declared ([${columnNames.join(", ")}])`,
     );
   }
 
@@ -94,7 +94,7 @@ function validateHeader(args: {
     const serverName = header.names[i]!;
     if (declaredName !== serverName) {
       throw new WireShapeMismatchError(
-        `column ${i} is declared as "${declaredName}" but the server returned "${serverName}" in that position`
+        `column ${i} is declared as "${declaredName}" but the server returned "${serverName}" in that position`,
       );
     }
 
@@ -102,7 +102,7 @@ function validateHeader(args: {
     const serverType = header.types[i]!;
     if (declaredType !== serverType) {
       throw new WireShapeMismatchError(
-        `column "${declaredName}" is declared as "${declaredType}" but the server returned "${serverType}"`
+        `column "${declaredName}" is declared as "${declaredType}" but the server returned "${serverType}"`,
       );
     }
   }
@@ -121,7 +121,9 @@ export function createRowCodec(): WireCodec {
     decodeRows<T>(args: {
       columns: readonly AnyWireColumn[];
       columnNames: readonly string[];
-      header: { names: readonly string[]; types: readonly string[] } | undefined;
+      header:
+        | { names: readonly string[]; types: readonly string[] }
+        | undefined;
       rows: readonly unknown[][];
     }): T[] {
       const { columns, columnNames, header, rows } = args;
@@ -133,7 +135,7 @@ export function createRowCodec(): WireCodec {
       return rows.map((row, rowIndex) => {
         if (row.length !== columnNames.length) {
           throw new WireShapeMismatchError(
-            `row ${rowIndex} has ${row.length} values but ${columnNames.length} columns were declared ([${columnNames.join(", ")}])`
+            `row ${rowIndex} has ${row.length} values but ${columnNames.length} columns were declared ([${columnNames.join(", ")}])`,
           );
         }
 

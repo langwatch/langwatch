@@ -29,7 +29,10 @@ function started(occurredAt = 1_000): LangyConversationStateEvent {
   };
 }
 
-function turnAccepted(turnId: string, occurredAt: number): LangyConversationStateEvent {
+function turnAccepted(
+  turnId: string,
+  occurredAt: number,
+): LangyConversationStateEvent {
   return {
     type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
     occurredAt,
@@ -167,7 +170,9 @@ describe("foldLangyConversationState", () => {
       expect(new Set(results).size).toBe(1);
       expect(results[0]).toBe(3_000);
 
-      const counts = permutations(events).map((order) => fold(order).MessageCount);
+      const counts = permutations(events).map(
+        (order) => fold(order).MessageCount,
+      );
       expect(new Set(counts)).toEqual(new Set([1]));
     });
   });

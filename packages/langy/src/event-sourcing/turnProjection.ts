@@ -115,7 +115,5 @@ export function isLangyTurnProjectionTerminal(
   state: LangyTurnProjectionState,
 ): boolean {
   const status = state.turn?.Status;
-  return (
-    status === "completed" || status === "failed" || status === "stopped"
-  );
+  return status === "completed" || status === "failed" || status === "stopped";
 }

@@ -48,15 +48,12 @@ export class UndecodableStateError extends EventSourcingError {
     expectedVersion: string;
     cause?: unknown;
   }) {
-    super(
-      `projection "${args.projectionName}" cannot decode stored state`,
-      {
-        projectionName: args.projectionName,
-        aggregateId: args.aggregateId,
-        storedVersion: args.storedVersion ?? null,
-        expectedVersion: args.expectedVersion,
-      },
-    );
+    super(`projection "${args.projectionName}" cannot decode stored state`, {
+      projectionName: args.projectionName,
+      aggregateId: args.aggregateId,
+      storedVersion: args.storedVersion ?? null,
+      expectedVersion: args.expectedVersion,
+    });
     if (args.cause !== undefined) this.cause = args.cause;
   }
 }

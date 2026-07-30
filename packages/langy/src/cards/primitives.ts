@@ -59,8 +59,7 @@ export const resolveTotal = ({
 }: {
   pagination?: Pagination | null;
   rows: readonly unknown[];
-}): number =>
-  pagination?.totalHits ?? pagination?.total ?? rows.length;
+}): number => pagination?.totalHits ?? pagination?.total ?? rows.length;
 
 /**
  * A text field the platform sends either bare (`"hello"`) or wrapped in the trace
@@ -102,7 +101,9 @@ export const collectionSchema = <Key extends string, Row extends z.ZodType>({
   z.looseObject({
     [key]: z.array(rowOrTruncationMarker(row)),
     pagination: paginationSchema.optional(),
-  } as Record<Key, z.ZodType> & { pagination: z.ZodOptional<typeof paginationSchema> });
+  } as Record<Key, z.ZodType> & {
+    pagination: z.ZodOptional<typeof paginationSchema>;
+  });
 
 /** An identifier, however the endpoint chose to spell it. */
 export const idSchema = z

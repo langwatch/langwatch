@@ -4,7 +4,12 @@ import type {
   QueryOptions,
 } from "../client/clickhouseClient";
 import { ch } from "../schema/columns";
-import { aggregating, append, defineTable, replacing } from "../schema/defineTable";
+import {
+  aggregating,
+  append,
+  defineTable,
+  replacing,
+} from "../schema/defineTable";
 import { AppendStoreConfigurationError, clickhouseAppend } from "./appendStore";
 
 interface SpanRecord {
@@ -151,7 +156,10 @@ describe("given clickhouseAppend()", () => {
       const call = client.insertCalls[0]!;
       const spanIdIndex = call.columns.indexOf("SpanId");
       const durationIndex = call.columns.indexOf("DurationMs");
-      expect(call.rows.map((row) => row[spanIdIndex])).toEqual(["span-1", "span-2"]);
+      expect(call.rows.map((row) => row[spanIdIndex])).toEqual([
+        "span-1",
+        "span-2",
+      ]);
       expect(call.rows.map((row) => row[durationIndex])).toEqual(["10", "20"]);
     });
   });
@@ -159,7 +167,10 @@ describe("given clickhouseAppend()", () => {
   describe("when writing a batch to a replacing table keyed per record", () => {
     it("marks the write retry-safe, since a duplicate collapses at merge", async () => {
       const client = createFakeClient();
-      const store = clickhouseAppend<SpanRecord, typeof idempotencyKeyedSpansTable.columns>({
+      const store = clickhouseAppend<
+        SpanRecord,
+        typeof idempotencyKeyedSpansTable.columns
+      >({
         client,
         table: idempotencyKeyedSpansTable,
         toRow: (record, context) => ({
@@ -168,7 +179,9 @@ describe("given clickhouseAppend()", () => {
         }),
       });
 
-      await store.writeBatch([{ spanId: "span-1", durationMs: 10 }], { tenantId: "tenant-a" });
+      await store.writeBatch([{ spanId: "span-1", durationMs: 10 }], {
+        tenantId: "tenant-a",
+      });
 
       expect(client.insertCalls[0]?.target).toEqual({ kind: "replacing" });
     });
@@ -204,7 +217,9 @@ describe("given clickhouseAppend()", () => {
       });
 
       await expect(
-        store.writeBatch([{ spanId: "span-1", durationMs: 10 }], { tenantId: "tenant-a" }),
+        store.writeBatch([{ spanId: "span-1", durationMs: 10 }], {
+          tenantId: "tenant-a",
+        }),
       ).rejects.toThrow("insert failed");
     });
   });

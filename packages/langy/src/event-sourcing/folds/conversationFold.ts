@@ -33,8 +33,8 @@ import {
   type LangyTitleSource,
 } from "../../constants";
 import type {
-  LangyAgentResponseFailedEventData,
   LangyAgentRespondedEventData,
+  LangyAgentResponseFailedEventData,
   LangyAgentTurnAcceptedEventData,
   LangyConversationArchivedEventData,
   LangyConversationForkedEventData,

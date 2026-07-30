@@ -17,7 +17,12 @@ interface Member {
 function indexMembers(
   index: Map<string, Member[]>,
   pipeline: BuiltPipeline,
-  members: Readonly<Record<string, { readonly name: string; readonly eventTypes: readonly string[] }>>,
+  members: Readonly<
+    Record<
+      string,
+      { readonly name: string; readonly eventTypes: readonly string[] }
+    >
+  >,
 ): void {
   for (const member of Object.values(members)) {
     for (const eventType of member.eventTypes) {
@@ -40,7 +45,10 @@ export interface PipelineRegistry extends Registry {
 
 export function createRegistry(): PipelineRegistry {
   const registered: RegisteredPipeline[] = [];
-  const commandOwners = new Map<string, { pipeline: BuiltPipeline; command: string }>();
+  const commandOwners = new Map<
+    string,
+    { pipeline: BuiltPipeline; command: string }
+  >();
   const eventTypeOwners = new Map<string, string>();
   const foldIndex = new Map<string, Member[]>();
   const mapIndex = new Map<string, Member[]>();
@@ -77,7 +85,8 @@ export function createRegistry(): PipelineRegistry {
       assertNoCommandCollision(pipeline);
       assertNoEventTypeCollision(pipeline);
 
-      for (const eventType of pipeline.eventTypes) eventTypeOwners.set(eventType, pipeline.name);
+      for (const eventType of pipeline.eventTypes)
+        eventTypeOwners.set(eventType, pipeline.name);
       for (const command of Object.keys(pipeline.commands)) {
         commandOwners.set(command, { pipeline, command });
       }

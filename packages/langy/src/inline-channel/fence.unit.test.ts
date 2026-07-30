@@ -92,9 +92,7 @@ describe("splitLangyCardFences", () => {
         "````",
         "like so.",
       ].join("\n");
-      expect(splitLangyCardFences(text)).toEqual([
-        { type: "text", text },
-      ]);
+      expect(splitLangyCardFences(text)).toEqual([{ type: "text", text }]);
     });
 
     it("treats an ordinary json fence as opaque text", () => {

@@ -11,7 +11,10 @@ describe("CLI tool result contract", () => {
       toCliToolResult({
         resource: "trace",
         verb: "search",
-        payload: { traces: [{ trace_id: "trace_1" }], pagination: { totalHits: 1 } },
+        payload: {
+          traces: [{ trace_id: "trace_1" }],
+          pagination: { totalHits: 1 },
+        },
       }),
     ).toMatchObject({ kind: "card", card: "traces" });
   });

@@ -2,9 +2,15 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { ConfigurationError } from "../errors";
 import { definePipeline } from "../pipeline/definePipeline";
+import type {
+  CommittedEvent,
+  EnginePorts,
+  EventProducer,
+  Lane,
+  LaneConsumer,
+} from "./contracts";
 import { createRegistry } from "./registry";
 import { createEventSourcingService } from "./service";
-import type { CommittedEvent, EnginePorts, EventProducer, Lane, LaneConsumer } from "./contracts";
 
 /**
  * The service owns lifecycle only: register, start, stop, replay (ADR-108
@@ -36,8 +42,16 @@ function fakePorts(overrides: Partial<EnginePorts> = {}): EnginePorts {
       park: async () => undefined,
       depth: async () => 0,
     },
-    spool: { put: async () => "", get: async () => null, release: async () => undefined },
-    processStore: { load: async () => null, save: async () => undefined, due: async () => [] },
+    spool: {
+      put: async () => "",
+      get: async () => null,
+      release: async () => undefined,
+    },
+    processStore: {
+      load: async () => null,
+      save: async () => undefined,
+      due: async () => [],
+    },
     outbox: {
       stage: async () => undefined,
       claim: async () => [],
@@ -50,7 +64,9 @@ function fakePorts(overrides: Partial<EnginePorts> = {}): EnginePorts {
   };
 }
 
-function fakeConsumer(): LaneConsumer & { calls: { start: number; stop: number } } {
+function fakeConsumer(): LaneConsumer & {
+  calls: { start: number; stop: number };
+} {
   const calls = { start: 0, stop: 0 };
   return {
     calls,
@@ -63,7 +79,9 @@ function fakeConsumer(): LaneConsumer & { calls: { start: number; stop: number }
   };
 }
 
-function fakeProducer(): EventProducer & { published: readonly CommittedEvent[][] } {
+function fakeProducer(): EventProducer & {
+  published: readonly CommittedEvent[][];
+} {
   const published: CommittedEvent[][] = [];
   return {
     published,
@@ -78,7 +96,10 @@ describe("createEventSourcingService", () => {
     /** @scenario starting with consumption disabled starts no consumer, and the command surface still dispatches */
     it("starts no consumer, and still dispatches a command, when consumption is disabled", async () => {
       const consumer = fakeConsumer();
-      const service = createEventSourcingService({ ports: fakePorts(), consumer });
+      const service = createEventSourcingService({
+        ports: fakePorts(),
+        consumer,
+      });
       service.register(tracePipeline());
 
       await service.start({ runsConsumers: false });
@@ -96,7 +117,10 @@ describe("createEventSourcingService", () => {
     /** @scenario starting with consumption enabled starts the injected consumer */
     it("starts the injected consumer when consumption is enabled", async () => {
       const consumer = fakeConsumer();
-      const service = createEventSourcingService({ ports: fakePorts(), consumer });
+      const service = createEventSourcingService({
+        ports: fakePorts(),
+        consumer,
+      });
       service.register(tracePipeline());
 
       await service.start({ runsConsumers: true });
@@ -106,7 +130,10 @@ describe("createEventSourcingService", () => {
     /** @scenario stopping a service twice is a no-op */
     it("does not stop the consumer a second time once already stopped", async () => {
       const consumer = fakeConsumer();
-      const service = createEventSourcingService({ ports: fakePorts(), consumer });
+      const service = createEventSourcingService({
+        ports: fakePorts(),
+        consumer,
+      });
       service.register(tracePipeline());
 
       await service.start({ runsConsumers: true });
@@ -143,9 +170,15 @@ describe("createEventSourcingService", () => {
       const registry = createRegistry();
       registry.bindCommandPort("billing/chargeCard");
       const consumer = fakeConsumer();
-      const service = createEventSourcingService({ ports: fakePorts(), registry, consumer });
+      const service = createEventSourcingService({
+        ports: fakePorts(),
+        registry,
+        consumer,
+      });
 
-      await expect(service.start({ runsConsumers: true })).rejects.toThrow(ConfigurationError);
+      await expect(service.start({ runsConsumers: true })).rejects.toThrow(
+        ConfigurationError,
+      );
       expect(consumer.calls.start).toBe(0);
     });
   });
@@ -205,7 +238,9 @@ describe("createEventSourcingService", () => {
 
     it("consults the ports' predicate when one is supplied", () => {
       const service = createEventSourcingService({
-        ports: fakePorts({ enabled: (candidate) => candidate.name !== "summary" }),
+        ports: fakePorts({
+          enabled: (candidate) => candidate.name !== "summary",
+        }),
       });
       expect(service.enabled(lane)).toBe(false);
       expect(service.enabled({ kind: "fold", name: "other" })).toBe(true);

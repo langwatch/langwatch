@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { ch, ColumnDecodeError } from "./columns";
+import { ColumnDecodeError, ch } from "./columns";
 
 /**
  * These tests guard the two properties ADR-099 depends on: a column decodes
@@ -315,7 +315,9 @@ describe("ch.json", () => {
     });
 
     it("throws when the parsed JSON does not match the declared schema", () => {
-      expect(() => col.decode(JSON.stringify({ count: "not-a-number" }))).toThrow();
+      expect(() =>
+        col.decode(JSON.stringify({ count: "not-a-number" })),
+      ).toThrow();
     });
   });
 });
@@ -379,7 +381,9 @@ describe("ch.epochMillis", () => {
     it("round-trips a known epoch millisecond value through the UInt64 wire form", () => {
       const wire = col.encode(new Date(Date.UTC(2024, 0, 15, 10, 30, 0, 123)));
       expect(wire).toBe("1705314600123");
-      expect(col.decode(wire)).toEqual(new Date(Date.UTC(2024, 0, 15, 10, 30, 0, 123)));
+      expect(col.decode(wire)).toEqual(
+        new Date(Date.UTC(2024, 0, 15, 10, 30, 0, 123)),
+      );
     });
 
     /** @scenario encoding a Date produces the exact epoch-millisecond wire string */
@@ -410,7 +414,9 @@ describe("ch.epochMillis", () => {
   describe("given a value that does not fit safely in a JS number", () => {
     /** @scenario decoding a UInt64 beyond Number.MAX_SAFE_INTEGER throws instead of losing precision */
     it("throws rather than silently rounding", () => {
-      const beyondSafeInteger = (BigInt(Number.MAX_SAFE_INTEGER) + 1n).toString();
+      const beyondSafeInteger = (
+        BigInt(Number.MAX_SAFE_INTEGER) + 1n
+      ).toString();
       expect(() => col.decode(beyondSafeInteger)).toThrow();
     });
 
@@ -474,7 +480,6 @@ describe("epoch-millisecond time roles", () => {
     });
   });
 });
-
 
 describe("ColumnDecodeError", () => {
   describe("given a map whose key column cannot encode to a string", () => {

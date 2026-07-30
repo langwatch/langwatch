@@ -6,8 +6,14 @@ import {
   type TenantTarget,
 } from "./tenantRouting";
 
-const primary: TenantTarget = { url: "https://ch-primary:8443", database: "langwatch" };
-const dedicated: TenantTarget = { url: "https://ch-dedicated:8443", database: "acme" };
+const primary: TenantTarget = {
+  url: "https://ch-primary:8443",
+  database: "langwatch",
+};
+const dedicated: TenantTarget = {
+  url: "https://ch-dedicated:8443",
+  database: "acme",
+};
 
 describe("given sharedDatabaseRouter", () => {
   it("resolves every tenant to the same target", () => {
@@ -19,11 +25,15 @@ describe("given sharedDatabaseRouter", () => {
 
   describe("when the target is incomplete", () => {
     it("throws at build time for an empty database", () => {
-      expect(() => sharedDatabaseRouter({ url: primary.url, database: "" })).toThrow(/empty database/);
+      expect(() =>
+        sharedDatabaseRouter({ url: primary.url, database: "" }),
+      ).toThrow(/empty database/);
     });
 
     it("throws at build time for an empty url", () => {
-      expect(() => sharedDatabaseRouter({ url: "", database: primary.database })).toThrow(/empty url/);
+      expect(() =>
+        sharedDatabaseRouter({ url: "", database: primary.database }),
+      ).toThrow(/empty url/);
     });
   });
 });
@@ -50,7 +60,7 @@ describe("given mappedTenantRouter", () => {
         mappedTenantRouter({
           fallback: primary,
           overrides: new Map([["tenant-bad", { url: "", database: "acme" }]]),
-        })
+        }),
       ).toThrow(/tenant-bad/);
     });
   });
@@ -65,8 +75,13 @@ describe("given mappedTenantRouter", () => {
         ]),
       });
 
-      expect(withDuplicateOverride.knownTargets()).toEqual([primary, dedicated]);
-      expect(withDuplicateOverride.knownTargets()).toEqual(withDuplicateOverride.knownTargets());
+      expect(withDuplicateOverride.knownTargets()).toEqual([
+        primary,
+        dedicated,
+      ]);
+      expect(withDuplicateOverride.knownTargets()).toEqual(
+        withDuplicateOverride.knownTargets(),
+      );
     });
   });
 });
@@ -94,7 +109,10 @@ describe("given createPoolRegistry", () => {
       });
 
       const first = registry.acquire(primary);
-      const second = registry.acquire({ url: primary.url, database: "a-different-database" });
+      const second = registry.acquire({
+        url: primary.url,
+        database: "a-different-database",
+      });
 
       expect(second).not.toBe(first);
       expect(second.database).toBe("a-different-database");

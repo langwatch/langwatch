@@ -47,9 +47,7 @@ describe("parseHandledError, given dialect 1 (the flattened Hono handler body)",
     expect(parsed.traceUrl).toBe(
       "https://grafana.example.com/explore?traceId=4bf",
     );
-    expect(parsed.logsUrl).toBe(
-      "https://grafana.example.com/explore?logs=4bf",
-    );
+    expect(parsed.logsUrl).toBe("https://grafana.example.com/explore?logs=4bf");
     expect(parsed.meta).toEqual({ id: "sales-q3" });
   });
 
@@ -166,7 +164,11 @@ describe("parseHandledError, given dialect 3 (the new framework envelope)", () =
     // degrades a perfectly well-named error to a status-derived guess.
     const parsed = parseHandledError({
       status: 404,
-      body: { type: "dataset_not_found", message: "dataset_not_found", meta: { id: "ds_1" } },
+      body: {
+        type: "dataset_not_found",
+        message: "dataset_not_found",
+        meta: { id: "ds_1" },
+      },
     });
 
     expect(parsed.code).toBe("dataset_not_found");
@@ -270,7 +272,9 @@ describe("parseHandledError, given the platform's remediation channel", () => {
       "Check the trace id — traces are deleted after the retention window",
       "If you just sent this trace, retry in a few seconds — ingestion is asynchronous",
     ]);
-    expect(parsed.docUrl).toBe("https://docs.langwatch.ai/platform/data-retention");
+    expect(parsed.docUrl).toBe(
+      "https://docs.langwatch.ai/platform/data-retention",
+    );
   });
 
   it("keeps the remediation copy out of meta — it is not domain context", () => {
@@ -310,7 +314,9 @@ describe("parseHandledError, given the platform's remediation channel", () => {
     expect(parsed.suggestions).toEqual([
       "Query in smaller windows and paginate through the results",
     ]);
-    expect(parsed.docUrl).toBe("https://docs.langwatch.ai/platform/rate-limits");
+    expect(parsed.docUrl).toBe(
+      "https://docs.langwatch.ai/platform/rate-limits",
+    );
   });
 
   it("still reads a document written under the CLI's own older names", () => {
@@ -359,7 +365,10 @@ describe("parseHandledError, given the `code` ↔ `kind` transition", () => {
 
 describe("parseHandledError, given a failure the platform did NOT name", () => {
   it("degrades an unrecognisable body to a status-coded infrastructure error", () => {
-    const parsed = parseHandledError({ status: 502, body: "<html>Bad Gateway</html>" });
+    const parsed = parseHandledError({
+      status: 502,
+      body: "<html>Bad Gateway</html>",
+    });
 
     expect(parsed).toMatchObject({
       code: "internal_error",
@@ -389,7 +398,10 @@ describe("parseHandledError, given a failure the platform did NOT name", () => {
     expect(
       parseHandledError({
         status: 0,
-        body: { error: "Internal server error", message: "An unknown error occurred" },
+        body: {
+          error: "Internal server error",
+          message: "An unknown error occurred",
+        },
       }).isHandled,
     ).toBe(false);
   });
@@ -679,7 +691,10 @@ describe("handledErrorFromThrown, given a transport failure fetch threw", () => 
 
 describe("parseHandledError, given a bare `code` with nothing else", () => {
   it("refuses to read a lone code as a domain discriminant", () => {
-    const parsed = parseHandledError({ status: 0, body: { code: "ECONNREFUSED" } });
+    const parsed = parseHandledError({
+      status: 0,
+      body: { code: "ECONNREFUSED" },
+    });
 
     expect(parsed).toMatchObject({ code: "network_error", isHandled: false });
   });
@@ -690,7 +705,10 @@ describe("parseHandledError, given a bare `code` with nothing else", () => {
       body: { code: "dataset_not_found", message: "Dataset not found" },
     });
 
-    expect(parsed).toMatchObject({ code: "dataset_not_found", isHandled: true });
+    expect(parsed).toMatchObject({
+      code: "dataset_not_found",
+      isHandled: true,
+    });
   });
 
   it("still reads a code that arrives with the envelope's meta bag", () => {

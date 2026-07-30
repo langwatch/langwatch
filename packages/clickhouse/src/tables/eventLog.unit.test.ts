@@ -88,7 +88,9 @@ describe("given the event_log table declaration", () => {
     it("declares EventOccurredAt's true role — customer-supplied, not frozen or platform-controlled — exempted as structural debt", () => {
       expect(eventLogTable.columns.EventOccurredAt.timeRole).toBe("occurredAt");
       expect(eventLogTable.columns.EventOccurredAt.frozen).toBe(false);
-      expect(eventLogTable.columns.EventOccurredAt.platformControlled).toBe(false);
+      expect(eventLogTable.columns.EventOccurredAt.platformControlled).toBe(
+        false,
+      );
       expect(eventLogTable.structuralDebt).toEqual([
         {
           column: "EventOccurredAt",

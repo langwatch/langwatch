@@ -20,10 +20,10 @@ import type * as z from "zod/v4";
 import {
   dashboardProbeSchema,
   evaluatorConfigProbeSchema,
+  type MeasuredCardKind,
   SCHEMA_BY_CARD_KIND,
   spendProbeSchema,
   timeseriesProbeSchema,
-  type MeasuredCardKind,
 } from "./schemas.js";
 
 /**
@@ -72,10 +72,8 @@ import {
  * A write card states what just happened and a bespoke `byVerb` read card was
  * chosen deliberately; neither is an invitation to guess again.
  */
-const PROMOTABLE_FROM: ReadonlySet<MeasuredCardKind> = new Set<MeasuredCardKind>([
-  "resourceRead",
-  "metrics",
-]);
+const PROMOTABLE_FROM: ReadonlySet<MeasuredCardKind> =
+  new Set<MeasuredCardKind>(["resourceRead", "metrics"]);
 
 export interface CardProbe {
   /** The card a payload matching `schema` is promoted to. */

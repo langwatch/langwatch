@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldStateTable } from "../__tests__/integration/fixtures";
-import { readTestClickHouseInfo, uniqueId, uniqueTenant } from "../__tests__/integration/testClickHouse";
-import { createClickHouseClient, type ClickHouseClient } from "../client/clickhouseClient";
+import {
+  readTestClickHouseInfo,
+  uniqueId,
+  uniqueTenant,
+} from "../__tests__/integration/testClickHouse";
+import {
+  type ClickHouseClient,
+  createClickHouseClient,
+} from "../client/clickhouseClient";
 import { createRowCodec } from "../codec/rowCodec";
 import { bindIdentifiers } from "../query/identifiers";
 import type { ColumnMap } from "./columns";
@@ -34,7 +41,9 @@ describe("given ch.uint64() against a live ClickHouse", () => {
     const key = uniqueId("key");
     const codec = createRowCodec();
     const columns = foldStateTable.columns as ColumnMap;
-    const wireColumns = foldStateTable.columnNames.map((name) => columns[name]!);
+    const wireColumns = foldStateTable.columnNames.map(
+      (name) => columns[name]!,
+    );
 
     const aboveDoublePrecision = 9_007_199_254_740_993n; // 2^53 + 1
     const now = new Date();
@@ -51,7 +60,11 @@ describe("given ch.uint64() against a live ClickHouse", () => {
     await client.insert({
       tenantId,
       table: foldStateTable.name,
-      rows: codec.encodeRows({ columns: wireColumns, columnNames: foldStateTable.columnNames, rows: [row] }),
+      rows: codec.encodeRows({
+        columns: wireColumns,
+        columnNames: foldStateTable.columnNames,
+        rows: [row],
+      }),
       columns: foldStateTable.columnNames,
       target: { kind: "replacing" },
     });
