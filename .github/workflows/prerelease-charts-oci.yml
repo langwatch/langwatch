@@ -6,11 +6,14 @@
 # is the artifact self-hosters install from. Publishing a build per merge there
 # would grow that index without bound and force every `helm search`/`helm
 # upgrade` onto --devel to avoid picking up an untagged main build. OCI has no
-# shared index — each push is an independent, immutable tag — so prereleases
-# and stable releases cannot interfere with each other.
+# shared index — each push is an independent tag — so prereleases and stable
+# releases cannot interfere with each other.
 #
-# Versions are `<chartVersion>-main.<run_number>.<shortSha>`, e.g.
-# 3.7.0-main.412.a1b2c3d. That is a valid semver PRERELEASE, so it sorts BELOW
+# Versions are `<chartVersion>-main.<run_number>.<run_attempt>.<shortSha>`,
+# e.g. 3.7.0-main.412.1.a1b2c3d. run_attempt is part of the identity because a
+# re-run reuses both run_number and sha while `helm package` is not
+# byte-reproducible; without it a re-run would republish one version string
+# with different bytes. That is a valid semver PRERELEASE, so it sorts BELOW
 # the eventual 3.7.0 and `helm upgrade` never selects it by accident, and it is
 # a valid OCI tag (semver build metadata, `+sha`, is not — `+` is not a legal
 # tag character, which is why the sha goes in the prerelease segment).
@@ -31,7 +34,11 @@ concurrency:
   # Serialise per branch: two merges in quick succession would otherwise race
   # on `helm dependency build`, and the later push should win.
   group: prerelease-charts-oci-${{ github.ref }}
-  cancel-in-progress: true
+  # NOT cancel-in-progress. Cancelling lands between `helm push` and
+  # `cosign sign` often enough to matter, and there is no cleanup path: the
+  # chart stays in GHCR unsigned while the run reports "cancelled" rather than
+  # failed, so nothing retries and nothing reconciles it. A publish run drains.
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -108,6 +115,11 @@ jobs:
           # reference paths must be lowercase and GitHub org names are not.
           OWNER: ${{ github.repository_owner }}
           RUN_NUMBER: ${{ github.run_number }}
+          # Re-running a workflow reuses run_number AND sha, but `helm package`
+          # is not byte-reproducible (tgz mtimes come from checkout), so without
+          # run_attempt a re-run silently republishes the SAME version string
+          # with different bytes and orphans the first run's signature.
+          RUN_ATTEMPT: ${{ github.run_attempt }}
           # Used to pin the expected signing identity on verification, so a
           # signature minted by some other repository's workflow is rejected.
           REPO_NAME: ${{ github.event.repository.name }}
@@ -131,17 +143,35 @@ jobs:
             # which is not the directory name (charts/gateway is
             # "langwatch-gateway"), and `helm show` needs dependencies resolved
             # first, which is the step below.
-            chart_name="$(awk '$1=="name:"{print $2; exit}' "${chart_dir}Chart.yaml")"
-            base_version="$(awk '$1=="version:"{print $2; exit}' "${chart_dir}Chart.yaml")"
+            # Strip surrounding quotes: Chart.yaml scalars are legitimately
+            # quotable (clickhouse-serverless quotes appVersion), and a quoted
+            # version yielded `"0.2.0"` verbatim — a malformed --version and a
+            # .tgz filename that does not exist.
+            read_chart_field() {
+              awk -v k="$2:" '$1==k{sub(/^[^:]*:[[:space:]]*/,""); gsub(/^["\x27]|["\x27]$/,""); print; exit}' "$1"
+            }
+            chart_name="$(read_chart_field "${chart_dir}Chart.yaml" name)"
+            base_version="$(read_chart_field "${chart_dir}Chart.yaml" version)"
             if [ -z "$chart_name" ] || [ -z "$base_version" ]; then
               echo "::error::could not read name/version from ${chart_dir}Chart.yaml"
               exit 1
             fi
-            version="${base_version}-main.${RUN_NUMBER}.${short_sha}"
+            version="${base_version}-main.${RUN_NUMBER}.${RUN_ATTEMPT}.${short_sha}"
 
             echo "::group::${chart_name} -> ${version}"
             helm dependency build "$chart_dir"
-            helm package "$chart_dir" --version "$version" --app-version "$short_sha" -d .oci-packages
+
+            # Never sign something that cannot install. Without this, a template
+            # error merged to main still produces a cryptographically valid
+            # signature over a broken chart.
+            helm lint "$chart_dir" >/dev/null
+            helm template smoke "$chart_dir" >/dev/null
+            # --app-version deliberately NOT set: clickhouse-serverless declares
+            # appVersion "25.10.2.65" (the actual ClickHouse release), and
+            # overwriting it with a git sha both destroys that and claims a
+            # correspondence the chart does not have — its image tags come from
+            # values.yaml, not appVersion. The sha is already in the version.
+            helm package "$chart_dir" --version "$version" -d .oci-packages
 
             # `helm push` prints the pushed digest to STDERR, not stdout, and
             # signing must bind to the immutable digest rather than the tag —
@@ -149,9 +179,12 @@ jobs:
             # attest to whatever the tag points at when it is verified.
             push_log="$(helm push ".oci-packages/${chart_name}-${version}.tgz" "$registry" 2>&1)"
             echo "$push_log"
-            digest="$(printf '%s' "$push_log" | awk '/Digest:/{print $2; exit}')"
-            if [ -z "$digest" ]; then
-              echo "::error::could not read pushed digest for ${chart_name}; refusing to sign a mutable tag"
+            digest="$(printf '%s' "$push_log" | awk '$1=="Digest:"{print $2; exit}')"
+            if ! printf '%s' "$digest" | grep -qE '^sha256:[0-9a-f]{64}$'; then
+              # Shape-checked, not just non-empty: an unanchored match would
+              # happily hand `cosign sign` a ref instead of a digest if helm
+              # ever prints them on one line.
+              echo "::error::unexpected digest '${digest}' for ${chart_name}; refusing to sign"
               exit 1
             fi
 
