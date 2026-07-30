@@ -9,7 +9,14 @@ import {
   type Permission,
 } from "../api/rbac";
 import { resolveApiKeyPermission } from "../rbac/role-binding-resolver";
+import {
+  GatewayGuardrailProjectMismatchError,
+  GatewayScopeOrgMismatchError,
+  GuardrailAttachForbiddenError,
+  VirtualKeyNotFoundError,
+} from "./errors";
 import type { GuardrailAttachment } from "./virtualKey.config";
+import type { VirtualKeyService } from "./virtualKey.service";
 
 /**
  * Scope-aware authorization for VirtualKey write paths.
@@ -150,6 +157,14 @@ export async function assertActorCanManageAllScopes(
   ctx: ActorContext,
   scopes: Scope[],
 ): Promise<void> {
+  // Deny on an empty list rather than falling through the loop: "the caller
+  // controls every scope in {}" is vacuously true, which would make this gate
+  // the one permission check in the file that grants by default. Its sibling
+  // `assertActorCanOperateOnAnyScope` already denies an empty list, and two
+  // gates in one file with opposite empty-input answers is the trap.
+  if (scopes.length === 0) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
+  }
   if (ctx.actor.kind === "session" && !ctx.actor.session) {
     throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
   }
@@ -283,52 +298,47 @@ export async function assertScopesBelongToOrg(
   organizationId: string,
   scopes: { scopeType: string; scopeId: string }[],
 ): Promise<void> {
-  const teamIds = scopes
-    .filter((s) => s.scopeType === "TEAM")
-    .map((s) => s.scopeId);
-  const projectIds = scopes
-    .filter((s) => s.scopeType === "PROJECT")
-    .map((s) => s.scopeId);
+  const idsOfType = (scopeType: string) =>
+    scopes.filter((s) => s.scopeType === scopeType).map((s) => s.scopeId);
 
-  for (const s of scopes) {
-    if (s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `scope_org_mismatch: scope ${s.scopeId} is not in organization ${organizationId}`,
-      });
-    }
+  if (
+    scopes.some(
+      (s) => s.scopeType === "ORGANIZATION" && s.scopeId !== organizationId,
+    )
+  ) {
+    throw new GatewayScopeOrgMismatchError("organization");
   }
 
-  if (teamIds.length > 0) {
-    const found = await prisma.team.findMany({
-      where: { id: { in: teamIds }, organizationId },
+  await assertAllResolve("team", idsOfType("TEAM"), (ids) =>
+    prisma.team.findMany({
+      where: { id: { in: ids }, organizationId },
       select: { id: true },
-    });
-    const foundIds = new Set(found.map((t) => t.id));
-    for (const id of teamIds) {
-      if (!foundIds.has(id)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `scope_org_mismatch: team ${id} is not in organization ${organizationId}`,
-        });
-      }
-    }
-  }
+    }),
+  );
 
-  if (projectIds.length > 0) {
-    const found = await prisma.project.findMany({
-      where: { id: { in: projectIds }, team: { organizationId } },
+  await assertAllResolve("project", idsOfType("PROJECT"), (ids) =>
+    prisma.project.findMany({
+      where: { id: { in: ids }, team: { organizationId } },
       select: { id: true },
-    });
-    const foundIds = new Set(found.map((p) => p.id));
-    for (const id of projectIds) {
-      if (!foundIds.has(id)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `scope_org_mismatch: project ${id} is not in organization ${organizationId}`,
-        });
-      }
-    }
+    }),
+  );
+}
+
+/**
+ * Every id must come back from an org-scoped lookup. An id that names
+ * another tenant's row simply does not match the `where`, so absence from
+ * the result is the refusal — the query never has to compare tenants
+ * itself.
+ */
+async function assertAllResolve(
+  scopeKind: string,
+  ids: string[],
+  lookup: (ids: string[]) => Promise<{ id: string }[]>,
+): Promise<void> {
+  if (ids.length === 0) return;
+  const found = new Set((await lookup(ids)).map((row) => row.id));
+  if (ids.some((id) => !found.has(id))) {
+    throw new GatewayScopeOrgMismatchError(scopeKind);
   }
 }
 
@@ -341,9 +351,15 @@ export async function assertScopesBelongToOrg(
 export async function resolveVkProjectId(
   prisma: PrismaClient,
   organizationId: string,
-  vkId: string | null,
-  inputScopes: { scopeType: string; scopeId: string }[] | undefined,
-  traceProjectId?: string | null,
+  {
+    vkId,
+    inputScopes,
+    traceProjectId,
+  }: {
+    vkId: string | null;
+    inputScopes: { scopeType: string; scopeId: string }[] | undefined;
+    traceProjectId?: string | null;
+  },
 ): Promise<string | null> {
   let scopes = inputScopes;
   let storedTraceProjectId: string | null = null;
@@ -382,10 +398,7 @@ export async function assertTraceProjectBelongsToOrg(
     select: { id: true },
   });
   if (!project) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `scope_org_mismatch: trace project ${traceProjectId} is not in organization ${organizationId}`,
-    });
+    throw new GatewayScopeOrgMismatchError("project");
   }
 }
 
@@ -412,11 +425,7 @@ export async function assertGuardrailAttachmentsAllowed(
   if (referencedIds.length === 0) return;
 
   if (!vkProjectId) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        "guardrail_project_mismatch: virtual key is not scoped to a single project",
-    });
+    throw new GatewayGuardrailProjectMismatchError();
   }
 
   // Scope the lookup to the VK's own project. Any referenced guardrail
@@ -429,13 +438,8 @@ export async function assertGuardrailAttachmentsAllowed(
   });
   const foundIds = new Set(rows.map((r) => r.id));
 
-  for (const id of referencedIds) {
-    if (!foundIds.has(id)) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `guardrail_project_mismatch: guardrail ${id} is not in the virtual key's project`,
-      });
-    }
+  if (referencedIds.some((id) => !foundIds.has(id))) {
+    throw new GatewayGuardrailProjectMismatchError();
   }
 
   const allowed = await actorHasPermissionAtScope(
@@ -444,10 +448,7 @@ export async function assertGuardrailAttachmentsAllowed(
     "gatewayGuardrails:attach",
   );
   if (!allowed) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "missing_perm:gatewayGuardrails:attach",
-    });
+    throw new GuardrailAttachForbiddenError();
   }
 }
 
@@ -468,4 +469,49 @@ export function isVisibleToMembership(
       return membership.teamIds.has(scope.scopeId);
     return membership.projectIds.has(scope.scopeId);
   });
+}
+
+/** A virtual-key loader. Structurally satisfied by {@link VirtualKeyService}. */
+export type VirtualKeyReader = Pick<VirtualKeyService, "getById">;
+
+/**
+ * The precondition every by-id MUTATION shares: the key has to exist.
+ * Authorization is a separate, permission-based decision the caller makes
+ * on the returned key's scopes, so this deliberately does not filter by
+ * visibility — a holder of a scope role binding can operate on a key its
+ * membership set never surfaces (vk-scope-rbac.feature).
+ */
+export async function requireExistingVk(
+  reader: VirtualKeyReader,
+  id: string,
+  organizationId: string,
+) {
+  const vk = await reader.getById(id, organizationId);
+  if (!vk) {
+    throw new VirtualKeyNotFoundError();
+  }
+  return vk;
+}
+
+/**
+ * The precondition every by-id READ shares: the key has to exist AND fall
+ * inside the caller's membership set. Both answers are the same
+ * `virtual_key_not_found`, because a distinguishable "forbidden" would be
+ * an existence oracle for keys in teams the caller has no part in.
+ *
+ * The membership set is the caller's own, derived per door — a session
+ * loads it from its user's rows, a project credential synthesizes the one
+ * its project implies — but the check itself is shared, so the two doors
+ * cannot drift on what "visible" means.
+ */
+export async function requireVisibleVk(
+  reader: VirtualKeyReader,
+  membership: MembershipSet,
+  { id, organizationId }: { id: string; organizationId: string },
+) {
+  const vk = await requireExistingVk(reader, id, organizationId);
+  if (!isVisibleToMembership(membership, vk.scopes)) {
+    throw new VirtualKeyNotFoundError();
+  }
+  return vk;
 }

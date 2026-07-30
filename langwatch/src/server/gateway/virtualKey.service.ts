@@ -97,12 +97,7 @@ export const virtualKeyBudgetInputSchema = z.object({
   name: z.string().min(1).max(128).optional(),
 });
 
-export type VirtualKeyBudgetInput = {
-  limitUsd: string;
-  window: "DAY" | "WEEK" | "MONTH";
-  onBreach?: "BLOCK" | "WARN";
-  name?: string;
-};
+export type VirtualKeyBudgetInput = z.infer<typeof virtualKeyBudgetInputSchema>;
 
 export type CreateVirtualKeyInput = {
   organizationId: string;

@@ -48,6 +48,8 @@ import {
   assertTraceProjectBelongsToOrg,
   isVisibleToMembership,
   type MembershipSet,
+  requireExistingVk,
+  requireVisibleVk,
   resolveVkProjectId,
   type VirtualKeyActor,
 } from "~/server/gateway/virtualKey.authz";
@@ -180,6 +182,23 @@ const errorSchema = z.object({
     message: z.string(),
   }),
 });
+
+/**
+ * Declare a route's JSON payload for the generated spec.
+ *
+ * The handlers parse with `safeParse` rather than a `zValidator` middleware,
+ * so that a rejected body answers in the same `validation_error` envelope as
+ * every other refusal on these routes instead of Hono's default. That choice
+ * costs the generator its only view of the request schema, so state it here:
+ * without this the spec publishes mutation routes with no documented payload
+ * at all, and a caller has nothing to write their request against.
+ */
+function jsonBody(schema: z.ZodTypeAny) {
+  return {
+    required: true,
+    content: { "application/json": { schema: resolver(schema) } },
+  };
+}
 
 /**
  * Best-effort organization lookup for the project behind the API key.
@@ -378,34 +397,6 @@ function membershipForApiCaller(project: Project): MembershipSet {
   };
 }
 
-/**
- * Load a key for a by-id READ with the list's visibility rule: a key the
- * caller can't see is indistinguishable from one that doesn't exist.
- * Mutations deliberately do NOT use this — their contract is
- * permission-based (the op-perm on any existing scope, same as tRPC), so
- * a credential holding a scope role binding can operate on a key its
- * membership set does not surface, and an unauthorized caller inside the
- * tenant gets FORBIDDEN, as virtual-key-access-boundaries.feature pins.
- */
-async function requireVisibleVk(
-  service: VirtualKeyService,
-  id: string,
-  organizationId: string,
-  project: Project,
-) {
-  const vk = await service.getById(id, organizationId);
-  if (
-    !vk ||
-    !isVisibleToMembership(membershipForApiCaller(project), vk.scopes)
-  ) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "virtual_key_not_found: virtual key not found",
-    });
-  }
-  return vk;
-}
-
 const TRPC_HTTP_STATUS: Record<string, ContentfulStatusCode> = {
   BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
@@ -546,6 +537,7 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
   "/virtual-keys",
   describeRoute({
     summary: "Create virtual key",
+    requestBody: jsonBody(createVirtualKeySchema),
     description:
       "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash. `scopes` defaults to the caller's project; org- and team-scoped keys require a scoped API key holding `virtualKeys:manage` at each requested scope. An org- or team-scoped key also needs a place for its traces and spend to land: pass `trace_project_id` (needs `virtualKeys:manage` on that project), or the organization's governance project is used, and creation refuses with `trace_project_required` when neither exists.",
     tags: ["Virtual Keys"],
@@ -605,13 +597,11 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
           { scopeType: "PROJECT", scopeId: body.data.trace_project_id },
         ]);
       }
-      const vkProjectId = await resolveVkProjectId(
-        prisma,
-        organizationId,
-        null,
-        scopes,
-        body.data.trace_project_id ?? null,
-      );
+      const vkProjectId = await resolveVkProjectId(prisma, organizationId, {
+        vkId: null,
+        inputScopes: scopes,
+        traceProjectId: body.data.trace_project_id ?? null,
+      });
       await assertGuardrailAttachmentsAllowed(
         { prisma, actor },
         vkProjectId,
@@ -672,7 +662,11 @@ secured.access(apiKeyPermission("virtualKeys:view")).get(
     const service = VirtualKeyService.create(prisma);
     const organizationId = await orgIdForProject(project.id);
     try {
-      const vk = await requireVisibleVk(service, id, organizationId, project);
+      const vk = await requireVisibleVk(
+        service,
+        membershipForApiCaller(project),
+        { id, organizationId },
+      );
       return c.json({ virtual_key: toVkDto(vk) });
     } catch (error) {
       return trpcErrorResponse(c, error);
@@ -746,7 +740,10 @@ secured.access(apiKeyPermission("gatewayUsage:view")).get(
     const service = VirtualKeyService.create(prisma);
     let vk;
     try {
-      vk = await requireVisibleVk(service, id, organizationId, project);
+      vk = await requireVisibleVk(service, membershipForApiCaller(project), {
+        id,
+        organizationId,
+      });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
@@ -795,6 +792,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
   "/virtual-keys/:id",
   describeRoute({
     summary: "Update virtual key",
+    requestBody: jsonBody(updateVirtualKeySchema),
     description:
       "Partial update — send only the fields you want to change. `scopes` replaces the entire visibility set and requires `virtualKeys:manage` at every NEW scope. `config` is deep-merged. `budget` upserts the key's own cap; explicit null archives it.",
     tags: ["Virtual Keys"],
@@ -825,13 +823,7 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await service.getById(id, organizationId);
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "virtual_key_not_found: virtual key not found",
-        });
-      }
+      const existing = await requireExistingVk(service, id, organizationId);
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in; re-scoping additionally needs manage
       // on every NEW scope — the same two gates as the tRPC update.
@@ -861,15 +853,14 @@ secured.access(apiKeyPermission("virtualKeys:update")).patch(
           ]);
         }
       }
-      const vkProjectId = await resolveVkProjectId(
-        prisma,
-        organizationId,
-        id,
-        scopes,
-        body.data.trace_project_id !== undefined
-          ? body.data.trace_project_id
-          : existing.traceProjectId,
-      );
+      const vkProjectId = await resolveVkProjectId(prisma, organizationId, {
+        vkId: id,
+        inputScopes: scopes,
+        traceProjectId:
+          body.data.trace_project_id !== undefined
+            ? body.data.trace_project_id
+            : existing.traceProjectId,
+      });
       // Newly-submitted attachments are always validated. A scope change
       // without re-sent config revalidates the existing attachments
       // against the new project; a plain metadata update touches neither.
@@ -934,13 +925,7 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await service.getById(id, organizationId);
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "virtual_key_not_found: virtual key not found",
-        });
-      }
+      const existing = await requireExistingVk(service, id, organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma, actor },
         existing.scopes,
@@ -984,13 +969,7 @@ secured.access(apiKeyPermission("virtualKeys:delete")).post(
     const { actor, actorUserId } = actorForRequest(c);
     const service = VirtualKeyService.create(prisma);
     try {
-      const existing = await service.getById(id, organizationId);
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "virtual_key_not_found: virtual key not found",
-        });
-      }
+      const existing = await requireExistingVk(service, id, organizationId);
       await assertActorCanOperateOnAnyScope(
         { prisma, actor },
         existing.scopes,
@@ -1169,6 +1148,7 @@ secured.access(apiKeyPermission("gatewayBudgets:create")).post(
   "/budgets",
   describeRoute({
     summary: "Create budget",
+    requestBody: jsonBody(createBudgetSchema),
     description:
       "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal / group). GROUP budgets are per-member allowances and require a deployment with the ClickHouse spend ledger (`group_budget_requires_clickhouse` otherwise). `provider_key` optionally pins the budget to one model provider.",
     tags: ["Budgets"],
@@ -1225,6 +1205,7 @@ secured.access(apiKeyPermission("gatewayBudgets:update")).patch(
   "/budgets/:id",
   describeRoute({
     summary: "Update budget",
+    requestBody: jsonBody(updateBudgetSchema),
     description:
       "Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.",
     tags: ["Budgets"],
@@ -1457,6 +1438,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:create")).post(
   "/cache-rules",
   describeRoute({
     summary: "Create a cache rule",
+    requestBody: jsonBody(createCacheRuleSchema),
     description:
       "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.",
     tags: ["Cache Rules"],
@@ -1507,6 +1489,7 @@ secured.access(apiKeyPermission("gatewayCacheRules:update")).patch(
   "/cache-rules/:id",
   describeRoute({
     summary: "Update a cache rule",
+    requestBody: jsonBody(updateCacheRuleSchema),
     description:
       "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
     tags: ["Cache Rules"],

@@ -34,6 +34,8 @@ import {
   assertTraceProjectBelongsToOrg,
   isVisibleToMembership,
   loadMembershipSet,
+  requireExistingVk,
+  requireVisibleVk as requireVisibleVkForMembership,
   resolveVkProjectId,
   type VirtualKeyActor,
 } from "~/server/gateway/virtualKey.authz";
@@ -70,27 +72,19 @@ async function requireVisibleVk(
   organizationId: string,
   id: string,
 ) {
-  const service = VirtualKeyService.create(ctx.prisma);
-  const vk = await service.getById(id, organizationId);
-  if (!vk) {
-    throw new TRPCError({ code: "NOT_FOUND" });
-  }
   const membership = await loadMembershipSet(
     ctx.prisma,
     organizationId,
     ctx.session.user.id,
   );
-  if (!isVisibleToMembership(membership, vk.scopes)) {
-    throw new TRPCError({ code: "NOT_FOUND" });
-  }
-  return vk;
+  return requireVisibleVkForMembership(
+    VirtualKeyService.create(ctx.prisma),
+    membership,
+    { id, organizationId },
+  );
 }
 
-const scopeInputSchema = scopeAssignmentSchema;
-
 const routingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
-
-const budgetInputSchema = virtualKeyBudgetInputSchema;
 
 const idInput = z.object({ organizationId: z.string(), id: z.string() });
 
@@ -188,7 +182,7 @@ export const virtualKeysRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         virtualKeyId: z.string().nullable().optional(),
-        scopes: z.array(scopeInputSchema).min(1),
+        scopes: z.array(scopeAssignmentSchema).min(1),
         traceProjectId: z.string().nullable().optional(),
         principalUserId: z.string().nullable().optional(),
       }),
@@ -289,11 +283,11 @@ export const virtualKeysRouter = createTRPCRouter({
         name: z.string().min(1).max(128),
         description: z.string().optional(),
         principalUserId: z.string().nullable().optional(),
-        scopes: z.array(scopeInputSchema).min(1),
+        scopes: z.array(scopeAssignmentSchema).min(1),
         traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
         routingMode: routingModeSchema.optional(),
-        budget: budgetInputSchema.nullable().optional(),
+        budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
@@ -330,9 +324,11 @@ export const virtualKeysRouter = createTRPCRouter({
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
-        null,
-        input.scopes,
-        input.traceProjectId ?? null,
+        {
+          vkId: null,
+          inputScopes: input.scopes,
+          traceProjectId: input.traceProjectId ?? null,
+        },
       );
       await assertGuardrailAttachmentsAllowed(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
@@ -363,21 +359,22 @@ export const virtualKeysRouter = createTRPCRouter({
         id: z.string(),
         name: z.string().min(1).max(128).optional(),
         description: z.string().nullable().optional(),
-        scopes: z.array(scopeInputSchema).min(1).optional(),
+        scopes: z.array(scopeAssignmentSchema).min(1).optional(),
         traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
         routingMode: routingModeSchema.optional(),
-        budget: budgetInputSchema.nullable().optional(),
+        budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await service.getById(input.id, input.organizationId);
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
+      const existing = await requireExistingVk(
+        service,
+        input.id,
+        input.organizationId,
+      );
       // Mutating an existing key needs virtualKeys:update on one of the
       // scopes it already lives in.
       await assertActorCanOperateOnAnyScope(
@@ -416,11 +413,14 @@ export const virtualKeysRouter = createTRPCRouter({
       const vkProjectId = await resolveVkProjectId(
         ctx.prisma,
         input.organizationId,
-        input.id,
-        input.scopes,
-        input.traceProjectId !== undefined
-          ? input.traceProjectId
-          : existing.traceProjectId,
+        {
+          vkId: input.id,
+          inputScopes: input.scopes,
+          traceProjectId:
+            input.traceProjectId !== undefined
+              ? input.traceProjectId
+              : existing.traceProjectId,
+        },
       );
       // Newly-submitted attachments are always validated. When the caller
       // is ALSO changing scopes (a possible project move) but did not
@@ -460,10 +460,11 @@ export const virtualKeysRouter = createTRPCRouter({
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await service.getById(input.id, input.organizationId);
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
+      const existing = await requireExistingVk(
+        service,
+        input.id,
+        input.organizationId,
+      );
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
@@ -482,10 +483,11 @@ export const virtualKeysRouter = createTRPCRouter({
     .use(authorizeInResolver)
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
-      const existing = await service.getById(input.id, input.organizationId);
-      if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND" });
-      }
+      const existing = await requireExistingVk(
+        service,
+        input.id,
+        input.organizationId,
+      );
       await assertActorCanOperateOnAnyScope(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
         existing.scopes,
