@@ -1712,12 +1712,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   /**
-   * Re-stages siblings drained for a batch that ultimately failed, so they are
-   * re-dispatched instead of lost. Each is staged with its original score and
-   * raw job data (context metadata preserved). Best-effort: a re-stage failure
-   * is logged, not thrown, so it never masks the original processing error.
-   */
-  /**
    * Per-group retry-chain counter.
    *
    * The per-JOB `__attempt` is stamped into the job data, but a re-staged
@@ -1758,6 +1752,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     }
   }
 
+  /**
+   * Re-stages siblings drained for a batch that ultimately failed, so they are
+   * re-dispatched instead of lost. Each is staged with its original score and
+   * raw job data (context metadata preserved). Best-effort: a re-stage failure
+   * is logged, not thrown, so it never masks the original processing error.
+   */
   private async restageDrainedSiblings(
     groupId: string,
     siblings: DrainedJob[],

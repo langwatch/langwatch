@@ -1,7 +1,9 @@
 import { Counter, Gauge, Histogram, register } from "prom-client";
 
-// Remove existing metrics if they exist (for hot reload)
-const metricNames = [
+// Remove existing metrics if they exist (for hot reload).
+// Exported so a test can assert this list and the metrics actually defined
+// below are the same set — see __tests__/metrics.unit.test.ts.
+export const metricNames = [
   "gq_active_groups",
   "gq_pending_groups",
   "gq_blocked_groups",
@@ -23,7 +25,6 @@ const metricNames = [
   "gq_job_duration_milliseconds",
   "gq_oldest_pending_age_milliseconds",
   // ADR-030 hardening + review 2026-06-24
-  "gq_blob_reclaim_s3_failures_total",
   "gq_blob_decode_cap_exceeded_total",
   "gq_envelope_gq2_downgrade_total",
   "gq_payload_too_large_total",
@@ -37,6 +38,8 @@ const metricNames = [
   "gq_blob_sweep_total",
   // ADR-066 pillar 2 mixed-command isolation
   "gq_foreign_siblings_restaged_total",
+  // #718/#719 drained-sibling outcome reporting
+  "gq_drained_dlq_restaged_total",
 ] as const;
 
 for (const name of metricNames) {

@@ -1473,8 +1473,11 @@ export class QueueRedisRepository implements QueueRepository {
    *
    * Cost: one EVALSHA per page where `dlqCount` used to be a single SCARD. The
    * liveness check runs inside Redis, so a page is one round trip no matter how
-   * many members it holds, and the sweep shrinks its own input — after the first
-   * pass over a queue the index holds only real dead-letters again.
+   * many members it holds — but that round trip is not free work: per
+   * {@link SWEEP_DLQ_INDEX_LUA}, the script runs a `ZCARD` and an `HLEN` per
+   * member (2 × page size) inside Redis's single-threaded main loop before
+   * returning. The sweep shrinks its own input — after the first pass over a
+   * queue the index holds only real dead-letters again.
    */
   private async *scanLiveDlqGroupIds(params: {
     prefix: string;
@@ -1517,10 +1520,17 @@ export class QueueRedisRepository implements QueueRepository {
    * dead-lettered and left to expire, it never read zero again. See
    * {@link SWEEP_DLQ_INDEX_LUA}.
    *
-   * The metrics collector calls this every 2s, so the first pass over a queue
-   * carrying a backlog of expired members is the expensive one and every later
-   * pass is small — the sweep is what shrinks it. `collect()` is single-flighted
-   * (`isCollecting`), so a slow first pass skips a tick rather than stacking up.
+   * The metrics collector calls this every 2s. The sweep only removes members
+   * whose dead-letter has already expired — it does nothing for a member that
+   * is still live, so a live member is re-walked in full on every single call.
+   * Steady-state cost is therefore O(live members) per tick per queue, not
+   * something that shrinks after a first pass: a queue whose DLQ fills
+   * automatically per job under never-reused group ids (see "WHY THIS EXISTS"
+   * above) can carry a large, persistently live backlog, and this call pays
+   * the full walk for it every 2s for as long as that backlog stays live.
+   * `collect()` is single-flighted (`isCollecting`), so a slow pass skips a
+   * tick rather than stacking up — that bounds concurrency, not the size or
+   * cost of any single pass.
    */
   private async countLiveDlqGroups(params: {
     prefix: string;
@@ -1541,9 +1551,15 @@ export class QueueRedisRepository implements QueueRepository {
     // Live members only: an index member whose dead-letter has expired is swept
     // by the scan and never becomes a row, so the page stops listing — and stops
     // paying three pipelined commands for — groups there is nothing left to act
-    // on. The ZCARD below re-reads what the sweep already checked; that is a
-    // deliberate one command per LIVE member on an operator-triggered page,
-    // traded for a scan contract the 2s `dlqCount` collector shares unchanged.
+    // on. The ZCARD below re-reads what the sweep already checked: one command
+    // per LIVE member, paid once per queue on every tick of the ops DLQ card's
+    // 10s poll (DlqCard.tsx's `refetchInterval`, fanned out serially over every
+    // discovered queue by `getAllDlqGroups` in queue.service.ts) — not a
+    // one-off operator page load. Accepted because this endpoint sits behind
+    // `opsViewPermission`: load scales with how many ops tabs are open, not
+    // with tenant traffic, and the extra read is one already-scoped command
+    // per live member, not another index scan — the same scan contract the 2s
+    // `dlqCount` collector shares unchanged.
     for await (const members of this.scanLiveDlqGroupIds({ prefix })) {
       const pipeline = this.redis.pipeline();
       for (const groupId of members) {
