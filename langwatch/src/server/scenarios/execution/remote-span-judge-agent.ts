@@ -11,6 +11,7 @@
  * conversation turn and the actual judge evaluation.
  */
 
+import { createLogger } from "@langwatch/observability";
 import {
   type AgentInput,
   type AgentReturnTypes,
@@ -19,7 +20,6 @@ import {
   type JudgeAgentConfig,
   judgeAgent,
 } from "@langwatch/scenario";
-import { createLogger } from "@langwatch/observability";
 import { collectRemoteSpans } from "./remote-span-collector";
 import type { SpanQueryFn } from "./types";
 

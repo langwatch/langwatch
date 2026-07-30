@@ -50,7 +50,11 @@ export class TtlCache<T> {
     const r = this.redis;
     if (!r) return;
     try {
-      await r.setex(`${this.prefix}${key}`, this.ttlSeconds, JSON.stringify(value));
+      await r.setex(
+        `${this.prefix}${key}`,
+        this.ttlSeconds,
+        JSON.stringify(value),
+      );
     } catch {
       // Redis unavailable, memory fallback already set
     }

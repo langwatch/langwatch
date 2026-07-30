@@ -21,7 +21,10 @@ const AUTH_FILE = path.resolve(__dirname, "auth.json");
 const OUT_DIR = "/tmp/workspace-switcher";
 
 async function shoot(page: Page, name: string) {
-  await page.screenshot({ path: path.join(OUT_DIR, `${name}.png`), fullPage: false });
+  await page.screenshot({
+    path: path.join(OUT_DIR, `${name}.png`),
+    fullPage: false,
+  });
 }
 
 void (async () => {
@@ -54,7 +57,9 @@ void (async () => {
 
   // Inspect the dropdown content
   const text = await page
-    .locator('[role="menu"], .chakra-menu__content, [data-scope="menu"][data-part="content"]')
+    .locator(
+      '[role="menu"], .chakra-menu__content, [data-scope="menu"][data-part="content"]',
+    )
     .first()
     .innerText()
     .catch(() => "");
@@ -63,7 +68,8 @@ void (async () => {
   console.log("--- end ---");
 
   // Check no other-user personal workspace appears
-  const otherPersonalLeak = /Ariana Personal|alexis.*Personal|Personal Workspace.*\(/i.test(text);
+  const otherPersonalLeak =
+    /Ariana Personal|alexis.*Personal|Personal Workspace.*\(/i.test(text);
   // Check no + New Project under any header
   const newProjectLeak = /\+ New Project|New Project/i.test(text);
 

@@ -21,7 +21,7 @@ vi.mock("@langwatch/observability", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(
@@ -163,10 +163,7 @@ describe("customerIoSimulationSync reactor", () => {
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
           userId: "user-1",
@@ -185,10 +182,7 @@ describe("customerIoSimulationSync reactor", () => {
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.trackEvent).toHaveBeenCalledWith({
           userId: "user-1",
@@ -210,10 +204,7 @@ describe("customerIoSimulationSync reactor", () => {
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
           userId: "user-1",
@@ -230,10 +221,7 @@ describe("customerIoSimulationSync reactor", () => {
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
       });
@@ -248,10 +236,7 @@ describe("customerIoSimulationSync reactor", () => {
         });
         const reactor = createCustomerIoSimulationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
         expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
@@ -272,10 +257,7 @@ describe("customerIoSimulationSync reactor", () => {
       });
       const reactor = createCustomerIoSimulationSyncReactor(deps);
 
-      await reactor.handle(
-        createEvent(),
-        createContext(createFoldState()),
-      );
+      await reactor.handle(createEvent(), createContext(createFoldState()));
 
       expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
       expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();

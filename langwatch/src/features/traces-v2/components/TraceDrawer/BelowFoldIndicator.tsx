@@ -1,11 +1,5 @@
 import { Box, Button, Icon, Portal, Text } from "@chakra-ui/react";
-import {
-  type RefObject,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
 
 interface BelowFoldIndicatorProps {

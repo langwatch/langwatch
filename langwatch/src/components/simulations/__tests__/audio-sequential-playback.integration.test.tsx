@@ -27,8 +27,8 @@ import {
   it,
   vi,
 } from "vitest";
-import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 
 // ---------------------------------------------------------------------------
 // tRPC / TraceMessage mocks (keep renderer lightweight in jsdom)
@@ -310,7 +310,8 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
       it("plays the third audio, not the first", async () => {
         renderMessages([audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]);
 
-        const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");
+        const [, audioB, audioC] =
+          document.querySelectorAll<HTMLAudioElement>("audio");
 
         playCalls.length = 0;
         fireAudioEvent(audioB!, "ended");
@@ -426,7 +427,8 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
           </ChakraProvider>,
         );
 
-        const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");
+        const [, audioB, audioC] =
+          document.querySelectorAll<HTMLAudioElement>("audio");
         expect(audioC).toBeDefined();
 
         playCalls.length = 0;

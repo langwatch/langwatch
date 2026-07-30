@@ -50,6 +50,7 @@ import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { ModelProviderScreen } from "~/features/onboarding/components/sections/ModelProviderScreen";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -64,7 +65,6 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
 import { useLangyMessages } from "../data/useLangyMessages";
@@ -94,9 +94,9 @@ import {
 } from "../logic/langyChatTransport";
 import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { mergeContextChips } from "../logic/langyContextChips";
-import { SURFACE_PATH_FOR_KIND } from "../logic/langyContextKindIntent";
 import {
   explainLangyError,
+  isStaleLangyHistoryRead,
   readLangyStreamError,
   readLangyTrpcError,
   resolveLiveTurnError,
@@ -106,7 +106,6 @@ import {
   selectLangySuggestions,
 } from "../logic/langyHomeSuggestions";
 import { navigateDedupKey, reserveNavigate } from "../logic/langyNavigateDedup";
-import { isInternalHref } from "../logic/spaLink";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
@@ -127,10 +126,7 @@ import {
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
-import {
-  type LangyRevealableKind,
-  useLangyContextTargetStore,
-} from "../stores/langyContextTargetStore";
+import { isInternalHref } from "../logic/spaLink";
 import { tapeForConversation, useLangyDevLog } from "../stores/langyDevLog";
 import {
   attachedContextToChip,
@@ -183,7 +179,6 @@ const PANEL_INSET = FLOATING_PANEL_INSET;
 // line's blur-crossfade when its text changes. `css` still routes through
 // emotion (so the shimmer keyframes inject), while motion drives opacity /
 // blur / y.
-const MotionText = motion.create(Box);
 // The "still replying" notice slides up out of the composer (height + fade)
 // rather than snapping in — see the composer-notice branch below.
 const MotionNotice = motion.create(Box);
@@ -360,8 +355,14 @@ function LangyLauncher({
   // itself, not ambient chrome). Disabled under reduced motion. `transform` is
   // driven imperatively from the hook's rAF, so the button's own transition
   // must NOT list transform, or it would double-smooth and lag the deform.
+  // `isOpen` must be part of `enabled`: the launcher stays MOUNTED while the
+  // panel is open and merely renders null below, and the hook's effect keys on
+  // [enabled] alone. Without this the listeners bind once against the orb node,
+  // survive the button unmounting when the panel opens (rAF keeps writing
+  // styles to a detached element, retaining it), and never rebind afterwards —
+  // so the proximity glow is dead for the rest of the session.
   const { orbRef, glowRef, activate } = useLangyOrbProximity({
-    enabled: !reduceMotion,
+    enabled: !reduceMotion && !isOpen,
   });
   if (isOpen) return null;
   return (
@@ -451,26 +452,6 @@ function LangyPanel({
   const organizationId = organization?.id;
   const utils = api.useUtils();
   const router = useRouter();
-
-  // `#trace` in the palette, answered: light matching targets up here, or —
-  // when this page has none — go to the surface that has them and let the
-  // pending reveal light them up as they mount.
-  const requestReveal = useLangyContextTargetStore((s) => s.requestReveal);
-  const onKindIntent = useCallback(
-    ({
-      kind,
-      action,
-    }: {
-      kind: LangyRevealableKind;
-      action: "reveal" | "browse";
-    }) => {
-      requestReveal({ kind });
-      if (action === "browse" && project?.slug) {
-        void router.push(`/${project.slug}/${SURFACE_PATH_FOR_KIND[kind]}`);
-      }
-    },
-    [requestReveal, project?.slug, router],
-  );
 
   // ── Client/UI state (single store) ────────────────────────────────────────
   const isOpen = useLangyStore((s) => s.isOpen);
@@ -735,9 +716,7 @@ function LangyPanel({
 
           const turnId = useLangyStore.getState().activeTurnId;
           const key = navigateDedupKey({ turnId, href: entry.href });
-          if (
-            !reserveNavigate({ seen: navigatedInstructionsRef.current, key })
-          )
+          if (!reserveNavigate({ seen: navigatedInstructionsRef.current, key }))
             return;
 
           // router.push ONLY — never window.location. A same-project SPA
@@ -829,9 +808,16 @@ function LangyPanel({
   // No model resolves for Langy's gate key => the chat route will 409 ("no
   // model configured"). Surface an inline setup instead of letting the user
   // type into a dead composer.
+  // Gate on SUCCESS, not on "no longer loading". An errored query also reports
+  // isLoading === false with data === undefined, so testing !isLoading made a
+  // transient failure of the gate lookup indistinguishable from "this project
+  // has no model configured" — and the branch below replaces the whole
+  // conversation with the provider-onboarding grid. With staleTime 300s, no
+  // refetchInterval and refetchOnWindowFocus off, nothing would refetch it, so
+  // the user's open transcript stayed hidden until a full reload.
   const langyNeedsModel =
     !!projectId &&
-    !resolvedDefaultQuery.isLoading &&
+    resolvedDefaultQuery.isSuccess &&
     !resolvedDefaultQuery.data?.model;
 
   // The project's Langy VK carries an optional `modelsAllowed` allowlist. When
@@ -985,7 +971,7 @@ function LangyPanel({
   }, [isActiveConversationUnconfirmed, refetchHistory]);
 
   // The turn phase — the SINGLE, event-driven source of "is a turn in flight"
-  // (ADR-058). It lives in the store as a machine (idle → active → stopping →
+  // (ADR-078). It lives in the store as a machine (idle → active → stopping →
   // idle); here we only FEED it the durable fold signal so it reflects turns
   // this tab did not start (another tab, a resume after refresh) and settles
   // once the fold that CONFIRMED the turn goes idle. The old per-render
@@ -996,7 +982,7 @@ function LangyPanel({
     useLangyStore.getState().observeBackendTurn(isFoldTurnInFlight);
   }, [isFoldTurnInFlight]);
 
-  // A user Stop is a REAL backend stop (ADR-058): the durable stopped terminal is
+  // A user Stop is a REAL backend stop (ADR-078): the durable stopped terminal is
   // the confirmation. `requestStop()` moves the phase to `stopping` (the Composer
   // shows the spinner) and it clears to `idle` only when the fold that saw the
   // turn goes idle — never on isBusy, which the client abort flips instantly,
@@ -1189,6 +1175,48 @@ function LangyPanel({
   useLangyFreshness(activeConversationId);
 
   const isEmpty = messages.length === 0;
+
+  /**
+   * The history read failed but the transcript is still HERE — a stale read,
+   * not a lost conversation.
+   *
+   * `langy.messages` polls every 3s for the whole of a turn, and react-query
+   * keeps the last good `data` when a background refetch fails: only `status`
+   * flips to error. So one API blip mid-turn used to replace the entire message
+   * column with "This conversation isn't loading" while tokens were still
+   * streaming into messages sitting right there. A failure may never be quieter
+   * than a success, but it may not shout over an answer either — say the quiet
+   * thing at the head of the column and let the poll's next tick clear it.
+   *
+   * A turn in flight counts as content of its own: between send and a terminal
+   * state the column owes the reader a working line, never a card claiming the
+   * conversation is gone.
+   *
+   * WHICH failure arrived decides this as much as whether anything is on screen.
+   * A conversation deleted in another tab answers `langy_conversation_not_found`
+   * on every poll from then on, and the engine still holds its messages — so
+   * "there is content, stay quiet" left the reader with a transcript that no
+   * longer exists, no retry and no next step, permanently. Terminal kinds keep
+   * the column (see `isStaleLangyHistoryRead`).
+   */
+  const isHistoryStale = isStaleLangyHistoryRead({
+    presentation: historyErrorPresentation,
+    hasContentOnScreen: !isEmpty || isBusy || turnActive,
+  });
+  /** The failure that really does own the column: nothing else can be shown. */
+  const blockingHistoryError = isHistoryStale ? null : historyErrorPresentation;
+
+  /**
+   * Is another read already on its way, or is the quiet line the end of the road?
+   *
+   * The stale line's whole premise is "the next tick will clear this" — but
+   * `langy.messages` only re-reads on an interval while the fold says a turn is
+   * in flight (see `langyMessagesPollInterval`), which is the same flag this
+   * reads. A settled conversation therefore has NOTHING coming: the reader is
+   * left looking at a passive notice that nothing will ever refresh. So when
+   * there is no tick to wait for, the line carries the retry instead.
+   */
+  const historyRetryIsComing = isFoldTurnInFlight;
 
   // RESTORING, not starting fresh. The panel remembered which conversation was
   // open, so the moment it mounts it already knows there is one — before the
@@ -1570,16 +1598,10 @@ function LangyPanel({
           meta: { closable: true },
         });
       } catch (error) {
-        if (!isHandledByGlobalHandler(error)) {
-          toaster.create({
-            title: "Failed to apply",
-            description:
-              error instanceof Error ? error.message : "Unknown error",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        }
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't apply this suggestion",
+        });
       } finally {
         clearProposalApplying(proposalId);
       }
@@ -1611,13 +1633,20 @@ function LangyPanel({
     // Reading only the stream shape (as this once did) collapsed EVERY mutation
     // rejection — model-not-configured, egress-misconfigured, insufficient-scope,
     // even a raw infra throw — into the generic "unknown" card, hiding the real
-    // (and often actionable) error the server actually returned. The unknown
-    // fallback now also carries the raw message so a genuinely-unhandled error
-    // stays legible in the dev-mode debug drawer instead of being a black box.
+    // (and often actionable) error the server actually returned.
     if (error) {
-      return explainLangyError(
-        resolveLiveTurnError({ error, durableLastError: historyLastError }),
-      );
+      const domain = resolveLiveTurnError({
+        error,
+        durableLastError: historyLastError,
+      });
+      // The raw message is DEBUG context, so it is logged, not put on `meta` —
+      // `meta` is the contract for what the card renders, and since #5984 a
+      // handled error's message is only its code slug anyway. Logged solely
+      // for the case nothing could name, which is the one worth reading.
+      if (domain.code === "unknown") {
+        console.warn("[Langy] unclassified turn failure", error.message);
+      }
+      return explainLangyError(domain);
     }
     // The DURABLE failure, off the conversation fold. A turn error lived only in
     // `useChat` state, so a refresh after a failed turn left the user's question
@@ -1782,48 +1811,75 @@ function LangyPanel({
   // The ordered timeline the choices lock state derives from (ADR-060 §6) —
   // built from whatever is being DISPLAYED, so time travel shows a question
   // open before its answer and locked after it, for free.
-  const choicesTimeline = useMemo(
-    () => langyChoicesTimeline(displayMessages),
-    [displayMessages],
-  );
+  //
+  // Held stable BY VALUE, not just memoised on the message list. The engine
+  // hands React a new array (and a new last message) on every streamed token,
+  // so a plain `useMemo` on `displayMessages` minted a new timeline at token
+  // rate and passed it to every `memo(MessageContent)` in the column — the same
+  // defeat-the-memo problem as `selectChoice` below, and the timeline's own
+  // value barely moves within a turn: it changes only when a question or a
+  // selection lands.
+  const choicesTimelineRef = useRef<{
+    key: string;
+    value: ReturnType<typeof langyChoicesTimeline>;
+  }>({ key: "", value: [] });
+  const choicesTimeline = useMemo(() => {
+    const next = langyChoicesTimeline(displayMessages);
+    const key = JSON.stringify(next);
+    if (key !== choicesTimelineRef.current.key) {
+      choicesTimelineRef.current = { key, value: next };
+    }
+    return choicesTimelineRef.current.value;
+  }, [displayMessages]);
 
   // Answer a choices card: the selection is the NEXT USER MESSAGE — a typed
   // part the record binds by blockId, plus the readable "Chose: X" the model
   // acts on (ADR-060 §6). Rides the ordinary send path; the turn lifecycle
   // is untouched.
-  const selectChoice = useCallback(
-    ({
-      selection,
-      card,
-    }: {
+  //
+  // STABLE, the same way `send` is (see `sendImplementationRef`), and for a
+  // sharper reason: this goes to every `memo(MessageContent)` in the column as
+  // `onChoiceSelect`, so a callback that changed identity per render made memo
+  // buy nothing — a 40-message conversation re-ran every message's tool-part
+  // scan on every streamed token. `isBusy` and `sendMessage` both move under a
+  // live turn, so the deps come off a ref rather than out of the dep array.
+  const selectChoiceImplementationRef = useRef<
+    (args: {
       selection: LangyChoiceSelection;
       card: LangyDerivedChoicesCard;
-    }) => {
-      if (!projectId || isBusy) return;
-      const text = renderLangyChoiceSelectionText({
-        selection,
-        optionLabelById: new Map(
-          card.options.map((option) => [option.id, option.label]),
-        ),
-      });
-      recovery.reset();
-      useLangyDevLog.getState().recordOutbound("send", `choice: ${text}`, {
-        text,
-        conversationId: useLangyStore.getState().activeConversationId,
-      });
-      void sendMessage({
-        role: "user",
-        // The selection part rides beside its text rendering. The engine's
-        // part union has no custom members — same honest cast the history
-        // rehydration path documents.
-        parts: [
-          { type: LANGY_CHOICE_SELECTION_PART_TYPE, ...selection },
-          { type: "text", text },
-        ] as unknown as UIMessage["parts"],
-      });
-    },
-    [projectId, isBusy, recovery, sendMessage],
+    }) => void
+  >(() => undefined);
+  const selectChoice = useCallback(
+    (args: {
+      selection: LangyChoiceSelection;
+      card: LangyDerivedChoicesCard;
+    }) => selectChoiceImplementationRef.current(args),
+    [],
   );
+  selectChoiceImplementationRef.current = ({ selection, card }) => {
+    if (!projectId || isBusy) return;
+    const text = renderLangyChoiceSelectionText({
+      selection,
+      optionLabelById: new Map(
+        card.options.map((option) => [option.id, option.label]),
+      ),
+    });
+    recovery.reset();
+    useLangyDevLog.getState().recordOutbound("send", `choice: ${text}`, {
+      text,
+      conversationId: useLangyStore.getState().activeConversationId,
+    });
+    void sendMessage({
+      role: "user",
+      // The selection part rides beside its text rendering. The engine's
+      // part union has no custom members — same honest cast the history
+      // rehydration path documents.
+      parts: [
+        { type: LANGY_CHOICE_SELECTION_PART_TYPE, ...selection },
+        { type: "text", text },
+      ] as unknown as UIMessage["parts"],
+    });
+  };
 
   // The verify hint's binding (ADR-060 §5): ask Langy — in words, through
   // the ordinary send path — to run the real platform query. The measured
@@ -2446,6 +2502,46 @@ function LangyPanel({
                           </IconButton>
                         </Box>
                       ) : null}
+                      {/* A refresh of the open conversation failed while the
+                          conversation itself is still on screen. One line, no
+                          card: the messages below are real — see
+                          `isHistoryStale`. While a turn is running the poll
+                          behind it clears this on its own, so the line stays
+                          silent; on a settled conversation nothing is coming,
+                          so it carries the retry (`historyRetryIsComing`). */}
+                      {isHistoryStale ? (
+                        <HStack
+                          data-testid="langy-history-stale"
+                          gap={1.5}
+                          align="baseline"
+                          paddingX={floating ? "19px" : "14px"}
+                          paddingTop={floating ? "19px" : "14px"}
+                        >
+                          <Text textStyle="2xs" color="fg.subtle">
+                            Showing the messages we last loaded. This
+                            conversation couldn&apos;t be refreshed.
+                          </Text>
+                          {historyRetryIsComing ? null : (
+                            // The same quiet retry the inline error uses (see
+                            // LangyError's `inline` render): a plain amber link,
+                            // no box, no alarm.
+                            <chakra.button
+                              type="button"
+                              onClick={() => refetchHistory()}
+                              flexShrink={0}
+                              borderWidth={0}
+                              background="transparent"
+                              color="orange.fg"
+                              cursor="pointer"
+                              textStyle="2xs"
+                              fontWeight="560"
+                              _hover={{ textDecoration: "underline" }}
+                            >
+                              Try again
+                            </chakra.button>
+                          )}
+                        </HStack>
+                      ) : null}
                       {showCardGallery ? (
                         <LangyCardGallery />
                       ) : langyNeedsModel || reconnectCodex ? (
@@ -2479,7 +2575,7 @@ function LangyPanel({
                             }}
                           />
                         </VStack>
-                      ) : historyErrorPresentation ? (
+                      ) : blockingHistoryError ? (
                         // Ahead of the empty state deliberately: a conversation we
                         // could not READ is not a conversation with nothing in it,
                         // and "How can I help?" over a failed load tells the reader
@@ -2490,7 +2586,7 @@ function LangyPanel({
                           paddingTop={floating ? "19px" : "14px"}
                         >
                           <LangyError
-                            presentation={historyErrorPresentation}
+                            presentation={blockingHistoryError}
                             onAction={onHistoryErrorAction}
                           />
                         </VStack>
@@ -2769,7 +2865,7 @@ function LangyPanel({
                     </chakra.button>
                   </HStack>
                 ) : null}
-                {/* The composer reads the turn phase straight from the store (ADR-058):
+                {/* The composer reads the turn phase straight from the store (ADR-078):
             it shows Send when idle and Stop while a turn is in flight or
             stopping — no isBusy / serverTurnInFlight / isStopping / queue props. */}
                 <Box
@@ -2799,7 +2895,6 @@ function LangyPanel({
                     onRemoveChip={removeContextChip}
                     addableChips={addableChips}
                     onAddChip={chooseChip}
-                    onKindIntent={onKindIntent}
                   />
                 </Box>
               </>

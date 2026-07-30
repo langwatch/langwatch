@@ -9,10 +9,7 @@
  */
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type {
-  ComparisonEvaluatorConfig,
-  LocalEvaluatorConfig,
-} from "../types";
+import type { ComparisonEvaluatorConfig, LocalEvaluatorConfig } from "../types";
 
 /**
  * Parameters to create evaluator editor callbacks.
@@ -35,9 +32,7 @@ import type {
  */
 export type CreateEvaluatorEditorCallbacksParams = {
   /** Direct local-config sink (use this when no target id is available). */
-  onLocalConfigChange?: (
-    localConfig: LocalEvaluatorConfig | undefined,
-  ) => void;
+  onLocalConfigChange?: (localConfig: LocalEvaluatorConfig | undefined) => void;
   /** Target-bound convenience: requires `updateTarget` to also be provided. */
   targetId?: string;
   /** Target-bound convenience: requires `targetId` to also be provided. */
@@ -70,9 +65,7 @@ export type CreateEvaluatorEditorCallbacksParams = {
  * All fields are optional so callers only pay for what they use.
  */
 export type EvaluatorEditorCallbacksForTarget = {
-  onLocalConfigChange?: (
-    localConfig: LocalEvaluatorConfig | undefined,
-  ) => void;
+  onLocalConfigChange?: (localConfig: LocalEvaluatorConfig | undefined) => void;
   onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,

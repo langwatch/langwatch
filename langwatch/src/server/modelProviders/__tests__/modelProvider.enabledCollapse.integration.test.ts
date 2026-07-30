@@ -19,10 +19,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../modelProvider.service";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 const hasCredentialsSecret = !!process.env.CREDENTIALS_SECRET;
 
-describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
+describe.skipIf(!hasCredentialsSecret)(
   "ModelProviderService enabled-vs-scope collapse (real DB)",
   () => {
     const ns = `mp-enabled-${nanoid(8)}`;
@@ -158,9 +157,8 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         ctx(),
       );
 
-      const result = await service().getProjectModelProvidersForFrontend(
-        projectId,
-      );
+      const result =
+        await service().getProjectModelProvidersForFrontend(projectId);
 
       expect(result.openai).toBeDefined();
       // `noUncheckedIndexedAccess` makes `result.openai` possibly
@@ -201,9 +199,8 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         ctx(),
       );
 
-      const result = await service().getProjectModelProvidersForFrontend(
-        projectId,
-      );
+      const result =
+        await service().getProjectModelProvidersForFrontend(projectId);
 
       expect(result.anthropic).toBeDefined();
       expect(result.anthropic!.enabled).toBe(true);

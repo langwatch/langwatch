@@ -6,7 +6,7 @@ describe("mergeAutoDetectedInputs()", () => {
     describe("when extracting variables", () => {
       it("detects variables from prompt text", () => {
         const result = mergeAutoDetectedInputs({
-          prompt: 'hello {{name}}, how is your {{pet_name}} today?',
+          prompt: "hello {{name}}, how is your {{pet_name}} today?",
           messages: [],
           inputs: [],
         });
@@ -56,8 +56,7 @@ describe("mergeAutoDetectedInputs()", () => {
     describe("when extracting variables", () => {
       it("detects input variable but not assigned variable", () => {
         const result = mergeAutoDetectedInputs({
-          prompt:
-            "{% assign greeting = 'Hello' %}{{ greeting }} {{ name }}",
+          prompt: "{% assign greeting = 'Hello' %}{{ greeting }} {{ name }}",
           messages: [],
           inputs: [],
         });

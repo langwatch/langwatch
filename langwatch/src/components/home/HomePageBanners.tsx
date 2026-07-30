@@ -7,7 +7,6 @@ import {
   Icon,
   IconButton,
   Kbd,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -25,7 +24,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
 import { useColorModeValue } from "../ui/color-mode";
-import { Tooltip } from "../ui/tooltip";
 
 // ---- Timing knobs -------------------------------------------------------
 

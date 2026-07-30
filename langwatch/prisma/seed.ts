@@ -62,21 +62,25 @@
  * must stay useless without it). Verification always succeeds locally
  * because hashing and verifying both read that same local pepper.
  */
-import fs from "fs";
-import path from "path";
 
-import { PrismaClient, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import {
+  PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
+import fs from "fs";
+import path from "path";
 import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
-import { modelProviders } from "../src/server/modelProviders/registry";
-import { encrypt } from "../src/utils/encryption";
 import {
   API_KEY_PREFIX,
-  INGEST_KEY_PREFIX,
   hashSecret,
+  INGEST_KEY_PREFIX,
 } from "../src/server/api-key/api-key-token.utils";
+import { modelProviders } from "../src/server/modelProviders/registry";
 import { CUSTOM_ROLE_KIND } from "../src/server/role/repositories/role.repository";
+import { encrypt } from "../src/utils/encryption";
 import { seedDemoPlatform } from "./seed-demo-platform";
 
 const prisma = new PrismaClient();
@@ -176,7 +180,11 @@ async function main() {
     // (`haven seed --no-first-message`); without one, an existing true is kept.
     update:
       hasFirstMessageOverride || isPastOnboarding
-        ? { apiKey, firstMessage: isPastOnboarding, integrated: isPastOnboarding }
+        ? {
+            apiKey,
+            firstMessage: isPastOnboarding,
+            integrated: isPastOnboarding,
+          }
         : { apiKey },
   });
 
@@ -211,7 +219,12 @@ async function main() {
   });
 
   await prisma.organizationUser.upsert({
-    where: { userId_organizationId: { userId: user.id, organizationId: organization.id } },
+    where: {
+      userId_organizationId: {
+        userId: user.id,
+        organizationId: organization.id,
+      },
+    },
     create: { userId: user.id, organizationId: organization.id, role: "ADMIN" },
     update: { role: "ADMIN" },
   });
@@ -253,7 +266,8 @@ async function main() {
     where: { lookupId: PRIVATE_TOKEN_LOOKUP_ID },
     create: {
       name: "Local Dev Private Access Token",
-      description: "Static local-dev personal access token seeded by prisma/seed.ts",
+      description:
+        "Static local-dev personal access token seeded by prisma/seed.ts",
       lookupId: PRIVATE_TOKEN_LOOKUP_ID,
       hashedSecret: hashSecret(PRIVATE_TOKEN_SECRET),
       permissionMode: "all",
@@ -268,7 +282,9 @@ async function main() {
       revokedAt: null,
     },
   });
-  await prisma.roleBinding.deleteMany({ where: { apiKeyId: privateApiKey.id } });
+  await prisma.roleBinding.deleteMany({
+    where: { apiKeyId: privateApiKey.id },
+  });
   await prisma.roleBinding.create({
     data: {
       organizationId: organization.id,
@@ -283,11 +299,17 @@ async function main() {
   // role restricted to traces:create — mirrors what ApiKeyService.create()
   // mints for a real ingestion key, just with a fixed token.
   const ingestionRole = await prisma.customRole.upsert({
-    where: { organizationId_name: { organizationId: organization.id, name: PUBLIC_TOKEN_ROLE_NAME } },
+    where: {
+      organizationId_name: {
+        organizationId: organization.id,
+        name: PUBLIC_TOKEN_ROLE_NAME,
+      },
+    },
     create: {
       organizationId: organization.id,
       name: PUBLIC_TOKEN_ROLE_NAME,
-      description: "Restricted role for the static local-dev public ingestion token (traces:create only)",
+      description:
+        "Restricted role for the static local-dev public ingestion token (traces:create only)",
       permissions: ["traces:create"],
       kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
     },
@@ -297,7 +319,8 @@ async function main() {
     where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
     create: {
       name: "Local Dev Public Ingestion Token",
-      description: "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
+      description:
+        "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
       lookupId: PUBLIC_TOKEN_LOOKUP_ID,
       hashedSecret: hashSecret(PUBLIC_TOKEN_SECRET),
       permissionMode: "restricted",
@@ -427,7 +450,9 @@ function schemaKeyNames(schema: unknown): string[] {
 async function seedModelProvidersFromEnv(organizationId: string) {
   const flag = process.env.HAVEN_SEED_MODEL_PROVIDERS;
   if (flag === "0" || flag === "false") {
-    console.log("⏭️  Model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)");
+    console.log(
+      "⏭️  Model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)",
+    );
     return;
   }
   const envMap = loadSeedEnv();
@@ -437,7 +462,8 @@ async function seedModelProvidersFromEnv(organizationId: string) {
     if (!envMap[def.apiKey]) continue;
 
     const keyNames = schemaKeyNames(def.keysSchema);
-    const names = keyNames.length > 0 ? keyNames : [def.apiKey, def.endpointKey];
+    const names =
+      keyNames.length > 0 ? keyNames : [def.apiKey, def.endpointKey];
     const keys: Record<string, string> = {};
     for (const name of names) {
       if (name && envMap[name]) keys[name] = envMap[name];
@@ -455,7 +481,10 @@ async function seedModelProvidersFromEnv(organizationId: string) {
         Boolean(name) && !optionalKeys.has(name!) && !keys[name!],
     );
     if (provider === "azure") {
-      const endpointNames = ["AZURE_OPENAI_ENDPOINT", "AZURE_API_GATEWAY_BASE_URL"];
+      const endpointNames = [
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_API_GATEWAY_BASE_URL",
+      ];
       missing = missing.filter((name) => !endpointNames.includes(name));
       if (!endpointNames.some((name) => keys[name])) {
         missing.push(endpointNames.join(" or "));
@@ -475,7 +504,14 @@ async function seedModelProvidersFromEnv(organizationId: string) {
     const customKeys = encrypt(JSON.stringify(keys));
     const row = await prisma.modelProvider.upsert({
       where: { id },
-      create: { id, name: def.name, provider, enabled: true, customKeys, organizationId },
+      create: {
+        id,
+        name: def.name,
+        provider,
+        enabled: true,
+        customKeys,
+        organizationId,
+      },
       update: { customKeys, enabled: true, disabledAt: null },
     });
     await prisma.modelProviderScope.upsert({

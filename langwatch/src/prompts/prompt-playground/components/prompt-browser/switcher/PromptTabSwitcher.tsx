@@ -7,7 +7,10 @@ import {
   MenuRoot,
   MenuTrigger,
 } from "~/components/ui/menu";
-import { getDisplayHandle, getPromptFolder } from "~/prompts/utils/promptHandle";
+import {
+  getDisplayHandle,
+  getPromptFolder,
+} from "~/prompts/utils/promptHandle";
 import { usePromptTabSummary } from "../tab/usePromptTabSummary";
 
 interface PromptTabSwitcherProps {

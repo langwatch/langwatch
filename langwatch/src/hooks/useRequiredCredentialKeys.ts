@@ -24,9 +24,7 @@ export function useRequiredCredentialKeys({
   return useMemo(() => {
     const definition = modelProvidersRegistry[
       providerKey as keyof typeof modelProvidersRegistry
-    ] as
-      | { keysSchema?: unknown; optionalKeys?: readonly string[] }
-      | undefined;
+    ] as { keysSchema?: unknown; optionalKeys?: readonly string[] } | undefined;
 
     return getRequiredCredentialKeys({
       keysSchema: definition?.keysSchema,

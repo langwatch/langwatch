@@ -180,10 +180,3 @@ export const LANGY_SKILLS: LangySkill[] = [
 export function findSkill(id: string): LangySkill | undefined {
   return LANGY_SKILLS.find((skill) => skill.id === id);
 }
-
-/** Substring match over name, id, description and the CLI commands themselves. */
-export function searchSkills(query: string): LangySkill[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return LANGY_SKILLS;
-  return LANGY_SKILLS.filter((skill) => skill.searchText.includes(q));
-}

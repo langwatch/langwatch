@@ -45,7 +45,9 @@ export function gateTreeCost({
   protections: Protections;
 }): SpanTreeNode[] {
   if (protections.canSeeCosts === true) return nodes;
-  return nodes.map((node) => (node.cost == null ? node : { ...node, cost: null }));
+  return nodes.map((node) =>
+    node.cost == null ? node : { ...node, cost: null },
+  );
 }
 
 /** Redact resource attributes with the viewer's restricted-attribute rules. */

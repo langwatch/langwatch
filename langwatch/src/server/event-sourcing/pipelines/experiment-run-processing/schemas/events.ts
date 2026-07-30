@@ -1,3 +1,4 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { EventSchema } from "../../../domain/types";
 import { EXPERIMENT_RUN_EVENT_TYPES } from "./constants";
@@ -49,6 +50,25 @@ export const targetResultEventDataSchema = z.object({
   cost: z.number().nullable().optional(),
   duration: z.number().nullable().optional(),
   error: z.string().nullable().optional(),
+  /**
+   * The failure's stable code, as the serialised handled error the SSE frame
+   * carries (`target_result.domainError`).
+   *
+   * `error` is the engine's engineer-facing string; it is what the row used to
+   * hold ALONE, so a page reload turned a coded failure back into raw engine
+   * text in the customer's cell. Persisting the code lets the read-back render
+   * the same registry copy the live stream does (ADR-045).
+   *
+   * Carried whole rather than mirrored field-by-field: the shape is owned by
+   * `@langwatch/handled-error`, and an event log that silently drops fields it
+   * was not built with is worse than one that keeps them.
+   */
+  domainError: z
+    .custom<SerializedHandledError>(
+      (value) => typeof value === "object" && value !== null,
+    )
+    .nullable()
+    .optional(),
   traceId: z.string().nullable().optional(),
   targets: z.array(targetSchema).optional(),
 });
@@ -151,8 +171,9 @@ export type ExperimentRunProcessingEvent =
   | ExperimentRunCompletedEvent;
 
 export {
-	isEvaluatorResultEvent, isExperimentRunCompletedEvent,
-	isExperimentRunStartedEvent, isTargetResultEvent,
-	isTraceMetricsComputedEvent
+  isEvaluatorResultEvent,
+  isExperimentRunCompletedEvent,
+  isExperimentRunStartedEvent,
+  isTargetResultEvent,
+  isTraceMetricsComputedEvent,
 } from "./typeGuards";
-

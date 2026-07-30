@@ -300,6 +300,12 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	if params.GatewayRequestID != "" {
 		attrs = append(attrs, attribute.String(AttrGatewayReqID, params.GatewayRequestID))
 	}
+	// The provider actually dispatched to (a ModelProvider row id). The
+	// trace fold matches it against each budget's provider filter, so
+	// provider-filtered budgets accrue exactly their own vendor's spend.
+	if params.ModelProviderID != "" {
+		attrs = append(attrs, attribute.String(AttrModelProviderID, params.ModelProviderID))
+	}
 	// VK tags become the trace's labels: the ingestion pipeline maps the
 	// langwatch.labels attribute into metadata.labels, the field the Trace
 	// Explorer filters as "Label".

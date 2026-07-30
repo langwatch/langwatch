@@ -61,7 +61,7 @@ const MODELS: ModelMix[] = [
     name: "claude-sonnet-4-7",
     costPerInputToken: 0.000003,
     costPerOutputToken: 0.000015,
-    weight: 0.50,
+    weight: 0.5,
     promptRange: [50, 2000],
     completionRange: [80, 1800],
   },
@@ -69,7 +69,7 @@ const MODELS: ModelMix[] = [
     name: "claude-opus-4-7",
     costPerInputToken: 0.000015,
     costPerOutputToken: 0.000075,
-    weight: 0.20,
+    weight: 0.2,
     promptRange: [80, 3000],
     completionRange: [120, 2500],
   },
@@ -85,7 +85,7 @@ const MODELS: ModelMix[] = [
     name: "gpt-5-mini",
     costPerInputToken: 0.00000025,
     costPerOutputToken: 0.000002,
-    weight: 0.10,
+    weight: 0.1,
     promptRange: [12, 800],
     completionRange: [10, 600],
   },
@@ -127,6 +127,7 @@ const SAMPLE_OUTPUTS = [
 
 function parseArgs(argv: string[]): Args {
   const out: Partial<Args> = { days: 30, rows: 150 };
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--personal-project") out.personalProject = argv[++i];
     else if (argv[i] === "--virtual-key") out.virtualKey = argv[++i];
@@ -228,7 +229,9 @@ function synthTrace(args: Args): SyntheticTrace {
  * Caller (CLI bootstrap or SeedAction wrapper) is responsible for
  * resolving inputs.
  */
-export async function runSeedHeavyUsage(args: Args): Promise<SeedHeavyUsageSummary> {
+export async function runSeedHeavyUsage(
+  args: Args,
+): Promise<SeedHeavyUsageSummary> {
   process.stderr.write(
     `[seed-heavy-usage] tenant=${args.personalProject} vk=${args.virtualKey} budget=${args.budget ?? "(none)"} window=${args.days}d rows=${args.rows}\n`,
   );
@@ -259,7 +262,9 @@ export async function runSeedHeavyUsage(args: Args): Promise<SeedHeavyUsageSumma
     TotalDurationMs: t.durationMs,
     TokensPerSecond:
       t.durationMs > 0
-        ? Math.round(((t.promptTokens + t.completionTokens) * 1000) / t.durationMs)
+        ? Math.round(
+            ((t.promptTokens + t.completionTokens) * 1000) / t.durationMs,
+          )
         : 0,
     SpanCount: 1,
     ContainsErrorStatus: false,

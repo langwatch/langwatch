@@ -5,7 +5,7 @@
  * removal: a failure may never be quieter than a success, and the raw text
  * is the reader's evidence of what the model actually wrote.
  */
-import { Box, HStack, Text, chakra } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text } from "@chakra-ui/react";
 import type { LangyCardFailedPart } from "@langwatch/langy";
 import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
 import { useState } from "react";

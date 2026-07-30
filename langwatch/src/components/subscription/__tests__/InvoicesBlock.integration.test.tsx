@@ -7,7 +7,7 @@
  * and error state.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InvoicesBlock } from "../InvoicesBlock";
 
@@ -45,7 +45,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 
 const renderInvoicesBlock = ({
   onViewAllInStripe,
-}: { onViewAllInStripe?: () => void } = {}) => {
+}: {
+  onViewAllInStripe?: () => void;
+} = {}) => {
   return render(
     <InvoicesBlock
       organizationId="test-org-id"
@@ -91,9 +93,7 @@ describe("<InvoicesBlock/>", () => {
         isError: true,
       };
       renderInvoicesBlock();
-      expect(
-        screen.getByText(/failed to load invoices/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/failed to load invoices/i)).toBeInTheDocument();
     });
   });
 
@@ -171,9 +171,7 @@ describe("<InvoicesBlock/>", () => {
 
     it("does not render PDF link when pdfUrl is null", () => {
       renderInvoicesBlock();
-      expect(
-        screen.queryByTestId("invoice-pdf-inv_2"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("invoice-pdf-inv_2")).not.toBeInTheDocument();
     });
   });
 
@@ -197,9 +195,7 @@ describe("<InvoicesBlock/>", () => {
       };
       renderInvoicesBlock({ onViewAllInStripe: vi.fn() });
       expect(screen.getByTestId("view-all-invoices-link")).toBeInTheDocument();
-      expect(
-        screen.getByText(/view all in stripe/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/view all in stripe/i)).toBeInTheDocument();
     });
 
     it("does not render when there are no invoices", () => {

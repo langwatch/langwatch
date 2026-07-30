@@ -18,9 +18,9 @@ import { Download, ExternalLink } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import { api } from "~/utils/api";
 import {
-  getInvoiceStatusColor,
-  formatInvoiceDate,
   formatInvoiceAmount,
+  formatInvoiceDate,
+  getInvoiceStatusColor,
 } from "./invoice-utils";
 
 export function InvoicesBlock({
@@ -111,9 +111,7 @@ export function InvoicesBlock({
                   {invoices.data.map((invoice) => (
                     <Table.Row key={invoice.id}>
                       <Table.Cell>
-                        <Text fontSize="sm">
-                          {invoice.number ?? "--"}
-                        </Text>
+                        <Text fontSize="sm">{invoice.number ?? "--"}</Text>
                       </Table.Cell>
                       <Table.Cell>
                         <Text fontSize="sm">
@@ -160,8 +158,6 @@ export function InvoicesBlock({
                 </Table.Body>
               </Table.Root>
             )}
-
-
         </VStack>
       </Card.Body>
     </Card.Root>

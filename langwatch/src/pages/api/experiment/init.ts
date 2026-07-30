@@ -78,7 +78,8 @@ export default async function handler(
     });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return res.status(denial.status).json({ message: denial.message });
+    // The full handled body — code, permission, tips — not just a sentence.
+    return res.status(denial.status).json(denial.body);
   }
 
   const project = resolved.project;
@@ -92,10 +93,7 @@ export default async function handler(
       "invalid init data received",
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    captureException(
-      toError(error),
-      { extra: { projectId: project.id } },
-    );
+    captureException(toError(error), { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });

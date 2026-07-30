@@ -74,6 +74,7 @@ export function useTraceHeader() {
     }
   }, [occurredAtMs, resolvedTimestamp, backfillOccurredAtMs]);
 
-  if (shared) return asSharedQueryResult(shared.header) as unknown as typeof query;
+  if (shared)
+    return asSharedQueryResult(shared.header) as unknown as typeof query;
   return query;
 }

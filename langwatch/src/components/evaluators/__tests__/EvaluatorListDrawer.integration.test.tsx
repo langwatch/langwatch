@@ -285,9 +285,9 @@ describe("EvaluatorListDrawer", () => {
       evaluatorsData = [];
       renderDrawer({ createLabel: "Add comparison", itemLabel: "comparison" });
 
-      expect(await screen.findByTestId("new-evaluator-button")).toHaveTextContent(
-        "Add comparison",
-      );
+      expect(
+        await screen.findByTestId("new-evaluator-button"),
+      ).toHaveTextContent("Add comparison");
     });
   });
 });

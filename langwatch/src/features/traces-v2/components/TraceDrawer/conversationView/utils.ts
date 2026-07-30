@@ -1,7 +1,4 @@
-import {
-  formatDuration,
-  formatRelativeTime,
-} from "../../../utils/formatters";
+import { formatDuration, formatRelativeTime } from "../../../utils/formatters";
 import { extractSystemText } from "../transcript/parsing";
 import type { ParsedTurn } from "./types";
 
@@ -68,7 +65,7 @@ export function buildConversationMarkdownChunks(
   for (let i = 0; i < parsedTurns.length; i++) {
     const { turn, userText, assistantText } = parsedTurns[i]!;
     const turnNum = i + 1;
-    const model = turn.models[0] ? (turn.models[0]) : "—";
+    const model = turn.models[0] ? turn.models[0] : "—";
     chunks.push({
       id: `turn-${turnNum}-header`,
       markdown: `## Turn ${turnNum} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,

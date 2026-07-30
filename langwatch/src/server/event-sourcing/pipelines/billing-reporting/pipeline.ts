@@ -21,13 +21,18 @@ export function createBillingReportingPipeline(
   return definePipeline<Event>()
     .withName(BILLING_REPORTING_PIPELINE_NAME)
     .withAggregateType("billing_report")
-    .withCommandInstance("reportUsageForMonth", ReportUsageForMonthCommand, deps.reportUsageForMonthCommand, {
-      delay: 300_000, // 5 min delay (initial + re-trigger)
-      deduplication: {
-        makeId: (p: { organizationId: string; billingMonth: string }) =>
-          `${p.organizationId}:${p.billingMonth}`,
-        ttlMs: 310_000, // 310s > 300s delay — prevents thundering herd, self-dispatch still works via replace logic
+    .withCommandInstance(
+      "reportUsageForMonth",
+      ReportUsageForMonthCommand,
+      deps.reportUsageForMonthCommand,
+      {
+        delay: 300_000, // 5 min delay (initial + re-trigger)
+        deduplication: {
+          makeId: (p: { organizationId: string; billingMonth: string }) =>
+            `${p.organizationId}:${p.billingMonth}`,
+          ttlMs: 310_000, // 310s > 300s delay — prevents thundering herd, self-dispatch still works via replace logic
+        },
       },
-    })
+    )
     .build();
 }

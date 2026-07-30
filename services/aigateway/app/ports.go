@@ -16,7 +16,11 @@ type AuthResolver interface {
 type ProviderRouter interface {
 	Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
 	DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)
-	ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, error)
+	// ListModels aggregates the chain's catalogs. Alongside the models it
+	// reports discovery gaps: providers that dispatch can route to but
+	// that contributed no catalog (and why), so the surface never silently
+	// reads as "no models" for a chain that can serve traffic.
+	ListModels(ctx context.Context, creds []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error)
 }
 
 // BudgetChecker validates spending pre-flight. Cost recording is handled
@@ -72,6 +76,13 @@ type MetricsRecorder interface {
 	SetCircuitState(credentialID string, state int)
 	RecordCacheOutcome(usage domain.Usage)
 	RecordCacheRuleHit(ruleID, mode string)
+
+	// RecordBudgetBlock counts a request rejected on budget. The budget
+	// checker counts the plain blocks it decides itself; this port entry
+	// exists for the one budget rejection only the app layer can see:
+	// provider-filtered exclusions emptying the candidate chain, which is
+	// decided at dispatch, after the checker has already answered.
+	RecordBudgetBlock(scope string)
 
 	// SetRequestLabels hands the resolved provider and model back to the
 	// transport layer, which cannot see them: routing and model resolution

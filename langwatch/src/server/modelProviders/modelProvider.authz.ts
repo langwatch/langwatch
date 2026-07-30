@@ -1,11 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import type { Session } from "~/server/auth";
 import {
   hasOrganizationPermission,
   hasProjectPermission,
   hasTeamPermission,
 } from "../api/rbac";
+import { ModelProviderScopeForbiddenError } from "./errors";
 
 /**
  * Minimum shape the RBAC helpers need. Matches the tRPC ctx slice that
@@ -47,7 +47,10 @@ export function requiredManagePermission(
   return "project:manage";
 }
 
-async function canManageScope(ctx: RBACContext, scope: Scope): Promise<boolean> {
+async function canManageScope(
+  ctx: RBACContext,
+  scope: Scope,
+): Promise<boolean> {
   if (!ctx.session) return false;
   if (scope.scopeType === "ORGANIZATION") {
     return hasOrganizationPermission(
@@ -63,8 +66,9 @@ async function canManageScope(ctx: RBACContext, scope: Scope): Promise<boolean> 
 }
 
 /**
- * Throws FORBIDDEN if the caller cannot manage the given scope. Fires
- * on every entry in a multi-scope write — no partial success.
+ * Throws `ModelProviderScopeForbiddenError` if the caller cannot manage the
+ * given scope. Fires on every entry in a multi-scope write — no partial
+ * success.
  */
 export async function assertCanManageScope(
   ctx: RBACContext,
@@ -72,11 +76,9 @@ export async function assertCanManageScope(
 ): Promise<void> {
   const ok = await canManageScope(ctx, scope);
   if (!ok) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `You need ${requiredManagePermission(
-        scope.scopeType,
-      )} on this ${scope.scopeType.toLowerCase()} to assign a model provider to it.`,
+    throw new ModelProviderScopeForbiddenError({
+      scopeType: scope.scopeType,
+      requiredPermission: requiredManagePermission(scope.scopeType),
     });
   }
 }
@@ -84,7 +86,8 @@ export async function assertCanManageScope(
 /**
  * Assert the caller can manage every scope in the given list. Fails
  * atomically on the first scope that fails authz — no entry is
- * partially applied.
+ * partially applied, and the refusal is the same
+ * `ModelProviderScopeForbiddenError` the single-scope assert raises.
  */
 export async function assertCanManageAllScopes(
   ctx: RBACContext,

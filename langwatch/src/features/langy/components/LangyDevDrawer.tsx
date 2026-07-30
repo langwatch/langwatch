@@ -62,7 +62,6 @@ import {
   INSPECTOR_WIDTH,
   resolveInspectorFrame,
 } from "../logic/langyPanelLayout";
-import { resolveCliCapability } from "./capabilities/capabilityRegistry";
 import {
   DEV_LOG_CAPACITY,
   type DevToolCall,
@@ -79,6 +78,7 @@ import {
   useLangyDevLog,
 } from "../stores/langyDevLog";
 import { useLangyStore } from "../stores/langyStore";
+import { resolveCliCapability } from "./capabilities/capabilityRegistry";
 
 const MotionBox = motion.create(Box);
 
@@ -588,7 +588,11 @@ const LANE_LEGEND: {
 }[] = [
   { lane: "outbound", label: "outbound", detail: "what this client asked" },
   { lane: "stream", label: "stream", detail: "tokens, signals, tool frames" },
-  { lane: "durable", label: "durable", detail: "the event log the fold replays" },
+  {
+    lane: "durable",
+    label: "durable",
+    detail: "the event log the fold replays",
+  },
   { lane: "signal", label: "signal", detail: "freshness pokes, with cursors" },
 ];
 

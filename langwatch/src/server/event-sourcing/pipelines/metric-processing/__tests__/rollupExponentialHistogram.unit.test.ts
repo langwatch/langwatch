@@ -214,9 +214,9 @@ describe("exponential histogram rollups", () => {
       });
       expect(rows).toHaveLength(1);
       expect(rows[0]!.count).toBe("2");
-      expect(
-        rows[0]!.positiveBucketCounts.length,
-      ).toBeLessThanOrEqual(MAX_DENSE_BUCKET_SPAN);
+      expect(rows[0]!.positiveBucketCounts.length).toBeLessThanOrEqual(
+        MAX_DENSE_BUCKET_SPAN,
+      );
       const totalBucketed = rows[0]!.positiveBucketCounts.reduce(
         (total, count) => total + BigInt(count),
         0n,

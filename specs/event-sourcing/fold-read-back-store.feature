@@ -1,3 +1,4 @@
+@unit
 Feature: Fold projections read back their own state
   A fold projection keeps its aggregate's state in a durable store fronted by a
   cache. When the cache is cold it recovers the state from the store — never by
@@ -5,6 +6,19 @@ Feature: Fold projections read back their own state
   history on the hot path is what let one large aggregate overwhelm the shared
   store and stall every writer sharing it; a fold recovers from its own last
   committed state instead. (ADR-066, pillar 1.)
+
+  This promise is universal: it holds for every fold, including the ones whose
+  stored row keeps only a slimmed, query-shaped summary. Such a fold still
+  recovers its full working state from its own row — never from the event log.
+
+  The promise is about state the fold stored in the shape it stores today. When
+  a fold changes that shape, everything it committed beforehand records less
+  than it now needs, and the parts that were never recorded are indistinguishable
+  from parts that were recorded as empty. A fold does not guess: it treats such a
+  state as absent and rebuilds that one aggregate from its history, once, after
+  which the aggregate is stored in the current shape and recovers from itself
+  like every other. The rebuild reaches only aggregates left over from before the
+  change, and stops happening at all once they have aged out.
 
   Background:
     Given a fold projection whose state is persisted after every batch
@@ -34,6 +48,67 @@ Feature: Fold projections read back their own state
     When the state is recovered from the store after a cold cache
     Then a subsequent contribution does not double-count
     And derived measures that depend on prior context stay correct
+
+  Scenario: a fold whose stored row is a slimmed analytics summary still recovers its working state
+    Given a fold whose stored row keeps only the columns an analytics query needs
+    And whose working state tracks more than those columns show
+    When its cached state has expired and the next event for the aggregate arrives
+    Then the fold recovers its full working state from its own stored row
+    And a late dimension-only signal still lands on the recovered state
+    And it does not replay the aggregate's history from the event log
+
+  Scenario: a stored state written under the fold's current shape is read straight back
+    Given an aggregate whose committed state was written by the fold as it stands today
+    And its cached state has expired
+    When the next event for that aggregate arrives
+    Then the fold recovers the committed state from its own store
+    And it does not replay the aggregate's history from the event log
+
+  Scenario: a stored state written under an older shape is rebuilt rather than trusted
+    Given a fold that has since changed the shape of the state it stores
+    And an aggregate whose committed state was written under the older shape
+    When the next event for that aggregate arrives
+    Then the fold treats the older state as absent rather than reading it back
+    And it rebuilds that aggregate's state from the event log
+    And the bookkeeping the older shape never recorded is recovered
+
+  Scenario: a state that cannot be read back is never quietly replaced by a partial one
+    Given a fold that has since changed the shape of the state it stores
+    And an aggregate whose committed state was written under the older shape
+    And the fold has no way to rebuild that aggregate from the event log
+    When the next event for that aggregate arrives
+    Then the fold reports the failure rather than starting from an empty state
+    And the committed state is left as it is
+
+  Scenario: rebuilding an aggregate once retires it from rebuilding again
+    Given an aggregate whose state was rebuilt because it had been stored under an older shape
+    When a further event for that aggregate arrives
+    Then the fold recovers the rebuilt state from its own store
+    And it does not replay the aggregate's history from the event log
+
+  Scenario: a user-visible name survives a late unrelated contribution
+    Given an aggregate whose name was set deliberately by a person
+    And whose committed state predates the fold recording that the name was set by a person
+    When a late contribution that would otherwise supply a name arrives
+    Then the name the person set is preserved
+
+  Scenario: a total recomputed from its recorded parts is not collapsed by the next part
+    Given an aggregate whose totals are recomputed whole from every part recorded against it
+    And whose committed state predates the fold recording those parts
+    When a further part for that aggregate arrives
+    Then the totals still account for every part recorded before it
+
+  Scenario: a sequence keeps the order things happened in rather than the order they arrived
+    Given an aggregate whose recorded sequence is kept in the order things actually happened
+    And whose committed state predates the fold recording when each entry happened
+    When a further entry arrives later than an entry that happened after it
+    Then the sequence still reflects the order things happened in
+
+  Scenario: a signal with nothing else to store is not lost to a cold cache
+    Given an aggregate whose only signal so far is a classification a person or job attached to it
+    And the fold has no summary worth committing for it yet
+    When its cached state is lost and a later event arrives
+    Then that classification is still part of the aggregate's state
 
   Scenario: a redelivered batch after a committed write does not double-count
     Given a fold that persists its applied-event set durably next to its state

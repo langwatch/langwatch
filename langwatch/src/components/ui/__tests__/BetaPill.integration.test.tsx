@@ -119,9 +119,7 @@ describe("<BetaPill />", () => {
       await user.unhover(pill);
       await waitFor(
         () => {
-          expect(
-            screen.getByText("Hover reopen message"),
-          ).not.toBeVisible();
+          expect(screen.getByText("Hover reopen message")).not.toBeVisible();
         },
         { timeout: 1000 },
       );

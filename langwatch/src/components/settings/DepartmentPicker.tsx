@@ -1,6 +1,7 @@
 import { NativeSelect } from "@chakra-ui/react";
 
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 import type { DepartmentOption } from "./useDepartmentColumn";
@@ -65,10 +66,9 @@ export function DepartmentPicker({
       toaster.create({ title: "Department updated", type: "success" });
       await onAssigned();
     } catch (e) {
-      toaster.create({
-        title: "Assignment failed",
-        description: e instanceof Error ? e.message : String(e),
-        type: "error",
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't update the department",
       });
     }
   };

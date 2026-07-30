@@ -215,7 +215,6 @@ describe("EvaluatorChip", () => {
           const runItem = screen.getByText("Run").closest("[data-disabled]");
           expect(runItem).toBeInTheDocument();
         });
-
       });
     });
 
@@ -389,7 +388,6 @@ describe("EvaluatorChip", () => {
           .closest("[data-disabled]");
         expect(item).toBeInTheDocument();
       });
-
     });
 
     describe("when evaluator is running", () => {

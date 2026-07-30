@@ -19,7 +19,10 @@ vi.mock("@clickhouse/client", () => ({
 import { reconcileTTL, TIERED_STORAGE_POLICY } from "../ttlReconciler";
 
 describe("reconcileTTL()", () => {
-  const envBackup = { CLICKHOUSE_COLD_STORAGE_ENABLED: process.env.CLICKHOUSE_COLD_STORAGE_ENABLED };
+  const envBackup = {
+    CLICKHOUSE_COLD_STORAGE_ENABLED:
+      process.env.CLICKHOUSE_COLD_STORAGE_ENABLED,
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -45,7 +48,8 @@ describe("reconcileTTL()", () => {
     if (envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED === undefined) {
       delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
     } else {
-      process.env.CLICKHOUSE_COLD_STORAGE_ENABLED = envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED;
+      process.env.CLICKHOUSE_COLD_STORAGE_ENABLED =
+        envBackup.CLICKHOUSE_COLD_STORAGE_ENABLED;
     }
   });
 

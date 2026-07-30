@@ -6,14 +6,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
-import { UserAvatar } from "~/components/UserAvatar";
-
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
+import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 export default function Annotations() {
   const router = useRouter();
@@ -58,11 +57,7 @@ export default function Annotations() {
 
   return (
     <AnnotationsLayout>
-      <Container
-        maxWidth={"calc(100vw - 330px)"}
-        padding={0}
-        margin={0}
-      >
+      <Container maxWidth={"calc(100vw - 330px)"} padding={0} margin={0}>
         <AnnotationsTable
           noDataTitle="No queued annotations for this queue"
           noDataDescription="Add a message to this queue to get started."

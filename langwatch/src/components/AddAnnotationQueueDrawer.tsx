@@ -11,13 +11,17 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Check, ChevronDown, Plus } from "react-feather";
 import { useEffect, useState } from "react";
+import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { Popover } from "../components/ui/popover";
@@ -87,13 +91,7 @@ export const AddAnnotationQueueDrawer = ({
       },
     );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    watch,
-  } = useForm<{
+  const form = useForm<{
     name: string;
     description?: string | null;
   }>({
@@ -102,6 +100,13 @@ export const AddAnnotationQueueDrawer = ({
       description: queue.data?.description ?? "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    watch,
+  } = form;
 
   type FormData = {
     name: string;
@@ -180,14 +185,13 @@ export const AddAnnotationQueueDrawer = ({
           reset();
         },
         onError: (error) => {
-          if (isHandledByGlobalHandler(error)) return;
-          toaster.create({
-            title: "Error creating annotation score",
-            description: error.message,
-            type: "error",
-            meta: {
-              closable: true,
-            },
+          if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+            return;
+          showErrorToast({
+            error,
+            fallbackTitle: queueId
+              ? "Couldn't update annotation queue"
+              : "Couldn't create annotation queue",
           });
         },
       },
@@ -247,6 +251,8 @@ export const AddAnnotationQueueDrawer = ({
             {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack align="start">
+                <FormServerError form={form} />
+
                 <FullWidthFormControl
                   label="Participants"
                   helper="Select the participants for this annotation queue"
@@ -264,9 +270,7 @@ export const AddAnnotationQueueDrawer = ({
                         width="full"
                         justifyContent="space-between"
                         fontWeight="normal"
-                        color={
-                          participants.length === 0 ? "fg.subtle" : "fg"
-                        }
+                        color={participants.length === 0 ? "fg.subtle" : "fg"}
                         paddingX={3}
                       >
                         {participants.length === 0 ? (
@@ -332,6 +336,7 @@ export const AddAnnotationQueueDrawer = ({
                 >
                   <Input {...register("name")} required />
                   {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
+                  <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
                 </FullWidthFormControl>
 
                 <FullWidthFormControl
@@ -340,6 +345,9 @@ export const AddAnnotationQueueDrawer = ({
                   invalid={!!errors.description}
                 >
                   <Textarea {...register("description")} required />
+                  <Field.ErrorText>
+                    {errors.description?.message}
+                  </Field.ErrorText>
                 </FullWidthFormControl>
 
                 <FullWidthFormControl
@@ -359,9 +367,7 @@ export const AddAnnotationQueueDrawer = ({
                         width="full"
                         justifyContent="space-between"
                         fontWeight="normal"
-                        color={
-                          scoreTypes.length === 0 ? "fg.subtle" : "fg"
-                        }
+                        color={scoreTypes.length === 0 ? "fg.subtle" : "fg"}
                         paddingX={3}
                       >
                         {scoreTypes.length === 0 ? (
@@ -402,9 +408,7 @@ export const AddAnnotationQueueDrawer = ({
                                 >
                                   <Check
                                     size={16}
-                                    color={
-                                      isSelected ? "green" : "transparent"
-                                    }
+                                    color={isSelected ? "green" : "transparent"}
                                   />
                                   <Text fontSize="sm">{score.name}</Text>
                                 </Button>

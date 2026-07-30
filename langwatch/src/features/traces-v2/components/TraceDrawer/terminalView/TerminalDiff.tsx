@@ -47,14 +47,31 @@ export const TerminalDiff = memo(function TerminalDiff({
             {filePath}
           </Text>
         )}
-        <Text fontFamily={TERMINAL_FONT_STACK} fontSize="13px" color={DIFF_TOKENS.addFg} flexShrink={0}>
+        <Text
+          fontFamily={TERMINAL_FONT_STACK}
+          fontSize="13px"
+          color={DIFF_TOKENS.addFg}
+          flexShrink={0}
+        >
           +{stat.added}
         </Text>
-        <Text fontFamily={TERMINAL_FONT_STACK} fontSize="13px" color={DIFF_TOKENS.removeFg} flexShrink={0}>
+        <Text
+          fontFamily={TERMINAL_FONT_STACK}
+          fontSize="13px"
+          color={DIFF_TOKENS.removeFg}
+          flexShrink={0}
+        >
           -{stat.removed}
         </Text>
       </HStack>
-      <Box as="pre" margin={0} fontFamily={TERMINAL_FONT_STACK} fontSize="13px" lineHeight="1.5" userSelect="text">
+      <Box
+        as="pre"
+        margin={0}
+        fontFamily={TERMINAL_FONT_STACK}
+        fontSize="13px"
+        lineHeight="1.5"
+        userSelect="text"
+      >
         {lines.map((line, index) => (
           <DiffRow key={index} line={line} />
         ))}
@@ -66,7 +83,11 @@ export const TerminalDiff = memo(function TerminalDiff({
 function DiffRow({ line }: { line: DiffLine }) {
   const isAdd = line.kind === "add";
   const isRemove = line.kind === "remove";
-  const bg = isAdd ? DIFF_TOKENS.addBg : isRemove ? DIFF_TOKENS.removeBg : undefined;
+  const bg = isAdd
+    ? DIFF_TOKENS.addBg
+    : isRemove
+      ? DIFF_TOKENS.removeBg
+      : undefined;
   const gutterColor = isAdd
     ? DIFF_TOKENS.addFg
     : isRemove

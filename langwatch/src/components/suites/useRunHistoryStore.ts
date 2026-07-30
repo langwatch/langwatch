@@ -52,10 +52,7 @@ export interface RunHistoryState {
   hydrateFromUrl: (query: QueryLike) => void;
 }
 
-function extractStringParam(
-  query: QueryLike,
-  key: string,
-): string {
+function extractStringParam(query: QueryLike, key: string): string {
   const value = query[key];
   if (Array.isArray(value)) return value[0] ?? "";
   return typeof value === "string" ? value : "";

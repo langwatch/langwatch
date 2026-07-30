@@ -27,7 +27,6 @@ import {
   afterAll,
   afterEach,
   beforeAll,
-  beforeEach,
   describe,
   expect,
   it,
@@ -37,8 +36,6 @@ import {
 import type { Event } from "../../domain/types";
 import { EventSourcedQueueProcessorMemory } from "../../queues/memory";
 import { replayEvents } from "../../replay/replayExecutor";
-import { EventSourcingService } from "../../services/eventSourcingService";
-import type { JobRegistryEntry } from "../../services/queues/queueManager";
 import {
   createMockEventStore,
   createMockFoldProjectionDefinition,
@@ -48,6 +45,8 @@ import {
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
+import { EventSourcingService } from "../../services/eventSourcingService";
+import type { JobRegistryEntry } from "../../services/queues/queueManager";
 import type { EventSubscriberDefinition } from "../eventSubscriber.types";
 
 /**
@@ -202,7 +201,9 @@ describe("event-subscriber runtime boundary", () => {
           handled.push(event);
           if (failFirstSubscriberCall) {
             failFirstSubscriberCall = false;
-            throw new Error("subscriber transient failure — will be redelivered");
+            throw new Error(
+              "subscriber transient failure — will be redelivered",
+            );
           }
         },
       };
@@ -234,7 +235,9 @@ describe("event-subscriber runtime boundary", () => {
         "test-pipeline:subscriber:conversationProcess",
       );
       expect(subscriberEntry).toBeDefined();
-      await subscriberEntry!.process(event as unknown as Record<string, unknown>);
+      await subscriberEntry!.process(
+        event as unknown as Record<string, unknown>,
+      );
 
       expect(handled).toHaveLength(2); // subscriber retried and succeeded
       expect(applied).toHaveLength(1); // projection NOT reapplied by the retry

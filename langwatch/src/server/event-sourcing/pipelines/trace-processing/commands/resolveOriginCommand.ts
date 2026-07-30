@@ -1,10 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { Command, CommandHandler } from "../../../";
-import {
-  createTenantId,
-  defineCommandSchema,
-  EventUtils,
-} from "../../../";
+import { createTenantId, defineCommandSchema, EventUtils } from "../../../";
 import type { ResolveOriginCommandData } from "../schemas/commands";
 import { resolveOriginCommandDataSchema } from "../schemas/commands";
 import {
@@ -14,9 +10,7 @@ import {
 } from "../schemas/constants";
 import type { OriginResolvedEvent } from "../schemas/events";
 
-const logger = createLogger(
-  "langwatch:trace-processing:resolve-origin",
-);
+const logger = createLogger("langwatch:trace-processing:resolve-origin");
 
 /**
  * Command handler for resolving the origin of a trace.
@@ -27,10 +21,7 @@ const logger = createLogger(
  */
 export class ResolveOriginCommand
   implements
-    CommandHandler<
-      Command<ResolveOriginCommandData>,
-      OriginResolvedEvent
-    >
+    CommandHandler<Command<ResolveOriginCommandData>, OriginResolvedEvent>
 {
   static readonly schema = defineCommandSchema(
     RESOLVE_ORIGIN_COMMAND_TYPE,
@@ -38,9 +29,7 @@ export class ResolveOriginCommand
     "Command to resolve the origin of a trace when not explicitly set",
   );
 
-  handle(
-    command: Command<ResolveOriginCommandData>,
-  ): OriginResolvedEvent[] {
+  handle(command: Command<ResolveOriginCommandData>): OriginResolvedEvent[] {
     const { tenantId: tenantIdStr, data } = command;
     const tenantId = createTenantId(tenantIdStr);
 

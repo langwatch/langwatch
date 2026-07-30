@@ -7,9 +7,9 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { EventStore } from "../stores/eventStore.types";
@@ -88,11 +88,17 @@ export interface EventSourcingServiceOptions<
   /**
    * Reactors (post-fold side-effect handlers) for this pipeline.
    */
-  reactors?: Array<{ foldName: string; definition: ReactorDefinition<EventType> }>;
+  reactors?: Array<{
+    foldName: string;
+    definition: ReactorDefinition<EventType>;
+  }>;
   /**
    * Reactors (post-map side-effect handlers) for this pipeline.
    */
-  mapReactors?: Array<{ mapName: string; definition: ReactorDefinition<EventType> }>;
+  mapReactors?: Array<{
+    mapName: string;
+    definition: ReactorDefinition<EventType>;
+  }>;
   /** Live event-only consumers, independent of projection state. */
   subscribers?: EventSubscriberDefinition<EventType>[];
   /**

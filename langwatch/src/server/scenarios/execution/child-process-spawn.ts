@@ -40,15 +40,25 @@ export function resolveChildProcessSpawn({
     return resolveProductionSpawn(packageRoot);
   }
 
-  logger.debug({ nodeEnv: nodeEnv ?? "undefined" }, "Using tsx for child process");
+  logger.debug(
+    { nodeEnv: nodeEnv ?? "undefined" },
+    "Using tsx for child process",
+  );
   return resolveDevelopmentSpawn(packageRoot);
 }
 
 function resolveProductionSpawn(packageRoot: string): SpawnConfig {
-  const bundlePath = path.join(packageRoot, "dist", "scenario-child-process.js");
+  const bundlePath = path.join(
+    packageRoot,
+    "dist",
+    "scenario-child-process.js",
+  );
 
   if (fs.existsSync(bundlePath)) {
-    logger.info({ bundlePath }, "Spawning child process from pre-compiled bundle");
+    logger.info(
+      { bundlePath },
+      "Spawning child process from pre-compiled bundle",
+    );
     return {
       command: "node",
       args: [bundlePath],

@@ -15,17 +15,17 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 }));
 
 import type { PrismaClient } from "@prisma/client";
+import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { LicenseHandler } from "../licenseHandler";
-import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
-import {
-  VALID_LICENSE_KEY,
-  EXPIRED_LICENSE_KEY,
-} from "./fixtures/testLicenses";
 import { TEST_PUBLIC_KEY } from "./fixtures/testKeys";
+import {
+  EXPIRED_LICENSE_KEY,
+  VALID_LICENSE_KEY,
+} from "./fixtures/testLicenses";
 
 const ORG_ID = "org_123";
 
@@ -68,7 +68,9 @@ describe("licenseHandler retention provisioning", () => {
           retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
         });
       }
-      expect(mockSetForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
+      expect(mockSetForScope).toHaveBeenCalledTimes(
+        RETENTION_CATEGORIES.length,
+      );
     });
   });
 
@@ -150,7 +152,9 @@ describe("licenseHandler retention provisioning", () => {
       );
 
       expect(result.success).toBe(true);
-      expect(mockSetForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
+      expect(mockSetForScope).toHaveBeenCalledTimes(
+        RETENTION_CATEGORIES.length,
+      );
     });
   });
 });

@@ -5,13 +5,13 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import {
   buildHttpAgentTarget,
   buildInputsFromBodyTemplate,
   convertHttpComponentConfig,
   extractVariablesFromBodyTemplate,
 } from "../httpAgentUtils";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
 
 describe("extractVariablesFromBodyTemplate", () => {
   it("extracts simple variables from body template", () => {
@@ -107,7 +107,9 @@ describe("convertHttpComponentConfig", () => {
     expect(result.bodyTemplate).toBe('{"input": "{{input}}"}');
     expect(result.outputPath).toBe("$.result");
     expect(result.timeoutMs).toBe(30000);
-    expect(result.headers).toEqual([{ key: "Content-Type", value: "application/json" }]);
+    expect(result.headers).toEqual([
+      { key: "Content-Type", value: "application/json" },
+    ]);
   });
 
   it("defaults method to POST when not specified", () => {

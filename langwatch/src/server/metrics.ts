@@ -3,7 +3,6 @@ import { performance } from "node:perf_hooks";
 import {
   Counter,
   collectDefaultMetrics,
-  Gauge,
   Histogram,
   register,
 } from "prom-client";
@@ -474,6 +473,33 @@ export const incrementEsFoldRefoldTotal = (
   outcome: "performed" | "declined" | "unavailable",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_fold_refold_on_miss_total");
+const esFoldRefoldOnMissTotal = new Counter({
+  name: "es_fold_refold_on_miss_total",
+  help: "Store-miss re-folds from the event log, by whether the aggregate had any history to replay",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * Makes the ADR-066 transitional net observable. `refoldOnStoreMiss` survives on
+ * the three read-back folds ONLY to rebuild aggregates whose committed row
+ * predates their read-back columns, and its deletion condition is "it stopped
+ * firing" — which without this counter is an assumption, not an observation. A
+ * transitional refold and a regression to the pre-ADR-066 steady state (every
+ * cache miss walking `event_log`, the 2026-07-23 `TOO_MANY_PARTS` outage) look
+ * identical from the outside; the difference is only visible as a rate that
+ * decays to nothing versus one that tracks `es_fold_projection_total`.
+ *
+ * `performed` — history was replayed, i.e. the net actually caught something.
+ * `absent` — the history read came back empty, so the aggregate was genuinely
+ * new and the executor fell through to `init()`. Expect a steady floor of these
+ * on high-cardinality folds; they are not transitional debt.
+ */
+export const incrementEsFoldRefoldOnMissTotal = (
+  projectionName: string,
+  outcome: "performed" | "absent",
+) => esFoldRefoldOnMissTotal.labels(projectionName, outcome).inc();
+
 register.removeSingleMetric("es_fold_read_window_fallback_total");
 const esFoldReadWindowFallbackTotal = new Counter({
   name: "es_fold_read_window_fallback_total",
@@ -631,6 +657,62 @@ export const observeEsSubscriberDuration = ({
 }) =>
   esSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
 
+/**
+ * Outcome of a subscriber's enqueue-time fan-out decision (payload-cost
+ * doctrine invariant 4 — ADR-069):
+ *
+ * - `filtered` — the predicate declined; no job was minted.
+ * - `staged` — a job carrying the full event was handed off to the
+ *   subscriber's lane.
+ * - `referenced` — a job carrying a claim-check reference instead of the
+ *   payload was handed off.
+ *
+ * - `failed` — the filter, the stage hook or the handoff threw. The routing
+ *   path has no retry, so this subscriber's job for this event is gone.
+ *
+ * `staged` and `referenced` are counted only after the handoff succeeded: the
+ * queue accepted the job, or (in the no-queue configuration) the handler ran
+ * inline. A handoff that throws counts `failed` instead, so a queue outage
+ * cannot inflate either.
+ *
+ * - `killed` — an operator disabled this subscriber for the event's tenant, so
+ *   the seam never judged relevance. Counted rather than skipped silently:
+ *   subscriber fan-out is never replayed (ADR-069), so a kill drops those
+ *   events permanently, and an operator must be able to tell a killed
+ *   subscriber from an idle one — which is exactly when they are looking.
+ *
+ * The five outcomes therefore DO sum to "events routed to this subscriber",
+ * which is what makes `failed` readable as a rate: it is the only outcome that
+ * loses work unintentionally, and it is otherwise invisible — a permanent drop
+ * that moved no series looked exactly like a quiet day. `killed` loses work
+ * too, but deliberately, which is why it is its own outcome and not `filtered`:
+ * conflating "an operator stopped this" with "the subscriber judged it
+ * irrelevant" would hide the kill behind an ordinary-looking series.
+ */
+type SubscriberEnqueueOutcome =
+  | "filtered"
+  | "staged"
+  | "referenced"
+  | "failed"
+  | "killed";
+register.removeSingleMetric("es_subscriber_enqueue_total");
+const esSubscriberEnqueueTotal = new Counter({
+  name: "es_subscriber_enqueue_total",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, staged as a full event or referenced as a claim-check once the handoff succeeded, failed — the retry-less routing path lost the job — or killed, an operator disabled the subscriber for that tenant",
+  labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
+});
+
+export const incrementEsSubscriberEnqueueTotal = ({
+  pipelineName,
+  subscriberName,
+  outcome,
+}: {
+  pipelineName: string;
+  subscriberName: string;
+  outcome: SubscriberEnqueueOutcome;
+}) =>
+  esSubscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
+
 // --- Process manager metrics ---
 register.removeSingleMetric("es_process_manager_total");
 const esProcessManagerTotal = new Counter({
@@ -752,7 +834,8 @@ export const observeEsProcessOutboxDispatchLag = ({
 }: {
   processName: string;
   lagMs: number;
-}) => esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
+}) =>
+  esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
 
 // Commits whose intents were dropped as already-dispatched (ADR-054).
 // Legitimate on event redelivery — but a sustained per-process rate is
@@ -833,7 +916,9 @@ const ingestionPullDuration = new Histogram({
   // adapter kind lives behind the run port — no cheap low-cardinality label.
   // A pull is a network poll plus row inserts, capped by the worker's
   // 5-minute soft deadline, so buckets run 100ms to 5min.
-  buckets: [100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000],
+  buckets: [
+    100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000,
+  ],
 });
 
 export const observeIngestionPullDuration = ({
@@ -1052,7 +1137,7 @@ export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
 // Model-emitted ```langy-card blocks at the relay stamp (ADR-060 §8). The
 // failure outcomes are the drift alarm for prompt regressions in block
 // emission — a rising unsalvageable/invalid rate means the agent's emission
-// quality slipped, exactly like ADR-059's probe-miss counter for cards.
+// quality slipped, exactly like ADR-079's probe-miss counter for cards.
 register.removeSingleMetric("langwatch_langy_blocks_total");
 const langyBlocksTotal = new Counter({
   name: "langwatch_langy_blocks_total",
@@ -1166,6 +1251,73 @@ const storedObjectSizeBytesHistogram = new Histogram({
 
 export const getStoredObjectSizeBytesHistogram = (purpose: string) =>
   storedObjectSizeBytesHistogram.labels(purpose);
+
+// ============================================================================
+// Coding-agent session reads
+// ============================================================================
+
+/**
+ * `hit` — the window returned rows. `empty` — it returned none, which still
+ * paid the full dedup scan. `error` — the read threw, so its duration is a
+ * failure time and must not sit in the same distribution as the successes.
+ */
+export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
+
+register.removeSingleMetric(
+  "coding_agent_session_list_read_duration_milliseconds",
+);
+const codingAgentSessionListReadDuration = new Histogram({
+  name: "coding_agent_session_list_read_duration_milliseconds",
+  help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
+  labelNames: ["table", "outcome"] as const,
+  // Runs to 30s deliberately. This metric's job is to catch the unpruned scan
+  // becoming expensive enough to promote ADR-071's writer freeze from "next" to
+  // "now", and a top bucket at 5s would put exactly that degradation into
+  // `+Inf`, where a p99 cannot be resolved — the histogram would go blind at
+  // the moment it was supposed to speak.
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000],
+});
+
+/**
+ * Prices ADR-071 sequencing step 2. `findManyRecent`'s inner `max(UpdatedAt)`
+ * subquery dropped its `StartedAt` bound, because a bound on a moving column
+ * inside a dedup scope returns a stale version. The scope therefore no longer
+ * prunes partitions and scans this tenant's sessions rather than the window's
+ * weeks — compact (sort-key columns plus `UpdatedAt`, one group row per
+ * session), but a real increase the ADR states rather than measures.
+ *
+ * Without this the ADR's own exit conditions are unfalsifiable: "the compact
+ * scan is acceptable" and "step 3's freeze can keep waiting" are both claims
+ * about this read's cost, and nothing else observes it. A rising p99 here is
+ * what promotes the freeze from deferred to due, and a flat one is what earns
+ * the deferral.
+ *
+ * `empty` is not noise. An empty window still runs the whole unwindowed dedup
+ * scan and materialises nothing in the outer `SELECT *`, so it isolates the
+ * scan's own floor from the cost of rendering rows.
+ *
+ * Duration only, deliberately. `client.query()` resolves a `ResultSet`, which
+ * carries `response_headers` but no parsed summary — the client parses
+ * `X-ClickHouse-Summary` (`read_rows`, `read_bytes`) for `insert`/`command`/
+ * `exec` alone, and for a streaming `SELECT` those counters are complete only
+ * under `wait_end_of_query=1`. Rows *returned* is capped by the caller's limit
+ * and so says nothing about the scan, which is why it is not recorded as a
+ * stand-in.
+ *
+ * `table` and `outcome` only: per-tenant attribution belongs in the structured
+ * log lines, never as a label (the cardinality doctrine above). This table is
+ * one row per session, so a tenant label would track the customer count.
+ */
+export const observeCodingAgentSessionListReadDuration = ({
+  table,
+  outcome,
+  durationMs,
+}: {
+  table: string;
+  outcome: CodingAgentSessionListReadOutcome;
+  durationMs: number;
+}) =>
+  codingAgentSessionListReadDuration.labels(table, outcome).observe(durationMs);
 
 // ============================================================================
 // withMetrics utility

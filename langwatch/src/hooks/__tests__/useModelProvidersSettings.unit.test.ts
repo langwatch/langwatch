@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+
 import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../utils/api", () => ({
   api: {
@@ -18,7 +19,7 @@ import { api } from "../../utils/api";
 import { useModelProvidersSettings } from "../useModelProvidersSettings";
 
 const mockUseQuery = vi.mocked(
-  api.modelProvider.getAllForProjectForFrontend.useQuery
+  api.modelProvider.getAllForProjectForFrontend.useQuery,
 );
 
 describe("useModelProvidersSettings()", () => {
@@ -38,7 +39,7 @@ describe("useModelProvidersSettings()", () => {
 
       it("returns true (optimistic default)", () => {
         const { result } = renderHook(() =>
-          useModelProvidersSettings({ projectId: "project-123" })
+          useModelProvidersSettings({ projectId: "project-123" }),
         );
 
         expect(result.current.hasEnabledProviders).toBe(true);
@@ -56,7 +57,7 @@ describe("useModelProvidersSettings()", () => {
 
       it("returns true (optimistic default)", () => {
         const { result } = renderHook(() =>
-          useModelProvidersSettings({ projectId: "project-123" })
+          useModelProvidersSettings({ projectId: "project-123" }),
         );
 
         expect(result.current.hasEnabledProviders).toBe(true);
@@ -74,7 +75,7 @@ describe("useModelProvidersSettings()", () => {
 
       it("returns false", () => {
         const { result } = renderHook(() =>
-          useModelProvidersSettings({ projectId: "project-123" })
+          useModelProvidersSettings({ projectId: "project-123" }),
         );
 
         expect(result.current.hasEnabledProviders).toBe(false);
@@ -98,7 +99,7 @@ describe("useModelProvidersSettings()", () => {
 
       it("returns false", () => {
         const { result } = renderHook(() =>
-          useModelProvidersSettings({ projectId: "project-123" })
+          useModelProvidersSettings({ projectId: "project-123" }),
         );
 
         expect(result.current.hasEnabledProviders).toBe(false);
@@ -122,7 +123,7 @@ describe("useModelProvidersSettings()", () => {
 
       it("returns true", () => {
         const { result } = renderHook(() =>
-          useModelProvidersSettings({ projectId: "project-123" })
+          useModelProvidersSettings({ projectId: "project-123" }),
         );
 
         expect(result.current.hasEnabledProviders).toBe(true);

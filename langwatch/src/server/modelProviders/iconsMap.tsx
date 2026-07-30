@@ -8,9 +8,9 @@ import { Cerebras } from "../../components/icons/Cerebras";
 import { Codex } from "../../components/icons/Codex";
 import { Custom } from "../../components/icons/Custom";
 import { DeepSeek } from "../../components/icons/DeepSeek";
+import { ElevenLabs } from "../../components/icons/ElevenLabs";
 import { Gemini } from "../../components/icons/Gemini";
 import { GoogleCloud } from "../../components/icons/GoogleCloud";
-import { ElevenLabs } from "../../components/icons/ElevenLabs";
 import { Groq } from "../../components/icons/Groq";
 import { OpenAI } from "../../components/icons/OpenAI";
 import { Voyage } from "../../components/icons/Voyage";
@@ -29,6 +29,10 @@ export const modelProviderIcons: Record<
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,
+  // The Cloud mark rather than the Gemini one: the models are Gemini, but the
+  // credential and console are Google Cloud's, and that is the distinction a
+  // customer is picking between in this list.
+  google_agent_platform: <GoogleCloud />,
   bedrock: <AWS />,
   deepseek: <DeepSeek />,
   custom: <Custom />,

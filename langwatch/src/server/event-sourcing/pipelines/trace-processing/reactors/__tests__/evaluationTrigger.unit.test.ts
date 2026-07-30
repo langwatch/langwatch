@@ -9,7 +9,9 @@ import {
 } from "../evaluationTrigger.reactor";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
 
-function makeEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessingEvent {
+function makeEvent(
+  overrides: Partial<TraceProcessingEvent> = {},
+): TraceProcessingEvent {
   return {
     id: "evt-1",
     type: "lw.obs.trace.span_received",
@@ -20,7 +22,12 @@ function makeEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessi
     createdAt: Date.now(),
     occurredAt: Date.now(),
     data: {
-      span: { name: "openai.chat", spanId: "span-1", parentSpanId: null, attributes: [] },
+      span: {
+        name: "openai.chat",
+        spanId: "span-1",
+        parentSpanId: null,
+        attributes: [],
+      },
     },
     metadata: { spanId: "span-1", traceId: "trace-1" },
     ...overrides,
@@ -29,7 +36,9 @@ function makeEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessi
 
 function makeContext(
   overrides: Partial<ReactorContext<TraceSummaryData>> = {},
-  attributeOverrides: Record<string, string> = { "langwatch.origin": "application" },
+  attributeOverrides: Record<string, string> = {
+    "langwatch.origin": "application",
+  },
 ): ReactorContext<TraceSummaryData> {
   return {
     tenantId: "project-1",
@@ -74,7 +83,9 @@ function makeMonitor(overrides: Partial<MonitorSummary> = {}): MonitorSummary {
   };
 }
 
-function createDeps(overrides: Partial<EvaluationTriggerReactorDeps> = {}): EvaluationTriggerReactorDeps {
+function createDeps(
+  overrides: Partial<EvaluationTriggerReactorDeps> = {},
+): EvaluationTriggerReactorDeps {
   return {
     monitors: {
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([]),
@@ -89,7 +100,9 @@ describe("evaluationTrigger reactor", () => {
     it("sends with dedup TTL outlasting deferred origin window", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: null });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
 
       const reactor = createEvaluationTriggerReactor(deps);
       const event = makeEvent();
@@ -101,7 +114,9 @@ describe("evaluationTrigger reactor", () => {
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
       expect(options!.deduplication).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.deduplication!.ttlMs).toBe(
+        DEFERRED_CHECK_DELAY_MS + 60_000,
+      );
       expect(options!.delay).toBeUndefined();
     });
   });
@@ -110,11 +125,19 @@ describe("evaluationTrigger reactor", () => {
     it("sends with dynamic delay and dedup based on threadIdleTimeout", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: 300 });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
 
       const reactor = createEvaluationTriggerReactor(deps);
       const event = makeEvent();
-      const context = makeContext({}, { "langwatch.origin": "application", "gen_ai.conversation.id": "thread-abc" });
+      const context = makeContext(
+        {},
+        {
+          "langwatch.origin": "application",
+          "gen_ai.conversation.id": "thread-abc",
+        },
+      );
 
       await reactor.handle(event, context);
 
@@ -137,7 +160,9 @@ describe("evaluationTrigger reactor", () => {
     it("falls back to trace-level dedup (6-min TTL, no delay override)", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: 300 });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
 
       const reactor = createEvaluationTriggerReactor(deps);
       const event = makeEvent();
@@ -148,7 +173,9 @@ describe("evaluationTrigger reactor", () => {
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.deduplication!.ttlMs).toBe(
+        DEFERRED_CHECK_DELAY_MS + 60_000,
+      );
       expect(options!.delay).toBeUndefined();
     });
   });
@@ -157,18 +184,28 @@ describe("evaluationTrigger reactor", () => {
     it("falls back to trace-level dedup (6-min TTL, no delay override)", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: 0 });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
 
       const reactor = createEvaluationTriggerReactor(deps);
       const event = makeEvent();
-      const context = makeContext({}, { "langwatch.origin": "application", "gen_ai.conversation.id": "thread-abc" });
+      const context = makeContext(
+        {},
+        {
+          "langwatch.origin": "application",
+          "gen_ai.conversation.id": "thread-abc",
+        },
+      );
 
       await reactor.handle(event, context);
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.deduplication!.ttlMs).toBe(
+        DEFERRED_CHECK_DELAY_MS + 60_000,
+      );
       expect(options!.delay).toBeUndefined();
     });
   });
@@ -180,7 +217,9 @@ describe("evaluationTrigger reactor", () => {
         evaluator: { name: "Evaluator Name" },
       });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
 
       const reactor = createEvaluationTriggerReactor(deps);
       await reactor.handle(makeEvent(), makeContext());
@@ -198,7 +237,9 @@ describe("evaluationTrigger reactor", () => {
         evaluator: null,
       });
       const deps = createDeps();
-      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
+      vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([
+        monitor,
+      ]);
 
       const reactor = createEvaluationTriggerReactor(deps);
       await reactor.handle(makeEvent(), makeContext());

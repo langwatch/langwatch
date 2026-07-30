@@ -8,27 +8,27 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Bot, Check, Terminal, Users } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Bot, Check, Terminal } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
 import {
-  IngestionTemplateInstallDrawer,
   type IngestionBindingResult,
+  IngestionTemplateInstallDrawer,
 } from "~/components/me/IngestionTemplateInstallDrawer";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 
 /**
- * /me Trace Ingest section — tile-grid for IngestionTemplate v1 catalog.
+ * /me Trace Ingest section, the tile-grid for the IngestionTemplate
+ * catalog.
  *
  * Tile metadata comes from `api.ingestionTemplates.list` (server is the
- * source of truth — admin can disable / org-author / archive). v1
- * platform-published rows are seeded by Sergey's seeders. Per-template
- * iconography is resolved client-side from a slug map since v1 platform
- * defaults ship with iconAsset=NULL.
+ * source of truth: admin can disable / org-author / archive). The
+ * platform ships NO default templates, so the whole section renders only
+ * when the org has at least one template of its own. A heading over an
+ * empty grid would read as a broken section on every fresh org's /me.
  *
  * Install fires `api.ingestionKey.install` mutation. The plaintext
  * sk-lw- token is shown ONCE in the drawer and stored in component state
@@ -38,7 +38,9 @@ import { api } from "~/utils/api";
  *
  * raw_otlp_advanced is rendered as a SEPARATE static tile (no
  * IngestionTemplate row, no install). It deep-links to
- * /me/configure#otlp — the BYO-OTLP fallback discovery card.
+ * /me/configure#otlp, the BYO-OTLP fallback discovery card. It renders
+ * only alongside real templates; the personal OTLP endpoint stays
+ * reachable via /me/configure regardless.
  *
  * The platform's coding assistants (claude_code, codex, cursor, gemini,
  * opencode) never appear in this grid because they are not seeded as
@@ -46,24 +48,30 @@ import { api } from "~/utils/api";
  * setup and the receiver converts their OTLP logs into canonical gen_ai
  * spans. Their entry points live on the AiToolsPortal "$ langwatch
  * <tool>" tiles. The grid simply renders whatever
- * `api.ingestionTemplates.list` returns (claude_cowork + any org-authored
- * templates) plus the raw_otlp_advanced discovery card — no slug filter.
+ * `api.ingestionTemplates.list` returns (org-authored templates) plus
+ * the raw_otlp_advanced discovery card, with no slug filter.
  *
  * Per the no-leak invariant in catalog.feature: this component MUST
  * NOT render under /[project] chrome — only on /me. Embedding lives on
  * /me/index.tsx.
  */
-const TILE_META: Record<
-  string,
-  { icon: ReactNode; subtitle: string }
-> = {
-  claude_cowork: {
-    icon: <Users size={20} />,
-    subtitle: "Multi-agent Claude sessions",
-  },
-};
-
 const FALLBACK_ICON = <Bot size={20} />;
+
+/**
+ * The mutation's error, but only if it was this template that raised it.
+ *
+ * `install` and `rotate` are one mutation each for the whole grid, and tRPC
+ * keeps the last error until the next call — so the question a drawer has to
+ * ask is never "did this fail" but "did this fail for the tool I'm showing".
+ * `variables` is the request that failed, which is the only record of that.
+ */
+function errorFor<TError, TVariables extends { sourceType: string }>(
+  mutation: { error: TError | null; variables?: TVariables },
+  sourceType: string,
+): TError | null {
+  if (!mutation.error) return null;
+  return mutation.variables?.sourceType === sourceType ? mutation.error : null;
+}
 
 export function TraceIngestSection() {
   const ctx = usePersonalContext();
@@ -79,28 +87,17 @@ export function TraceIngestSection() {
   );
 
   const utils = api.useUtils();
+  // Neither mutation toasts: both are driven from inside the install drawer,
+  // which is open whenever they can fail and renders this same error inline
+  // via `<HandledErrorAlert>`. A toast would report it a second time.
   const installMutation = api.ingestionKey.install.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
-    },
-    onError: (err) => {
-      toaster.create({
-        title: "Install failed",
-        description: err.message,
-        type: "error",
-      });
     },
   });
   const rotateMutation = api.ingestionKey.rotate.useMutation({
     onSuccess: () => {
       void utils.ingestionKey.list.invalidate();
-    },
-    onError: (err) => {
-      toaster.create({
-        title: "Rotate failed",
-        description: err.message,
-        type: "error",
-      });
     },
   });
 
@@ -120,8 +117,20 @@ export function TraceIngestSection() {
 
   /** Connected ingestion keys, keyed by the source they were minted for. */
   const keyBySourceType = new Map(keys.map((k) => [k.sourceType, k]));
+
+  // No templates, no section: the platform ships no defaults, so most
+  // orgs have nothing to install here. Rendering nothing (not even
+  // load skeletons) while the list is in flight keeps /me from flashing
+  // a section that then disappears, and only a SUCCESSFUL empty list
+  // hides the section for good. A failed list is NOT an empty catalog:
+  // it falls through to the normal render (heading, grid, raw-OTLP
+  // fallback card) rather than silently hiding the section. Installed
+  // sources keep ingesting regardless: the receiver keys on the
+  // IngestionSource, not on a listed template.
+  if (!templatesQuery.isSuccess && !templatesQuery.isError) return null;
+  if (templatesQuery.isSuccess && templates.length === 0) return null;
   const openTemplate = openSlug
-    ? templates.find((t) => t.slug === openSlug) ?? null
+    ? (templates.find((t) => t.slug === openSlug) ?? null)
     : null;
 
   const handleInstall = async (
@@ -140,7 +149,7 @@ export function TraceIngestSection() {
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
     } catch {
-      // surfaced via toaster + drawer error state
+      // surfaced inline by the drawer, off `installMutation.error`
     }
   };
 
@@ -160,7 +169,7 @@ export function TraceIngestSection() {
         [slug]: { token: result.token, endpoint: otlpEndpoint },
       }));
     } catch {
-      // surfaced via toaster + drawer error state
+      // surfaced inline by the drawer, off `rotateMutation.error`
     }
   };
 
@@ -205,37 +214,24 @@ export function TraceIngestSection() {
       </VStack>
 
       <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={3}>
-        {templatesQuery.isLoading
-          ? Array.from({ length: 3 }).map((_, idx) => (
-              <TileSkeleton key={`skeleton-${idx}`} />
-            ))
-          : templates.map((t) => {
-              const connected = keyBySourceType.has(t.sourceType);
-              const meta = TILE_META[t.slug] ?? {
-                icon: FALLBACK_ICON,
-                subtitle: t.description ?? t.sourceType,
-              };
-              return (
-                <InstallTile
-                  key={t.id}
-                  slug={t.slug}
-                  label={t.displayName}
-                  subtitle={meta.subtitle}
-                  icon={meta.icon}
-                  installed={connected}
-                  onClick={() => handleTileClick(t.sourceType, t.id, t.slug)}
-                />
-              );
-            })}
+        {templates.map((t) => (
+          <InstallTile
+            key={t.id}
+            slug={t.slug}
+            label={t.displayName}
+            subtitle={t.description ?? t.sourceType}
+            icon={FALLBACK_ICON}
+            installed={keyBySourceType.has(t.sourceType)}
+            onClick={() => handleTileClick(t.sourceType, t.id, t.slug)}
+          />
+        ))}
         <RawOtlpAdvancedTile />
       </SimpleGrid>
 
       {openTemplate && (
         <IngestionTemplateInstallDrawer
           open={!!openSlug}
-          onOpenChange={(next) =>
-            handleOpenChange(openTemplate.slug, next)
-          }
+          onOpenChange={(next) => handleOpenChange(openTemplate.slug, next)}
           template={{
             slug: openTemplate.slug,
             displayName: openTemplate.displayName,
@@ -244,11 +240,16 @@ export function TraceIngestSection() {
           }}
           installResult={installResults[openTemplate.slug] ?? null}
           isInstalling={installMutation.isPending || rotateMutation.isPending}
+          // Both halves are gated on the template they belong to. A tRPC
+          // mutation's `error` outlives the drawer that caused it, and these
+          // two mutations are shared across every tile — so an ungated
+          // fallback meant a failed rotate on one tool was still on screen
+          // when you opened the next one's drawer, reported as that tool's
+          // failure. This drawer is the only place either failure is shown,
+          // which makes showing the wrong one worse than showing none.
           installError={
-            installMutation.error?.message &&
-            installMutation.variables?.sourceType === openTemplate.sourceType
-              ? installMutation.error.message
-              : rotateMutation.error?.message ?? null
+            errorFor(installMutation, openTemplate.sourceType) ??
+            errorFor(rotateMutation, openTemplate.sourceType)
           }
           hasExistingKey={keyBySourceType.has(openTemplate.sourceType)}
           onInstall={() =>
@@ -339,19 +340,6 @@ function InstallTile({
         </VStack>
       </HStack>
     </Box>
-  );
-}
-
-function TileSkeleton() {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-      height="76px"
-      backgroundColor="bg.subtle"
-    />
   );
 }
 

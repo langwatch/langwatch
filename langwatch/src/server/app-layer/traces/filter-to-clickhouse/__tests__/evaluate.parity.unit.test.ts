@@ -421,6 +421,97 @@ const cases: Case[] = [
     trace: makeTrace({ computedInput: null, computedOutput: "refund please" }),
     expected: false,
   },
+  // Free text over names (issue #6356). A tool or agent identifier usually
+  // lives on the span, not in the captured I/O, so free text has to reach the
+  // trace name (the root span's name) and the span names too.
+  {
+    name: "free text matches the trace name when the IO columns miss",
+    query: "codex",
+    trace: makeTrace({
+      traceName: "codex exec",
+      computedInput: "nothing relevant",
+      computedOutput: "still nothing",
+    }),
+    expected: true,
+  },
+  {
+    name: "free text matches the trace name case-insensitively",
+    query: "CODEX",
+    trace: makeTrace({ traceName: "Codex.Exec" }),
+    expected: true,
+  },
+  {
+    name: "free text matches a loaded span name when the IO columns miss",
+    query: "codex",
+    trace: makeTrace(
+      { computedInput: "nothing relevant", computedOutput: "still nothing" },
+      { spans: [{ name: "codex", statusCode: 1, attributes: {} }] },
+    ),
+    expected: true,
+  },
+  {
+    name: "free text matches a loaded span name as a substring",
+    query: "codex",
+    trace: makeTrace(
+      { computedInput: "nothing relevant", computedOutput: "still nothing" },
+      { spans: [{ name: "Codex.Exec", statusCode: 1, attributes: {} }] },
+    ),
+    expected: true,
+  },
+  {
+    name: "free text misses when no name or IO column contains the term",
+    query: "codex",
+    trace: makeTrace(
+      {
+        traceName: "checkout",
+        computedInput: "nothing relevant",
+        computedOutput: "still nothing",
+      },
+      { spans: [{ name: "http.request", statusCode: 1, attributes: {} }] },
+    ),
+    expected: false,
+  },
+  {
+    name: "negated free text excludes a trace name match",
+    query: "NOT codex",
+    trace: makeTrace({
+      traceName: "codex exec",
+      computedInput: "hello",
+      computedOutput: "world",
+    }),
+    expected: false,
+  },
+  {
+    name: "negated free text excludes a loaded span name match",
+    query: "NOT codex",
+    trace: makeTrace(
+      { computedInput: "hello", computedOutput: "world" },
+      { spans: [{ name: "codex", statusCode: 1, attributes: {} }] },
+    ),
+    expected: false,
+  },
+  {
+    // The documented narrowing: without span rows the mirror cannot see a
+    // span-name-only match, so it answers from the columns it does have rather
+    // than failing the tag closed and breaking every negated free-text filter.
+    name: "free text without loaded spans answers from the summary columns alone",
+    query: "NOT codex",
+    trace: makeTrace({ computedInput: "hello", computedOutput: "world" }),
+    expected: true,
+  },
+  {
+    // Same narrowing, positive direction: dispatch cannot surface a trace whose
+    // only match would have come from a span name it never loaded. The SQL side
+    // does surface it, which is exactly the asymmetry the spec pins.
+    name: "free text without loaded spans misses a span-name-only match",
+    query: "codex",
+    trace: makeTrace({
+      traceName: "checkout flow",
+      computedInput: "hello",
+      computedOutput: "world",
+    }),
+    expected: false,
+  },
   // Boolean composition
   {
     name: "AND requires both sides",
@@ -537,14 +628,11 @@ const cases: Case[] = [
 ];
 
 describe("evaluateQueryInMemory", () => {
-  it.each(cases.map((c) => [c.name, c] as const))(
-    "%s",
-    (_name, testCase) => {
-      expect(evaluateQueryInMemory(testCase.query, testCase.trace)).toBe(
-        testCase.expected,
-      );
-    },
-  );
+  it.each(cases.map((c) => [c.name, c] as const))("%s", (_name, testCase) => {
+    expect(evaluateQueryInMemory(testCase.query, testCase.trace)).toBe(
+      testCase.expected,
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -579,42 +667,40 @@ describe("FieldDef SQL/read parity", () => {
   });
 
   describe("when a facet's in-memory read applies a default", () => {
-    it.each(autoDerived.map((d) => [d.key, d] as const))(
-      "[%s] spells that default out in the ClickHouse expression too",
-      (_key, def) => {
-        const value = def.read!(emptyTrace);
-        // No default (bare column: CH yields '' or NULL, and the read agrees),
-        // an array-valued read, or a field that can't be read at dispatch.
-        if (
-          value === UNSUPPORTED ||
-          value === null ||
-          value === "" ||
-          Array.isArray(value) ||
-          typeof value === "number"
-        ) {
-          return;
-        }
-        // A read that invents a value for an unset trace is only honest if the
-        // SQL invents the same one — otherwise the two halves disagree on
-        // exactly the rows nobody stamped.
-        expect(def.expression).toContain(`'${value}'`);
-      },
-    );
+    it.each(
+      autoDerived.map((d) => [d.key, d] as const),
+    )("[%s] spells that default out in the ClickHouse expression too", (_key, def) => {
+      const value = def.read!(emptyTrace);
+      // No default (bare column: CH yields '' or NULL, and the read agrees),
+      // an array-valued read, or a field that can't be read at dispatch.
+      if (
+        value === UNSUPPORTED ||
+        value === null ||
+        value === "" ||
+        Array.isArray(value) ||
+        typeof value === "number"
+      ) {
+        return;
+      }
+      // A read that invents a value for an unset trace is only honest if the
+      // SQL invents the same one — otherwise the two halves disagree on
+      // exactly the rows nobody stamped.
+      expect(def.expression).toContain(`'${value}'`);
+    });
   });
 
   describe("when a field is compiled to ClickHouse", () => {
-    it.each(autoDerived.map((d) => [d.key, d] as const))(
-      "[%s] compiles against its registry expression",
-      (key, def) => {
-        const literal = def.kind === "range" ? "1" : "x";
-        const compiled = translateFilterToClickHouse(
-          `${key}:${literal}`,
-          "tenant-1",
-          { from: 0, to: 1 },
-        );
-        expect(compiled?.sql).toContain(def.expression);
-      },
-    );
+    it.each(
+      autoDerived.map((d) => [d.key, d] as const),
+    )("[%s] compiles against its registry expression", (key, def) => {
+      const literal = def.kind === "range" ? "1" : "x";
+      const compiled = translateFilterToClickHouse(
+        `${key}:${literal}`,
+        "tenant-1",
+        { from: 0, to: 1 },
+      );
+      expect(compiled?.sql).toContain(def.expression);
+    });
   });
 });
 
@@ -643,25 +729,29 @@ const PROTOTYPE_FIELDS = [
 
 describe("given a filter field that collides with an Object.prototype member", () => {
   describe("when the dispatcher evaluates it in memory", () => {
-    it.each(PROTOTYPE_FIELDS)(
-      "[%s] fails closed instead of throwing",
-      (field) => {
-        expect(() =>
-          evaluateQueryInMemory(`${field}:x`, makeTrace({})),
-        ).not.toThrow();
-        expect(evaluateQueryInMemory(`${field}:x`, makeTrace({}))).toBe(false);
-      },
-    );
+    it.each(
+      PROTOTYPE_FIELDS,
+    )("[%s] fails closed instead of throwing", (field) => {
+      expect(() =>
+        evaluateQueryInMemory(`${field}:x`, makeTrace({})),
+      ).not.toThrow();
+      expect(evaluateQueryInMemory(`${field}:x`, makeTrace({}))).toBe(false);
+    });
 
     it("fails closed when the poisoned tag is OR-ed with a matching one", () => {
       expect(
-        evaluateQueryInMemory("topic:t1 OR constructor:x", makeTrace({ topicId: "t1" })),
+        evaluateQueryInMemory(
+          "topic:t1 OR constructor:x",
+          makeTrace({ topicId: "t1" }),
+        ),
       ).toBe(false);
     });
   });
 
   describe("when the save-time gate compiles it", () => {
-    it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
+    it.each(
+      PROTOTYPE_FIELDS,
+    )("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
         translateFilterToClickHouse(`${field}:x`, "tenant-1", {
           from: 0,
@@ -715,14 +805,21 @@ describe("queryNeeds", () => {
 
     it("collects events for event fields and prefixes", () => {
       expect(queryNeeds("event:user_feedback").has("events")).toBe(true);
-      expect(
-        queryNeeds("event.attribute.exception.type:x").has("events"),
-      ).toBe(true);
+      expect(queryNeeds("event.attribute.exception.type:x").has("events")).toBe(
+        true,
+      );
     });
 
     it("collects spans for span fields and prefixes", () => {
       expect(queryNeeds("spanType:llm").has("spans")).toBe(true);
       expect(queryNeeds("span.attribute.k:v").has("spans")).toBe(true);
+    });
+
+    // Free text reaches span names through a stored_spans subquery, so a
+    // dispatcher has to know it needs the span rows to answer it exactly.
+    it("collects spans for free text", () => {
+      expect(queryNeeds("codex").has("spans")).toBe(true);
+      expect(queryNeeds('"refund policy"').has("spans")).toBe(true);
     });
 
     it("resolves has/none value-polymorphic needs", () => {
@@ -745,5 +842,104 @@ describe("queryNeeds", () => {
     it("returns an empty set for an unparseable query", () => {
       expect(queryNeeds("((").size).toBe(0);
     });
+  });
+});
+
+describe("the in-memory free-text narrowing", () => {
+  // Dispatch passes `spans: null` (confirmSettledMatch), so the mirror answers
+  // free text from the summary alone. These two pin both directions of that.
+
+  /** @scenario A trigger's in-memory re-check cannot see span names */
+  it("misses a span-name-only match while the SQL side finds it", () => {
+    // Nothing in the summary mentions codex; only an unloaded span would.
+    const trace = makeTrace({
+      traceName: "checkout flow",
+      computedInput: "summarise the quarterly report",
+      computedOutput: "here is the summary",
+    });
+    expect(trace.spans).toBeUndefined();
+    expect(evaluateQueryInMemory("codex", trace)).toBe(false);
+
+    // The same filter compiled for ClickHouse does reach span names, which is
+    // the asymmetry the spec records.
+    const compiled = translateFilterToClickHouse("codex", "tenant-1", {
+      from: 0,
+      to: 1,
+    });
+    expect(compiled!.sql).toContain("FROM stored_spans");
+    expect(compiled!.sql).toContain("SpanName ILIKE");
+
+    // Loading the spans closes the gap with no change to the evaluator.
+    expect(
+      evaluateQueryInMemory("codex", {
+        ...trace,
+        spans: [{ name: "Codex.Exec", statusCode: 1, attributes: {} }],
+      }),
+    ).toBe(true);
+  });
+
+  /** @scenario The in-memory re-check still matches on the trace name */
+  it("still matches on the trace name, which travels with the fold state", () => {
+    expect(
+      evaluateQueryInMemory(
+        "codex",
+        makeTrace({
+          traceName: "codex exec",
+          computedInput: "run the migration script",
+          computedOutput: "migration finished",
+        }),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("free text compiled to ClickHouse", () => {
+  function compile(query: string) {
+    return translateFilterToClickHouse(query, "tenant-1", {
+      from: 1000,
+      to: 2000,
+    });
+  }
+
+  it("searches the computed IO columns, the trace name, and span names", () => {
+    const compiled = compile("codex");
+    expect(compiled).not.toBeNull();
+    const sql = compiled!.sql;
+
+    expect(sql).toContain("ComputedInput ILIKE");
+    expect(sql).toContain("ComputedOutput ILIKE");
+    expect(sql).toContain("ifNull(TraceName, '') ILIKE");
+    expect(sql).toContain("FROM stored_spans");
+    expect(sql).toContain("SpanName ILIKE");
+    // The span subquery crosses into another table, so its tenant predicate is
+    // the one whose regression leaks across tenants rather than just returning
+    // the wrong rows. Pin it here even though `boundedSubquery` owns it.
+    expect(sql).toContain("TenantId = {tenantId:String}");
+    expect(compiled!.params).toMatchObject({ tenantId: "tenant-1" });
+    expect(Object.values(compiled!.params)).toContain("%codex%");
+  });
+
+  it("binds one parameter reused across every branch", () => {
+    const compiled = compile("codex");
+    const freeTextParams = Object.keys(compiled!.params).filter((k) =>
+      k.startsWith("freeText"),
+    );
+    expect(freeTextParams).toHaveLength(1);
+    // Four branches: input, output, trace name, span name.
+    const name = freeTextParams[0]!;
+    const occurrences = compiled!.sql.split(`{${name}:String}`).length - 1;
+    expect(occurrences).toBe(4);
+  });
+
+  it("bounds the span subquery to the query time window for partition pruning", () => {
+    const compiled = compile("codex");
+    expect(compiled!.sql).toContain("StartTime >=");
+    expect(compiled!.sql).toContain("StartTime <=");
+    expect(compiled!.params).toMatchObject({ timeFrom: 1000, timeTo: 2000 });
+  });
+
+  it("negates the whole clause, not just the IO columns", () => {
+    const compiled = compile("NOT codex");
+    expect(compiled!.sql.trim()).toMatch(/^NOT \(/);
   });
 });

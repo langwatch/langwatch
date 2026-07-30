@@ -13,7 +13,16 @@
 
 import type { Edge, Node } from "@xyflow/react";
 
-import { LATEST_SPEC_VERSION, type Code, type Entry, type Evaluator, type Field, type HttpComponentConfig, type Signature, type Workflow } from "~/optimization_studio/types/dsl";
+import {
+  type Code,
+  type Entry,
+  type Evaluator,
+  type Field,
+  type HttpComponentConfig,
+  LATEST_SPEC_VERSION,
+  type Signature,
+  type Workflow,
+} from "~/optimization_studio/types/dsl";
 import type {
   DatasetColumn,
   DatasetReference,
@@ -227,7 +236,9 @@ const createHttpNode = (
     data: {
       name: target.id, // Name is fetched from DB at execution time
       inputs: inputs as HttpComponentConfig["inputs"],
-      outputs: (target.outputs ?? [{ identifier: "output", type: "str" }]) as HttpComponentConfig["outputs"],
+      outputs: (target.outputs ?? [
+        { identifier: "output", type: "str" },
+      ]) as HttpComponentConfig["outputs"],
       // HTTP-specific config
       url: httpConfig.url,
       method: httpConfig.method,
@@ -398,7 +409,7 @@ export const getActiveDatasetData = (
   const activeDataset = state.datasets.find(
     (d) => d.id === state.activeDatasetId,
   );
-  if (!activeDataset || activeDataset.type !== "inline") {
+  if (activeDataset?.type !== "inline") {
     return undefined;
   }
   return activeDataset.inline;

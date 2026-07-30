@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockRedisStore, mockRedis } = vi.hoisted(() => {
   const mockRedisStore = new Map<string, { value: string; ttl: number }>();
@@ -7,12 +7,22 @@ const { mockRedisStore, mockRedis } = vi.hoisted(() => {
     setex: vi.fn(async (key: string, ttl: number, value: string) => {
       mockRedisStore.set(key, { value, ttl });
     }),
-    set: vi.fn(async (key: string, value: string, ex: string, ttl: number, nx: string) => {
-      if (nx === "NX" && mockRedisStore.has(key)) return null;
-      mockRedisStore.set(key, { value, ttl });
-      return "OK";
+    set: vi.fn(
+      async (
+        key: string,
+        value: string,
+        ex: string,
+        ttl: number,
+        nx: string,
+      ) => {
+        if (nx === "NX" && mockRedisStore.has(key)) return null;
+        mockRedisStore.set(key, { value, ttl });
+        return "OK";
+      },
+    ),
+    del: vi.fn(async (key: string) => {
+      mockRedisStore.delete(key);
     }),
-    del: vi.fn(async (key: string) => { mockRedisStore.delete(key); }),
   };
   return { mockRedisStore, mockRedis };
 });
@@ -20,8 +30,12 @@ const { mockRedisStore, mockRedis } = vi.hoisted(() => {
 let mockIsBuildOrNoRedis = false;
 
 vi.mock("~/server/redis", () => ({
-  get isBuildOrNoRedis() { return mockIsBuildOrNoRedis; },
-  get connection() { return mockRedis; },
+  get isBuildOrNoRedis() {
+    return mockIsBuildOrNoRedis;
+  },
+  get connection() {
+    return mockRedis;
+  },
 }));
 
 import { TtlCache } from "../ttlCache";
@@ -70,7 +84,9 @@ describe("TtlCache", () => {
       await cache.set("key1", 1);
 
       expect(mockRedis.setex).toHaveBeenCalledWith(
-        expect.any(String), 45, expect.any(String)
+        expect.any(String),
+        45,
+        expect.any(String),
       );
     });
 
@@ -80,12 +96,17 @@ describe("TtlCache", () => {
       await cache.set("key1", 1);
 
       expect(mockRedis.setex).toHaveBeenCalledWith(
-        "my_prefix:key1", expect.any(Number), expect.any(String)
+        "my_prefix:key1",
+        expect.any(Number),
+        expect.any(String),
       );
     });
 
     it("serializes complex objects to JSON", async () => {
-      const cache = new TtlCache<{ name: string; count: number }>(30_000, "test:");
+      const cache = new TtlCache<{ name: string; count: number }>(
+        30_000,
+        "test:",
+      );
       const obj = { name: "test", count: 42 };
 
       await cache.set("obj1", obj);
@@ -120,7 +141,11 @@ describe("TtlCache", () => {
       await cache.claim("lock1", true);
 
       expect(mockRedis.set).toHaveBeenCalledWith(
-        "test:lock1", JSON.stringify(true), "EX", 60, "NX",
+        "test:lock1",
+        JSON.stringify(true),
+        "EX",
+        60,
+        "NX",
       );
     });
   });

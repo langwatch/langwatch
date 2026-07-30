@@ -22,12 +22,12 @@ import {
   countSpans,
   ingestBrowserTraces,
   type OtlpResourceSpans,
-  readCappedBody,
   RUM_GLOBAL_PER_MINUTE,
   RUM_PER_CALLER_PER_MINUTE,
   RumPayloadInvalidError,
   RumPayloadTooLargeError,
   RumRateLimitedError,
+  readCappedBody,
   stampIdentity,
 } from "../rum-ingest.service";
 
@@ -36,7 +36,10 @@ const attribute = (key: string, value: string) => ({
   value: { stringValue: value },
 });
 
-const exportWith = (spanCount: number, attributes = [attribute("service.name", RUM_SERVICE_NAME)]) =>
+const exportWith = (
+  spanCount: number,
+  attributes = [attribute("service.name", RUM_SERVICE_NAME)],
+) =>
   JSON.stringify({
     resourceSpans: [
       {
@@ -170,7 +173,10 @@ describe("given a browser posting telemetry", () => {
       let refusals = 0;
       for (let i = 0; i < attempts; i++) {
         try {
-          await ingestBrowserTraces({ body: exportWith(1), callerKey: "flood" });
+          await ingestBrowserTraces({
+            body: exportWith(1),
+            callerKey: "flood",
+          });
           accepted++;
         } catch (error) {
           if (error instanceof RumRateLimitedError) refusals++;
@@ -235,7 +241,10 @@ describe("given a browser posting telemetry", () => {
       ["not json at all", "<html>"],
       ["json with no resourceSpans", "{}"],
       ["an empty resourceSpans list", '{"resourceSpans":[]}'],
-      ["resourceSpans carrying no spans", '{"resourceSpans":[{"resource":{}}]}'],
+      [
+        "resourceSpans carrying no spans",
+        '{"resourceSpans":[{"resource":{}}]}',
+      ],
     ])("refuses %s", async (_case, body) => {
       await expect(
         ingestBrowserTraces({ body, callerKey: `invalid-${_case}` }),

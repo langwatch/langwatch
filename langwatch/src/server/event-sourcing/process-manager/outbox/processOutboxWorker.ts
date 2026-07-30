@@ -75,7 +75,7 @@ export class ProcessOutboxWorker {
 
   private triggerDrain(): void {
     if (!this.started) return;
-    if (this.inFlight) {
+    if (this.inFlight !== null) {
       // Do not overlap local drains, but do not lose a producer notification
       // that may describe work committed after the current lease query.
       this.drainRequested = true;

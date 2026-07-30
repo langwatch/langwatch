@@ -44,9 +44,7 @@ describe("createSyntheticErrorSpan()", () => {
       reason: "test",
     });
 
-    expect(span.spanContext().traceId).toBe(
-      "abcdef1234567890abcdef1234567890",
-    );
+    expect(span.spanContext().traceId).toBe("abcdef1234567890abcdef1234567890");
   });
 
   it("is an INTERNAL span kind", () => {

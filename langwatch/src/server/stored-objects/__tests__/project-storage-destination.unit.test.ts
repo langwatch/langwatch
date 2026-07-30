@@ -22,11 +22,11 @@ vi.mock("~/server/dataplane-s3", () => ({
   getS3ConfigForProject: vi.fn(),
 }));
 
+import { getS3ConfigForProject } from "~/server/dataplane-s3";
 import {
   AzureBackendMisconfiguredError,
   resolveProjectStorageDestination,
 } from "../project-storage-destination";
-import { getS3ConfigForProject } from "~/server/dataplane-s3";
 
 const mockGetS3ConfigForProject = vi.mocked(getS3ConfigForProject);
 
@@ -81,9 +81,9 @@ describe("resolveProjectStorageDestination", () => {
       await expect(
         resolveProjectStorageDestination("proj_1"),
       ).rejects.toBeInstanceOf(AzureBackendMisconfiguredError);
-      await expect(
-        resolveProjectStorageDestination("proj_1"),
-      ).rejects.toThrow(new RegExp(missingVariable));
+      await expect(resolveProjectStorageDestination("proj_1")).rejects.toThrow(
+        new RegExp(missingVariable),
+      );
     });
   });
 

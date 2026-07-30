@@ -1,8 +1,8 @@
-import { getModelMetadata } from "./registry";
 import type {
   CustomModelEntry,
   SupportedParameter,
 } from "./customModel.schema";
+import { getModelMetadata } from "./registry";
 
 type ProviderWithCustomModels = {
   customModels?: CustomModelEntry[] | null;

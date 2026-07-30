@@ -36,9 +36,9 @@ const contributionBaseSchema = z.object({
   sessionId: z.string().min(1),
   sessionKeySource: sessionKeySourceSchema,
   /**
-   * The detected agent (`claude_code`, `opencode`, `codex`, `gemini_cli`,
-   * `copilot`). Dispatchers gate on detection, so `unknown` never reaches a
-   * contribution.
+   * The detected agent (`claude_code`, `claude_cowork`, `opencode`, `codex`,
+   * `gemini_cli`, `copilot` — the ids in `../agents/`). Dispatchers gate on
+   * detection, so `unknown` never reaches a contribution.
    */
   agent: z.string().min(1),
   occurredAt: z.number().int().positive(),

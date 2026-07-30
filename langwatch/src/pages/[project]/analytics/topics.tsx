@@ -1,10 +1,4 @@
-import {
-  Card,
-  GridItem,
-  Heading,
-  HStack,
-  SimpleGrid,
-} from "@chakra-ui/react";
+import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import {
   CustomGraph,

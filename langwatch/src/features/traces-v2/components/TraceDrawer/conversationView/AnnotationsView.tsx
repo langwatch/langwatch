@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   Flex,
   HStack,
@@ -10,11 +9,11 @@ import {
 } from "@chakra-ui/react";
 import { Edit3, Lightbulb, MessageSquare } from "lucide-react";
 import { useMemo, useState } from "react";
+import { UserAvatar } from "~/components/UserAvatar";
 import {
   type AnnotationByTrace,
   useAnnotationsByTraceIds,
 } from "~/hooks/useAnnotationsByTraceIds";
-import { UserAvatar } from "~/components/UserAvatar";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { AnnotationPopover } from "./AnnotationPopover";

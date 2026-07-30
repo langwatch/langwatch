@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Box,
   Button,
@@ -8,18 +7,19 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
+  AlertTriangle,
   Bomb,
   FileQuestion,
-  AlertTriangle,
   PanelRight,
-  Square,
   Skull,
+  Square,
 } from "lucide-react";
+import { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import { Link } from "~/components/ui/link";
+import { DashboardLayout } from "~/components/DashboardLayout";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
-import { DashboardLayout } from "~/components/DashboardLayout";
+import { Link } from "~/components/ui/link";
 import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 
 function ThrowOnRender(): never {
@@ -36,11 +36,7 @@ function CrashableContent({ label }: { label: string }) {
   return (
     <VStack gap={3} padding={4}>
       <Text textStyle="sm">This is the {label} content.</Text>
-      <Button
-        size="sm"
-        colorPalette="red"
-        onClick={() => setShouldCrash(true)}
-      >
+      <Button size="sm" colorPalette="red" onClick={() => setShouldCrash(true)}>
         <Bomb size={14} />
         Crash it
       </Button>
@@ -48,11 +44,7 @@ function CrashableContent({ label }: { label: string }) {
   );
 }
 
-function InnerContent({
-  onCrashOuter,
-}: {
-  onCrashOuter: () => void;
-}) {
+function InnerContent({ onCrashOuter }: { onCrashOuter: () => void }) {
   const [shouldCrash, setShouldCrash] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -83,10 +75,7 @@ function InnerContent({
               borderColor="border"
             >
               <VStack gap={3}>
-                <AlertTriangle
-                  size={20}
-                  color="var(--chakra-colors-red-400)"
-                />
+                <AlertTriangle size={20} color="var(--chakra-colors-red-400)" />
                 <Text textStyle="sm" fontWeight="medium">
                   Crash page content (inner)
                 </Text>
@@ -113,10 +102,7 @@ function InnerContent({
               borderColor="border"
             >
               <VStack gap={3}>
-                <Skull
-                  size={20}
-                  color="var(--chakra-colors-red-600)"
-                />
+                <Skull size={20} color="var(--chakra-colors-red-600)" />
                 <Text textStyle="sm" fontWeight="medium">
                   Crash entire page (outer)
                 </Text>
@@ -144,10 +130,7 @@ function InnerContent({
               borderColor="border"
             >
               <VStack gap={3}>
-                <Square
-                  size={20}
-                  color="var(--chakra-colors-orange-400)"
-                />
+                <Square size={20} color="var(--chakra-colors-orange-400)" />
                 <Text textStyle="sm" fontWeight="medium">
                   Crash inside a Dialog
                 </Text>
@@ -173,10 +156,7 @@ function InnerContent({
               borderColor="border"
             >
               <VStack gap={3}>
-                <PanelRight
-                  size={20}
-                  color="var(--chakra-colors-blue-400)"
-                />
+                <PanelRight size={20} color="var(--chakra-colors-blue-400)" />
                 <Text textStyle="sm" fontWeight="medium">
                   Crash inside a Drawer
                 </Text>

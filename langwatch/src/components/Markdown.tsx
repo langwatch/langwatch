@@ -1,5 +1,5 @@
-import { createLogger } from "@langwatch/observability";
 import { chakra } from "@chakra-ui/react";
+import { createLogger } from "@langwatch/observability";
 import {
   Children,
   isValidElement,
@@ -9,11 +9,11 @@ import {
 } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useRouter } from "~/utils/compat/next-router";
-import { ConfirmDialog } from "./gateway/ConfirmDialog";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { RenderCode } from "./code/RenderCode";
 import { getProxiedImageUrl } from "./ExternalImage";
+import { ConfirmDialog } from "./gateway/ConfirmDialog";
 import { Link as UiLink } from "./ui/link";
 import { Prose } from "./ui/prose";
 

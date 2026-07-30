@@ -1,8 +1,8 @@
 export { translateFilterToClickHouse } from "./ast";
 export {
   FIELD_DEFS,
-  type KnownField,
   KNOWN_FIELDS,
+  type KnownField,
 } from "./build-handlers";
 export { evaluateQueryInMemory, queryNeeds } from "./evaluate";
 export {

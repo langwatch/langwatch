@@ -35,16 +35,28 @@ async function probe(secret: string) {
   const bundle = await materialiser.materialise(vk);
 
   console.log(`\n=== ${vk.name} (${vk.id}) ===`);
-  console.log(`  scopes:           ${vk.scopes.map((s) => `${s.scopeType}:${s.scopeId.slice(0, 10)}…`).join(", ") || "(none)"}`);
+  console.log(
+    `  scopes:           ${vk.scopes.map((s) => `${s.scopeType}:${s.scopeId.slice(0, 10)}…`).join(", ") || "(none)"}`,
+  );
   console.log(`  organizationId:   ${vk.organizationId}`);
-  console.log(`  routingPolicyId:  ${vk.routingPolicyId ?? "(none, falls back to deterministic order)"}`);
+  console.log(
+    `  routingPolicyId:  ${vk.routingPolicyId ?? "(none, falls back to deterministic order)"}`,
+  );
   console.log(`  principalUserId:  ${vk.principalUserId ?? "(null)"}`);
-  console.log(`  → eligible MPs:     ${eligibleMPs.map((m) => `${m.provider}(${m.id.slice(0, 8)}…)`).join(", ") || "(empty)"}`);
-  console.log(`  → traceProject:     ${traceProject ? `${traceProject.id} (apiKey=${traceProject.apiKey.slice(0, 12)}…)` : "null (no project_id on bundle)"}`);
+  console.log(
+    `  → eligible MPs:     ${eligibleMPs.map((m) => `${m.provider}(${m.id.slice(0, 8)}…)`).join(", ") || "(empty)"}`,
+  );
+  console.log(
+    `  → traceProject:     ${traceProject ? `${traceProject.id} (apiKey=${traceProject.apiKey.slice(0, 12)}…)` : "null (no project_id on bundle)"}`,
+  );
   console.log(`  → bundle.project_id:        ${bundle.project_id ?? "null"}`);
   console.log(`  → bundle.team_id:           ${bundle.team_id ?? "null"}`);
-  console.log(`  → bundle.providers[].type:  [${bundle.providers.map((p) => p.type).join(", ")}]`);
-  console.log(`  → bundle.fallback.chain:    [${bundle.fallback.chain.map((id) => id.slice(0, 8) + "…").join(", ")}]`);
+  console.log(
+    `  → bundle.providers[].type:  [${bundle.providers.map((p) => p.type).join(", ")}]`,
+  );
+  console.log(
+    `  → bundle.fallback.chain:    [${bundle.fallback.chain.map((id) => id.slice(0, 8) + "…").join(", ")}]`,
+  );
   console.log(`  → bundle.budgets.count:     ${bundle.budgets.length}`);
   console.log(`  → bundle.cache_rules.count: ${bundle.cache_rules.length}`);
 }

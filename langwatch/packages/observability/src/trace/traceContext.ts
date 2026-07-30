@@ -5,11 +5,7 @@
  * active OTEL context. Silently no-ops when no active OTEL context exists.
  */
 
-import {
-  context as otelContext,
-  propagation,
-  trace,
-} from "@opentelemetry/api";
+import { context as otelContext, propagation, trace } from "@opentelemetry/api";
 import { INVALID_TRACE_ID } from "../constants";
 
 interface InjectResult {

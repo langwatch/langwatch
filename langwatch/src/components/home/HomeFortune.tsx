@@ -82,9 +82,7 @@ export function HomeFortune() {
         <motion.div
           key={index}
           initial={
-            reduceMotion
-              ? false
-              : { opacity: 0, y: 6, filter: "blur(4px)" }
+            reduceMotion ? false : { opacity: 0, y: 6, filter: "blur(4px)" }
           }
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.35, ease: "easeOut" }}

@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
-import { z } from "zod";
+import { NotFoundError } from "@langwatch/handled-error";
+import { getCurrentContext } from "@langwatch/observability/context";
 import type { MiddlewareHandler } from "hono";
 import { generateSpecs } from "hono-openapi";
-import { getCurrentContext } from "@langwatch/observability/context";
-import { NotFoundError } from "@langwatch/handled-error";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { createService } from "../builder.js";
 

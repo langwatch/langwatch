@@ -67,10 +67,7 @@ export function useAnnotationsByTraceIds({
     ),
   );
 
-  const data = useMemo(
-    () => results.flatMap((r) => r.data ?? []),
-    [results],
-  );
+  const data = useMemo(() => results.flatMap((r) => r.data ?? []), [results]);
 
   return {
     data,

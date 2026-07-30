@@ -14,17 +14,15 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, it, expect, vi } from "vitest";
-import { createTenantId, type Command } from "../../../../";
+import { describe, expect, it, vi } from "vitest";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { type Command, createTenantId } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
-import {
-  RECORD_SPAN_COMMAND_TYPE,
-} from "../../schemas/constants";
+import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
 import {
   RecordSpanCommand,
   type RecordSpanCommandDependencies,
 } from "../recordSpanCommand";
-import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -168,8 +166,14 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
       const events = await handler.handle(command);
 
       // Spool was fetched once
-      expect((blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> }).getSpool).toHaveBeenCalledOnce();
-      expect((blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> }).getSpool).toHaveBeenCalledWith(SPOOL_REF);
+      expect(
+        (blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> })
+          .getSpool,
+      ).toHaveBeenCalledOnce();
+      expect(
+        (blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> })
+          .getSpool,
+      ).toHaveBeenCalledWith(SPOOL_REF);
 
       // Reconstituted span flows through — event data carries the full attributes
       expect(events).toHaveLength(1);
@@ -189,7 +193,10 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
 
       await handler.handle(command);
 
-      expect((blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> }).getSpool).not.toHaveBeenCalled();
+      expect(
+        (blobStore as unknown as { getSpool: ReturnType<typeof vi.fn> })
+          .getSpool,
+      ).not.toHaveBeenCalled();
     });
 
     it("does NOT call BlobStore.deleteSpool inside handle() — deletion is deferred to cleanupAfterStore()", async () => {
@@ -259,14 +266,16 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
 
       const deps = makeDeps();
       // Make PII redaction throw to simulate a processing failure before event construction
-      (deps.piiRedactionService.redactSpan as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("PII redaction failed"),
-      );
+      (
+        deps.piiRedactionService.redactSpan as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(new Error("PII redaction failed"));
 
       const handler = new RecordSpanCommand({ ...deps, blobStore });
       const command = makeOversizedCommand({ spoolRef: SPOOL_REF });
 
-      await expect(handler.handle(command)).rejects.toThrow("PII redaction failed");
+      await expect(handler.handle(command)).rejects.toThrow(
+        "PII redaction failed",
+      );
 
       // deleteSpool must NOT have been called
       expect(deleteSpoolMock).not.toHaveBeenCalled();
@@ -274,7 +283,9 @@ describe("given a RecordSpanCommand that carries a spoolRef (oversized path)", (
 
     it("propagates the error when BlobStore.getSpool throws", async () => {
       const blobStore = {
-        getSpool: vi.fn().mockRejectedValue(new Error("S3 GET failed: NoSuchKey")),
+        getSpool: vi
+          .fn()
+          .mockRejectedValue(new Error("S3 GET failed: NoSuchKey")),
         deleteSpool: vi.fn(),
       } as unknown as BlobStore;
 
@@ -393,14 +404,12 @@ describe("given a shared RecordSpanCommand instance processing two concurrent tr
     it("deletes each job's own spoolRef — not the other job's ref — pinning the race fix", async () => {
       const deleteSpoolMock = vi.fn().mockResolvedValue(undefined);
       const blobStore = {
-        getSpool: vi
-          .fn()
-          .mockImplementation(async (ref: string) => {
-            if (ref === SPOOL_REF_A) {
-              return Buffer.from(makeSpoolBody(TRACE_ID_A, SPAN_ID_A), "utf-8");
-            }
-            return Buffer.from(makeSpoolBody(TRACE_ID_B, SPAN_ID_B), "utf-8");
-          }),
+        getSpool: vi.fn().mockImplementation(async (ref: string) => {
+          if (ref === SPOOL_REF_A) {
+            return Buffer.from(makeSpoolBody(TRACE_ID_A, SPAN_ID_A), "utf-8");
+          }
+          return Buffer.from(makeSpoolBody(TRACE_ID_B, SPAN_ID_B), "utf-8");
+        }),
         deleteSpool: deleteSpoolMock,
       } as unknown as BlobStore;
 
@@ -475,7 +484,9 @@ describe("given a command carrying a spoolRef but a handler with no blobStore", 
 
       // No event must have been produced (verified via piiRedactionService not being called)
       expect(
-        depsWithoutBlobStore.piiRedactionService.redactSpan as ReturnType<typeof vi.fn>,
+        depsWithoutBlobStore.piiRedactionService.redactSpan as ReturnType<
+          typeof vi.fn
+        >,
       ).not.toHaveBeenCalled();
     });
   });

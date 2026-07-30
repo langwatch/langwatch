@@ -11,11 +11,14 @@ import {
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
-import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
+import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
+import { HandledErrorAlert } from "~/features/errors";
+import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
+import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useDrawerRunCallbacks } from "~/hooks/useDrawerRunCallbacks";
@@ -25,21 +28,22 @@ import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
-import { useRouter } from "~/utils/compat/next-router";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-import { formatCost, formatLatency } from "~/components/shared/formatters";
-import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { TraceDetails } from "../traces/TraceDetails";
-import { hasNoResults, shouldShowNoResponse } from "./scenario-run-status.utils";
-import { getRunStatePollInterval } from "./run-state-polling";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
 import { RunCriteriaChip } from "./RunCriteriaChip";
 import { RunDetailSection } from "./RunDetailSection";
+import { getRunStatePollInterval } from "./run-state-polling";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
+import {
+  hasNoResults,
+  shouldShowNoResponse,
+} from "./scenario-run-status.utils";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
 
 export interface ScenarioRunDetailDrawerProps {
@@ -57,7 +61,9 @@ export function ScenarioRunDetailDrawer({
   const params = useDrawerParams();
   const { project } = useOrganizationTeamProject();
   const [runModalOpen, setRunModalOpen] = useState(false);
-  const [traceDrawerTraceId, setTraceDrawerTraceId] = useState<string | null>(null);
+  const [traceDrawerTraceId, setTraceDrawerTraceId] = useState<string | null>(
+    null,
+  );
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
 
   const scenarioRunId = params.scenarioRunId;
@@ -79,19 +85,20 @@ export function ScenarioRunDetailDrawer({
     onStreamingEvent: handleStreamingEvent,
   });
 
-  const { data: scenarioState, error: runStateError } = api.scenarios.getRunState.useQuery(
-    {
-      scenarioRunId: scenarioRunId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id && !!scenarioRunId && !!open,
-      // Finished runs never change — stop polling entirely. Live runs poll
-      // fast only while the event stream is down.
-      refetchInterval: (data) =>
-        getRunStatePollInterval({ status: data?.status, sseConnected }),
-    },
-  );
+  const { data: scenarioState, error: runStateError } =
+    api.scenarios.getRunState.useQuery(
+      {
+        scenarioRunId: scenarioRunId ?? "",
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!project?.id && !!scenarioRunId && !!open,
+        // Finished runs never change — stop polling entirely. Live runs poll
+        // fast only while the event stream is down.
+        refetchInterval: (data) =>
+          getRunStatePollInterval({ status: data?.status, sseConnected }),
+      },
+    );
 
   // Clear streaming messages once server data includes them
   useEffect(() => {
@@ -267,13 +274,24 @@ export function ScenarioRunDetailDrawer({
                   <VStack gap={2} align="start" w="100%" pt={4}>
                     <Drawer.CloseTrigger />
                     <Heading size="md">Run details not available yet</Heading>
-                    <Text color="fg.muted" fontSize="sm">This run may be queued, in progress, or recently cancelled. Details will appear once available.</Text>
+                    <Text color="fg.muted" fontSize="sm">
+                      This run may be queued, in progress, or recently
+                      cancelled. Details will appear once available.
+                    </Text>
                   </VStack>
                 ) : (
+                  // The alert is the whole error surface here: it reads the
+                  // handled payload, an authored non-5xx message, or the
+                  // generic unknown state, and carries the tips, docs link and
+                  // copyable error id with it.
                   <VStack gap={2} align="start" w="100%" pt={4}>
                     <Drawer.CloseTrigger />
-                    <Heading size="md" color="red.500">Failed to load run</Heading>
-                    <Text color="fg.muted" fontSize="sm">{runStateError.message}</Text>
+                    <Box width="100%">
+                      <HandledErrorAlert
+                        error={runStateError}
+                        fallbackTitle="Failed to load run"
+                      />
+                    </Box>
                   </VStack>
                 )
               ) : (
@@ -286,15 +304,15 @@ export function ScenarioRunDetailDrawer({
             </Drawer.Body>
           )}
           {scenarioState && (
-              <Drawer.Body
-                paddingY={0}
-                paddingX={0}
-                overflowY="auto"
-                display="flex"
-                flexDirection="column"
-                width="full"
-                bg={{ base: "bg.surface", _dark: "bg.panel" }}
-              >
+            <Drawer.Body
+              paddingY={0}
+              paddingX={0}
+              overflowY="auto"
+              display="flex"
+              flexDirection="column"
+              width="full"
+              bg={{ base: "bg.surface", _dark: "bg.panel" }}
+            >
               {/* Sticky header — inside scroll container for correct sticky
                   behavior. Translucent fill + backdrop blur matches the
                   Traces V2 drawer header band. */}
@@ -501,7 +519,7 @@ export function ScenarioRunDetailDrawer({
                   </Box>
                 </RunDetailSection>
               </Accordion.Root>
-              </Drawer.Body>
+            </Drawer.Body>
           )}
         </Drawer.Content>
       </Drawer.Root>

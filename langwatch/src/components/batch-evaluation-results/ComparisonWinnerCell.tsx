@@ -97,7 +97,11 @@ export function ComparisonWinnerCell({
 
   if (!verdict) {
     return (
-      <Text fontSize="13px" color="fg.subtle" data-testid="comparison-winner-none">
+      <Text
+        fontSize="13px"
+        color="fg.subtle"
+        data-testid="comparison-winner-none"
+      >
         -
       </Text>
     );

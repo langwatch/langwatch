@@ -1,6 +1,6 @@
 import { Alert, Button, CloseButton, HStack, Text } from "@chakra-ui/react";
-import { useLocalStorage } from "usehooks-ts";
 import { LuArrowRight } from "react-icons/lu";
+import { useLocalStorage } from "usehooks-ts";
 
 export type Announcement = {
   /** Unique key used for localStorage dismiss state */
@@ -17,8 +17,7 @@ const announcements: Announcement[] = [
     id: "litellm-vulnerability-2026-03",
     message:
       "Your data is safe — LangWatch was not affected by the recent LiteLLM vulnerability.",
-    linkUrl:
-      "https://langwatch.ai/blog/a-note-on-the-litellm-vulnerability",
+    linkUrl: "https://langwatch.ai/blog/a-note-on-the-litellm-vulnerability",
     linkLabel: "Read our full statement",
     expiresAt: new Date("2026-03-27T00:00:00Z"),
   },
@@ -50,12 +49,7 @@ function AnnouncementItem({ announcement }: { announcement: Announcement }) {
       <Alert.Content>
         <HStack width="full">
           <Text>{announcement.message}</Text>
-          <Button
-            size="xs"
-            variant="outline"
-            colorPalette="blue"
-            asChild
-          >
+          <Button size="xs" variant="outline" colorPalette="blue" asChild>
             <a
               href={announcement.linkUrl}
               target="_blank"

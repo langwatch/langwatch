@@ -42,9 +42,9 @@ describe("langyChoicesTimeline", () => {
         { kind: "question", blockId: "q1" },
       ]);
       // Its own prose never supersedes its own question.
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q1", timeline }),
-      ).toEqual({ status: "open" });
+      expect(deriveLangyChoicesLockState({ blockId: "q1", timeline })).toEqual({
+        status: "open",
+      });
     });
   });
 
@@ -64,9 +64,10 @@ describe("langyChoicesTimeline", () => {
         { kind: "question", blockId: "q1" },
         { kind: "selection", blockId: "q1", optionIds: ["a"] },
       ]);
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q1", timeline }),
-      ).toEqual({ status: "answered", optionIds: ["a"] });
+      expect(deriveLangyChoicesLockState({ blockId: "q1", timeline })).toEqual({
+        status: "answered",
+        optionIds: ["a"],
+      });
     });
   });
 
@@ -76,9 +77,9 @@ describe("langyChoicesTimeline", () => {
         { role: "assistant", parts: [questionPart("q1")] },
         userText("actually, forget that"),
       ]);
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q1", timeline }),
-      ).toEqual({ status: "superseded" });
+      expect(deriveLangyChoicesLockState({ blockId: "q1", timeline })).toEqual({
+        status: "superseded",
+      });
     });
   });
 
@@ -89,12 +90,13 @@ describe("langyChoicesTimeline", () => {
         { role: "assistant", parts: [questionPart("q2")] },
         { role: "user", parts: [selectionPart("q2", ["a"])] },
       ]);
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q2", timeline }),
-      ).toEqual({ status: "answered", optionIds: ["a"] });
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q1", timeline }),
-      ).toEqual({ status: "superseded" });
+      expect(deriveLangyChoicesLockState({ blockId: "q2", timeline })).toEqual({
+        status: "answered",
+        optionIds: ["a"],
+      });
+      expect(deriveLangyChoicesLockState({ blockId: "q1", timeline })).toEqual({
+        status: "superseded",
+      });
     });
   });
 
@@ -108,9 +110,9 @@ describe("langyChoicesTimeline", () => {
         },
       ]);
       expect(timeline[1]).toEqual({ kind: "message" });
-      expect(
-        deriveLangyChoicesLockState({ blockId: "q1", timeline }),
-      ).toEqual({ status: "superseded" });
+      expect(deriveLangyChoicesLockState({ blockId: "q1", timeline })).toEqual({
+        status: "superseded",
+      });
     });
   });
 });

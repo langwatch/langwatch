@@ -9,7 +9,7 @@
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
  */
-import { validator as zValidator } from "~/server/api/validation";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
@@ -24,6 +24,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -32,6 +33,11 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import {
+  ExperimentNotFoundError,
+  InvalidExperimentConfigurationError,
+  RunNotFoundError,
+} from "~/server/experiments/errors";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
@@ -40,9 +46,9 @@ import {
   requestAbort,
   runOrchestrator,
 } from "~/server/experiments-v3/execution/orchestrator";
+import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
 import {
-  type EvaluationV3Event,
   type ExecutionScope,
   executionRequestSchema,
   runInputsBodySchema,
@@ -52,17 +58,30 @@ import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
-import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:experiments-v3");
 
 const secured = createServiceApp({ basePath: "/api/experiments" });
-const sessionAuth = handlerManagedAuth(
-  "user session validated in-handler via getServerAuthSession",
-);
-const apiKeyAuth = handlerManagedAuth(
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
-);
+const sessionAuth = handlerManagedAuth({
+  reason: "user session validated in-handler via getServerAuthSession",
+  permissions: ["evaluations:manage"],
+  credential: "session",
+});
+// The read endpoints (runs list / status / results) and the run endpoint gate
+// on different grains, so they declare separately: a single shared policy
+// would report the coarser of the two for routes that only read.
+const apiKeyAuthRead = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["evaluations:view"],
+  credential: "apiKey",
+});
+const apiKeyAuthRun = handlerManagedAuth({
+  reason:
+    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+  permissions: ["evaluations:create"],
+  credential: "apiKey",
+});
 
 // Backward-compat aliases: redirect old /api/evaluations/v3/... paths to new /api/experiments/...
 // Python SDK still calls the old routes until it is updated in a follow-up.
@@ -111,7 +130,14 @@ const authenticateRequest = async (
     await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+    // `body` carries the full handled payload (code, permission, tips) for
+    // routes that answer with it; `error` stays the sentence for the ones that
+    // still render `{ error }`.
+    return {
+      error: denial.message,
+      status: denial.status,
+      body: denial.body,
+    };
   }
 
   const markUsed = () => {
@@ -269,11 +295,17 @@ secured
         logger.error({ error, projectId }, "Orchestrator error");
         captureException(toError(error), { extra: { projectId } });
 
+        // Through the same mapper the orchestrator uses: a handled error
+        // travels as its code plus `domainError` (so the client renders
+        // registry copy), and anything else becomes a fixed generic string.
+        // Writing `(error as Error).message` here put a Prisma string or a Go
+        // net error straight into the customer's cell — these two frames were
+        // the only producers the coded-error work didn't cover.
+        //
+        // No `rowIndex`: the orchestrator itself threw, so the whole run is
+        // gone and the mapper says so, rather than blaming one row.
         await stream.writeSSE({
-          data: JSON.stringify({
-            type: "error",
-            message: (error as Error).message,
-          }),
+          data: JSON.stringify(mapThrownErrorEvent({ error })),
         });
       }
     });
@@ -335,7 +367,7 @@ secured.access(sessionAuth).post("/abort", async (c) => {
     (await abortManager.getRunningProjectId(runId)) ??
     (await runStateManager.getRunState(runId))?.projectId;
   if (!ownerProjectId || ownerProjectId !== projectId) {
-    return c.json({ error: "Run not found" }, { status: 404 });
+    throw new RunNotFoundError(runId);
   }
 
   logger.info({ projectId, runId }, "Requesting abort");
@@ -348,12 +380,24 @@ secured.access(sessionAuth).post("/abort", async (c) => {
 
 // ── POST /:slug/run  (CI/CD execution) ──────────────────────────────
 
-secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
+secured.access(apiKeyAuthRun).post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
-  const authResult = await authenticateRequest(c, "evaluations:manage");
+  // Starting a run CREATES a run row against an experiment that already
+  // exists; it does not administer the evaluations family. Asking for
+  // `:manage` here refused every least-privilege key that legitimately holds
+  // the create — the Langy session key among them, which stops short of
+  // `:manage` precisely because `:manage` implies the delete. `:manage` still
+  // satisfies `:create` through `hasPermissionWithHierarchy`, so narrowing the
+  // grain takes access away from nobody.
+  const authResult = await authenticateRequest(c, "evaluations:create");
   if ("error" in authResult) {
-    return c.json({ error: authResult.error }, { status: authResult.status });
+    // `authResult.body` carries the handled payload (code, permission, tips)
+    // when the denial came from a handled error; `{ error }` is the fallback
+    // for the failures that have none.
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
   }
   const { project, markUsed } = authResult;
 
@@ -364,7 +408,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   });
 
   if (!experiment) {
-    return c.json({ error: "Experiment not found" }, { status: 404 });
+    throw new ExperimentNotFoundError(slug);
   }
 
   const parseResult = persistedEvaluationsV3StateSchema.safeParse(
@@ -375,10 +419,10 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
       { slug, errors: parseResult.error.errors },
       "Invalid workbenchState",
     );
-    return c.json(
-      { error: "Invalid experiment configuration" },
-      { status: 400 },
-    );
+    // The stored workbench state no longer matches its schema. The customer
+    // did not type this and cannot repair it from the API, so it is ours:
+    // `fault: "platform"` keeps it out of the customer-error noise.
+    throw new InvalidExperimentConfigurationError(slug);
   }
 
   const workbenchState = parseResult.data;
@@ -487,11 +531,17 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
           extra: { projectId: project.id, slug },
         });
 
+        // Through the same mapper the orchestrator uses: a handled error
+        // travels as its code plus `domainError` (so the client renders
+        // registry copy), and anything else becomes a fixed generic string.
+        // Writing `(error as Error).message` here put a Prisma string or a Go
+        // net error straight into the customer's cell — these two frames were
+        // the only producers the coded-error work didn't cover.
+        //
+        // No `rowIndex`: the orchestrator itself threw, so the whole run is
+        // gone and the mapper says so, rather than blaming one row.
         await stream.writeSSE({
-          data: JSON.stringify({
-            type: "error",
-            message: (error as Error).message,
-          }),
+          data: JSON.stringify(mapThrownErrorEvent({ error })),
         });
       }
     });
@@ -517,10 +567,15 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
 // ── GET /runs?experimentSlug=... (list runs for an experiment) ──────
 
-secured.access(apiKeyAuth).get("/runs", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs", async (c) => {
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
-    return c.json({ error: authResult.error }, { status: authResult.status });
+    // `authResult.body` carries the handled payload (code, permission, tips)
+    // when the denial came from a handled error; `{ error }` is the fallback
+    // for the failures that have none.
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
   }
   const { project } = authResult;
 
@@ -556,7 +611,7 @@ secured.access(apiKeyAuth).get("/runs", async (c) => {
     });
 
   if (!experiment) {
-    return c.json({ error: "Experiment not found" }, { status: 404 });
+    throw new ExperimentNotFoundError(experimentSlug);
   }
 
   const offset = (page - 1) * pageSize;
@@ -577,23 +632,31 @@ secured.access(apiKeyAuth).get("/runs", async (c) => {
 
 // ── GET /runs/:runId (poll run status) ───────────────────────────────
 
-secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs/:runId", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
-    return c.json({ error: authResult.error }, { status: authResult.status });
+    // `authResult.body` carries the handled payload (code, permission, tips)
+    // when the denial came from a handled error; `{ error }` is the fallback
+    // for the failures that have none.
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
   }
   const { project, markUsed } = authResult;
 
   const runState = await runStateManager.getRunState(runId);
 
+  // All three not-found branches raise the SAME code. From outside they are one
+  // answer — this run is not yours to read — and telling a caller which of them
+  // it was would confirm that the id exists in another project.
   if (!runState) {
-    return c.json({ error: "Run not found" }, { status: 404 });
+    throw new RunNotFoundError(runId);
   }
 
   if (runState.projectId !== project.id) {
-    return c.json({ error: "Run not found" }, { status: 404 });
+    throw new RunNotFoundError(runId);
   }
 
   // Same archive guard as /runs/:runId/results: a run whose owning
@@ -606,7 +669,7 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
       id: runState.experimentId,
     });
     if (!stillLive) {
-      return c.json({ error: "Run not found" }, { status: 404 });
+      throw new RunNotFoundError(runId);
     }
   }
 
@@ -643,7 +706,13 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
       total: runState.total,
       startedAt: runState.startedAt,
       finishedAt: runState.finishedAt,
+      // The code, never the thrown message — an API consumer gets the same
+      // contract the stream gives a browser: something stable to branch on,
+      // plus the handled payload when the failure had one, plus the trace id
+      // for the failures we could not name (ADR-045).
       error: runState.error,
+      ...(runState.domainError ? { domainError: runState.domainError } : {}),
+      ...(runState.traceId ? { traceId: runState.traceId } : {}),
     });
   }
 
@@ -659,12 +728,17 @@ secured.access(apiKeyAuth).get("/runs/:runId", async (c) => {
 });
 
 // ── GET /runs/:runId/results (full per-row results from ClickHouse) ──
-secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
+secured.access(apiKeyAuthRead).get("/runs/:runId/results", async (c) => {
   const { runId } = c.req.param();
 
   const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
-    return c.json({ error: authResult.error }, { status: authResult.status });
+    // `authResult.body` carries the handled payload (code, permission, tips)
+    // when the denial came from a handled error; `{ error }` is the fallback
+    // for the failures that have none.
+    return c.json(authResult.body ?? { error: authResult.error }, {
+      status: authResult.status,
+    });
   }
   const { project, markUsed } = authResult;
 
@@ -715,13 +789,10 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
   }
 
   if (!experimentId) {
-    return c.json(
-      {
-        error:
-          "Run not found. Pass ?experimentSlug=<slug> if the run is older than 24h.",
-      },
-      { status: 404 },
-    );
+    // The remediation that used to be spelled out here — pass ?experimentSlug
+    // for a run older than the status cache — is the registry's copy for this
+    // code now, so every surface says it the same way.
+    throw new RunNotFoundError(runId);
   }
 
   try {
@@ -733,20 +804,20 @@ secured.access(apiKeyAuth).get("/runs/:runId/results", async (c) => {
     });
 
     if (!run) {
-      return c.json(
-        { error: "Run not found or results not yet available" },
-        { status: 404 },
-      );
+      throw new RunNotFoundError(runId);
     }
 
     markUsed();
     return c.json(run);
   } catch (error) {
+    // Only a genuine miss is a 404. This used to answer EVERY failure with
+    // "Run not found or results not yet available", so a ClickHouse outage
+    // told the caller their run did not exist — a wrong answer served with a
+    // status code that invites them to stop asking. Anything we cannot name
+    // goes up to the boundary, where it becomes a 500 and a trace id (ADR-045).
+    if (HandledError.isHandled(error)) throw error;
     logger.error({ error, runId }, "Failed to fetch run results");
-    return c.json(
-      { error: "Run not found or results not yet available" },
-      { status: 404 },
-    );
+    throw error;
   }
 });
 

@@ -281,7 +281,25 @@ function translateFreeText(
   validateValueLength(value);
   const paramName = nextParam(ctx, "freeText");
   ctx.params[paramName] = `%${value}%`;
+  const p = `{${paramName}:String}`;
 
-  const clause = `(ComputedInput ILIKE {${paramName}:String} OR ComputedOutput ILIKE {${paramName}:String})`;
+  // Span names are part of free text, not just the captured I/O: the name is
+  // often the only place a tool or agent identifier appears, so a query like
+  // `codex` has to reach it. `TraceName` covers the root span's name straight
+  // off `trace_summaries`; the subquery covers every other span via
+  // `stored_spans.SpanName` (backed by `idx_span_name`).
+  //
+  // `TraceName` is `String DEFAULT ''`, so the `ifNull` wrapper is belt-and-
+  // braces rather than load-bearing; it matches how `meta-handlers.ts` already
+  // reads the column. What matters is that both name branches evaluate to a
+  // definite true/false, never a NULL, so the clause's three-valued logic when a
+  // computed I/O column is NULL stays exactly as it was. The parity suite pins
+  // that. The span subquery is tenant-scoped and time-bounded by
+  // `boundedSubquery`.
+  const clause = `(ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ifNull(TraceName, '') ILIKE ${p} OR ${boundedSubquery(
+    "stored_spans",
+    "StartTime",
+    `SpanName ILIKE ${p}`,
+  )})`;
   return negated ? `NOT ${clause}` : clause;
 }

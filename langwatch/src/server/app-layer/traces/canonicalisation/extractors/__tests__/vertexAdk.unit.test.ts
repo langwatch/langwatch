@@ -267,9 +267,9 @@ describe("VertexAdkExtractor", () => {
 
         extractor.apply(ctx);
 
-        expect(
-          ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
-        ).toBe(2100);
+        expect(ctx.out[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]).toBe(
+          2100,
+        );
       });
     });
 
@@ -441,9 +441,7 @@ describe("VertexAdkExtractor", () => {
         expect(ctx.bag.attrs.has("gcp.vertex.agent.tool_call_args")).toBe(
           false,
         );
-        expect(ctx.bag.attrs.has("gcp.vertex.agent.tool_response")).toBe(
-          false,
-        );
+        expect(ctx.bag.attrs.has("gcp.vertex.agent.tool_response")).toBe(false);
         expect(ctx.bag.attrs.has("gcp.vertex.agent.llm_request")).toBe(false);
         expect(ctx.bag.attrs.has("gcp.vertex.agent.llm_response")).toBe(false);
       });

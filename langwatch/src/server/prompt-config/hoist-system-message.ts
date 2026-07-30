@@ -24,7 +24,9 @@ export function hoistSystemMessage(source: {
   );
 
   return {
-    prompt: systemMessage ? systemMessage.content : (source.prompt ?? undefined),
+    prompt: systemMessage
+      ? systemMessage.content
+      : (source.prompt ?? undefined),
     messages: nonSystemMessages?.length ? nonSystemMessages : undefined,
   };
 }

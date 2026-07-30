@@ -1,8 +1,8 @@
+import type { Logger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import type { Cluster, Redis } from "ioredis";
-import { type ProcessRole, roleRunsWorkers } from "../config";
-import type { Logger } from "@langwatch/observability";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { type ProcessRole, roleRunsWorkers } from "../config";
 import { computeCatchUp, computeNextRunAt } from "./nextRunAt";
 import type { SchedulerRegistry } from "./scheduler.registry";
 import type {
@@ -249,7 +249,7 @@ export class SchedulerService {
       }
     }
 
-    if (this.loopPromise) {
+    if (this.loopPromise !== null) {
       const settled = await Promise.race([
         this.loopPromise.then(() => true),
         new Promise<false>((resolve) =>

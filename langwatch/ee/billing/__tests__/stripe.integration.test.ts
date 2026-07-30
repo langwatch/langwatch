@@ -1,8 +1,11 @@
 import Stripe from "stripe";
 import { afterAll, describe, expect, it } from "vitest";
-import { STRIPE_PRICE_NAMES } from "../stripe/stripePrices.types";
-import { getItemsToUpdate, prices } from "../services/subscriptionItemCalculator";
 import { PlanTypes } from "../planTypes";
+import {
+  getItemsToUpdate,
+  prices,
+} from "../services/subscriptionItemCalculator";
+import { STRIPE_PRICE_NAMES } from "../stripe/stripePrices.types";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
@@ -72,9 +75,7 @@ describeIfStripeKey("Stripe billing integration", () => {
       const customer = await createTrackedCustomer("crud");
 
       expect(customer.id).toMatch(/^cus_/);
-      expect(customer.email).toBe(
-        "integration-test-crud@langwatch.test",
-      );
+      expect(customer.email).toBe("integration-test-crud@langwatch.test");
       expect(customer.name).toBe("Integration Test crud");
     });
 
@@ -146,8 +147,7 @@ describeIfStripeKey("Stripe billing integration", () => {
     });
 
     it("retrieves the subscription and verifies data", async () => {
-      const subscription =
-        await stripe.subscriptions.retrieve(subscriptionId);
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
       expect(subscription.id).toBe(subscriptionId);
       expect(subscription.customer).toBe(customerId);
@@ -178,8 +178,7 @@ describeIfStripeKey("Stripe billing integration", () => {
     });
 
     it("switches from LAUNCH to ACCELERATE plan", async () => {
-      const current =
-        await stripe.subscriptions.retrieve(subscriptionId);
+      const current = await stripe.subscriptions.retrieve(subscriptionId);
       const currentItems = current.items.data;
 
       // Delete all current items and add ACCELERATE base
@@ -199,8 +198,7 @@ describeIfStripeKey("Stripe billing integration", () => {
     });
 
     it("cancels the subscription", async () => {
-      const cancelled =
-        await stripe.subscriptions.cancel(subscriptionId);
+      const cancelled = await stripe.subscriptions.cancel(subscriptionId);
 
       expect(cancelled.status).toBe("canceled");
       // Remove from cleanup since already cancelled

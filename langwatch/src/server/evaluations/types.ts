@@ -1,10 +1,10 @@
 import { z } from "zod";
+import { filterFieldsEnum } from "../filters/types";
 import type {
   EvaluationResult,
   EvaluationResultError,
   EvaluationResultSkipped,
 } from "./evaluators.generated";
-import { filterFieldsEnum } from "../filters/types";
 
 // ---------------------------------------------------------------------------
 // Precondition schemas (Zod-first, types inferred)

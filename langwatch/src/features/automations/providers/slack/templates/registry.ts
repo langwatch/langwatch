@@ -1,5 +1,5 @@
-import type { ComponentType } from "react";
 import type { GatedBlockType } from "@langwatch/automations/templating/blockKitAllowlist";
+import type { ComponentType } from "react";
 import digestCompactSource from "./digest_compact.liquid?raw";
 import digestEvaluatorRollupSource from "./digest_evaluator_rollup.liquid?raw";
 import digestInlineRichSource from "./digest_inline_rich.liquid?raw";
@@ -122,7 +122,8 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "trace_alert_compact",
     displayName: "Compact alert",
     emoji: "🔔",
-    tagline: "Header and evaluation, then the trace's input and output as quoted text.",
+    tagline:
+      "Header and evaluation, then the trace's input and output as quoted text.",
     deliveryNote: "1 message per trace",
     cadenceFit: "immediate",
     kind: "trace",
@@ -259,8 +260,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "graph_alert_one_liner",
     displayName: "One-liner",
     emoji: "⚡",
-    tagline:
-      "A single line: severity, metric, threshold, current value, link.",
+    tagline: "A single line: severity, metric, threshold, current value, link.",
     deliveryNote: "1 message per alert",
     cadenceFit: "immediate",
     kind: "graphAlert",
@@ -310,8 +310,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     id: "report_table",
     displayName: "Table of traces",
     emoji: "🧮",
-    tagline:
-      "Every matching trace as a row: input, model, cost, and duration.",
+    tagline: "Every matching trace as a row: input, model, cost, and duration.",
     deliveryNote: "1 message per report",
     cadenceFit: "both",
     kind: "report",

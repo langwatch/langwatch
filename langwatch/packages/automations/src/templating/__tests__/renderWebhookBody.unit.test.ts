@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ALERT_TRIGGER_DEFAULTS,
-  REPORT_TRIGGER_DEFAULTS,
-} from "../defaults";
+import { ALERT_TRIGGER_DEFAULTS, REPORT_TRIGGER_DEFAULTS } from "../defaults";
 import { renderWebhookBody } from "../renderWebhookBody";
 import {
   buildExampleReportTemplateContext,
@@ -107,7 +104,8 @@ describe("renderWebhookBody", () => {
   describe("when a custom template is provided", () => {
     it("renders it against the context", async () => {
       const rendered = await renderWebhookBody({
-        template: '{ "name": {{ trigger.name | json }}, "n": {{ digest.count }} }',
+        template:
+          '{ "name": {{ trigger.name | json }}, "n": {{ digest.count }} }',
         context: makeContext(),
       });
       expect(rendered.usedDefault).toBe(false);

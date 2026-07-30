@@ -1,9 +1,9 @@
 import {
   foldLangyConversationTurn,
   initLangyConversationTurnState,
-  makeConversationTurnKey,
   LANGY_CONVERSATION_PROJECTION_VERSIONS,
   type LangyConversationTurnData,
+  makeConversationTurnKey,
 } from "@langwatch/langy";
 import type { Projection } from "../../../";
 import {
@@ -12,18 +12,18 @@ import {
 } from "../../../projections/abstractFoldProjection";
 import type { StateProjectionStore } from "../../../projections/stateProjection.types";
 import type {
+  LangyAgentRespondedEvent,
   LangyAgentResponseFailedEvent,
   LangyAgentTurnAcceptedEvent,
-  LangyAgentRespondedEvent,
   LangyPlanUpdatedEvent,
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
 } from "../schemas/events";
 import {
+  LangyAgentRespondedEventSchema,
   LangyAgentResponseFailedEventSchema,
   LangyAgentTurnAcceptedEventSchema,
-  LangyAgentRespondedEventSchema,
   LangyPlanUpdatedEventSchema,
   LangyToolCallFailedEventSchema,
   LangyToolCallInitiatedEventSchema,

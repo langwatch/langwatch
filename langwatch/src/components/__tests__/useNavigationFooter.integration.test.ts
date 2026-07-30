@@ -9,8 +9,8 @@
  *
  * @see specs/traces/pagination-controls.feature
  */
-import { renderHook, act } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPush = vi.fn();
 
@@ -32,67 +32,67 @@ describe("useMessagesNavigationFooter()", () => {
     });
 
     describe("when navigating to the next page", () => {
-    it("preserves the project slug in the query for dynamic route resolution", () => {
-      const { result } = renderHook(() => useMessagesNavigationFooter());
+      it("preserves the project slug in the query for dynamic route resolution", () => {
+        const { result } = renderHook(() => useMessagesNavigationFooter());
 
-      act(() => {
-        result.current.nextPage();
+        act(() => {
+          result.current.nextPage();
+        });
+
+        expect(mockPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({ project: "my-project" }),
+          }),
+          undefined,
+          expect.any(Object),
+        );
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({ project: "my-project" }),
-        }),
-        undefined,
-        expect.any(Object),
-      );
+      it("sets pageOffset to current offset plus page size", () => {
+        const { result } = renderHook(() => useMessagesNavigationFooter());
+
+        act(() => {
+          result.current.nextPage();
+        });
+
+        expect(mockPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({ pageOffset: "25" }),
+          }),
+          undefined,
+          expect.any(Object),
+        );
+      });
     });
 
-    it("sets pageOffset to current offset plus page size", () => {
-      const { result } = renderHook(() => useMessagesNavigationFooter());
+    describe("when changing page size", () => {
+      it("preserves the project slug in the query", () => {
+        const { result } = renderHook(() => useMessagesNavigationFooter());
 
-      act(() => {
-        result.current.nextPage();
+        act(() => {
+          result.current.changePageSize(50);
+        });
+
+        expect(mockPush).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({ project: "my-project" }),
+          }),
+          undefined,
+          expect.any(Object),
+        );
       });
 
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({ pageOffset: "25" }),
-        }),
-        undefined,
-        expect.any(Object),
-      );
-    });
-  });
+      it("resets pageOffset to 0 and sets new page size", () => {
+        const { result } = renderHook(() => useMessagesNavigationFooter());
 
-  describe("when changing page size", () => {
-    it("preserves the project slug in the query", () => {
-      const { result } = renderHook(() => useMessagesNavigationFooter());
+        act(() => {
+          result.current.changePageSize(50);
+        });
 
-      act(() => {
-        result.current.changePageSize(50);
+        const query = mockPush.mock.calls[0]![0].query;
+        expect(query.pageOffset).toBeUndefined();
+        expect(query.pageSize).toBe("50");
       });
-
-      expect(mockPush).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: expect.objectContaining({ project: "my-project" }),
-        }),
-        undefined,
-        expect.any(Object),
-      );
     });
-
-    it("resets pageOffset to 0 and sets new page size", () => {
-      const { result } = renderHook(() => useMessagesNavigationFooter());
-
-      act(() => {
-        result.current.changePageSize(50);
-      });
-
-      const query = mockPush.mock.calls[0]![0].query;
-      expect(query.pageOffset).toBeUndefined();
-      expect(query.pageSize).toBe("50");
-    });
-  });
   });
 });

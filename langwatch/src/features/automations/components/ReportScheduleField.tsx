@@ -15,8 +15,8 @@ import {
   DEFAULT_PARTS,
   defaultTimezone,
   describeCron,
-  type Frequency,
   FREQUENCY_LABELS,
+  type Frequency,
   groupTimezones,
   ordinal,
   partsFromCron,
@@ -54,14 +54,9 @@ export function ReportScheduleField({
 }) {
   // A cron we can't map to the friendly picker opens Advanced so the value is
   // still editable rather than clobbered by the defaults.
-  const [advanced, setAdvanced] = useState(
-    () => partsFromCron(cron) === null,
-  );
+  const [advanced, setAdvanced] = useState(() => partsFromCron(cron) === null);
 
-  const parts = useMemo(
-    () => partsFromCron(cron) ?? DEFAULT_PARTS,
-    [cron],
-  );
+  const parts = useMemo(() => partsFromCron(cron) ?? DEFAULT_PARTS, [cron]);
 
   const zones = useMemo(() => supportedTimezones(), []);
   const groups = useMemo(() => groupTimezones(zones), [zones]);

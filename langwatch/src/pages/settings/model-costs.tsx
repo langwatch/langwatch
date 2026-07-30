@@ -1,4 +1,3 @@
-import { VStack } from "@chakra-ui/react";
 import SettingsLayout from "../../components/SettingsLayout";
 import { LLMModelCost } from "../../components/settings/LLMModelCost";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

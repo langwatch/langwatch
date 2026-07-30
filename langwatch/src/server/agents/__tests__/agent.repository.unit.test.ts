@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { AgentRepository } from "../agent.repository";
 import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { AgentRepository } from "../agent.repository";
 
 function makeMockPrisma(findFirstResult: unknown = null) {
   return {
@@ -17,7 +17,10 @@ describe("AgentRepository", () => {
         const prisma = makeMockPrisma({ id: "agent_1" });
         const repository = new AgentRepository(prisma);
 
-        const result = await repository.exists({ id: "agent_1", projectId: "proj_1" });
+        const result = await repository.exists({
+          id: "agent_1",
+          projectId: "proj_1",
+        });
 
         expect(result).toBe(true);
       });
@@ -40,7 +43,10 @@ describe("AgentRepository", () => {
         const prisma = makeMockPrisma(null);
         const repository = new AgentRepository(prisma);
 
-        const result = await repository.exists({ id: "agent_missing", projectId: "proj_1" });
+        const result = await repository.exists({
+          id: "agent_missing",
+          projectId: "proj_1",
+        });
 
         expect(result).toBe(false);
       });

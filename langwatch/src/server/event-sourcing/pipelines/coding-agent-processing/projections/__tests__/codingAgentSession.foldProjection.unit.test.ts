@@ -55,6 +55,7 @@ function spanFactsEvent({
   startMs = 1_000,
   endMs = 2_000,
   statusCode = 0,
+  agent = "claude_code",
 }: {
   name: string;
   spanId: string;
@@ -63,6 +64,7 @@ function spanFactsEvent({
   startMs?: number;
   endMs?: number;
   statusCode?: number;
+  agent?: string;
 }): SpanFactsContributedEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -71,7 +73,7 @@ function spanFactsEvent({
       tenantId: "tenant-1",
       sessionId: SESSION_ID,
       sessionKeySource: "provider",
-      agent: "claude_code",
+      agent,
       occurredAt: startMs,
       traceId,
       spanId,
@@ -89,10 +91,12 @@ function logFactsEvent({
   facts,
   traceId = null,
   timeMs = 1_500,
+  agent = "claude_code",
 }: {
   facts: Record<string, string | number | boolean>;
   traceId?: string | null;
   timeMs?: number;
+  agent?: string;
 }): LogFactsContributedEvent {
   return {
     tenantId: createTenantId("tenant-1"),
@@ -101,7 +105,7 @@ function logFactsEvent({
       tenantId: "tenant-1",
       sessionId: SESSION_ID,
       sessionKeySource: "provider",
-      agent: "claude_code",
+      agent,
       occurredAt: timeMs,
       recordId: `rec-${timeMs}`,
       traceId,
@@ -458,7 +462,7 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
-        version: "2026-07-21",
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
       });
 
       expect(row.sessionId).toBe(SESSION_ID);
@@ -543,6 +547,351 @@ describe("read-back losslessness (ADR-066)", () => {
       const decoded = codingAgentSessionStateFromRow(row);
 
       expect(decoded).toEqual(state);
+    });
+  });
+
+  /**
+   * The round-trip above proves the bookkeeping survives the row. These prove
+   * why that matters: each one folds a further contribution onto the recovered
+   * state, and contrasts it with the same contribution folded onto a state
+   * whose bookkeeping did NOT survive — which is exactly the shape a row
+   * written before these columns existed decodes to, and exactly why the store
+   * refuses such a row instead of reading it back.
+   */
+  describe("when a further contribution folds onto the recovered state", () => {
+    /** Round-trips a state through the row the fold would have committed. */
+    function recover(state: CodingAgentSessionState): CodingAgentSessionState {
+      return codingAgentSessionStateFromRow(
+        projectCodingAgentSessionToRow({
+          state,
+          tenantId: "tenant-1",
+          sessionId: SESSION_ID,
+          version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+        }),
+      );
+    }
+
+    /** @scenario recovered state preserves the fold's internal bookkeeping */
+    it("recognises a sub-agent it has already seen and still reads the prior call's context", () => {
+      const projection = makeProjection();
+      const modelCall = (facts: Record<string, string | number>) =>
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "llm",
+          facts,
+        });
+
+      let state = projection.apply(
+        projection.init(),
+        modelCall({ agent_id: "sub-a", cache_read_tokens: 400 }),
+      );
+      state = projection.apply(
+        state,
+        modelCall({
+          agent_id: "sub-b",
+          cache_read_tokens: 800,
+          cache_creation_tokens: 200,
+        }),
+      );
+      expect(state.subAgents).toBe(2);
+
+      // A third call from a sub-agent already counted, whose cache creation
+      // dwarfs the previous call's context — a rebuild, but only if the fold
+      // still knows what that context was.
+      const third = modelCall({
+        agent_id: "sub-a",
+        cache_creation_tokens: 5_000,
+      });
+
+      const next = projection.apply(recover(state), third);
+
+      expect(next.subAgents).toBe(2);
+      expect(next.cacheRebuildCount).toBe(1);
+
+      // The same contribution onto a state that lost the dedup set and the
+      // prior context: the sub-agent count collapses to the one id it can see,
+      // and the rebuild reads as the session's first call.
+      const withoutBookkeeping = projection.apply(
+        { ...recover(state), subAgentIds: [], previousCallContextTokens: 0 },
+        third,
+      );
+
+      expect(withoutBookkeeping.subAgents).toBe(1);
+      expect(withoutBookkeeping.cacheRebuildCount).toBe(0);
+    });
+
+    /** @scenario a total recomputed from its recorded parts is not collapsed by the next part */
+    it("adds the new series to the ones already recorded instead of recomputing from it alone", () => {
+      const projection = makeProjection();
+      const linesAdded = (seriesId: string, value: number) =>
+        metricFactsEvent({
+          seriesId,
+          metricName: "claude_code.lines_of_code.count",
+          attributes: { type: "added" },
+          value,
+        });
+
+      let state = projection.apply(projection.init(), linesAdded("loc-1", 40));
+      state = projection.apply(state, linesAdded("loc-2", 2));
+      expect(state.linesAdded).toBe(42);
+
+      const next = projection.apply(recover(state), linesAdded("loc-3", 5));
+
+      expect(next.linesAdded).toBe(47);
+
+      // The total is recomputed WHOLE from the recorded series, so a state that
+      // lost them recomputes from the newest one alone.
+      const withoutParts = projection.apply(
+        { ...recover(state), metricSeries: {} },
+        linesAdded("loc-3", 5),
+      );
+
+      expect(withoutParts.linesAdded).toBe(5);
+    });
+
+    /** @scenario a sequence keeps the order things happened in rather than the order they arrived */
+    it("places a late-arriving step by when it started, not by when it turned up", () => {
+      const projection = makeProjection();
+      const toolAt = (spanId: string, tool: string, startMs: number) =>
+        spanFactsEvent({
+          name: "claude_code.tool",
+          spanId,
+          startMs,
+          endMs: startMs + 100,
+          facts: { tool_name: tool },
+        });
+
+      let state = projection.apply(
+        projection.init(),
+        toolAt("t1", "Read", 3_000),
+      );
+      state = projection.apply(state, toolAt("t2", "Bash", 5_000));
+
+      // Spans are batched on the wire, so this one lands last despite having
+      // started between the other two.
+      const late = toolAt("t3", "Grep", 4_000);
+
+      const next = projection.apply(recover(state), late);
+
+      expect(next.steps.map((step) => step.name)).toEqual([
+        "Read",
+        "Grep",
+        "Bash",
+      ]);
+
+      // Without the recorded start times every earlier step reads as time zero,
+      // so the late step can only be appended — the order the spans arrived in.
+      const withoutTimes = projection.apply(
+        {
+          ...recover(state),
+          steps: state.steps.map((step) => ({ ...step, startedAtMs: 0 })),
+        },
+        late,
+      );
+
+      expect(withoutTimes.steps.map((step) => step.name)).toEqual([
+        "Read",
+        "Bash",
+        "Grep",
+      ]);
+    });
+  });
+});
+
+describe("coding-agent session fold, per-agent gating", () => {
+  describe("when a Cowork session folds from events only", () => {
+    /** @scenario a Cowork session is an agent session */
+    it("folds the model call — tokens, model, cost — from the api_request event", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: {
+            "event.name": "claude_code.api_request",
+            cost_usd: 0.42,
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_read_tokens: 1_000,
+            cache_creation_tokens: 200,
+            model: "claude-fable-5",
+            duration_ms: 800,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.agent).toBe("claude_cowork");
+      expect(state.modelCalls).toBe(1);
+      expect(state.inputTokens).toBe(100);
+      expect(state.outputTokens).toBe(50);
+      expect(state.cacheReadTokens).toBe(1_000);
+      expect(state.cacheCreationTokens).toBe(200);
+      expect(state.costUsd).toBeCloseTo(0.42);
+      expect(state.models).toEqual(["claude-fable-5"]);
+    });
+
+    it("folds the tool run — name, count, step — from the tool_result event", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          timeMs: 2_000,
+          facts: {
+            "event.name": "claude_code.tool_result",
+            tool_name: "Bash",
+            success: "true",
+            duration_ms: 120,
+            tool_result_size_bytes: 2_048,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.toolCalls).toBe(1);
+      expect(state.toolCounts).toEqual({ Bash: 1 });
+      expect(state.steps).toEqual([
+        { name: "Bash", count: 1, startedAtMs: 2_000, failed: false },
+      ]);
+      expect(state.toolResultBytes).toBe(2_048);
+    });
+
+    /** @scenario a Cowork session is an agent session */
+    it("counts a turn once when the beta trace export also emits its span", () => {
+      const projection = makeProjection();
+      const modelFacts = {
+        model: "claude-fable-5",
+        input_tokens: 100,
+        output_tokens: 50,
+      };
+
+      // Cowork behind its beta trace-export flag: the SAME turn arrives twice,
+      // once as Claude Code's llm_request span and once as the api_request
+      // event Cowork folds its model calls from.
+      const afterSpan = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.llm_request",
+          spanId: "cw-llm-1",
+          agent: "claude_cowork",
+          facts: modelFacts,
+        }),
+        initStateOf(projection),
+      );
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: { "event.name": "claude_code.api_request", ...modelFacts },
+        }),
+        afterSpan,
+      );
+
+      expect(state.modelCalls).toBe(1);
+      expect(state.inputTokens).toBe(100);
+      expect(state.outputTokens).toBe(50);
+    });
+
+    /** @scenario a Cowork session is an agent session */
+    it("counts a tool run once when the beta trace export also emits its span", () => {
+      const projection = makeProjection();
+
+      const afterSpan = projection.handleCodingAgentSessionSpanFactsContributed(
+        spanFactsEvent({
+          name: "claude_code.tool",
+          spanId: "cw-tool-1",
+          agent: "claude_cowork",
+          facts: { tool_name: "Bash", duration_ms: 120 },
+        }),
+        initStateOf(projection),
+      );
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          timeMs: 2_000,
+          facts: {
+            "event.name": "claude_code.tool_result",
+            tool_name: "Bash",
+            success: "true",
+            duration_ms: 120,
+          },
+        }),
+        afterSpan,
+      );
+
+      expect(state.toolCalls).toBe(1);
+      expect(state.toolCounts).toEqual({ Bash: 1 });
+    });
+
+    it("identifies the user from Cowork's account uuid", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_cowork",
+          facts: {
+            "event.name": "claude_code.user_prompt",
+            prompt_length: 12,
+            "user.account_uuid": "0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c",
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.userId).toBe("0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c");
+    });
+  });
+
+  describe("when a span-bearing agent's api_request event contributes", () => {
+    /** @scenario re-delivered telemetry does not inflate a session */
+    it("folds cost only — its tokens arrive on the llm_request span", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_code",
+          facts: {
+            "event.name": "claude_code.api_request",
+            cost_usd: 0.42,
+            input_tokens: 100,
+            output_tokens: 50,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.costUsd).toBeCloseTo(0.42);
+      // The double-count gate: these fold from the span for claude_code.
+      expect(state.modelCalls).toBe(0);
+      expect(state.inputTokens).toBe(0);
+      expect(state.outputTokens).toBe(0);
+    });
+  });
+
+  describe("when a span-bearing agent's tool_result event contributes", () => {
+    /** @scenario re-delivered telemetry does not inflate a session */
+    it("folds result bytes only — the run itself arrives on the tool span", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          agent: "claude_code",
+          facts: {
+            "event.name": "claude_code.tool_result",
+            tool_name: "Bash",
+            success: "true",
+            duration_ms: 120,
+            tool_result_size_bytes: 2_048,
+          },
+        }),
+        initStateOf(projection),
+      );
+
+      expect(state.toolResultBytes).toBe(2_048);
+      // The other half of the gate — untested until now, and the half that
+      // would double every Claude Code tool run if it regressed.
+      expect(state.toolCalls).toBe(0);
+      expect(state.toolCounts).toEqual({});
+      expect(state.steps).toEqual([]);
     });
   });
 });

@@ -76,9 +76,9 @@ import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { SavedViewsBar } from "./messages/SavedViewsBar";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
-import { UserAvatar } from "./UserAvatar";
 import { PresenceMenuItem } from "./sidebar/PresenceMenuItem";
 import { GlobalUpgradeModal } from "./UpgradeModal";
+import { UserAvatar } from "./UserAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -855,7 +855,9 @@ export const DashboardLayout = ({
                     <Menu.Item value="settings" asChild>
                       <Link href="/settings">Settings</Link>
                     </Menu.Item>
-                    <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
+                    <Menu.Root
+                      positioning={{ placement: "right-start", gutter: 2 }}
+                    >
                       <Menu.TriggerItem value="reduced-graphics">
                         <Monitor size={14} />
                         Reduced graphics (

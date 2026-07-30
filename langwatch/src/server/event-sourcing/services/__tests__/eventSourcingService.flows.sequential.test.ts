@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventStoreMemory } from "../../stores/eventStoreMemory";
-import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EVENT_TYPES } from "../../domain/eventType";
 import type { Event } from "../../domain/types";
+import { EventStoreMemory } from "../../stores/eventStoreMemory";
+import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,

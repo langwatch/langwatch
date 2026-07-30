@@ -10,6 +10,7 @@
  * - src/pages/api/dataset/evaluate.ts
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { Project } from "@prisma/client";
@@ -40,7 +41,6 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
-import { HandledError } from "@langwatch/handled-error";
 import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
 import {
@@ -94,13 +94,33 @@ const tokenResolver = TokenResolver.create(prisma);
 
 const AUTH_REASON = "project API key resolved in-handler";
 
+// The static evaluator catalogue: no project data, so no permission.
+const catalogueAuth = handlerManagedAuth({
+  reason: "public evaluator catalogue; no project data returned",
+  permissions: [],
+  credential: "apiKey",
+});
+// Every other legacy route runs or records an evaluation.
+//
+// NOTE: these ask for `evaluations:manage` on what are append/create actions —
+// the same over-coarse grain that `POST /api/experiments/:slug/run` had, which
+// refuses any least-privilege key holding only `evaluations:create`. Declaring
+// it here does not fix it; it makes it VISIBLE, which is the precondition.
+// Tracked separately rather than widened in this change.
+const legacyEvaluationAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["evaluations:manage"],
+  credential: "apiKey",
+});
+
 /**
  * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either a `{ project, markUsed }` context on
- * success or `{ error, status }` for the caller to short-circuit with
- * c.json(...). `markUsed` is a no-op for legacy keys and a fire-and-forget
- * lastUsedAt bump for API keys — callers invoke it after building a success
- * response.
+ * success or `{ error, status, body }` for the caller to short-circuit with
+ * c.json(...) — `body` is a bare sentence for an unauthenticated call, and the
+ * full handled payload (code, permission, tips) for a permission denial.
+ * `markUsed` is a no-op for legacy keys and a fire-and-forget lastUsedAt bump
+ * for API keys — callers invoke it after building a success response.
  */
 async function authenticateRequest(
   c: Context,
@@ -110,15 +130,13 @@ async function authenticateRequest(
       project: Project & { team?: { id: string; organizationId: string } };
       markUsed: () => void;
     }
-  | { error: string; status: 401 | 403 }
+  | { error: string; status: 401 | 403; body: object }
 > {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
-      status: 401,
-    };
+    const message =
+      "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
+    return { error: message, status: 401, body: { message } };
   }
 
   const resolved = await tokenResolver.resolve({
@@ -126,14 +144,17 @@ async function authenticateRequest(
     projectId: credentials.projectId,
   });
   if (!resolved) {
-    return { error: "Invalid auth token.", status: 401 };
+    const message = "Invalid auth token.";
+    return { error: message, status: 401, body: { message } };
   }
 
   try {
     await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+    // The ceiling only ever denies with 403; narrowed here so the descriptor
+    // keeps its `401 | 403` contract with the routes.
+    return { error: denial.message, status: 403, body: denial.body };
   }
 
   const markUsed = () => {
@@ -148,45 +169,43 @@ async function authenticateRequest(
 const secured = createServiceApp({ basePath: "/api" });
 
 // ---------- GET /api/evaluations/list ----------
-secured
-  .access(handlerManagedAuth(AUTH_REASON))
-  .get("/evaluations/list", async (c) => {
-    const evaluators = Object.fromEntries(
-      Object.entries(AVAILABLE_EVALUATORS)
-        .filter(
-          ([key]) =>
-            !key.startsWith("example/") &&
-            key !== "aws/comprehend_pii_detection" &&
-            key !== "google_cloud/dlp_pii_detection",
-        )
-        .map(([key, value]) => [
-          key,
-          {
-            ...value,
-            name: evaluatorTempNameMap[value.name] ?? value.name,
-            settings_json_schema: zodToJsonSchema(
-              // @ts-expect-error `key` indexes the union of every evaluator
-              // type, so `.shape.settings` resolves to a heterogeneous union
-              // that zodToJsonSchema accepts at runtime but TS can't narrow.
-              evaluatorsSchema.shape[key].shape.settings,
-            ),
-          },
-        ]),
-    );
+secured.access(catalogueAuth).get("/evaluations/list", async (c) => {
+  const evaluators = Object.fromEntries(
+    Object.entries(AVAILABLE_EVALUATORS)
+      .filter(
+        ([key]) =>
+          !key.startsWith("example/") &&
+          key !== "aws/comprehend_pii_detection" &&
+          key !== "google_cloud/dlp_pii_detection",
+      )
+      .map(([key, value]) => [
+        key,
+        {
+          ...value,
+          name: evaluatorTempNameMap[value.name] ?? value.name,
+          settings_json_schema: zodToJsonSchema(
+            // @ts-expect-error `key` indexes the union of every evaluator
+            // type, so `.shape.settings` resolves to a heterogeneous union
+            // that zodToJsonSchema accepts at runtime but TS can't narrow.
+            evaluatorsSchema.shape[key].shape.settings,
+          ),
+        },
+      ]),
+  );
 
-    return c.json({ evaluators });
-  });
+  return c.json({ evaluators });
+});
 
 // ---------- POST /api/evaluations/batch/log_results ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post(
     "/evaluations/batch/log_results",
     bodyLimit({ maxSize: 20 * 1024 * 1024 }),
     async (c) => {
       const auth = await authenticateRequest(c, "evaluations:manage");
       if ("error" in auth) {
-        return c.json({ message: auth.error }, auth.status);
+        return c.json(auth.body, auth.status);
       }
       const { project, markUsed } = auth;
 
@@ -301,7 +320,7 @@ secured
 
 // ---------- POST /api/evaluations/:evaluator/evaluate ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post(
     "/evaluations/:evaluator/evaluate",
     bodyLimit({ maxSize: 30 * 1024 * 1024 }),
@@ -313,7 +332,7 @@ secured
 
 // ---------- POST /api/evaluations/:evaluator/:subpath/evaluate ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post(
     "/evaluations/:evaluator/:subpath/evaluate",
     bodyLimit({ maxSize: 30 * 1024 * 1024 }),
@@ -325,7 +344,7 @@ secured
 
 // ---------- POST /api/guardrails/:evaluator/evaluate ----------
 secured
-  .access(handlerManagedAuth(AUTH_REASON))
+  .access(legacyEvaluationAuth)
   .post(
     "/guardrails/:evaluator/evaluate",
     bodyLimit({ maxSize: 30 * 1024 * 1024 }),
@@ -336,169 +355,167 @@ secured
   );
 
 // ---------- POST /api/dataset/evaluate ----------
-secured
-  .access(handlerManagedAuth(AUTH_REASON))
-  .post("/dataset/evaluate", async (c) => {
-    const auth = await authenticateRequest(c, "evaluations:manage");
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, auth.status);
-    }
-    const { markUsed } = auth;
-    // dataset/evaluate needs the full team relation for downstream queries.
-    const project = await prisma.project.findUnique({
-      where: { id: auth.project.id },
-      include: { team: true },
-    });
-    if (!project) {
-      return c.json({ message: "Invalid auth token." }, 401);
-    }
+secured.access(legacyEvaluationAuth).post("/dataset/evaluate", async (c) => {
+  const auth = await authenticateRequest(c, "evaluations:manage");
+  if ("error" in auth) {
+    return c.json(auth.body, auth.status);
+  }
+  const { markUsed } = auth;
+  // dataset/evaluate needs the full team relation for downstream queries.
+  const project = await prisma.project.findUnique({
+    where: { id: auth.project.id },
+    include: { team: true },
+  });
+  if (!project) {
+    return c.json({ message: "Invalid auth token." }, 401);
+  }
 
-    let body: Record<string, any>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
+  let body: Record<string, any>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ message: "Bad request" }, 400);
+  }
 
-    let params: BatchEvaluationRESTParams;
-    try {
-      params = batchEvaluationInputSchema.parse(body);
-    } catch (error) {
-      logger.error(
-        { error, body, projectId: project.id },
-        "invalid evaluation params received",
-      );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
-    }
-
-    const { datasetSlug } = params;
-    const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid();
-    const evaluation = params.evaluation;
-    let settings = null;
-    let checkType;
-
-    const check = await prisma.monitor.findFirst({
-      where: { projectId: project.id, slug: evaluation },
-    });
-
-    if (check != null) {
-      checkType = check.checkType;
-      settings = check.parameters;
-    } else {
-      checkType = evaluation;
-    }
-
-    const evaluator = await getEvaluatorIncludingCustom(
-      project.id,
-      checkType as EvaluatorTypes,
+  let params: BatchEvaluationRESTParams;
+  try {
+    params = batchEvaluationInputSchema.parse(body);
+  } catch (error) {
+    logger.error(
+      { error, body, projectId: project.id },
+      "invalid evaluation params received",
     );
-    if (!evaluator) {
-      return c.json({ error: `Evaluator not found: ${checkType}` }, 400);
-    }
+    captureException(toError(error), { extra: { projectId: project.id } });
+    const validationError = fromZodError(error as ZodError);
+    return c.json({ error: validationError.message }, 400);
+  }
 
-    let data: DataForEvaluation;
-    try {
-      data = getEvaluatorDataForParams(
-        checkType,
-        params.data as Record<string, any>,
-      );
-      if (
-        !evaluator.requiredFields.every((field: string) => field in data.data)
-      ) {
-        return c.json(
-          {
-            error: `Missing required field for ${checkType}`,
-            requiredFields: evaluator.requiredFields,
-          },
-          400,
-        );
-      }
-    } catch (error) {
-      logger.error(
-        { error, body, projectId: project.id },
-        "invalid evaluation data received",
-      );
-      captureException(toError(error), { extra: { projectId: project.id } });
-      const validationError = fromZodError(error as ZodError);
-      return c.json({ error: validationError.message }, 400);
-    }
+  const { datasetSlug } = params;
+  const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid();
+  const evaluation = params.evaluation;
+  let settings = null;
+  let checkType;
 
-    const dataset = await prisma.dataset.findFirst({
-      where: { slug: datasetSlug, projectId: project.id },
-    });
-    if (!dataset) {
-      return c.json({ error: "Dataset not found" }, 404);
-    }
+  const check = await prisma.monitor.findFirst({
+    where: { projectId: project.id, slug: evaluation },
+  });
 
-    let result: SingleEvaluationResult;
-    try {
-      result = await runEvaluation({
-        projectId: project.id,
-        data,
-        evaluatorType: checkType as EvaluatorTypes,
-        settings: (settings as Record<string, unknown>) ?? {},
-      });
-    } catch (error) {
-      result = {
-        status: "error",
-        error_type: "INTERNAL_ERROR",
-        details: error instanceof Error ? error.message : "Internal error",
-        traceback: [],
-      };
-    }
+  if (check != null) {
+    checkType = check.checkType;
+    settings = check.parameters;
+  } else {
+    checkType = evaluation;
+  }
 
-    const experiment = await ExperimentService.create(prisma).findBySlug({
-      projectId: project.id,
-      slug: experimentSlug,
-    });
-    if (!experiment) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Experiment not found",
-      });
-    }
+  const evaluator = await getEvaluatorIncludingCustom(
+    project.id,
+    checkType as EvaluatorTypes,
+  );
+  if (!evaluator) {
+    return c.json({ error: `Evaluator not found: ${checkType}` }, 400);
+  }
 
-    if ("cost" in result && result.cost) {
-      await prisma.cost.create({
-        data: {
-          id: `cost_${nanoid()}`,
-          projectId: project.id,
-          costType: CostType.BATCH_EVALUATION,
-          costName: evaluation,
-          referenceType: CostReferenceType.BATCH,
-          referenceId: experiment.id,
-          amount: result.cost.amount,
-          currency: result.cost.currency,
+  let data: DataForEvaluation;
+  try {
+    data = getEvaluatorDataForParams(
+      checkType,
+      params.data as Record<string, any>,
+    );
+    if (
+      !evaluator.requiredFields.every((field: string) => field in data.data)
+    ) {
+      return c.json(
+        {
+          error: `Missing required field for ${checkType}`,
+          requiredFields: evaluator.requiredFields,
         },
-      });
+        400,
+      );
     }
+  } catch (error) {
+    logger.error(
+      { error, body, projectId: project.id },
+      "invalid evaluation data received",
+    );
+    captureException(toError(error), { extra: { projectId: project.id } });
+    const validationError = fromZodError(error as ZodError);
+    return c.json({ error: validationError.message }, 400);
+  }
 
-    const { score, passed, details, cost, status, label } =
-      result as EvaluationResult;
+  const dataset = await prisma.dataset.findFirst({
+    where: { slug: datasetSlug, projectId: project.id },
+  });
+  if (!dataset) {
+    return c.json({ error: "Dataset not found" }, 404);
+  }
 
-    await prisma.batchEvaluation.create({
+  let result: SingleEvaluationResult;
+  try {
+    result = await runEvaluation({
+      projectId: project.id,
+      data,
+      evaluatorType: checkType as EvaluatorTypes,
+      settings: (settings as Record<string, unknown>) ?? {},
+    });
+  } catch (error) {
+    result = {
+      status: "error",
+      error_type: "INTERNAL_ERROR",
+      details: error instanceof Error ? error.message : "Internal error",
+      traceback: [],
+    };
+  }
+
+  const experiment = await ExperimentService.create(prisma).findBySlug({
+    projectId: project.id,
+    slug: experimentSlug,
+  });
+  if (!experiment) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Experiment not found",
+    });
+  }
+
+  if ("cost" in result && result.cost) {
+    await prisma.cost.create({
       data: {
-        id: nanoid(),
-        experimentId: experiment.id,
+        id: `cost_${nanoid()}`,
         projectId: project.id,
-        data: data.data,
-        status,
-        score: score ?? 0,
-        passed: passed ?? false,
-        label,
-        details: details ?? "",
-        cost: cost?.amount ?? 0,
-        evaluation,
-        datasetSlug,
-        datasetId: dataset.id,
+        costType: CostType.BATCH_EVALUATION,
+        costName: evaluation,
+        referenceType: CostReferenceType.BATCH,
+        referenceId: experiment.id,
+        amount: result.cost.amount,
+        currency: result.cost.currency,
       },
     });
+  }
 
-    markUsed();
-    return c.json(result);
+  const { score, passed, details, cost, status, label } =
+    result as EvaluationResult;
+
+  await prisma.batchEvaluation.create({
+    data: {
+      id: nanoid(),
+      experimentId: experiment.id,
+      projectId: project.id,
+      data: data.data,
+      status,
+      score: score ?? 0,
+      passed: passed ?? false,
+      label,
+      details: details ?? "",
+      cost: cost?.amount ?? 0,
+      evaluation,
+      datasetSlug,
+      datasetId: dataset.id,
+    },
   });
+
+  markUsed();
+  return c.json(result);
+});
 
 export const app = secured.hono;
 
@@ -787,7 +804,7 @@ async function handleEvaluatorCall(
 ) {
   const auth = await authenticateRequest(c, "evaluations:manage");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 

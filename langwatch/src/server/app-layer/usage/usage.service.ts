@@ -1,8 +1,14 @@
+import { createLogger } from "@langwatch/observability";
 import { UNLIMITED_MESSAGES } from "../../../../ee/billing/planLimits";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import type { OrganizationRepository } from "../../repositories/organization.repository";
 import type { EventUsageService } from "../../traces/event-usage.service";
 import type { TraceUsageService } from "../../traces/trace-usage.service";
+import {
+  type ProjectUsageCounts,
+  USAGE_UNKNOWN,
+  type UsageCount,
+} from "../../traces/usage-count";
 import { TtlCache } from "../../utils/ttlCache";
 import { OrganizationNotFoundForTeamError } from "../organizations/errors";
 import type { OrganizationService } from "../organizations/organization.service";
@@ -10,6 +16,9 @@ import type { SimulationRunService } from "../simulations/simulation-run.service
 import type { PlanResolver } from "../subscription/plan-provider";
 import { ScenarioSetLimitExceededError } from "./errors";
 import { buildLimitMessage } from "./limit-message";
+
+const logger = createLogger("langwatch:usage");
+
 import {
   type MeterDecision,
   resolveUsageMeter,
@@ -76,6 +85,24 @@ export class UsageService {
     const count = await this.getCurrentMonthCount({ organizationId, plan });
 
     if (count === "unlimited") {
+      return { exceeded: false };
+    }
+
+    if (count === USAGE_UNKNOWN) {
+      // Deliberately permissive, and deliberately loud. Enforcement cannot say
+      // whether this organization is over its cap, and locking a paying
+      // customer out of their own product because OUR counting store is down
+      // is the worse of the two errors — so traffic continues.
+      //
+      // What changed is that the decision is now made HERE, once, by the code
+      // that owns enforcement, instead of arriving pre-made as a `0` from a
+      // counting service that had no idea it was granting anyone anything. It
+      // is logged at warn so a metering outage is visible as a metering
+      // outage, rather than showing up as a suspiciously quiet month.
+      logger.warn(
+        { organizationId, plan: plan.name },
+        "checkLimit: usage is unknown, allowing traffic without enforcement",
+      );
       return { exceeded: false };
     }
 
@@ -184,7 +211,7 @@ export class UsageService {
   }: {
     organizationId: string;
     plan?: PlanInfo;
-  }): Promise<number | "unlimited"> {
+  }): Promise<UsageCount | "unlimited"> {
     // Skip the heavy ClickHouse query for unlimited plans (e.g. seat-based pricing).
     // The count would never exceed the limit, so querying is wasted work for
     // ENFORCEMENT. Returns "unlimited" so callers can distinguish from actual 0
@@ -212,7 +239,7 @@ export class UsageService {
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<number> {
+  }): Promise<UsageCount> {
     return this.computeCurrentMonthCount({ organizationId });
   }
 
@@ -222,7 +249,7 @@ export class UsageService {
   }: {
     organizationId: string;
     plan?: PlanInfo;
-  }): Promise<number> {
+  }): Promise<UsageCount> {
     const decision = await this.getCachedMeterDecision(organizationId, plan);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
 
@@ -234,6 +261,7 @@ export class UsageService {
     const projectIds =
       await this.organizationService.getProjectIds(organizationId);
     if (projectIds.length === 0) {
+      // A real measurement: an organization with no projects has sent nothing.
       return 0;
     }
 
@@ -242,6 +270,12 @@ export class UsageService {
       organizationId,
       projectIds,
     });
+    if (counts === USAGE_UNKNOWN) {
+      // Not cached. A cached unknown would outlive the outage that caused it
+      // by the length of the TTL, which is exactly the trap the trace service
+      // avoided by not caching its fail-open zero.
+      return USAGE_UNKNOWN;
+    }
     const total = counts.reduce((sum, c) => sum + c.count, 0);
 
     await this.countCache.set(cacheKey, total);
@@ -255,7 +289,7 @@ export class UsageService {
   }: {
     organizationId: string;
     projectIds: string[];
-  }): Promise<Array<{ projectId: string; count: number }>> {
+  }): Promise<ProjectUsageCounts> {
     if (projectIds.length === 0) {
       return [];
     }
@@ -272,7 +306,7 @@ export class UsageService {
     decision: MeterDecision;
     organizationId: string;
     projectIds: string[];
-  }): Promise<Array<{ projectId: string; count: number }>> {
+  }): Promise<ProjectUsageCounts> {
     if (decision.usageUnit === "events") {
       return this.eventUsageService.getCountByProjects({
         organizationId,

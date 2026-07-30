@@ -2,8 +2,8 @@ import {
   type CustomRole,
   OrganizationUserRole,
   type Team,
-  TeamUserRole,
   type TeamUser,
+  TeamUserRole,
 } from "@prisma/client";
 import {
   MISSING_CUSTOM_ROLE_VALUE,

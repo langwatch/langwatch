@@ -22,6 +22,12 @@ export interface ExecuteRequest {
   cwd: string;
   env: Record<string, string>;
   colorLevel: number;
+  /**
+   * The bin the CALLER typed (`process.argv[1]` on the client). One daemon
+   * serves both `lw` and `langwatch`, so the program has to be named from this
+   * rather than from the daemon's own argv. See `ExecFrame.bin`.
+   */
+  bin?: string;
   sink: OutputSink;
 }
 
@@ -282,8 +288,9 @@ export function createCommandExecutor({
       try {
         // A fresh tree per request: commander mutates its Command objects with
         // the parsed option values, so a shared tree would leak options between
-        // callers.
-        const program = buildProgram();
+        // callers. Named from the CALLER's bin, not this process's — see
+        // `ExecuteRequest.bin`.
+        const program = buildProgram({ bin: request.bin });
         await withExecutionContext(context, () =>
           program.parseAsync(request.args, { from: "user" }),
         );

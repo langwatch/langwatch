@@ -12,7 +12,6 @@ const presenceLensSchema = z.enum([
   "settings",
   "other",
 ]);
-type PresenceLens = z.infer<typeof presenceLensSchema>;
 
 const presenceDrawerViewModeSchema = z.enum([
   "trace",

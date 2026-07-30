@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import {
   applyOrganizationRoleToPendingTeamRoles,
   arePendingTeamRolesEqual,

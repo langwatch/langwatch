@@ -76,11 +76,16 @@ describe("Experiment init limit enforcement", () => {
           expect(body).toHaveProperty("limitType", "experiments");
           break;
         } else {
-          expect.fail(`Unexpected status ${status} on experiment ${i}: ${JSON.stringify(body)}`);
+          expect.fail(
+            `Unexpected status ${status} on experiment ${i}: ${JSON.stringify(body)}`,
+          );
         }
       }
 
-      expect(blockedSlug, "should have hit the limit within 20 attempts").toBeDefined();
+      expect(
+        blockedSlug,
+        "should have hit the limit within 20 attempts",
+      ).toBeDefined();
     });
 
     it("R6: 403 response body has the structured error shape", async () => {
@@ -109,7 +114,7 @@ describe("Experiment init limit enforcement", () => {
         // This can't work because we can't create at the limit. Skip gracefully.
         console.warn(
           "R2 skipped: org was already at experiment limit before test run. " +
-          "Use a fresh org or delete experiments to test re-run behavior.",
+            "Use a fresh org or delete experiments to test re-run behavior.",
         );
         return;
       }

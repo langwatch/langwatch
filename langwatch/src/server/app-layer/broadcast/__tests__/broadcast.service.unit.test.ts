@@ -50,7 +50,11 @@ describe("BroadcastService", () => {
         const { redis } = createMockRedis();
         const service = new BroadcastService(redis as any);
 
-        await service.broadcastToTenant("tenant-1", "test-event", "trace_updated");
+        await service.broadcastToTenant(
+          "tenant-1",
+          "test-event",
+          "trace_updated",
+        );
 
         expect(redis.publish).toHaveBeenCalledWith(
           "broadcast:trace_updated",
@@ -70,7 +74,11 @@ describe("BroadcastService", () => {
         const received: unknown[] = [];
         emitter.on("trace_updated", (data) => received.push(data));
 
-        await service.broadcastToTenant("tenant-1", "test-event", "trace_updated");
+        await service.broadcastToTenant(
+          "tenant-1",
+          "test-event",
+          "trace_updated",
+        );
 
         expect(received).toHaveLength(1);
 
@@ -87,7 +95,11 @@ describe("BroadcastService", () => {
         const received: unknown[] = [];
         emitter.on("trace_updated", (data) => received.push(data));
 
-        await service.broadcastToTenant("tenant-1", "test-event", "trace_updated");
+        await service.broadcastToTenant(
+          "tenant-1",
+          "test-event",
+          "trace_updated",
+        );
 
         expect(received).toHaveLength(1);
 

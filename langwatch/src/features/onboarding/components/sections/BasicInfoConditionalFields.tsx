@@ -53,59 +53,59 @@ export const BasicInfoConditionalFields: React.FC<
           transition={{ duration: 0.3, ease: "easeInOut" }}
           style={{ width: "100%", overflow: "hidden" }}
         >
-      <VStack gap={6} align="stretch" pt={4} w="full" minW="0">
-        <Field.Root
-          colorPalette="orange"
-          w="full"
-          invalid={phoneHasValue && !phoneIsValid}
-        >
-          <Field.Label>{"What is your phone number?"}</Field.Label>
-          <PhoneNumberInput
-            autoDetectDefaultCountry
-            value={phoneNumber}
-            onFocus={() => emit("focused", "phone_number")}
-            onChange={(e164, meta) => {
-              setPhoneNumber(e164 ?? "");
-              const hasValue = meta.national.trim().length > 0;
-              setLocalPhoneHasValue(hasValue);
-              setLocalPhoneIsValid(Boolean(meta.isValid));
-              setPhoneHasValue(hasValue);
-              setPhoneIsValid(Boolean(meta.isValid));
-            }}
-          />
-        </Field.Root>
+          <VStack gap={6} align="stretch" pt={4} w="full" minW="0">
+            <Field.Root
+              colorPalette="orange"
+              w="full"
+              invalid={phoneHasValue && !phoneIsValid}
+            >
+              <Field.Label>{"What is your phone number?"}</Field.Label>
+              <PhoneNumberInput
+                autoDetectDefaultCountry
+                value={phoneNumber}
+                onFocus={() => emit("focused", "phone_number")}
+                onChange={(e164, meta) => {
+                  setPhoneNumber(e164 ?? "");
+                  const hasValue = meta.national.trim().length > 0;
+                  setLocalPhoneHasValue(hasValue);
+                  setLocalPhoneIsValid(Boolean(meta.isValid));
+                  setPhoneHasValue(hasValue);
+                  setPhoneIsValid(Boolean(meta.isValid));
+                }}
+              />
+            </Field.Root>
 
-        <Field.Root colorPalette="orange" w="full">
-          <Field.Label>{"How large is your company?"}</Field.Label>
-          <IconRadioCardGroup<CompanySize>
-            items={companySizeItems}
-            value={companySize}
-            onChange={(value) => {
-              if (value) {
-                setCompanySize(value);
-                emit("selected", "company_size", { value });
-              }
-            }}
-            direction="horizontal"
-            maxColumns={3}
-          />
-        </Field.Root>
+            <Field.Root colorPalette="orange" w="full">
+              <Field.Label>{"How large is your company?"}</Field.Label>
+              <IconRadioCardGroup<CompanySize>
+                items={companySizeItems}
+                value={companySize}
+                onChange={(value) => {
+                  if (value) {
+                    setCompanySize(value);
+                    emit("selected", "company_size", { value });
+                  }
+                }}
+                direction="horizontal"
+                maxColumns={3}
+              />
+            </Field.Root>
 
-        <Field.Root colorPalette="orange" w="full">
-          <Field.Label>
-            {"How do you plan to deploy LangWatch?"}
-          </Field.Label>
-          <IconRadioCardGroup<SolutionType>
-            items={solutionTypeItems}
-            value={solutionType}
-            onChange={(value) => {
-              setSolutionType(value);
-              emit("selected", "solution_type", { value });
-            }}
-            direction="horizontal"
-          />
-        </Field.Root>
-      </VStack>
+            <Field.Root colorPalette="orange" w="full">
+              <Field.Label>
+                {"How do you plan to deploy LangWatch?"}
+              </Field.Label>
+              <IconRadioCardGroup<SolutionType>
+                items={solutionTypeItems}
+                value={solutionType}
+                onChange={(value) => {
+                  setSolutionType(value);
+                  emit("selected", "solution_type", { value });
+                }}
+                direction="horizontal"
+              />
+            </Field.Root>
+          </VStack>
         </motion.div>
       )}
     </AnimatePresence>

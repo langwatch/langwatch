@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { EvalEntry } from "./utils";
 import { useIsReadOnlyTrace } from "../../../context/TraceViewerContext";
+import type { EvalEntry } from "./utils";
 
 export interface ResolvedEvalInputs {
   inputEntries: [string, unknown][];
@@ -35,7 +35,11 @@ export function useEvalInputs({
     eval_.inputs && Object.keys(eval_.inputs).length > 0 ? eval_.inputs : null;
 
   const needLazy =
-    enabled && !listInputs && !!eval_.evaluationId && !!project?.id && !isReadOnly;
+    enabled &&
+    !listInputs &&
+    !!eval_.evaluationId &&
+    !!project?.id &&
+    !isReadOnly;
 
   const query = api.traces.getEvaluationInputs.useQuery(
     {

@@ -1,19 +1,26 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  startTestContainers,
-  stopTestContainers,
   getTestClickHouseClient,
   getTestRedisConnection,
+  startTestContainers,
+  stopTestContainers,
 } from "../../__tests__/integration/testContainers";
 import { generateTestTenantId } from "../../__tests__/integration/testHelpers";
-import { ReplayService } from "../replayService";
-import type { RegisteredFoldProjection, RegisteredMapProjection } from "../types";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
-import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX, doneMarkerKey } from "../replayConstants";
-import { aggregateKey } from "../replayMarkers";
 import { RedisReplayMarkerChecker } from "../../projections/replayMarkerCheck";
+import {
+  COMPLETED_KEY_PREFIX,
+  CUTOFF_KEY_PREFIX,
+  doneMarkerKey,
+} from "../replayConstants";
+import { aggregateKey } from "../replayMarkers";
+import { ReplayService } from "../replayService";
+import type {
+  RegisteredFoldProjection,
+  RegisteredMapProjection,
+} from "../types";
 
 describe("ReplayService tenant-specific ClickHouse", () => {
   let tenantA: string;
@@ -122,14 +129,24 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: {
+            name: "test",
+            version: "v1",
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            eventTypes: ["trace.upserted"],
+            init: () => ({}),
+            apply: (s) => s,
+            store: { store: vi.fn(), get: vi.fn() },
+          },
         },
         since: "2023-11-01",
         tenantId: tenantA,
       });
 
       expect(resultA.aggregates).toHaveLength(2);
-      expect(resultA.aggregates.every((a) => a.tenantId === tenantA)).toBe(true);
+      expect(resultA.aggregates.every((a) => a.tenantId === tenantA)).toBe(
+        true,
+      );
       expect(resolverCalls).toContain(tenantA);
     });
 
@@ -144,7 +161,15 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: {
+            name: "test",
+            version: "v1",
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            eventTypes: ["trace.upserted"],
+            init: () => ({}),
+            apply: (s) => s,
+            store: { store: vi.fn(), get: vi.fn() },
+          },
         },
         since: "2023-11-01",
         tenantId: tenantA,
@@ -158,7 +183,15 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: {
+            name: "test",
+            version: "v1",
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            eventTypes: ["trace.upserted"],
+            init: () => ({}),
+            apply: (s) => s,
+            store: { store: vi.fn(), get: vi.fn() },
+          },
         },
         since: "2023-11-01",
         tenantId: tenantB,
@@ -169,8 +202,12 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(resultB.aggregates).toHaveLength(1);
 
       // No cross-tenant leakage
-      expect(resultA.aggregates.every((a) => a.tenantId === tenantA)).toBe(true);
-      expect(resultB.aggregates.every((a) => a.tenantId === tenantB)).toBe(true);
+      expect(resultA.aggregates.every((a) => a.tenantId === tenantA)).toBe(
+        true,
+      );
+      expect(resultB.aggregates.every((a) => a.tenantId === tenantB)).toBe(
+        true,
+      );
 
       // Resolver was called with both tenant IDs
       expect(resolverCalls).toContain(tenantA);
@@ -190,7 +227,15 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: {
+            name: "test",
+            version: "v1",
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            eventTypes: ["trace.upserted"],
+            init: () => ({}),
+            apply: (s) => s,
+            store: { store: vi.fn(), get: vi.fn() },
+          },
         },
         since: "2023-11-01",
         // no tenantId — discovers across all
@@ -234,7 +279,15 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: {
+            name: "test",
+            version: "v1",
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            eventTypes: ["trace.upserted"],
+            init: () => ({}),
+            apply: (s) => s,
+            store: { store: vi.fn(), get: vi.fn() },
+          },
         },
         since: "2023-11-01",
         tenantId: tenantA,
@@ -248,7 +301,15 @@ describe("ReplayService tenant-specific ClickHouse", () => {
           source: "pipeline",
           pauseKey: "test/projection/test",
           kind: "fold",
-          definition: { name: "test", version: "v1", LastEventOccurredAtKey: "LastEventOccurredAt", eventTypes: ["trace.upserted"], init: () => ({}), apply: (s) => s, store: { store: vi.fn(), get: vi.fn() } },
+          definition: {
+            name: "test",
+            version: "v1",
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            eventTypes: ["trace.upserted"],
+            init: () => ({}),
+            apply: (s) => s,
+            store: { store: vi.fn(), get: vi.fn() },
+          },
         },
         since: "2023-11-01",
         tenantId: tenantB,
@@ -258,14 +319,19 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(resultA.aggregates).toHaveLength(2);
       // Tenant B now has trace-b1 + trace-a1 (shared ID, different tenant)
       expect(resultB.aggregates).toHaveLength(2);
-      expect(resultB.aggregates.map((a) => a.aggregateId).sort()).toEqual(["trace-a1", "trace-b1"]);
+      expect(resultB.aggregates.map((a) => a.aggregateId).sort()).toEqual([
+        "trace-a1",
+        "trace-b1",
+      ]);
     });
   });
 
   describe("replay map projection", () => {
     type MapRecord = { doubled: number; src: string };
     type AppendFn = MapProjectionDefinition<MapRecord, any>["store"]["append"];
-    type BulkAppendFn = NonNullable<MapProjectionDefinition<MapRecord, any>["store"]["bulkAppend"]>;
+    type BulkAppendFn = NonNullable<
+      MapProjectionDefinition<MapRecord, any>["store"]["bulkAppend"]
+    >;
 
     function createMapProjection({
       name,
@@ -316,7 +382,10 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         );
       });
 
-      const projection = createMapProjection({ name: projectionName, bulkAppend });
+      const projection = createMapProjection({
+        name: projectionName,
+        bulkAppend,
+      });
       const service = createServiceWithResolver();
 
       const result = await service.replay({
@@ -334,9 +403,16 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       // aggregates — never one awaited call per aggregate (that per-trace
       // grouping is what made span-storage replays take weeks).
       expect(bulkAppend).toHaveBeenCalledTimes(1);
-      const appendedRecords = bulkAppend.mock.calls.flatMap(([records]) => records as any[]);
-      expect(appendedRecords.map((r) => r.src).sort()).toEqual(["trace-a1", "trace-a2"]);
-      expect(appendedRecords.map((r) => r.doubled).sort((a, b) => a - b)).toEqual([2, 4]);
+      const appendedRecords = bulkAppend.mock.calls.flatMap(
+        ([records]) => records as any[],
+      );
+      expect(appendedRecords.map((r) => r.src).sort()).toEqual([
+        "trace-a1",
+        "trace-a2",
+      ]);
+      expect(
+        appendedRecords.map((r) => r.doubled).sort((a, b) => a - b),
+      ).toEqual([2, 4]);
 
       // The bulk call carries the tenant-scoped context.
       for (const [, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
@@ -354,8 +430,12 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(stillPaused).toBe(0);
 
       // Final cleanupAll removed both replay marker keys.
-      const cutoffLeft = await redis.exists(`${CUTOFF_KEY_PREFIX}${projectionName}`);
-      const completedLeft = await redis.exists(`${COMPLETED_KEY_PREFIX}${projectionName}`);
+      const cutoffLeft = await redis.exists(
+        `${CUTOFF_KEY_PREFIX}${projectionName}`,
+      );
+      const completedLeft = await redis.exists(
+        `${COMPLETED_KEY_PREFIX}${projectionName}`,
+      );
       expect(cutoffLeft).toBe(0);
       expect(completedLeft).toBe(0);
     });
@@ -376,7 +456,10 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         if (jobStillActive) bulkAppendCalledWhileJobActive = true;
       });
 
-      const projection = createMapProjection({ name: projectionName, bulkAppend });
+      const projection = createMapProjection({
+        name: projectionName,
+        bulkAppend,
+      });
       const service = createServiceWithResolver();
 
       const replayPromise = service.replay({
@@ -447,10 +530,18 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         definition: foldDefinition,
       };
 
-      const bulkAppend = vi.fn(async (_records: { src: string }[], _ctx: any) => {
-        mapPausedAtBulkAppend = await redis.sismember(pausedSetKey, mapPauseKey);
-        foldPausedAtBulkAppend = await redis.sismember(pausedSetKey, foldPauseKey);
-      });
+      const bulkAppend = vi.fn(
+        async (_records: { src: string }[], _ctx: any) => {
+          mapPausedAtBulkAppend = await redis.sismember(
+            pausedSetKey,
+            mapPauseKey,
+          );
+          foldPausedAtBulkAppend = await redis.sismember(
+            pausedSetKey,
+            foldPauseKey,
+          );
+        },
+      );
       const mapDefinition: MapProjectionDefinition<{ src: string }, any> = {
         name: mapName,
         eventTypes: ["trace.upserted"],
@@ -494,12 +585,13 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
       // Map bulk-appended both aggregates in a single tenant-scoped call.
       expect(bulkAppend).toHaveBeenCalledTimes(1);
-      for (const [records, ctx] of bulkAppend.mock.calls as Array<[any[], any]>) {
+      for (const [records, ctx] of bulkAppend.mock.calls as Array<
+        [any[], any]
+      >) {
         expect(ctx.tenantId).toBe(tenantA);
-        expect((records as { src: string }[]).map((r) => r.src).sort()).toEqual([
-          "trace-a1",
-          "trace-a2",
-        ]);
+        expect((records as { src: string }[]).map((r) => r.src).sort()).toEqual(
+          ["trace-a1", "trace-a2"],
+        );
       }
 
       // Fold projection was paused while its own WRITE phase ran. The map's
@@ -539,7 +631,9 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       // failure and be cleared BY the failure path, not never written at all.
       let foldCutoffsAtFailure: Record<string, string> | null = null;
       const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => {
-        foldCutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`);
+        foldCutoffsAtFailure = await redis.hgetall(
+          `${CUTOFF_KEY_PREFIX}${foldName}`,
+        );
         throw new Error("fold store boom");
       });
 
@@ -618,7 +712,9 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       // ...and the failed batch's pending/cutoff markers were cleared too —
       // live events for its aggregates process normally right away instead of
       // deferring until the marker TTL lapses.
-      expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`)).toEqual({});
+      expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`)).toEqual(
+        {},
+      );
     });
 
     it("clears the failed batch's markers and unpauses when a map projection batch fails", async () => {
@@ -632,11 +728,16 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       // failure and be cleared BY the failure path, not never written at all.
       let cutoffsAtFailure: Record<string, string> | null = null;
       const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
-        cutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${projectionName}`);
+        cutoffsAtFailure = await redis.hgetall(
+          `${CUTOFF_KEY_PREFIX}${projectionName}`,
+        );
         throw new Error("bulk write boom");
       });
 
-      const projection = createMapProjection({ name: projectionName, bulkAppend });
+      const projection = createMapProjection({
+        name: projectionName,
+        bulkAppend,
+      });
       const service = createServiceWithResolver();
 
       const result = await service.replay({
@@ -654,14 +755,22 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       // write failed...
       expect(cutoffsAtFailure).not.toBeNull();
       const expectedAggKeys = ["trace-a1", "trace-a2"].map((id) =>
-        aggregateKey({ tenantId: tenantA, aggregateType: "trace", aggregateId: id }),
+        aggregateKey({
+          tenantId: tenantA,
+          aggregateType: "trace",
+          aggregateId: id,
+        }),
       );
-      expect(Object.keys(cutoffsAtFailure!).sort()).toEqual(expectedAggKeys.sort());
+      expect(Object.keys(cutoffsAtFailure!).sort()).toEqual(
+        expectedAggKeys.sort(),
+      );
 
       // ...and the failure path cleared them, so live events for the failed
       // batch's aggregates process normally right away instead of deferring
       // until the marker TTL lapses.
-      expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${projectionName}`)).toEqual({});
+      expect(
+        await redis.hgetall(`${CUTOFF_KEY_PREFIX}${projectionName}`),
+      ).toEqual({});
 
       // The catch unpauses BEFORE its final emit — the pause-set entry (a
       // no-TTL set member) must be gone so live processing is never left
@@ -680,10 +789,16 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         aggregateType: "trace",
         aggregateId: "trace-a1",
       });
-      await redis.sadd(`${COMPLETED_KEY_PREFIX}${projectionName}`, completedAggKey);
+      await redis.sadd(
+        `${COMPLETED_KEY_PREFIX}${projectionName}`,
+        completedAggKey,
+      );
 
       const bulkAppend = vi.fn().mockResolvedValue(undefined);
-      const projection = createMapProjection({ name: projectionName, bulkAppend });
+      const projection = createMapProjection({
+        name: projectionName,
+        bulkAppend,
+      });
       const service = createServiceWithResolver();
 
       const result = await service.replay({
@@ -698,20 +813,31 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       expect(result.totalEvents).toBe(1);
 
       expect(bulkAppend).toHaveBeenCalledTimes(1);
-      const appendedRecords = bulkAppend.mock.calls.flatMap(([records]) => records as any[]);
+      const appendedRecords = bulkAppend.mock.calls.flatMap(
+        ([records]) => records as any[],
+      );
       expect(appendedRecords.map((r) => r.src)).toEqual(["trace-a2"]);
 
       // cleanupAll ran — both keys gone, including the pre-populated completed set.
-      const completedLeft = await redis.exists(`${COMPLETED_KEY_PREFIX}${projectionName}`);
-      const cutoffLeft = await redis.exists(`${CUTOFF_KEY_PREFIX}${projectionName}`);
+      const completedLeft = await redis.exists(
+        `${COMPLETED_KEY_PREFIX}${projectionName}`,
+      );
+      const cutoffLeft = await redis.exists(
+        `${CUTOFF_KEY_PREFIX}${projectionName}`,
+      );
       expect(completedLeft).toBe(0);
       expect(cutoffLeft).toBe(0);
     });
-
   });
 
   describe("replayOptimized per-eventType projection mapping", () => {
-    function createFoldProjection({ name, store }: { name: string; store: any }): RegisteredFoldProjection {
+    function createFoldProjection({
+      name,
+      store,
+    }: {
+      name: string;
+      store: any;
+    }): RegisteredFoldProjection {
       const definition: FoldProjectionDefinition<{ count: number }, any> = {
         name,
         version: "v1",
@@ -732,7 +858,13 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       };
     }
 
-    function createSpanMapProjection({ name, bulkAppend }: { name: string; bulkAppend: any }): RegisteredMapProjection {
+    function createSpanMapProjection({
+      name,
+      bulkAppend,
+    }: {
+      name: string;
+      bulkAppend: any;
+    }): RegisteredMapProjection {
       const definition: MapProjectionDefinition<{ src: string }, any> = {
         name,
         eventTypes: ["span.created"],
@@ -800,15 +932,23 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         aggregateId: `span-s1-${suffix}`,
       });
       const traceAggKeys = ["trace-a1", "trace-a2"].map((id) =>
-        aggregateKey({ tenantId: tenantA, aggregateType: "trace", aggregateId: id }),
+        aggregateKey({
+          tenantId: tenantA,
+          aggregateType: "trace",
+          aggregateId: id,
+        }),
       );
 
       // Capture marker state at WRITE time (markers are cleaned at run end).
       let foldCutoffsAtWrite: Record<string, string> | null = null;
       let mapCutoffsAtWrite: Record<string, string> | null = null;
       const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => {
-        foldCutoffsAtWrite = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`);
-        mapCutoffsAtWrite = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+        foldCutoffsAtWrite = await redis.hgetall(
+          `${CUTOFF_KEY_PREFIX}${foldName}`,
+        );
+        mapCutoffsAtWrite = await redis.hgetall(
+          `${CUTOFF_KEY_PREFIX}${mapName}`,
+        );
       });
       const bulkAppend = vi.fn().mockResolvedValue(undefined);
 
@@ -816,7 +956,10 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         name: foldName,
         store: { store: foldStore, get: vi.fn().mockResolvedValue(null) },
       });
-      const mapProjection = createSpanMapProjection({ name: mapName, bulkAppend });
+      const mapProjection = createSpanMapProjection({
+        name: mapName,
+        bulkAppend,
+      });
 
       const service = createServiceWithResolver();
       const batchKinds: string[] = [];
@@ -836,12 +979,16 @@ describe("ReplayService tenant-specific ClickHouse", () => {
       // Fold wrote both trace aggregates; map wrote only the span aggregate.
       expect(foldStore).toHaveBeenCalledTimes(2);
       expect(bulkAppend).toHaveBeenCalledTimes(1);
-      expect(bulkAppend.mock.calls[0]![0]).toEqual([{ src: `span-s1-${suffix}` }]);
+      expect(bulkAppend.mock.calls[0]![0]).toEqual([
+        { src: `span-s1-${suffix}` },
+      ]);
 
       // The fold projection's cutoff markers cover only its own aggregates —
       // the span-only aggregate never appears, and vice versa for the map.
       expect(foldCutoffsAtWrite).not.toBeNull();
-      expect(Object.keys(foldCutoffsAtWrite!).sort()).toEqual(traceAggKeys.sort());
+      expect(Object.keys(foldCutoffsAtWrite!).sort()).toEqual(
+        traceAggKeys.sort(),
+      );
       expect(Object.keys(mapCutoffsAtWrite!)).toEqual([spanAggKey]);
 
       // Mixed fold+map runs report the dominant kind.
@@ -880,7 +1027,8 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         },
         {
           onBatchComplete: (info) => batchKinds.push(info.projectionKind),
-          onProgress: (progress) => progressKinds.add(progress.currentProjectionKind),
+          onProgress: (progress) =>
+            progressKinds.add(progress.currentProjectionKind),
         },
       );
 
@@ -926,9 +1074,14 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
         const pausedDuringWrite: number[] = [];
         const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
-          pausedDuringWrite.push(await redis.sismember(pausedSetKey, mapPauseKey));
+          pausedDuringWrite.push(
+            await redis.sismember(pausedSetKey, mapPauseKey),
+          );
         });
-        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const projection = createTrackedMapProjection({
+          name: mapName,
+          bulkAppend,
+        });
         const service = createServiceWithResolver();
 
         const pausedAtBatchComplete: number[] = [];
@@ -985,7 +1138,10 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         const bulkAppend = vi.fn(async () => {
           throw new Error("bulk write boom");
         });
-        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const projection = createTrackedMapProjection({
+          name: mapName,
+          bulkAppend,
+        });
         const service = createServiceWithResolver();
 
         const result = await service.replayOptimized({
@@ -1012,10 +1168,15 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         // failure and be cleared BY the failure path.
         let cutoffsAtFailure: Record<string, string> | null = null;
         const bulkAppend = vi.fn(async () => {
-          cutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+          cutoffsAtFailure = await redis.hgetall(
+            `${CUTOFF_KEY_PREFIX}${mapName}`,
+          );
           throw new Error("bulk write boom");
         });
-        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const projection = createTrackedMapProjection({
+          name: mapName,
+          bulkAppend,
+        });
         const service = createServiceWithResolver();
 
         const result = await service.replayOptimized({
@@ -1033,7 +1194,9 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
         // ...but the failed batch's aggregates were never replayed — their
         // pending/cutoff markers must not linger for the 7-day marker TTL.
-        const cutoffMarkers = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+        const cutoffMarkers = await redis.hgetall(
+          `${CUTOFF_KEY_PREFIX}${mapName}`,
+        );
         expect(cutoffMarkers).toEqual({});
 
         // The live marker checker lets the failed batch's aggregates process
@@ -1065,10 +1228,15 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
           flushCalls++;
           if (flushCalls === 1) return;
-          cutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+          cutoffsAtFailure = await redis.hgetall(
+            `${CUTOFF_KEY_PREFIX}${mapName}`,
+          );
           throw new Error("bulk write boom");
         });
-        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const projection = createTrackedMapProjection({
+          name: mapName,
+          bulkAppend,
+        });
         const service = createServiceWithResolver();
 
         const result = await service.replayOptimized({
@@ -1084,8 +1252,12 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
         // Which aggregate completed first depends on discovery order — derive
         // it from the successful first flush.
-        const completedId = (bulkAppend.mock.calls[0]![0] as Array<{ src: string }>)[0]!.src;
-        const failedId = ["trace-a1", "trace-a2"].find((id) => id !== completedId)!;
+        const completedId = (
+          bulkAppend.mock.calls[0]![0] as Array<{ src: string }>
+        )[0]!.src;
+        const failedId = ["trace-a1", "trace-a2"].find(
+          (id) => id !== completedId,
+        )!;
         const completedAggKey = aggregateKey({
           tenantId: tenantA,
           aggregateType: "trace",
@@ -1104,16 +1276,22 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
         // ...but afterwards it holds no marker of any kind — it is back to
         // unconditional live processing.
-        const cutoffMarkers = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+        const cutoffMarkers = await redis.hgetall(
+          `${CUTOFF_KEY_PREFIX}${mapName}`,
+        );
         expect(cutoffMarkers).toEqual({});
-        expect(await redis.exists(doneMarkerKey(mapName, failedAggKey))).toBe(0);
+        expect(await redis.exists(doneMarkerKey(mapName, failedAggKey))).toBe(
+          0,
+        );
 
         // ... while the completed batch keeps its done marker and its
         // completed-set entry, so an operator re-run resumes past it.
-        expect(await redis.exists(doneMarkerKey(mapName, completedAggKey))).toBe(1);
-        expect(await redis.smembers(`${COMPLETED_KEY_PREFIX}${mapName}`)).toEqual([
-          completedAggKey,
-        ]);
+        expect(
+          await redis.exists(doneMarkerKey(mapName, completedAggKey)),
+        ).toBe(1);
+        expect(
+          await redis.smembers(`${COMPLETED_KEY_PREFIX}${mapName}`),
+        ).toEqual([completedAggKey]);
       });
     });
 
@@ -1125,7 +1303,10 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         const mapPauseKey = `test_pipeline/handler/${mapName}`;
 
         const bulkAppend = vi.fn().mockResolvedValue(undefined);
-        const projection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const projection = createTrackedMapProjection({
+          name: mapName,
+          bulkAppend,
+        });
         const service = createServiceWithResolver();
 
         // Snapshot the cutoff hash at cancellation time. onProgress is sync,
@@ -1173,7 +1354,9 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         // leave them lingering for the marker TTL.
         expect(cutoffsAtCancel).not.toBeNull();
         expect(Object.keys(cutoffsAtCancel!)).not.toHaveLength(0);
-        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`)).toEqual({});
+        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`)).toEqual(
+          {},
+        );
 
         // The per-batch finally unpaused despite the rethrow — live
         // processing is never left frozen by a cancelled run.
@@ -1188,19 +1371,22 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         const foldName = `optMixedFold_${suffix}`;
         const mapName = `optMixedMapFail_${suffix}`;
 
-        const foldStore = vi.fn(async (_state: { count: number }, _ctx: any) => undefined);
-        const foldDefinition: FoldProjectionDefinition<{ count: number }, any> = {
-          name: foldName,
-          version: "v1",
-          eventTypes: ["trace.upserted"],
-          LastEventOccurredAtKey: "LastEventOccurredAt",
-          init: () => ({ count: 0 }),
-          apply: (state) => ({ count: state.count + 1 }),
-          store: {
-            store: foldStore,
-            get: vi.fn().mockResolvedValue(null),
-          },
-        };
+        const foldStore = vi.fn(
+          async (_state: { count: number }, _ctx: any) => undefined,
+        );
+        const foldDefinition: FoldProjectionDefinition<{ count: number }, any> =
+          {
+            name: foldName,
+            version: "v1",
+            eventTypes: ["trace.upserted"],
+            LastEventOccurredAtKey: "LastEventOccurredAt",
+            init: () => ({ count: 0 }),
+            apply: (state) => ({ count: state.count + 1 }),
+            store: {
+              store: foldStore,
+              get: vi.fn().mockResolvedValue(null),
+            },
+          };
         const foldProjection: RegisteredFoldProjection = {
           projectionName: foldName,
           pipelineName: "test_pipeline",
@@ -1220,10 +1406,15 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         const bulkAppend = vi.fn(async (_records: any[], _ctx: any) => {
           mapFlushes++;
           if (mapFlushes === 1) return;
-          mapCutoffsAtFailure = await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`);
+          mapCutoffsAtFailure = await redis.hgetall(
+            `${CUTOFF_KEY_PREFIX}${mapName}`,
+          );
           throw new Error("bulk write boom");
         });
-        const mapProjection = createTrackedMapProjection({ name: mapName, bulkAppend });
+        const mapProjection = createTrackedMapProjection({
+          name: mapName,
+          bulkAppend,
+        });
 
         const service = createServiceWithResolver();
 
@@ -1243,8 +1434,12 @@ describe("ReplayService tenant-specific ClickHouse", () => {
 
         // Which aggregate completed first depends on discovery order — derive
         // it from the successful first flush.
-        const completedId = (bulkAppend.mock.calls[0]![0] as Array<{ src: string }>)[0]!.src;
-        const failedId = ["trace-a1", "trace-a2"].find((id) => id !== completedId)!;
+        const completedId = (
+          bulkAppend.mock.calls[0]![0] as Array<{ src: string }>
+        )[0]!.src;
+        const failedId = ["trace-a1", "trace-a2"].find(
+          (id) => id !== completedId,
+        )!;
         const completedAggKey = aggregateKey({
           tenantId: tenantA,
           aggregateType: "trace",
@@ -1263,22 +1458,34 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         // clearFailedBatchMarkers HDELs the failed batch's aggKeys across ALL
         // projections — including the fold, whose write had already
         // succeeded. Both cutoff hashes end empty.
-        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`)).toEqual({});
-        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`)).toEqual({});
+        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${foldName}`)).toEqual(
+          {},
+        );
+        expect(await redis.hgetall(`${CUTOFF_KEY_PREFIX}${mapName}`)).toEqual(
+          {},
+        );
 
         // ...but those extra HDELs are no-ops for done markers: the completed
         // batch keeps its done marker and completed-set entry for BOTH
         // projections, so an operator re-run resumes past it.
-        expect(await redis.exists(doneMarkerKey(foldName, completedAggKey))).toBe(1);
-        expect(await redis.smembers(`${COMPLETED_KEY_PREFIX}${foldName}`)).toEqual([
-          completedAggKey,
-        ]);
-        expect(await redis.exists(doneMarkerKey(mapName, completedAggKey))).toBe(1);
+        expect(
+          await redis.exists(doneMarkerKey(foldName, completedAggKey)),
+        ).toBe(1);
+        expect(
+          await redis.smembers(`${COMPLETED_KEY_PREFIX}${foldName}`),
+        ).toEqual([completedAggKey]);
+        expect(
+          await redis.exists(doneMarkerKey(mapName, completedAggKey)),
+        ).toBe(1);
 
         // The failed batch's aggregate holds no terminal marker for either
         // projection — it is back to unconditional live processing.
-        expect(await redis.exists(doneMarkerKey(foldName, failedAggKey))).toBe(0);
-        expect(await redis.exists(doneMarkerKey(mapName, failedAggKey))).toBe(0);
+        expect(await redis.exists(doneMarkerKey(foldName, failedAggKey))).toBe(
+          0,
+        );
+        expect(await redis.exists(doneMarkerKey(mapName, failedAggKey))).toBe(
+          0,
+        );
       });
     });
   });
@@ -1392,12 +1599,11 @@ describe("ReplayService tenant-specific ClickHouse", () => {
         // cutoff/load path would drop or mix records across these calls.
         expect(bulkAppend).toHaveBeenCalledTimes(2);
         const recordsByTenant = new Map<string, string[]>();
-        for (const [records, ctx] of bulkAppend.mock.calls as Array<[Array<{ src: string }>, any]>) {
+        for (const [records, ctx] of bulkAppend.mock.calls as Array<
+          [Array<{ src: string }>, any]
+        >) {
           expect(recordsByTenant.has(ctx.tenantId)).toBe(false);
-          recordsByTenant.set(
-            ctx.tenantId,
-            records.map((r) => r.src).sort(),
-          );
+          recordsByTenant.set(ctx.tenantId, records.map((r) => r.src).sort());
         }
         expect(recordsByTenant.get(tenantA)).toEqual([aggA1, aggA2]);
         expect(recordsByTenant.get(tenantB)).toEqual([aggB1]);

@@ -1,3 +1,4 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import { PromptsFacade, PromptsApiService } from "./services/prompts";
 export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
 export type {
@@ -148,7 +149,7 @@ export class LangWatch {
   readonly secrets: SecretsApiService;
 
   constructor(options: LangWatchConstructorOptions = {}) {
-    const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    const apiKey = options.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = options.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
 
     this.config = this.#createInternalConfig({

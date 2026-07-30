@@ -1,3 +1,4 @@
+import type { NotificationCadence } from "@langwatch/automations/cadences";
 import type {
   AlertType,
   Prisma,
@@ -5,7 +6,6 @@ import type {
   TriggerAction,
   TriggerKind,
 } from "@prisma/client";
-import type { NotificationCadence } from "@langwatch/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
 
 export interface TriggerSummary {
@@ -124,7 +124,9 @@ export interface TriggerRepository {
   }): Promise<Trigger | null>;
 
   /** Persist a new trigger row. `data` must carry `projectId` (multitenancy). */
-  create(params: { data: Prisma.TriggerUncheckedCreateInput }): Promise<Trigger>;
+  create(params: {
+    data: Prisma.TriggerUncheckedCreateInput;
+  }): Promise<Trigger>;
 
   /** Update a trigger row, scoped to the calling project. */
   update(params: {
@@ -305,7 +307,9 @@ export class NullTriggerRepository implements TriggerRepository {
   }): Promise<Trigger> {
     // Loud by design: there is no honest Trigger row to fabricate. Wiring
     // that reaches authoring writes must inject a real repository.
-    throw new Error("Trigger authoring is not supported by NullTriggerRepository");
+    throw new Error(
+      "Trigger authoring is not supported by NullTriggerRepository",
+    );
   }
 
   async update(_params: {
@@ -313,6 +317,8 @@ export class NullTriggerRepository implements TriggerRepository {
     projectId: string;
     data: Prisma.TriggerUncheckedUpdateInput;
   }): Promise<Trigger> {
-    throw new Error("Trigger authoring is not supported by NullTriggerRepository");
+    throw new Error(
+      "Trigger authoring is not supported by NullTriggerRepository",
+    );
   }
 }

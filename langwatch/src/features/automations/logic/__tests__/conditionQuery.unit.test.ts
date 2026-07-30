@@ -15,25 +15,33 @@ describe("serializeConditions", () => {
   describe("given a single membership condition", () => {
     it("emits field:value for is", () => {
       expect(
-        serializeConditions([cond({ field: "status", operator: "is", value: "error" })]),
+        serializeConditions([
+          cond({ field: "status", operator: "is", value: "error" }),
+        ]),
       ).toBe("status:error");
     });
 
     it("emits -field:value for is_not", () => {
       expect(
-        serializeConditions([cond({ field: "status", operator: "is_not", value: "error" })]),
+        serializeConditions([
+          cond({ field: "status", operator: "is_not", value: "error" }),
+        ]),
       ).toBe("-status:error");
     });
 
     it("quotes a value that contains a space", () => {
       expect(
-        serializeConditions([cond({ field: "user", operator: "is", value: "acme corp" })]),
+        serializeConditions([
+          cond({ field: "user", operator: "is", value: "acme corp" }),
+        ]),
       ).toBe('user:"acme corp"');
     });
 
     it("leaves a wildcard value bare", () => {
       expect(
-        serializeConditions([cond({ field: "model", operator: "is", value: "gpt-4o*" })]),
+        serializeConditions([
+          cond({ field: "model", operator: "is", value: "gpt-4o*" }),
+        ]),
       ).toBe("model:gpt-4o*");
     });
   });
@@ -41,17 +49,26 @@ describe("serializeConditions", () => {
   describe("given range conditions", () => {
     it("emits comparators", () => {
       expect(
-        serializeConditions([cond({ field: "cost", operator: "gt", value: "0.1" })]),
+        serializeConditions([
+          cond({ field: "cost", operator: "gt", value: "0.1" }),
+        ]),
       ).toBe("cost:>0.1");
       expect(
-        serializeConditions([cond({ field: "cost", operator: "lte", value: "1" })]),
+        serializeConditions([
+          cond({ field: "cost", operator: "lte", value: "1" }),
+        ]),
       ).toBe("cost:<=1");
     });
 
     it("emits a bracketed range for between", () => {
       expect(
         serializeConditions([
-          cond({ field: "cost", operator: "between", value: "0.1", valueTo: "1" }),
+          cond({
+            field: "cost",
+            operator: "between",
+            value: "0.1",
+            valueTo: "1",
+          }),
         ]),
       ).toBe("cost:[0.1 TO 1]");
     });
@@ -81,7 +98,12 @@ describe("serializeConditions", () => {
     it("skips a between row missing its upper bound", () => {
       expect(
         serializeConditions([
-          cond({ field: "cost", operator: "between", value: "0.1", valueTo: "" }),
+          cond({
+            field: "cost",
+            operator: "between",
+            value: "0.1",
+            valueTo: "",
+          }),
         ]),
       ).toBe("");
     });
@@ -119,7 +141,13 @@ describe("queryToConditions", () => {
         { id: "c0", field: "cost", operator: "gt", value: "0.1" },
       ]);
       expect(queryToConditions("cost:[0.1 TO 1]")).toEqual([
-        { id: "c0", field: "cost", operator: "between", value: "0.1", valueTo: "1" },
+        {
+          id: "c0",
+          field: "cost",
+          operator: "between",
+          value: "0.1",
+          valueTo: "1",
+        },
       ]);
     });
 
@@ -152,7 +180,13 @@ describe("queryToConditions", () => {
     it("survives builder → string → builder unchanged", () => {
       const conditions: Condition[] = [
         { id: "c0", field: "status", operator: "is", value: "error" },
-        { id: "c1", field: "cost", operator: "between", value: "0.1", valueTo: "1" },
+        {
+          id: "c1",
+          field: "cost",
+          operator: "between",
+          value: "0.1",
+          valueTo: "1",
+        },
         { id: "c2", field: "user", operator: "is_not", value: "acme corp" },
       ];
       const query = serializeConditions(conditions);

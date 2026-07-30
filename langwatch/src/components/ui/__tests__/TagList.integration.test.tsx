@@ -31,10 +31,9 @@ describe("<TagList/>", () => {
 
   describe("when onAdd is provided", () => {
     it("displays a + add button", () => {
-      render(
-        <TagList labels={["ci"]} onAdd={vi.fn()} onRemove={vi.fn()} />,
-        { wrapper: Wrapper },
-      );
+      render(<TagList labels={["ci"]} onAdd={vi.fn()} onRemove={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("+ add")).toBeInTheDocument();
     });
@@ -42,10 +41,9 @@ describe("<TagList/>", () => {
     it("shows an inline text input when + add is clicked", async () => {
       const user = userEvent.setup();
 
-      render(
-        <TagList labels={["ci"]} onAdd={vi.fn()} onRemove={vi.fn()} />,
-        { wrapper: Wrapper },
-      );
+      render(<TagList labels={["ci"]} onAdd={vi.fn()} onRemove={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("+ add"));
       expect(screen.getByPlaceholderText("Add label...")).toBeInTheDocument();
@@ -55,10 +53,9 @@ describe("<TagList/>", () => {
       const user = userEvent.setup();
       const onAdd = vi.fn();
 
-      render(
-        <TagList labels={[]} onAdd={onAdd} onRemove={vi.fn()} />,
-        { wrapper: Wrapper },
-      );
+      render(<TagList labels={[]} onAdd={onAdd} onRemove={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("+ add"));
       const input = screen.getByPlaceholderText("Add label...");
@@ -84,26 +81,22 @@ describe("<TagList/>", () => {
     it("keeps the input open after pressing Enter for rapid entry", async () => {
       const user = userEvent.setup();
 
-      render(
-        <TagList labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />,
-        { wrapper: Wrapper },
-      );
+      render(<TagList labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("+ add"));
       const input = screen.getByPlaceholderText("Add label...");
       await user.type(input, "new-tag{enter}");
-      expect(
-        screen.getByPlaceholderText("Add label..."),
-      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Add label...")).toBeInTheDocument();
     });
 
     it("hides the input on Escape", async () => {
       const user = userEvent.setup();
 
-      render(
-        <TagList labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />,
-        { wrapper: Wrapper },
-      );
+      render(<TagList labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("+ add"));
       screen.getByPlaceholderText("Add label...");
@@ -124,13 +117,9 @@ describe("<TagList/>", () => {
 
   describe("when onRemove is provided", () => {
     it("displays remove buttons on each tag", () => {
-      render(
-        <TagList
-          labels={["alpha", "beta"]}
-          onRemove={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
+      render(<TagList labels={["alpha", "beta"]} onRemove={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       expect(
         screen.getByRole("button", { name: "Remove alpha tag" }),
@@ -144,10 +133,9 @@ describe("<TagList/>", () => {
       const user = userEvent.setup();
       const onRemove = vi.fn();
 
-      render(
-        <TagList labels={["alpha", "beta"]} onRemove={onRemove} />,
-        { wrapper: Wrapper },
-      );
+      render(<TagList labels={["alpha", "beta"]} onRemove={onRemove} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(
         screen.getByRole("button", { name: "Remove alpha tag" }),

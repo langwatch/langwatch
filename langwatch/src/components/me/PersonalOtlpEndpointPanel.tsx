@@ -1,8 +1,6 @@
-import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-
-import { Button } from "@chakra-ui/react";
 import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 
@@ -102,8 +100,8 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${apiKey}"`
       <Text fontSize="xs" color="fg.muted">
         For ad-hoc / custom telemetry. Spans land as-emitted; cost / tokens /
         model are not auto-populated unless your spans already follow{" "}
-        <code>gen_ai.*</code> conventions. For tool-specific auto-shape, use
-        the catalog tiles on /me when available.
+        <code>gen_ai.*</code> conventions. For tool-specific auto-shape, use the
+        catalog tiles on /me when available.
       </Text>
     </VStack>
   );

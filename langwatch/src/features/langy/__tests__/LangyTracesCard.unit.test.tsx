@@ -13,8 +13,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { LangyTracesCard } from "../components/capabilities/LangyTracesCard";
 import { resolveCapability } from "../components/capabilities/capabilityRegistry";
+import { LangyTracesCard } from "../components/capabilities/LangyTracesCard";
 
 const descriptor = resolveCapability("langwatch.trace.search")!;
 

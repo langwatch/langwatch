@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -9,6 +10,7 @@ import {
   isAutoSpawnEnabled,
   isDaemonDisabledByConfig,
   resolveColorLevel,
+  stdinCarriesData,
   type EligibilityInput,
 } from "../eligibility";
 
@@ -18,6 +20,7 @@ const piped = (overrides: Partial<EligibilityInput> = {}): EligibilityInput => (
   stdoutIsTty: false,
   stderrIsTty: false,
   stdinIsTty: false,
+  stdinCarriesData: false,
   platform: "darwin",
   ...overrides,
 });
@@ -85,6 +88,83 @@ describe("evaluateEligibility", () => {
     });
   });
 
+  /**
+   * The daemon is spawned with `stdio: "ignore"` (spawn.ts), so its fd 0 is
+   * /dev/null. A caller who is PIPING data in is therefore the one shape it can
+   * least serve — while being, on a TTY check alone, indistinguishable from the
+   * agent this whole feature exists for.
+   */
+  describe("given a caller whose stdin carries data", () => {
+    /** @scenario "A command reads the caller's standard input" */
+    it("refuses a piped stdin, which no terminal check would have caught", () => {
+      expect(
+        evaluateEligibility(
+          piped({
+            args: ["dataset", "records", "add", "my-ds", "--stdin"],
+            stdinCarriesData: true,
+          }),
+        ),
+      ).toEqual({ eligible: false, reason: "piped-stdin" });
+    });
+
+    it("refuses a piped stdin whatever the command is", () => {
+      // Served, `readStdin()` would resolve "" on the daemon's immediate EOF —
+      // and the SECOND such request would never settle at all, because
+      // process.stdin has already emitted `end`.
+      expect(
+        evaluateEligibility(piped({ stdinCarriesData: true })),
+      ).toEqual({ eligible: false, reason: "piped-stdin" });
+    });
+
+    it("refuses --stdin even when fd 0 could not be inspected", () => {
+      expect(
+        evaluateEligibility(
+          piped({ args: ["dataset", "records", "add", "my-ds", "--stdin"] }),
+        ),
+      ).toEqual({ eligible: false, reason: "reads-stdin" });
+    });
+
+    it("still serves the same command when nothing is piped in", () => {
+      expect(
+        evaluateEligibility(
+          piped({
+            args: ["dataset", "records", "add", "my-ds", "--file", "rows.json"],
+          }),
+        ),
+      ).toEqual({ eligible: true });
+    });
+  });
+
+  describe("when the command prompts on stdin", () => {
+    /** @scenario "A command asks me a question at a prompt" */
+    it("refuses push, whose conflict prompt would never be answered", () => {
+      expect(evaluateEligibility(piped({ args: ["push"] }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
+    });
+
+    /** @scenario "A command asks me a question at a prompt" */
+    it("refuses prompt tag delete, which confirms by typing the tag name", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["prompt", "tag", "delete", "prod"] })),
+      ).toEqual({ eligible: false, reason: "denied-command" });
+    });
+
+    it("keeps serving the tag commands that never prompt", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["prompt", "tag", "list"] })),
+      ).toEqual({ eligible: true });
+    });
+
+    it("keeps serving a --tag VALUE, which the phrase rule exists to spare", () => {
+      // Denying the bare word `tag` would have taken this with it.
+      expect(
+        evaluateEligibility(piped({ args: ["pull", "--tag", "production"] })),
+      ).toEqual({ eligible: true });
+    });
+  });
+
   describe("when the command mutates identity or takes over stdio", () => {
     it.each([
       ["login"],
@@ -100,6 +180,7 @@ describe("evaluateEligibility", () => {
       ["daemon"],
       ["init-shell"],
       ["report"],
+      ["push"],
     ])("refuses %s", (command) => {
       expect(evaluateEligibility(piped({ args: [command] }))).toEqual({
         eligible: false,
@@ -110,6 +191,40 @@ describe("evaluateEligibility", () => {
     it("finds the command name past leading flags", () => {
       expect(
         evaluateEligibility(piped({ args: ["--verbose", "login"] })),
+      ).toEqual({ eligible: false, reason: "denied-command" });
+    });
+  });
+
+  describe("when a value-taking global option comes before the command", () => {
+    // The root program's `-o <format>`, `--json <fields>` and `--jq <expr>`
+    // parse ahead of the subcommand, so the first bare word is the option's
+    // VALUE, not the command. Reading it as the command let `-o json open`
+    // through to a daemon with no display environment and stdio on /dev/null:
+    // no browser opened, and for the wrappers the caller's output vanished.
+    it.each([
+      [["-o", "json", "open", "/traces"]],
+      [["--output", "json", "request-increase"]],
+      [["-o", "json", "claude", "-p", "summarise this"]],
+      [["--json", "id,name", "config", "set", "daemon", "off"]],
+      [["--jq", ".projects[].id", "login"]],
+    ])("refuses %j", (args) => {
+      expect(evaluateEligibility(piped({ args }))).toEqual({
+        eligible: false,
+        reason: "denied-command",
+      });
+    });
+
+    it("still serves an allowed command behind the same option", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["-o", "json", "trace", "search"] })),
+      ).toEqual({ eligible: true });
+    });
+  });
+
+  describe("when a denied name appears somewhere other than the command", () => {
+    it("refuses anyway, because a needless cold start is the cheap mistake", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["prompt", "get", "open"] })),
       ).toEqual({ eligible: false, reason: "denied-command" });
     });
   });
@@ -137,6 +252,43 @@ describe("evaluateEligibility", () => {
         eligible: false,
         reason: "no-command",
       });
+    });
+
+    // A global option's VALUE is a bare word too, so `-o json` used to read as
+    // the command `json` and reach the daemon, which then rendered the root
+    // help for an invocation there was nothing to warm for. (Which bin name
+    // that help carries is settled separately, by `ExecFrame.bin`.)
+    it.each([
+      [["-o", "json"]],
+      [["--output", "yaml"]],
+      [["--jq", ".projects[].id"]],
+      [["--json", "id,name"]],
+      [["-o", "json", "--jq", ".id"]],
+    ])("refuses %j, which names no command at all", (args) => {
+      expect(evaluateEligibility(piped({ args }))).toEqual({
+        eligible: false,
+        reason: "no-command",
+      });
+    });
+
+    it("still serves a command that follows a global option's value", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["-o", "json", "trace", "list"] })),
+      ).toEqual({ eligible: true });
+    });
+
+    it("still serves a command behind a boolean global option", () => {
+      // `--agent` takes no value, so `trace` is the command — and `list`,
+      // following an operand rather than a flag, is what proves it.
+      expect(
+        evaluateEligibility(piped({ args: ["--agent", "trace", "list"] })),
+      ).toEqual({ eligible: true });
+    });
+
+    it("reads an option that carries its own value as not eating the command", () => {
+      expect(
+        evaluateEligibility(piped({ args: ["--output=json", "trace"] })),
+      ).toEqual({ eligible: true });
     });
   });
 
@@ -209,6 +361,75 @@ describe("resolveColorLevel", () => {
   describe("when NO_COLOR wins", () => {
     it("overrides FORCE_COLOR", () => {
       expect(resolveColorLevel({ NO_COLOR: "1", FORCE_COLOR: "3" })).toBe(0);
+    });
+  });
+});
+
+describe("stdinCarriesData", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-stdin-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  describe("given a descriptor the daemon cannot be handed", () => {
+    it("reports a redirected file as carrying data", () => {
+      const file = path.join(dir, "records.json");
+      fs.writeFileSync(file, "[]");
+      const fd = fs.openSync(file, "r");
+      try {
+        expect(stdinCarriesData(fd)).toBe(true);
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
+
+    it("reports a pipe as carrying data", () => {
+      // The shape `cat records.json | langwatch …` actually hands fd 0. node
+      // has no mkfifo binding, and O_NONBLOCK is what keeps opening the read
+      // end from waiting for a writer that this test is not going to provide.
+      const fifo = path.join(dir, "fifo");
+      execFileSync("mkfifo", [fifo]);
+      const fd = fs.openSync(fifo, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK);
+      try {
+        expect(stdinCarriesData(fd)).toBe(true);
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
+  });
+
+  describe("given a descriptor the daemon reproduces exactly", () => {
+    it("reports /dev/null as carrying nothing — that IS the daemon's fd 0", () => {
+      const fd = fs.openSync("/dev/null", "r");
+      try {
+        expect(stdinCarriesData(fd)).toBe(false);
+      } finally {
+        fs.closeSync(fd);
+      }
+    });
+
+    it("reports a descriptor nothing is open on as carrying nothing rather than throwing", () => {
+      // NOT open-then-close: fd numbers are recycled lowest-first, so anything
+      // the runner opens between the close and the fstat lands on that same
+      // number and the assertion starts measuring an unrelated file — a failure
+      // with no relation to the code under test. A number far above what a
+      // process this size ever allocates is never handed out, so the fstat can
+      // only answer EBADF: exactly what a closed descriptor answers.
+      const neverAllocated = 4096;
+
+      // Pin the premise, so a machine that somehow DID have this descriptor
+      // open says so plainly instead of failing the real assertion obscurely —
+      // and so the case below can never quietly become vacuous.
+      expect(() => fs.fstatSync(neverAllocated)).toThrow(
+        expect.objectContaining({ code: "EBADF" }),
+      );
+
+      expect(stdinCarriesData(neverAllocated)).toBe(false);
     });
   });
 });

@@ -15,8 +15,8 @@ vi.mock("../../../ee/licensing/server", () => {
   };
 });
 
-import { getLicenseHandler } from "../subscriptionHandler";
 import { createLicenseHandler } from "../../../ee/licensing/server";
+import { getLicenseHandler } from "../subscriptionHandler";
 
 describe("getLicenseHandler", () => {
   /** @scenario getLicenseHandler returns same instance */

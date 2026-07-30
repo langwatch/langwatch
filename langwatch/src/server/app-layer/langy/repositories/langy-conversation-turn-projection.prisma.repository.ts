@@ -1,3 +1,12 @@
+import {
+  LANGY_CONVERSATION_TURN_STATUS,
+  type LangyConversationTurnData,
+  type LangyConversationTurnStatus,
+  langyMessagePartSchema,
+  langyPlanItemSchema,
+  langyTurnToolCallSchema,
+  parseConversationTurnKey,
+} from "@langwatch/langy";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
@@ -5,15 +14,6 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
-import {
-  langyMessagePartSchema,
-  langyPlanItemSchema,
-  langyTurnToolCallSchema,
-  parseConversationTurnKey,
-  type LangyConversationTurnData,
-  LANGY_CONVERSATION_TURN_STATUS,
-  type LangyConversationTurnStatus,
-} from "@langwatch/langy";
 
 /**
  * The status values this column accepts, derived from the ONE definition rather
@@ -95,7 +95,9 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
 }
 
 /** Postgres row I/O for the type-aware turn projection. */
-export class PrismaLangyConversationTurnProjectionRepository implements StateProjectionStore<LangyConversationTurnData> {
+export class PrismaLangyConversationTurnProjectionRepository
+  implements StateProjectionStore<LangyConversationTurnData>
+{
   constructor(
     private readonly prisma: ConversationTurnProjectionPrismaClient,
   ) {}

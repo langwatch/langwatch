@@ -22,9 +22,12 @@ vi.mock("~/components/ui/color-mode", () => ({
 }));
 /** Channels the mocked listSlackChannels mutation has "already loaded". Tests
  *  that care about the picker set this before rendering. */
-const listedChannels: { current: { id: string; name: string }[] | undefined } = {
-  current: undefined,
-};
+const listedChannels: { current: { id: string; name: string }[] | undefined } =
+  {
+    current: undefined,
+  };
+/** Why the listing is short of the workspace, as the server would report it. */
+const listedGaps: { current: string[] } = { current: [] };
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -36,7 +39,7 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({
           mutate: vi.fn(),
           data: listedChannels.current
-            ? { channels: listedChannels.current }
+            ? { channels: listedChannels.current, gaps: listedGaps.current }
             : undefined,
           isPending: false,
         }),
@@ -45,8 +48,11 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+import {
+  SLACK_BOT_TOKEN_KEPT,
+  type SlackPreview,
+} from "@langwatch/automations/providers/slack";
 import slackClient, { type SlackSlice } from "../client";
-import { SLACK_BOT_TOKEN_KEPT, type SlackPreview } from "@langwatch/automations/providers/slack";
 import {
   SLACK_BLOCK_KIT_TEMPLATES,
   templateOptionsFor,
@@ -341,6 +347,7 @@ describe("SlackConfigForm channel picker", () => {
   afterEach(() => {
     cleanup();
     listedChannels.current = undefined;
+    listedGaps.current = [];
   });
 
   describe("given a workspace whose channels have loaded", () => {
@@ -516,6 +523,93 @@ describe("SlackConfigForm channel picker", () => {
         expect(onChangeSpy).toHaveBeenLastCalledWith(
           expect.objectContaining({ channelId: "#adhoc" }),
         );
+      });
+    });
+
+    // A short list that looks complete is the failure mode being fixed: the
+    // author scrolls, doesn't find their channel, and concludes the whole
+    // integration is broken. Every way the list can come back short has to say
+    // so, and point at the way through.
+    describe("when the workspace has more channels than the fetch can return", () => {
+      beforeEach(() => {
+        listedGaps.current = ["page_cap"];
+      });
+
+      it("tells the author the list is incomplete", async () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        expect(
+          await screen.findByText(/more channels than we can list/i),
+        ).toBeInTheDocument();
+      });
+
+      it("points the author at entering the channel themselves", async () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        expect(
+          await screen.findByText(/type the channel name or paste its id/i),
+        ).toBeInTheDocument();
+      });
+    });
+
+    // Reachable: an app with no groups:read whose public channels then outrun
+    // the page budget. Ranking the two would have the author fix the scope and
+    // still come up short.
+    describe("when the list is short for more than one reason", () => {
+      beforeEach(() => {
+        listedGaps.current = ["page_cap", "private_channels_hidden"];
+      });
+
+      it("names every reason, not just the first", async () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        const hint = await screen.findByText(/private channels aren't listed/i);
+
+        expect(hint).toHaveTextContent(/more channels than we can list/i);
+      });
+    });
+
+    describe("when the app cannot see private channels", () => {
+      beforeEach(() => {
+        listedGaps.current = ["private_channels_hidden"];
+      });
+
+      it("names the permission that would show them", async () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        const hint = await screen.findByText(/private channels aren't listed/i);
+
+        expect(hint).toHaveTextContent(/groups:read/);
+      });
+    });
+
+    describe("when the list covers the whole workspace", () => {
+      it("says nothing about the list being short", () => {
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        expect(
+          screen.queryByText(/more channels than we can list/i),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByText(/private channels aren't listed/i),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    // The manifest grants chat:write.public, so public channels need no invite
+    // and private ones do. Telling the author only "invite the bot" sends them
+    // to do the one thing that doesn't help for a public channel, and doesn't
+    // mention the case where it is required.
+    describe("when the author reads the setup steps", () => {
+      it("says public channels need no invite and private ones do", async () => {
+        const user = userEvent.setup();
+        renderForm({ initial: botSlice({ channelId: "" }) });
+
+        await user.click(screen.getByText(/setup steps/i));
+
+        expect(
+          await screen.findByText(/public channels work straight away/i),
+        ).toHaveTextContent(/private channel, add the app to that channel/i);
       });
     });
 

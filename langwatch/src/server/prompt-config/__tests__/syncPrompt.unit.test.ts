@@ -218,10 +218,7 @@ describe("PromptService", () => {
 
         mockRepository.compareConfigContent.mockReturnValue({
           isEqual: false,
-          differences: [
-            "model: gpt-4 → gpt-4o-mini",
-            "temperature: 0.7 → 0.3",
-          ],
+          differences: ["model: gpt-4 → gpt-4o-mini", "temperature: 0.7 → 0.3"],
         });
 
         const localConfigData = {

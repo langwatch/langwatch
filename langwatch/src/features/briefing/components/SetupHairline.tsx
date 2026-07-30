@@ -1,7 +1,7 @@
 import {
   Box,
-  chakra,
   Collapsible,
+  chakra,
   Grid,
   HStack,
   Text,
@@ -10,15 +10,15 @@ import {
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { LuCheck } from "react-icons/lu";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { useRouter } from "~/utils/compat/next-router";
 import {
   buildOnboardingSteps,
   calculateCompletionPercentage,
   type OnboardingStepKey,
   STEP_ICON,
 } from "~/components/home/OnboardingProgress";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * The setup checklist, receded to a hairline.

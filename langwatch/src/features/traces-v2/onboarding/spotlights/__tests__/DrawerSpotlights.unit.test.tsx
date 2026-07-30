@@ -48,7 +48,6 @@ vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
 });
 vi.stubGlobal("cancelAnimationFrame", () => undefined);
 
-import React from "react";
 import { DrawerSpotlights } from "../DrawerSpotlights";
 
 function addAnchor(anchor: string): HTMLElement {
@@ -241,5 +240,4 @@ describe("<DrawerSpotlights />", () => {
       });
     });
   });
-
 });

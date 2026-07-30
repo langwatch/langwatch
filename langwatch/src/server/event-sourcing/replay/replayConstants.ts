@@ -34,7 +34,10 @@ export const DONE_KEY_PREFIX = "projection-replay:done:";
 export const DONE_MARKER_TTL_SECONDS = 15 * 60;
 
 /** Per-aggregate done-marker key: `projection-replay:done:{projectionName}:{aggregateKey}`. */
-export function doneMarkerKey(projectionName: string, aggregateKey: string): string {
+export function doneMarkerKey(
+  projectionName: string,
+  aggregateKey: string,
+): string {
   return `${DONE_KEY_PREFIX}${projectionName}:${aggregateKey}`;
 }
 
@@ -76,5 +79,10 @@ export function isAtOrBeforeCutoffMarker(
     return false; // Corrupted marker
   }
 
-  return isAtOrBeforeCutoff(eventTimestamp, eventId, cutoffTimestamp, cutoffEventId);
+  return isAtOrBeforeCutoff(
+    eventTimestamp,
+    eventId,
+    cutoffTimestamp,
+    cutoffEventId,
+  );
 }

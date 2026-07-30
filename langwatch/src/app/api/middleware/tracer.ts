@@ -66,7 +66,9 @@ export const tracerMiddleware = (options?: TracerOptions) => {
             const routePath = c.req.routePath;
             span.setAttribute(
               "service.family",
-              routePath && routePath !== "/*" ? routePath : (options?.name ?? "api"),
+              routePath && routePath !== "/*"
+                ? routePath
+                : (options?.name ?? "api"),
             );
 
             // After handler, add context attributes to span if available

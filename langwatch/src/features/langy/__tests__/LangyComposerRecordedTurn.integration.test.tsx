@@ -14,8 +14,9 @@
  * would otherwise pull) and the typewriter placeholder hook. The store, the
  * fold, and the composer are all real.
  */
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

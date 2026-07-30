@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.unmock("~/utils/compat/next-dynamic");
+
 import { resolveModule } from "../next-dynamic";
 
 describe("resolveModule()", () => {

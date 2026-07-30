@@ -39,6 +39,11 @@ export const SPAN_ATTR_MAPPINGS = [
   // gateway_budget_ledger_events stays empty.
   ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
   ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
+  // The provider the request was actually dispatched to (a ModelProvider
+  // row id). Provider-filtered budgets ("$50/month, OpenAI only") can only
+  // accrue their own spend if the fold knows which vendor served the call;
+  // without this key they never accrue at all.
+  ["langwatch.model_provider_id", "langwatch.model_provider_id"],
   // Governance ingest markers — stamped on every span by the
   // /api/ingest/otel/:sourceId receiver (langwatch/src/server/routes/ingest/ingestionRoutes.ts).
   // Hoisted into trace_summaries so the ActivityMonitorService dashboard

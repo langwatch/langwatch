@@ -1,10 +1,10 @@
+import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import {
   evaluateQueryInMemory,
   queryNeeds,
 } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   buildPreconditionTraceDataFromFoldState,

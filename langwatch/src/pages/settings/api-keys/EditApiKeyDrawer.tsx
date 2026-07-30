@@ -8,23 +8,23 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { TeamUserRole } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
-import { Drawer } from "../../../components/ui/drawer";
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
 } from "../../../components/settings/ScopeChipPicker";
-import type { RouterOutputs } from "../../../utils/api";
-import {
-  PERMISSION_CATEGORIES,
-  computePermissionsFromSelections,
-  selectionsFromPermissions,
-} from "../../../server/api-key/permission-categories";
+import { Drawer } from "../../../components/ui/drawer";
 import {
   getTeamRolePermissions,
   hasPermissionWithHierarchy,
 } from "../../../server/api/rbac";
-import { TeamUserRole } from "@prisma/client";
+import {
+  computePermissionsFromSelections,
+  PERMISSION_CATEGORIES,
+  selectionsFromPermissions,
+} from "../../../server/api-key/permission-categories";
+import type { RouterOutputs } from "../../../utils/api";
 import {
   PermissionCategoryList,
   PermissionCounter,
@@ -139,11 +139,14 @@ export function EditApiKeyDrawer({
       setSelectedScopes(bindingsToScopes(apiKey.roleBindings));
 
       if (mode === "restricted") {
-        setCategorySelections(bindingsToSelections(apiKey, {
-          permissionCategories: PERMISSION_CATEGORIES,
-          selectionsFromPermissions,
-          getTeamRolePermissions: (role) => getTeamRolePermissions(role as TeamUserRole),
-        }) as Record<string, PermissionSelection>);
+        setCategorySelections(
+          bindingsToSelections(apiKey, {
+            permissionCategories: PERMISSION_CATEGORIES,
+            selectionsFromPermissions,
+            getTeamRolePermissions: (role) =>
+              getTeamRolePermissions(role as TeamUserRole),
+          }) as Record<string, PermissionSelection>,
+        );
       } else {
         setCategorySelections({});
       }
@@ -152,7 +155,10 @@ export function EditApiKeyDrawer({
 
   const handlePermissionModeChange = (mode: "all" | "restricted") => {
     setPermissionMode(mode);
-    if (mode === "restricted" && Object.values(categorySelections).every((v) => !v || v === "none")) {
+    if (
+      mode === "restricted" &&
+      Object.values(categorySelections).every((v) => !v || v === "none")
+    ) {
       const allSelected: Record<string, PermissionSelection> = {};
       for (const cat of PERMISSION_CATEGORIES) {
         const canRead = cat.readPermissions.every((p) =>
@@ -179,8 +185,13 @@ export function EditApiKeyDrawer({
 
     const bindings = selectedScopes.map((s) => ({
       role: deriveBindingRole({
-        permissionMode, scopeType: s.scopeType, scopeId: s.scopeId,
-        myBindings: myBindings.data, organizationId, orgProjects, isServiceKey,
+        permissionMode,
+        scopeType: s.scopeType,
+        scopeId: s.scopeId,
+        myBindings: myBindings.data,
+        organizationId,
+        orgProjects,
+        isServiceKey,
       }),
       scopeType: s.scopeType,
       scopeId: s.scopeId,
@@ -228,10 +239,7 @@ export function EditApiKeyDrawer({
               <Text fontWeight="600" fontSize="sm">
                 Name
               </Text>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
             </VStack>
 
             {/* Description */}
@@ -280,28 +288,32 @@ export function EditApiKeyDrawer({
                 Permissions
               </Text>
               <HStack justify="space-between" width="full">
-              <SegmentGroup.Root
-                size="sm"
-                value={permissionMode}
-                onValueChange={(e) =>
-                  handlePermissionModeChange(e.value as "all" | "restricted")
-                }
-              >
-                <SegmentGroup.Indicator />
-                <SegmentGroup.Item value="all">
-                  <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
-                  <SegmentGroup.ItemHiddenInput />
-                </SegmentGroup.Item>
-                <SegmentGroup.Item value="restricted">
-                  <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
-                  <SegmentGroup.ItemHiddenInput />
-                </SegmentGroup.Item>
-              </SegmentGroup.Root>
-              {permissionMode === "restricted" && (
-                <PermissionCounter
-                  count={Object.values(categorySelections).filter((v) => v && v !== "none").length}
-                />
-              )}
+                <SegmentGroup.Root
+                  size="sm"
+                  value={permissionMode}
+                  onValueChange={(e) =>
+                    handlePermissionModeChange(e.value as "all" | "restricted")
+                  }
+                >
+                  <SegmentGroup.Indicator />
+                  <SegmentGroup.Item value="all">
+                    <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
+                    <SegmentGroup.ItemHiddenInput />
+                  </SegmentGroup.Item>
+                  <SegmentGroup.Item value="restricted">
+                    <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
+                    <SegmentGroup.ItemHiddenInput />
+                  </SegmentGroup.Item>
+                </SegmentGroup.Root>
+                {permissionMode === "restricted" && (
+                  <PermissionCounter
+                    count={
+                      Object.values(categorySelections).filter(
+                        (v) => v && v !== "none",
+                      ).length
+                    }
+                  />
+                )}
               </HStack>
 
               {permissionMode === "restricted" && (

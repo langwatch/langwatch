@@ -62,7 +62,9 @@ function str(value: unknown): string | undefined {
 }
 
 function num(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 /** Parse a `github.open_pr` tool part's output. Null if it isn't one. */
@@ -100,8 +102,12 @@ export function parseGithubPrCard(output: unknown): GithubPrCardData | null {
     ...(str(pr.headRef) ? { headRef: str(pr.headRef)! } : {}),
     ...(str(pr.baseRef) ? { baseRef: str(pr.baseRef)! } : {}),
     ...(str(pr.author) ? { author: str(pr.author)! } : {}),
-    ...(num(pr.additions) !== undefined ? { additions: num(pr.additions)! } : {}),
-    ...(num(pr.deletions) !== undefined ? { deletions: num(pr.deletions)! } : {}),
+    ...(num(pr.additions) !== undefined
+      ? { additions: num(pr.additions)! }
+      : {}),
+    ...(num(pr.deletions) !== undefined
+      ? { deletions: num(pr.deletions)! }
+      : {}),
     ...(num(pr.changedFiles) !== undefined
       ? { changedFiles: num(pr.changedFiles)! }
       : {}),

@@ -79,7 +79,8 @@ export function ExportProgress({
             </HStack>
           ) : (
             <Text textStyle="sm" color="fg">
-              Exported {exported.toLocaleString()} of {total.toLocaleString()} traces…
+              Exported {exported.toLocaleString()} of {total.toLocaleString()}{" "}
+              traces…
             </Text>
           )}
           {!isDone && onCancel && (

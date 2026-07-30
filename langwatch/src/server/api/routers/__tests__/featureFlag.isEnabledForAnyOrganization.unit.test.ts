@@ -94,8 +94,8 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
       const caller = buildCaller(
         buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B])),
       );
-      mockIsEnabled.mockImplementation(async (_flag, opts: any) =>
-        opts.organizationId === OWN_ORG_B,
+      mockIsEnabled.mockImplementation(
+        async (_flag, opts: any) => opts.organizationId === OWN_ORG_B,
       );
 
       const result = await caller.isEnabledForAnyOrganization({
@@ -114,8 +114,8 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
   describe("when the input mixes member and non-member organizations", () => {
     it("silently filters non-member ids before evaluating the flag", async () => {
       const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
-      mockIsEnabled.mockImplementation(async (_flag, opts: any) =>
-        opts.organizationId === OWN_ORG_A,
+      mockIsEnabled.mockImplementation(
+        async (_flag, opts: any) => opts.organizationId === OWN_ORG_A,
       );
 
       const result = await caller.isEnabledForAnyOrganization({
@@ -147,16 +147,15 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
 
     it("returns the same shape as a member with the flag off, so the response cannot oracle membership", async () => {
       const nonMemberCaller = buildCaller(buildMockPrisma(new Set()));
-      const memberCaller = buildCaller(
-        buildMockPrisma(new Set([OWN_ORG_A])),
-      );
+      const memberCaller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
       mockIsEnabled.mockResolvedValue(false);
 
-      const nonMemberResult =
-        await nonMemberCaller.isEnabledForAnyOrganization({
+      const nonMemberResult = await nonMemberCaller.isEnabledForAnyOrganization(
+        {
           flag: FLAG,
           organizationIds: [FOREIGN_ORG],
-        });
+        },
+      );
       const memberResult = await memberCaller.isEnabledForAnyOrganization({
         flag: FLAG,
         organizationIds: [OWN_ORG_A],

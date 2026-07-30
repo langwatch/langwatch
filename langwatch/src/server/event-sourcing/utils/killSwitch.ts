@@ -7,7 +7,11 @@ import type {
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { AggregateType } from "../domain/aggregateType";
 
-export type KillSwitchComponentType = "projection" | "mapProjection" | "command";
+export type KillSwitchComponentType =
+  | "projection"
+  | "mapProjection"
+  | "command"
+  | "subscriber";
 
 /**
  * Generates a feature flag key for a component kill switch.
@@ -51,11 +55,21 @@ export async function isComponentDisabled({
   }
 
   const flagKey: FeatureFlagKey =
-    customKey ?? generateKillSwitchKey(aggregateType, componentType, componentName);
+    customKey ??
+    generateKillSwitchKey(aggregateType, componentType, componentName);
 
   try {
+    // `projectId` — not just `distinctId` — is what makes this switch targetable
+    // at one tenant. Rule matching runs against `RuleEvaluationContext`
+    // (`{ projectId, organizationId }`, featureFlag/rules.ts); `distinctId` is
+    // the percentage-rollout bucketing key and is never consulted by
+    // `matchesContext`. Passing the tenant only as `distinctId` left every rule
+    // carrying a projectId unmatchable, so the flag fell through to its
+    // row-level `enabled` and a switch meant to stop ONE tenant stopped all of
+    // them. In this platform the event-sourcing tenant id IS the project id.
     const isDisabled = await featureFlagService.isEnabled(flagKey, {
       distinctId: tenantId,
+      projectId: tenantId,
       defaultValue: false,
       cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
     });

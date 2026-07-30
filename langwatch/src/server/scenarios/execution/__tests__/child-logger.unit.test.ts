@@ -12,8 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@langwatch/observability", () => {
   const make = (bindings: Record<string, unknown> = {}) => ({
     bindings: () => bindings,
-    child: (extra: Record<string, unknown>) =>
-      make({ ...bindings, ...extra }),
+    child: (extra: Record<string, unknown>) => make({ ...bindings, ...extra }),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),

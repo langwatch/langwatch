@@ -9,7 +9,8 @@ export const APP_BASE =
 export const PROJECT_ID = process.env.LANGY_PROJECT_ID ?? "local-dev-project";
 export const PROJECT_SLUG =
   process.env.LANGY_PROJECT_SLUG ?? process.env.LANGY_PROJECT_ID ?? PROJECT_ID;
-export const ADMIN_EMAIL = process.env.LANGY_ADMIN_EMAIL ?? "admin@haven.localhost";
+export const ADMIN_EMAIL =
+  process.env.LANGY_ADMIN_EMAIL ?? "admin@haven.localhost";
 export const ADMIN_PASSWORD =
   process.env.LANGY_ADMIN_PASSWORD ?? "LocalHavenAdmin!2026";
 // langwatch-api.ts's Layer-2 REST verification defaulted to a stale

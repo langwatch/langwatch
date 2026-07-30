@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  propagation,
-  trace,
-} from "@opentelemetry/api";
-import { injectTraceContextHeaders, getActiveTraceId } from "../trace/traceContext";
+import { propagation, trace } from "@opentelemetry/api";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { INVALID_TRACE_ID } from "../constants";
+import {
+  getActiveTraceId,
+  injectTraceContextHeaders,
+} from "../trace/traceContext";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -19,7 +19,9 @@ describe("injectTraceContextHeaders", () => {
 
   describe("when no active span exists", () => {
     it("returns headers unchanged and traceId as undefined", () => {
-      const headers: Record<string, string> = { "content-type": "application/json" };
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+      };
 
       const result = injectTraceContextHeaders({ headers });
 

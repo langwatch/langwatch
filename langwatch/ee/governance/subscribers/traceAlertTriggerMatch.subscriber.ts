@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { RecordTriggerMatchPort } from "~/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
@@ -28,7 +28,8 @@ export function createTraceAlertTriggerMatchHandler(deps: {
       context.tenantId,
     );
     for (const trigger of triggers) {
-      if (classifyTriggerFilters(trigger.filters).hasEvaluationFilters) continue;
+      if (classifyTriggerFilters(trigger.filters).hasEvaluationFilters)
+        continue;
       // Idempotency contract (at-least-once delivery): every input to the
       // command's idempotency key — triggerId, traceId, and the settle-window
       // bucket derived from occurredAt + traceDebounceMs — comes from the

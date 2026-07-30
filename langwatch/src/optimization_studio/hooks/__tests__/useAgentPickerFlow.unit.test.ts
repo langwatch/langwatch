@@ -13,8 +13,8 @@
  */
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Component } from "../../types/dsl";
 import type { NodeWithOptionalPosition } from "~/types";
+import type { Component } from "../../types/dsl";
 
 // Mock useWorkflowStore
 const mockSetNode = vi.fn();
@@ -118,11 +118,9 @@ describe("useAgentPickerFlow()", () => {
         vi.runAllTimers();
       });
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith(
-        "agentList",
-        undefined,
-        { resetStack: true },
-      );
+      expect(mockOpenDrawer).toHaveBeenCalledWith("agentList", undefined, {
+        resetStack: true,
+      });
     });
 
     it("stores the pending node id in the ref", () => {

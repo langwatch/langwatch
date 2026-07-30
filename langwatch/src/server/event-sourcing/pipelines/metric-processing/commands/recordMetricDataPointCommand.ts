@@ -1,18 +1,21 @@
-import type { Command, CommandHandler } from "../../../commands/command";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
+import type { Command, CommandHandler } from "../../../commands/command";
+import type { RecordMetricDataPointCommandData } from "../schemas/commands";
+import { recordMetricDataPointCommandDataSchema } from "../schemas/commands";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   METRIC_DATA_POINT_RECEIVED_EVENT_VERSION_LATEST,
   RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
 } from "../schemas/constants";
-import type { RecordMetricDataPointCommandData } from "../schemas/commands";
-import { recordMetricDataPointCommandDataSchema } from "../schemas/commands";
 import type { MetricDataPointReceivedEvent } from "../schemas/events";
 
-export class RecordMetricDataPointCommand implements CommandHandler<
-  Command<RecordMetricDataPointCommandData>,
-  MetricDataPointReceivedEvent
-> {
+export class RecordMetricDataPointCommand
+  implements
+    CommandHandler<
+      Command<RecordMetricDataPointCommandData>,
+      MetricDataPointReceivedEvent
+    >
+{
   static readonly schema = defineCommandSchema(
     RECORD_METRIC_DATA_POINT_COMMAND_TYPE,
     recordMetricDataPointCommandDataSchema,

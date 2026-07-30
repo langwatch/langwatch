@@ -56,6 +56,10 @@ type BifrostRouter struct {
 	discoveryOnce   sync.Once
 	discoveryHTTP   *http.Client
 	discoveryModels *modelsDiscoveryCache
+	// hostedCatalogs overrides hostedModelCatalogs (tests only), pointing
+	// hosted providers' catalog probes at local servers. nil means the
+	// production table; an empty non-nil map disables hosted probes.
+	hostedCatalogs map[domain.ProviderID]catalogProbe
 	// codexClient streams against OpenAI's codex backend (no overall
 	// timeout — turns run for minutes; cancellation rides the context).
 	codexClient *http.Client
@@ -178,12 +182,12 @@ func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred do
 // + un-normalizes the response back to OpenAI shape.
 //
 // For /v1/messages (RequestTypeMessages) the inbound body is already
-// provider-native (Anthropic /v1/messages shape). Running it through
-// the OpenAI parser would silently drop Anthropic-specific fields like
-// `thinking`, so we opt into Bifrost's raw-forward mode and let it
-// passthrough. Downstream VKs for `/v1/messages` are expected to route
-// to an Anthropic-family provider; sending it to OpenAI is a caller
-// error and Bifrost/OpenAI will reject accordingly.
+// provider-native (Anthropic /v1/messages shape). Destinations that speak
+// the Anthropic wire format keep Bifrost's raw-forward mode so the bytes
+// pass through untouched; every other destination is translated through
+// the neutral Responses request (see anthropic_translation.go), because
+// forwarding an Anthropic body verbatim hands the provider JSON it
+// cannot parse.
 func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
@@ -204,7 +208,13 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	// Codex streams upstream always (the backend is SSE-only); the
 	// non-streaming path aggregates to the completed Response. See codex.go.
+	// The backend speaks the Responses dialect only, so /v1/messages is
+	// translated first (anthropic_codex.go): raw-forwarding an Anthropic body
+	// would be rejected before it ever left the gateway.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
+		if req.Type == domain.RequestTypeMessages {
+			return r.dispatchMessagesTranslatedCodex(ctx, req, model, cred)
+		}
 		return r.dispatchCodex(ctx, req, model, cred)
 	}
 
@@ -230,16 +240,24 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchPassthrough(ctx, req, provider, model, cred)
 	}
 
+	// /v1/messages to a destination that does not speak the Anthropic wire
+	// format is translated rather than raw-forwarded. Forwarding verbatim
+	// hands the provider a body it cannot parse and surfaces its own
+	// "Unknown parameter: 'system'" back to the caller.
+	if req.Type == domain.RequestTypeMessages && !isAnthropicWireProvider(provider) {
+		return r.dispatchMessagesTranslated(ctx, req, provider, model, cred)
+	}
+
 	// Managed-Bedrock with a per-request runtime endpoint (the customer's
 	// VPC endpoint) dispatches through the official AWS SDK bedrockruntime
 	// client with BaseEndpoint pinned to that VPCE, so the request is
 	// SigV4-signed for and sent to that host instead of the public AWS
 	// endpoint. Without this, the customer's VPCE-conditioned IAM policy
-	// rejects the InvokeModel with a 403. Gated to RequestTypeChat only:
-	// /v1/messages must stay on the raw-forward path below (routing
-	// Anthropic-native bodies through Converse would drop messages-only
-	// fields like `thinking`); embeddings/responses/passthrough are handled
-	// above. A no-op for Bedrock credentials without a runtime endpoint.
+	// rejects the InvokeModel with a 403. Gated to RequestTypeChat here:
+	// /v1/messages took the translated lane above, which runs its own VPCE
+	// intercept (anthropic_bedrock_vpce.go); embeddings/responses/passthrough
+	// are handled above. A no-op for Bedrock credentials without a runtime
+	// endpoint.
 	if req.Type == domain.RequestTypeChat {
 		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
 			return nil, err
@@ -550,8 +568,14 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	}
 
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
-	// backend with OAuth + one-shot token refresh. See codex.go.
+	// backend with OAuth + one-shot token refresh. See codex.go. Its backend
+	// speaks the Responses dialect only, so /v1/messages goes through the
+	// translated codex lane (anthropic_codex.go) and comes back as the
+	// Anthropic SSE union.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
+		if req.Type == domain.RequestTypeMessages {
+			return r.dispatchMessagesTranslatedCodexStream(ctx, req, model, cred)
+		}
 		return r.dispatchCodexStream(ctx, req, model, cred)
 	}
 
@@ -566,14 +590,23 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	}
 
 	if req.Type == domain.RequestTypeMessages {
-		return r.dispatchMessagesStream(ctx, req, provider, model, cred)
+		// Anthropic-wire destinations keep the raw-forward passthrough so the
+		// provider's own SSE frames reach the client untouched. Everything
+		// else is translated: PassthroughStream would POST /v1/messages to a
+		// provider that has no such route, and the iterator would then block
+		// on a channel yielding neither chunk nor error.
+		if isAnthropicWireProvider(provider) {
+			return r.dispatchMessagesStream(ctx, req, provider, model, cred)
+		}
+		return r.dispatchMessagesTranslatedStream(ctx, req, provider, model, cred)
 	}
 
 	// Managed-Bedrock with a per-request runtime endpoint streams through the
 	// official Bedrock ConverseStream API over the customer's VPC endpoint —
-	// same rationale as the non-streaming Dispatch intercept above, and gated
-	// to RequestTypeChat for the same reason (/v1/messages stays raw-forward).
-	// A no-op for Bedrock credentials without a runtime endpoint.
+	// same rationale as the non-streaming Dispatch intercept above. Gated to
+	// RequestTypeChat because /v1/messages took its own lanes above, each
+	// with its own VPCE handling. A no-op for Bedrock credentials without a
+	// runtime endpoint.
 	if req.Type == domain.RequestTypeChat {
 		if endpoint, err := bedrockVPCEEndpoint(cred); err != nil {
 			return nil, err
@@ -1378,10 +1411,13 @@ func errFromBifrost(ctx context.Context, berr *bfschemas.BifrostError, respHeade
 		return classifyBifrostError(ctx, berr)
 	}
 	body, _ := extractRawResponseBytes(berr.ExtraFields.RawResponse)
+	errType, errCode := bfErrorTypeCode(berr)
 	return &domain.UpstreamError{
 		StatusCode: status,
 		Body:       body,
 		Message:    bfErrorMsg(berr),
+		ErrorType:  errType,
+		ErrorCode:  errCode,
 		Headers:    forwardableUpstreamHeaders(respHeaders),
 	}
 }
@@ -1455,6 +1491,23 @@ func bfErrorMsg(e *bfschemas.BifrostError) string {
 	return fmt.Sprintf("bifrost error (status %v)", e.StatusCode)
 }
 
+// bfErrorTypeCode lifts the provider's own error discriminants (error.type /
+// error.code as parsed by Bifrost's provider adapter) off a BifrostError.
+// These carry the error's identity (insufficient_quota, overloaded_error,
+// ThrottlingException, ...) on lanes where the native body is not captured.
+func bfErrorTypeCode(e *bfschemas.BifrostError) (errType, errCode string) {
+	if e == nil || e.Error == nil {
+		return "", ""
+	}
+	if e.Error.Type != nil {
+		errType = *e.Error.Type
+	}
+	if e.Error.Code != nil {
+		errCode = *e.Error.Code
+	}
+	return errType, errCode
+}
+
 // upstreamStreamError converts a mid-stream BifrostError chunk into a
 // structured domain.UpstreamError the SSE writer can forward faithfully.
 //
@@ -1472,6 +1525,7 @@ func upstreamStreamError(e *bfschemas.BifrostError) *domain.UpstreamError {
 		ue.Message = "provider stream error"
 		return ue
 	}
+	ue.ErrorType, ue.ErrorCode = bfErrorTypeCode(e)
 	if code := e.StatusCode; code != nil {
 		ue.StatusCode = *code
 	}

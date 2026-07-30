@@ -32,8 +32,7 @@ export type GatewayJwtClaims = {
 };
 
 function getSecret(): string {
-  const secret =
-    process.env.LW_GATEWAY_JWT_SECRET ?? env.LW_GATEWAY_JWT_SECRET;
+  const secret = process.env.LW_GATEWAY_JWT_SECRET ?? env.LW_GATEWAY_JWT_SECRET;
   if (!secret) {
     throw new Error(
       "LW_GATEWAY_JWT_SECRET is required to sign gateway-facing JWTs",
@@ -73,4 +72,3 @@ export function verifyGatewayJwt(token: string): GatewayJwtClaims {
     revision: payload.revision,
   };
 }
-

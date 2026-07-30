@@ -205,7 +205,9 @@ describe("ProviderScopeSection", () => {
 
       await user.click(screen.getByRole("combobox"));
       // Team option renders by team name.
-      await user.click(await screen.findByRole("option", { name: /platform/i }));
+      await user.click(
+        await screen.findByRole("option", { name: /platform/i }),
+      );
 
       expect(setScopes).toHaveBeenCalledWith([
         { scopeType: "TEAM", scopeId: "team_1" },

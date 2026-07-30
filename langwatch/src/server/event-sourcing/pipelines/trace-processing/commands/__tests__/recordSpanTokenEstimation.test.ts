@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTenantId, type Command } from "../../../../";
+import { type Command, createTenantId } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
 import type { OtlpSpan } from "../../schemas/otlp";

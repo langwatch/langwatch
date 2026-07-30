@@ -1,9 +1,9 @@
 /**
  * @vitest-environment node
  */
-import { describe, it, expect } from "vitest";
-import { hasUnsavedChanges } from "../../../utils/unsavedChanges";
+import { describe, expect, it } from "vitest";
 import type { Component, Evaluator, Signature } from "../../../types/dsl";
+import { hasUnsavedChanges } from "../../../utils/unsavedChanges";
 
 describe("hasUnsavedChanges", () => {
   describe("when node data has no local changes", () => {

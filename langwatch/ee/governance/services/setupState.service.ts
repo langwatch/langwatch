@@ -128,9 +128,7 @@ export class GovernanceSetupStateService {
    * has no Gov Project yet — no governance-origin traffic is possible
    * before the first IngestionSource is minted.
    */
-  private async probeRecentActivity(
-    organizationId: string,
-  ): Promise<boolean> {
+  private async probeRecentActivity(organizationId: string): Promise<boolean> {
     const govProject = await this.prisma.project.findFirst({
       where: {
         kind: PROJECT_KIND.INTERNAL_GOVERNANCE,

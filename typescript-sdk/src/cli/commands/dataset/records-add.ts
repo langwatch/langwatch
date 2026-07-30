@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import fs from "fs";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
@@ -52,7 +52,7 @@ export const recordsAddCommand = async (
   slugOrId: string,
   options: { json?: string; file?: string; stdin?: boolean },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!options.json && !options.file && !options.stdin) {
     reportCommandError({

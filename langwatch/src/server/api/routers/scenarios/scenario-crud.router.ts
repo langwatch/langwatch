@@ -53,7 +53,11 @@ export const scenarioCrudRouter = createTRPCRouter({
         lastUpdatedById: ctx.session.user.id,
       });
 
-      trackServerEvent({ userId: ctx.session.user.id, event: "scenario_created", projectId: input.projectId });
+      trackServerEvent({
+        userId: ctx.session.user.id,
+        event: "scenario_created",
+        projectId: input.projectId,
+      });
 
       void ctx.prisma.scenario
         .count({
@@ -69,7 +73,10 @@ export const scenarioCrudRouter = createTRPCRouter({
         })
         .catch(captureException);
 
-      logger.info({ projectId: input.projectId, scenarioId: result.id }, "Scenario created");
+      logger.info(
+        { projectId: input.projectId, scenarioId: result.id },
+        "Scenario created",
+      );
       return result;
     }),
 
@@ -86,7 +93,10 @@ export const scenarioCrudRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      logger.debug({ projectId: input.projectId, scenarioId: input.id }, "Fetching scenario by id");
+      logger.debug(
+        { projectId: input.projectId, scenarioId: input.id },
+        "Fetching scenario by id",
+      );
       const service = ScenarioService.create(ctx.prisma);
       const scenario = await service.getById(input);
       if (!scenario) {
@@ -114,7 +124,10 @@ export const scenarioCrudRouter = createTRPCRouter({
     .input(updateScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      logger.info({ projectId: input.projectId, scenarioId: input.id }, "Updating scenario");
+      logger.info(
+        { projectId: input.projectId, scenarioId: input.id },
+        "Updating scenario",
+      );
 
       const { id, projectId, ...data } = input;
       const service = ScenarioService.create(ctx.prisma);
@@ -131,12 +144,18 @@ export const scenarioCrudRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      logger.info({ projectId: input.projectId, scenarioId: input.id }, "Archiving scenario");
+      logger.info(
+        { projectId: input.projectId, scenarioId: input.id },
+        "Archiving scenario",
+      );
 
       const service = ScenarioService.create(ctx.prisma);
       try {
         const result = await service.archive(input);
-        logger.info({ projectId: input.projectId, scenarioId: input.id }, "Scenario archived");
+        logger.info(
+          { projectId: input.projectId, scenarioId: input.id },
+          "Scenario archived",
+        );
         return result;
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {
@@ -162,7 +181,11 @@ export const scenarioCrudRouter = createTRPCRouter({
       const result = await service.batchArchive(input);
 
       logger.info(
-        { projectId: input.projectId, archived: result.archived.length, failed: result.failed.length },
+        {
+          projectId: input.projectId,
+          archived: result.archived.length,
+          failed: result.failed.length,
+        },
         "Batch archive complete",
       );
       return result;

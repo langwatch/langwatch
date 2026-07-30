@@ -292,7 +292,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   if (category === "audio") {
     return (
       <VStack align="flex-start" width="100%">
-        {/* biome-ignore lint/a11y/useMediaCaption: captions not available for dynamically stored audio */}
+        {/* Captions are not available for dynamically stored audio. */}
         <audio
           data-testid="media-part-audio"
           controls
@@ -339,7 +339,7 @@ export function MediaPart({ part, projectId, audioPlayback }: MediaPartProps) {
   if (category === "video") {
     return (
       <VStack align="flex-start" width="100%">
-        {/* biome-ignore lint/a11y/useMediaCaption: captions not available for dynamically stored video */}
+        {/* Captions are not available for dynamically stored video. */}
         <video
           data-testid="media-part-video"
           controls

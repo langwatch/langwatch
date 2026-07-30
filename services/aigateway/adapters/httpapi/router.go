@@ -572,10 +572,19 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		models, err := deps.App.ListModels(r.Context(), bundle)
+		models, gaps, err := deps.App.ListModels(r.Context(), bundle)
 		if err != nil {
 			writeError(deps.Logger, w, r.Context(), err)
 			return
+		}
+
+		// Discovery gaps make an empty or partial list diagnosable from
+		// the response itself: a provider the key can dispatch to that
+		// contributed no models is named here with the reason, instead of
+		// silently reading as "no models". A header rather than a body
+		// field so the payload stays exactly the OpenAI list shape.
+		if len(gaps) > 0 {
+			w.Header().Set("X-Langwatch-Models-Discovery-Incomplete", formatDiscoveryGaps(gaps))
 		}
 
 		// OpenAI list shape: model-picker clients (OpenWebUI, LibreChat,
@@ -615,6 +624,17 @@ func modelOwnedBy(m domain.Model) string {
 		return "langwatch"
 	}
 	return string(m.ProviderID)
+}
+
+// formatDiscoveryGaps renders gaps as "provider:reason" tokens, comma
+// separated ("bedrock:not-enumerable,openai:probe-failed"). The adapter
+// returns them deduped and sorted, so the header is deterministic.
+func formatDiscoveryGaps(gaps []domain.ModelDiscoveryGap) string {
+	tokens := make([]string, 0, len(gaps))
+	for _, gap := range gaps {
+		tokens = append(tokens, string(gap.ProviderID)+":"+string(gap.Reason))
+	}
+	return strings.Join(tokens, ",")
 }
 
 func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (*domain.Bundle, bool) {
@@ -954,12 +974,23 @@ func streamErrorFrame(err error) []byte {
 		return ue.Body
 	}
 	msg := err.Error()
-	if ue != nil && ue.Message != "" {
-		msg = ue.Message
+	errType := "provider_error"
+	if ue != nil {
+		if ue.Message != "" {
+			msg = ue.Message
+		}
+		// Keep the provider's own error discriminant when the adapter parsed
+		// one, so SDK clients that dispatch on error.type still recognize
+		// e.g. insufficient_quota without the native event body.
+		if ue.ErrorType != "" {
+			errType = ue.ErrorType
+		} else if ue.ErrorCode != "" {
+			errType = ue.ErrorCode
+		}
 	}
 	frame, marshalErr := sonic.Marshal(sseErrorPayload{
 		Type:  "error",
-		Error: sseErrorDetail{Type: "provider_error", Message: msg},
+		Error: sseErrorDetail{Type: errType, Message: msg},
 	})
 	if marshalErr != nil {
 		return []byte(`{"type":"error","error":{"type":"provider_error","message":"stream failed"}}`)
@@ -1058,8 +1089,12 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 // The provider's native error body is written byte-for-byte when present, so
 // the client sees the exact upstream envelope under the upstream's real
 // status code (not a masked 502) and can tell terminal from retryable. When
-// only the status + message are available, a minimal JSON envelope carrying
-// both is emitted instead.
+// the native body is unavailable, the minimal envelope still preserves the
+// error's identity: the provider's own error type/code (insufficient_quota,
+// overloaded_error, ...) when the adapter parsed them, and a generic
+// provider_error only when nothing better is known. The originating provider
+// rides a response header either way, since the verbatim body cannot be
+// tampered with to carry it.
 func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	status := ue.StatusCode
 	if status <= 0 {
@@ -1067,21 +1102,45 @@ func writeUpstreamError(w http.ResponseWriter, ue *domain.UpstreamError) {
 	}
 	// Forward the upstream's retry-signaling headers (Retry-After,
 	// x-should-retry) so the client can honor the provider's backoff and
-	// terminal-vs-retryable hint, not just the status code.
+	// terminal-vs-retryable hint, not just the status code. Passthrough
+	// lanes forward the upstream's headers wholesale, including its exact
+	// Content-Type (e.g. Google's "application/json; charset=UTF-8"), so
+	// only default the Content-Type when the upstream did not provide one.
 	for k, v := range ue.Headers {
 		w.Header().Set(k, v)
 	}
-	w.Header().Set("Content-Type", "application/json")
+	if ue.Provider != "" {
+		w.Header().Set("X-LangWatch-Provider", ue.Provider)
+	}
+	if w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	w.WriteHeader(status)
 	if len(ue.Body) > 0 {
 		_, _ = w.Write(ue.Body)
 		return
 	}
+	errType := ue.ErrorType
+	if errType == "" {
+		errType = ue.ErrorCode
+	}
+	if errType == "" {
+		errType = "provider_error"
+	}
+	errCode := ue.ErrorCode
+	if errCode == "" {
+		errCode = errType
+	}
+	meta := map[string]any{"status": status}
+	if ue.Provider != "" {
+		meta["provider"] = ue.Provider
+	}
 	body, _ := sonic.Marshal(map[string]any{
 		"error": map[string]any{
-			"type":    "provider_error",
+			"type":    errType,
+			"code":    errCode,
 			"message": ue.Message,
-			"meta":    map[string]any{"status": status},
+			"meta":    meta,
 		},
 	})
 	_, _ = w.Write(body)
@@ -1107,6 +1166,11 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrUnsupportedParameter, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrPayloadTooLarge, http.StatusRequestEntityTooLarge)
 	herr.RegisterStatus(domain.ErrChainExhausted, http.StatusBadGateway)
+	// 503, not 500: an open breaker is the gateway declining to hit an
+	// upstream that has been failing, a retryable provider-side condition.
+	// Unregistered it would default to 500 internal_error, which reads as a
+	// gateway bug and hides that the provider is the thing to look at.
+	herr.RegisterStatus(domain.ErrCircuitOpen, http.StatusServiceUnavailable)
 	herr.RegisterStatus(domain.ErrNotFound, http.StatusNotFound)
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 	herr.RegisterStatus(domain.ErrNoProviderConfigured, http.StatusBadRequest)

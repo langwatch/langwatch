@@ -47,6 +47,14 @@ const loggerMetrics = createLogger("langwatch:otel:v1:metrics");
 
 const AUTH_REASON = "OTLP ingestion API key resolved in-handler";
 
+// One policy for all three OTLP signals: traces, logs and metrics are the same
+// write to the same tenant, so they answer to the same permission.
+const otelIngestAuth = handlerManagedAuth({
+  reason: AUTH_REASON,
+  permissions: ["traces:create"],
+  credential: "apiKey",
+});
+
 const secured = createServiceApp({ basePath: "/api/otel/v1" });
 
 // ── shared auth + limit check ────────────────────────────────────────
@@ -96,11 +104,9 @@ async function authenticate(
         ? "Authentication failed: X-Auth-Token sent but empty"
         : "Authentication failed: no auth header present",
     );
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
-      status: 401 as const,
-    };
+    const message =
+      "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   let resolved;
@@ -111,7 +117,8 @@ async function authenticate(
     });
   } catch (error) {
     logger.error({ ...diag, error }, "Database error during authentication");
-    return { error: "Authentication service error.", status: 500 as const };
+    const message = "Authentication service error.";
+    return { error: message, status: 500 as const, body: { message } };
   }
 
   if (!resolved) {
@@ -124,7 +131,8 @@ async function authenticate(
       },
       "Authentication failed: invalid credentials",
     );
-    return { error: "Invalid auth token.", status: 401 as const };
+    const message = "Invalid auth token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   // Enforce API-key ceiling (legacy tokens bypass). `traces:create` gates write
@@ -146,7 +154,11 @@ async function authenticate(
       },
       "API key permission denied for traces:create",
     );
-    return { error: denial.message, status: denial.status };
+    return {
+      error: denial.message,
+      status: denial.status,
+      body: denial.body,
+    };
   }
 
   return { project: resolved.project, resolved };
@@ -267,7 +279,7 @@ export function peekCustomerTraceIds(
 
 // ── POST /traces ─────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
+secured.access(otelIngestAuth).post("/traces", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.traces");
 
   return tracer.withActiveSpan(
@@ -283,10 +295,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;
@@ -417,7 +426,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
 
 // ── POST /logs ───────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
+secured.access(otelIngestAuth).post("/logs", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.logs");
 
   return tracer.withActiveSpan(
@@ -431,10 +440,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;
@@ -540,7 +546,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
 
 // ── POST /metrics ────────────────────────────────────────────────────
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
+secured.access(otelIngestAuth).post("/metrics", async (c) => {
   const tracer = getLangWatchTracer("langwatch.otel.metrics");
 
   return tracer.withActiveSpan(
@@ -554,10 +560,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
           code: SpanStatusCode.ERROR,
           message: authResult.error,
         });
-        return c.json(
-          { message: authResult.error },
-          { status: authResult.status },
-        );
+        return c.json(authResult.body, { status: authResult.status });
       }
 
       const { project, resolved } = authResult;

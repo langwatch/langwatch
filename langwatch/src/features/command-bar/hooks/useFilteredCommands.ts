@@ -1,7 +1,13 @@
 import { Pin, PinOff, ToggleLeft } from "lucide-react";
 import { useMemo } from "react";
+import {
+  setFeatureFlagOverride,
+  useFeatureFlagOverrides,
+} from "~/hooks/useFeatureFlagOverrides";
+import { useOpsPermission } from "~/hooks/useOpsPermission";
+import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
+import { FRONTEND_FEATURE_FLAGS } from "~/server/featureFlag/frontendFeatureFlags";
 import { useRouter } from "~/utils/compat/next-router";
-import type { Command } from "../types";
 import {
   actionCommands,
   filterCommands,
@@ -9,15 +15,12 @@ import {
   supportCommands,
   themeCommands,
 } from "../command-registry";
-import { MIN_SEARCH_QUERY_LENGTH, MIN_CATEGORY_MATCH_LENGTH } from "../constants";
-import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
-import { getPageCommands } from "../pageCommands";
 import {
-  setFeatureFlagOverride,
-  useFeatureFlagOverrides,
-} from "~/hooks/useFeatureFlagOverrides";
-import { useOpsPermission } from "~/hooks/useOpsPermission";
-import { FRONTEND_FEATURE_FLAGS } from "~/server/featureFlag/frontendFeatureFlags";
+  MIN_CATEGORY_MATCH_LENGTH,
+  MIN_SEARCH_QUERY_LENGTH,
+} from "../constants";
+import { getPageCommands } from "../pageCommands";
+import type { Command } from "../types";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -55,7 +58,8 @@ export function useFilteredCommands(
     const navKeywords = ["navigation", "navigate", "go to", "jump to", "pages"];
     const isSearchingCategory = navKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_CATEGORY_MATCH_LENGTH,
     );
 
     if (isSearchingCategory) {
@@ -159,7 +163,8 @@ export function useFilteredCommands(
     const actionKeywords = ["new", "create", "add new", "actions"];
     const isSearchingCategory = actionKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     if (isSearchingCategory) {
@@ -176,10 +181,17 @@ export function useFilteredCommands(
     const lowerQuery = query.toLowerCase().trim();
 
     // Check if searching for support/help category
-    const supportKeywords = ["support", "help", "docs", "documentation", "chat"];
+    const supportKeywords = [
+      "support",
+      "help",
+      "docs",
+      "documentation",
+      "chat",
+    ];
     const isSearchingCategory = supportKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     // Filter out "Open Chat" if not SAAS and set dynamic paths
@@ -210,7 +222,8 @@ export function useFilteredCommands(
     const themeKeywords = ["theme", "dark", "light", "mode", "appearance"];
     const isSearchingCategory = themeKeywords.some(
       (kw) =>
-        kw.startsWith(lowerQuery) && lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH
+        kw.startsWith(lowerQuery) &&
+        lowerQuery.length >= MIN_SEARCH_QUERY_LENGTH,
     );
 
     if (isSearchingCategory) {

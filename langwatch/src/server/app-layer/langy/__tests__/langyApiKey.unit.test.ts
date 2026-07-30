@@ -73,6 +73,7 @@ const ALL_CANDIDATES = [
   "workflows:view",
   "workflows:create",
   "workflows:update",
+  "experiments:view",
 ];
 
 beforeEach(() => {
@@ -351,6 +352,55 @@ describe("mintLangySessionApiKey", () => {
         );
         expect(triggerPermissions).toEqual(["triggers:view"]);
       });
+
+      // `experiments:view` is what `GET /api/experiments` asks for, and without
+      // it `langwatch experiment list` — and `langwatch status`, which calls it
+      // — were refused a read every role in the project already holds. The
+      // family stops at the view because no route asks for anything finer:
+      // starting a run is gated by the evaluations family, and `:manage` is the
+      // only other action the family defines, which is the delete Langy must
+      // never hold.
+      it("reads the project's experiments but can never manage them", async () => {
+        batchProjectPermissions.mockImplementation(
+          (_ctx: unknown, args: { permissions: string[] }) =>
+            Promise.resolve(args.permissions),
+        );
+
+        await mintLangySessionApiKey({
+          prisma,
+          session: SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        const experimentPermissions = (arg.permissions as string[]).filter(
+          (p) => p.startsWith("experiments:"),
+        );
+        expect(experimentPermissions).toEqual(["experiments:view"]);
+      });
+
+      // Starting an experiment run creates a run row; it does not administer
+      // the evaluations family. The route asks for the create grain precisely
+      // so this key clears it — see the route note in experiments-v3.ts.
+      it("can start an experiment run without holding the evaluations manage grain", async () => {
+        batchProjectPermissions.mockImplementation(
+          (_ctx: unknown, args: { permissions: string[] }) =>
+            Promise.resolve(args.permissions),
+        );
+
+        await mintLangySessionApiKey({
+          prisma,
+          session: SESSION,
+          projectId: "proj-1",
+          organizationId: "org-1",
+        });
+
+        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
+        expect(arg.permissions).toContain("evaluations:create");
+        expect(arg.permissions).not.toContain("evaluations:manage");
+        expect(arg.permissions).not.toContain("evaluations:delete");
+      });
     });
   });
 
@@ -401,7 +451,11 @@ describe("revokeLangySessionApiKey", () => {
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k1", projectId: "p1" }),
+          revokeLangySessionApiKey({
+            prisma: p,
+            apiKeyId: "k1",
+            projectId: "p1",
+          }),
         ).resolves.toBe("revoked");
 
         expect(p.apiKey.update).toHaveBeenCalledWith({
@@ -425,7 +479,11 @@ describe("revokeLangySessionApiKey", () => {
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k2", projectId: "p1" }),
+          revokeLangySessionApiKey({
+            prisma: p,
+            apiKeyId: "k2",
+            projectId: "p1",
+          }),
         ).resolves.toBe("refused");
 
         expect(p.apiKey.update).not.toHaveBeenCalled();
@@ -499,6 +557,11 @@ describe("revokeLangySessionApiKey", () => {
 describe("reapExpiredLangySessionApiKeys", () => {
   describe("given Langy session keys whose lifetime has elapsed", () => {
     describe("when the reaper runs", () => {
+      // Prisma is fully mocked here, so the org-tenancy middleware
+      // (`prisma.$use(guardOrganizationId)`) never runs — this covers the query
+      // SHAPE only. That the guard admits that shape is covered by
+      // `utils/__tests__/dbOrganizationIdProtection.unit.test.ts`, which drives
+      // this same function through the real middleware.
       it("revokes exactly the expired, unrevoked Langy session keys", async () => {
         const updateMany = vi.fn().mockResolvedValue({ count: 3 });
         const p = { apiKey: { updateMany } } as any;

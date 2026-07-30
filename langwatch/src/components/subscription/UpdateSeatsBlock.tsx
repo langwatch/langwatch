@@ -1,14 +1,7 @@
 /**
  * Update seats Block - allows Growth plan users to finalize seat changes
  */
-import {
-  Button,
-  Card,
-  Flex,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Card, Flex, HStack, Text, VStack } from "@chakra-ui/react";
 import { PricingSummary } from "./PricingSummary";
 
 export function UpdateSeatsBlock({

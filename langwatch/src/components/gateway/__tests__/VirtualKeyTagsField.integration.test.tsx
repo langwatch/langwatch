@@ -36,17 +36,30 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
     organization: { id: "org-1", name: "ACME", teams: [] },
     team: undefined,
     project: undefined,
+    hasPermission: () => true,
+  }),
+}));
+
+vi.mock("~/hooks/useRequiredSession", () => ({
+  useRequiredSession: () => ({
+    data: { user: { id: "user-1", name: "Ada", email: "ada@acme.test" } },
   }),
 }));
 
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      virtualKeys: { list: { invalidate: vi.fn() } },
+      virtualKeys: {
+        list: { invalidate: vi.fn() },
+        applicableBudgets: { invalidate: vi.fn() },
+      },
     }),
     virtualKeys: {
       create: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      applicableBudgets: {
+        useQuery: () => ({ data: [] }),
       },
     },
     modelProvider: {
@@ -56,6 +69,11 @@ vi.mock("~/utils/api", () => ({
     },
     routingPolicy: {
       list: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+    user: {
+      personalContext: {
+        useQuery: () => ({ data: undefined }),
+      },
     },
   },
 }));

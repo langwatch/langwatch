@@ -15,7 +15,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import {
+import type {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
 } from "@prisma/client";
@@ -24,10 +24,10 @@ import { useEffect, useMemo, useState } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Drawer } from "~/components/ui/drawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { toaster } from "~/components/ui/toaster";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -126,10 +126,9 @@ function GuardrailsPage() {
       });
       setArchiving(null);
     } catch (error) {
-      toaster.create({
-        title:
-          error instanceof Error ? error.message : "Failed to archive",
-        type: "error",
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't archive the guardrail",
       });
     }
   };
@@ -216,8 +215,8 @@ function GuardrailsPage() {
                       ) : (
                         <>
                           Click <strong>New guardrail</strong> to bind one of
-                          your project evaluators as a pre / post /
-                          stream_chunk hook.
+                          your project evaluators as a pre / post / stream_chunk
+                          hook.
                         </>
                       )}
                     </EmptyState.Description>
@@ -262,12 +261,20 @@ function GuardrailsPage() {
                         {evaluator ? (
                           <VStack align="start" gap={0}>
                             <Text fontSize="sm">{evaluator.name}</Text>
-                            <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
+                            <Text
+                              fontSize="2xs"
+                              color="fg.muted"
+                              fontFamily="mono"
+                            >
                               {evaluator.slug}
                             </Text>
                           </VStack>
                         ) : (
-                          <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+                          <Text
+                            fontSize="xs"
+                            color="fg.muted"
+                            fontFamily="mono"
+                          >
                             {row.evaluatorId}
                           </Text>
                         )}
@@ -362,8 +369,7 @@ function GuardrailDrawer({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [evaluatorId, setEvaluatorId] = useState("");
-  const [direction, setDirection] =
-    useState<GatewayGuardrailDirection>("PRE");
+  const [direction, setDirection] = useState<GatewayGuardrailDirection>("PRE");
   const [failureMode, setFailureMode] =
     useState<GatewayGuardrailFailureMode>("FAIL_CLOSED");
 
@@ -391,7 +397,10 @@ function GuardrailDrawer({
       onClose();
     },
     onError: (err) =>
-      toaster.create({ title: err.message, type: "error" }),
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't create the guardrail",
+      }),
   });
   const updateMutation = api.gatewayGuardrails.update.useMutation({
     onSuccess: async () => {
@@ -399,7 +408,10 @@ function GuardrailDrawer({
       onClose();
     },
     onError: (err) =>
-      toaster.create({ title: err.message, type: "error" }),
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't save the guardrail",
+      }),
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -482,8 +494,8 @@ function GuardrailDrawer({
                 </NativeSelect.Field>
               </NativeSelect.Root>
               <Field.HelperText>
-                Only evaluators with executionMode AS_GUARDRAIL are listed.
-                Flip an evaluator in Evaluations to expose it here.
+                Only evaluators with executionMode AS_GUARDRAIL are listed. Flip
+                an evaluator in Evaluations to expose it here.
               </Field.HelperText>
             </Field.Root>
 
@@ -493,9 +505,7 @@ function GuardrailDrawer({
                 <NativeSelect.Field
                   value={direction}
                   onChange={(e) =>
-                    setDirection(
-                      e.target.value as GatewayGuardrailDirection,
-                    )
+                    setDirection(e.target.value as GatewayGuardrailDirection)
                   }
                 >
                   {(["PRE", "POST", "STREAM_CHUNK"] as const).map((d) => (
@@ -526,8 +536,8 @@ function GuardrailDrawer({
                 </NativeSelect.Field>
               </NativeSelect.Root>
               <Field.HelperText>
-                stream_chunk is always fail-open per contract regardless of
-                this setting.
+                stream_chunk is always fail-open per contract regardless of this
+                setting.
               </Field.HelperText>
             </Field.Root>
           </VStack>

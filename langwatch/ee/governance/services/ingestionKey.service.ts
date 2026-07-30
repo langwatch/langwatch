@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@prisma/client";
-
-import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 
@@ -66,7 +65,12 @@ export class IngestionKeyService {
     /** Human label of the CLI device session that minted the key (display
      * provenance on the API-keys settings page). Null for non-CLI callers. */
     createdByDeviceLabel?: string | null;
-  }): Promise<{ token: string; apiKeyId: string; prefix: string; sourceType: string }> {
+  }): Promise<{
+    token: string;
+    apiKeyId: string;
+    prefix: string;
+    sourceType: string;
+  }> {
     // Hard-cut rotation: revoke any prior live ingest key for this
     // (project, sourceType) so the previous token dies immediately and we
     // never accumulate keys.
@@ -122,7 +126,12 @@ export class IngestionKeyService {
     sourceType: string;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
-  }): Promise<{ token: string; apiKeyId: string; prefix: string; sourceType: string }> {
+  }): Promise<{
+    token: string;
+    apiKeyId: string;
+    prefix: string;
+    sourceType: string;
+  }> {
     const workspace = await this.personalWorkspace.findExisting({
       userId,
       organizationId,

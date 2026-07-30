@@ -116,9 +116,7 @@ describe("extractDeduplicationKey", () => {
         "../orgBillableEventsMeter.mapProjection"
       );
 
-      const result = extractDeduplicationKey(
-        makeEvent({ id: "evt-42" }),
-      );
+      const result = extractDeduplicationKey(makeEvent({ id: "evt-42" }));
 
       expect(result).toBe("evt-42");
     });
@@ -204,7 +202,6 @@ describe("orgBillableEventsMeterStore", () => {
         "../orgBillableEventsMeter.store"
       );
 
-
       await orgBillableEventsMeterStore.append(
         {
           organizationId: "",
@@ -246,7 +243,6 @@ describe("orgBillableEventsMeterStore", () => {
         "../orgBillableEventsMeter.store"
       );
 
-
       await orgBillableEventsMeterStore.append(
         {
           organizationId: "",
@@ -287,7 +283,7 @@ describe("orgBillableEventsMeterStore", () => {
             organizationId: "",
             tenantId: "proj-1",
             eventId: "evt-1",
-  
+
             eventType: "lw.obs.trace.span_received",
             deduplicationKey: "trace-abc:span-123",
             eventTimestamp: 1739613600000,

@@ -5,8 +5,8 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { formatDuration } from "../../../utils/formatters";
 import { isSkillSpan } from "../transcript/skillInvocation";
 import {
-  getSpanBarColor,
   GROUP_ROW_HEIGHT,
+  getSpanBarColor,
   getSpanPalette,
   INDENT_PX,
   type SiblingGroup,
@@ -85,7 +85,9 @@ export const GroupRow = memo(function GroupRow({
         <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
           <HStack gap={1.5} minWidth={0}>
             <Text textStyle="xs" color="fg" truncate>
-              {group.toolName ? `${group.name} · ${group.toolName}` : group.name}
+              {group.toolName
+                ? `${group.name} · ${group.toolName}`
+                : group.name}
             </Text>
             <Text
               textStyle="2xs"

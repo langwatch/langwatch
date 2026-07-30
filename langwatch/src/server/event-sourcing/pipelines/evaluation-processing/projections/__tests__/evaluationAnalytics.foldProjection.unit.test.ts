@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type {
-  EvaluationCompletedEvent,
-  EvaluationReportedEvent,
-  EvaluationScheduledEvent,
-  EvaluationStartedEvent,
-} from "../../schemas/events";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
   projectEvaluationAnalyticsStateToRow,
 } from "../evaluationAnalytics.foldProjection";
+import {
+  createEvaluationCompletedEvent,
+  createEvaluationReportedEvent,
+  createEvaluationScheduledEvent,
+  createEvaluationStartedEvent,
+} from "./fixtures/evaluation-events.fixtures";
 
 const TENANT = "proj-eval";
 
@@ -28,83 +28,20 @@ function projectFromState(state: EvaluationAnalyticsData) {
   });
 }
 
-function makeScheduled(): EvaluationScheduledEvent {
-  return {
-    type: "lw.evaluation.scheduled",
-    id: "evt-1",
-    tenantId: TENANT,
-    aggregateId: "eval-1",
-    occurredAt: 1_000_000,
-    data: {
-      evaluationId: "eval-1",
-      evaluatorId: "monitor-x",
-      evaluatorType: "langevals/llm_answer_match",
-      evaluatorName: "Judge",
-      traceId: "trace-1",
-      isGuardrail: false,
-    },
-    metadata: { "metadata.team": "platform" },
-  } as unknown as EvaluationScheduledEvent;
-}
+const makeScheduled = () =>
+  createEvaluationScheduledEvent({ metadata: { "metadata.team": "platform" } });
 
-function makeStarted(): EvaluationStartedEvent {
-  return {
-    type: "lw.evaluation.started",
-    id: "evt-2",
-    tenantId: TENANT,
-    aggregateId: "eval-1",
-    occurredAt: 1_000_500,
-    data: {
-      evaluationId: "eval-1",
-      evaluatorId: "monitor-x",
-      evaluatorType: "langevals/llm_answer_match",
-    },
-  } as unknown as EvaluationStartedEvent;
-}
+const makeStarted = () =>
+  createEvaluationStartedEvent({ occurredAt: 1_000_500 });
 
-function makeCompleted(): EvaluationCompletedEvent {
-  return {
-    type: "lw.evaluation.completed",
-    id: "evt-3",
-    tenantId: TENANT,
-    aggregateId: "eval-1",
-    occurredAt: 1_002_500,
-    data: {
-      evaluationId: "eval-1",
-      status: "processed",
-      score: 0.85,
-      passed: true,
-      label: "good",
-      details: "(redacted detail blob that the slim should drop)",
-      inputs: { conversation: "(big blob)" },
-      costId: "cost-1",
-    },
-  } as unknown as EvaluationCompletedEvent;
-}
+const makeCompleted = () =>
+  createEvaluationCompletedEvent({ occurredAt: 1_002_500 });
 
-function makeReportedAtomic(): EvaluationReportedEvent {
-  return {
-    type: "lw.evaluation.reported",
-    id: "evt-r",
-    tenantId: TENANT,
-    aggregateId: "eval-2",
+const makeReportedAtomic = () =>
+  createEvaluationReportedEvent({
+    evaluationId: "eval-2",
     occurredAt: 1_100_000,
-    data: {
-      evaluationId: "eval-2",
-      evaluatorId: "monitor-y",
-      evaluatorType: "langevals/custom",
-      evaluatorName: "Custom",
-      traceId: "trace-9",
-      isGuardrail: true,
-      status: "error",
-      score: null,
-      passed: null,
-      label: null,
-      error: "boom",
-      errorDetails: "(stack trace)",
-    },
-  } as unknown as EvaluationReportedEvent;
-}
+  });
 
 describe("evaluationAnalytics fold projection — slim row derivation", () => {
   describe("given a scheduled → started → completed sequence", () => {

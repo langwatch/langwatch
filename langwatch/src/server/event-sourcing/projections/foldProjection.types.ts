@@ -166,20 +166,45 @@ export interface FoldProjectionOptions {
    */
   readWindow?: { widthMs: number };
   /**
-   * Re-fold from the event log when `store.get()` returns null instead of
+   * Re-fold from the event log when `store.get()` returns null, instead of
    * starting from `init()`.
    *
-   * A fold whose persisted row cannot be read back into fold state (e.g. the
-   * slim analytics tables — deliberately lossy rows) has NO state continuity
-   * of its own: without this option, every store miss silently folds only the
-   * delivered events, so a partial batch overwrites the complete row and
-   * late dimension-only events land on empty state. With this option, a miss
-   * rebuilds state from the aggregate's event history up to the delivered
-   * event (log order, `eventLoaderUpTo`), which is the event-sourcing-native
-   * source of truth.
+   * **Defaults to `false`, and that is the shape a new fold should keep** — the
+   * executor gates on `=== true`, so omitting it never re-folds. Opt in only
+   * with a reason and an exit condition; this is not a free safety net.
    *
-   * Pair the store with a RedisCachedFoldStore so the re-fold only runs on
-   * cache expiry/eviction/restart, not on every event.
+   * A re-fold scans the aggregate's whole history in `event_log` with no time
+   * bound, walking cold partitions. Under ADR-066 that is the behaviour behind
+   * the 2026-07-23 `TOO_MANY_PARTS` outage: as a steady-state continuity
+   * mechanism it makes every cache miss pay for the entire history. A fold that
+   * needs continuity earns it by persisting enough typed state to reconstruct
+   * itself (a "read-back store"), NOT by re-reading the log.
+   *
+   * The remaining legitimate use is TRANSITIONAL, and every current adopter is
+   * one: a fold that gained read-back columns has rows written before those
+   * columns existed, whose defaults would decode into silently wrong state. Its
+   * store compares the row's projection version and reports any older stamp as
+   * a miss, so this option rebuilds exactly those rows, exactly once each,
+   * before they are rewritten at the current version. It must never fire in
+   * steady state, and it should be deleted once retention has aged the old rows
+   * out. See `traceAnalytics`, `evaluationAnalytics` and `codingAgentSession`
+   * for the pattern.
+   *
+   * **Check each adopter before deleting it — "transitional" is a claim about
+   * the adopter, not about this option.** An adopter whose store can decline to
+   * write a row (a persistability gate) or can write one the read window will
+   * never find (a bad partition anchor) has a class of aggregate that misses on
+   * EVERY delivery, so its `es_fold_refold_on_miss_total{outcome="performed"}`
+   * never goes quiet and removing this option turns a permanent refold into
+   * permanent data loss instead. `traceAnalytics` has two such classes today,
+   * both documented on the projection.
+   *
+   * Requires `eventLoaderUpTo` (auto-wired by EventSourcingService) — the
+   * executor silently declines to re-fold without it. Pair the store with a
+   * RedisCachedFoldStore so a re-fold can only follow cache
+   * expiry/eviction/restart rather than an ordinary event.
+   *
+   * @default false
    */
   refoldOnStoreMiss?: boolean;
   /**
@@ -239,5 +264,28 @@ export interface FoldProjectionStore<State> {
   getWithApplied?(
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<{ state: State | null; appliedEventIds: string[] }>;
+  ): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    /**
+     * Why `state` is null, for stores that can tell them apart.
+     *
+     * `absent` — no row for this aggregate in the scope that was read.
+     * `undecodable` — a row IS there and the store refused it, which for an
+     * ADR-066 adopter means its version gate rejected an older shape.
+     *
+     * The distinction is load-bearing on both sides. The executor answers a
+     * windowed miss by re-reading UNWINDOWED, which is right for `absent` (the
+     * row may sit outside the window) and pure waste for `undecodable` (the row
+     * was found and refused; a wider scope finds the same row and refuses it
+     * again) — and that wasted read is deliberately unpruned. It also keeps the
+     * read-window metric honest: counting a version rejection as `absent` reads
+     * as "the window missed a live aggregate", which is a different operator
+     * action than "these rows need rebuilding".
+     *
+     * Omit when the store cannot distinguish; the executor then assumes
+     * `absent`, which is the safe direction.
+     */
+    miss?: "absent" | "undecodable";
+  }>;
 }

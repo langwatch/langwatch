@@ -120,10 +120,7 @@ export const safeTruncate = <T>(
   try {
     return truncateWithSizeLimit(data, maxTotalLength, stringLengths) as T;
   } catch (error) {
-    captureException(
-      toError(error),
-      { extra: { data } },
-    );
+    captureException(toError(error), { extra: { data } });
     return data;
   }
 };

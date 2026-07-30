@@ -4,7 +4,6 @@ import {
   Button,
   Heading,
   HStack,
-  Separator,
   Text,
   VStack,
 } from "@chakra-ui/react";

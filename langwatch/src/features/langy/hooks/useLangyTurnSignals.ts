@@ -1,7 +1,4 @@
-import {
-  type LangyProgressSample,
-  useLangyStore,
-} from "../stores/langyStore";
+import { type LangyProgressSample, useLangyStore } from "../stores/langyStore";
 
 export interface LangyTurnMetric {
   /** Value to roll to; the statcard rolls it up from 0 on first paint. */

@@ -126,5 +126,4 @@ describe("useScenarioTabFollow", () => {
       expect(screen.getByTestId("tab-id")).toHaveTextContent("none");
     });
   });
-
 });

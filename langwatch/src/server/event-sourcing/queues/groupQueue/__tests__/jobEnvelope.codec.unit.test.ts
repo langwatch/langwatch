@@ -168,10 +168,7 @@ describe("jobEnvelope body codecs", () => {
         vi.stubEnv("GROUP_QUEUE_MSGPACK_WRITES_ENABLED", "false");
         await encodeJobEnvelope({ jobData, tieredBlobs, projectId: PROJECT });
 
-        const keys = [
-          ...redisBlobs.store.keys(),
-          ...objectStore.store.keys(),
-        ];
+        const keys = [...redisBlobs.store.keys(), ...objectStore.store.keys()];
         expect(keys).toHaveLength(2);
       });
     });

@@ -51,7 +51,9 @@ vi.mock("~/utils/api", () => ({
       myBindings: { useQuery: () => ({ data: [], isLoading: false }) },
       orgProjects: { useQuery: () => ({ data: [], isLoading: false }) },
       orgTeams: { useQuery: () => ({ data: [], isLoading: false }) },
-      orgMembers: { useQuery: () => ({ data: [{ id: "u-1" }], isLoading: false }) },
+      orgMembers: {
+        useQuery: () => ({ data: [{ id: "u-1" }], isLoading: false }),
+      },
       create: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
       update: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
       revoke: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },

@@ -19,9 +19,9 @@
 
 import type { CliResultDigest, CliToolResult } from "@langwatch/langy";
 import {
+  LANGY_LIVENESS,
   LANGY_STREAM,
   LANGY_STREAMING,
-  LANGY_LIVENESS,
 } from "./langy.streaming.constants";
 
 /**

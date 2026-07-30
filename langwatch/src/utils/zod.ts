@@ -47,31 +47,32 @@ function deepApplyObject(
 type DeepUnknownKeys<
   T extends ZodTypeAny,
   UnknownKeys extends UnknownKeysParam,
-> = T extends ZodObject<infer Shape, infer _, infer Catchall>
-  ? ZodObject<
-      {
-        [k in keyof Shape]: DeepUnknownKeys<Shape[k], UnknownKeys>;
-      },
-      UnknownKeys,
-      Catchall
-    >
-  : T extends ZodArray<infer Type, infer Card>
-    ? ZodArray<DeepUnknownKeys<Type, UnknownKeys>, Card>
-    : T extends ZodOptional<infer Type>
-      ? ZodOptional<DeepUnknownKeys<Type, UnknownKeys>>
-      : T extends ZodNullable<infer Type>
-        ? ZodNullable<DeepUnknownKeys<Type, UnknownKeys>>
-        : T extends ZodTuple<infer Items>
-          ? {
-              [k in keyof Items]: Items[k] extends ZodTypeAny
-                ? DeepUnknownKeys<Items[k], UnknownKeys>
-                : never;
-            } extends infer PI
-            ? PI extends ZodTupleItems
-              ? ZodTuple<PI>
+> =
+  T extends ZodObject<infer Shape, infer _, infer Catchall>
+    ? ZodObject<
+        {
+          [k in keyof Shape]: DeepUnknownKeys<Shape[k], UnknownKeys>;
+        },
+        UnknownKeys,
+        Catchall
+      >
+    : T extends ZodArray<infer Type, infer Card>
+      ? ZodArray<DeepUnknownKeys<Type, UnknownKeys>, Card>
+      : T extends ZodOptional<infer Type>
+        ? ZodOptional<DeepUnknownKeys<Type, UnknownKeys>>
+        : T extends ZodNullable<infer Type>
+          ? ZodNullable<DeepUnknownKeys<Type, UnknownKeys>>
+          : T extends ZodTuple<infer Items>
+            ? {
+                [k in keyof Items]: Items[k] extends ZodTypeAny
+                  ? DeepUnknownKeys<Items[k], UnknownKeys>
+                  : never;
+              } extends infer PI
+              ? PI extends ZodTupleItems
+                ? ZodTuple<PI>
+                : never
               : never
-            : never
-          : T;
+            : T;
 
 type DeepPassthrough<T extends ZodTypeAny> = DeepUnknownKeys<T, "passthrough">;
 export function deepPassthrough<T extends ZodTypeAny>(

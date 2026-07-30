@@ -6,7 +6,10 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import {
+  LiteMemberRestrictedError,
+  ProjectPermissionDeniedError,
+} from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 
@@ -666,9 +669,21 @@ export const checkProjectPermission =
           ),
         });
       }
+      // `cause` carries the handled error, exactly as the EXTERNAL branch
+      // above does. Without it this denial crossed the boundary as bare prose,
+      // so the client had no code to key copy off and rendered the generic
+      // "unknown" state for a refusal we can name — and one the customer can
+      // act on by asking an admin for the permission named in `meta`.
+      //
+      // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled
+      // below: `handledErrorMiddleware` re-derives it from the handled cause's
+      // `httpStatus` (403). That is the right answer — the caller IS
+      // authenticated, they just lack the permission — and it now matches what
+      // the REST surface has always returned for the same refusal.
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this project resource",
+        cause: new ProjectPermissionDeniedError(permission),
       });
     }
 
@@ -1277,7 +1292,9 @@ async function loadScopeResolution(
               {
                 userId,
                 user: {
-                  orgMemberships: { some: { organizationId: args.organizationId } },
+                  orgMemberships: {
+                    some: { organizationId: args.organizationId },
+                  },
                 },
               },
               ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),

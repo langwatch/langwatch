@@ -26,12 +26,12 @@ import {
 } from "../logic/langyFeedbackDirective";
 import { langyPlan } from "../logic/langyPlan";
 import { questionToolCardParts } from "../logic/langyQuestionTool";
-import { useSpaLinkClick } from "../logic/spaLink";
 import {
   foldReasoningTitles,
   stripReasoningTitles,
 } from "../logic/langyReasoningTitles";
 import { stripToolNarration } from "../logic/langyToolNarration";
+import { useSpaLinkClick } from "../logic/spaLink";
 import { useLangyStore } from "../stores/langyStore";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { LangyFailedCard } from "./derived-cards/LangyFailedCard";
@@ -43,7 +43,6 @@ import { LangyFeedback } from "./LangyFeedback";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "./LangyMark";
 import { LangyPlanCard } from "./LangyPlanCard";
 import { hasLangyActivity, LangyToolActivity } from "./LangyToolActivity";
-import { StreamingText } from "./StreamingText";
 
 export interface LangyProposal {
   langyProposal: true;

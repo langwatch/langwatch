@@ -60,6 +60,7 @@ describe("handleError()", () => {
   }
 
   describe("when error is a LimitExceededError", () => {
+    /** @scenario "A known failure is normalised by Hono to a client-safe body" */
     it("returns 403 with HandledError shape", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
@@ -74,6 +75,8 @@ describe("handleError()", () => {
       );
     });
 
+    /** @scenario "A known failure is normalised by Hono to a client-safe body" */
+    /** @scenario "An external contract wins over cross-transport symmetry" */
     it("includes meta fields in the response body", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
@@ -88,6 +91,7 @@ describe("handleError()", () => {
   });
 
   describe("when error carries remediation fields", () => {
+    /** @scenario "A handled error carries remediation for agent consumers" */
     it("emits tips, docsUrl and fault in the body", async () => {
       const error = new (class extends HandledError {
         constructor() {
@@ -111,6 +115,7 @@ describe("handleError()", () => {
       expect(body.fault).toBe("customer");
     });
 
+    /** @scenario "Remediation fields are additive and optional" */
     it("omits remediation keys when the error has none", async () => {
       const error = new (class extends HandledError {
         constructor() {
@@ -143,9 +148,11 @@ describe("handleError()", () => {
       expect(res.status).toBe(400);
       const body = await res.json();
       // ModelNotConfiguredError is a HandledError, so it goes through the
-      // generic HandledError branch — `error` carries the same discriminant
-      // the legacy `cause` field used to (see modelNotConfiguredError.ts).
-      expect(body.error).toBe("MODEL_NOT_CONFIGURED");
+      // generic HandledError branch and `error` carries its enumerated code —
+      // the one the presentation registry writes copy for. The UPPERCASE
+      // `MODEL_NOT_CONFIGURED` is only the legacy tRPC `data.cause`
+      // discriminator and never reaches this boundary.
+      expect(body.error).toBe("model_not_configured");
       expect(body.featureKey).toBe("evaluator.create_default");
       expect(body.role).toBe("DEFAULT");
       expect(body.featureDisplayName).toBe("Evaluator default model");

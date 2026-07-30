@@ -10,11 +10,11 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, Pencil } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useMemo } from "react";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
@@ -160,7 +160,7 @@ export function EvaluationStatusItem({
   const hasDetails = check.status === "processed" && check.details;
   const errorMessage =
     check.status === "error"
-      ? check.error?.message ?? check.details ?? null
+      ? (check.error?.message ?? check.details ?? null)
       : null;
 
   return (

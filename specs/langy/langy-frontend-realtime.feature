@@ -53,21 +53,12 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     When the backend broadcasts that a conversation changed
     Then Langy receives only a lightweight signal carrying the conversation id
     And it cancels and invalidates the affected queries rather than accepting pushed rows
-    And the "N new" counter stays accurate across the update
 
   @integration
   Scenario: A single SSE subscription serves the whole panel
     Given the Langy panel is mounted
     Then exactly one SSE subscription is opened for conversation freshness
     And additional list or detail consumers reuse that one coordinator
-
-  @integration
-  Scenario: Polling only runs when the live signal is disconnected
-    Given the freshness SSE is connected
-    Then the new-count query does not poll on an interval
-    When the freshness SSE disconnects
-    Then the new-count query falls back to adaptive polling
-    And the interval backs off as consecutive polls come back empty
 
   # ---------------------------------------------------------------------------
   # Live turn streaming (the one thing that genuinely streams)

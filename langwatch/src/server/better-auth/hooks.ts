@@ -1,6 +1,11 @@
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { type Organization, Prisma, type PrismaClient, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import {
+  Prisma,
+  type PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { APIError } from "better-auth/api";
 import { getApp } from "~/server/app-layer/app";
 import { InviteService } from "~/server/invites/invite.service";
@@ -64,7 +69,10 @@ export const beforeUserCreate = async ({
   user,
 }: {
   prisma: PrismaClient;
-  user: { email: string; deactivatedAt?: Date | null } & Record<string, unknown>;
+  user: { email: string; deactivatedAt?: Date | null } & Record<
+    string,
+    unknown
+  >;
 }): Promise<boolean | void> => {
   if (user.deactivatedAt) {
     logger.warn({ email: user.email }, "Blocked signup: user is deactivated");
@@ -116,11 +124,12 @@ export const afterUserCreate = async ({
     });
     if (!org) return;
 
-    const pendingInvite = await InviteService.create(prisma)
-      .findPendingByOrgAndEmail({
-        organizationId: org.id,
-        email: user.email,
-      });
+    const pendingInvite = await InviteService.create(
+      prisma,
+    ).findPendingByOrgAndEmail({
+      organizationId: org.id,
+      email: user.email,
+    });
 
     try {
       await prisma.$transaction(async (tx) => {
@@ -449,7 +458,10 @@ export const beforeSessionCreate = async ({
     select: { deactivatedAt: true },
   });
   if (user?.deactivatedAt) {
-    logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
+    logger.warn(
+      { userId: session.userId },
+      "Blocked session create: user deactivated",
+    );
     return false;
   }
 };
@@ -474,8 +486,14 @@ export const afterSessionCreate = async ({
   prisma: PrismaClient;
   userId: string;
   isImpersonationSession?: boolean;
-  fireActivityTrackingNurturing: (args: { userId: string; hasOrganization: boolean }) => void;
-  ensureUserSyncedToCio: (args: { userId: string; hasOrganization: boolean }) => void;
+  fireActivityTrackingNurturing: (args: {
+    userId: string;
+    hasOrganization: boolean;
+  }) => void;
+  ensureUserSyncedToCio: (args: {
+    userId: string;
+    hasOrganization: boolean;
+  }) => void;
 }): Promise<void> => {
   // lastLoginAt is only updated for "real" sessions — not admin impersonation.
   if (!isImpersonationSession) {
@@ -485,7 +503,10 @@ export const afterSessionCreate = async ({
         data: { lastLoginAt: new Date() },
       });
     } catch (err) {
-      logger.error({ err, userId }, "Failed to update lastLoginAt after session create");
+      logger.error(
+        { err, userId },
+        "Failed to update lastLoginAt after session create",
+      );
     }
   }
 
@@ -504,6 +525,9 @@ export const afterSessionCreate = async ({
       ensureUserSyncedToCio({ userId, hasOrganization });
     })
     .catch((err) => {
-      logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");
+      logger.error(
+        { err, userId },
+        "Failed to fire nurturing hooks after session create",
+      );
     });
 };

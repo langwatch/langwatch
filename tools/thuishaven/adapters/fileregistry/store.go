@@ -91,6 +91,105 @@ func (s *Store) WriteSlugCache(worktreeDir, slug string) error {
 	return os.WriteFile(filepath.Join(worktreeDir, ".langwatch-slug"), []byte(slug+"\n"), 0o644)
 }
 
+// selectionFile is the on-disk shape of the worktree-local sticky service
+// selection (ADR-064) — .haven.json next to .langwatch-slug.
+type selectionFile struct {
+	Services *selectionFields `json:"services"`
+}
+
+// selectionFields is domain.Selection with every service optional. The pointers
+// are the whole point: decoding straight into a Selection makes an absent key
+// indistinguishable from a false one, so a file naming only what the developer
+// turned ON — the natural thing to hand-write, and what a truncated or
+// hand-merged file looks like — would silently strip gateway and nlp off the
+// stack. Absent means "not stated", and what is not stated keeps its default.
+type selectionFields struct {
+	Workers *bool `json:"workers"`
+	Gateway *bool `json:"gateway"`
+	NLP     *bool `json:"nlp"`
+	Langy   *bool `json:"langy"`
+}
+
+// applyTo overlays the services this file actually states onto sel.
+func (f selectionFields) applyTo(sel *domain.Selection) {
+	for _, field := range []struct{ stated, target *bool }{
+		{f.Workers, &sel.Workers},
+		{f.Gateway, &sel.Gateway},
+		{f.NLP, &sel.NLP},
+		{f.Langy, &sel.Langy},
+	} {
+		if field.stated != nil {
+			*field.target = *field.stated
+		}
+	}
+}
+
+func selectionPath(worktreeDir string) string {
+	return filepath.Join(worktreeDir, ".haven.json")
+}
+
+// ReadSelection reads the worktree's sticky service selection; ok is false when
+// none has been written yet, or the file states no services at all (callers
+// fall back to the lean default). A file that states some services and not
+// others is honoured for the ones it states — the rest keep their default
+// rather than decoding to off.
+func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
+	b, err := os.ReadFile(selectionPath(worktreeDir))
+	if err != nil {
+		return domain.Selection{}, false
+	}
+	var f selectionFile
+	if json.Unmarshal(b, &f) != nil || f.Services == nil {
+		return domain.Selection{}, false
+	}
+	sel := domain.DefaultSelection()
+	f.Services.applyTo(&sel)
+	return sel, true
+}
+
+// WriteSelection persists the worktree's sticky service selection. The write is
+// atomic (temp file + rename): a crash mid-write must never leave a half-written
+// .haven.json, which ReadSelection can't tell from "never written" and would
+// silently reset the sticky selection to the lean default.
+// A written file always states every service, so haven's own writes never rely
+// on the default-keeping behaviour above — that is there for files it did not
+// write.
+func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
+	b, err := json.MarshalIndent(selectionFile{Services: &selectionFields{
+		Workers: &sel.Workers,
+		Gateway: &sel.Gateway,
+		NLP:     &sel.NLP,
+		Langy:   &sel.Langy,
+	}}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(selectionPath(worktreeDir), append(b, '\n'), 0o644)
+}
+
+// writeFileAtomic writes data to a temp file in the destination directory and
+// renames it into place, so a reader never observes a partial file.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }() // a no-op once the rename succeeds
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
+}
+
 // WriteOverlay writes langwatch/.env.portless. Mode 0o600: it carries
 // LANGWATCH_API_KEY, so it must not be world-readable.
 func (s *Store) WriteOverlay(lwDir string, st domain.Stack) error {

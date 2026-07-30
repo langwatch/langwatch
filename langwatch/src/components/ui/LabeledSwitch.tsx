@@ -1,5 +1,5 @@
-import { useId } from "react";
 import { HStack, Text } from "@chakra-ui/react";
+import { useId } from "react";
 import { Switch } from "~/components/ui/switch";
 
 interface LabeledSwitchProps<T extends string> {
@@ -23,15 +23,17 @@ export function LabeledSwitch<T extends string>({
 
   return (
     <HStack gap={2} data-testid={testId}>
-      <Text id={leftLabelId} fontWeight={value === left.value ? "bold" : "normal"} fontSize="sm">
+      <Text
+        id={leftLabelId}
+        fontWeight={value === left.value ? "bold" : "normal"}
+        fontSize="sm"
+      >
         {left.label}
       </Text>
       <Switch
         colorPalette="blue"
         checked={value === right.value}
-        onCheckedChange={(e) =>
-          onChange(e.checked ? right.value : left.value)
-        }
+        onCheckedChange={(e) => onChange(e.checked ? right.value : left.value)}
         aria-labelledby={`${leftLabelId} ${rightLabelId}`}
       />
       <Text

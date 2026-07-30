@@ -4,11 +4,7 @@ import type { AggregateType } from "../domain/aggregateType";
 import type { EventType } from "../domain/eventType";
 import type { TenantId } from "../domain/tenantId";
 import { TenantIdSchema } from "../domain/tenantId";
-import type {
-  Event,
-  EventMetadataBase,
-  Projection,
-} from "../domain/types";
+import type { Event, EventMetadataBase, Projection } from "../domain/types";
 import {
   EventMetadataBaseSchema,
   EventSchema,
@@ -72,7 +68,11 @@ export interface CreateEventParams<
  */
 // Overload for full Event type
 function createEvent<TEvent extends Event>(
-  params: CreateEventParams<TEvent["data"], NonNullable<TEvent["metadata"]>, TEvent["type"]>,
+  params: CreateEventParams<
+    TEvent["data"],
+    NonNullable<TEvent["metadata"]>,
+    TEvent["type"]
+  >,
 ): TEvent;
 
 // Implementation
@@ -155,7 +155,8 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
     return metadata;
   }
 
-  const traceparent = traceparentOverride ?? getCurrentTraceparentFromActiveSpan();
+  const traceparent =
+    traceparentOverride ?? getCurrentTraceparentFromActiveSpan();
   if (!traceparent) {
     return metadata;
   }

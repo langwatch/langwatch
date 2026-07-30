@@ -62,9 +62,7 @@ describe("buildRollupTimeseriesQuery", () => {
       const { sql: avgSql } = buildRollupTimeseriesQuery({
         projectId: "tenant-rollup",
         ...baseDates,
-        series: [
-          { metric: "performance.completion_time", aggregation: "avg" },
-        ],
+        series: [{ metric: "performance.completion_time", aggregation: "avg" }],
         timeScale: 60,
       });
       expect(avgSql).toContain(

@@ -27,7 +27,7 @@ export function useModelProvidersSettings(params: {
         typeof provider === "object" &&
         provider !== null &&
         "enabled" in provider &&
-        provider.enabled
+        provider.enabled,
     );
   }, [providers, isLoading]);
 

@@ -1,8 +1,15 @@
 export { AnsiText } from "./AnsiText";
-export { TerminalOutput } from "./TerminalOutput";
+export { computeLineDiff, type DiffLine, diffStat } from "./diff";
+export {
+  ansiColorToken,
+  CLAUDE_MARK_GRADIENT,
+  TERMINAL_TOKENS,
+} from "./palette";
+export { deriveSessionBanner, type SessionBanner } from "./sessionBanner";
 export { TerminalDiff } from "./TerminalDiff";
-export { TerminalView } from "./TerminalView";
+export { TerminalOutput } from "./TerminalOutput";
 export { TerminalTab } from "./TerminalTab";
+export { TerminalView } from "./TerminalView";
 export {
   buildEntryTimeline,
   extractDiffFromToolInput,
@@ -11,6 +18,3 @@ export {
   toolPrimaryArg,
 } from "./terminalSession";
 export { indexToolSpansBySpanId, type TerminalToolSpan } from "./toolSpans";
-export { deriveSessionBanner, type SessionBanner } from "./sessionBanner";
-export { computeLineDiff, diffStat, type DiffLine } from "./diff";
-export { ansiColorToken, CLAUDE_MARK_GRADIENT, TERMINAL_TOKENS } from "./palette";

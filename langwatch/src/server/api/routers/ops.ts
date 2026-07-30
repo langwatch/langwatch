@@ -59,7 +59,9 @@ const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
  * deliberate act rather than a mis-click.
  */
 function requireBlobStoreWriteAuth(
-  ctx: { session: { user: { impersonator?: { email?: string | null } | null } } },
+  ctx: {
+    session: { user: { impersonator?: { email?: string | null } | null } };
+  },
   confirm: string | undefined,
 ) {
   if (ctx.session.user.impersonator) {

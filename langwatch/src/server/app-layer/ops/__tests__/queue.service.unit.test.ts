@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { QueueService } from "../queue.service";
-import type { QueueRepository, DlqGroupInfo } from "../repositories/queue.repository";
+import type {
+  DlqGroupInfo,
+  QueueRepository,
+} from "../repositories/queue.repository";
 import type { GroupInfo, QueueInfo } from "../types";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
@@ -27,12 +30,16 @@ function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
   };
 }
 
-function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueRepository {
+function createMockRepo(
+  overrides: Partial<QueueRepository> = {},
+): QueueRepository {
   return {
     discoverQueueNames: vi.fn().mockResolvedValue([]),
     scanQueues: vi.fn().mockResolvedValue([]),
     getGroupJobs: vi.fn().mockResolvedValue({ jobs: [], total: 0 }),
-    getBlockedSummary: vi.fn().mockResolvedValue({ totalBlocked: 0, clusters: [] }),
+    getBlockedSummary: vi
+      .fn()
+      .mockResolvedValue({ totalBlocked: 0, clusters: [] }),
     unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: false }),
     unblockAll: vi.fn().mockResolvedValue({ unblockedCount: 0 }),
     drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 0 }),
@@ -41,17 +48,29 @@ function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueReposito
     retryBlocked: vi.fn().mockResolvedValue({ wasBlocked: false }),
     listPausedKeys: vi.fn().mockResolvedValue([]),
     moveToDlq: vi.fn().mockResolvedValue({ jobsMoved: 0 }),
-    moveAllBlockedToDlq: vi.fn().mockResolvedValue({ movedCount: 0, jobsMoved: 0 }),
+    moveAllBlockedToDlq: vi
+      .fn()
+      .mockResolvedValue({ movedCount: 0, jobsMoved: 0 }),
     replayFromDlq: vi.fn().mockResolvedValue({ jobsReplayed: 0 }),
-    replayAllFromDlq: vi.fn().mockResolvedValue({ replayedCount: 0, jobsReplayed: 0 }),
-    canaryRedrive: vi.fn().mockResolvedValue({ redrivenCount: 0, groupIds: [] }),
-    canaryUnblock: vi.fn().mockResolvedValue({ unblockedCount: 0, groupIds: [] }),
+    replayAllFromDlq: vi
+      .fn()
+      .mockResolvedValue({ replayedCount: 0, jobsReplayed: 0 }),
+    canaryRedrive: vi
+      .fn()
+      .mockResolvedValue({ redrivenCount: 0, groupIds: [] }),
+    canaryUnblock: vi
+      .fn()
+      .mockResolvedValue({ unblockedCount: 0, groupIds: [] }),
     listDlqGroups: vi.fn().mockResolvedValue([]),
-    drainAllBlockedPreview: vi.fn().mockResolvedValue({ totalAffected: 0, byPipeline: [], byError: [] }),
+    drainAllBlockedPreview: vi
+      .fn()
+      .mockResolvedValue({ totalAffected: 0, byPipeline: [], byError: [] }),
     pauseTenant: vi.fn().mockResolvedValue(undefined),
     unpauseTenant: vi.fn().mockResolvedValue(undefined),
     listPausedTenants: vi.fn().mockResolvedValue([]),
-    drainTenant: vi.fn().mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
+    drainTenant: vi
+      .fn()
+      .mockResolvedValue({ groupsDrained: 0, jobsDrained: 0 }),
     reconcileTotalPending: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
@@ -81,7 +100,11 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.getGroups({ queueName: "q1", page: 1, pageSize: 10 });
+        const result = await service.getGroups({
+          queueName: "q1",
+          page: 1,
+          pageSize: 10,
+        });
 
         expect(result.groups).toHaveLength(10);
         expect(result.groups[0]!.groupId).toBe("g0");
@@ -97,7 +120,11 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.getGroups({ queueName: "q1", page: 3, pageSize: 10 });
+        const result = await service.getGroups({
+          queueName: "q1",
+          page: 3,
+          pageSize: 10,
+        });
 
         expect(result.groups).toHaveLength(5);
         expect(result.groups[0]!.groupId).toBe("g20");
@@ -111,7 +138,11 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.getGroups({ queueName: "q1", page: 10, pageSize: 10 });
+        const result = await service.getGroups({
+          queueName: "q1",
+          page: 10,
+          pageSize: 10,
+        });
 
         expect(result.groups).toHaveLength(0);
         expect(result.total).toBe(25);
@@ -125,7 +156,11 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.getGroups({ queueName: "missing", page: 1, pageSize: 10 });
+        const result = await service.getGroups({
+          queueName: "missing",
+          page: 1,
+          pageSize: 10,
+        });
 
         expect(result.groups).toHaveLength(0);
         expect(result.total).toBe(0);
@@ -153,7 +188,10 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.getGroupDetail({ queueName: "q1", groupId: "target" });
+        const result = await service.getGroupDetail({
+          queueName: "q1",
+          groupId: "target",
+        });
 
         expect(result).toEqual(group);
       });
@@ -177,7 +215,10 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.getGroupDetail({ queueName: "q1", groupId: "missing" });
+        const result = await service.getGroupDetail({
+          queueName: "q1",
+          groupId: "missing",
+        });
 
         expect(result).toBeNull();
       });
@@ -190,7 +231,10 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.getGroupDetail({ queueName: "missing", groupId: "g1" });
+        const result = await service.getGroupDetail({
+          queueName: "missing",
+          groupId: "g1",
+        });
 
         expect(result).toBeNull();
       });
@@ -201,14 +245,29 @@ describe("QueueService", () => {
     describe("when multiple queues have DLQ groups", () => {
       it("merges and sorts by movedAt desc", async () => {
         const dlq1: DlqGroupInfo[] = [
-          { groupId: "a", error: null, errorStack: null, pipelineName: null, jobCount: 1, movedAt: 1000 },
+          {
+            groupId: "a",
+            error: null,
+            errorStack: null,
+            pipelineName: null,
+            jobCount: 1,
+            movedAt: 1000,
+          },
         ];
         const dlq2: DlqGroupInfo[] = [
-          { groupId: "b", error: null, errorStack: null, pipelineName: null, jobCount: 2, movedAt: 3000 },
+          {
+            groupId: "b",
+            error: null,
+            errorStack: null,
+            pipelineName: null,
+            jobCount: 2,
+            movedAt: 3000,
+          },
         ];
         const repo = createMockRepo({
           discoverQueueNames: vi.fn().mockResolvedValue(["q1:gq", "q2:gq"]),
-          listDlqGroups: vi.fn()
+          listDlqGroups: vi
+            .fn()
             .mockResolvedValueOnce(dlq1)
             .mockResolvedValueOnce(dlq2),
         });
@@ -227,7 +286,14 @@ describe("QueueService", () => {
         const repo = createMockRepo({
           discoverQueueNames: vi.fn().mockResolvedValue(["{prefix}:events:gq"]),
           listDlqGroups: vi.fn().mockResolvedValue([
-            { groupId: "g1", error: null, errorStack: null, pipelineName: null, jobCount: 1, movedAt: null },
+            {
+              groupId: "g1",
+              error: null,
+              errorStack: null,
+              pipelineName: null,
+              jobCount: 1,
+              movedAt: null,
+            },
           ]),
         });
         const service = new QueueService(repo);
@@ -242,8 +308,22 @@ describe("QueueService", () => {
     describe("when movedAt is null", () => {
       it("sorts to end", async () => {
         const dlq: DlqGroupInfo[] = [
-          { groupId: "a", error: null, errorStack: null, pipelineName: null, jobCount: 1, movedAt: null },
-          { groupId: "b", error: null, errorStack: null, pipelineName: null, jobCount: 1, movedAt: 5000 },
+          {
+            groupId: "a",
+            error: null,
+            errorStack: null,
+            pipelineName: null,
+            jobCount: 1,
+            movedAt: null,
+          },
+          {
+            groupId: "b",
+            error: null,
+            errorStack: null,
+            pipelineName: null,
+            jobCount: 1,
+            movedAt: 5000,
+          },
         ];
         const repo = createMockRepo({
           discoverQueueNames: vi.fn().mockResolvedValue(["q:gq"]),
@@ -267,10 +347,16 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.unblockGroup({ queueName: "q1", groupId: "g1" });
+        const result = await service.unblockGroup({
+          queueName: "q1",
+          groupId: "g1",
+        });
 
         expect(result).toEqual({ wasBlocked: true });
-        expect(repo.unblockGroup).toHaveBeenCalledWith({ queueName: "q1", groupId: "g1" });
+        expect(repo.unblockGroup).toHaveBeenCalledWith({
+          queueName: "q1",
+          groupId: "g1",
+        });
       });
     });
 
@@ -281,7 +367,10 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.unblockGroup({ queueName: "q1", groupId: "g1" });
+        const result = await service.unblockGroup({
+          queueName: "q1",
+          groupId: "g1",
+        });
 
         expect(result.wasBlocked).toBe(false);
       });
@@ -296,10 +385,16 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.drainGroup({ queueName: "q1", groupId: "g1" });
+        const result = await service.drainGroup({
+          queueName: "q1",
+          groupId: "g1",
+        });
 
         expect(result).toEqual({ jobsRemoved: 5 });
-        expect(repo.drainGroup).toHaveBeenCalledWith({ queueName: "q1", groupId: "g1" });
+        expect(repo.drainGroup).toHaveBeenCalledWith({
+          queueName: "q1",
+          groupId: "g1",
+        });
       });
     });
   });
@@ -312,10 +407,16 @@ describe("QueueService", () => {
         });
         const service = new QueueService(repo);
 
-        const result = await service.moveToDlq({ queueName: "q1", groupId: "g1" });
+        const result = await service.moveToDlq({
+          queueName: "q1",
+          groupId: "g1",
+        });
 
         expect(result).toEqual({ jobsMoved: 3 });
-        expect(repo.moveToDlq).toHaveBeenCalledWith({ queueName: "q1", groupId: "g1" });
+        expect(repo.moveToDlq).toHaveBeenCalledWith({
+          queueName: "q1",
+          groupId: "g1",
+        });
       });
     });
   });
@@ -340,14 +441,28 @@ describe("QueueService", () => {
     describe("when DLQ groups exist", () => {
       it("delegates to repo with count and filter", async () => {
         const repo = createMockRepo({
-          canaryRedrive: vi.fn().mockResolvedValue({ redrivenCount: 3, groupIds: ["g1", "g2", "g3"] }),
+          canaryRedrive: vi.fn().mockResolvedValue({
+            redrivenCount: 3,
+            groupIds: ["g1", "g2", "g3"],
+          }),
         });
         const service = new QueueService(repo);
 
-        const result = await service.canaryRedrive({ queueName: "q1", count: 3, pipelineFilter: "trace" });
+        const result = await service.canaryRedrive({
+          queueName: "q1",
+          count: 3,
+          pipelineFilter: "trace",
+        });
 
-        expect(result).toEqual({ redrivenCount: 3, groupIds: ["g1", "g2", "g3"] });
-        expect(repo.canaryRedrive).toHaveBeenCalledWith({ queueName: "q1", count: 3, pipelineFilter: "trace" });
+        expect(result).toEqual({
+          redrivenCount: 3,
+          groupIds: ["g1", "g2", "g3"],
+        });
+        expect(repo.canaryRedrive).toHaveBeenCalledWith({
+          queueName: "q1",
+          count: 3,
+          pipelineFilter: "trace",
+        });
       });
     });
   });
@@ -356,14 +471,22 @@ describe("QueueService", () => {
     describe("when blocked groups exist", () => {
       it("delegates to repo with count and filter", async () => {
         const repo = createMockRepo({
-          canaryUnblock: vi.fn().mockResolvedValue({ unblockedCount: 2, groupIds: ["g1", "g2"] }),
+          canaryUnblock: vi
+            .fn()
+            .mockResolvedValue({ unblockedCount: 2, groupIds: ["g1", "g2"] }),
         });
         const service = new QueueService(repo);
 
-        const result = await service.canaryUnblock({ queueName: "q1", count: 5 });
+        const result = await service.canaryUnblock({
+          queueName: "q1",
+          count: 5,
+        });
 
         expect(result).toEqual({ unblockedCount: 2, groupIds: ["g1", "g2"] });
-        expect(repo.canaryUnblock).toHaveBeenCalledWith({ queueName: "q1", count: 5 });
+        expect(repo.canaryUnblock).toHaveBeenCalledWith({
+          queueName: "q1",
+          count: 5,
+        });
       });
     });
   });

@@ -37,7 +37,8 @@ export function RegenerateApiKeyDialog({
                 <Alert.Content>
                   <Alert.Title>This action cannot be undone</Alert.Title>
                   <Alert.Description>
-                    You&apos;ll need to update all applications using this API key.
+                    You&apos;ll need to update all applications using this API
+                    key.
                   </Alert.Description>
                 </Alert.Content>
               </Alert.Root>
@@ -47,11 +48,7 @@ export function RegenerateApiKeyDialog({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              colorPalette="red"
-              onClick={onConfirm}
-              loading={isLoading}
-            >
+            <Button colorPalette="red" onClick={onConfirm} loading={isLoading}>
               Regenerate Key
             </Button>
           </Dialog.Footer>

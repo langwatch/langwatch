@@ -134,9 +134,11 @@ describe("SecretsService reserved-name guard", () => {
       // The discriminating positive case: the guard keys on the name, not on
       // refusing every row.
       const { prisma, fns } = mockPrisma({
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ ...reservedRow(), id: "sec_2", name: "MY_API_KEY" }),
+        findFirst: vi.fn().mockResolvedValue({
+          ...reservedRow(),
+          id: "sec_2",
+          name: "MY_API_KEY",
+        }),
       });
 
       await expect(

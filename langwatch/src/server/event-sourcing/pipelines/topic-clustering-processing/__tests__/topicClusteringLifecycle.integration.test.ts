@@ -1,20 +1,19 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import { PrismaTopicClusteringRunHistoryProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
+import { PrismaTopicClusteringRunProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
+import { PrismaTopicClusteringStatusRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-status.repository";
+import { PrismaTopicModelProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-model-projection.prisma.repository";
+import { seedProjectTopicModel } from "~/server/app-layer/topic-clustering/seedTopicModel";
+import { TopicClusteringStatusService } from "~/server/app-layer/topic-clustering/topic-clustering-status.service";
 import { prisma } from "~/server/db";
-import { EventSourcing } from "../../../eventSourcing";
-import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "../../../__tests__/integration/testContainers";
-import { PrismaTopicClusteringRunProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-projection.prisma.repository";
-import { PrismaTopicClusteringRunHistoryProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-run-history-projection.prisma.repository";
-import { PrismaTopicModelProjectionRepository } from "~/server/app-layer/topic-clustering/repositories/topic-model-projection.prisma.repository";
-import { PrismaTopicClusteringStatusRepository } from "~/server/app-layer/topic-clustering/repositories/topic-clustering-status.repository";
-import { TopicClusteringStatusService } from "~/server/app-layer/topic-clustering/topic-clustering-status.service";
-import { seedProjectTopicModel } from "~/server/app-layer/topic-clustering/seedTopicModel";
+import { EventSourcing } from "../../../eventSourcing";
+import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
+import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
 import { createTopicClusteringProcessingPipeline } from "../pipeline";
 
 /**
@@ -32,7 +31,9 @@ const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL
 );
 
-const ns = `tclc${nanoid(8).toLowerCase().replace(/[^a-z0-9]/g, "x")}`;
+const ns = `tclc${nanoid(8)
+  .toLowerCase()
+  .replace(/[^a-z0-9]/g, "x")}`;
 
 async function waitFor<T>(
   probe: () => Promise<T | null | undefined | false>,
@@ -83,7 +84,9 @@ async function destroyProject(projectId: string) {
   });
   await prisma.topic.deleteMany({ where: { projectId } });
   await prisma.topicModelProjection.deleteMany({ where: { projectId } });
-  await prisma.topicClusteringRunProjection.deleteMany({ where: { projectId } });
+  await prisma.topicClusteringRunProjection.deleteMany({
+    where: { projectId },
+  });
   await prisma.topicClusteringRunHistoryProjection.deleteMany({
     where: { projectId },
   });
@@ -240,9 +243,9 @@ describe.skipIf(!hasTestcontainers)(
           `${ns}-child`,
           `${ns}-parent`,
         ]);
-        expect(
-          rows.find((r) => r.id === `${ns}-child`)?.parentId,
-        ).toBe(`${ns}-parent`);
+        expect(rows.find((r) => r.id === `${ns}-child`)?.parentId).toBe(
+          `${ns}-parent`,
+        );
         for (const row of rows) expect(row.lastEventId).not.toBeNull();
         expect(
           await prisma.topicModelProjection.findUnique({
@@ -303,8 +306,7 @@ describe.skipIf(!hasTestcontainers)(
             where: { projectId },
             select: { id: true },
           });
-          return found.length === 2 &&
-            found.every((r) => r.id.endsWith("2"))
+          return found.length === 2 && found.every((r) => r.id.endsWith("2"))
             ? found
             : null;
         }, "the batch replace to reconcile the previous model away");

@@ -3,71 +3,71 @@ import { generateEvaluatorSlug, isValidEvaluatorSlug } from "../evaluatorSlug";
 
 describe("generateEvaluatorSlug", () => {
   /** @scenario Generate slug from evaluator name on creation */
-  it("should generate slug from simple name with format name-XXXXX", () => {
+  it("generates slug from simple name with format name-XXXXX", () => {
     const slug = generateEvaluatorSlug("My Custom Evaluator");
     expect(slug).toMatch(/^my-custom-evaluator-[a-z0-9]{5}$/);
   });
 
-  it("should handle single word names", () => {
+  it("handles single word names", () => {
     const slug = generateEvaluatorSlug("Safety");
     expect(slug).toMatch(/^safety-[a-z0-9]{5}$/);
   });
 
   /** @scenario Handle special characters in name */
-  it("should handle names with special characters", () => {
+  it("handles names with special characters", () => {
     const slug = generateEvaluatorSlug("LLM Judge (v2.0) - Beta!");
     // slugify with strict: true removes special chars (dots are removed, not converted)
     expect(slug).toMatch(/^llm-judge-v20-beta-[a-z0-9]{5}$/);
   });
 
-  it("should handle names with colons and question marks", () => {
+  it("handles names with colons and question marks", () => {
     const slug = generateEvaluatorSlug("Question: What?");
     expect(slug).toMatch(/^question-what-[a-z0-9]{5}$/);
   });
 
-  it("should handle names with underscores", () => {
+  it("handles names with underscores", () => {
     const slug = generateEvaluatorSlug("my_custom_eval");
     expect(slug).toMatch(/^my-custom-eval-[a-z0-9]{5}$/);
   });
 
-  it("should handle names with ampersands", () => {
+  it("handles names with ampersands", () => {
     const slug = generateEvaluatorSlug("Safety & Quality Check");
     // slugify with strict: true removes ampersands
     expect(slug).toMatch(/^safety-quality-check-[a-z0-9]{5}$/);
   });
 
-  it("should handle names with numbers", () => {
+  it("handles names with numbers", () => {
     const slug = generateEvaluatorSlug("Evaluator v3.0");
     // slugify with strict: true removes dots
     expect(slug).toMatch(/^evaluator-v30-[a-z0-9]{5}$/);
   });
 
-  it("should lowercase the slug", () => {
+  it("lowercases the slug", () => {
     const slug = generateEvaluatorSlug("UPPERCASE NAME");
     expect(slug).toMatch(/^uppercase-name-[a-z0-9]{5}$/);
   });
 
-  it("should trim whitespace from name", () => {
+  it("trims whitespace from name", () => {
     const slug = generateEvaluatorSlug("  Trimmed Name  ");
     expect(slug).toMatch(/^trimmed-name-[a-z0-9]{5}$/);
   });
 
   /** @scenario Handle empty or whitespace-only names */
-  it("should throw error for empty name", () => {
+  it("throws error for empty name", () => {
     expect(() => generateEvaluatorSlug("")).toThrow(
       "Evaluator name cannot be empty",
     );
   });
 
   /** @scenario Handle empty or whitespace-only names */
-  it("should throw error for whitespace-only name", () => {
+  it("throws error for whitespace-only name", () => {
     expect(() => generateEvaluatorSlug("   ")).toThrow(
       "Evaluator name cannot be empty",
     );
   });
 
   /** @scenario Handle very long names */
-  it("should truncate very long names", () => {
+  it("truncates very long names", () => {
     const longName = "A".repeat(100);
     const slug = generateEvaluatorSlug(longName);
     // Base should be truncated to 50 chars max, plus hyphen and 5-char suffix
@@ -76,7 +76,7 @@ describe("generateEvaluatorSlug", () => {
     expect(slug).toMatch(/-[a-z0-9]{5}$/);
   });
 
-  it("should handle name that becomes empty after slugify", () => {
+  it("handles name that becomes empty after slugify", () => {
     // Name with only special chars that get removed
     const slug = generateEvaluatorSlug("!!!");
     // Should still return at least the nanoid suffix (5 chars)
@@ -84,7 +84,7 @@ describe("generateEvaluatorSlug", () => {
     expect(slug).toMatch(/^[a-z0-9]{5}$/);
   });
 
-  it("should not end with hyphen before suffix", () => {
+  it("does not end with hyphen before suffix", () => {
     // If truncation happens mid-word with hyphen at end
     const longName = "word-".repeat(20);
     const slug = generateEvaluatorSlug(longName);
@@ -92,7 +92,7 @@ describe("generateEvaluatorSlug", () => {
     expect(slug).not.toContain("--");
   });
 
-  it("should include 5-character nanoid suffix", () => {
+  it("includes 5-character nanoid suffix", () => {
     const slug = generateEvaluatorSlug("Test");
     // Suffix is 5 chars after last hyphen
     const parts = slug.split("-");
@@ -100,7 +100,7 @@ describe("generateEvaluatorSlug", () => {
   });
 
   /** @scenario Slug uniqueness within project */
-  it("should generate unique slugs for same name", () => {
+  it("generates unique slugs for same name", () => {
     const slug1 = generateEvaluatorSlug("Same Name");
     const slug2 = generateEvaluatorSlug("Same Name");
 
@@ -149,52 +149,52 @@ describe("generateEvaluatorSlug", () => {
 });
 
 describe("isValidEvaluatorSlug", () => {
-  it("should return true for valid slug", () => {
+  it("returns true for valid slug", () => {
     expect(isValidEvaluatorSlug("my-custom-evaluator-abc12")).toBe(true);
   });
 
-  it("should return true for simple valid slug", () => {
+  it("returns true for simple valid slug", () => {
     expect(isValidEvaluatorSlug("safety-abc12")).toBe(true);
   });
 
-  it("should return true for slug with numbers", () => {
+  it("returns true for slug with numbers", () => {
     expect(isValidEvaluatorSlug("evaluator-v3-abc12")).toBe(true);
   });
 
-  it("should return true for slug that is just nanoid", () => {
+  it("returns true for slug that is just nanoid", () => {
     expect(isValidEvaluatorSlug("abc12")).toBe(true);
   });
 
-  it("should return false for empty string", () => {
+  it("returns false for empty string", () => {
     expect(isValidEvaluatorSlug("")).toBe(false);
   });
 
-  it("should return false for slug with uppercase", () => {
+  it("returns false for slug with uppercase", () => {
     expect(isValidEvaluatorSlug("My-Evaluator-abc12")).toBe(false);
   });
 
-  it("should return false for slug starting with hyphen", () => {
+  it("returns false for slug starting with hyphen", () => {
     expect(isValidEvaluatorSlug("-evaluator-abc12")).toBe(false);
   });
 
-  it("should return false for slug ending with hyphen", () => {
+  it("returns false for slug ending with hyphen", () => {
     expect(isValidEvaluatorSlug("evaluator-abc12-")).toBe(false);
   });
 
-  it("should return false for slug with consecutive hyphens", () => {
+  it("returns false for slug with consecutive hyphens", () => {
     expect(isValidEvaluatorSlug("my--evaluator-abc12")).toBe(false);
   });
 
-  it("should return false for slug with special characters", () => {
+  it("returns false for slug with special characters", () => {
     expect(isValidEvaluatorSlug("my_evaluator_abc12")).toBe(false);
     expect(isValidEvaluatorSlug("my.evaluator.abc12")).toBe(false);
   });
 
-  it("should return false for slug too short", () => {
+  it("returns false for slug too short", () => {
     expect(isValidEvaluatorSlug("abc")).toBe(false);
   });
 
-  it("should return false for null or undefined", () => {
+  it("returns false for null or undefined", () => {
     expect(isValidEvaluatorSlug(null as any)).toBe(false);
     expect(isValidEvaluatorSlug(undefined as any)).toBe(false);
   });

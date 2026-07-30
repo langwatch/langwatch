@@ -1,5 +1,4 @@
 import type { PrismaClient, Project } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import type { Session } from "~/server/auth";
@@ -7,6 +6,11 @@ import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockC
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
+import {
+  ModelProviderAnchorRequiredError,
+  ModelProviderNotFoundError,
+  ModelProviderScopesRequiredError,
+} from "./errors";
 import {
   assertCanManageAllScopes,
   canReadAnyScope,
@@ -124,10 +128,7 @@ type AdvancedGatewayInput = {
  */
 function assertRowCarriesScopes(row: { id: string; scopes: unknown[] }): void {
   if (row.scopes.length === 0) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Model provider not found",
-    });
+    throw new ModelProviderNotFoundError();
   }
 }
 
@@ -462,11 +463,7 @@ export class ModelProviderService {
     } = input;
 
     if (!projectId && !organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "A model provider write needs either a project or an organization to anchor it.",
-      });
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
     }
 
     const advanced = {
@@ -504,10 +501,7 @@ export class ModelProviderService {
     // row in the caller's project instead of erroring; surface
     // NOT_FOUND so the client can refetch and retry.
     if (id && !existingProvider) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
 
     // Resolve input scope set. Callers may pass `scopes: [...]` directly,
@@ -559,11 +553,7 @@ export class ModelProviderService {
           : undefined));
 
     if (!existingProvider && !createScopes) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "A new model provider needs at least one scope when no project is given.",
-      });
+      throw new ModelProviderScopesRequiredError();
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -706,19 +696,12 @@ export class ModelProviderService {
     const { id, projectId, provider } = input;
 
     if (!projectId && !input.organizationId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message:
-          "A model provider delete needs either a project or an organization to anchor it.",
-      });
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
     }
     // Matching by provider string is the legacy project-shaped contract —
     // it asks for "this provider type in this project", which needs one.
     if (!id && !projectId) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Deleting a model provider by provider name needs a project.",
-      });
+      throw new ModelProviderAnchorRequiredError("project");
     }
 
     const anchor = await this.resolveOrganizationAnchor({
@@ -739,10 +722,7 @@ export class ModelProviderService {
               ? await this.repository.findByProvider(provider, projectId)
               : null;
       if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Model provider not found",
-        });
+        throw new ModelProviderNotFoundError();
       }
       assertRowCarriesScopes(existing);
       await assertCanManageAllScopes(
@@ -785,12 +765,29 @@ export class ModelProviderService {
     projectId: string,
     ctx: AuthzContext,
   ): Promise<ModelProviderWithScopes> {
-    const existing = await this.repository.findById(id, projectId);
+    // Org-anchored, for the same reason the edit path is (see
+    // `findEditableById`): `findById` matches only rows carrying a PROJECT
+    // scope for this project, so an ORGANIZATION- or TEAM-scoped provider —
+    // which the settings list surfaces here by inheritance — resolved to null
+    // and 404'd. Worse, it made the read gate below unreachable for exactly
+    // the scopes it exists to judge: a row that never loads is never asked
+    // about.
+    //
+    // Two boundaries, both load-bearing, and neither substitutes for the
+    // other: `findByIdForOrganization` is the TENANT boundary — it cannot
+    // return a row belonging to another organization — and `canReadAnyScope`
+    // below is the SCOPE-VISIBILITY boundary, deciding whether this caller may
+    // see this row within that tenant. Widening the lookup is only safe
+    // because the second one exists; do not drop either.
+    //
+    // Falls back to the project lookup when the tenant can't be resolved, so
+    // a missing project can't widen the blast radius.
+    const anchor = await this.resolveOrganizationAnchor({ projectId });
+    const existing = anchor
+      ? await this.repository.findByIdForOrganization(id, anchor)
+      : await this.repository.findById(id, projectId);
     if (!existing) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
     const readable = await canReadAnyScope(
       ctx,
@@ -800,10 +797,7 @@ export class ModelProviderService {
       })),
     );
     if (!readable) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Model provider not found",
-      });
+      throw new ModelProviderNotFoundError();
     }
     return existing;
   }

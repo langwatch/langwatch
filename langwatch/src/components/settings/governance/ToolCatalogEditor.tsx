@@ -10,8 +10,8 @@ import {
 import {
   closestCenter,
   DndContext,
-  type DraggableAttributes,
   type DragEndEvent,
+  type DraggableAttributes,
   PointerSensor,
   useSensor,
   useSensors,
@@ -35,13 +35,13 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-
-import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import type { AiToolEntry } from "~/components/me/tiles/types";
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 const SECTION_LABELS: Record<AiToolEntry["type"], string> = {
@@ -93,13 +93,8 @@ export function ToolCatalogEditor({
       void utils.aiTools.adminList.invalidate({ organizationId });
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to update tile",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't update tile" }),
   });
 
   const removeMutation = api.aiTools.remove.useMutation({
@@ -109,26 +104,16 @@ export function ToolCatalogEditor({
       toaster.create({ title: "Tile deleted", type: "success" });
       setPendingDelete(null);
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to delete tile",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't delete tile" }),
   });
 
   const reorderMutation = api.aiTools.reorder.useMutation({
     onSuccess: () => {
       void utils.aiTools.list.invalidate({ organizationId });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to reorder",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tiles" }),
   });
 
   const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
@@ -147,13 +132,11 @@ export function ToolCatalogEditor({
         type: "success",
       });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to import starter pack",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't import the starter pack",
+      }),
   });
 
   const starterPackQuery = api.aiTools.starterPackCatalog.useQuery(
@@ -164,6 +147,11 @@ export function ToolCatalogEditor({
   // A slug is selected unless the admin explicitly unchecks it, so the
   // checklist defaults to the full pack without waiting on the query.
   const [unchecked, setUnchecked] = useState<Record<string, boolean>>({});
+  // The import card is always reachable: open by default while the catalog
+  // is empty, behind a small toggle once tiles exist. The service skips
+  // tiles the org already has (archived ones included), so re-import only
+  // ever adds starter tiles the catalog never had.
+  const [showImport, setShowImport] = useState(false);
   const starterTiles = starterPackQuery.data ?? [];
   const selectedSlugs = starterTiles
     .filter((t) => !unchecked[t.slug])
@@ -238,7 +226,18 @@ export function ToolCatalogEditor({
 
   return (
     <VStack align="stretch" gap={6} width="full">
-      {isCatalogEmpty && (
+      {!isCatalogEmpty && (
+        <HStack justifyContent="flex-end">
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => setShowImport((v) => !v)}
+          >
+            <PackageOpen size={14} /> Import starter pack
+          </Button>
+        </HStack>
+      )}
+      {(isCatalogEmpty || showImport) && (
         <Box
           borderWidth="1px"
           borderColor="orange.300"
@@ -252,13 +251,18 @@ export function ToolCatalogEditor({
             </Box>
             <VStack align="start" gap={2} flex={1} minWidth={0}>
               <Text fontSize="sm" fontWeight="semibold">
-                Publish a starter pack to get going
+                {isCatalogEmpty
+                  ? "Publish a starter pack to get going"
+                  : "Import starter pack"}
               </Text>
               <Text fontSize="xs" color="fg.muted">
-                Pick the tools to publish at org scope so every member sees
-                them on /me. You can rename, reorder, disable, or remove
-                individual tiles afterwards. Re-running is safe; only new
-                slugs get added.
+                {isCatalogEmpty
+                  ? "Pick the tools to publish at org scope so every member " +
+                    "sees them on /me. You can rename, reorder, disable, or " +
+                    "remove individual tiles afterwards. Re-running is safe; " +
+                    "only new slugs get added."
+                  : "Adds starter tiles the catalog never had. Tiles already " +
+                    "present, archived ones included, are skipped."}
               </Text>
               <VStack align="start" gap={2} paddingTop={1} width="full">
                 {SECTION_ORDER.map((type) => {
@@ -266,7 +270,11 @@ export function ToolCatalogEditor({
                   if (tiles.length === 0) return null;
                   return (
                     <VStack key={type} align="start" gap={1}>
-                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                      <Text
+                        fontSize="xs"
+                        fontWeight="semibold"
+                        color="fg.muted"
+                      >
                         {SECTION_LABELS[type]}
                       </Text>
                       {tiles.map((tile) => (
@@ -295,10 +303,10 @@ export function ToolCatalogEditor({
                   loading={importStarterPackMutation.isPending}
                   disabled={selectedSlugs.length === 0}
                   onClick={() =>
-                    importStarterPackMutation.mutate({
-                      organizationId,
-                      slugs: selectedSlugs,
-                    })
+                    importStarterPackMutation.mutate(
+                      { organizationId, slugs: selectedSlugs },
+                      { onSuccess: () => setShowImport(false) },
+                    )
                   }
                 >
                   <PackageOpen size={14} /> Import selected (
@@ -514,7 +522,11 @@ function SortableCatalogRow({
 function scopeChipsFor(
   entry: AiToolEntry,
   departmentNameById: Map<string, string>,
-): { scopeType: "ORGANIZATION" | "DEPARTMENT"; scopeId: string; name?: string }[] {
+): {
+  scopeType: "ORGANIZATION" | "DEPARTMENT";
+  scopeId: string;
+  name?: string;
+}[] {
   const departmentIds = entry.departmentIds ?? [];
   if (departmentIds.length === 0) {
     return [{ scopeType: "ORGANIZATION", scopeId: "org" }];

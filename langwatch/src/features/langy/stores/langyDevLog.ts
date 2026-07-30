@@ -1,10 +1,10 @@
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
-  seedLangyTurnProjection,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
   type LangyTurnProjectionState,
+  seedLangyTurnProjection,
 } from "@langwatch/langy";
 import { create } from "zustand";
 import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
@@ -148,9 +148,7 @@ interface LangyDevLogState {
 }
 
 export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
-  const append = (
-    make: (seq: number) => LangyDevLogRecord,
-  ): void => {
+  const append = (make: (seq: number) => LangyDevLogRecord): void => {
     if (!get().recording) return;
     set((state) => {
       const seq = state.nextSeq;
@@ -203,7 +201,7 @@ export const useLangyDevLog = create<LangyDevLogState>((set, get) => {
         conversationId: attributed(
           typeof (detail as { conversationId?: unknown } | null)
             ?.conversationId === "string"
-            ? ((detail as { conversationId: string }).conversationId)
+            ? (detail as { conversationId: string }).conversationId
             : undefined,
         ),
         lane: "outbound",

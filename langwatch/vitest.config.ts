@@ -2,7 +2,12 @@ import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+import WeightBalancedSequencer from "./vitest.sequencer";
+
 config();
+
+// One switch for the CI-vs-laptop trade-offs below.
+const isCI = !!process.env.CI;
 
 export default defineConfig({
   test: {
@@ -25,15 +30,41 @@ export default defineConfig({
       },
     },
     watch: false,
-    // vmForks over vmThreads: the VM context leaks memory by design, but a
-    // forked child reclaims ALL of it on exit, whereas a worker THREAD's leak
-    // accumulates in the shared process heap. Measured on src/features/traces-v2
-    // (68 files): peak RSS 2.56GB (vmThreads) -> 573MB (vmForks), ~4.5x, for
-    // ~15% more wall-clock. vmMemoryLimit still recycles a worker before its
-    // context grows unbounded. See dev/docs/best_practices/vitest-performance.md.
+    // The pool trades memory against speed, and the two environments want
+    // opposite ends of that trade.
+    //
+    // Measured on src/features/traces-v2 (68 files): peak RSS 2.56GB
+    // (vmThreads) vs 573MB (vmForks) — 4.5x — for ~15% more wall-clock on
+    // forks. The VM context leaks by design; a forked child hands all of it
+    // back on exit, while a worker thread's leak accumulates in the shared
+    // process heap. See dev/docs/best_practices/vitest-performance.md.
+    //
+    // LOCAL takes the memory side. A laptop runs several worktrees and
+    // everything else at once, and 2.5GB of test process is felt immediately.
+    //
+    // CI was briefly switched to vmThreads for that ~15%, and it broke two
+    // suites: the ClickHouse DateTime64 decode tests set `process.env.TZ` to
+    // a non-UTC zone and assert the decode still lands on UTC. A thread does
+    // not get its own process, so the TZ change no longer takes hold per
+    // worker and the assertion collapses to "expected +0 not to be +0".
+    //
+    // Forks everywhere, then. The memory argument was always the stronger one;
+    // this just means the speed argument was never available to trade against
+    // it. Anything that reads process-global state — TZ, cwd, process.env —
+    // needs a process, and this suite has such tests.
     pool: "vmForks",
-    maxWorkers: "50%", // Low default for local dev; CI overrides with VITEST_MAX_WORKERS
-    vmMemoryLimit: "512MB", // Recycle a worker once its reused VM context hits this
+    // Half the cores locally so a run leaves the machine usable; all of them
+    // in CI. The workflow also sets VITEST_MAX_WORKERS, which vitest applies
+    // over whatever is resolved here.
+    maxWorkers: isCI ? "100%" : "50%",
+    // Recycle a worker once its reused VM context hits this. Higher in CI
+    // because recycling is not free and there is memory to spare.
+    vmMemoryLimit: isCI ? "1GB" : "512MB",
+    // Shard by weight, not by file count. Vitest's default splits the file
+    // list into equal-sized pieces, which paced the matrix at its slowest leg:
+    // four shards of 402/402/402/401 files ran 2.7, 4.8, 3.3 and 2.9 minutes.
+    // See vitest.sequencer.ts for what it weighs and why.
+    sequence: { sequencer: WeightBalancedSequencer },
     // isolate:false reuses one VM context across the files in a worker instead
     // of building a fresh module registry per file. Safe here because the suite
     // resets shared state between tests (test-setup.ts + clearMocks-style

@@ -50,7 +50,10 @@ function renderStrip({ isStripOverflowing }: { isStripOverflowing: boolean }) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <DraggableTabsBrowser.Root onTabMove={vi.fn()}>
-        <DraggableTabsBrowser.Window windowId="window-1" activeTabId="summarizer">
+        <DraggableTabsBrowser.Window
+          windowId="window-1"
+          activeTabId="summarizer"
+        >
           <DraggableTabsBrowser.TabBar tabIds={TABS.map((tab) => tab.id)}>
             <PromptTabStrip
               tabs={TABS}

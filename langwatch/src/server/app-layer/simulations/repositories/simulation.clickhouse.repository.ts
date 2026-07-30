@@ -259,24 +259,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   private async queryRows<T>(
     query: string,
     params: { tenantId: string } & Record<string, string | string[]>,
-    options?: {
-      expectedMaxDurationMs?: number;
-      expectedMaxReadBytes?: number;
-    },
   ): Promise<T[]> {
     const client = await this.getClient(params.tenantId);
     const result = await client.query({
       query,
       query_params: params,
       format: "JSONEachRow",
-      clickhouse_settings: {
-        ...(options?.expectedMaxDurationMs !== undefined && {
-          langwatch_expected_max_duration_ms: options.expectedMaxDurationMs,
-        }),
-        ...(options?.expectedMaxReadBytes !== undefined && {
-          langwatch_expected_max_read_bytes: options.expectedMaxReadBytes,
-        }),
-      },
     });
     return result.json<T>();
   }
@@ -977,7 +965,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
           : {}),
         ...dateFilter.params,
       },
-      { expectedMaxDurationMs: 1000, expectedMaxReadBytes: 1_000_000 },
     );
 
     return Number(rows[0]?.LastUpdatedAt ?? "0");
@@ -1230,7 +1217,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
           ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
           : {}),
       },
-      { expectedMaxDurationMs: 5000, expectedMaxReadBytes: 5_000_000 },
     );
 
     const now = Date.now();

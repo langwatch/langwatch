@@ -138,10 +138,7 @@ export interface EventSourcedQueueDefinition<
    * Used by fold projections to collapse a backed-up group's events into one
    * load/apply/store cycle. The first payload is always the dispatched job.
    */
-  processBatch?: (
-    payloads: Payload[],
-    delivery?: JobDelivery,
-  ) => Promise<void>;
+  processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
 
   /**
    * Optional per-payload resolver for the maximum number of same-group jobs to

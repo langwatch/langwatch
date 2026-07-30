@@ -1,13 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  parsePromptShorthand,
   type PromptShorthand,
+  parsePromptShorthand,
 } from "../parsePromptShorthand";
 
 describe("parsePromptShorthand()", () => {
   describe("when input is slug:tag format", () => {
     it("returns slug with tag", () => {
-      expect(parsePromptShorthand("pizza-prompt:production")).toEqual<PromptShorthand>({
+      expect(
+        parsePromptShorthand("pizza-prompt:production"),
+      ).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: "production",
         version: undefined,
@@ -40,7 +42,9 @@ describe("parsePromptShorthand()", () => {
 
   describe("when input has 'latest' suffix", () => {
     it("returns slug with no tag or version but hadSuffix true", () => {
-      expect(parsePromptShorthand("pizza-prompt:latest")).toEqual<PromptShorthand>({
+      expect(
+        parsePromptShorthand("pizza-prompt:latest"),
+      ).toEqual<PromptShorthand>({
         slug: "pizza-prompt",
         tag: undefined,
         version: undefined,
@@ -51,7 +55,9 @@ describe("parsePromptShorthand()", () => {
 
   describe("when slug contains a slash", () => {
     it("preserves the full slug and extracts the tag", () => {
-      expect(parsePromptShorthand("my-org/prompt:staging")).toEqual<PromptShorthand>({
+      expect(
+        parsePromptShorthand("my-org/prompt:staging"),
+      ).toEqual<PromptShorthand>({
         slug: "my-org/prompt",
         tag: "staging",
         version: undefined,
@@ -100,12 +106,14 @@ describe("parsePromptShorthand()", () => {
 
   describe("when input is slug with float version", () => {
     it("treats float as a tag", () => {
-      expect(parsePromptShorthand("pizza-prompt:1.5")).toEqual<PromptShorthand>({
-        slug: "pizza-prompt",
-        tag: "1.5",
-        version: undefined,
-        hadSuffix: true,
-      });
+      expect(parsePromptShorthand("pizza-prompt:1.5")).toEqual<PromptShorthand>(
+        {
+          slug: "pizza-prompt",
+          tag: "1.5",
+          version: undefined,
+          hadSuffix: true,
+        },
+      );
     });
   });
 });

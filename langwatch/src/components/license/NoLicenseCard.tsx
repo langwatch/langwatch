@@ -1,4 +1,3 @@
-import { useCallback, useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -9,12 +8,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 import { Link } from "~/components/ui/link";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Tooltip } from "~/components/ui/tooltip";
-import { formatFileSize } from "./licenseStatusUtils";
-import { CONTACT_SALES_URL, DEFAULT_LICENSE_PURCHASE_URL } from "../../../ee/licensing/constants";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import {
+  CONTACT_SALES_URL,
+  DEFAULT_LICENSE_PURCHASE_URL,
+} from "../../../ee/licensing/constants";
+import { formatFileSize } from "./licenseStatusUtils";
 
 type ActivationMethod = "file" | "key";
 
@@ -34,7 +37,9 @@ export function NoLicenseCard({
   isActivating,
 }: NoLicenseCardProps) {
   const publicEnv = usePublicEnv();
-  const purchaseLinkUrl = publicEnv.data?.STRIPE_LICENSE_PAYMENT_LINK_URL ?? DEFAULT_LICENSE_PURCHASE_URL;
+  const purchaseLinkUrl =
+    publicEnv.data?.STRIPE_LICENSE_PAYMENT_LINK_URL ??
+    DEFAULT_LICENSE_PURCHASE_URL;
 
   const [activationMethod, setActivationMethod] =
     useState<ActivationMethod>("file");
@@ -239,10 +244,7 @@ export function NoLicenseCard({
             {purchaseLinkUrl && (
               <Tooltip content="After purchase, your license will be generated and delivered to your email.">
                 <Button asChild variant="outline" size="sm">
-                  <Link
-                    href={purchaseLinkUrl}
-                    isExternal
-                  >
+                  <Link href={purchaseLinkUrl} isExternal>
                     Purchase license
                   </Link>
                 </Button>

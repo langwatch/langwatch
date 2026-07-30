@@ -298,7 +298,12 @@ export async function runWorkflow(
 
   if (!response.ok) {
     logger.error(
-      { status: response.status, statusText: response.statusText, projectId, workflowId },
+      {
+        status: response.status,
+        statusText: response.statusText,
+        projectId,
+        workflowId,
+      },
       "nlpgo execute_sync returned a non-OK response",
     );
     throw new WorkflowExecutionFailedError();

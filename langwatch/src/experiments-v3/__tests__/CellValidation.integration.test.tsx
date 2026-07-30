@@ -5,12 +5,7 @@
  * Validates input transformation and error display.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -210,9 +205,7 @@ describe("Boolean column validation", () => {
         { id: "input_0", name: "input", type: "string" },
         { id: "expected_1", name: "expected", type: "boolean" },
       ],
-      savedRecords: [
-        { id: "rec1", input: "hello", expected: "" },
-      ],
+      savedRecords: [{ id: "rec1", input: "hello", expected: "" }],
     });
     store.setActiveDataset("bool_test");
   });
@@ -282,7 +275,9 @@ describe("Boolean column validation", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getByTestId("cell-0-expected_1")).toHaveTextContent("false");
+      expect(screen.getByTestId("cell-0-expected_1")).toHaveTextContent(
+        "false",
+      );
     });
   });
 
@@ -298,7 +293,9 @@ describe("Boolean column validation", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() => {
-      expect(screen.getByTestId("cell-0-expected_1")).toHaveTextContent("false");
+      expect(screen.getByTestId("cell-0-expected_1")).toHaveTextContent(
+        "false",
+      );
     });
   });
 
@@ -319,7 +316,9 @@ describe("Boolean column validation", () => {
     });
 
     // Cell should not have the invalid value
-    expect(screen.getByTestId("cell-0-expected_1")).not.toHaveTextContent("invalid");
+    expect(screen.getByTestId("cell-0-expected_1")).not.toHaveTextContent(
+      "invalid",
+    );
   });
 
   it("cancels without saving when pressing Escape", async () => {
@@ -337,7 +336,9 @@ describe("Boolean column validation", () => {
     await waitFor(() => {
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     });
-    expect(screen.getByTestId("cell-0-expected_1")).not.toHaveTextContent("true");
+    expect(screen.getByTestId("cell-0-expected_1")).not.toHaveTextContent(
+      "true",
+    );
   });
 
   it("shows true/false quick buttons for boolean cells", async () => {
@@ -384,7 +385,9 @@ describe("Boolean column validation", () => {
     // Should save immediately and close editor
     await waitFor(() => {
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-      expect(screen.getByTestId("cell-0-expected_1")).toHaveTextContent("false");
+      expect(screen.getByTestId("cell-0-expected_1")).toHaveTextContent(
+        "false",
+      );
     });
   });
 });

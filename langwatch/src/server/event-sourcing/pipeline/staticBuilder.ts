@@ -24,8 +24,8 @@ import type {
 } from "../projections/mapProjection.types";
 import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import { ConfigurationError } from "../services/errorHandling";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import {
   buildProcessManager,
   type ProcessManagerApplier,
@@ -299,9 +299,7 @@ export class StaticPipelineBuilderWithNameAndType<
    * delivery and doubles as a filter when combined with `fold`/`map`.
    * Retry is queue redelivery — use only where losing one is harmless.
    */
-  withSubscriber<
-    Fold extends FoldNames & keyof RegisteredFoldStates & string,
-  >(
+  withSubscriber<Fold extends FoldNames & keyof RegisteredFoldStates & string>(
     subscriberName: string,
     spec: SubscriberSpec<EventType> & {
       fold: Fold;
@@ -311,10 +309,7 @@ export class StaticPipelineBuilderWithNameAndType<
       ) => Promise<void>;
     },
   ): this;
-  withSubscriber(
-    subscriberName: string,
-    spec: SubscriberSpec<EventType>,
-  ): this;
+  withSubscriber(subscriberName: string, spec: SubscriberSpec<EventType>): this;
   withSubscriber(
     subscriberName: string,
     spec: SubscriberSpec<EventType>,
@@ -361,9 +356,7 @@ export class StaticPipelineBuilderWithNameAndType<
             const defaultId = (event: Event) =>
               `${event.tenantId}:${String(event.aggregateId)}`;
             const customDedup =
-              spec.dedup && spec.dedup !== "aggregate"
-                ? spec.dedup
-                : undefined;
+              spec.dedup && spec.dedup !== "aggregate" ? spec.dedup : undefined;
             if (customDedup) {
               return {
                 ...customDedup,

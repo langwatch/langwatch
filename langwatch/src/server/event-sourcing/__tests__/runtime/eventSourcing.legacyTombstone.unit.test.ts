@@ -24,26 +24,27 @@ describe("ADR-052 legacy queue tombstone", () => {
     vi.clearAllMocks();
   });
 
-  describe.each(["settle", "cadence", "graphEval"])(
-    "given a staged %s payload from the retired outbox",
-    (stage) => {
-      it("acknowledges and drops it before event routing", async () => {
-        const eventSourcing = new EventSourcing({ redis: null });
+  describe.each([
+    "settle",
+    "cadence",
+    "graphEval",
+  ])("given a staged %s payload from the retired outbox", (stage) => {
+    it("acknowledges and drops it before event routing", async () => {
+      const eventSourcing = new EventSourcing({ redis: null });
 
-        await expect(
-          eventSourcing.globalQueue!.send({
-            stage,
-            projectId: "project-1",
-            arbitraryLegacyRevision: true,
-          }),
-        ).resolves.toBeUndefined();
+      await expect(
+        eventSourcing.globalQueue!.send({
+          stage,
+          projectId: "project-1",
+          arbitraryLegacyRevision: true,
+        }),
+      ).resolves.toBeUndefined();
 
-        expect(warnMock).toHaveBeenCalledWith(
-          { stage, projectId: "project-1" },
-          "Dropping legacy ReactorOutbox-era queue payload staged before the ADR-052 cutover",
-        );
-        await eventSourcing.close();
-      });
-    },
-  );
+      expect(warnMock).toHaveBeenCalledWith(
+        { stage, projectId: "project-1" },
+        "Dropping legacy ReactorOutbox-era queue payload staged before the ADR-052 cutover",
+      );
+      await eventSourcing.close();
+    });
+  });
 });

@@ -19,18 +19,14 @@ export const NoDataInfoBlock = ({
       <EmptyState.Root>
         <EmptyState.Content>
           <EmptyState.Indicator>
-            <Icon size={"lg"}>
-              {icon}
-            </Icon>
+            <Icon size={"lg"}>{icon}</Icon>
           </EmptyState.Indicator>
           <EmptyState.Title>{title}</EmptyState.Title>
           <EmptyState.Description>
             <Center>
               <VStack align="center">
                 <Box>{description}</Box>
-                <Box>
-                  {docsInfo}
-                </Box>
+                <Box>{docsInfo}</Box>
                 {children}
               </VStack>
             </Center>

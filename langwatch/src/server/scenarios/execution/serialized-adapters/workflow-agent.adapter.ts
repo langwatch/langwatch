@@ -129,10 +129,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      NLP_FETCH_TIMEOUT_MS,
-    );
+    const timeout = setTimeout(() => controller.abort(), NLP_FETCH_TIMEOUT_MS);
 
     try {
       let response: Response;
@@ -152,7 +149,9 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
             : "";
         throw new Error(
           `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
-            fetchError instanceof Error ? fetchError.message : String(fetchError)
+            fetchError instanceof Error
+              ? fetchError.message
+              : String(fetchError)
           }${cause}`,
         );
       }

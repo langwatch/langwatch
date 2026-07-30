@@ -14,15 +14,18 @@
  * These tests are the guarantee that it cannot happen again.
  */
 import { describe, expect, it } from "vitest";
+import { LANGY_THINKING_VERBS } from "../components/langyThinkingVerbs";
 import {
   langyThinkingLine,
   THINKING_SLOW_MS,
   THINKING_STILL_STARTING_MS,
   THINKING_STUCK_MS,
 } from "../logic/langyThinkingLine";
-import { LANGY_THINKING_VERBS } from "../components/langyThinkingVerbs";
 
-const assistant = (parts: unknown[]) => ({ role: "assistant", parts: parts as never });
+const assistant = (parts: unknown[]) => ({
+  role: "assistant",
+  parts: parts as never,
+});
 const user = { role: "user", parts: [{ type: "text", text: "hi" }] };
 
 describe("langyThinkingLine", () => {
@@ -49,7 +52,10 @@ describe("langyThinkingLine", () => {
     });
 
     it("says it is slow when it is slow", () => {
-      const line = langyThinkingLine({ messages: [user], elapsedMs: THINKING_SLOW_MS });
+      const line = langyThinkingLine({
+        messages: [user],
+        elapsedMs: THINKING_SLOW_MS,
+      });
       expect(line.text).toContain("longer than usual");
       expect(line.allowWhimsy).toBe(false);
     });
@@ -65,7 +71,12 @@ describe("langyThinkingLine", () => {
     });
 
     it("escalates monotonically — it never gets less worried with time", () => {
-      const tones = [0, THINKING_STILL_STARTING_MS, THINKING_SLOW_MS, THINKING_STUCK_MS].map(
+      const tones = [
+        0,
+        THINKING_STILL_STARTING_MS,
+        THINKING_SLOW_MS,
+        THINKING_STUCK_MS,
+      ].map(
         (elapsedMs) => langyThinkingLine({ messages: [user], elapsedMs }).tone,
       );
       expect(tones).toEqual(["waiting", "waiting", "waiting", "stuck"]);
@@ -139,7 +150,10 @@ describe("langyThinkingLine", () => {
       // A joke about Langy's character claims nothing about the work, and here
       // the work is real: tokens are arriving.
       const line = langyThinkingLine({
-        messages: [user, assistant([{ type: "text", text: "Here are 4 traces" }])],
+        messages: [
+          user,
+          assistant([{ type: "text", text: "Here are 4 traces" }]),
+        ],
         elapsedMs: 5_000,
       });
       expect(line.tone).toBe("working");

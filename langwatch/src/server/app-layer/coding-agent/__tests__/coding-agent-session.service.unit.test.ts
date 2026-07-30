@@ -6,7 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { projectCodingAgentSessionToRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import {
+  CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+  projectCodingAgentSessionToRow,
+} from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionService } from "../coding-agent-session.service";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
@@ -36,7 +39,7 @@ function makeRow(
     },
     tenantId: PROJECT,
     sessionId: SESSION,
-    version: "2026-07-21",
+    version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   });
   return { ...base, ...overrides };
 }

@@ -1,0 +1,27 @@
+# gitleaks configuration — read by the `secrets` job in
+# `.github/workflows/code-scanners.yml`.
+#
+# gitleaks is a BLOCKING gate: a committed credential is never acceptable, and
+# #5708 is the precedent for why. That only stays true if the gate is
+# believable, so every entry below has to name the value it is allowing and why
+# that value is not a secret. An allowlist that says "noisy file" is how a
+# blocking scanner gets switched off six months later.
+
+[extend]
+useDefault = true
+
+# The Stripe product catalog is a checked-in snapshot of PUBLIC Stripe objects —
+# products, prices and their `lookupKey`s (`LAUNCH_TRACES_10K` and friends).
+# A lookup key is the stable public handle used to fetch a price by name instead
+# of by `price_...` id; it is designed to be shipped in client code. gitleaks'
+# `generic-api-key` rule fires on the `Key": "<high-entropy value>"` shape and
+# cannot tell the two apart.
+#
+# Scoped to `generic-api-key` only, so Stripe's OWN rules still apply to this
+# file: a real `sk_live_`/`rk_live_` token landing here is still caught by
+# `stripe-access-token`. Scoped by path rather than by value so a new lookup key
+# does not need a config change to be added.
+[[allowlists]]
+description = "Stripe catalog lookupKeys are public price handles, not credentials"
+targetRules = ["generic-api-key"]
+paths = ['''langwatch/ee/billing/stripe/stripeCatalog\.json''']

@@ -14,7 +14,7 @@
  */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // The empty states carry the Setup via Agent menu, whose langy hooks need

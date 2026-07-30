@@ -22,8 +22,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   buildScopeHierarchy,
-  resolveEligible,
   type OrgModelProvider,
+  resolveEligible,
 } from "~/components/gateway/eligibleModelProviders";
 import { prisma } from "~/server/db";
 import {
@@ -120,7 +120,10 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
     const mp = (
       id: string,
       name: string,
-      scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>,
+      scopes: Array<{
+        scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+        scopeId: string;
+      }>,
       overrides: { enabled?: boolean; disabledAt?: Date } = {},
     ) =>
       prisma.modelProvider.create({
@@ -182,7 +185,9 @@ describe("eligible model providers - drawer / gateway parity on real PG", () => 
 
   afterAll(async () => {
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.modelProvider.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.modelProvider.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.project.deleteMany({ where: { teamId: TEAM_ID } });
     await prisma.team.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });

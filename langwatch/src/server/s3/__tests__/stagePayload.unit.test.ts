@@ -4,7 +4,7 @@
  * project S3 client so the test stays pure: the contract under test is the
  * key layout, the presign call, and the delete, not the SDK plumbing.
  */
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const s3SendCalls: { type: string; input: any }[] = [];
 const presignerCalls: { input: any; opts: any }[] = [];

@@ -63,6 +63,62 @@ describe("ScopeChipPicker quick-picks", () => {
   });
 });
 
+describe("ScopeChipPicker multi-select zero-state", () => {
+  afterEach(cleanup);
+
+  describe("given quick-picks with zero scopes selected", () => {
+    describe("when the picker renders", () => {
+      /** @scenario zero selected reads "None selected", never "Multiple" */
+      it("labels the active chip None selected, never Multiple", () => {
+        renderPicker(
+          <ScopeChipPicker
+            value={[]}
+            onChange={vi.fn()}
+            organizationId="org-1"
+            showQuickPicks
+            currentOrganizationId="org-1"
+            currentTeamId="team-1"
+            currentProjectId="proj-1"
+          />,
+        );
+
+        const chip = screen.getByTestId("quick-scope-multiple");
+        expect(chip.getAttribute("aria-pressed")).toBe("true");
+        expect(within(chip).getByText("None selected")).toBeDefined();
+        expect(screen.queryByText("Multiple")).toBeNull();
+      });
+    });
+  });
+
+  describe("given two scopes selected", () => {
+    describe("when the picker renders", () => {
+      it("keeps the Multiple label for a real multi-scope selection", () => {
+        renderPicker(
+          <ScopeChipPicker
+            value={[
+              { scopeType: "TEAM", scopeId: "team-1" },
+              { scopeType: "TEAM", scopeId: "team-2" },
+            ]}
+            onChange={vi.fn()}
+            organizationId="org-1"
+            availableTeams={[
+              { id: "team-1", name: "Alpha Team" },
+              { id: "team-2", name: "Beta Team" },
+            ]}
+            showQuickPicks
+            currentOrganizationId="org-1"
+            currentTeamId="team-1"
+          />,
+        );
+
+        const chip = screen.getByTestId("quick-scope-multiple");
+        expect(within(chip).getByText("Multiple")).toBeDefined();
+        expect(screen.queryByText("None selected")).toBeNull();
+      });
+    });
+  });
+});
+
 describe("ScopeChipPicker single-select variant", () => {
   afterEach(cleanup);
 

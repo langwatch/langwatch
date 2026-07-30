@@ -25,6 +25,7 @@ import type {
   LangwatchSignalBucket,
   ModelSpanSampleRow,
   ModelUsageStatsRow,
+  NormalizedSpanByIdParams,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
@@ -707,7 +708,14 @@ interface ClickHouseSpanRecord {
   _retention_days: number;
 }
 
-interface FullSpanRow {
+/**
+ * The projection of `stored_spans` that {@link mapChRowToNormalized} reads.
+ * Exported so the claim-check equivalence test can drive the REAL mapping
+ * rather than a hand-built stand-in — the whole claim-check design rests on a
+ * resolved span producing the same command as the inline one, and a
+ * column-mapping regression is exactly what that contract must catch.
+ */
+export interface FullSpanRow {
   SpanId: string;
   TraceId: string;
   TenantId: string;
@@ -736,7 +744,7 @@ interface FullSpanRow {
   Links_Attributes: Record<string, unknown>[];
 }
 
-function mapChRowToNormalized(row: FullSpanRow) {
+export function mapChRowToNormalized(row: FullSpanRow) {
   return {
     id: "",
     traceId: row.TraceId,
@@ -1016,38 +1024,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         { tenantId, traceId, occurredAtMs },
         (span) => span === null,
         async (window) => {
-          const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
-          // Single-span fetch. WHERE pins (TenantId, TraceId, SpanId) - the
-          // primary key prefix - so we hit a tiny granule range. ORDER BY
-          // UpdatedAt DESC LIMIT 1 deliberately picks up CH 25.10's
-          // LazilyRead optimiser: heavy columns (SpanAttributes, Events.*,
-          // Links.*) are deferred past the LIMIT, so unmerged versions
-          // don't materialise them. Investigation numbers + the per-query
-          // lock that keeps the optimiser engaged live in
-          // SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
-          // rule predates LazilyRead and isn't load-bearing on this shape.
-          const result = await client.query({
-            query: `
-              SELECT ${FULL_SPAN_SELECT}
-              FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                AND SpanId = {spanId:String}
-                ${partition.sqlAnd}
-              ORDER BY UpdatedAt DESC
-              LIMIT 1
-            `,
-            query_params: { tenantId, traceId, spanId, ...partition.params },
-            clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
-            format: "JSONEachRow",
+          const row = await this.fetchNormalizedSpanRow({
+            tenantId,
+            traceId,
+            spanId,
+            window,
           });
-
-          const rows = (await result.json()) as FullSpanRow[];
-          if (rows.length === 0) return null;
-          const [span] = mapNormalizedSpansToSpans(
-            rows.map(mapChRowToNormalized),
-          );
+          if (row === null) return null;
+          const [span] = mapNormalizedSpansToSpans([row]);
           return span ?? null;
         },
       );
@@ -1063,6 +1047,115 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       );
       throw error;
     }
+  }
+
+  /**
+   * Claim-check resolution read (ADR-069): the canonical single-span read for
+   * internal derivation consumers holding a `span_referenced` staging. A miss
+   * is an EXPECTED transient state here — the reference is often dequeued
+   * before the sibling spanStorage write lands — so `fallback: "none"` keeps a
+   * miss one cheap windowed probe (the caller throws into the queue's backoff)
+   * instead of an unbounded scan per retry.
+   *
+   * The hint must be the SPAN'S OWN start, not the ingest time of the event
+   * that referenced it: this table's partition column is `StartTime`, so a
+   * window centred on ingest time excludes any span whose duration plus export
+   * lag exceeded it — and spans export on end. Such a span would sit outside
+   * every retry's window forever. Callers pass the reference's parsed
+   * `startTimeUnixMs`, falling back to the envelope's occurredAt only when the
+   * wire span carried no parseable start.
+   *
+   * The hint is REQUIRED, not an {@link OccurredAtHint}: `fallback: "none"`
+   * only bounds the read when there is a window to stay inside. A hintless
+   * call would fall straight through to the unbounded fragment and scan every
+   * partition, cold S3 tier included — precisely what this read promises not
+   * to do, and per retry.
+   */
+  async findNormalizedSpanById({
+    tenantId,
+    traceId,
+    spanId,
+    occurredAtMs,
+  }: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "SpanStorageClickHouseRepository.findNormalizedSpanById",
+    );
+
+    try {
+      return await queryWindowed<NormalizedSpan | null>({
+        table: TABLE_NAME,
+        hintMs: occurredAtMs,
+        windowMs: DEFAULT_PARTITION_WINDOW_MS,
+        fallback: "none",
+        isEmpty: (row) => row === null,
+        run: (window) =>
+          this.fetchNormalizedSpanRow({ tenantId, traceId, spanId, window }),
+      });
+    } catch (error) {
+      logger.error(
+        {
+          tenantId,
+          traceId,
+          spanId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get normalized span by id from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Single-span fetch shared by {@link getSpanByIds} and
+   * {@link findNormalizedSpanById}. WHERE pins (TenantId, TraceId, SpanId) - the
+   * primary key prefix - so we hit a tiny granule range. ORDER BY
+   * UpdatedAt DESC LIMIT 1 deliberately picks up CH 25.10's
+   * LazilyRead optimiser: heavy columns (SpanAttributes, Events.*,
+   * Links.*) are deferred past the LIMIT, so unmerged versions
+   * don't materialise them. Investigation numbers + the per-query
+   * lock that keeps the optimiser engaged live in
+   * SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
+   * rule predates LazilyRead and isn't load-bearing on this shape.
+   *
+   * KNOWN MISMATCH, pre-existing: the engine's version column is `StartTime`
+   * (`ReplacingMergeTree(StartTime)`), not `UpdatedAt`. So a span re-exported
+   * with a CHANGED StartTime answers last-written-wins before a merge and
+   * largest-StartTime-wins after one. #6117 widened the blast radius by
+   * resolving claim-checks through this read, not just the UI.
+   */
+  private async fetchNormalizedSpanRow({
+    tenantId,
+    traceId,
+    spanId,
+    window,
+  }: {
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+    window: WindowFragment | null;
+  }): Promise<NormalizedSpan | null> {
+    const partition = partitionFragment(window);
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT ${FULL_SPAN_SELECT}
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          AND SpanId = {spanId:String}
+          ${partition.sqlAnd}
+        ORDER BY UpdatedAt DESC
+        LIMIT 1
+      `,
+      query_params: { tenantId, traceId, spanId, ...partition.params },
+      clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
+      format: "JSONEachRow",
+    });
+
+    const rows = (await result.json()) as FullSpanRow[];
+    if (rows.length === 0) return null;
+    return mapChRowToNormalized(rows[0]!);
   }
 
   async findSpanResourcesByTraceId({

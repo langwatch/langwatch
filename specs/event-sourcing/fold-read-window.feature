@@ -1,3 +1,4 @@
+@unit
 Feature: Fold read windows are declared, not hand-rolled
   A fold whose backing table is time-partitioned wants its read-back pruned to
   a window of partitions around the event being folded. The window's width and
@@ -25,6 +26,13 @@ Feature: Fold read windows are declared, not hand-rolled
     And the retry does not consult the read cache again
     And the recovered state is folded onto, not replaced
     And the recovery is counted so a drifting window is visible
+
+  Scenario: a row the store found but refused is not read again unwindowed
+    Given the fold declares a read window
+    And a committed row the store finds but refuses because it was written under an older shape
+    When its next event is folded
+    Then the platform does not retry the read without the window
+    And the refusal is not reported as a window that needs widening
 
   Scenario: a genuinely new aggregate still starts empty
     Given the fold declares a read window

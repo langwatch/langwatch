@@ -128,7 +128,10 @@ describe("TriggerService report-schedule sync", () => {
       const scheduledJobs = makeScheduledJobs();
       const svc = new TriggerService(triggerRepo, scheduledJobs, null);
 
-      await svc.removeReportSchedule({ projectId: "proj-1", triggerId: "trig-1" });
+      await svc.removeReportSchedule({
+        projectId: "proj-1",
+        triggerId: "trig-1",
+      });
 
       expect(scheduledJobs.deactivateForTarget).toHaveBeenCalledWith({
         projectId: "proj-1",

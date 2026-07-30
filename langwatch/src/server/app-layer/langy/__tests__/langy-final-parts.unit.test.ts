@@ -274,7 +274,7 @@ describe("buildFinalAssistantParts", () => {
     });
 
     it("leaves an ordinary code fence alone — only langy-card fences stamp", () => {
-      const text = "```json\n{\"a\": 1}\n```";
+      const text = '```json\n{"a": 1}\n```';
       expect(buildFinalAssistantParts({ text })).toEqual([
         { type: "text", text, role: "assistant" },
       ]);

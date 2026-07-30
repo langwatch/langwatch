@@ -1,7 +1,7 @@
-import { useRouter } from "~/utils/compat/next-router";
+import { OrganizationUserRole, type Project } from "@prisma/client";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { OrganizationUserRole, type Project } from "@prisma/client";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
@@ -11,7 +11,11 @@ import {
 } from "../server/api/rbac";
 import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
-import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
+import {
+  noOrgBouncerRoutes,
+  publicRoutes,
+  useRequiredSession,
+} from "./useRequiredSession";
 
 /**
  * Whether a permission is org-scoped: it lives in ORGANIZATION_ROLE_PERMISSIONS
@@ -84,9 +88,9 @@ export function resolveProjectRedirectSubPath({
     return rest;
   };
 
-  return matchSegmentPrefix(decodedPrefix)
-    ?? matchSegmentPrefix(encodedPrefix)
-    ?? "";
+  return (
+    matchSegmentPrefix(decodedPrefix) ?? matchSegmentPrefix(encodedPrefix) ?? ""
+  );
 }
 
 export const useOrganizationTeamProject = (
@@ -201,10 +205,9 @@ export const useOrganizationTeamProject = (
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
-  const [, setLastVisitedHomeKind] = useLocalStorage<"" | "project" | "personal">(
-    "lastVisitedHomeKind",
-    "",
-  );
+  const [, setLastVisitedHomeKind] = useLocalStorage<
+    "" | "project" | "personal"
+  >("lastVisitedHomeKind", "");
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
@@ -320,8 +323,7 @@ export const useOrganizationTeamProject = (
         t.projects.some(
           (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
         ),
-      ) ??
-      selectAmbientTeam(organization?.teams ?? [])) // The team holding the demo project, else the ambient one
+      ) ?? selectAmbientTeam(organization?.teams ?? [])) // The team holding the demo project, else the ambient one
     : resolvedSlugMatch
       ? resolvedSlugMatch.team
       : ownPersonalTeam
@@ -552,7 +554,10 @@ export const useOrganizationTeamProject = (
 
     // EXTERNAL users get restricted defaults instead of full team role permissions
     if (organizationRole === OrganizationUserRole.EXTERNAL) {
-      return hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission);
+      return hasPermissionWithHierarchy(
+        EXTERNAL_MEMBER_PERMISSIONS,
+        permission,
+      );
     }
 
     // Only fall back to built-in team role if NO custom role exists

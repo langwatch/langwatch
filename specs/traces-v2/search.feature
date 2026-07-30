@@ -190,6 +190,7 @@ Rule: Query syntax
   Scenario: Free text search in quotes
     When the user searches for "refund policy"
     Then traces with "refund policy" in their input or output content are shown
+    And traces whose trace name or any span name contains "refund policy" are shown
 
   Scenario: Negation with NOT
     When the user searches for "NOT @status:error"
@@ -235,6 +236,94 @@ Rule: Query syntax
   Scenario: Unquoted free text is treated as full-text search
     When the user types "timeout" without quotes or @ prefix
     Then it is treated as a full-text search across trace content
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FREE TEXT REACHES SPAN NAMES
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Free text used to match only ComputedInput and ComputedOutput, so a trace
+# whose span name was the only place the query appeared was invisible to the
+# search box. Searching "codex" returned nothing even though Codex traces
+# existed, because the tool name lives on the span, not in the captured I/O.
+# Span names are now part of the same free-text clause: the trace's own name
+# (the root span's name, held on trace_summaries) plus every span name in
+# stored_spans, matched as a case-insensitive substring the way the I/O
+# columns already are.
+Rule: Free text matches span names as well as captured I/O
+  When a query is answered from stored data, a free-text term is looked for in
+  the trace input, the trace output, the trace name, and the names of the
+  trace's spans. Any one of them matching surfaces the trace. The in-memory
+  evaluator that automation dispatch uses is narrower, and the last scenario
+  in this rule pins how.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  Scenario: A term that appears only in a span name still finds the trace
+    Given a trace has a span named "codex" and no occurrence of "codex" in its input or output
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: A term that appears only in the trace name still finds the trace
+    Given a trace is named "codex exec" and no occurrence of "codex" in its input or output
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: Span name matching is case-insensitive substring matching
+    Given a trace has a span named "Codex.Exec"
+    When the user searches for "codex"
+    Then that trace is in the results
+
+  Scenario: A term in no field at all does not match
+    Given a trace has no occurrence of "codex" in its input, output, trace name, or any span name
+    When the user searches for "codex"
+    Then that trace is not in the results
+
+  Scenario: Negated free text excludes a span-name match
+    Given a trace has a span named "codex"
+    When the user searches for "NOT codex"
+    Then that trace is not in the results
+
+  # Both free-text paths carry the same promise: the traces-v2 search bar
+  # (which is also what Langy searches through) and the legacy messages list
+  # and public search endpoint.
+  Scenario: The legacy messages list search also reaches span names
+    Given a trace has a span named "codex" and no occurrence of "codex" in its input or output
+    When the same term is searched through the legacy messages list search
+    Then that trace is in the results
+
+  # Ranking is deliberately unchanged. Neither free-text path scores results:
+  # they are boolean SQL filters and the list stays ordered newest-first, so
+  # "prioritising" a span-name match means including it in the match set at
+  # all rather than assigning it a relevance weight.
+  Scenario: Results stay in chronological order
+    Given several traces match "codex" by span name and by input content
+    When the user searches for "codex"
+    Then the results are ordered newest first, not by which field matched
+
+  # The one place the two sides of the query language do not agree. A trigger's
+  # filter is re-checked in memory at dispatch time against the settled fold
+  # state, which carries the trace name but no span rows. Treating the missing
+  # spans as unknown and failing the tag closed would stop every negated
+  # free-text trigger from matching, so the narrower answer is the deliberate
+  # choice: it can miss a match that only a span name would have made. A
+  # dispatcher that starts deriving spans becomes exact with no change needed.
+  @unit
+  Scenario: A trigger's in-memory re-check cannot see span names
+    Given an automation whose filter is the free text "codex"
+    And a trace whose only occurrence of "codex" is a span name
+    When the filter is re-checked in memory at dispatch time, with no span rows loaded
+    Then the trace does not match
+    But the same filter run against stored data does surface that trace
+
+  @unit
+  Scenario: The in-memory re-check still matches on the trace name
+    Given an automation whose filter is the free text "codex"
+    And a trace named "codex exec" with no occurrence of "codex" in its input or output
+    When the filter is re-checked in memory at dispatch time
+    Then the trace matches, because the trace name travels with the fold state
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1,12 +1,12 @@
-import { Prisma, type PrismaClient, type Trigger } from "@prisma/client";
 import {
   NOTIFICATION_CADENCES,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import { Prisma, type PrismaClient, type Trigger } from "@prisma/client";
 import type { TriggerFilters } from "~/server/filters/types";
 import {
-  graphAlertIncidentKey,
   type GraphTriggerSentRepository,
+  graphAlertIncidentKey,
   type OpenGraphTriggerSent,
   type ReportScheduleTarget,
   type TriggerRepository,

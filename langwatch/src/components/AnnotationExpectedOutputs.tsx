@@ -1,5 +1,4 @@
 import { Box, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
 import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

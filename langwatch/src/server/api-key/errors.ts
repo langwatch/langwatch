@@ -24,10 +24,7 @@ export class ApiKeyNotFoundError extends NotFoundError {
 export class ApiKeyNotOwnedError extends HandledError {
   declare readonly code: "api_key_not_owned";
 
-  constructor(
-    apiKeyId: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(apiKeyId: string, options: { reasons?: readonly Error[] } = {}) {
     super("api_key_not_owned", "Not authorized to modify this API Key", {
       meta: { apiKeyId },
       httpStatus: 403,
@@ -44,10 +41,7 @@ export class ApiKeyNotOwnedError extends HandledError {
 export class ApiKeyAlreadyRevokedError extends HandledError {
   declare readonly code: "api_key_already_revoked";
 
-  constructor(
-    apiKeyId: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
+  constructor(apiKeyId: string, options: { reasons?: readonly Error[] } = {}) {
     super("api_key_already_revoked", "API Key is already revoked", {
       meta: { apiKeyId },
       httpStatus: 409,

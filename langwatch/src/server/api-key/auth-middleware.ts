@@ -1,13 +1,18 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Organization, PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
-import type { Permission } from "~/server/api/rbac";
-import { HandledError } from "@langwatch/handled-error";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
+import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { getTokenType } from "./api-key-token.utils";
 import { ApiKeyPermissionDeniedError } from "./errors";
-import { type OrgResolvedToken, type ResolvedToken, TokenResolver } from "./token-resolver";
+import {
+  type OrgResolvedToken,
+  type ResolvedToken,
+  TokenResolver,
+} from "./token-resolver";
 
 const logger = createLogger("langwatch:api:unified-auth");
 const permissionLogger = createLogger("langwatch:api:api-key-ceiling");
@@ -237,7 +242,10 @@ export function createOrgAuthMiddleware({
     } catch (error) {
       orgLogger.error({ ...diag, error }, "Database error during org auth");
       return c.json(
-        { error: "Internal Server Error", message: "Authentication service error" },
+        {
+          error: "Internal Server Error",
+          message: "Authentication service error",
+        },
         500,
       );
     }
@@ -250,7 +258,8 @@ export function createOrgAuthMiddleware({
       return c.json(
         {
           error: "Unauthorized",
-          message: "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
+          message:
+            "Invalid credentials. Organization-level endpoints require an admin API key created in Settings > API Keys. Project API keys cannot be used here.",
         },
         401,
       );
@@ -307,7 +316,11 @@ export type AuthDiagnostics = {
 };
 
 export function collectAuthDiagnostics(c: {
-  req: { path: string; method: string; header: (name: string) => string | undefined };
+  req: {
+    path: string;
+    method: string;
+    header: (name: string) => string | undefined;
+  };
 }): AuthDiagnostics {
   const get = (name: string) => c.req.header(name) ?? null;
   const xAuthToken = c.req.header("x-auth-token");
@@ -377,14 +390,32 @@ export async function enforceApiKeyCeiling({
 }
 
 /**
- * Converts an API key permission denial into a Hono-style JSON response.
- * Re-throws anything that isn't an `ApiKeyPermissionDeniedError`.
+ * Converts an API key permission denial into the status + JSON body a route
+ * should answer with. Re-throws anything that isn't an
+ * `ApiKeyPermissionDeniedError`.
+ *
+ * `body` is the SAME body `onError → handleError` produces, and the same one
+ * `requireApiKeyPermission` below already answers with — the two paths through
+ * this ceiling had drifted, and only one of them was migrated. The hand-built
+ * `{ error: "Forbidden", message }` this replaced threw away everything a
+ * caller can act on: the `api_key_permission_denied` code, the permission in
+ * `meta`, and the tips/docsUrl the remediation channel exists to deliver
+ * (ADR-045). A CLI was left with a sentence and no code to branch on.
+ *
+ * `message` is kept alongside for callers that only render a sentence; it is
+ * the same string `body.message` carries.
  */
-export function apiKeyCeilingDenialResponse(
-  error: unknown,
-): { error: string; message: string; status: 403 } {
-  if (HandledError.isHandled(error) && error.code === "api_key_permission_denied") {
-    return { error: "Forbidden", message: error.message, status: 403 };
+export function apiKeyCeilingDenialResponse(error: unknown): {
+  status: ContentfulStatusCode;
+  body: object;
+  message: string;
+} {
+  if (
+    HandledError.isHandled(error) &&
+    error.code === "api_key_permission_denied"
+  ) {
+    const { statusCode, body } = handledErrorResponseBody(error);
+    return { status: statusCode, body, message: error.message };
   }
   throw error;
 }

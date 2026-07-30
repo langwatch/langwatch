@@ -20,6 +20,7 @@ interface Args {
 
 function parseArgs(argv: string[]): Args {
   const out: Args = {};
+  // biome-ignore lint/style/useForOf: flag parser advances the index (argv[++i]) to consume a value; for...of has no index to advance.
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--organization-id") out.organizationId = argv[++i];
@@ -32,19 +33,25 @@ async function deleteOrg(orgId: string): Promise<void> {
   process.stderr.write(`[cleanup] deleting organizationId=${orgId}\n`);
   await prisma.ingestionSource
     .deleteMany({ where: { organizationId: orgId } })
-    .catch((e) => process.stderr.write(`[cleanup] ingestionSource: ${String(e)}\n`));
+    .catch((e) =>
+      process.stderr.write(`[cleanup] ingestionSource: ${String(e)}\n`),
+    );
   await prisma.project
     .deleteMany({ where: { team: { organizationId: orgId } } })
     .catch((e) => process.stderr.write(`[cleanup] project: ${String(e)}\n`));
   await prisma.organizationUser
     .deleteMany({ where: { organizationId: orgId } })
-    .catch((e) => process.stderr.write(`[cleanup] organizationUser: ${String(e)}\n`));
+    .catch((e) =>
+      process.stderr.write(`[cleanup] organizationUser: ${String(e)}\n`),
+    );
   await prisma.team
     .deleteMany({ where: { organizationId: orgId } })
     .catch((e) => process.stderr.write(`[cleanup] team: ${String(e)}\n`));
   await prisma.organization
     .delete({ where: { id: orgId } })
-    .catch((e) => process.stderr.write(`[cleanup] organization: ${String(e)}\n`));
+    .catch((e) =>
+      process.stderr.write(`[cleanup] organization: ${String(e)}\n`),
+    );
 }
 
 async function main(): Promise<void> {
@@ -57,7 +64,9 @@ async function main(): Promise<void> {
       where: { slug: { startsWith: args.slugPrefix } },
       select: { id: true, slug: true },
     });
-    process.stderr.write(`[cleanup] found ${orgs.length} org(s) with slug-prefix=${args.slugPrefix}\n`);
+    process.stderr.write(
+      `[cleanup] found ${orgs.length} org(s) with slug-prefix=${args.slugPrefix}\n`,
+    );
     for (const o of orgs) {
       await deleteOrg(o.id);
     }

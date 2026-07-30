@@ -7,7 +7,7 @@
  * visible (no collapse-on-hover), and the send control swaps to a stop control
  * while Langy is working.
  *
- * "Working" comes from the store's turn phase (ADR-058), the composer's single
+ * "Working" comes from the store's turn phase (ADR-078), the composer's single
  * source for the send/stop affordance — there is no `isBusy` prop.
  *
  * The shared model-option hook is mocked at its module boundary so the test

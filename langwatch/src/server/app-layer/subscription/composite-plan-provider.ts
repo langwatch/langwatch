@@ -1,5 +1,5 @@
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { isAdmin } from "../../../../ee/billing/planProvider";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import type { PlanProvider, PlanProviderUser } from "./plan-provider";
 
 /**
@@ -22,15 +22,22 @@ export function createCompositePlanProvider({
   return {
     async getActivePlan({ organizationId, user }) {
       // 1. Try license override
-      const licensePlan =
-        await licensePlanProvider.getActivePlan({ organizationId });
+      const licensePlan = await licensePlanProvider.getActivePlan({
+        organizationId,
+      });
 
       // 2. Select plan source — composite is the single canonical authority for planSource
       let selectedPlan: PlanInfo;
       if (licensePlan.free) {
         // License is free/absent — fall through to SaaS
-        const saasPlan = await saasPlanProvider.getActivePlan({ organizationId, user });
-        selectedPlan = { ...saasPlan, planSource: saasPlan.free ? "free" : "subscription" };
+        const saasPlan = await saasPlanProvider.getActivePlan({
+          organizationId,
+          user,
+        });
+        selectedPlan = {
+          ...saasPlan,
+          planSource: saasPlan.free ? "free" : "subscription",
+        };
       } else {
         // License is valid — use it as the complete plan
         selectedPlan = { ...licensePlan, planSource: "license" };
@@ -45,8 +52,6 @@ export function createCompositePlanProvider({
   };
 }
 
-function computeOverrideAddingLimitations(
-  user?: PlanProviderUser,
-): boolean {
+function computeOverrideAddingLimitations(user?: PlanProviderUser): boolean {
   return !!user?.impersonator && isAdmin(user.impersonator);
 }

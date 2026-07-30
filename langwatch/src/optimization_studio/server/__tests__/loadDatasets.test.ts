@@ -6,9 +6,9 @@ vi.mock("../../../server/api/routers/datasetRecord.utils", () => ({
 }));
 
 vi.mock("../../utils/datasetUtils", async () => {
-  const actual = await vi.importActual<typeof import("../../utils/datasetUtils")>(
-    "../../utils/datasetUtils",
-  );
+  const actual = await vi.importActual<
+    typeof import("../../utils/datasetUtils")
+  >("../../utils/datasetUtils");
   return actual;
 });
 
@@ -72,8 +72,18 @@ describe("loadDatasets", () => {
       id: "ds_xyz",
       name: "Saved",
       datasetRecords: [
-        { id: "r1", entry: { question: "q1" }, createdAt: new Date(), updatedAt: new Date() },
-        { id: "r2", entry: { question: "q2" }, createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: "r1",
+          entry: { question: "q1" },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: "r2",
+          entry: { question: "q2" },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ],
       count: 2,
       truncated: false,

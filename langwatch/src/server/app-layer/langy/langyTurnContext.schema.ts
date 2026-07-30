@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { LANGY_SKILLS } from "~/shared/langy/langySkills";
 import { LANGY_RESOURCE_KINDS } from "~/shared/langy/langyResourceKinds";
+import { LANGY_SKILLS } from "~/shared/langy/langySkills";
 
 /**
  * THE WIRE SHAPE for everything the composer attaches to a turn — and the one

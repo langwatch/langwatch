@@ -2,7 +2,6 @@ import {
   Badge,
   chakra,
   HoverCard,
-  HStack,
   Icon,
   Portal,
   Text,
@@ -207,7 +206,7 @@ function renderModel(row: TraceListItem, density: Density) {
     );
   }
   const rawPrimary = row.models[0]!;
-  const primary = (rawPrimary);
+  const primary = rawPrimary;
   const overflow = row.models.length - 1;
   const compact = density === "compact";
   // "Known" = the provider was recognised, which is the table's proxy

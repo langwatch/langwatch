@@ -1,5 +1,5 @@
 import type { ServerModelProviderKey } from "~/hooks/useModelProviderFields";
-import type { Docs, IconData } from "../shared/types";
+import type { IconData } from "../shared/types";
 
 export type ModelProviderKey =
   | "anthropic"
@@ -9,6 +9,7 @@ export type ModelProviderKey =
   | "custom"
   | "deepseek"
   | "gemini"
+  | "google_agent_platform"
   | "grok_xai"
   | "groq"
   | "open_ai_azure"
@@ -33,6 +34,15 @@ export interface ModelProviderSpec {
   key: ModelProviderKey;
   defaultModel?: string | null;
   defaultBaseUrl?: string;
+  /**
+   * The host the provider's APIs hang off, without a version segment.
+   *
+   * Only needed by providers that answer on more than one path — credential
+   * validation probes each one, and the alternative is parsing
+   * `defaultBaseUrl` to guess at a structure the registry could simply
+   * state. Absent for the providers with a single documented endpoint.
+   */
+  apiRoot?: string;
   label: string;
   icon: IconData;
   externalDocsUrl?: string;

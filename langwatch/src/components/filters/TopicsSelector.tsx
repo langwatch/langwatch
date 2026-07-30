@@ -2,20 +2,17 @@ import {
   EmptyState,
   Heading,
   HStack,
-  Separator,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import React, { useEffect, useRef, useState } from "react";
-import { HelpCircle } from "react-feather";
+import { useRouter } from "~/utils/compat/next-router";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
 import { Delayed } from "../Delayed";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { Checkbox } from "../ui/checkbox";
-import { Tooltip } from "../ui/tooltip";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();
@@ -26,9 +23,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   useEffect(() => {
     const topics = router.query.topics;
     if (topics) {
-      setSelectedTopics(
-        Array.isArray(topics) ? topics : topics.split(","),
-      );
+      setSelectedTopics(Array.isArray(topics) ? topics : topics.split(","));
     } else {
       setSelectedTopics([]);
     }
@@ -237,9 +232,12 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
             <EmptyState.Root size="sm">
               <EmptyState.Content>
                 <VStack textAlign="center">
-                  <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+                  <EmptyState.Title textStyle="sm">
+                    No topics found
+                  </EmptyState.Title>
                   <EmptyState.Description textStyle="xs">
-                    Topics are assigned automatically after enough messages are collected.{" "}
+                    Topics are assigned automatically after enough messages are
+                    collected.{" "}
                   </EmptyState.Description>
                 </VStack>
               </EmptyState.Content>
@@ -248,7 +246,9 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         ) : (
           <EmptyState.Root size="sm">
             <EmptyState.Content>
-              <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+              <EmptyState.Title textStyle="sm">
+                No topics found
+              </EmptyState.Title>
             </EmptyState.Content>
           </EmptyState.Root>
         )}

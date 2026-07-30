@@ -1,8 +1,8 @@
 import { merge } from "lodash-es";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Component } from "~/optimization_studio/types/dsl";
 import { MODULES } from "~/optimization_studio/registry";
+import type { Component } from "~/optimization_studio/types/dsl";
 import type { NodeWithOptionalPosition } from "~/types";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";

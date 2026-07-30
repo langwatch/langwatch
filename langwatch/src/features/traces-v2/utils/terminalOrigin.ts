@@ -19,6 +19,7 @@ export interface TerminalOriginSignals {
 const CODING_AGENT_SERVICE_MARKERS = [
   "claude-code",
   "claude_code",
+  "cowork",
   "opencode",
   "codex",
   "gemini-cli",

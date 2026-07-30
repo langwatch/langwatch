@@ -149,7 +149,10 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
               name: "test-span",
               kind: 1,
               attributes: [
-                { key: "langwatch.output", value: { stringValue: LARGE_OUTPUT } },
+                {
+                  key: "langwatch.output",
+                  value: { stringValue: LARGE_OUTPUT },
+                },
               ],
               events: [],
               links: [],
@@ -218,7 +221,9 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
 
       // Apply leanForProjection to every row — mimicking replayExecutor.apply.
       const leanedEvents = eventLogRows.map((row) => {
-        const event = JSON.parse(row.EventPayload) as Parameters<typeof leanForProjection>[0];
+        const event = JSON.parse(row.EventPayload) as Parameters<
+          typeof leanForProjection
+        >[0];
         return leanForProjection(event);
       });
 
@@ -228,7 +233,12 @@ describe("given a sequence of span events ingested via the live pipeline", () =>
 
       for (const leaned of leanedEvents) {
         const leanedSpanData = leaned?.data as {
-          span: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
+          span: {
+            attributes?: Array<{
+              key: string;
+              value: { stringValue?: string };
+            }>;
+          };
         };
         const outputAttr = leanedSpanData?.span?.attributes?.find(
           (a) => a.key === "langwatch.output",

@@ -1,3 +1,4 @@
+import { HandledError } from "@langwatch/handled-error";
 import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,12 +37,10 @@ const { mintLangySessionApiKey, LangySessionKeyScopeError } = vi.hoisted(() => {
     }
   }
   return {
-    mintLangySessionApiKey: vi
-      .fn()
-      .mockResolvedValue({
-        token: "sk-lw-test-langy-token",
-        apiKeyId: "key-1",
-      }),
+    mintLangySessionApiKey: vi.fn().mockResolvedValue({
+      token: "sk-lw-test-langy-token",
+      apiKeyId: "key-1",
+    }),
     LangySessionKeyScopeError,
   };
 });
@@ -143,7 +142,8 @@ describe("LangyCredentialService", () => {
         // is a raw, haven-assigned loopback port the worker process cannot reach,
         // so the stable LANGWATCH_ENDPOINT hostname must win — otherwise the relay
         // is silently disabled and the turn stalls with no live edge and no error.
-        process.env.LANGWATCH_ENDPOINT = "https://app.stack.langwatch.localhost";
+        process.env.LANGWATCH_ENDPOINT =
+          "https://app.stack.langwatch.localhost";
         const prisma = makePrisma({
           projectSecret: {
             findFirst: vi
@@ -308,16 +308,28 @@ describe("LangyCredentialService", () => {
     });
   });
 
+  // Our own deployment being misconfigured is not a failure the customer can
+  // act on, so it must NOT arrive as a handled error: `langy_credential_
+  // resolution` tells them to sign out and back in, which could never fix it.
+  // A plain Error degrades to the generic unknown plus a trace id (ADR-045),
+  // and the variable name goes to the log line, never to the wire.
   describe("given env config is incomplete", () => {
     describe("when LW_GATEWAY_BASE_URL is unset", () => {
-      it("throws LangyCredentialResolutionError before any provisioning", async () => {
+      it("fails as an unhandled error before any provisioning", async () => {
         delete process.env.LW_GATEWAY_BASE_URL;
         const prisma = makePrisma();
         const svc = new LangyCredentialService(prisma);
 
-        await expect(
-          svc.getOrProvision({ projectId: "p1", session: SESSION }),
-        ).rejects.toThrow(/LW_GATEWAY_BASE_URL/);
+        const failure = await svc
+          .getOrProvision({ projectId: "p1", session: SESSION })
+          .then(
+            () => null,
+            (error: unknown) => error,
+          );
+
+        expect(failure).toBeInstanceOf(Error);
+        expect(HandledError.isHandled(failure)).toBe(false);
+        expect((failure as Error).message).not.toContain("LW_GATEWAY_BASE_URL");
         expect(vkCreate).not.toHaveBeenCalled();
       });
     });
@@ -472,7 +484,7 @@ describe("LangyCredentialService", () => {
     });
   });
 
-  // Per-project Langy egress allow-list (ADR-043). Read by /langy/chat and
+  // Per-project Langy egress allow-list (ADR-076). Read by /langy/chat and
   // threaded into the credentials envelope; the agent's egress adapter is
   // constructed with it at spawn. null/empty = monitor-only (watch, never
   // block); a set list = the enforced set (floor ∪ list). Parsed through Zod so
@@ -645,7 +657,9 @@ describe("resolveWorkerCallbackUrl", () => {
 
     it("falls back to LANGWATCH_API_URL when the endpoint is absent", () => {
       expect(
-        resolveWorkerCallbackUrl({ LANGWATCH_API_URL: "http://127.0.0.1:41001" }),
+        resolveWorkerCallbackUrl({
+          LANGWATCH_API_URL: "http://127.0.0.1:41001",
+        }),
       ).toBe("http://127.0.0.1:41001");
     });
 
@@ -676,7 +690,9 @@ describe("resolveWorkerGatewayBaseUrl", () => {
         }),
       ).toBe("https://gateway.slug.langwatch.localhost");
       expect(
-        resolveWorkerGatewayBaseUrl({ LW_GATEWAY_BASE_URL: "http://127.0.0.1:45000" }),
+        resolveWorkerGatewayBaseUrl({
+          LW_GATEWAY_BASE_URL: "http://127.0.0.1:45000",
+        }),
       ).toBe("http://127.0.0.1:45000");
     });
 

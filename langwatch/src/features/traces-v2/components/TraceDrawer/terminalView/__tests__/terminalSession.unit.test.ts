@@ -7,7 +7,11 @@ import {
   toolPrimaryArg,
 } from "../terminalSession";
 
-function modelCall(atMs: number, tokens: number, costUsd: number): TranscriptEntry {
+function modelCall(
+  atMs: number,
+  tokens: number,
+  costUsd: number,
+): TranscriptEntry {
   return {
     kind: "model_call",
     atMs,

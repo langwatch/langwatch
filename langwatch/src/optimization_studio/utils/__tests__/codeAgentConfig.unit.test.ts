@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { AgentComponentConfig } from "~/server/agents/agent.repository";
 
 import {
-  DEFAULT_CODE,
   buildCodeConfig,
+  DEFAULT_CODE,
   getCodeFromConfig,
 } from "../codeAgentConfig";
 

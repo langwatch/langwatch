@@ -666,7 +666,10 @@ describe("PromptTabbedSection Layout Modes", () => {
       };
 
       // Mount, type a value, then unmount — this is "switch away".
-      const first = renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
+      const first = renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        formValues,
+      );
       await user.click(screen.getByRole("tab", { name: /variables/i }));
       const emptyInput = (await screen.findAllByRole("textbox")).find(
         (el) => (el as HTMLInputElement).value === "",

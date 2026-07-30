@@ -1,11 +1,11 @@
 import { Box } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import {
-  type LangyWaveActivity,
-  type LangyWaveMotion,
   isErrorTransition,
   isSuccessTransition,
   isWakeTransition,
+  type LangyWaveActivity,
+  type LangyWaveMotion,
   restingWaveMotion,
   stepWaveMotion,
   WAVE_CELEBRATE_DURATION_S,

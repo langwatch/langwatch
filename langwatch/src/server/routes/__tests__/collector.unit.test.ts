@@ -173,9 +173,7 @@ describe("POST /api/collector", () => {
         const body = await res.json();
         expect(body.message).toContain("3");
         expect(body.partialSuccess.rejectedSpans).toBe(3);
-        expect(body.partialSuccess.errorMessage).toContain(
-          "redis unavailable",
-        );
+        expect(body.partialSuccess.errorMessage).toContain("redis unavailable");
       });
     });
 

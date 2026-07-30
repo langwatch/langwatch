@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { describe, expect, it } from "vitest";
 import {
   computeBestMatchMappings,
@@ -10,9 +10,7 @@ import {
 } from "../resolve-field-mappings";
 import type { FieldMapping } from "../types";
 
-const makeAgentInput = (
-  overrides: Partial<AgentInput> = {},
-): AgentInput => ({
+const makeAgentInput = (overrides: Partial<AgentInput> = {}): AgentInput => ({
   threadId: "thread-1",
   messages: [{ role: "user", content: "Hello world" }],
   newMessages: [{ role: "user", content: "Hello world" }],
@@ -33,7 +31,7 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["query"]).toBe("Hello world");
+      expect(result.query).toBe("Hello world");
     });
 
     it("picks the last user message when there are multiple messages", () => {
@@ -50,7 +48,7 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["query"]).toBe("Second message");
+      expect(result.query).toBe("Second message");
     });
 
     it("returns empty string when there are no user messages", () => {
@@ -61,7 +59,7 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["query"]).toBe("");
+      expect(result.query).toBe("");
     });
   });
 
@@ -79,7 +77,7 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["history"]).toBe(JSON.stringify(messages));
+      expect(result.history).toBe(JSON.stringify(messages));
     });
   });
 
@@ -93,7 +91,7 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["tid"]).toBe("abc-123");
+      expect(result.tid).toBe("abc-123");
     });
 
     it("returns empty string when threadId is absent", () => {
@@ -104,7 +102,7 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["tid"]).toBe("");
+      expect(result.tid).toBe("");
     });
   });
 
@@ -118,7 +116,7 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["context"]).toBe("Use the knowledge base");
+      expect(result.context).toBe("Use the knowledge base");
     });
   });
 
@@ -131,20 +129,24 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["query"]).toBe("");
+      expect(result.query).toBe("");
     });
   });
 
   describe("when mapping type is source with an unknown path", () => {
     it("returns empty string for an unrecognized source path", () => {
       const fieldMappings: Record<string, FieldMapping> = {
-        query: { type: "source", sourceId: "scenario", path: ["unknown_field"] },
+        query: {
+          type: "source",
+          sourceId: "scenario",
+          path: ["unknown_field"],
+        },
       };
       const agentInput = makeAgentInput();
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["query"]).toBe("");
+      expect(result.query).toBe("");
     });
   });
 
@@ -158,8 +160,8 @@ describe("resolveFieldMappings", () => {
 
       const result = resolveFieldMappings({ fieldMappings, agentInput });
 
-      expect(result["query"]).toBe("Hello world");
-      expect(result["context"]).toBe("KB context");
+      expect(result.query).toBe("Hello world");
+      expect(result.context).toBe("KB context");
     });
   });
 });
@@ -213,7 +215,7 @@ describe("computeBestMatchMappings", () => {
       expect(result).toEqual({
         query: { type: "source", sourceId: "scenario", path: ["input"] },
       });
-      expect(result["custom_field"]).toBeUndefined();
+      expect(result.custom_field).toBeUndefined();
     });
   });
 
@@ -233,7 +235,11 @@ describe("computeBestMatchMappings", () => {
 
       expect(result).toEqual({
         message: { type: "source", sourceId: "scenario", path: ["input"] },
-        session_id: { type: "source", sourceId: "scenario", path: ["threadId"] },
+        session_id: {
+          type: "source",
+          sourceId: "scenario",
+          path: ["threadId"],
+        },
       });
     });
   });

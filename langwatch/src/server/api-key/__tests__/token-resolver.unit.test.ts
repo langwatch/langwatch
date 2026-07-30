@@ -14,7 +14,8 @@ vi.mock("@langwatch/observability", () => ({
 
 // A legacy project key whose random body happens to contain an underscore —
 // the regression shape: it must resolve via the project lookup, not 401
-const LEGACY_KEY_WITH_UNDERSCORE = "sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM";
+const LEGACY_KEY_WITH_UNDERSCORE =
+  "sk-lw-AbCdEfGhIjKlMnOpQrStUvWxYz012345_floM";
 
 const project = {
   id: "project_1",

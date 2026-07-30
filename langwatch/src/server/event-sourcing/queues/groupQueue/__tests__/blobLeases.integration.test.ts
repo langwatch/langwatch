@@ -349,9 +349,9 @@ describe("BlobLeases", () => {
           expect(await redis.ttl(BLOB_KEY)).toBeGreaterThan(
             BLOB_RELEASE_GRACE_TTL_SECONDS,
           );
-          expect(await leases.countLive({ projectId: PROJECT, hash: HASH })).toBe(
-            1,
-          );
+          expect(
+            await leases.countLive({ projectId: PROJECT, hash: HASH }),
+          ).toBe(1);
         });
       });
     });
@@ -389,7 +389,12 @@ describe("BlobLeases", () => {
         it("graces the displaced blob and leaves the replacement's backstop", async () => {
           const otherHash = "replacementhash";
           const otherBlobKey = `${PREFIX}blob:${PROJECT}/${otherHash}`;
-          await redis.set(BLOB_KEY, "old body", "EX", BLOB_BACKSTOP_TTL_SECONDS);
+          await redis.set(
+            BLOB_KEY,
+            "old body",
+            "EX",
+            BLOB_BACKSTOP_TTL_SECONDS,
+          );
           await redis.set(
             otherBlobKey,
             "new body",

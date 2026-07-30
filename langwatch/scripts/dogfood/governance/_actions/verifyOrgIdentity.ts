@@ -7,7 +7,11 @@
  * was archived, soft-deleted, or never had its identity set).
  */
 
-import type { SeedAction, SeedActionContext, SeedActionOutcome } from "../_lib/seedRunner";
+import type {
+  SeedAction,
+  SeedActionContext,
+  SeedActionOutcome,
+} from "../_lib/seedRunner";
 
 export const verifyOrgIdentity: SeedAction = {
   name: "verifyOrgIdentity",

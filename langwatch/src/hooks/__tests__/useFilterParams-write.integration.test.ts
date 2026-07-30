@@ -80,15 +80,6 @@ function lastPushUrl(): string {
   );
 }
 
-function lastPushQuery(): Record<string, unknown> {
-  const lastCall = mockPush.mock.lastCall;
-  if (!lastCall) throw new Error("router.push was not called");
-  if (typeof lastCall[0] === "object" && lastCall[0].query) {
-    return lastCall[0].query as Record<string, unknown>;
-  }
-  return {};
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

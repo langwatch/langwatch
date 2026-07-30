@@ -140,7 +140,11 @@ describe("given a dev checkout running on a non-default port", () => {
   describe("when the browser posts a sign-in from that port", () => {
     /** @scenario Sign-in succeeds on a non-default port */
     it("signs the user in and hands back a session", async () => {
-      const response = await post(app, `http://localhost:${APP_PORT}`, PASSWORD);
+      const response = await post(
+        app,
+        `http://localhost:${APP_PORT}`,
+        PASSWORD,
+      );
 
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({

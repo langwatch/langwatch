@@ -68,6 +68,11 @@ export interface ProcessCommit<State = unknown> {
    * Inbox identity: (processName, projectId, sourceEventId) is consumed at
    * most once. Null for wake-driven commits, which are guarded by
    * `expectedRevision` instead.
+   *
+   * Any length is accepted. A store that enforces the uniqueness in an index
+   * derives a fixed-width key from this value rather than indexing it
+   * (`stores/inboxKey.ts`), so a caller's idempotency key can be as long as its
+   * own domain needs.
    */
   sourceEventId: string | null;
   /** 0 when the process has never been committed. */
@@ -112,7 +117,9 @@ export interface ProcessStore {
   commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
 
   /** All messages for one process, primarily for diagnostics and tests. */
-  findMessagesByRef(params: { ref: ProcessRef }): Promise<OutboxMessageRecord[]>;
+  findMessagesByRef(params: {
+    ref: ProcessRef;
+  }): Promise<OutboxMessageRecord[]>;
 
   /**
    * Lease pending, due messages for exclusive dispatch until

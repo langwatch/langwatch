@@ -45,7 +45,7 @@ Feature: Pending counter conservation across job lifecycle
   @integration @counter @block
   Scenario: Counter tracks restage-and-block as a new pending job
     Given a dispatched job (counter was decremented at dispatch)
-    When RESTAGE_AND_BLOCK re-stages with a new ID and blocks the group
+    When RESTAGE_AND_BLOCK re-stages the job and blocks the group
     Then the counter is incremented (job re-enters :jobs ZSET)
 
   @integration @counter @redelivery

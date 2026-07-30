@@ -1,10 +1,10 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { z } from "zod";
-import { checkOrganizationPermission } from "../rbac";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { RoleService } from "~/server/role/role.service";
+import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { checkOrganizationPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeTypeSchema = z.nativeEnum(RoleBindingScopeType);
 const roleSchema = z.nativeEnum(TeamUserRole);
@@ -38,7 +38,10 @@ export const roleBindingRouter = createTRPCRouter({
       const repo = new PrismaRoleBindingRepository(ctx.prisma);
       const roleService = new RoleService(ctx.prisma);
       const service = new RoleBindingService(ctx.prisma, repo, roleService);
-      return service.listForUser({ organizationId: input.organizationId, userId: input.userId });
+      return service.listForUser({
+        organizationId: input.organizationId,
+        userId: input.userId,
+      });
     }),
 
   /**

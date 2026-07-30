@@ -17,16 +17,15 @@
  */
 
 import { createServer, type Server } from "node:http";
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { HttpAgentData } from "../types";
 import { SerializedHttpAgentAdapter } from "../serialized-adapters/http-agent.adapter";
+import type { HttpAgentData } from "../types";
 
 // Use native fetch so localhost isn't blocked by SSRF protection. Vitest hoists
 // vi.mock above the static import below, so the adapter still gets the mock.
 vi.mock("~/utils/ssrfProtection", () => ({
-  ssrfSafeFetch: async (url: string, init?: RequestInit) =>
-    fetch(url, init),
+  ssrfSafeFetch: async (url: string, init?: RequestInit) => fetch(url, init),
 }));
 
 interface N8nLikeServer {
@@ -162,9 +161,7 @@ describe("HTTP agent body JSON safety (n8n regression)", () => {
 
         expect(srv.lastParsedBody()).toEqual({
           thread_id: "thread-1",
-          messages: [
-            { role: "user", content: 'line\nbreak and a "quote"' },
-          ],
+          messages: [{ role: "user", content: 'line\nbreak and a "quote"' }],
         });
       });
     });

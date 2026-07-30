@@ -17,7 +17,7 @@ async function main() {
     },
   });
   console.log(
-    `✓ updated azure (${azureMp.id}) deploymentMapping: gpt-5-mini→gpt-5-mini`
+    `✓ updated azure (${azureMp.id}) deploymentMapping: gpt-5-mini→gpt-5-mini`,
   );
 }
 

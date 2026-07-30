@@ -51,12 +51,14 @@ export function ShadowDivider({
   }, [scrollRef, fadeAfterPx]);
 
   return (
-    <Box width="full" flexShrink={0} position="relative" opacity={opacity} transition="opacity 0.15s ease-out">
-      <Box
-        width="full"
-        height="1px"
-        bg="border.muted"
-      />
+    <Box
+      width="full"
+      flexShrink={0}
+      position="relative"
+      opacity={opacity}
+      transition="opacity 0.15s ease-out"
+    >
+      <Box width="full" height="1px" bg="border.muted" />
       <Box
         width="full"
         height="4px"

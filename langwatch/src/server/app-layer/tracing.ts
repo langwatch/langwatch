@@ -18,7 +18,10 @@ import { getLangWatchTracer } from "langwatch";
  */
 export function traced<T extends object>(instance: T, className: string): T {
   const tracer = getLangWatchTracer(`langwatch.${className.toLowerCase()}`);
-  const wrapperCache = new Map<string | symbol, Function>();
+  const wrapperCache = new Map<
+    string | symbol,
+    (this: unknown, ...args: unknown[]) => unknown
+  >();
 
   return new Proxy(instance, {
     get(target, prop, receiver) {
@@ -41,10 +44,7 @@ export function traced<T extends object>(instance: T, className: string): T {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return tracer.withActiveSpan(spanName, async () =>
           // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call
-          (value as (...a: unknown[]) => unknown).apply(
-            this ?? target,
-            args,
-          ),
+          (value as (...a: unknown[]) => unknown).apply(this ?? target, args),
         );
       };
       wrapperCache.set(prop, wrapper);

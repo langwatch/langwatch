@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { LlmConfigRepository } from "../llm-config.repository";
 import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { LlmConfigRepository } from "../llm-config.repository";
 
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
@@ -34,7 +34,10 @@ describe("LlmConfigRepository", () => {
         // Mock getConfigByIdOrHandleWithLatestVersion to return a config with
         // a prefixed handle (what the DB actually stores) and a non-empty name.
         const repo = new LlmConfigRepository(prisma);
-        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(
+          repo,
+          "getConfigByIdOrHandleWithLatestVersion",
+        ).mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -70,7 +73,10 @@ describe("LlmConfigRepository", () => {
         const prisma = makeMockPrisma({ update: mockUpdate });
 
         const repo = new LlmConfigRepository(prisma);
-        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(
+          repo,
+          "getConfigByIdOrHandleWithLatestVersion",
+        ).mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
@@ -99,10 +105,16 @@ describe("LlmConfigRepository", () => {
       it("does not call prisma.delete", async () => {
         const mockDelete = vi.fn();
         const mockUpdate = vi.fn(() => Promise.resolve({}));
-        const prisma = makeMockPrisma({ delete: mockDelete, update: mockUpdate });
+        const prisma = makeMockPrisma({
+          delete: mockDelete,
+          update: mockUpdate,
+        });
 
         const repo = new LlmConfigRepository(prisma);
-        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+        vi.spyOn(
+          repo,
+          "getConfigByIdOrHandleWithLatestVersion",
+        ).mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",

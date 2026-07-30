@@ -16,22 +16,22 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
-import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";
 import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
 import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
+import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
@@ -160,7 +160,6 @@ export function MessagesTable({
     highlightIds,
     acceptPending: acceptPendingBuffer,
     mouseLeftAtRef,
-    bypassBufferRef,
     displayDataRef,
     addPendingCount,
     reset: resetBuffer,
@@ -206,9 +205,7 @@ export function MessagesTable({
       }
 
       const hasVisibleUpdate = traceIds.some((id) => displayedIds.has(id));
-      const newCount = traceIds.filter(
-        (id) => !displayedIds.has(id),
-      ).length;
+      const newCount = traceIds.filter((id) => !displayedIds.has(id)).length;
 
       if (hasVisibleUpdate) {
         // Same endDate refetch — refreshes visible trace data without pulling new traces
@@ -347,9 +344,7 @@ export function MessagesTable({
       sortable: true,
       render: (trace, index) => {
         const checkId = columnKey.split(".")[1];
-        const traceCheck = displayData?.traceChecks?.[
-          trace.trace_id
-        ]?.find(
+        const traceCheck = displayData?.traceChecks?.[trace.trace_id]?.find(
           (traceCheck_: ElasticSearchEvaluation) =>
             traceCheck_.evaluator_id === checkId,
         );
@@ -582,9 +577,7 @@ export function MessagesTable({
       render: (trace: TraceWithGuardrail, index: number) => {
         const rawOrigin = trace.metadata["langwatch.origin"];
         const displayOrigin =
-          typeof rawOrigin === "string" && rawOrigin !== ""
-            ? rawOrigin
-            : null;
+          typeof rawOrigin === "string" && rawOrigin !== "" ? rawOrigin : null;
 
         return (
           <Table.Cell
@@ -595,20 +588,21 @@ export function MessagesTable({
               })
             }
           >
-            {displayOrigin && (() => {
-              const colors = getOriginColor(displayOrigin);
-              return (
-                <Badge
-                  size="sm"
-                  paddingX={2}
-                  background={colors.background}
-                  color={colors.color}
-                  fontSize="12px"
-                >
-                  {getOriginLabel(displayOrigin)}
-                </Badge>
-              );
-            })()}
+            {displayOrigin &&
+              (() => {
+                const colors = getOriginColor(displayOrigin);
+                return (
+                  <Badge
+                    size="sm"
+                    paddingX={2}
+                    background={colors.background}
+                    color={colors.color}
+                    fontSize="12px"
+                  >
+                    {getOriginLabel(displayOrigin)}
+                  </Badge>
+                );
+              })()}
           </Table.Cell>
         );
       },
@@ -1016,7 +1010,8 @@ export function MessagesTable({
   };
 
   const toggleAllTraces = () => {
-    const totalTraceCount = displayData?.groups.reduce((sum, g) => sum + g.length, 0) ?? 0;
+    const totalTraceCount =
+      displayData?.groups.reduce((sum, g) => sum + g.length, 0) ?? 0;
     if (selectedTraceIds.length === totalTraceCount) {
       setSelectedTraceIds([]);
     } else {

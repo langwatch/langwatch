@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // auth-middleware → api/rbac → ~/server/auth → ~/server/better-auth → redis + db.
 // Mock both to prevent the persistent Redis socket from keeping the Vite process
@@ -7,7 +7,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("~/server/db", () => ({ prisma: {} }));
 vi.mock("~/server/redis", () => ({ connection: undefined }));
 
-import { extractCredentials, collectAuthDiagnostics } from "../auth-middleware";
+import { collectAuthDiagnostics, extractCredentials } from "../auth-middleware";
 
 function mockGetHeader(headers: Record<string, string>) {
   return (name: string) => headers[name.toLowerCase()] ?? headers[name];

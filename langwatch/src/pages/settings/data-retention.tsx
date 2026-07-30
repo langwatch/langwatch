@@ -43,6 +43,7 @@ import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/Scope
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -230,10 +231,9 @@ function DataRetentionPage({
       });
     },
     onError: (error) =>
-      toaster.create({
-        title: "Failed to cancel",
-        description: error.message,
-        type: "error",
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't cancel the retroactive update",
       }),
   });
 
@@ -291,10 +291,9 @@ function DataRetentionPage({
       const firstError = failed.find(
         (r): r is { ok: false; error: Error } => !r.ok,
       );
-      toaster.create({
-        title: "Failed to remove policy",
-        description: firstError?.error.message,
-        type: "error",
+      showErrorToast({
+        error: firstError?.error,
+        fallbackTitle: "Couldn't remove the retention policy",
       });
     }
   };
@@ -566,13 +565,19 @@ function DataRetentionPage({
                     error: Error;
                   } => !r.ok,
                 );
-                toaster.create({
-                  title:
-                    failed.length === pairs.length
-                      ? "Failed to save retention policy"
-                      : `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
-                  description: firstError?.error.message,
-                  type: "error",
+                // The partial count is an outcome, not an error headline: a
+                // recognised code overrides `fallbackTitle`, which would erase
+                // "Saved 7 of 9". Report the two things separately.
+                if (failed.length < pairs.length) {
+                  toaster.create({
+                    title: `Saved ${pairs.length - failed.length} of ${pairs.length} updates`,
+                    type: "warning",
+                    meta: { closable: true },
+                  });
+                }
+                showErrorToast({
+                  error: firstError?.error,
+                  fallbackTitle: "Couldn't save the retention policy",
                 });
                 return {
                   success: failed.length === 0,
@@ -655,10 +660,9 @@ function DataRetentionPage({
                       const firstError = triggerFailed.find(
                         (r): r is { ok: false; error: Error } => !r.ok,
                       );
-                      toaster.create({
-                        title: "Some retroactive updates failed",
-                        description: firstError?.error.message,
-                        type: "error",
+                      showErrorToast({
+                        error: firstError?.error,
+                        fallbackTitle: "Some retroactive updates failed",
                       });
                     }
                   }

@@ -19,11 +19,12 @@
  *     BASE_URL=http://localhost:5571 \
  *     pnpm exec tsx e2e/experiment-archive-dogfood.ts
  */
-import { chromium } from "playwright";
-import { mkdir } from "node:fs/promises";
+
 import { existsSync } from "node:fs";
-import { PrismaClient, ExperimentType } from "@prisma/client";
+import { mkdir } from "node:fs/promises";
+import { ExperimentType, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { chromium } from "playwright";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5571";
 const EMAIL = `qa-archive-${Date.now()}@test.local`;
@@ -69,7 +70,10 @@ async function main() {
   });
   check("signup completed", true, page.url());
 
-  await page.screenshot({ path: `${SHOTS_DIR}/01-after-signup.png`, fullPage: false });
+  await page.screenshot({
+    path: `${SHOTS_DIR}/01-after-signup.png`,
+    fullPage: false,
+  });
 
   const user = await prisma.user.findUnique({ where: { email: EMAIL } });
   if (!user) throw new Error("signup did not create a user row");
@@ -173,7 +177,11 @@ async function main() {
     where: { id: targetExp.id, projectId: project.id },
   });
   check("target row STILL exists in Postgres (soft archive)", !!row);
-  check("target row archivedAt is set", !!row?.archivedAt, String(row?.archivedAt));
+  check(
+    "target row archivedAt is set",
+    !!row?.archivedAt,
+    String(row?.archivedAt),
+  );
   check(
     "target row slug was renamed (contains '-archived-')",
     !!row?.slug?.includes("-archived-"),
@@ -183,9 +191,14 @@ async function main() {
   const liveRow = await prisma.experiment.findFirst({
     where: { id: liveExp.id, projectId: project.id },
   });
-  check("untouched experiment archivedAt remains null", liveRow?.archivedAt === null);
+  check(
+    "untouched experiment archivedAt remains null",
+    liveRow?.archivedAt === null,
+  );
 
-  console.log("\n[7] Idempotent re-archive returns success and does not move archivedAt");
+  console.log(
+    "\n[7] Idempotent re-archive returns success and does not move archivedAt",
+  );
   const firstArchivedAt = row!.archivedAt!;
   await new Promise((r) => setTimeout(r, 50));
   const archiveRes2 = await page.request.post(

@@ -18,6 +18,16 @@ const DefaultLocalAPIKey = "sk-lw-local-development-key"
 // "always the same locally" contract as DefaultLocalAPIKey.
 const DefaultLangyInternalSecret = "langy-local-development-secret"
 
+// DefaultRetentionDays is the platform retention default haven pins for a dev
+// stack: one week, so an unseeded worktree's ClickHouse stays tiny and whole
+// weekly partitions drop cleanly (the partition key is toYearWeek, so retention
+// must be a whole number of weeks). Emitted as LANGWATCH_DEFAULT_RETENTION_DAYS,
+// which the control plane reads ONLY outside production — it fails loud if that
+// var is ever set in prod, where the default is fixed. A seeded DB overrides
+// this with a two-year, partition-aligned RetentionPolicy so the seeded history
+// survives (see the seed:retention step).
+const DefaultRetentionDays = 7
+
 // svc looks a service up by name; a zero value is fine for the string formatting
 // below when a stack is partial.
 func (s Stack) svc(name string) Service {
@@ -71,6 +81,12 @@ func (s Stack) OverlayEnv() []string {
 		// services keep their JSON default. The collector still receives structured
 		// records regardless of the console format (clog tees the two).
 		"LOG_FORMAT=pretty",
+		// A tiny default retention for the dev stack: an unseeded worktree keeps a
+		// week of data so ClickHouse stays small and whole weekly partitions drop
+		// cleanly. Haven-dev only — the control plane fails loud if this var is set
+		// in prod, where the platform default is fixed. Seeding overrides it with a
+		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
+		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as

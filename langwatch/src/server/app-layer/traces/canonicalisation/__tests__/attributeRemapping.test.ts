@@ -123,7 +123,7 @@ describe("CanonicalizeSpanAttributesService — take vs preserve semantics", () 
       const result = service.canonicalize({ metadata }, [], stubSpan);
 
       // metadata is consumed via take(), so raw blob is gone
-      expect(result.attributes["metadata"]).toBeUndefined();
+      expect(result.attributes.metadata).toBeUndefined();
       // Reserved fields are promoted to canonical keys
       expect(result.attributes["langwatch.user.id"]).toBe("u1");
       // Custom fields are hoisted as metadata.{key}

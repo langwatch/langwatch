@@ -52,7 +52,9 @@ vi.mock("~/utils/api", () => ({
     publicEnv: { useQuery: idleQuery },
     modelProvider: {
       getAllForProject: { useQuery: idleQuery },
-      delete: { useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }) },
+      delete: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
     },
     useContext: () => ({
       organization: { getAll: { invalidate: vi.fn() } },

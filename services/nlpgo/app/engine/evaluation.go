@@ -322,7 +322,10 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 	emit(ctx, out, workflowRunningEvent(req, traceID, started, true))
 	entries, err := selectEvaluationEntries(req.Workflow, req.EvaluateOn, req.DatasetEntry)
 	if err != nil {
-		emit(ctx, out, workflowErrorEvent(req, traceID, err.Error(), true))
+		emit(ctx, out, workflowErrorEvent(req, traceID, &NodeError{
+			Type:    "invalid_dataset",
+			Message: err.Error(),
+		}, true))
 		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
 		return
 	}
@@ -417,7 +420,10 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 	canceled := false
 	for i, entry := range entries {
 		if ctx.Err() != nil {
-			emit(ctx, out, workflowErrorEvent(req, traceID, ctx.Err().Error(), true))
+			emit(ctx, out, workflowErrorEvent(req, traceID, &NodeError{
+				Type:    "context_canceled",
+				Message: ctx.Err().Error(),
+			}, true))
 			canceled = true
 			break
 		}

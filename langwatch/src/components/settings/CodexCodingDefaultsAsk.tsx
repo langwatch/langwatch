@@ -2,6 +2,7 @@ import { Button, Text } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { create } from "zustand";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { showErrorToast } from "~/features/errors";
 import { syncLangyAfterCodingDefaultsWrite } from "~/features/langy/logic/codingDefaultSync";
 import {
   isCodexModel,
@@ -128,11 +129,7 @@ async function acceptCodexCodingDefaults({
     });
     onClose();
   } catch (error) {
-    toaster.create({
-      title: "Could not set the defaults",
-      description: error instanceof Error ? error.message : undefined,
-      type: "error",
-    });
+    showErrorToast({ error, fallbackTitle: "Could not set the defaults" });
   }
 }
 

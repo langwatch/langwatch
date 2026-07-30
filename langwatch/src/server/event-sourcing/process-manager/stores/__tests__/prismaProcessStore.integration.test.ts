@@ -1,10 +1,11 @@
+import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import type { JsonValue } from "../../json";
 import type { ProcessRef } from "../../processManager.types";
-import type { NewOutboxMessage, ProcessCommit } from "../processStore.types";
 import { PrismaProcessStore } from "../prismaProcessStore";
+import type { NewOutboxMessage, ProcessCommit } from "../processStore.types";
 
 const store = new PrismaProcessStore(prisma);
 let processName: string;
@@ -660,5 +661,148 @@ describe("PrismaProcessStore", () => {
       { key: "fresh-dispatched-msg", status: "dispatched" },
       { key: "still-pending-msg", status: "pending" },
     ]);
+  });
+
+  // A source event id is `idempotencyKey ?? id`, composed by whichever pipeline
+  // emits the command. These run against real Postgres because the failure they
+  // pin is the database refusing the index row (SQLSTATE 54000) — an in-memory
+  // store cannot express it, and a string-length assertion would not observe it.
+  describe("given a source event id far past the btree index limit", () => {
+    // The filler has to be INCOMPRESSIBLE or this whole block is a test that
+    // cannot fail. Postgres pglz-compresses a datum before it goes into the
+    // index, so repetitive filler shrinks under the limit and inserts happily
+    // against the OLD index too. The production value was a base64 thought
+    // signature — high entropy, no compression — so the fixture chains sha256
+    // digests: deterministic across runs, and pglz cannot shrink it either.
+    // `is still rejected by the pre-fix index shape` below pins that against
+    // the real engine, so the fixture cannot silently degrade into one that
+    // would pass with or without the digest key.
+    const incompressible = (length: number): string => {
+      let out = "";
+      let block = createHash("sha256").update("langy-tool-call").digest("hex");
+      while (out.length < length) {
+        out += block;
+        block = createHash("sha256").update(block).digest("hex");
+      }
+      return out.slice(0, length);
+    };
+    // 3,017 characters is what production actually sent: a Gemini thought
+    // signature stapled onto a tool call id, inside a composed idempotency key.
+    const oversized = (suffix = "") =>
+      `project-1:langyconv_1:tool-start:oljdh6z0_ts_${incompressible(2936)}${suffix}`;
+
+    it("is still rejected by the pre-fix index shape", async () => {
+      // Builds a replica of the constraint as it was before the digest key and
+      // shows Postgres itself refusing this exact value. This is the assertion
+      // that gives the rest of the block its meaning: without it, a fixture
+      // that drifted into being compressible would make them all vacuous.
+      await prisma.$executeRawUnsafe(
+        `CREATE TEMP TABLE pre_fix_inbox ("processName" TEXT, "projectId" TEXT, "sourceEventId" TEXT)`,
+      );
+      await prisma.$executeRawUnsafe(
+        `CREATE UNIQUE INDEX pre_fix_inbox_key ON pre_fix_inbox("processName", "projectId", "sourceEventId")`,
+      );
+
+      await expect(
+        prisma.$executeRawUnsafe(
+          `INSERT INTO pre_fix_inbox VALUES ($1, $2, $3)`,
+          processName,
+          "project-1",
+          oversized(),
+        ),
+      ).rejects.toThrow(/exceeds btree version \d+ maximum/);
+    });
+
+    describe("when the process commits its consumption of the event", () => {
+      /** @scenario A source event id far past the index limit is still consumed */
+      it("commits instead of failing on the index row size", async () => {
+        const result = await store.commit(
+          commit({ sourceEventId: oversized(), messages: [] }),
+        );
+
+        expect(result.outcome).toBe("committed");
+      });
+
+      /** @scenario A source event id far past the index limit is still consumed */
+      it("keeps the raw source event id on the row for diagnostics", async () => {
+        const sourceEventId = oversized();
+        await store.commit(commit({ sourceEventId, messages: [] }));
+
+        const row = await prisma.processManagerInbox.findFirst({
+          where: { processName, projectId: "project-1" },
+        });
+        expect(row?.sourceEventId).toBe(sourceEventId);
+      });
+    });
+
+    describe("when two such ids share a long common prefix", () => {
+      /** @scenario Two different long source event ids stay distinct */
+      it("consumes both without mistaking one for the other", async () => {
+        const first = await store.commit(
+          commit({
+            target: ref("conversation-a"),
+            sourceEventId: oversized("-a"),
+            messages: [],
+          }),
+        );
+        const second = await store.commit(
+          commit({
+            target: ref("conversation-b"),
+            sourceEventId: oversized("-b"),
+            messages: [],
+          }),
+        );
+
+        expect([first.outcome, second.outcome]).toEqual([
+          "committed",
+          "committed",
+        ]);
+        expect(
+          await prisma.processManagerInbox.count({
+            where: { processName, projectId: "project-1" },
+          }),
+        ).toBe(2);
+      });
+    });
+
+    describe("when the same event is delivered again", () => {
+      /** @scenario Redelivery of a long source event id is still deduplicated */
+      it("reports the redelivery as a duplicate and writes no second row", async () => {
+        const sourceEventId = oversized();
+        await store.commit(commit({ sourceEventId, messages: [] }));
+
+        const redelivery = await store.commit(
+          commit({ sourceEventId, expectedRevision: 1, messages: [] }),
+        );
+
+        expect(redelivery.outcome).toBe("duplicateEvent");
+        expect(
+          await prisma.processManagerInbox.count({
+            where: { processName, projectId: "project-1" },
+          }),
+        ).toBe(1);
+      });
+    });
+
+    describe("when a later event arrives for the same process", () => {
+      /** @scenario A long source event id no longer blocks the process */
+      it("processes the later event instead of wedging on the oversized one", async () => {
+        const first = await store.commit(
+          commit({ sourceEventId: oversized(), messages: [] }),
+        );
+        expect(first.outcome).toBe("committed");
+
+        const later = await store.commit(
+          commit({
+            sourceEventId: "event-after-the-oversized-one",
+            expectedRevision: 1,
+            state: { step: 2 },
+            messages: [message("later-message")],
+          }),
+        );
+
+        expect(later).toMatchObject({ outcome: "committed", revision: 2 });
+      });
+    });
   });
 });

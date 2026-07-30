@@ -120,10 +120,11 @@ describe("trace-processing pipeline subscriber wiring", () => {
         aggregateId: "t-2",
         foldState,
       });
-      expect(deps.automations.triggerMatchHandler).toHaveBeenCalledWith(
-        event,
-        { tenantId: "project-2", aggregateId: "t-2", state: foldState },
-      );
+      expect(deps.automations.triggerMatchHandler).toHaveBeenCalledWith(event, {
+        tenantId: "project-2",
+        aggregateId: "t-2",
+        state: foldState,
+      });
     });
   });
 
@@ -164,9 +165,7 @@ describe("trace-processing pipeline subscriber wiring", () => {
     it("delegates to automations.graphActivityHandler with tenant/aggregate", async () => {
       const deps = buildTraceDeps();
       const pipeline = createTraceProcessingPipeline(deps);
-      const subscriber = pipeline.eventSubscribers.get(
-        "graphTriggerActivity",
-      )!;
+      const subscriber = pipeline.eventSubscribers.get("graphTriggerActivity")!;
       const event = fakeEvent({ tenantId: "project-3", aggregateId: "t-3" });
       await subscriber.handle(event, {
         tenantId: "project-3",

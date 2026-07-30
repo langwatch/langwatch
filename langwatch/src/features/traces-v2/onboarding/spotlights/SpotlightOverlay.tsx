@@ -332,7 +332,7 @@ export function SpotlightPopover({
           <HStack gap={1} aria-label={`Step ${index + 1} of ${total}`}>
             {Array.from({ length: total }, (_, i) => (
               <Box
-                // biome-ignore lint/suspicious/noArrayIndexKey: dots are positional by definition
+                // Dots are positional by definition.
                 key={i}
                 width={i === index ? "14px" : "5px"}
                 height="5px"

@@ -198,6 +198,26 @@ export class LangyEmptyMessageError extends HandledError {
   }
 }
 
+/**
+ * The caller is sending faster than the per-user Langy limit allows (HTTP 429).
+ *
+ * `meta.message` carries the sentence deliberately: `serialize()` does not put a
+ * HandledError's `message` on the wire, so per ADR-045 `meta.message` is the one
+ * channel that reaches a client with no bespoke explainer case for the code.
+ */
+export class LangyRateLimitedError extends HandledError {
+  declare readonly code: "langy_rate_limited";
+  constructor(message = "Too many messages. Please slow down.") {
+    super("langy_rate_limited", message, {
+      httpStatus: 429,
+      fault: "customer",
+      meta: { message },
+      ...remediation("langy_rate_limited"),
+    });
+    this.name = "LangyRateLimitedError";
+  }
+}
+
 /** A turn is already in flight for the conversation — one at a time (HTTP 409). */
 export class LangyTurnInProgressError extends HandledError {
   declare readonly code: "langy_turn_in_progress";

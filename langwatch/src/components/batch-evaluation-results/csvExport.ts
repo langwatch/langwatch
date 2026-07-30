@@ -11,11 +11,7 @@
 import numeral from "numeral";
 import Parse from "papaparse";
 
-import type {
-  BatchEvaluationData,
-  BatchResultRow,
-  BatchTargetOutput,
-} from "./types";
+import type { BatchEvaluationData, BatchResultRow } from "./types";
 
 /**
  * Stringify a value for CSV output

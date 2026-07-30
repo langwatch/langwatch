@@ -17,7 +17,9 @@ export function useScrollToBatch({
 }: {
   highlightBatchId: string | null | undefined;
 }): { highlightedBatchId: string | null } {
-  const [highlightedBatchId, setHighlightedBatchId] = useState<string | null>(null);
+  const [highlightedBatchId, setHighlightedBatchId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!highlightBatchId) {
@@ -32,7 +34,9 @@ export function useScrollToBatch({
     const poll = () => {
       if (cancelled) return;
 
-      const el = document.querySelector(`[data-batch-id="${highlightBatchId}"]`);
+      const el = document.querySelector(
+        `[data-batch-id="${highlightBatchId}"]`,
+      );
       if (!el) {
         attempts++;
         if (attempts < MAX_POLL_ATTEMPTS) {

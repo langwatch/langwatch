@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { ComputeRunMetricsCommand } from "../computeRunMetrics.command";
-import type { ComputeRunMetricsDeps } from "../computeRunMetrics.command";
-import type { ComputeRunMetricsCommandData } from "../../schemas/commands";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { ComputeRunMetricsCommandData } from "../../schemas/commands";
+import type { ComputeRunMetricsDeps } from "../computeRunMetrics.command";
+import { ComputeRunMetricsCommand } from "../computeRunMetrics.command";
 
-function makeDeps(overrides: Partial<ComputeRunMetricsDeps> = {}): ComputeRunMetricsDeps {
+function makeDeps(
+  overrides: Partial<ComputeRunMetricsDeps> = {},
+): ComputeRunMetricsDeps {
   return {
     traceSummaryStore: {
       get: vi.fn().mockResolvedValue(null),
@@ -35,7 +37,9 @@ function makeCommand(overrides: Partial<ComputeRunMetricsCommandData> = {}): {
   };
 }
 
-function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
+function makeTraceSummary(
+  overrides: Partial<TraceSummaryData> = {},
+): TraceSummaryData {
   return {
     traceId: "trace-1",
     traceName: "",
@@ -91,9 +95,10 @@ describe("ComputeRunMetricsCommand", () => {
           store: vi.fn(),
         },
         // No role cost derivable yet (spans not settled) and totalCost null.
-        deriveScenarioRoleMetrics: vi
-          .fn()
-          .mockResolvedValue({ scenarioRoleCosts: {}, scenarioRoleLatencies: {} }),
+        deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({
+          scenarioRoleCosts: {},
+          scenarioRoleLatencies: {},
+        }),
       });
 
       const handler = new ComputeRunMetricsCommand(deps);
@@ -133,7 +138,9 @@ describe("ComputeRunMetricsCommand", () => {
     it("emits a metrics_computed event with totalCost from the summary and role costs derived from spans", async () => {
       const deps = makeDeps({
         traceSummaryStore: {
-          get: vi.fn().mockResolvedValue(makeTraceSummary({ totalCost: 0.003 })),
+          get: vi
+            .fn()
+            .mockResolvedValue(makeTraceSummary({ totalCost: 0.003 })),
           store: vi.fn(),
         },
         deriveScenarioRoleMetrics: vi.fn().mockResolvedValue({

@@ -7,7 +7,10 @@ export type EvaluatorServiceMiddlewareVariables = {
   evaluatorService: EvaluatorService;
 };
 
-export const evaluatorServiceMiddleware: MiddlewareHandler = async (c, next) => {
+export const evaluatorServiceMiddleware: MiddlewareHandler = async (
+  c,
+  next,
+) => {
   c.set("evaluatorService", EvaluatorService.create(prisma));
   await next();
 };

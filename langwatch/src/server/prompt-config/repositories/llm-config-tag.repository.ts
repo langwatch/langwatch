@@ -1,5 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient, PromptTag, PromptTagAssignment } from "@prisma/client";
+import type {
+  Prisma,
+  PrismaClient,
+  PromptTag,
+  PromptTagAssignment,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 
 const logger = createLogger("langwatch:prompt-version-tags");
@@ -43,7 +48,10 @@ export class PromptTagAssignmentRepository {
     });
 
     if (!version) {
-      logger.warn({ versionId, configId, projectId }, "Version does not belong to prompt config");
+      logger.warn(
+        { versionId, configId, projectId },
+        "Version does not belong to prompt config",
+      );
       throw new TagValidationError(
         "Version does not belong to this prompt config",
       );
@@ -100,7 +108,10 @@ export class PromptTagAssignmentRepository {
       include: { promptTag: true },
     });
 
-    logger.info({ configId, versionId, tagId, projectId }, "Tag assigned to prompt version");
+    logger.info(
+      { configId, versionId, tagId, projectId },
+      "Tag assigned to prompt version",
+    );
 
     return result;
   }

@@ -16,14 +16,23 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { Permission } from "~/server/api/rbac";
+import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { prisma } from "../../../db";
 import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
 } from "../langyApiKey";
+import { experimentRoutePermissions } from "./helpers/routePermissions";
 
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
+// This suite only needs Postgres — every harness (CI's testcontainers, native
+// local services) provides that, so it runs unconditionally. It used to carry
+// an `isTestcontainersOnly`/`TEST_CLICKHOUSE_URL` skip guard, which permanently
+// skipped it EVERYWHERE: CI always sets TEST_CLICKHOUSE_URL for the
+// ClickHouse-dependent suites sharing the run. The file had gone stale unnoticed
+// as a result. Do not add the guard back — see PR #5988.
 
 // The limited role the "editor" user holds: prompts (view/create/update) plus
 // datasets:view — deliberately NO triggers, NO datasets create/update, so the
@@ -43,12 +52,21 @@ const EXPECTED_HELD_SUBSET = [
   "prompts:view",
 ];
 
-describe.skipIf(isTestcontainersOnly)("Langy session key (caller-scoped)", () => {
+// A member who can work with experiments the ordinary way: the dedicated
+// experiments read every project role holds, plus management of the
+// evaluations family that actually executes a run.
+const EXPERIMENTER_ROLE_PERMISSIONS = [
+  "experiments:view",
+  "evaluations:manage",
+];
+
+describe("Langy session key (caller-scoped)", () => {
   const ns = `langy-session-${nanoid(8)}`;
   let organizationId: string;
   let teamId: string;
   let projectId: string;
   let editorUserId: string;
+  let experimenterUserId: string;
   let noAccessUserId: string;
 
   const sessionFor = (userId: string) =>
@@ -113,6 +131,38 @@ describe.skipIf(isTestcontainersOnly)("Langy session key (caller-scoped)", () =>
       },
     });
 
+    // Experimenter: holds the experiment surface the ordinary way, so the
+    // intersection is decided by Langy's candidate list rather than by a gap
+    // in the human's own role.
+    const experimenter = await prisma.user.create({
+      data: { name: "Experimenter", email: `experimenter-${ns}@example.com` },
+    });
+    experimenterUserId = experimenter.id;
+    await prisma.organizationUser.create({
+      data: {
+        userId: experimenterUserId,
+        organizationId,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    const experimenterRole = await prisma.customRole.create({
+      data: {
+        name: `experimenter-${ns}`,
+        organizationId,
+        permissions: EXPERIMENTER_ROLE_PERMISSIONS,
+      },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        organizationId,
+        userId: experimenterUserId,
+        role: TeamUserRole.CUSTOM,
+        customRoleId: experimenterRole.id,
+        scopeType: RoleBindingScopeType.PROJECT,
+        scopeId: projectId,
+      },
+    });
+
     // No-access: an org member with NO project/team binding at all.
     const noAccess = await prisma.user.create({
       data: { name: "No Access", email: `noaccess-${ns}@example.com` },
@@ -144,7 +194,11 @@ describe.skipIf(isTestcontainersOnly)("Langy session key (caller-scoped)", () =>
       .catch(() => {});
     await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
     await prisma.user
-      .deleteMany({ where: { id: { in: [editorUserId, noAccessUserId] } } })
+      .deleteMany({
+        where: {
+          id: { in: [editorUserId, experimenterUserId, noAccessUserId] },
+        },
+      })
       .catch(() => {});
     await prisma.organization
       .deleteMany({ where: { id: organizationId } })
@@ -166,7 +220,7 @@ describe.skipIf(isTestcontainersOnly)("Langy session key (caller-scoped)", () =>
   describe("given an org member who holds a limited role in the project", () => {
     describe("when a session key is minted for them", () => {
       it("persists a user-owned, restricted, project-bound, expiring key", async () => {
-        const token = await mintLangySessionApiKey({
+        const { token } = await mintLangySessionApiKey({
           prisma,
           session: sessionFor(editorUserId),
           projectId,
@@ -198,13 +252,84 @@ describe.skipIf(isTestcontainersOnly)("Langy session key (caller-scoped)", () =>
         const customRole = await prisma.customRole.findUnique({
           where: { id: binding.customRoleId! },
         });
-        const permissions = (customRole!.permissions as string[]).slice().sort();
+        const permissions = (customRole!.permissions as string[])
+          .slice()
+          .sort();
 
         // Exactly the held subset — nothing the human can't already do.
         expect(permissions).toEqual(EXPECTED_HELD_SUBSET);
         // The caller can't create triggers, so the key can't either — even
         // though the old shared service key could.
         expect(permissions).not.toContain("triggers:create");
+      });
+    });
+  });
+
+  // The reported failure: `langwatch experiment list` came back
+  // `api_key_permission_denied` for `experiments:view` against a key minted for
+  // a user who could see the project's experiments perfectly well in the UI.
+  // Asserting the candidate list alone would not have caught it — the refusal
+  // happens at the door, where the route's grain meets the key's ceiling — so
+  // this drives the real path: mint the key, resolve the token the CLI would
+  // send, and run the same ceiling check the route runs.
+  describe("given an org member who can work with experiments in the project", () => {
+    describe("when their Langy session key is checked against the experiment routes", () => {
+      it("clears the ceiling for every permission the experiment surface asks for", async () => {
+        const { token } = await mintLangySessionApiKey({
+          prisma,
+          session: sessionFor(experimenterUserId),
+          projectId,
+          organizationId,
+        });
+
+        const resolved = await TokenResolver.create(prisma).resolve({
+          token,
+          projectId,
+        });
+        expect(resolved).not.toBeNull();
+
+        const required = experimentRoutePermissions();
+        // Guard the guard: an empty list would make the loop below vacuous.
+        expect(required).toContain("experiments:view");
+
+        for (const permission of required) {
+          await expect(
+            enforceApiKeyCeiling({
+              prisma,
+              resolved: resolved!,
+              permission: permission as Permission,
+            }),
+            `Langy was refused ${permission}, which an /api/experiments route ` +
+              `demands. Either the candidate list is missing it, or the route ` +
+              `asks for a grain no least-privilege key can hold`,
+          ).resolves.toBeUndefined();
+        }
+      });
+
+      it("is still refused the destructive grains the caller's role does grant", async () => {
+        const { token } = await mintLangySessionApiKey({
+          prisma,
+          session: sessionFor(experimenterUserId),
+          projectId,
+          organizationId,
+        });
+
+        const resolved = await TokenResolver.create(prisma).resolve({
+          token,
+          projectId,
+        });
+
+        // The human holds `evaluations:manage`, which implies the delete. The
+        // key deliberately stops at view/create/update, so Langy cannot reach
+        // the delete even though the person who asked for it could.
+        for (const permission of [
+          "evaluations:delete",
+          "evaluations:manage",
+        ] as const) {
+          await expect(
+            enforceApiKeyCeiling({ prisma, resolved: resolved!, permission }),
+          ).rejects.toThrow();
+        }
       });
     });
   });

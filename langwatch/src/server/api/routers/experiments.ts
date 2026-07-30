@@ -28,7 +28,6 @@ import type {
   DSPyRunsSummary,
   DSPyStep,
   DSPyStepSummary,
-  ESBatchEvaluation,
 } from "../../experiments/types";
 import {
   isLegacyOnlineEvaluationWorkbenchState,

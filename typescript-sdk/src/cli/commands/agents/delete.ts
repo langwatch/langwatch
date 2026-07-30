@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -10,7 +10,7 @@ import type { CommandResult } from "../../utils/output";
  * it in whatever format the caller asked for (utils/output.ts).
  */
 export const deleteAgentCommand = async (id: string): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new AgentsApiService();
   const spinner = createSpinner(`Archiving agent "${id}"...`).start();

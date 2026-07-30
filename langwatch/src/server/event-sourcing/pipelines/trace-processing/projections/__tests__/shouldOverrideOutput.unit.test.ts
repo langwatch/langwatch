@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { shouldOverrideOutput } from "../services/trace-io-accumulation.service";
 
 describe("shouldOverrideOutput", () => {

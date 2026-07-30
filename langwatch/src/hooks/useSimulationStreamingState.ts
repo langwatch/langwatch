@@ -82,7 +82,10 @@ export function createStreamingStore() {
   let rafId: number | null = null;
 
   // Buffer for CONTENT deltas that arrive before START
-  const earlyDeltas = new Map<string, { deltas: string[]; receivedAt: number }>();
+  const earlyDeltas = new Map<
+    string,
+    { deltas: string[]; receivedAt: number }
+  >();
   const EARLY_DELTA_TTL_MS = 10_000;
 
   function scheduleNotify() {
@@ -138,14 +141,21 @@ export function createStreamingStore() {
         earlyDeltas.set(messageId, entry);
         return;
       }
-      messages[idx] = { ...messages[idx]!, content: messages[idx]!.content + delta };
+      messages[idx] = {
+        ...messages[idx]!,
+        content: messages[idx]!.content + delta,
+      };
       scheduleNotify();
     },
 
     complete(messageId: string, finalContent?: string) {
       messages = messages.map((m) =>
         m.messageId === messageId
-          ? { ...m, content: finalContent ?? m.content, status: "complete" as const }
+          ? {
+              ...m,
+              content: finalContent ?? m.content,
+              status: "complete" as const,
+            }
           : m,
       );
       earlyDeltas.delete(messageId);

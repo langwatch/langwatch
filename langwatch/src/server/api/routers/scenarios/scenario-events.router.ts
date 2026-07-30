@@ -5,10 +5,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { startScenarioTabPresence } from "~/server/scenarios/browser-tab/scenario-tab-presence";
-import type {
-  BatchRunDataResult,
-  ScenarioRunData,
-} from "~/server/scenarios/scenario-event.types";
+import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
 import { checkProjectPermission } from "../../rbac";
 
 const logger = createLogger("langwatch:api:scenarios:events");

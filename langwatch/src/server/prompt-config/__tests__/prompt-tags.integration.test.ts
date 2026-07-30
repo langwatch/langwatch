@@ -1,10 +1,10 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { prisma } from "~/server/db";
 import { projectFactory } from "~/factories/project.factory";
-import { PromptService } from "../prompt.service";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
+import { prisma } from "~/server/db";
+import { PromptService } from "../prompt.service";
 
 describe("Feature: Prompt version tags", () => {
   let testOrganization: Organization;
@@ -55,9 +55,7 @@ describe("Feature: Prompt version tags", () => {
         config: { DEFAULT: "openai/gpt-4o-mini" },
         organizationId: testOrganization.id,
         scopes: {
-          create: [
-            { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
-          ],
+          create: [{ scopeType: "ORGANIZATION", scopeId: testOrganization.id }],
         },
       },
       select: { id: true },
@@ -153,7 +151,8 @@ describe("Feature: Prompt version tags", () => {
       });
 
       const firstVersion = allVersions[0];
-      if (!firstVersion) throw new Error("test setup failed: missing version 0");
+      if (!firstVersion)
+        throw new Error("test setup failed: missing version 0");
       const configId = firstVersion.id;
       const v2 = allVersions[1];
       if (!v2) throw new Error("test setup failed: missing version 1");
@@ -180,7 +179,8 @@ describe("Feature: Prompt version tags", () => {
       });
 
       const firstVersion = allVersions[0];
-      if (!firstVersion) throw new Error("test setup failed: missing version 0");
+      if (!firstVersion)
+        throw new Error("test setup failed: missing version 0");
       const configId = firstVersion.id;
       const v2 = allVersions[1];
       if (!v2) throw new Error("test setup failed: missing version 1");
@@ -224,15 +224,19 @@ describe("Feature: Prompt version tags", () => {
       });
 
       const pizzaFirst = pizzaVersions[0];
-      if (!pizzaFirst) throw new Error("test setup failed: missing pizza version 0");
+      if (!pizzaFirst)
+        throw new Error("test setup failed: missing pizza version 0");
       const pizzaConfigId = pizzaFirst.id;
       const pizzaV2 = pizzaVersions[1];
-      if (!pizzaV2) throw new Error("test setup failed: missing pizza version 1");
+      if (!pizzaV2)
+        throw new Error("test setup failed: missing pizza version 1");
       const emailFirst = emailVersions[0];
-      if (!emailFirst) throw new Error("test setup failed: missing email version 0");
+      if (!emailFirst)
+        throw new Error("test setup failed: missing email version 0");
       const emailConfigId = emailFirst.id;
       const emailV5 = emailVersions[4];
-      if (!emailV5) throw new Error("test setup failed: missing email version 4");
+      if (!emailV5)
+        throw new Error("test setup failed: missing email version 4");
 
       await service.assignTag({
         configId: pizzaConfigId,
@@ -276,7 +280,8 @@ describe("Feature: Prompt version tags", () => {
       });
 
       const firstVersion = allVersions[0];
-      if (!firstVersion) throw new Error("test setup failed: missing version 0");
+      if (!firstVersion)
+        throw new Error("test setup failed: missing version 0");
       const configId = firstVersion.id;
       const v2 = allVersions[1];
       if (!v2) throw new Error("test setup failed: missing version 1");
