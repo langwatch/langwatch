@@ -16,8 +16,8 @@
 # Spec: specs/setup/langy-local-dogfood.feature
 set -uo pipefail
 
-ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-ENV_FILE="$ROOT/langwatch/.env"
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+ENV_FILE="$ROOT/platform/app/.env"
 APP_PORT="${PORT:-5560}"
 GATEWAY_PORT=$((APP_PORT + 3))
 AGENT_PORT="${LANGY_AGENT_PORT:-8080}"
@@ -124,7 +124,7 @@ fi
 echo "services:"
 if listening "$APP_PORT"; then ok "app on :$APP_PORT"; else
   bad "app not listening on :$APP_PORT"
-  hint "cd \"$ROOT/langwatch\" && pnpm dev   (or make -C \"$ROOT\" quickstart)"
+  hint "cd \"$ROOT/platform/app\" && pnpm dev   (or make -C \"$ROOT\" quickstart)"
 fi
 if listening "$GATEWAY_PORT"; then ok "AI gateway on :$GATEWAY_PORT"; else
   bad "AI gateway not listening on :$GATEWAY_PORT"

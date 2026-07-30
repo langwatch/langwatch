@@ -13,7 +13,7 @@
 # off-host). Re-run any time; it converges.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 ENV_FILE="${REPO_ROOT}/platform/app/.env"
 GRAFANA_PORT="${LW_OBS_GRAFANA_PORT:-3000}"
 GRAFANA_URL="http://localhost:${GRAFANA_PORT}"

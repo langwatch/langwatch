@@ -755,7 +755,7 @@ main() {
   app_image="${app_repo}:${app_tag}"
   if ! docker image inspect "$app_image" &>/dev/null 2>&1; then
     local repo_root="${CHART_DIR}/../.."
-    if [[ -f "/infra/docker/Dockerfile" ]]; then
+    if [[ -f "$repo_root/infra/docker/Dockerfile" ]]; then
       info "Building app image: $app_image"
       docker build -t "$app_image" -f "$repo_root/infra/docker/Dockerfile" "$repo_root"
     fi

@@ -72,8 +72,8 @@ This runs the langyagent worker as a bare host process instead of inside the col
 **If you use `LANGY_UNSAFE_HOST_ACCESS=1`, you also need the `opencode` binary on `$PATH`** — normally baked into the colima container image, absent on the bare host. Symptom if missing: `POST /worker/create` in the logs shows `error=start opencode`, `.cause=exec: "opencode"`. Fix (pin version + hash to whatever `Dockerfile.langyagent` currently specifies — don't hardcode a version here, it drifts):
 
 ```bash
-v=$(grep -oP 'ARG OPENCODE_VERSION=\K.*' Dockerfile.langyagent)
-sha=$(grep -oP 'OPENCODE_SHA256_AMD64=\K[0-9a-f]+' Dockerfile.langyagent)  # or ARM64 on arm hosts
+v=$(grep -oP 'ARG OPENCODE_VERSION=\K.*' infra/docker/Dockerfile.langyagent)
+sha=$(grep -oP 'OPENCODE_SHA256_AMD64=\K[0-9a-f]+' infra/docker/Dockerfile.langyagent)  # or ARM64 on arm hosts
 cd /tmp
 curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-x64.tar.gz" -o opencode.tar.gz
 echo "${sha}  opencode.tar.gz" | sha256sum -c -

@@ -76,6 +76,6 @@ Every guide assumes:
    Zod, langevals types).
 4. `make quickstart all-local` (or the preset the guide names) is up
    and healthy.
-5. `pnpm dev` is running from `langwatch/`. Ports collide? paste the
+5. `pnpm dev` is running from `platform/app/`. Ports collide? paste the
    `PORT=5570 pnpm dev` command that `check-ports.sh` prints; do not
    invent your own process-tree walker.

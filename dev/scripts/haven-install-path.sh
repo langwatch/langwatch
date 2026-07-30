@@ -6,7 +6,7 @@
 # command doesn't resolve, so this script offers to append a PATH line to
 # the user's shell rc — interactively, never silently. Spec:
 # specs/setup/haven-install-path.feature. Tests:
-# scripts/__tests__/haven-install-path.unit.bats.
+# dev/scripts/__tests__/haven-install-path.unit.bats.
 
 haven_go_bin_dir() {
   local gobin

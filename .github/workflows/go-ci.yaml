@@ -52,7 +52,7 @@ jobs:
             # is the only spelling that stays one: the earlier per-prefix list
             # left out `internal/**` and root-level `*.go`, so a code declared
             # there changed the generated artifact while the drift job skipped
-            # and `go-ci-complete` went green on it. The whole `langwatch/` tree
+            # and `go-ci-complete` went green on it. The whole `platform/app/` tree
             # is still deliberately NOT listed, since a frontend-only PR has no
             # Go to check.
             go:

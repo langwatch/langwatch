@@ -31,7 +31,7 @@ const __dirname = dirname(__filename);
 
 const pwPath =
   process.env.PLAYWRIGHT_TEST_PATH ??
-  resolve(__dirname, "../../platform/app/node_modules/@playwright/test/index.js");
+  resolve(__dirname, "../../../platform/app/node_modules/@playwright/test/index.js");
 const require_ = createRequire(import.meta.url);
 const pwTest = require_(pwPath);
 const { chromium } = pwTest;
@@ -41,7 +41,7 @@ const EMAIL = process.env.DOGFOOD_USER_EMAIL ?? "dogfood@langwatch.local";
 const PASSWORD = process.env.DOGFOOD_PASSWORD ?? "DogfoodPassword!2026";
 const OUT = resolve(
   process.env.OUT_DIR ??
-    resolve(__dirname, "../../.claude/dogfood-evidence/trace-walkthrough"),
+    resolve(__dirname, "../../../.claude/dogfood-evidence/trace-walkthrough"),
 );
 mkdirSync(OUT, { recursive: true });
 

@@ -233,7 +233,7 @@ jobs:
         run: pnpm prisma:seed
 
       - name: Install goose
-        # Override job-level defaults.run.working-directory (typescript-sdk)
+        # Override job-level defaults.run.working-directory (sdks/typescript)
         # so the script path resolves from the repo root.
         working-directory: .
         run: bash .github/scripts/install-goose.sh

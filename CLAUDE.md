@@ -125,7 +125,7 @@ haven already defaulted to a single process, so plain `pnpm dev` disagreeing wit
 
 ### AI Gateway (Go, services/aigateway/)
 
-The gateway is a separate Go service (not in `infra/compose.dev.yml`) that terminates
+The gateway is a separate Go service (not in `dev/compose.dev.yml`) that terminates
 virtual-key traffic, fans out to providers via Bifrost, and reports usage back to
 the control plane. `pnpm dev` auto-starts it alongside vite + api when the Go
 toolchain is on PATH; the process appears as `gateway` in the concurrent output
