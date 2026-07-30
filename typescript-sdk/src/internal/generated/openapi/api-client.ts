@@ -660,7 +660,7 @@ export interface paths {
         put?: never;
         /**
          * Create budget
-         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal).
+         * @description Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / group / virtual_key / principal); group budgets cap each member individually.
          */
         post: operations["postApiGatewayV1Budgets"];
         delete?: never;
@@ -4199,6 +4199,7 @@ export interface operations {
                             on_breach: "BLOCK" | "WARN";
                             limit_usd: string;
                             spent_usd: string;
+                            provider_key: string | null;
                             resets_at: string;
                             archived_at: string | null;
                         }[];
@@ -4262,7 +4263,46 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    scope: {
+                        /** @constant */
+                        kind: "ORGANIZATION";
+                        organization_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "TEAM";
+                        team_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "PROJECT";
+                        project_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "VIRTUAL_KEY";
+                        virtual_key_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "PRINCIPAL";
+                        principal_user_id: string;
+                    } | {
+                        /** @constant */
+                        kind: "GROUP";
+                        group_id: string;
+                    };
+                    name: string;
+                    description?: string;
+                    /** @enum {string} */
+                    window: "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
+                    limit_usd: number | string;
+                    /** @enum {string} */
+                    on_breach?: "BLOCK" | "WARN";
+                    timezone?: string | null;
+                    provider_key?: string | null;
+                };
+            };
+        };
         responses: {
             /** @description Budget created */
             201: {
@@ -4283,6 +4323,7 @@ export interface operations {
                             on_breach: "BLOCK" | "WARN";
                             limit_usd: string;
                             spent_usd: string;
+                            provider_key: string | null;
                             resets_at: string;
                             archived_at: string | null;
                         };
@@ -4372,6 +4413,7 @@ export interface operations {
                             on_breach: "BLOCK" | "WARN";
                             limit_usd: string;
                             spent_usd: string;
+                            provider_key: string | null;
                             resets_at: string;
                             archived_at: string | null;
                         };
@@ -4458,6 +4500,7 @@ export interface operations {
                             on_breach: "BLOCK" | "WARN";
                             limit_usd: string;
                             spent_usd: string;
+                            provider_key: string | null;
                             resets_at: string;
                             archived_at: string | null;
                         };
@@ -5306,6 +5349,9 @@ export interface operations {
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
                             provider_credential_ids: string[];
                             revision: string;
                             last_used_at: string | null;
@@ -5388,6 +5434,9 @@ export interface operations {
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
                             provider_credential_ids: string[];
                             revision: string;
                             last_used_at: string | null;
@@ -5476,6 +5525,9 @@ export interface operations {
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
                             provider_credential_ids: string[];
                             revision: string;
                             last_used_at: string | null;
@@ -5575,6 +5627,9 @@ export interface operations {
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
                             provider_credential_ids: string[];
                             revision: string;
                             last_used_at: string | null;
@@ -5662,6 +5717,9 @@ export interface operations {
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
                             provider_credential_ids: string[];
                             revision: string;
                             last_used_at: string | null;
@@ -5746,6 +5804,9 @@ export interface operations {
                             /** @enum {string} */
                             status: "active" | "revoked";
                             principal_user_id: string | null;
+                            trace_project_id: string | null;
+                            /** @enum {string} */
+                            routing_mode: "NONE" | "FALLBACK_ALL" | "POLICY";
                             provider_credential_ids: string[];
                             revision: string;
                             last_used_at: string | null;

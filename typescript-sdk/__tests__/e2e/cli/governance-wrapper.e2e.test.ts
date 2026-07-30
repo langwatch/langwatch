@@ -839,7 +839,7 @@ describe("governance CLI wrappers — e2e", () => {
   // `--tool-mode=gateway`, or `LANGWATCH_TOOL_MODE=gateway`. Every scenario
   // above pins it; these two prove that without a pin the wrapper does not
   // find its way there on its own, which is the bug this suite guards.
-  describe("implicit path choice — nothing pins the mode", () => {
+  describe("given nothing pins the tool mode", () => {
     describe("when a non-TTY run has no tool-mode pin", () => {
       it("never injects gateway credentials and never reaches the gateway", async () => {
         writeLoggedInConfig();
