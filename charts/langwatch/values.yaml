@@ -805,11 +805,13 @@ langwatch_nlp:
   # Deploy the NLP service as part of this release. Turn it off when the
   # service is run outside the chart — a shared instance for several releases,
   # or a serverless deployment — and point app.upstreams.nlp / workers at that
-  # address instead. Disabling only stops the chart rendering the Deployment
-  # and Service; the app still expects to reach an NLP service somewhere, so
-  # an install with this off and no upstream override will fail at runtime,
-  # not at render time.
-  ## @param langwatch_nlp.enabled [default: true] Deploy the NLP service.
+  # address instead. Disabling stops the chart rendering the Deployment, the
+  # Service AND the PodDisruptionBudget — so an external instance is no longer
+  # covered by this release's disruption protection either, and needs its own
+  # wherever it runs. The app still expects to reach an NLP service somewhere,
+  # so an install with this off and no upstream override fails at runtime, not
+  # at render time.
+  ## @param langwatch_nlp.enabled [default: true] Deploy the NLP service (Deployment, Service and PDB).
   enabled: true
 
   # Number of NLP service replicas
@@ -947,9 +949,11 @@ langwatch_nlp:
 langevals:
   # Deploy the evaluations service as part of this release. Same shape as
   # langwatch_nlp.enabled: turn it off to point at a shared or externally-run
-  # instance via app.upstreams.langevals. Evaluators that call this service
-  # will fail at runtime if it is disabled without an upstream override.
-  ## @param langevals.enabled [default: true] Deploy the evaluations service.
+  # instance via app.upstreams.langevals. Disabling stops the chart rendering
+  # the Deployment, the Service AND the PodDisruptionBudget. Evaluators that
+  # call this service will fail at runtime if it is disabled without an
+  # upstream override.
+  ## @param langevals.enabled [default: true] Deploy the evaluations service (Deployment, Service and PDB).
   enabled: true
 
   # Number of evaluation service replicas
