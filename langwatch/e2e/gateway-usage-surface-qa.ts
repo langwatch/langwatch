@@ -36,18 +36,51 @@ async function shot(page: Page, name: string) {
 }
 
 /**
- * The page shows a bare spinner while the usage query is in flight, and each
- * of its three settled states carries a distinct heading. Waiting for one of
- * them rather than for a fixed interval is what stops a slow first compile
- * from being read as an empty window.
+ * Reads the page's settled state as one comparable string, evaluated in the
+ * browser. An empty result means the usage query is still in flight: the page
+ * is showing a bare spinner and none of its three settled states has
+ * rendered yet.
+ */
+const READ_USAGE_STATE = () => {
+  const text = document.body.innerText;
+  if (text.includes("No usage in this window")) return "empty";
+  if (text.includes("Failed to load usage")) return "error";
+  const total = /Total spend\s*\$([\d.,]+)/.exec(text);
+  return total ? `$${total[1]}` : "";
+};
+
+/**
+ * Waiting for the page to settle rather than for a fixed interval is what
+ * stops a slow first compile from being read as an empty window: on a cold
+ * dev server the old fixed waits elapsed while the spinner was still up, so
+ * the empty-state checks passed against a page that had rendered nothing and
+ * the captured mobile screenshot came out blank.
  */
 async function waitForUsageSettled(page: Page) {
+  await page.waitForFunction(READ_USAGE_STATE, undefined, { timeout: 60_000 });
+}
+
+/**
+ * Changing the window or clearing the key filter starts a fresh query, and
+ * the previous render stays on screen until it resolves. Settling alone is
+ * not enough to wait for here, in either direction: checked immediately it
+ * still sees the OLD total, and checked again it briefly sees the spinner. So
+ * require a settled state whose total DIFFERS from the one on screen before
+ * the click. Without this the "after Last 7 days" capture came out
+ * byte-identical to the month-to-date one it was meant to contrast with.
+ */
+async function actAndAwaitNewUsage(page: Page, act: () => Promise<void>) {
+  const before = await page.evaluate(READ_USAGE_STATE);
+  await act();
   await page.waitForFunction(
-    () =>
-      ["Total spend", "No usage in this window", "Failed to load usage"].some(
-        (marker) => document.body.innerText.includes(marker),
-      ),
-    undefined,
+    (previous: string) => {
+      const text = document.body.innerText;
+      if (text.includes("No usage in this window")) return previous !== "empty";
+      if (text.includes("Failed to load usage")) return previous !== "error";
+      const total = /Total spend\s*\$([\d.,]+)/.exec(text);
+      return !!total && `$${total[1]}` !== previous;
+    },
+    before,
     { timeout: 60_000 },
   );
 }
@@ -121,8 +154,9 @@ async function main() {
   await shot(page, "02-usage-filtered-desktop");
 
   // ── Defect 2: date presets keep the route ─────────────────────────
-  await page.getByRole("button", { name: "Last 7 days" }).click();
-  await waitForUsageSettled(page);
+  await actAndAwaitNewUsage(page, () =>
+    page.getByRole("button", { name: "Last 7 days" }).click(),
+  );
   const afterPreset = new URL(page.url());
   check(
     "date preset stays on /settings/gateway/usage",
@@ -140,8 +174,9 @@ async function main() {
   await shot(page, "03-usage-after-7d-desktop");
 
   // ── Defect 2: chip dismissal keeps the route ──────────────────────
-  await page.getByRole("button", { name: "Clear key filter" }).click();
-  await waitForUsageSettled(page);
+  await actAndAwaitNewUsage(page, () =>
+    page.getByRole("button", { name: "Clear key filter" }).click(),
+  );
   const afterChip = new URL(page.url());
   check(
     "chip dismissal stays on /settings/gateway/usage",
