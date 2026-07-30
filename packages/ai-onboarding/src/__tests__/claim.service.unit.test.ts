@@ -9,6 +9,8 @@ import {
   EphemeralAccountExpiredError,
   EphemeralAccountNotFoundError,
   OnboardingRateLimitedError,
+  PasskeyChallengeMissingError,
+  PasskeyRegistrationFailedError,
 } from "../domain/errors.js";
 import { deriveCodeChallenge, mintSecret, peppered } from "../domain/tokens.js";
 import {
@@ -16,7 +18,9 @@ import {
   FakeAccountRepository,
   FakeClock,
   FakeHandoffStore,
+  FakePasskeyRepository,
   FakeRateLimiter,
+  FakeWebAuthnCeremony,
   FakeWorkspaceProvisioner,
 } from "./fakes.js";
 
@@ -29,6 +33,8 @@ let accounts: FakeAccountRepository;
 let handoffs: FakeHandoffStore;
 let workspaces: FakeWorkspaceProvisioner;
 let limiter: FakeRateLimiter;
+let passkeys: FakePasskeyRepository;
+let ceremony: FakeWebAuthnCeremony;
 let clock: FakeClock;
 let service: ClaimService;
 
@@ -43,6 +49,8 @@ beforeEach(() => {
   handoffs = new FakeHandoffStore();
   workspaces = new FakeWorkspaceProvisioner();
   limiter = new FakeRateLimiter();
+  passkeys = new FakePasskeyRepository();
+  ceremony = new FakeWebAuthnCeremony();
   clock = new FakeClock(new Date(PROVISIONED.getTime() + 2 * 86_400_000));
 
   service = new ClaimService({
@@ -52,6 +60,8 @@ beforeEach(() => {
     guard: new RateLimitGuard(limiter, defaultRateLimitConfig, PEPPER),
     config: resolveConfig({ appBaseUrl: "https://app.example.com" }),
     pepper: PEPPER,
+    passkeys,
+    ceremony,
     clock,
   });
 });
@@ -436,6 +446,137 @@ describe("claiming through a browser handoff", () => {
         identity,
       });
       expect(fresh.handoffCode).toBeTruthy();
+    });
+  });
+
+  describe("enrolling a passkey from the phone that scanned the QR", () => {
+    beforeEach(() => seedAccount());
+
+    async function beginAndVerify(code: string) {
+      await service.beginPasskeyEnrollment({ handoffCode: code });
+      return service.completePasskeyEnrollment({
+        handoffCode: code,
+        response: { id: "cred" },
+        label: "iPhone",
+      });
+    }
+
+    /** @scenario "the phone is offered registration options for the account" */
+    it("issues options carrying the code the terminal is showing", async () => {
+      const code = await startHandoff();
+      const opts = await service.beginPasskeyEnrollment({ handoffCode: code });
+
+      // The human can compare it against their own terminal before touching
+      // the sensor.
+      expect(opts.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+      expect(opts.options).toHaveProperty("challenge");
+    });
+
+    /** @scenario "the credential is enrolled against the account's own owner" */
+    it("stores the credential against the placeholder that owns the org", async () => {
+      const code = await startHandoff();
+      await beginAndVerify(code);
+
+      expect(passkeys.stored).toHaveLength(1);
+      expect(passkeys.stored[0]?.userId).toBe("user_placeholder_seed");
+      expect(passkeys.stored[0]?.label).toBe("iPhone");
+    });
+
+    /** @scenario "enrolling claims the account in the same step" */
+    it("claims the account in the same step, promoting in place", async () => {
+      const code = await startHandoff();
+      const result = await beginAndVerify(code);
+
+      expect(result.claimed.account.projectId).toBe("proj_seed");
+      // Promote, not transfer: the placeholder already owned everything.
+      expect(workspaces.promoted).toHaveLength(1);
+      expect(workspaces.transferred).toEqual([]);
+
+      const row = await accounts.findById("acct_seed");
+      expect(row?.claimedAt).not.toBeNull();
+      expect(row?.deleteAfter).toBeNull();
+    });
+
+    /** @scenario "the waiting CLI settles once the phone is done" */
+    it("lets the CLI's poll settle once the phone is done", async () => {
+      const code = await startHandoff();
+      await beginAndVerify(code);
+
+      const polled = await service.exchange({
+        handoffCode: code,
+        codeVerifier: verifier,
+      });
+      expect(polled.status).toBe("approved");
+    });
+
+    describe("when the attestation does not verify", () => {
+      /** @scenario "an attestation that does not verify is refused" */
+      it("refuses, and stores nothing", async () => {
+        const code = await startHandoff();
+        await service.beginPasskeyEnrollment({ handoffCode: code });
+        ceremony.verifies = false;
+
+        await expect(
+          service.completePasskeyEnrollment({
+            handoffCode: code,
+            response: { id: "forged" },
+          }),
+        ).rejects.toBeInstanceOf(PasskeyRegistrationFailedError);
+
+        expect(passkeys.stored).toEqual([]);
+      });
+
+      /** @scenario "a failed ceremony leaves the account claimable" */
+      it("leaves the account unclaimed", async () => {
+        const code = await startHandoff();
+        await service.beginPasskeyEnrollment({ handoffCode: code });
+        ceremony.verifies = false;
+
+        await service
+          .completePasskeyEnrollment({ handoffCode: code, response: {} })
+          .catch(() => void 0);
+
+        const row = await accounts.findById("acct_seed");
+        expect(row?.claimedAt).toBeNull();
+      });
+    });
+
+    describe("when verify is called without a preceding options call", () => {
+      /** @scenario "the challenge cannot be supplied by the caller" */
+      it("refuses rather than trusting a caller-supplied challenge", async () => {
+        const code = await startHandoff();
+
+        await expect(
+          service.completePasskeyEnrollment({
+            handoffCode: code,
+            response: { id: "cred" },
+          }),
+        ).rejects.toBeInstanceOf(PasskeyChallengeMissingError);
+      });
+    });
+
+    describe("when the account was already claimed", () => {
+      /** @scenario "an already-claimed account refuses further enrolment" */
+      it("refuses to enrol against it", async () => {
+        const code = await startHandoff();
+        await beginAndVerify(code);
+
+        await expect(
+          service.beginPasskeyEnrollment({ handoffCode: code }),
+        ).rejects.toBeInstanceOf(EphemeralAccountAlreadyClaimedError);
+      });
+    });
+
+    describe("when the handoff has expired", () => {
+      /** @scenario "an expired handoff refuses enrolment" */
+      it("refuses — the QR is not a standing invitation", async () => {
+        const code = await startHandoff();
+        clock.set(new Date(clock.now().getTime() + 60 * 60 * 1000));
+
+        await expect(
+          service.beginPasskeyEnrollment({ handoffCode: code }),
+        ).rejects.toBeInstanceOf(ClaimHandoffNotFoundError);
+      });
     });
   });
 

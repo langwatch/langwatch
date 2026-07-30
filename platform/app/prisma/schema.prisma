@@ -112,6 +112,7 @@ model User {
   groupMemberships              GroupMembership[]
   /// Present while this user is an unclaimed agent-onboarding placeholder.
   ephemeralAccount              EphemeralAccount?
+  passkeys                      Passkey[]
   roleBindings                  RoleBinding[]
   apiKeys                       ApiKey[]
   gatewayBudgetsCreated         GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
@@ -3699,4 +3700,35 @@ model EphemeralAccount {
 
   @@index([deleteAfter])
   @@index([ingestionStopsAt])
+}
+
+/// A WebAuthn credential, enrolled from a phone by scanning the QR the CLI
+/// prints. The ceremony always happens in a real browser: the phone's browser
+/// is a genuine WebAuthn client, so the origin binding in `clientDataJSON` is
+/// trustworthy. A CLI acting as its own client would have to assert its own
+/// origin, which is exactly the phishing resistance a passkey exists to
+/// provide — see specs/ai-governance/agent-onboarding/passkey-claim.feature.
+///
+/// Shaped to match what @simplewebauthn/server returns so a future migration
+/// onto a better-auth passkey plugin is a rename, not a re-derivation.
+model Passkey {
+  id           String    @id @default(nanoid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Human label, e.g. "iPhone". Null until the owner renames it.
+  name         String?
+  /// Base64url credential id from the authenticator. Globally unique.
+  credentialId String    @unique
+  publicKey    Bytes
+  /// Signature counter, for cloned-authenticator detection.
+  counter      Int       @default(0)
+  /// "singleDevice" | "multiDevice" — whether the credential syncs.
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  /// Comma-separated AuthenticatorTransport list, as returned by the browser.
+  transports   String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
 }

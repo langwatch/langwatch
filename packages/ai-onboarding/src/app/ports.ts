@@ -77,6 +77,15 @@ export interface HandoffStore {
   consume(codeHash: string): Promise<void>;
 
   /**
+   * Park the WebAuthn challenge on the handoff between the options call and
+   * the verify call. Returns null if the handoff vanished meanwhile.
+   */
+  setPasskeyChallenge(params: {
+    codeHash: string;
+    challenge: string;
+  }): Promise<ClaimHandoff | null>;
+
+  /**
    * Whether this poll is allowed to proceed, given the minimum interval.
    * Lives on the store because it is one round-trip against the same key —
    * a separate limiter would double the latency of every poll.
@@ -152,4 +161,51 @@ export interface WorkspaceProvisioner {
     placeholderUserId: string;
     claimingUserId: string;
   }): Promise<void>;
+}
+
+/**
+ * A stored WebAuthn credential, in the shape `@simplewebauthn/server` hands
+ * back — kept verbatim so the verifying library and this port cannot drift.
+ */
+export interface PasskeyCredential {
+  credentialId: string;
+  publicKey: Uint8Array;
+  counter: number;
+  deviceType: string | null;
+  backedUp: boolean;
+  transports: string[] | null;
+}
+
+export interface PasskeyRepository {
+  create(params: {
+    userId: string;
+    label: string | null;
+    credential: PasskeyCredential;
+  }): Promise<void>;
+
+  countForUser(userId: string): Promise<number>;
+}
+
+/**
+ * The WebAuthn half, behind a port so the package keeps no crypto dependency
+ * and a unit test can drive enrollment without a browser or a real
+ * authenticator. The adapter wraps `@simplewebauthn/server`.
+ */
+export interface WebAuthnCeremony {
+  /** Options for `navigator.credentials.create()`, plus the challenge to store. */
+  buildRegistrationOptions(params: {
+    userId: string;
+    userName: string;
+    userDisplayName: string;
+  }): Promise<{ options: Record<string, unknown>; challenge: string }>;
+
+  /**
+   * Verify an attestation against the challenge issued earlier. Returns null
+   * when it does not verify — the caller turns that into a typed error rather
+   * than the library's own exception shape.
+   */
+  verifyRegistration(params: {
+    response: Record<string, unknown>;
+    expectedChallenge: string;
+  }): Promise<PasskeyCredential | null>;
 }

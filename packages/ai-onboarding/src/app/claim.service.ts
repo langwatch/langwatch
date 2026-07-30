@@ -3,6 +3,8 @@ import type {
   ClaimHandoffDescribeResponse,
   ClaimHandoffStartResponse,
   ClaimResult,
+  PasskeyRegistrationOptionsResponse,
+  PasskeyVerifyResponse,
 } from "@langwatch/contracts/agent-onboarding";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -18,6 +20,8 @@ import {
   EphemeralAccountExpiredError,
   EphemeralAccountNotFoundError,
   OnboardingRateLimitedError,
+  PasskeyChallengeMissingError,
+  PasskeyRegistrationFailedError,
 } from "../domain/errors.js";
 import { type ClaimHandoff, isHandoffExpired } from "../domain/handoff.js";
 import {
@@ -30,7 +34,9 @@ import {
   type Clock,
   type EphemeralAccountRepository,
   type HandoffStore,
+  type PasskeyRepository,
   systemClock,
+  type WebAuthnCeremony,
   type WorkspaceProvisioner,
 } from "./ports.js";
 import type { CallerIdentity, RateLimitGuard } from "./rate-limit.guard.js";
@@ -56,6 +62,8 @@ export interface ClaimServiceDeps {
   config: OnboardingConfig;
   /** Keyed-hash secret for claim tokens and handoff codes. */
   pepper: string;
+  passkeys: PasskeyRepository;
+  ceremony: WebAuthnCeremony;
   clock?: Clock;
 }
 
@@ -66,6 +74,8 @@ export class ClaimService {
   private readonly guard: RateLimitGuard;
   private readonly config: OnboardingConfig;
   private readonly pepper: string;
+  private readonly passkeys: PasskeyRepository;
+  private readonly ceremony: WebAuthnCeremony;
   private readonly clock: Clock;
 
   constructor(deps: ClaimServiceDeps) {
@@ -75,7 +85,96 @@ export class ClaimService {
     this.guard = deps.guard;
     this.config = deps.config;
     this.pepper = deps.pepper;
+    this.passkeys = deps.passkeys;
+    this.ceremony = deps.ceremony;
     this.clock = deps.clock ?? systemClock;
+  }
+
+  // -------------------------------------------------------------------------
+  // Passkey enrollment — the phone half of the QR handoff
+  // -------------------------------------------------------------------------
+
+  /**
+   * Issue registration options for the phone that scanned the QR.
+   *
+   * The credential is enrolled against the placeholder user, which already
+   * owns the organization — so when enrollment completes there is nothing to
+   * transfer, and the passkey is the account's login from that moment on.
+   */
+  async beginPasskeyEnrollment(params: {
+    handoffCode: string;
+  }): Promise<PasskeyRegistrationOptionsResponse> {
+    const handoff = await this.loadLiveHandoff(params.handoffCode);
+    const account = await this.accounts.findById(handoff.accountId);
+    if (account === null) throw new EphemeralAccountNotFoundError();
+    this.assertClaimable(account);
+
+    const { options, challenge } = await this.ceremony.buildRegistrationOptions(
+      {
+        userId: account.userId,
+        // The placeholder has no email, so the project name is the only thing
+        // the phone can show that means anything to the person holding it.
+        userName: account.projectSlug,
+        userDisplayName: account.projectName,
+      },
+    );
+
+    const stored = await this.handoffs.setPasskeyChallenge({
+      codeHash: peppered(params.handoffCode, this.pepper),
+      challenge,
+    });
+    if (stored === null) throw new ClaimHandoffNotFoundError();
+
+    return { options, userCode: handoff.userCode };
+  }
+
+  /**
+   * Verify the attestation and, in the same step, claim the account.
+   *
+   * Enrolling and claiming are one action on purpose: the human just proved
+   * possession of the code the CLI printed and is standing there with their
+   * phone unlocked. Making them come back for a separate claim would be
+   * ceremony for its own sake. Anyone who never scans still has the 30-day
+   * claim-token path.
+   */
+  async completePasskeyEnrollment(params: {
+    handoffCode: string;
+    response: Record<string, unknown>;
+    label?: string;
+  }): Promise<PasskeyVerifyResponse> {
+    const codeHash = peppered(params.handoffCode, this.pepper);
+    const handoff = await this.loadLiveHandoff(params.handoffCode);
+    if (!handoff.passkeyChallenge) throw new PasskeyChallengeMissingError();
+
+    const account = await this.accounts.findById(handoff.accountId);
+    if (account === null) throw new EphemeralAccountNotFoundError();
+    this.assertClaimable(account);
+
+    const credential = await this.ceremony.verifyRegistration({
+      response: params.response,
+      expectedChallenge: handoff.passkeyChallenge,
+    });
+    if (credential === null) throw new PasskeyRegistrationFailedError();
+
+    await this.passkeys.create({
+      userId: account.userId,
+      label: params.label ?? null,
+      credential,
+    });
+
+    // The claimer IS the placeholder, so this takes the promote-in-place path:
+    // nothing changes hands, `unclaimedAt` clears, and the passkey that was
+    // just enrolled becomes the way back in.
+    const claimed = await this.attach({ account, userId: account.userId });
+
+    await this.handoffs.approve({ codeHash, userId: account.userId });
+
+    logger.info(
+      { projectId: account.projectId, userId: account.userId },
+      "claimed ephemeral account by passkey enrollment",
+    );
+
+    return { credentialId: credential.credentialId, claimed };
   }
 
   // -------------------------------------------------------------------------

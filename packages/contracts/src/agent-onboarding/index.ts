@@ -8,5 +8,6 @@
  * the client's expectations.
  */
 export * from "./claim.js";
+export * from "./passkey.js";
 export * from "./primitives.js";
 export * from "./provision.js";

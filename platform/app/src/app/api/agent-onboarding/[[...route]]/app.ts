@@ -17,6 +17,9 @@ import {
   claimHandoffStartRequestSchema,
   claimHandoffStartResponseSchema,
   claimResultSchema,
+  passkeyRegistrationOptionsResponseSchema,
+  passkeyVerifyRequestSchema,
+  passkeyVerifyResponseSchema,
   provisionRequestSchema,
   provisionResponseSchema,
   statusResponseSchema,
@@ -152,6 +155,51 @@ function registerAnonymousEndpoints(v: Version): void {
   );
 }
 
+/**
+ * Passkey enrollment from the phone that scanned the QR.
+ *
+ * Unauthenticated on purpose: possession of the handoff code — which only ever
+ * appeared in the CLI's own terminal, inside a QR with a 15-minute life — is
+ * the capability, exactly as it is for the CLI's own poll. Requiring a session
+ * here would mean signing in before you can create the credential you are
+ * signing in with.
+ */
+function registerPasskeyEndpoints(v: Version): void {
+  v.post(
+    "/claim/handoff/:handoffCode/passkey/options",
+    {
+      auth: "none",
+      params: z.object({ handoffCode: z.string().min(1) }),
+      output: passkeyRegistrationOptionsResponseSchema,
+      status: 201,
+      description:
+        "WebAuthn registration options for the phone that scanned the claim QR.",
+    },
+    async (_c, { params, app }) =>
+      app.onboarding.claim.beginPasskeyEnrollment({
+        handoffCode: params.handoffCode,
+      }),
+  );
+
+  v.post(
+    "/claim/handoff/:handoffCode/passkey/verify",
+    {
+      auth: "none",
+      params: z.object({ handoffCode: z.string().min(1) }),
+      input: passkeyVerifyRequestSchema,
+      output: passkeyVerifyResponseSchema,
+      description:
+        "Verify the passkey attestation and claim the account in the same step.",
+    },
+    async (_c, { params, input, app }) =>
+      app.onboarding.claim.completePasskeyEnrollment({
+        handoffCode: params.handoffCode,
+        response: input.response,
+        label: input.label,
+      }),
+  );
+}
+
 /** The human half of the handoff — a signed-in browser. */
 function registerBrowserClaimEndpoints(v: Version): void {
   v.get(
@@ -215,6 +263,7 @@ export const app = createService({
   })
   .version("2026-07-30", (v) => {
     registerAnonymousEndpoints(v);
+    registerPasskeyEndpoints(v);
     registerBrowserClaimEndpoints(v);
     registerDirectClaimEndpoint(v);
   })

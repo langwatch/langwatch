@@ -22,6 +22,12 @@ export interface ClaimHandoff {
   expiresAt: string;
   status: "pending" | "approved";
   approvedByUserId: string | null;
+  /**
+   * The WebAuthn challenge issued for this handoff, held between the options
+   * call and the verify call. Lives here rather than in its own store because
+   * the handoff already has the right key, the right owner and the right TTL.
+   */
+  passkeyChallenge?: string | null;
 }
 
 export function isHandoffExpired(handoff: ClaimHandoff, now: Date): boolean {

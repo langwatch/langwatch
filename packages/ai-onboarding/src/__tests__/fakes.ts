@@ -4,9 +4,12 @@ import type {
   CreateEphemeralAccountParams,
   EphemeralAccountRepository,
   HandoffStore,
+  PasskeyCredential,
+  PasskeyRepository,
   ProvisionedWorkspace,
   RateLimitDecision,
   RateLimiter,
+  WebAuthnCeremony,
   WorkspaceProvisioner,
 } from "../app/ports.js";
 import type { EphemeralAccount } from "../domain/account.js";
@@ -133,6 +136,69 @@ export class FakeHandoffStore implements HandoffStore {
     if (this.refusePolls) return false;
     this.polls.add(params.codeHash);
     return true;
+  }
+
+  async setPasskeyChallenge(params: {
+    codeHash: string;
+    challenge: string;
+  }): Promise<ClaimHandoff | null> {
+    const existing = this.records.get(params.codeHash);
+    if (!existing) return null;
+    const updated: ClaimHandoff = {
+      ...existing,
+      passkeyChallenge: params.challenge,
+    };
+    this.records.set(params.codeHash, updated);
+    return updated;
+  }
+}
+
+export class FakePasskeyRepository implements PasskeyRepository {
+  readonly stored: Array<{
+    userId: string;
+    label: string | null;
+    credential: PasskeyCredential;
+  }> = [];
+
+  async create(params: {
+    userId: string;
+    label: string | null;
+    credential: PasskeyCredential;
+  }): Promise<void> {
+    this.stored.push(params);
+  }
+
+  async countForUser(userId: string): Promise<number> {
+    return this.stored.filter((c) => c.userId === userId).length;
+  }
+}
+
+/** Stands in for the browser + authenticator, so enrollment is unit-testable. */
+export class FakeWebAuthnCeremony implements WebAuthnCeremony {
+  readonly challenges: string[] = [];
+  /** Set false to simulate an attestation that does not verify. */
+  verifies = true;
+
+  async buildRegistrationOptions(params: {
+    userId: string;
+  }): Promise<{ options: Record<string, unknown>; challenge: string }> {
+    const challenge = `challenge-for-${params.userId}`;
+    this.challenges.push(challenge);
+    return { options: { challenge, rp: { name: "LangWatch" } }, challenge };
+  }
+
+  async verifyRegistration(params: {
+    expectedChallenge: string;
+  }): Promise<PasskeyCredential | null> {
+    if (!this.verifies) return null;
+    return {
+      credentialId: `cred-for-${params.expectedChallenge}`,
+      publicKey: new Uint8Array([1, 2, 3]),
+      counter: 0,
+      deviceType: "multiDevice",
+      backedUp: true,
+      transports: ["internal", "hybrid"],
+    };
   }
 }
 

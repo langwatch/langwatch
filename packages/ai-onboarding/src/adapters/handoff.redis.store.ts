@@ -60,6 +60,25 @@ export class RedisHandoffStore implements HandoffStore {
     return approved;
   }
 
+  async setPasskeyChallenge(params: {
+    codeHash: string;
+    challenge: string;
+  }): Promise<ClaimHandoff | null> {
+    const key = this.key(params.codeHash);
+    const existing = await this.get(params.codeHash);
+    if (existing === null) return null;
+
+    const ttl = await this.redis.ttl(key);
+    if (ttl <= 0) return null;
+
+    const updated: ClaimHandoff = {
+      ...existing,
+      passkeyChallenge: params.challenge,
+    };
+    await this.redis.set(key, JSON.stringify(updated), "EX", ttl);
+    return updated;
+  }
+
   async consume(codeHash: string): Promise<void> {
     await this.redis.del(this.key(codeHash));
   }

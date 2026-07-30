@@ -15,6 +15,8 @@ import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
 import { PrismaEphemeralAccountRepository } from "./ephemeral-account.prisma.repository";
+import { PrismaPasskeyRepository } from "./passkey.prisma.repository";
+import { SimpleWebAuthnCeremony } from "./webauthn.ceremony";
 import { LangWatchWorkspaceProvisioner } from "./workspace.provisioner";
 
 /**
@@ -68,6 +70,11 @@ export function onboardingServices(): OnboardingServices {
       guard,
       config,
       pepper: pepper(),
+      passkeys: PrismaPasskeyRepository.create(prisma),
+      ceremony: new SimpleWebAuthnCeremony({
+        appBaseUrl: config.appBaseUrl,
+        rpName: "LangWatch",
+      }),
     }),
   };
   return cached;

@@ -172,3 +172,35 @@ export class OnboardingUnavailableError extends HandledError {
     this.name = "OnboardingUnavailableError";
   }
 }
+
+/**
+ * The attestation did not verify against the challenge we issued. Covers a
+ * replayed ceremony, a mismatched origin, and a browser that simply failed —
+ * all of which mean the same thing to the person holding the phone.
+ */
+export class PasskeyRegistrationFailedError extends HandledError {
+  declare readonly code: "passkey_registration_failed";
+
+  constructor() {
+    super(
+      "passkey_registration_failed",
+      "That passkey could not be verified. Scan the code again to retry.",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "PasskeyRegistrationFailedError";
+  }
+}
+
+/** Verify was called without a preceding options call on the same handoff. */
+export class PasskeyChallengeMissingError extends HandledError {
+  declare readonly code: "passkey_challenge_missing";
+
+  constructor() {
+    super(
+      "passkey_challenge_missing",
+      "This passkey setup expired. Scan the code again to retry.",
+      { httpStatus: 410, fault: "customer" },
+    );
+    this.name = "PasskeyChallengeMissingError";
+  }
+}
