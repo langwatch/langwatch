@@ -26,40 +26,41 @@ WORKDIR /app
 # Skip Prisma checksum verification for air-gapped builds
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
-# mcp-server is a workspace member — copy it early so pnpm install can link it.
-# Its build runs automatically as part of langwatch's `pnpm run build`
+# mcp/typescript is a workspace member — copy it early so pnpm install can link
+# it. Its build runs automatically as part of the app's `pnpm run build`
 # (via start:prepare:files → build:mcp-server).
-COPY mcp-server ./mcp-server
-COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY mcp/typescript ./mcp/typescript
+COPY services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY packages ./packages
 COPY skills ./skills
-COPY Dockerfile.langyagent ./Dockerfile.langyagent
+COPY infra/docker/Dockerfile.langyagent ./infra/docker/Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
 
 # Since ADR-076 the repo is a SINGLE pnpm workspace: the lockfile, the
 # workspace definition and the hoist settings all live at the root, and
-# langwatch/ is one member of it. The install therefore runs from /app rather
-# than /app/langwatch, and is narrowed with a filter so the TypeScript SDK,
+# platform/app/ is one member of it. The install therefore runs from /app rather
+# than /app/platform/app, and is narrowed with a filter so the TypeScript SDK,
 # the skills compiler and the e2e suites never enter the image.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
-COPY langwatch/package.json ./langwatch/
+COPY platform/app/package.json ./platform/app/
 # Every workspace member's manifest must be present or `--frozen-lockfile`
 # has nothing to check the lockfile against. These three carry no source into
 # the image — only the manifest the workspace needs to stay coherent.
-COPY typescript-sdk/package.json ./typescript-sdk/
-COPY agentic-e2e-tests/package.json ./agentic-e2e-tests/
+COPY sdks/typescript/package.json ./sdks/typescript/
+COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
 # are consumed as source, so pnpm install must see their package.json to link them
 # and install their own dependencies (pino, pino-pretty, ...) into
 # packages/*/node_modules. Without this the app bundle build fails to resolve those
-# deps (e.g. "Rolldown failed to resolve import 'pino'"). Same reason mcp-server is
-# copied early above. node_modules is dockerignored, so only source is copied here.
-COPY langwatch/packages ./langwatch/packages
-COPY langwatch/vendor ./langwatch/vendor
+# deps (e.g. "Rolldown failed to resolve import 'pino'"). Same reason mcp/typescript
+# is copied early above — and why `COPY packages` above brings the whole tree, now
+# that all nine members live there. node_modules is dockerignored, so only source
+# is copied here.
+COPY platform/app/vendor ./platform/app/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
-COPY langwatch ./langwatch
-WORKDIR /app/langwatch
+COPY platform/app ./platform/app
+WORKDIR /app/platform/app
 RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 WORKDIR /app
 
@@ -93,7 +94,7 @@ RUN CI=true pnpm install --frozen-lockfile --prod --filter "@langwatch/web..."
 # generated client (it is not a declared dependency).
 RUN CI=true pnpm prune --prod
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
-WORKDIR /app/langwatch
+WORKDIR /app/platform/app
 RUN pnpm prisma generate
 WORKDIR /app
 
@@ -109,24 +110,24 @@ WORKDIR /app
 # Copy built artifacts from builder.
 #
 # /app/node_modules FIRST, and it is not optional. Since ADR-076 the install
-# root is /app, not /app/langwatch, so pnpm's virtual store lives at
-# /app/node_modules/.pnpm and every entry in langwatch/node_modules is a
+# root is /app, not /app/platform/app, so pnpm's virtual store lives at
+# /app/node_modules/.pnpm and every entry in platform/app/node_modules is a
 # symlink into it:
 #
-#   langwatch/node_modules/react -> ../../node_modules/.pnpm/react@…/node_modules/react
+#   platform/app/node_modules/react -> ../../../node_modules/.pnpm/react@…/node_modules/react
 #
-# Copying langwatch/ without it leaves every one of those links dangling. The
+# Copying platform/app/ without it leaves every one of those links dangling. The
 # image builds clean and dies at boot on the first import — there is no build
 # error to catch it, which is exactly why it is spelled out here.
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/langwatch ./langwatch
-# mcp-server must be copied alongside langwatch because pnpm workspace
-# symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
+COPY --from=builder /app/platform/app ./platform/app
+# mcp/typescript must be copied alongside the app because pnpm workspace
+# symlinks platform/app/node_modules/@langwatch/mcp-server -> ../../../../mcp/typescript.
 # langy and handled-error are other root workspace packages linked the same
 # way. Both are loaded by migration tasks as well as the running server —
 # handled-error is imported for side effects by the server and worker entry
 # points, so omitting it fails the boot outright.
-COPY --from=builder /app/mcp-server ./mcp-server
+COPY --from=builder /app/mcp/typescript ./mcp/typescript
 # The whole packages/ tree, not a cherry-picked list.
 #
 # Two reasons. First, each package's own node_modules comes with it: langy and
@@ -144,7 +145,7 @@ COPY --from=builder /app/mcp-server ./mcp-server
 # CLI, is the only member the app does not import) against an image measured
 # in hundreds.
 COPY --from=builder /app/packages ./packages
-COPY --from=builder /app/langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
+COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
@@ -153,4 +154,4 @@ EXPOSE 5560
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-CMD cd langwatch && pnpm start
+CMD cd platform/app && pnpm start

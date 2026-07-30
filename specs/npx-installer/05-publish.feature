@@ -55,7 +55,7 @@ Feature: CI smoke + publish for `@langwatch/server`
       | schedule                  | "0 4 * * *" (nightly, UTC)                                             |
       | push paths                | package.json, pnpm-workspace.yaml, packages/server/**                   |
       | push paths                | langwatch_nlp/pyproject.toml, langevals/**/pyproject.toml               |
-      | push paths                | services/aigateway/**, langwatch/package.json, langwatch/scripts/**     |
+      | push paths                | services/aigateway/**, langwatch/package.json, platform/app/scripts/**     |
 
   # =========================================================================
   # Publish job

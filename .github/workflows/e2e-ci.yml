@@ -35,9 +35,9 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'langwatch/**'
-              - 'python-sdk/**'
-              - 'agentic-e2e-tests/**'
+              - 'platform/app/**'
+              - 'sdks/python/**'
+              - 'tests/agentic-e2e/**'
               # The single lockfile, workspace definition, root manifest and
               # hoist config live at the repo root since ADR-076; a dependency
               # or override change touches only these.
@@ -63,10 +63,10 @@ jobs:
       NEXTAUTH_URL: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
       # Trust the in-repo TEST license keypair so the members suite
-      # (agentic-e2e-tests/tests/members/steps.ts withEnterpriseLicense()) can
+      # (tests/agentic-e2e/tests/members/steps.ts withEnterpriseLicense()) can
       # activate a test ENTERPRISE license and exercise member-invitation flows
       # above the free-tier maxMembers=1 cap. Public key only (safe to commit) — matches
-      # TEST_PUBLIC_KEY in langwatch/ee/licensing/__tests__/fixtures/testKeys.ts.
+      # TEST_PUBLIC_KEY in platform/app/ee/licensing/__tests__/fixtures/testKeys.ts.
       # Must be on the app process env before `pnpm start` boots — constants.ts
       # resolves PUBLIC_KEY from this var once at module load. gitleaks:allow
       LANGWATCH_LICENSE_PUBLIC_KEY: |
@@ -226,22 +226,22 @@ jobs:
       # video recording is off in CI, so no ffmpeg binary is needed.
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Install goose
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Setup ClickHouse
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm clickhouse:migrate
 
       - name: Build app
-        working-directory: langwatch
+        working-directory: platform/app
         run: NODE_ENV=test pnpm build
 
       - name: Run E2E tests
@@ -272,7 +272,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-report
-          path: agentic-e2e-tests/playwright-report/
+          path: tests/agentic-e2e/playwright-report/
           retention-days: 7
 
       - name: Upload test artifacts
@@ -280,7 +280,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
-          path: agentic-e2e-tests/test-results/
+          path: tests/agentic-e2e/test-results/
           retention-days: 7
 
       - name: Notify Slack on failure

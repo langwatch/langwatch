@@ -106,8 +106,8 @@ EXCLUDES=(
   # PUBLIC, and the working tree carries dotenv files that are gitignored but
   # very much present: haven writes langwatch/.env.portless (mode 0600, with
   # the admin password and access tokens in it) and the quickstart picker
-  # writes langwatch/.env.dev-up. Listing the variants individually shipped
-  # .env.portless into a real tarball — deleting langwatch/.npmignore removed
+  # writes platform/app/.env.dev-up. Listing the variants individually shipped
+  # .env.portless into a real tarball — deleting platform/app/.npmignore removed
   # the `.env*.local` rule that used to catch some of them, and because this
   # script also strips .gitignore/.npmignore from the staged tree, this array
   # is the ONLY filter left. `.env.example` is tracked documentation and is
@@ -117,7 +117,7 @@ EXCLUDES=(
   --include=.env.example
   --exclude=.env
   --exclude=.env.*
-  # Keys and certificates. `*.pem` was in the deleted langwatch/.npmignore and
+  # Keys and certificates. `*.pem` was in the deleted platform/app/.npmignore and
   # was not carried across; a TLS key, JWT signing key or SSH key dropped
   # anywhere under a shipped directory would otherwise be published.
   --exclude=*.pem
@@ -136,7 +136,7 @@ EXCLUDES=(
   --exclude=.next
   --exclude=.turbo
   --exclude=.pnpm-store
-  # The quickwit dev binary (langwatch/quickwit*) is a local download, not
+  # The quickwit dev binary (platform/app/quickwit*) is a local download, not
   # source — no tracked path anywhere contains the name (the old .npmignore's
   # `!elastic/quickwit` re-include referenced a directory that no longer
   # exists), so the bare-name exclude collides with nothing.

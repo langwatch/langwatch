@@ -117,11 +117,11 @@ describe("the repo is a single pnpm workspace", () => {
 			const members = workspaceMembers();
 
 			for (const project of [
-				"langwatch",
-				"typescript-sdk",
-				"mcp-server",
+				"platform/app",
+				"sdks/typescript",
+				"mcp/typescript",
 				"skills",
-				"agentic-e2e-tests",
+				"tests/agentic-e2e",
 			]) {
 				expect(members).toContain(project);
 			}
@@ -138,7 +138,7 @@ describe("the repo is a single pnpm workspace", () => {
 	describe("when the package names are compared", () => {
 		/** @scenario The application and the SDK no longer share a package name */
 		it("gives the app the name the npx installer filters by, and the SDK its own", () => {
-			const app = readJson("langwatch/package.json").name;
+			const app = readJson("platform/app/package.json").name;
 			const sdk = readJson("sdks/typescript/package.json").name;
 
 			// Cross-checked against the constant the end-user install filters
@@ -153,7 +153,7 @@ describe("the repo is a single pnpm workspace", () => {
 
 		/** @scenario The application still gets the published SDK */
 		it("keeps the app on the published SDK rather than the working copy", () => {
-			const app = readJson("langwatch/package.json") as {
+			const app = readJson("platform/app/package.json") as {
 				dependencies?: Record<string, string>;
 			};
 

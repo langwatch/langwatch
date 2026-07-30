@@ -46,17 +46,17 @@ Feature: PR impact map comment
     Then the file is attributed to the earliest matching rule
 
   Scenario: Migration files are attributed to Migrations, not to the application
-    Given a pull request changes "langwatch/prisma/migrations/0001_init/migration.sql"
+    Given a pull request changes "platform/app/prisma/migrations/0001_init/migration.sql"
     When the impact map is built
     Then the file is attributed to "Migrations"
 
   Scenario: Test files are attributed to Tests, not to the code they cover
-    Given a pull request changes "langwatch/src/server/analytics/__tests__/analytics.service.test.ts"
+    Given a pull request changes "platform/app/src/server/analytics/__tests__/analytics.service.test.ts"
     When the impact map is built
     Then the file is attributed to "Tests"
 
   Scenario: SDK files are attributed to SDKs, not to their language
-    Given a pull request changes "python-sdk/src/langwatch/client.py"
+    Given a pull request changes "sdks/python/src/langwatch/client.py"
     When the impact map is built
     Then the file is attributed to "SDKs"
 

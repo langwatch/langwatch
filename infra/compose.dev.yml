@@ -49,7 +49,7 @@ x-common-env: &common-env
   # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
   # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
   # contributor's `langwatch/.env` is the source of truth — `quickstart`
-  # writes a per-mode overlay at `langwatch/.env.dev-up` that overrides
+  # writes a per-mode overlay at `platform/app/.env.dev-up` that overrides
   # only the URLs whose services are starting locally for that mode
   # (#3860 AC#2 / AC#6).
 
@@ -141,41 +141,41 @@ services:
 
   init:
     image: node:24
-    working_dir: /langwatch
+    working_dir: /platform/app
     volumes:
       # The container mirrors the repo layout rooted at `/` (ADR-076: one pnpm
-      # workspace, one lockfile, at the root). langwatch/ used to be mounted AT
+      # workspace, one lockfile, at the root). The app used to be mounted AT
       # /app and be its own workspace root; now it is a member, so it mounts at
-      # /langwatch and the root manifest, lockfile, .npmrc and every member the
+      # /platform/app and the root manifest, lockfile, .npmrc and every member the
       # workspace names must be visible at the paths the root packages: list
-      # uses. skills/ and agentic-e2e-tests/ contribute manifests only — a
+      # uses. skills/ and tests/agentic-e2e/ contribute manifests only — a
       # frozen install checks the lockfile against every member it can see.
-      - ./langwatch:/langwatch
+      - ./platform/app:/platform/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./pnpm-lock.yaml:/pnpm-lock.yaml:ro
       - ./package.json:/package.json:ro
       - ./.npmrc:/.npmrc:ro
       - ./packages:/packages
-      - ./mcp-server:/mcp-server
-      - mcp_server_modules:/mcp-server/node_modules
+      - ./mcp/typescript:/mcp/typescript
+      - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
-      - ./agentic-e2e-tests/package.json:/agentic-e2e-tests/package.json:ro
-      - ./langevals:/langevals
-      - ./typescript-sdk:/typescript-sdk:ro
-      - ./python-sdk:/python-sdk:ro
+      - ./tests/agentic-e2e/package.json:/tests/agentic-e2e/package.json:ro
+      - ./services/langevals:/services/langevals
+      - ./sdks/typescript:/sdks/typescript:ro
+      - ./sdks/python:/sdks/python:ro
       # Two node_modules overlays: the STORE now lives at the workspace root
       # (/node_modules/.pnpm) and langwatch/node_modules holds only symlinks
       # into it. Both stay in named volumes so the container's Linux install
       # never writes into the host's macOS tree (ADR-004).
       - root_modules:/node_modules
-      - app_modules:/langwatch/node_modules
+      - app_modules:/platform/app/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
       - goose_bin:/opt/goose-bin
     command: >
       sh -c "
         corepack enable &&
         pnpm config set store-dir /root/.local/share/pnpm/store &&
-        mkdir -p /node_modules /langwatch/node_modules &&
+        mkdir -p /node_modules /platform/app/node_modules &&
         GOOSE_VERSION=v3.26.0 &&
         ARCH=$$(uname -m) &&
         if [ \"$$ARCH\" = \"aarch64\" ]; then GOOSE_ARCH=arm64; else GOOSE_ARCH=x86_64; fi &&
@@ -201,24 +201,24 @@ services:
   app:
     image: node:24
     restart: unless-stopped
-    working_dir: /langwatch
+    working_dir: /platform/app
     volumes:
       # See the init service for why the layout is rooted at `/` (ADR-076).
-      - ./langwatch:/langwatch
+      - ./platform/app:/platform/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./pnpm-lock.yaml:/pnpm-lock.yaml:ro
       - ./package.json:/package.json:ro
       - ./.npmrc:/.npmrc:ro
       - ./packages:/packages
-      - ./mcp-server:/mcp-server
-      - mcp_server_modules:/mcp-server/node_modules
+      - ./mcp/typescript:/mcp/typescript
+      - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
-      - ./agentic-e2e-tests/package.json:/agentic-e2e-tests/package.json:ro
-      - ./langevals:/langevals
-      - ./typescript-sdk:/typescript-sdk:ro
-      - ./python-sdk:/python-sdk:ro
+      - ./tests/agentic-e2e/package.json:/tests/agentic-e2e/package.json:ro
+      - ./services/langevals:/services/langevals
+      - ./sdks/typescript:/sdks/typescript:ro
+      - ./sdks/python:/sdks/python:ro
       - root_modules:/node_modules
-      - app_modules:/langwatch/node_modules
+      - app_modules:/platform/app/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: >
       sh -c "
@@ -246,7 +246,7 @@ services:
       NEXTAUTH_PROVIDER: "email"
     env_file:
       - langwatch/.env
-      - path: langwatch/.env.dev-up
+      - path: platform/app/.env.dev-up
         required: false
     depends_on:
       init:
@@ -276,25 +276,25 @@ services:
 
   workers:
     image: node:24
-    working_dir: /langwatch
+    working_dir: /platform/app
     profiles: [workers, scenarios, full]
     volumes:
       # See the init service for why the layout is rooted at `/` (ADR-076).
-      - ./langwatch:/langwatch
+      - ./platform/app:/platform/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./pnpm-lock.yaml:/pnpm-lock.yaml:ro
       - ./package.json:/package.json:ro
       - ./.npmrc:/.npmrc:ro
       - ./packages:/packages
-      - ./mcp-server:/mcp-server
-      - mcp_server_modules:/mcp-server/node_modules
+      - ./mcp/typescript:/mcp/typescript
+      - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
-      - ./agentic-e2e-tests/package.json:/agentic-e2e-tests/package.json:ro
-      - ./langevals:/langevals
-      - ./typescript-sdk:/typescript-sdk:ro
-      - ./python-sdk:/python-sdk:ro
+      - ./tests/agentic-e2e/package.json:/tests/agentic-e2e/package.json:ro
+      - ./services/langevals:/services/langevals
+      - ./sdks/typescript:/sdks/typescript:ro
+      - ./sdks/python:/sdks/python:ro
       - root_modules:/node_modules
-      - app_modules:/langwatch/node_modules
+      - app_modules:/platform/app/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm exec tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
     environment:
@@ -308,7 +308,7 @@ services:
       # To enable verbose scenario SDK logging, add: SCENARIO_VERBOSE: "true"
     env_file:
       - langwatch/.env
-      - path: langwatch/.env.dev-up
+      - path: platform/app/.env.dev-up
         required: false
     depends_on:
       init:
@@ -378,25 +378,25 @@ services:
 
   ai-server:
     image: node:24
-    working_dir: /langwatch
+    working_dir: /platform/app
     profiles: [test, scenarios, full]
     volumes:
       # See the init service for why the layout is rooted at `/` (ADR-076).
-      - ./langwatch:/langwatch
+      - ./platform/app:/platform/app
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./pnpm-lock.yaml:/pnpm-lock.yaml:ro
       - ./package.json:/package.json:ro
       - ./.npmrc:/.npmrc:ro
       - ./packages:/packages
-      - ./mcp-server:/mcp-server
-      - mcp_server_modules:/mcp-server/node_modules
+      - ./mcp/typescript:/mcp/typescript
+      - mcp_server_modules:/mcp/typescript/node_modules
       - ./skills/package.json:/skills/package.json:ro
-      - ./agentic-e2e-tests/package.json:/agentic-e2e-tests/package.json:ro
-      - ./langevals:/langevals
-      - ./typescript-sdk:/typescript-sdk:ro
-      - ./python-sdk:/python-sdk:ro
+      - ./tests/agentic-e2e/package.json:/tests/agentic-e2e/package.json:ro
+      - ./services/langevals:/services/langevals
+      - ./sdks/typescript:/sdks/typescript:ro
+      - ./sdks/python:/sdks/python:ro
       - root_modules:/node_modules
-      - app_modules:/langwatch/node_modules
+      - app_modules:/platform/app/node_modules
     command: sh -c "corepack enable && pnpm exec tsx scripts/ai-server.ts"
     ports:
       - "${AI_SERVER_PORT:-3456}:3456"
@@ -407,7 +407,7 @@ services:
       LOG_LEVEL: "debug"
     env_file:
       - langwatch/.env
-      - path: langwatch/.env.dev-up
+      - path: platform/app/.env.dev-up
         required: false
     depends_on:
       init:

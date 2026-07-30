@@ -122,9 +122,9 @@ jobs:
               - 'packages/**'
               - 'skills/**'
               - 'tools/**'
-              - 'mcp-server/**'
-              - 'typescript-sdk/**'
-              - 'python-sdk/**'
+              - 'mcp/typescript/**'
+              - 'sdks/typescript/**'
+              - 'sdks/python/**'
               - 'services/**'
               - 'pkg/**'
               - 'langevals/**'
@@ -158,10 +158,10 @@ jobs:
       - name: Cache TypeScript incremental build info
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: langwatch/node_modules/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
+          path: platform/app/node_modules/.cache/tsbuildinfo
+          key: ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'langwatch/tsconfig.tsgo.json', 'langwatch/tsconfig.tsgo.tests.json') }}-
+            ${{ runner.os }}-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'platform/app/tsconfig.tsgo.json', 'platform/app/tsconfig.tsgo.tests.json') }}-
             ${{ runner.os }}-tsbuildinfo-
 
       - name: Run typecheck
@@ -255,10 +255,10 @@ jobs:
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
-        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
+        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
-          files: langwatch/coverage/lcov.info
+          files: platform/app/coverage/lcov.info
           flags: unit
           name: unit-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
@@ -360,7 +360,7 @@ jobs:
         run: pnpm start:prepare:files
 
       # traceparent-roundtrip.integration.test.ts runs the REAL nlpgo service,
-      # so it compiles it: `go build ./cmd/service` into langwatch/.vitest-tmp/.
+      # so it compiles it: `go build ./cmd/service` into platform/app/.vitest-tmp/.
       # That build is the single most expensive thing in the whole integration
       # suite — 140.9s for a file containing one test, measured on shard 2,
       # where the entire shard's tests came to 10.6 minutes. One Go compile was
@@ -374,7 +374,7 @@ jobs:
       - name: Cache the compiled nlpgo test binary
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: langwatch/.vitest-tmp
+          path: platform/app/.vitest-tmp
           key: ${{ runner.os }}-nlpgo-testbin-${{ hashFiles('services/nlpgo/**/*.go', 'go.sum') }}
 
       - name: Setup database
@@ -456,10 +456,10 @@ jobs:
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
-        if: always() && hashFiles('langwatch/coverage/lcov.info') != ''
+        if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
-          files: langwatch/coverage/lcov.info
+          files: platform/app/coverage/lcov.info
           flags: integration
           name: integration-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
@@ -776,16 +776,16 @@ jobs:
       - name: Cache Prisma client
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: langwatch/node_modules/.prisma
-          key: ${{ runner.os }}-prisma-${{ hashFiles('langwatch/prisma/schema.prisma') }}
+          path: platform/app/node_modules/.prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('platform/app/prisma/schema.prisma') }}
 
       # Cache Vite build artifacts
       - name: Cache Vite
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            langwatch/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/vite.config.ts') }}
+            platform/app/node_modules/.vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'platform/app/vite.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
@@ -888,12 +888,12 @@ jobs:
             echo "FAIL: canary step should have failed (vitest should exit non-zero for a failing test), got outcome=${{ steps.canary.outcome }}"
             exit 1
           fi
-          if [ ! -s langwatch/test-failures.txt ]; then
+          if [ ! -s platform/app/test-failures.txt ]; then
             echo "FAIL: test-failures.txt is missing or empty — failure extraction did not work"
             exit 1
           fi
           echo "PASS: canary failed as expected and failures were extracted"
-          cat langwatch/test-failures.txt
+          cat platform/app/test-failures.txt
 
   langwatch-app-complete:
     needs: [changes, typecheck, test-unit, test-integration, lint, ast-grep, feature-parity, build, ci-scripts-test, ci-self-test]

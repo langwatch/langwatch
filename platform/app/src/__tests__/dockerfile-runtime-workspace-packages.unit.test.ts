@@ -5,7 +5,7 @@
  * The builder stage does `COPY packages ./packages`, but the runtime stage
  * cherry-picks individual packages to keep the image slim. pnpm links these as
  * `platform/app/node_modules/@langwatch/<name> -> ../../../../packages/<name>`, and
- * that symlink is copied along with `langwatch/`. If the package it points at
+ * that symlink is copied along with `platform/app/`. If the package it points at
  * is not also copied, the link dangles and the process dies at boot with
  * `Cannot find module '@langwatch/<name>'` — which is exactly how
  * `@langwatch/handled-error` broke the workers entry point after it was added
@@ -15,7 +15,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-// src/__tests__/ -> ../../ = langwatch/ -> ../../../ = repo root
+// src/__tests__/ -> ../../ = platform/app/ -> ../../../../ = repo root
 const APP_DIR = path.join(__dirname, "../..");
 const REPO_ROOT = path.join(APP_DIR, "../..");
 const DOCKERFILE_PATH = path.join(REPO_ROOT, "infra/docker/Dockerfile");
@@ -70,7 +70,7 @@ describe("Dockerfile runtime stage", () => {
   describe("when the runtime stage assembles its node_modules", () => {
     it("copies the workspace store before the app tree", () => {
       // Since ADR-076 the install root is /app, so pnpm's virtual store lives
-      // at /app/node_modules/.pnpm and EVERY entry in langwatch/node_modules
+      // at /app/node_modules/.pnpm and EVERY entry in platform/app/node_modules
       // is a symlink into it. Omitting this copy builds a clean image whose
       // container dies on its first import — there is no build error to catch
       // it, which is how it shipped broken once already.
@@ -78,16 +78,17 @@ describe("Dockerfile runtime stage", () => {
         /COPY --from=builder \/app\/node_modules\s+\.\/node_modules/,
       );
       const appCopy = stage.search(
-        /COPY --from=builder \/app\/langwatch\s+\.\/langwatch/,
+        /COPY --from=builder \/app\/platform\/app\s+\.\/platform\/app/,
       );
 
       expect(
         storeCopy,
         "runtime stage must COPY /app/node_modules",
       ).toBeGreaterThan(-1);
-      expect(appCopy, "runtime stage must COPY /app/langwatch").toBeGreaterThan(
-        -1,
-      );
+      expect(
+        appCopy,
+        "runtime stage must COPY /app/platform/app",
+      ).toBeGreaterThan(-1);
       expect(
         storeCopy,
         "the store copy must precede the app copy — the app tree is symlinks into it",
@@ -114,7 +115,7 @@ describe("Dockerfile runtime stage", () => {
 
       expect(
         hasWholeTreeCopy || stage.includes(`/app/packages/${dir}`),
-        `The runtime stage must COPY /app/packages/${dir} (or the whole /app/packages tree) — langwatch/node_modules/@langwatch/* symlinks into it, so omitting it makes the app fail at boot with "Cannot find module".`,
+        `The runtime stage must COPY /app/packages/${dir} (or the whole /app/packages tree) — platform/app/node_modules/@langwatch/* symlinks into it, so omitting it makes the app fail at boot with "Cannot find module".`,
       ).toBe(true);
     });
   });
