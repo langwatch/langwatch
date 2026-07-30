@@ -3,9 +3,11 @@ import {
   OnboardingRateLimitedError,
 } from "@langwatch/ai-onboarding";
 import {
+  type BaseApp,
   createErrorHandler,
   createService,
   routeHandlers,
+  type VersionBuilder,
 } from "@langwatch/api";
 import {
   claimDirectRequestSchema,
@@ -23,7 +25,7 @@ import {
 import type { Context } from "hono";
 import { z } from "zod";
 import { nearestHopIp } from "~/server/http/client-ip";
-import { onboardingServices } from "./dependencies";
+import { type OnboardingServices, onboardingServices } from "./dependencies";
 import { browserSessionAuth, deviceSessionAuth, userIdFrom } from "./identity";
 
 /**
@@ -78,6 +80,133 @@ async function onError(err: Error, c: Context): Promise<Response> {
   return response;
 }
 
+/** The handler context once `.provide()` has run. */
+type OnboardingApp = BaseApp<unknown> & { onboarding: OnboardingServices };
+type Version = VersionBuilder<OnboardingApp>;
+
+/**
+ * Endpoints an agent can reach with no identity at all. Possession of a claim
+ * token, or of the PKCE verifier, is the capability.
+ */
+function registerAnonymousEndpoints(v: Version): void {
+  v.post(
+    "/provision",
+    {
+      auth: "none",
+      input: provisionRequestSchema,
+      output: provisionResponseSchema,
+      status: 201,
+      description:
+        "Create a temporary, claimable workspace and return an ingestion-only key. No identity required.",
+    },
+    async (c, { input, app }) =>
+      app.onboarding.provisioning.provision({
+        request: input,
+        identity: callerIdentity(c),
+      }),
+  );
+
+  v.get(
+    "/status",
+    {
+      auth: "none",
+      output: statusResponseSchema,
+      description:
+        "Lifecycle of the temporary account the presented claim token belongs to.",
+    },
+    async (c, { app }) =>
+      app.onboarding.provisioning.status({ claimToken: claimTokenFrom(c) }),
+  );
+
+  v.post(
+    "/claim/handoff",
+    {
+      auth: "none",
+      input: claimHandoffStartRequestSchema,
+      output: claimHandoffStartResponseSchema,
+      status: 201,
+      description:
+        "Start a browser handoff for a CLI with no identity. Returns the URL to open and the interval to poll.",
+    },
+    async (c, { input, app }) =>
+      app.onboarding.claim.startHandoff({
+        claimToken: input.claimToken,
+        codeChallenge: input.codeChallenge,
+        identity: callerIdentity(c),
+      }),
+  );
+
+  v.post(
+    "/claim/exchange",
+    {
+      auth: "none",
+      input: claimExchangeRequestSchema,
+      output: claimExchangeResponseSchema,
+      description:
+        "Poll a handoff. Returns pending until the human approves in the browser.",
+    },
+    async (_c, { input, app }) =>
+      app.onboarding.claim.exchange({
+        handoffCode: input.handoffCode,
+        codeVerifier: input.codeVerifier,
+      }),
+  );
+}
+
+/** The human half of the handoff — a signed-in browser. */
+function registerBrowserClaimEndpoints(v: Version): void {
+  v.get(
+    "/claim/handoff/:handoffCode",
+    {
+      auth: browserSessionAuth,
+      params: z.object({ handoffCode: z.string().min(1) }),
+      output: claimHandoffDescribeResponseSchema,
+      description:
+        "What the claim page shows a signed-in human before they approve.",
+    },
+    async (_c, { params, app }) =>
+      app.onboarding.claim.describeHandoff({
+        handoffCode: params.handoffCode,
+      }),
+  );
+
+  v.post(
+    "/claim/handoff/:handoffCode/approve",
+    {
+      auth: browserSessionAuth,
+      params: z.object({ handoffCode: z.string().min(1) }),
+      output: claimHandoffApproveResponseSchema,
+      description:
+        "Attach the signed-in identity to the temporary account behind this handoff.",
+    },
+    async (c, { params, app }) =>
+      app.onboarding.claim.approveHandoff({
+        handoffCode: params.handoffCode,
+        userId: requireUserId(c),
+      }),
+  );
+}
+
+/** A terminal that already logged in through the device flow. */
+function registerDirectClaimEndpoint(v: Version): void {
+  v.post(
+    "/claim/direct",
+    {
+      auth: deviceSessionAuth,
+      input: claimDirectRequestSchema,
+      output: claimResultSchema,
+      description:
+        "Claim from a terminal that already holds a device session — no browser round-trip.",
+    },
+    async (c, { input, app }) =>
+      app.onboarding.claim.claimDirect({
+        claimToken: input.claimToken,
+        userId: requireUserId(c),
+        identity: callerIdentity(c),
+      }),
+  );
+}
+
 export const app = createService({
   name: "agent-onboarding",
   onError,
@@ -86,132 +215,9 @@ export const app = createService({
     onboarding: () => onboardingServices(),
   })
   .version("2026-07-30", (v) => {
-    // -----------------------------------------------------------------------
-    // Anonymous
-    // -----------------------------------------------------------------------
-
-    v.post(
-      "/provision",
-      {
-        auth: "none",
-        input: provisionRequestSchema,
-        output: provisionResponseSchema,
-        status: 201,
-        description:
-          "Create a temporary, claimable workspace and return an ingestion-only key. No identity required.",
-      },
-      async (c, { input, app }) =>
-        app.onboarding.provisioning.provision({
-          request: input,
-          identity: callerIdentity(c),
-        }),
-    );
-
-    v.get(
-      "/status",
-      {
-        auth: "none",
-        output: statusResponseSchema,
-        description:
-          "Lifecycle of the temporary account the presented claim token belongs to.",
-      },
-      async (c, { app }) =>
-        app.onboarding.provisioning.status({ claimToken: claimTokenFrom(c) }),
-    );
-
-    // -----------------------------------------------------------------------
-    // Claim — PKCE handoff
-    // -----------------------------------------------------------------------
-
-    v.post(
-      "/claim/handoff",
-      {
-        auth: "none",
-        input: claimHandoffStartRequestSchema,
-        output: claimHandoffStartResponseSchema,
-        status: 201,
-        description:
-          "Start a browser handoff for a CLI with no identity. Returns the URL to open and the interval to poll.",
-      },
-      async (c, { input, app }) =>
-        app.onboarding.claim.startHandoff({
-          claimToken: input.claimToken,
-          codeChallenge: input.codeChallenge,
-          identity: callerIdentity(c),
-        }),
-    );
-
-    v.post(
-      "/claim/exchange",
-      {
-        auth: "none",
-        input: claimExchangeRequestSchema,
-        output: claimExchangeResponseSchema,
-        description:
-          "Poll a handoff. Returns pending until the human approves in the browser.",
-      },
-      async (_c, { input, app }) =>
-        app.onboarding.claim.exchange({
-          handoffCode: input.handoffCode,
-          codeVerifier: input.codeVerifier,
-        }),
-    );
-
-    // -----------------------------------------------------------------------
-    // Claim — the browser half
-    // -----------------------------------------------------------------------
-
-    v.get(
-      "/claim/handoff/:handoffCode",
-      {
-        auth: browserSessionAuth,
-        params: z.object({ handoffCode: z.string().min(1) }),
-        output: claimHandoffDescribeResponseSchema,
-        description:
-          "What the claim page shows a signed-in human before they approve.",
-      },
-      async (_c, { params, app }) =>
-        app.onboarding.claim.describeHandoff({
-          handoffCode: params.handoffCode,
-        }),
-    );
-
-    v.post(
-      "/claim/handoff/:handoffCode/approve",
-      {
-        auth: browserSessionAuth,
-        params: z.object({ handoffCode: z.string().min(1) }),
-        output: claimHandoffApproveResponseSchema,
-        description:
-          "Attach the signed-in identity to the temporary account behind this handoff.",
-      },
-      async (c, { params, app }) =>
-        app.onboarding.claim.approveHandoff({
-          handoffCode: params.handoffCode,
-          userId: requireUserId(c),
-        }),
-    );
-
-    // -----------------------------------------------------------------------
-    // Claim — a CLI that already has an identity
-    // -----------------------------------------------------------------------
-
-    v.post(
-      "/claim/direct",
-      {
-        auth: deviceSessionAuth,
-        input: claimDirectRequestSchema,
-        output: claimResultSchema,
-        description:
-          "Claim from a terminal that already holds a device session — no browser round-trip.",
-      },
-      async (c, { input, app }) =>
-        app.onboarding.claim.claimDirect({
-          claimToken: input.claimToken,
-          userId: requireUserId(c),
-          identity: callerIdentity(c),
-        }),
-    );
+    registerAnonymousEndpoints(v);
+    registerBrowserClaimEndpoints(v);
+    registerDirectClaimEndpoint(v);
   })
   .build();
 
