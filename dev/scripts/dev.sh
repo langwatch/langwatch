@@ -15,8 +15,8 @@
 #   dev/scripts/dev.sh ps | logs | clean | rebuild
 set -e
 
-COMPOSE="docker compose -f infra/compose.dev.yml --project-directory ."
-COMPOSE_MIGRATION="docker compose -f infra/compose.dev.yml -f infra/compose.dev.migration.yml --project-directory ."
+COMPOSE="docker compose -f dev/compose.dev.yml --project-directory ."
+COMPOSE_MIGRATION="docker compose -f dev/compose.dev.yml -f dev/compose.dev.migration.yml --project-directory ."
 
 # ---------------------------------------------------------------------------
 # Help — non-interactive reference

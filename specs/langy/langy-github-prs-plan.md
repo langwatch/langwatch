@@ -233,7 +233,7 @@ exception.
 
 ```bash
 # from full-langy worktree
-docker compose -f infra/compose.dev.yml up -d   # infra
+docker compose -f dev/compose.dev.yml up -d   # infra
 cd platform/app && pnpm dev                  # app on :5560
 # langy-agent locally:
 node services/langy-agent/server.js

@@ -65,8 +65,9 @@ lockfile breaks `npx @langwatch/server` for every end user.
 with one lockfile.**
 
 **We will rename the application package from `langwatch` to `@langwatch/web`.**
-The directory stays `langwatch/`. This is what unblocks the merge; it also ends
-the self-referential dependency.
+The directory stays `langwatch/` (later relocated to `platform/app/` by the
+unrelated sdks/platform restructure, #6361). This is what unblocks the merge;
+it also ends the self-referential dependency.
 
 **We will keep the application on the published `langwatch@1.0.0` SDK.**
 `linkWorkspacePackages` stays `false` (pnpm 10's default) and we now state it
@@ -202,9 +203,9 @@ one command and a security pin that reaches every project.
   `@langwatch/ssrf` are declarable from any project in the repo, including the
   SDK and the skills compiler.
 - The application's package name changes. Anything filtering it by name needs
-  `@langwatch/web`; path-based invocation (`pnpm -C langwatch`) is unaffected.
+  `@langwatch/web`; path-based invocation (`pnpm -C platform/app`) is unaffected.
 - The tarball grows by every member `package.json` it did not previously carry
-  (`packages/server`, `typescript-sdk`, `agentic-e2e-tests`) — a few kilobytes —
+  (`packages/server`, `sdks/typescript`, `tests/agentic-e2e`) — a few kilobytes —
   and by the root lockfile. In exchange it stops carrying a second lockfile that
   could drift from the one the repo develops against.
 - `npx @langwatch/server` installs from `app/` inside the tarball — the staged

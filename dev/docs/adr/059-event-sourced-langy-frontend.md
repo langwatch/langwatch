@@ -82,7 +82,7 @@ Net: no new infrastructure, no schema migration, no CH scaling concern.
 Extract the **pure** projection logic — event schemas (Zod, already portable),
 state types, the cursor type + its comparator, and the fold reducers — into a
 new source-only workspace package `@langwatch/langy` (`packages/langy`, exports
-`./src/index.ts`, no build step), consumed by `langwatch/` via `workspace:*`
+`./src/index.ts`, no build step), consumed by `platform/app/` via `workspace:*`
 exactly like `@langwatch/handled-error`.
 
 > **2026-07-22.** This package has since absorbed the CLI card contract that was

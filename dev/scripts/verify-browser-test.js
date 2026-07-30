@@ -13,8 +13,8 @@ const { chromium } = require("playwright-core");
 const fs = require("fs");
 const path = require("path");
 
-const SCREENSHOT_DIR = path.join(__dirname, "..", "browser-tests", "verify");
-const DEV_PORT_FILE = path.join(__dirname, "..", ".dev-port");
+const SCREENSHOT_DIR = path.join(__dirname, "..", "..", "browser-tests", "verify");
+const DEV_PORT_FILE = path.join(__dirname, "..", "..", ".dev-port");
 
 // Find Chromium binary (Playwright cache or system)
 function findChromium() {
@@ -53,7 +53,7 @@ async function main() {
   console.log(`\n=== Browser Test Verification ===`);
   console.log(`App URL:     ${baseUrl}`);
   console.log(`Chromium:    ${path.basename(path.dirname(chromiumPath))}/${path.basename(chromiumPath)}`);
-  console.log(`Screenshots: ${path.relative(path.join(__dirname, ".."), SCREENSHOT_DIR)}\n`);
+  console.log(`Screenshots: ${path.relative(path.join(__dirname, "..", ".."), SCREENSHOT_DIR)}\n`);
 
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 
@@ -153,7 +153,7 @@ async function main() {
     console.log(`\n=== Verification Complete ===`);
     console.log(`Screenshots captured: ${screenshots.length}`);
     screenshots.forEach((f) => console.log(`  ${f}`));
-    console.log(`\nAll screenshots saved to: ${path.relative(path.join(__dirname, ".."), SCREENSHOT_DIR)}`);
+    console.log(`\nAll screenshots saved to: ${path.relative(path.join(__dirname, "..", ".."), SCREENSHOT_DIR)}`);
   } catch (error) {
     console.error(`\nERROR: ${error.message}`);
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, "error-state.png"), fullPage: true }).catch(() => {});

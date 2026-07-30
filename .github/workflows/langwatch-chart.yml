@@ -17,8 +17,8 @@ on:
       # the pnpm install root left every dependency symlink in the runtime
       # stage dangling, the build stayed green, and the container would have
       # died on its first import.
-      - "Dockerfile"
-      - "Dockerfile.go_service"
+      - "infra/docker/Dockerfile"
+      - "infra/docker/Dockerfile.go_service"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -40,8 +40,8 @@ on:
       # the pnpm install root left every dependency symlink in the runtime
       # stage dangling, the build stayed green, and the container would have
       # died on its first import.
-      - "Dockerfile"
-      - "Dockerfile.go_service"
+      - "infra/docker/Dockerfile"
+      - "infra/docker/Dockerfile.go_service"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"

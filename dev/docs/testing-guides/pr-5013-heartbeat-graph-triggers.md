@@ -39,7 +39,7 @@ visible in the ES audit log at boot.)
 
 ```bash
 make quickstart all-local          # local CH + PG + Redis + app + workers
-pnpm dev                            # from langwatch/
+pnpm dev                            # from platform/app/
 ```
 
 - Workers must be running (outbox + heartbeat live under
