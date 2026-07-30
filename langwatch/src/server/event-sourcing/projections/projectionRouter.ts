@@ -37,6 +37,7 @@ import {
 } from "../services/errorHandling";
 import type { QueueManager } from "../services/queues/queueManager";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
+import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import { EventUtils } from "../utils/event.utils";
 import { isComponentDisabled } from "../utils/killSwitch";
@@ -157,7 +158,39 @@ export class ProjectionRouter<
       );
     }
     this.assertCoalesceWithinAppliedIdCap(projection);
+    this.assertTrustedAbsenceIsTimeLocal(projection);
     this.foldProjections.set(projection.name, projection);
+  }
+
+  /**
+   * Rejects a fold that trusts a WINDOWED absence on an aggregate whose rows
+   * can outlive the window.
+   *
+   * `trustAbsentMiss` retires the unwindowed retry: an absent windowed read is
+   * taken as proof nothing was ever committed, and the fold restarts from
+   * `init()`. That is only true while every row of the aggregate stays inside
+   * the window, which is a bet on the aggregate's LIFETIME, the same one
+   * `rehydrationLowerBoundMs` makes when it bounds an event scan. A long-lived
+   * aggregate (a session spanning weeks) may declare a `readWindow` for
+   * partition pruning, but trusting its misses would silently overwrite live
+   * state with an empty one. Unwindowed folds are untouched: with no window
+   * there is nothing an absence could be hiding behind.
+   */
+  private assertTrustedAbsenceIsTimeLocal(
+    projection: FoldProjectionDefinition<any, EventType>,
+  ): void {
+    if (projection.options?.trustAbsentMiss !== true) return;
+    if (projection.options.readWindow === undefined) return;
+    if (TIME_LOCAL_AGGREGATE_TYPES.has(this.aggregateType)) return;
+
+    throw new ConfigurationError(
+      "ProjectionRouter",
+      `Fold projection "${projection.name}" trusts an absent windowed read but its aggregate type "${this.aggregateType}" is not time-local: rows of such an aggregate outlive any window width, so an absent read is not proof the state was never committed.`,
+      {
+        projectionName: projection.name,
+        aggregateType: this.aggregateType,
+      },
+    );
   }
 
   /**

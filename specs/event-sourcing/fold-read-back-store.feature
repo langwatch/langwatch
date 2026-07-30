@@ -125,7 +125,7 @@ Feature: Fold projections read back their own state
     But live delivery never reads the event log to fold
 
   # For a fold to treat a missing row as proof that nothing was committed, the
-  # store must never decline to write a state it was handed — otherwise absence
+  # store must never decline to write a state it was handed. Otherwise absence
   # means either "new" or "declined" and proves neither. So a state with only a
   # dimension, or with no identity of its own, still gets a row; readers that
   # want only aggregates carrying real signal filter on what the row records
@@ -138,7 +138,7 @@ Feature: Fold projections read back their own state
     And a reader asking for aggregates with real signal does not see it
     And a missing row therefore proves the aggregate was never committed
 
-  Scenario: no state is unwritable — identity falls back to the aggregate id
+  Scenario: no state is unwritable, identity falls back to the aggregate id
     Given a committed state that carries no identity of its own
     When the fold commits it
     Then the row is written under the aggregate's id
