@@ -1,13 +1,13 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 export const listWorkflowsCommand = async (): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new WorkflowsApiService();
   const spinner = createSpinner("Fetching workflows...").start();

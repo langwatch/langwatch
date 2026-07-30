@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError } from "../../utils/errorOutput";
 import type { CommandResult } from "../../utils/output";
@@ -14,7 +14,7 @@ export const createAgentCommand = async (
   name: string,
   options: { type: string; config?: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new AgentsApiService();
   const spinner = createSpinner(`Creating agent "${name}"...`).start();

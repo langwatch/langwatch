@@ -256,10 +256,8 @@ function userTokensIndexKey(userId: string): string {
 async function validateAccessToken(
   authHeader: string | null | undefined,
 ): Promise<AccessTokenRecord | null> {
-  if (!authHeader) return null;
-  const match = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/.exec(authHeader.trim());
-  if (!match) return null;
-  const token = match[1]!;
+  const token = bearerAccessToken(authHeader);
+  if (!token) return null;
   const redis = getRedis();
   const raw = await redis.get(accessTokenKey(token));
   if (!raw) return null;
@@ -287,6 +285,163 @@ function getRedis() {
     );
   }
   return redisConnection;
+}
+
+/**
+ * The authorization rule every endpoint that hands back a Project.apiKey
+ * shares (/approve with a project pick, /project-key): a personal project is
+ * honoured only as the caller's OWN explicit pick (the original hazard, per
+ * customer report, was a coding agent silently auto-selecting someone's
+ * personal project), and because the key is the shared write credential
+ * usable outside the UI's RBAC constraints, team membership alone is not
+ * enough: the caller needs a write-capable project permission. A view-only
+ * member cannot extract it.
+ *
+ * Returns the refusal response to send, or null when the handout is allowed.
+ */
+async function refuseProjectKeyHandout(
+  c: Context,
+  project: { id: string; isPersonal: boolean; ownerUserId: string | null },
+  userId: string,
+): Promise<Response | null> {
+  if (project.isPersonal && project.ownerUserId !== userId) {
+    return c.json(
+      {
+        error: "personal_project_not_allowed",
+        error_description:
+          "Another user's personal project can't back your API key. Pick a shared team project, or your own personal workspace.",
+      },
+      400,
+    );
+  }
+  const canWriteProject = await hasProjectPermission(
+    {
+      prisma,
+      session: { user: { id: userId } },
+    } as Parameters<typeof hasProjectPermission>[0],
+    project.id,
+    "project:update",
+  );
+  if (!canWriteProject) {
+    return c.json(
+      {
+        error: "forbidden",
+        error_description:
+          "You need write access to this project to retrieve its API key.",
+      },
+      403,
+    );
+  }
+  return null;
+}
+
+/**
+ * The one grammar for a CLI bearer access token. Both the validating reader
+ * (validateAccessToken) and the raw extraction below share it, so tightening
+ * it can never leave a second, more permissive copy behind on the auth
+ * boundary.
+ */
+const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/;
+
+/**
+ * Extract the Bearer access token from an Authorization header, or null.
+ * Kept separate from validateAccessToken so callers that need the raw token
+ * string (to revoke it) don't re-run full validation.
+ */
+function bearerAccessToken(
+  authHeader: string | null | undefined,
+): string | null {
+  if (!authHeader) return null;
+  const match = BEARER_ACCESS_TOKEN_REGEX.exec(authHeader.trim());
+  return match ? match[1]! : null;
+}
+
+/**
+ * The tenancy boundary for key-minting CLI endpoints.
+ *
+ * `validateAccessToken` only proves a Redis token has not expired; it says
+ * nothing about whether the user is STILL an active member of the token's
+ * organization. A user offboarded after their token was issued must not be
+ * able to recreate a personal workspace in the former tenant or pull any
+ * project's key. Every endpoint that mints or returns a project API key
+ * therefore re-derives current membership from Postgres (the same authority
+ * the web RBAC helpers use) before handing anything back.
+ *
+ * On refusal it also severs the stale session: the presented access token is
+ * dropped from Redis (and from the user's token index), so a token minted
+ * before removal cannot keep hitting these endpoints. Org-scoped: only the
+ * caller's own presented token is revoked, never their sessions in other
+ * organizations. Org-wide offboarding still runs
+ * CliTokenRevocationService.revokeForUser via user deactivation.
+ *
+ * Returns a 403 Response to send when the caller is not an active member,
+ * or null to proceed.
+ *
+ * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+ */
+async function ensureActiveOrgMemberOr403(
+  c: Context,
+  tokenRecord: { user_id: string; organization_id: string },
+): Promise<Response | null> {
+  const [user, membership] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: tokenRecord.user_id },
+      select: { deactivatedAt: true },
+    }),
+    prisma.organizationUser.findUnique({
+      where: {
+        userId_organizationId: {
+          userId: tokenRecord.user_id,
+          organizationId: tokenRecord.organization_id,
+        },
+      },
+      select: { userId: true },
+    }),
+  ]);
+
+  const active = !!user && user.deactivatedAt === null && !!membership;
+  if (active) return null;
+
+  // Sever the stale session before refusing: drop the presented access token
+  // so the offboarded caller's token stops authenticating immediately.
+  const token = bearerAccessToken(c.req.header("Authorization"));
+  if (token) {
+    try {
+      const redis = getRedis();
+      await redis.del(accessTokenKey(token));
+      await redis.srem(
+        userTokensIndexKey(tokenRecord.user_id),
+        accessTokenKey(token),
+      );
+    } catch (err) {
+      logger.warn(
+        { err, userId: tokenRecord.user_id },
+        "[auth-cli] failed to revoke stale access token on membership refusal",
+      );
+    }
+  }
+
+  logger.info(
+    {
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      reason: !user
+        ? "user_missing"
+        : user.deactivatedAt !== null
+          ? "user_deactivated"
+          : "not_org_member",
+    },
+    "[auth-cli] refusing key-minting request from non-active org member; session revoked",
+  );
+
+  return c.json(
+    {
+      error: "forbidden",
+      error_description:
+        "Your access to this organization has ended. Run `langwatch login` to sign in again.",
+    },
+    403,
+  );
 }
 
 /**
@@ -578,6 +733,37 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // navigation. The CLI wrapper mints a VK lazily on first gateway call
     // once a provider chain becomes available.
 
+    // Personal project delivery: the personal project is a normal project
+    // with a normal apiKey, and it is what data commands (`langwatch trace
+    // search`, `/api/me/usage`, ...) authenticate with after a device
+    // login. Ensure the workspace here (idempotent; approve may have
+    // skipped VK minting for provider-less orgs) and ship its key so the
+    // CLI never has to ask the user for one. Best-effort: a workspace
+    // failure must not fail the login itself, and older CLIs ignore the
+    // extra field.
+    let personalProject:
+      | { id: string; slug: string; name: string; api_key: string }
+      | undefined;
+    try {
+      const workspace = await new PersonalWorkspaceService(prisma).ensure({
+        userId: user.id,
+        organizationId: organization.id,
+        displayName: user.name,
+        displayEmail: user.email,
+      });
+      personalProject = {
+        id: workspace.project.id,
+        slug: workspace.project.slug,
+        name: workspace.project.name,
+        api_key: workspace.project.apiKey,
+      };
+    } catch (err) {
+      logger.error(
+        { err, userId: user.id, organizationId: organization.id },
+        "[auth-cli] could not ensure personal workspace on exchange; device session ships without personal_project",
+      );
+    }
+
     // Mint access + refresh tokens, persist both in Redis with TTL so
     // protected CLI endpoints (/budget/status etc.) can validate Bearer
     // tokens against an authoritative store.
@@ -661,6 +847,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           slug: organization.slug,
         },
         default_personal_vk: record.personal_vk,
+        personal_project: personalProject,
         endpoint: responseEndpoint,
       },
       200,
@@ -992,6 +1179,153 @@ secured.access(CLI_POLICY).get("/bootstrap", async (c: Context) => {
     organizationId: tokenRecord.organization_id,
   });
   return c.json(result, 200);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/personal-project
+// ---------------------------------------------------------------------------
+// Lazy personal-key exchange for device sessions minted before /exchange
+// started shipping `personal_project`. The CLI calls this once with its
+// bearer token, persists the key into ~/.langwatch/config.json, and never
+// asks again. Ensures the workspace (idempotent) so sessions approved via
+// the provider-less branch, which skips VK minting, still resolve a key.
+//
+// Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+// ---------------------------------------------------------------------------
+secured.access(CLI_POLICY).get("/personal-project", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  // Tenancy boundary: prove current, active org membership BEFORE ensure(),
+  // which would otherwise recreate a personal workspace in a former tenant
+  // and hand out its key to an offboarded user.
+  const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
+  if (denied) return denied;
+
+  const user = await prisma.user.findUnique({
+    where: { id: tokenRecord.user_id },
+    select: { name: true, email: true },
+  });
+  try {
+    const workspace = await new PersonalWorkspaceService(prisma).ensure({
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      displayName: user?.name,
+      displayEmail: user?.email,
+    });
+    return c.json(
+      {
+        project: {
+          id: workspace.project.id,
+          slug: workspace.project.slug,
+          name: workspace.project.name,
+          api_key: workspace.project.apiKey,
+        },
+      },
+      200,
+    );
+  } catch (err) {
+    logger.error(
+      { err, userId: tokenRecord.user_id },
+      "[auth-cli] personal-project resolution failed",
+    );
+    return c.json(
+      {
+        error: "server_error",
+        error_description: "Could not resolve your personal project",
+      },
+      500,
+    );
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/cli/project-key
+// ---------------------------------------------------------------------------
+// Non-interactive project login: `langwatch login --project <slug>` in a
+// headless context (agent VM, CI without a key). The device session proves
+// the user; the same RBAC gate as the browser approve flow applies
+// (`project:update`, because Project.apiKey is the shared write credential),
+// and nothing new is minted, the project's existing key is returned. The
+// caller's OWN personal project is allowed, exactly like the authorize page's
+// explicit personal pick; anyone else's personal project is refused.
+//
+// Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+// ---------------------------------------------------------------------------
+const projectKeyRequestSchema = z.object({
+  slug: z.string().min(1),
+});
+
+secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  // Same tenancy boundary as /personal-project: an offboarded user's
+  // pre-removal token must not be able to pull a shared project's key.
+  const denied = await ensureActiveOrgMemberOr403(c, tokenRecord);
+  if (denied) return denied;
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = projectKeyRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_request", error_description: "slug is required" },
+      400,
+    );
+  }
+  const project = await prisma.project.findFirst({
+    where: {
+      slug: parsed.data.slug,
+      archivedAt: null,
+      team: { organizationId: tokenRecord.organization_id },
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      apiKey: true,
+      isPersonal: true,
+      ownerUserId: true,
+    },
+  });
+  if (!project) {
+    return c.json(
+      {
+        error: "not_found",
+        error_description: `No project with slug "${parsed.data.slug}" in your organization`,
+      },
+      404,
+    );
+  }
+  const refusal = await refuseProjectKeyHandout(
+    c,
+    project,
+    tokenRecord.user_id,
+  );
+  if (refusal) return refusal;
+  return c.json(
+    {
+      api_key: project.apiKey,
+      project: { id: project.id, slug: project.slug, name: project.name },
+    },
+    200,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -1620,6 +1954,7 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
         name: true,
         apiKey: true,
         isPersonal: true,
+        ownerUserId: true,
       },
     });
     if (!project) {
@@ -1633,41 +1968,11 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
       );
     }
 
-    // Project login must target a real, shared project, never a personal
-    // workspace project. A coding agent that picked (or had auto-selected)
-    // the personal project silently sent the user's evaluations there
-    // (customer report). The browser picker hides personal projects; this
-    // is the server-side guarantee.
-    if (project.isPersonal) {
-      return c.json(
-        {
-          error: "personal_project_not_allowed",
-          error_description:
-            "Personal projects can't back a project API key. Pick a shared team project so your evaluations, prompts and traces land on a real project.",
-        },
-        400,
-      );
-    }
-
-    // The returned Project.apiKey is the shared write credential and is
-    // usable outside the UI's RBAC constraints, so team membership alone
-    // is not enough: require a write-capable project permission. A
-    // view-only member cannot extract it.
-    const canWriteProject = await hasProjectPermission(
-      { prisma, session },
-      project.id,
-      "project:update",
-    );
-    if (!canWriteProject) {
-      return c.json(
-        {
-          error: "forbidden",
-          error_description:
-            "You need write access to this project to retrieve its API key.",
-        },
-        403,
-      );
-    }
+    // The browser picker lists personal as a clearly-labelled entry the user
+    // must deliberately choose, so an explicit self-pick is honoured here;
+    // everything else the shared handout rule refuses.
+    const refusal = await refuseProjectKeyHandout(c, project, session.user.id);
+    if (refusal) return refusal;
 
     await approveDeviceCode({
       deviceCode: record.device_code,

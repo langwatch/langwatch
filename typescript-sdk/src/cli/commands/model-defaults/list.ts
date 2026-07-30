@@ -3,7 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 
 import { ModelDefaultsApiService } from "@/client-sdk/services/model-defaults/model-defaults-api.service";
 
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -15,7 +15,7 @@ import type { CommandResult } from "../../utils/output";
  * only shows in its spinner line.
  */
 export const listModelDefaultsCommand = async (): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new ModelDefaultsApiService();
   const spinner = createSpinner("Fetching default-model configuration...").start();

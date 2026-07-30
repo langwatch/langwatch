@@ -286,6 +286,9 @@ export const TargetHeader = memo(function TargetHeader({
     configId: target.type === "prompt" ? target.promptId : undefined,
     currentVersion:
       target.type === "prompt" ? target.promptVersionNumber : undefined,
+    // One instance per target column, all always mounted — same N-mounted
+    // storm shape as the prompt tab labels (#5585).
+    isLiveRefetchEnabled: false,
   });
 
   // Check if this target is effectively at "latest" version

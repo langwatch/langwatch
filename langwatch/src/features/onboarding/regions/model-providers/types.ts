@@ -33,6 +33,15 @@ export interface ModelProviderSpec {
   key: ModelProviderKey;
   defaultModel?: string | null;
   defaultBaseUrl?: string;
+  /**
+   * The host the provider's APIs hang off, without a version segment.
+   *
+   * Only needed by providers that answer on more than one path — credential
+   * validation probes each one, and the alternative is parsing
+   * `defaultBaseUrl` to guess at a structure the registry could simply
+   * state. Absent for the providers with a single documented endpoint.
+   */
+  apiRoot?: string;
   label: string;
   icon: IconData;
   externalDocsUrl?: string;

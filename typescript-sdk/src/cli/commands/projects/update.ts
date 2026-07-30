@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -20,7 +20,7 @@ export const updateProjectCommand = async (
   id: string,
   options: UpdateProjectOptions,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const noFieldsProvided =
     options.name === undefined &&
