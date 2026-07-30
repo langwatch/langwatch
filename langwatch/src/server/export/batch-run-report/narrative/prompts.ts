@@ -23,7 +23,9 @@ Rules, in order of importance:
 2. Never invent a scenario id, criterion id, group id, turn number or figure.
    Every id you cite must appear verbatim in EVIDENCE. Citing something that is
    not there deletes the whole sentence, so a guess costs you the point you were
-   making.
+   making. A "run" citation's runId must be one of the run_id values listed
+   under ## SCENARIOS or ## CONVERSATIONS — never the suite name from ## RUN,
+   which is not a run and cannot be cited as one.
 3. Declining a question is a correct answer. If the evidence cannot support an
    answer, decline it in one sentence saying what is missing.
 4. Never state a percentage without also stating how many runs it is out of. If
@@ -59,6 +61,16 @@ You are analysing one run of an automated agent test suite, for the engineer who
 owns the agent. You are given EVIDENCE computed from the run. Answer each of the
 questions below from that evidence.
 
+Respond with a single JSON object shaped exactly like this — an "answers" array,
+one entry per question id, never a top-level object keyed by question id:
+
+{"answers":[{"questionId":"past.outcome","declined":false,
+"statements":[{"text":"One sentence, citing evidence.",
+"citations":[{"kind":"run","runId":"the exact id from EVIDENCE"}]}]}]}
+
+A question you decline still gets its own entry: {"questionId":"...",
+"declined":true,"declinedReason":"why, in one sentence"}.
+
 QUESTIONS
 ${buildQuestionBrief({ questions })}
 
@@ -76,6 +88,18 @@ consider.
 `.trim();
 }
 
+/**
+ * Whether a prompt satisfies OpenAI-compatible APIs' own requirement: a
+ * request using `response_format: json_object` 400s unless the word "json"
+ * appears somewhere in the messages. Both system prompts here are what get
+ * sent as those messages, so this is checked at module load — a prompt edit
+ * that drops the word fails every report silently (a fast, generic-looking
+ * 400) rather than failing loudly at the one place it can be caught cheaply.
+ */
+export function mentionsJson(text: string): boolean {
+  return /\bjson\b/i.test(text);
+}
+
 export const VERIFIER_SYSTEM_PROMPT = `
 You are checking a draft report against the run data it was written from.
 
@@ -87,7 +111,39 @@ Mark a statement unsupported if it states a figure EVIDENCE does not contain,
 describes behaviour no conversation in EVIDENCE shows, generalises far past what
 was measured, or asserts a trend EVIDENCE does not support.
 
+A statement whose id starts with "future." proposes a fix — a scenario, a line
+of agent instructions, a guardrail rule — rather than describing what happened.
+Judge those by their citations, not by their wording: they are supported when
+every citation is real and the proposal is a direct response to the failure it
+points at. A proposal's own text (the scenario, the instruction, the rule) is
+new by construction and will never itself appear in EVIDENCE — that is not a
+reason to mark it unsupported. Mark a proposal unsupported only when a citation
+does not exist, or the proposal has no real connection to what its citations
+show (for example, it addresses a failure the citations do not describe).
+
 Return a verdict for EVERY statement id you were given, and none you were not.
 Do not rewrite anything. Do not explain your reasoning at length — one short
 sentence when unsupported, so a human can audit the call.
+
+Respond with a single JSON object shaped exactly like this — a "verdicts"
+array, one entry per statement id, never a top-level object keyed by statement
+id and never a string status in place of the boolean:
+
+{"verdicts":[{"claimId":"the exact id you were given","supported":true},
+{"claimId":"another id","supported":false,"reason":"why, in one sentence"}]}
 `.trim();
+
+function assertPromptsSupportJsonMode(): void {
+  const narrativePrompt = buildNarrativeSystemPrompt({ questions: [] });
+  if (!mentionsJson(narrativePrompt)) {
+    throw new Error(
+      "buildNarrativeSystemPrompt() no longer mentions 'json' — OpenAI-compatible providers reject a json_object response_format request whose messages don't contain the word.",
+    );
+  }
+  if (!mentionsJson(VERIFIER_SYSTEM_PROMPT)) {
+    throw new Error(
+      "VERIFIER_SYSTEM_PROMPT no longer mentions 'json' — OpenAI-compatible providers reject a json_object response_format request whose messages don't contain the word.",
+    );
+  }
+}
+assertPromptsSupportJsonMode();

@@ -1,5 +1,4 @@
-import type { ReportEvidence } from "../report.types";
-import type { SelectedTranscript } from "./transcript-budget";
+import type { ReportEvidence, SelectedTranscript } from "../report.types";
 
 /**
  * Renders the evidence as the exact text both model passes are given.
@@ -38,7 +37,8 @@ export function buildEvidenceBlock({
 function runSection(evidence: ReportEvidence): string[] {
   return [
     "## RUN",
-    `suite: ${evidence.batch.suiteName ?? "(unnamed)"}`,
+    "(context only — nothing on this line is a citable id; cite run_id values from ## SCENARIOS instead)",
+    `suite_name: ${evidence.batch.suiteName ?? "(unnamed)"}`,
     `scenarios: ${evidence.counts.totalCount}`,
     `passed: ${evidence.counts.passedCount}  failed: ${evidence.counts.failedCount}  stalled: ${evidence.counts.stalledCount}  cancelled: ${evidence.counts.cancelledCount}`,
     `settled: ${evidence.counts.settledCount}`,
@@ -95,9 +95,10 @@ function trendSection(evidence: ReportEvidence): string[] {
 function scenariosSection(evidence: ReportEvidence): string[] {
   return [
     "## SCENARIOS",
+    '(run_id is the only value citable as a "run" citation)',
     ...evidence.runs.map(
       (run) =>
-        `${run.runId}  "${run.scenarioName}"  ${run.status}  turns=${run.turnCount}` +
+        `run_id=${run.runId}  scenario="${run.scenarioName}"  ${run.status}  turns=${run.turnCount}` +
         (run.unmetCriteria.length > 0
           ? `\n    unmet: ${run.unmetCriteria.join(" | ")}`
           : "") +
@@ -121,7 +122,7 @@ function conversationsSection({
       : `(${transcripts.length} of ${evidence.truncation.failingRuns} failing conversations, covering ${evidence.truncation.signaturesCovered} of ${evidence.truncation.signaturesTotal} distinct failure groups)`,
     ...transcripts.map((transcript) =>
       [
-        `--- ${transcript.runId} "${transcript.scenarioName}" group=${transcript.signatureId}`,
+        `--- run_id=${transcript.runId} scenario="${transcript.scenarioName}" group=${transcript.signatureId}`,
         transcript.omittedTurns > 0
           ? `    [${transcript.omittedTurns} middle turns omitted]`
           : "",

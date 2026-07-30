@@ -26,7 +26,10 @@ const logger = createLogger("langwatch:batch-run-report:narrative");
  */
 
 const draftStatementSchema = z.object({
-  text: z.string().max(400).describe("One plain sentence. No markdown."),
+  // A sentence naming run ids, scenario names and criteria inline routinely
+  // runs past 400 characters without being verbose — this cap only needs to
+  // rule out paragraphs, not ordinary citation-bearing prose.
+  text: z.string().max(700).describe("One plain sentence. No markdown."),
   citations: z
     .array(citationSchema)
     .max(6)
