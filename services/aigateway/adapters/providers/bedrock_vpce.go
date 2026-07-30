@@ -265,66 +265,109 @@ func mapBedrockAdditionalFields(ctx context.Context, params *bfschemas.ChatParam
 	}
 	fields := map[string]any{}
 
-	if params.Reasoning != nil && !bfschemas.IsAnthropicModel(model) {
-		// Non-Anthropic families reach here only if the parameter policy
-		// allowed them (Nova); the VPCE path serves Anthropic inference
-		// profiles, so keep the honest refusal rather than guessing a
-		// mapping bifrost implements differently per family.
-		return nil, herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
-			"message": fmt.Sprintf("refusing to drop 'reasoning_effort' for bedrock/%s: the managed Bedrock endpoint maps reasoning for Anthropic models only. Remove it, or use an Anthropic model", model),
-			"fault":   "customer",
-		})
+	mapper := bedrockFieldMapper{fields: fields, params: params, model: model}
+	if err := mapper.applyReasoning(ctx); err != nil {
+		return nil, err
 	}
-	if params.Reasoning != nil {
-		effort := ""
-		if params.Reasoning.Effort != nil {
-			effort = *params.Reasoning.Effort
-		}
-		switch {
-		case params.Reasoning.MaxTokens != nil:
-			budget := *params.Reasoning.MaxTokens
-			if budget == -1 {
-				budget = anthropicMinimumThinkingBudget
-			}
-			if budget < anthropicMinimumThinkingBudget {
-				return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
-					"reason": fmt.Sprintf("reasoning.max_tokens must be >= %d for anthropic", anthropicMinimumThinkingBudget),
-				})
-			}
-			fields["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
-		case effort != "" && effort != "none":
-			if bfanthropic.SupportsAdaptiveThinking(model) {
-				fields["thinking"] = map[string]any{"type": "adaptive"}
-				setOutputConfig(fields, "effort", bfanthropic.MapBifrostEffortToAnthropic(effort))
-			} else {
-				maxTokens := bfproviderutils.GetMaxOutputTokensOrDefault(model, bedrockDefaultCompletionMaxTokens)
-				if params.MaxCompletionTokens != nil {
-					maxTokens = *params.MaxCompletionTokens
-				}
-				budget, err := bfproviderutils.GetBudgetTokensFromReasoningEffort(effort, anthropicMinimumThinkingBudget, maxTokens)
-				if err != nil {
-					return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
-				}
-				fields["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
-			}
-		}
-	}
-
-	if schema, name, ok := jsonSchemaFromResponseFormat(params.ResponseFormat); ok {
-		if !bfschemas.IsAnthropicModel(model) {
-			return nil, herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
-				"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: the managed Bedrock endpoint enforces json_schema for Anthropic models only. Remove it, or use an Anthropic model", model),
-				"fault":   "customer",
-			})
-		}
-		_ = name // Anthropic's output_config carries type + schema only, same as bifrost.
-		setOutputConfig(fields, "format", map[string]any{"type": "json_schema", "schema": schema})
+	if err := mapper.applyResponseFormat(ctx); err != nil {
+		return nil, err
 	}
 
 	if len(fields) == 0 {
 		return nil, nil
 	}
 	return brdocument.NewLazyDocument(fields), nil
+}
+
+// bedrockFieldMapper builds one request's additionalModelRequestFields.
+type bedrockFieldMapper struct {
+	fields map[string]any
+	params *bfschemas.ChatParameters
+	model  string
+}
+
+// applyReasoning writes the thinking block for a reasoning request.
+// Non-Anthropic families reach here only if the parameter policy allowed
+// them (Nova); this endpoint serves Anthropic inference profiles, so keep
+// the honest refusal rather than guessing a mapping bifrost implements
+// differently per family.
+func (m bedrockFieldMapper) applyReasoning(ctx context.Context) error {
+	if m.params.Reasoning == nil {
+		return nil
+	}
+	if !bfschemas.IsAnthropicModel(m.model) {
+		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
+			"message": fmt.Sprintf("refusing to drop 'reasoning_effort' for bedrock/%s: the managed Bedrock endpoint maps reasoning for Anthropic models only. Remove it, or use an Anthropic model", m.model),
+			"fault":   "customer",
+		})
+	}
+	if m.params.Reasoning.MaxTokens != nil {
+		return m.applyExplicitThinkingBudget(ctx)
+	}
+	return m.applyThinkingEffort(ctx)
+}
+
+// applyExplicitThinkingBudget honors a caller-sent reasoning.max_tokens.
+// The sentinel -1 means "the minimum the provider accepts".
+func (m bedrockFieldMapper) applyExplicitThinkingBudget(ctx context.Context) error {
+	budget := *m.params.Reasoning.MaxTokens
+	if budget == -1 {
+		budget = anthropicMinimumThinkingBudget
+	}
+	if budget < anthropicMinimumThinkingBudget {
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"reason": fmt.Sprintf("reasoning.max_tokens must be >= %d for anthropic", anthropicMinimumThinkingBudget),
+		})
+	}
+	m.fields["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
+	return nil
+}
+
+// applyThinkingEffort derives the thinking budget from reasoning_effort:
+// adaptive-thinking models take the effort natively, the rest get a budget
+// computed against the caller's output cap.
+func (m bedrockFieldMapper) applyThinkingEffort(ctx context.Context) error {
+	effort := ""
+	if m.params.Reasoning.Effort != nil {
+		effort = *m.params.Reasoning.Effort
+	}
+	if effort == "" || effort == "none" {
+		return nil
+	}
+	if bfanthropic.SupportsAdaptiveThinking(m.model) {
+		m.fields["thinking"] = map[string]any{"type": "adaptive"}
+		setOutputConfig(m.fields, "effort", bfanthropic.MapBifrostEffortToAnthropic(effort))
+		return nil
+	}
+	maxTokens := bfproviderutils.GetMaxOutputTokensOrDefault(m.model, bedrockDefaultCompletionMaxTokens)
+	if m.params.MaxCompletionTokens != nil {
+		maxTokens = *m.params.MaxCompletionTokens
+	}
+	budget, err := bfproviderutils.GetBudgetTokensFromReasoningEffort(effort, anthropicMinimumThinkingBudget, maxTokens)
+	if err != nil {
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+	}
+	m.fields["thinking"] = map[string]any{"type": "enabled", "budget_tokens": budget}
+	return nil
+}
+
+// applyResponseFormat writes the output_config block for a json_schema
+// request, refusing the families this endpoint cannot enforce it for.
+func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
+	schema, _, ok := jsonSchemaFromResponseFormat(m.params.ResponseFormat)
+	if !ok {
+		return nil
+	}
+	if !bfschemas.IsAnthropicModel(m.model) {
+		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
+			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: the managed Bedrock endpoint enforces json_schema for Anthropic models only. Remove it, or use an Anthropic model", m.model),
+			"fault":   "customer",
+		})
+	}
+	// Anthropic's output_config carries type + schema only, same as bifrost,
+	// so the schema name the caller sent has nowhere to go.
+	setOutputConfig(m.fields, "format", map[string]any{"type": "json_schema", "schema": schema})
+	return nil
 }
 
 // anthropicMinimumThinkingBudget and bedrockDefaultCompletionMaxTokens

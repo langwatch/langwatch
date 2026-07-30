@@ -31,7 +31,7 @@ import (
 //     functionally; honoring the request without it would change what the
 //     client observably gets. Always refused, regardless of drop_tuning_params.
 //
-// The docs page docs/self-hosting/gateway-parameter-mapping.mdx renders
+// The docs page docs/ai-gateway/parameter-mapping.mdx renders
 // this table; TestParamPolicyDocsInSync keeps the two from drifting.
 
 // policyLane identifies a translated lane for parameter policy. Vertex
@@ -93,6 +93,13 @@ type ruleCtx struct {
 	lane   policyLane
 	model  string
 	value  gjson.Result
+	// strict is `drop_tuning_params: false`: a droppable parameter refuses
+	// instead of dropping.
+	strict bool
+}
+
+func (rc ruleCtx) laneLabel() string {
+	return fmt.Sprintf("%s/%s", rc.lane, rc.model)
 }
 
 type paramRule struct {
@@ -442,59 +449,120 @@ func dropTuningParamsEnabled(body []byte) bool {
 	return gjson.GetBytes(body, "drop_tuning_params").Type != gjson.False
 }
 
+// ruleFor is the lane's rule for one request key; a key the table does
+// not know falls back to the default (dropped) rule.
+func ruleFor(name string, lane policyLane) paramRule {
+	laneRules, known := paramPolicyTable[name]
+	if !known {
+		return paramPolicyDefaultRule
+	}
+	return laneRules[lane]
+}
+
+// resolveDisposition applies the rule's refinement, if it has one, keeping
+// the table's static reason when the refinement supplies none.
+func resolveDisposition(rule paramRule, rc ruleCtx) (disposition, string) {
+	if rule.refine == nil {
+		return rule.disp, rule.why
+	}
+	disp, why := rule.refine(rc)
+	if why == "" {
+		why = rule.why
+	}
+	return disp, why
+}
+
+func refusedFunctionally(name, laneLabel, why string) *paramRefusalError {
+	return &paramRefusalError{msg: fmt.Sprintf(
+		"refusing to drop '%s' for %s: the request depends on it functionally (%s). Remove it, or use a model that supports it",
+		name, laneLabel, why)}
+}
+
+func refusedStrictMode(name, laneLabel, why string) *paramRefusalError {
+	return &paramRefusalError{msg: fmt.Sprintf(
+		"refusing to drop '%s' for %s: drop_tuning_params is false and %s. Remove it, set drop_tuning_params to true, or use a model that supports it",
+		name, laneLabel, why)}
+}
+
+// paramVerdict is what the policy decided about one request key: refuse
+// the request, drop the key (optionally clearing it off the parsed
+// parameters first), or let it through.
+type paramVerdict struct {
+	refusal *paramRefusalError
+	drop    bool
+	clear   func(*bfschemas.ChatParameters)
+}
+
+// applyDrop records a dropped key and clears it off the parsed parameters
+// so the translator never sees it. A no-op for anything but a drop.
+func (v paramVerdict) applyDrop(result *paramPolicyResult, params *bfschemas.ChatParameters, name string) {
+	if !v.drop {
+		return
+	}
+	if v.clear != nil {
+		v.clear(params)
+	}
+	result.dropped = append(result.dropped, name)
+}
+
+// classifyParam decides one request key against the lane's rule.
+func classifyParam(rc ruleCtx, name string) paramVerdict {
+	if paramPolicyIgnoredKeys[name] {
+		return paramVerdict{}
+	}
+	rule := ruleFor(name, rc.lane)
+	disp, why := resolveDisposition(rule, rc)
+	switch disp {
+	case dispRefused:
+		return paramVerdict{refusal: refusedFunctionally(name, rc.laneLabel(), why)}
+	case dispDropped:
+		if rc.strict {
+			return paramVerdict{refusal: refusedStrictMode(name, rc.laneLabel(), why)}
+		}
+		return paramVerdict{drop: true, clear: rule.clear}
+	default:
+		return paramVerdict{}
+	}
+}
+
+// policyTarget is the dispatch destination the policy is evaluated
+// against: the provider picks the lane, the model refines rules that vary
+// by family.
+type policyTarget struct {
+	provider bfschemas.ModelProvider
+	model    string
+}
+
 // applyParamPolicy walks the request's top-level keys and applies the
 // table: mapped keys pass, droppable keys are dropped (signaled) or
 // refused in strict mode, contract keys always refuse. It also performs
 // the mapping-side fixes the table promises (anthropic top_p coexistence,
 // bedrock tool_choice none).
-func applyParamPolicy(body []byte, params *bfschemas.ChatParameters, provider bfschemas.ModelProvider, model string) (paramPolicyResult, error) {
+func applyParamPolicy(target policyTarget, body []byte, params *bfschemas.ChatParameters) (paramPolicyResult, error) {
 	var result paramPolicyResult
-	lane, ok := policyLaneFor(provider)
+	lane, ok := policyLaneFor(target.provider)
 	if !ok {
 		return result, nil
 	}
-	strict := !dropTuningParamsEnabled(body)
-	laneLabel := fmt.Sprintf("%s/%s", lane, model)
+	base := ruleCtx{
+		body:   body,
+		params: params,
+		lane:   lane,
+		model:  target.model,
+		strict: !dropTuningParamsEnabled(body),
+	}
 
 	var refusal *paramRefusalError
 	gjson.ParseBytes(body).ForEach(func(key, value gjson.Result) bool {
+		rc := base
+		rc.value = value
 		name := key.String()
-		if paramPolicyIgnoredKeys[name] {
-			return true
-		}
-		laneRules, known := paramPolicyTable[name]
-		rule := paramPolicyDefaultRule
-		if known {
-			rule = laneRules[lane]
-		}
-		disp, why := rule.disp, rule.why
-		if rule.refine != nil {
-			disp, why = rule.refine(ruleCtx{body: body, params: params, lane: lane, model: model, value: value})
-			if why == "" {
-				why = rule.why
-			}
-		}
-		switch disp {
-		case dispMapped:
-			return true
-		case dispRefused:
-			refusal = &paramRefusalError{msg: fmt.Sprintf(
-				"refusing to drop '%s' for %s: the request depends on it functionally (%s). Remove it, or use a model that supports it",
-				name, laneLabel, why)}
+		verdict := classifyParam(rc, name)
+		if verdict.refusal != nil {
+			refusal = verdict.refusal
 			return false
-		case dispDropped:
-			if strict {
-				refusal = &paramRefusalError{msg: fmt.Sprintf(
-					"refusing to drop '%s' for %s: drop_tuning_params is false and %s. Remove it, set drop_tuning_params to true, or use a model that supports it",
-					name, laneLabel, why)}
-				return false
-			}
-			if rule.clear != nil {
-				rule.clear(params)
-			}
-			result.dropped = append(result.dropped, name)
-			return true
 		}
+		verdict.applyDrop(&result, params, name)
 		return true
 	})
 	if refusal != nil {
@@ -536,39 +604,49 @@ func renderParamPolicyTable() string {
 	}
 	sort.Strings(names)
 
-	label := func(r paramRule) string {
-		switch r.disp {
-		case dispMapped:
-			return "mapped"
-		case dispDropped:
-			return "dropped"
-		default:
-			return "refused"
-		}
-	}
 	var b strings.Builder
 	b.WriteString("| Parameter | anthropic | bedrock | gemini / vertex | Notes |\n")
 	b.WriteString("|---|---|---|---|---|\n")
 	for _, name := range names {
 		rules := paramPolicyTable[name]
-		note := ""
-		if a, bd, g := rules[laneAnthropic].note, rules[laneBedrock].note, rules[laneGemini].note; a == bd && bd == g {
-			note = a
-		} else {
-			for _, lane := range []policyLane{laneAnthropic, laneBedrock, laneGemini} {
-				if n := rules[lane].note; n != "" {
-					if note != "" {
-						note += "; "
-					}
-					note += string(lane) + ": " + n
-				}
-			}
-		}
 		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | %s |\n",
-			name, label(rules[laneAnthropic]), label(rules[laneBedrock]), label(rules[laneGemini]), note)
+			name,
+			dispositionLabel(rules[laneAnthropic]),
+			dispositionLabel(rules[laneBedrock]),
+			dispositionLabel(rules[laneGemini]),
+			renderPolicyNote(rules))
 	}
 	b.WriteString("| any other key | dropped | dropped | dropped | vendor params with no mapping on translated lanes |\n")
 	return b.String()
+}
+
+// dispositionLabel is the table cell for one lane's rule.
+func dispositionLabel(r paramRule) string {
+	switch r.disp {
+	case dispMapped:
+		return "mapped"
+	case dispDropped:
+		return "dropped"
+	default:
+		return "refused"
+	}
+}
+
+// renderPolicyNote composes one parameter's Notes cell: a note the three
+// lanes share is printed once, otherwise each non-empty note is prefixed
+// with the lane it belongs to.
+func renderPolicyNote(rules map[policyLane]paramRule) string {
+	anthropic, bedrock, gemini := rules[laneAnthropic].note, rules[laneBedrock].note, rules[laneGemini].note
+	if anthropic == bedrock && bedrock == gemini {
+		return anthropic
+	}
+	parts := make([]string, 0, 3)
+	for _, lane := range []policyLane{laneAnthropic, laneBedrock, laneGemini} {
+		if n := rules[lane].note; n != "" {
+			parts = append(parts, string(lane)+": "+n)
+		}
+	}
+	return strings.Join(parts, "; ")
 }
 
 // paramRefusalError marks a policy refusal so the dispatch call sites can

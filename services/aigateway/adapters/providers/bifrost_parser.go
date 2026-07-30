@@ -180,7 +180,7 @@ func buildChatRequest(
 	if err != nil {
 		return nil, ctx, err
 	}
-	policy, err := applyParamPolicy(req.Body, params, provider, model)
+	policy, err := applyParamPolicy(policyTarget{provider: provider, model: model}, req.Body, params)
 	if err != nil {
 		return nil, ctx, err
 	}
