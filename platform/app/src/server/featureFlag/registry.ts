@@ -98,7 +98,8 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
-  // Kill switch for the evaluation-inputs offload (ADR-096). The offload is ON
+  // Kill switch for the evaluation-inputs offload (ADR-096, retired; ground
+  // now ADR-098). The offload is ON
   // by default: oversized evaluator inputs go to the durable stored-objects
   // service and the event/row carry a bounded marker instead of the full
   // payload. Flipping this ON keeps inputs inline (only the unconditional
@@ -142,7 +143,8 @@ export const FEATURE_FLAGS = [
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
-  // Per-project gate for trace blob offload (#4215 / ADR-022). Checked ONCE per
+  // Per-project gate for trace blob offload (#4215 / ADR-022, retired;
+  // ground now ADR-099). Checked ONCE per
   // ingestion request (not per span) via the postgres-cached store, so the
   // hot-path cost is one cached lookup. When on, over-threshold spans get
   // routed via the transient S3 spool at the edge (ADR-022). Off = today's
@@ -187,7 +189,7 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via PostHog or the operator store to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
-  // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
+  // ADR-034 (retired; ground now ADR-099) Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
   // when the query shape allows. OFF (default) = legacy trace_summaries reads
   // unchanged. The router (`pickAnalyticsTable`) is the SINGLE place that
@@ -199,7 +201,7 @@ export const FEATURE_FLAGS = [
     description:
       "Routes analytics getTimeseries reads to the slim trace_analytics / rollup trace_analytics_rollup tables (ADR-034 Phases 1+2) when the query shape allows. Off = legacy trace_summaries reads unchanged.",
   },
-  // ADR-034 Phase 3 tripwire — when ON, runs both the routed query AND the
+  // ADR-034 (retired; ground now ADR-099) Phase 3 tripwire — when ON, runs both the routed query AND the
   // legacy `trace_summaries` query in parallel and logs a structured warning
   // on divergence beyond a small numeric tolerance. Returns the routed result
   // either way; thin wrapper, no read-path duplication beyond the comparison.
@@ -211,7 +213,8 @@ export const FEATURE_FLAGS = [
     description:
       "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
   },
-  // NOTE: `release_es_graph_triggers_firing` (ADR-034 Phase 5) was retired —
+  // NOTE: `release_es_graph_triggers_firing` (ADR-034, retired; ground now
+  // ADR-099, Phase 5) was retired —
   // the event-sourced graph-alert path is now unconditional and the K8s cron
   // was removed, so there is no longer a cron/ES choice to gate.
   // SYSTEM on purpose despite being a product surface: the Langy rollout is

@@ -2,7 +2,7 @@
 
 /**
  * `governanceKpis` — the /governance spend stream as a real projection
- * (ADR-075 Class C).
+ * (ADR-075 Class C, retired; ground now ADR-098).
  *
  * ADR-075 singles this one out: "governance_kpis is the one that needs
  * work: it is an incrementing aggregate per (org, source, hour_bucket), so

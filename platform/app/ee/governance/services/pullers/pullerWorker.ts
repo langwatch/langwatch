@@ -22,7 +22,7 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { createLogger } from "@langwatch/observability";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import {
   captureException,
@@ -213,14 +213,10 @@ export async function runIngestionPull(params: {
       prisma,
       source.organizationId,
     );
-    const ocsfRepo = new GovernanceOcsfEventsClickHouseRepository(
-      async (tenantId) => {
-        const client = await getClickHouseClientForProject(tenantId);
-        if (!client) {
-          throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-        }
-        return client;
-      },
+    // ADR-104: resolve through the composition root's client, not a
+    // second one built here.
+    const ocsfRepo = new GovernanceOcsfEventsClickHouseRepository((tenantId) =>
+      getApp().resolveClickHouseClient(tenantId),
     );
     for (const evt of result.events) {
       await ocsfRepo.insertEvent(

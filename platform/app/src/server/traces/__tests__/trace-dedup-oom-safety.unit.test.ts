@@ -67,7 +67,7 @@ describe("trace dedup OOM safety", () => {
     "utf-8",
   );
 
-  // ADR-051 moved the clustering domain into app-layer; the OOM-guarded
+  // ADR-051 (retired; ground now ADR-098) moved the clustering domain into app-layer; the OOM-guarded
   // ClickHouse fetch lives in clustering.ts there now.
   const topicClusteringPath = path.resolve(
     __dirname,

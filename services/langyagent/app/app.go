@@ -44,7 +44,8 @@ var reachingLangyStatuses = []string{
 }
 
 // readyStatusFor words the pre-first-frame status by the transition actually
-// happening: resuming a checkpointed turn (ADR-048), waking a worker that has
+// happening: resuming a checkpointed turn (ADR-048, retired; ground now
+// dev/docs/adr/098-event-sourcing-core.md), waking a worker that has
 // never answered, or reaching one that has. Lines rotate deterministically off
 // the turn id — stable for a re-drive of the same turn, different across turns.
 func readyStatusFor(req ChatRequest, worker Worker) string {

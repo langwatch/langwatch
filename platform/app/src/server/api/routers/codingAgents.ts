@@ -7,7 +7,8 @@ import { checkProjectPermission } from "../rbac";
 const DEFAULT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * Read surface for coding-agent SESSION usage (ADR-056).
+ * Read surface for coding-agent SESSION usage (ADR-056, retired; ground now
+ * ADR-105).
  *
  * Project-scoped and gated by `traces:view`, like tracesV2. Personal-workspace
  * usage passes the caller's personal project id (the /me page already resolves

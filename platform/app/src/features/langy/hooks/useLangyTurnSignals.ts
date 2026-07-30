@@ -47,7 +47,8 @@ export interface LangyTurnSignals {
  * Single consumer point for the live turn's granular streaming signals.
  *
  * `status_reported` / `progress_reported` are classified ephemeral by the
- * backend (ADR-046): they never hit the event_log. They ride the durable token
+ * backend (ADR-046, retired; ground now ADR-098): they never hit the
+ * event_log. They ride the durable token
  * buffer (as `status` / `progress` entries), which the `langy.onTurnStream`
  * subscription relays; the custom `ChatTransport` peels them off the stream —
  * they are not message parts — and writes them to the store, which this hook

@@ -16,7 +16,8 @@ from langwatch.telemetry.tracing import LangWatchTrace
 def test_trace_default_has_no_client_truncation():
     """The SDK must not truncate span content client-side by default (#4215).
 
-    Fidelity is the backend's job (ADR-022: event_log source-of-truth + edge
+    Fidelity is the backend's job (ADR-022, retired; ground now
+    dev/docs/adr/099-projection-storage-and-table-definition.md: event_log source-of-truth + edge
     spool); the Python SDK stays consistent with the TS/Go SDKs and stock
     OpenTelemetry, none of which truncate span content client-side. This guards
     against silently re-introducing a default per-field byte cap on either the

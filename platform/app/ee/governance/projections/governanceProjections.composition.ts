@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Layer-0 composition root (ADR-082) for the three governance stream
- * projections (ADR-075 Class C): it constructs, and does nothing else.
+ * Layer-0 composition root (ADR-082, retired; ground now ADR-102) for the
+ * three governance stream projections (ADR-075 Class C, retired; ground now
+ * ADR-098): it constructs, and does nothing else.
  *
  * The `*.composition.ts` suffix is the membership test — *does this file only
  * construct?* — the same one

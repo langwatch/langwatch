@@ -2,7 +2,7 @@
   "name": "@langwatch/langy",
   "version": "0.1.0",
   "private": true,
-  "description": "Langy's shared contract: the CARD vocabulary (every kind of card the panel can draw, the closed derived-safe allowlist a model may write, the CLI verb registry, digest and handled-error), the inline ```langy-card channel, and the conversation-projection contract (event payload schemas, the pure turn fold, the turn-phase machine, the event cursor) — imported by the LangWatch server pipeline, the browser panel and the CLI so a turn renders identically everywhere (ADR-059, ADR-060).",
+  "description": "Langy's shared contract: the CARD vocabulary (every kind of card the panel can draw, the closed derived-safe allowlist a model may write, the CLI verb registry, digest and handled-error), the inline ```langy-card channel, and the conversation-projection contract (event payload schemas, the pure turn fold, the turn-phase machine, the event cursor) — imported by the LangWatch server pipeline, the browser panel and the CLI so a turn renders identically everywhere (ADR-059 [retired; ground now ADR-098], ADR-060).",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

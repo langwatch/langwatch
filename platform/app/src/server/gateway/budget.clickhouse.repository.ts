@@ -196,7 +196,8 @@ export class GatewayBudgetClickHouseRepository {
    *
    * Returns whether rows were actually written. Callers use it to tell a
    * first write from a replay that found the ledger already intact — the
-   * ADR-075 `gatewayBudgetDebits` projection gates its `BUDGET_UPDATED`
+   * ADR-075 (retired; ground now ADR-098) `gatewayBudgetDebits` projection
+   * gates its `BUDGET_UPDATED`
    * change event on it, so replaying a window cannot flood the gateway's
    * revision feed with notifications for spend it already knows about.
    *

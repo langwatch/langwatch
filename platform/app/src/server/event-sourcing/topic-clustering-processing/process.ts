@@ -1,16 +1,22 @@
 import { createHash } from "node:crypto";
-import type { EvolveWakeFn, IntentUnion } from "@langwatch/event-sourcing";
-import { defineProcess } from "@langwatch/event-sourcing";
+import type {
+  EvolveStep,
+  HandlerContext,
+  IntentDef,
+  ProcessContext,
+} from "@langwatch/event-sourcing";
 import { z } from "zod";
-import type { ClusteringPageOutcome } from "~/server/app-layer/topic-clustering/clustering";
-import { topicClustering } from "./aggregate";
 import {
   mintManualRunId,
   mintScheduledRunId,
   runIsNewer,
   runRank,
 } from "./runIdentity";
-import type { RunCompletedData, RunFailedData, RunStartedData } from "./schema";
+import type {
+  RequestedData,
+  RunCompletedData,
+  RunFailedData,
+} from "./schema";
 import { topicClusteringSearchAfterSchema } from "./schema";
 
 /**
@@ -42,14 +48,11 @@ export type TopicClusteringRunIntentPayload = z.infer<
   typeof topicClusteringRunIntentPayloadSchema
 >;
 
-const topicClusteringIntents = {
-  run: {
-    payload: topicClusteringRunIntentPayloadSchema,
-    messageKey: (payload: TopicClusteringRunIntentPayload) =>
-      `run:${payload.runId}:page-${payload.page}`,
-  },
+export type TopicClusteringIntents = {
+  run: IntentDef<typeof topicClusteringRunIntentPayloadSchema>;
 };
-type TopicClusteringIntents = typeof topicClusteringIntents;
+
+type Step = EvolveStep<TopicClusteringScheduleState, TopicClusteringIntents>;
 
 export interface TopicClusteringScheduleState {
   /** The run this process believes owns the project, or `null` when idle.
@@ -101,28 +104,30 @@ function isRunInFlight(
   return refMs - startedAtMs < TOPIC_CLUSTERING_STALE_RUN_MS;
 }
 
-/** Clamps scheduling to the present. `ctx.at` is business time, so a backed-up
- * subscriber can deliver an event whose next slot has already passed, and
- * scheduling from it would arm a wake in the past. */
-function schedulingRef(ctx: { at: number; now: number }): number {
-  return Math.max(ctx.at, ctx.now);
+/**
+ * Clamps scheduling to the present. An event's `occurredAt` is business time,
+ * so a backed-up subscriber can deliver one whose next slot has already passed,
+ * and scheduling from it would arm a wake in the past.
+ */
+function schedulingRef(occurredAt: number, ctx: ProcessContext): number {
+  return Math.max(occurredAt, ctx.now);
 }
 
 /** Every step reschedules the daily slot; the wake-time in-flight guard, not
  * wake suppression, is what prevents run pile-ups. */
 function settle(
   state: TopicClusteringScheduleState,
-  ctx: { tenantId: string; at: number; now: number },
-  intents: readonly IntentUnion<
-    typeof TOPIC_CLUSTERING_PROCESS_NAME,
-    TopicClusteringIntents
-  >[] = [],
-) {
-  return {
-    state,
-    intents,
-    nextWakeAt: nextDailySlot(ctx.tenantId, schedulingRef(ctx)),
-  };
+  ctx: ProcessContext,
+  refMs: number,
+  intents: Step["intents"] = [],
+): Step {
+  return { state, intents, nextWakeAt: nextDailySlot(ctx.tenantId, refMs) };
+}
+
+function startRun(runId: string, ctx: ProcessContext, refMs: number): Step {
+  return settle({ currentRun: { runId, page: 1 } }, ctx, refMs, [
+    { type: "run", payload: { runId, page: 1, searchAfter: null } },
+  ]);
 }
 
 /**
@@ -131,92 +136,114 @@ function settle(
  * not from the slot it missed; clustering re-derives its work from live
  * unassigned traces, so one catch-up run covers the whole gap.
  */
-export const onTopicClusteringWake: EvolveWakeFn<
-  TopicClusteringScheduleState,
-  typeof TOPIC_CLUSTERING_PROCESS_NAME,
-  TopicClusteringIntents
-> = (state, intents, ctx) => {
-  if (isRunInFlight(state.currentRun, schedulingRef(ctx))) {
-    return settle(state, ctx);
+export function onTopicClusteringWake(
+  state: TopicClusteringScheduleState,
+  ctx: ProcessContext,
+): Step {
+  if (isRunInFlight(state.currentRun, ctx.now)) return settle(state, ctx, ctx.now);
+  return startRun(mintScheduledRunId(ctx.now), ctx, ctx.now);
+}
+
+/** A manual ask preempts a merely-recorded (stale) run but defers to one
+ * genuinely in flight; a bootstrap only ensures the schedule exists. The run id
+ * is minted from business time, so a redelivered request mints the same id
+ * rather than starting a second run. */
+export function onClusteringRequested(
+  state: TopicClusteringScheduleState,
+  data: RequestedData,
+  ctx: ProcessContext,
+): Step {
+  const refMs = schedulingRef(data.occurredAt, ctx);
+  if (data.trigger !== "manual") return settle(state, ctx, refMs);
+  if (isRunInFlight(state.currentRun, refMs)) return settle(state, ctx, refMs);
+  return startRun(mintManualRunId(data.occurredAt), ctx, refMs);
+}
+
+/** Continues the walk if a cursor came back, otherwise clears the run. A
+ * completion for a run a newer one has superseded is a late straggler. */
+export function onClusteringRunCompleted(
+  state: TopicClusteringScheduleState,
+  data: RunCompletedData,
+  ctx: ProcessContext,
+): Step {
+  const refMs = schedulingRef(data.occurredAt, ctx);
+  if (
+    state.currentRun !== null &&
+    state.currentRun.runId !== data.runId &&
+    !runIsNewer(data.runId, state.currentRun.runId)
+  ) {
+    return settle(state, ctx, refMs);
   }
-  const runId = mintScheduledRunId(schedulingRef(ctx));
-  return settle({ currentRun: { runId, page: 1 } }, ctx, [
-    intents.run({ runId, page: 1, searchAfter: null }),
+  if (data.nextSearchAfter === undefined) {
+    return settle({ currentRun: null }, ctx, refMs);
+  }
+  const page = data.page + 1;
+  return settle({ currentRun: { runId: data.runId, page } }, ctx, refMs, [
+    {
+      type: "run",
+      payload: {
+        runId: data.runId,
+        page,
+        searchAfter: [data.nextSearchAfter[0], data.nextSearchAfter[1]],
+      },
+    },
   ]);
-};
+}
 
-export const topicClusteringProcess = defineProcess(
-  TOPIC_CLUSTERING_PROCESS_NAME,
-)
-  .state(topicClusteringScheduleStateSchema, initTopicClusteringScheduleState)
-  .intents(topicClusteringIntents)
-  .on(topicClustering)
-  .onEvents({
-    /** A manual ask preempts a merely-recorded (stale) run but defers to one
-     * genuinely in flight; a bootstrap only ensures the schedule exists.
-     * The run id is minted from business time, so a redelivered request mints
-     * the same id rather than starting a second run. */
-    requested: (state, data, intents, ctx) => {
-      if (data.trigger !== "manual") return settle(state, ctx);
-      if (isRunInFlight(state.currentRun, schedulingRef(ctx))) {
-        return settle(state, ctx);
-      }
-      const runId = mintManualRunId(ctx.at);
-      return settle({ currentRun: { runId, page: 1 } }, ctx, [
-        intents.run({ runId, page: 1, searchAfter: null }),
-      ]);
-    },
-
-    /** Continues the walk if a cursor came back, otherwise clears the run. A
-     * completion for a run a newer one has superseded is a late straggler. */
-    runCompleted: (state, data, intents, ctx) => {
-      if (
-        state.currentRun !== null &&
-        state.currentRun.runId !== data.runId &&
-        !runIsNewer(data.runId, state.currentRun.runId)
-      ) {
-        return settle(state, ctx);
-      }
-      if (data.nextSearchAfter === undefined) {
-        return settle({ currentRun: null }, ctx);
-      }
-      const page = data.page + 1;
-      return settle({ currentRun: { runId: data.runId, page } }, ctx, [
-        intents.run({
-          runId: data.runId,
-          page,
-          searchAfter: [data.nextSearchAfter[0], data.nextSearchAfter[1]],
-        }),
-      ]);
-    },
-
-    /** Mirror of the completion guard, so a late failure from a superseded run
-     * cannot null out a newer one that has since started. */
-    runFailed: (state, data, _intents, ctx) => {
-      if (state.currentRun !== null && state.currentRun.runId !== data.runId) {
-        return settle(state, ctx);
-      }
-      return settle({ currentRun: null }, ctx);
-    },
-  })
-  .onWake(onTopicClusteringWake)
-  .build();
+/** Mirror of the completion guard, so a late failure from a superseded run
+ * cannot null out a newer one that has since started. */
+export function onClusteringRunFailed(
+  state: TopicClusteringScheduleState,
+  data: RunFailedData,
+  ctx: ProcessContext,
+): Step {
+  const refMs = schedulingRef(data.occurredAt, ctx);
+  if (state.currentRun !== null && state.currentRun.runId !== data.runId) {
+    return settle(state, ctx, refMs);
+  }
+  return settle({ currentRun: null }, ctx, refMs);
+}
 
 /**
- * What the `run` intent's handler calls out to: the clustering algorithm, and
- * this pipeline's own commands for reporting the outcome. Neither is an
- * event-sourcing concern, so this interface is the seam the composition root
- * adapts. Every argument shape is the declared payload, never a parallel
- * hand-written struct.
+ * What the `run` intent's delivery calls out to: one clustering page, start to
+ * finish, including the outcome it records for itself.
+ *
+ * The whole effect is one port rather than the four primitives it decomposes
+ * into, because its failure handling is attempt-dependent — below the retry cap
+ * a clustering error rethrows so the outbox retries with backoff, and only the
+ * final attempt records a durable `runFailed` — while the delivery context the
+ * pipeline can see (`{ now, tenantId }`) carries no attempt number. Keeping the
+ * split behind this port lets the composition root supply the deployed executor
+ * unchanged instead of the pipeline approximating it.
  */
 export interface TopicClusteringDispatchPorts {
   runClusteringPage(
-    params: Pick<
-      TopicClusteringRunIntentPayload,
-      "runId" | "page" | "searchAfter"
-    > & { projectId: string },
-  ): Promise<ClusteringPageOutcome>;
-  recordClusteringRunStarted(params: RunStartedData): Promise<void>;
-  recordClusteringRunCompleted(params: RunCompletedData): Promise<void>;
-  recordClusteringRunFailed(params: RunFailedData): Promise<void>;
+    payload: TopicClusteringRunIntentPayload,
+    ctx: HandlerContext,
+  ): Promise<void>;
+}
+
+/** The mount record, with the one effect bound to the port that runs it. */
+export function topicClusteringProcess(ports: TopicClusteringDispatchPorts) {
+  return {
+    state: topicClusteringScheduleStateSchema,
+    init: initTopicClusteringScheduleState,
+    intents: {
+      run: {
+        payload: topicClusteringRunIntentPayloadSchema,
+        messageKey: (payload: TopicClusteringRunIntentPayload) =>
+          `run:${payload.runId}:page-${payload.page}`,
+        deliver: (
+          payload: TopicClusteringRunIntentPayload,
+          ctx: HandlerContext,
+        ) => ports.runClusteringPage(payload, ctx),
+      },
+    },
+    on: {
+      requested: onClusteringRequested,
+      runCompleted: onClusteringRunCompleted,
+      runFailed: onClusteringRunFailed,
+    },
+    onWake: onTopicClusteringWake,
+  };
 }

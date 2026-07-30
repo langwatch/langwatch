@@ -1,4 +1,5 @@
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
+import type { PIIRedactionLevel } from "~/server/event-sourcing/trace-processing/schema";
 import type { DeepPartial } from "~/utils/types";
 import { buildPoint, type PreparedMetricPoint } from "./canonical/buildPoint";
 import {
@@ -7,7 +8,6 @@ import {
   metricKind,
 } from "./canonical/kinds";
 import {
-  type PiiRedactionLevel,
   type RedactionService,
   redactTypedAttributes,
 } from "./canonical/redaction";
@@ -135,7 +135,7 @@ interface PrepareMetricDataPointsArgs {
   tenantId: string;
   organizationId: string;
   request: DeepPartial<IExportMetricsServiceRequest>;
-  piiRedactionLevel: PiiRedactionLevel;
+  piiRedactionLevel: PIIRedactionLevel;
   redactionService: RedactionService;
   acceptedAt?: number;
 }

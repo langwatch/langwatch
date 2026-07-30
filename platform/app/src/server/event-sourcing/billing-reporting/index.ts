@@ -1,262 +1,171 @@
 /**
- * The billing-reporting pipeline (ADR-098, ADR-099, ADR-100, ADR-102).
+ * The billing-reporting pipeline (ADR-098, ADR-099, ADR-100, ADR-105).
  *
  * @see specs/licensing/billing-meter-dispatch.feature
  *
- * The **meter** records every billable event, one deduplicated row each. The
- * **poke** is the losable fast path; the **sweep** re-reports hourly whether or
- * not anything poked, and is the guarantee. Both dispatch
- * `reportUsageForMonth`, which reads the month total as a LEVEL.
+ * `recordBillableEvent` is the command bridge (ADR-105 consequences): the
+ * only way another pipeline's own billable activity reaches this one, since
+ * this pipeline cannot see another's events. Its own `billableEventRecorded`
+ * feeds three members: the `billableEventsMeter` map, which records the
+ * deduplicated ledger row; `billingMeterPoke`, one process instance per
+ * organization, which re-reads and reports that organization's month total;
+ * and `billingMeterSweep`, one global instance, which is the durability
+ * guarantee behind the poke.
  */
 
 import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "@ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "@ee/billing/services/usageReportingService";
-import {
-  type ClickHouseClient,
-  clickhouseAppend,
-  deriveAppendMapping,
-} from "@langwatch/clickhouse";
-import type { AppendStore, BatchContext } from "@langwatch/event-sourcing";
-import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
+import { type ClickHouseClient, clickhouseAppend } from "@langwatch/clickhouse";
+import { type GroupKey, definePipeline, processGroupKey } from "@langwatch/event-sourcing";
 import type { BillingCheckpointService } from "~/server/app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "~/server/app-layer/organizations/organization.service";
+import type { OrganizationForBilling } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { resolveOrganizationId as resolveOrganizationIdDefault } from "~/server/organizations/resolveOrganizationId";
+import { TtlCache } from "~/server/utils/ttlCache";
+import { toBillableEventRow, toBillableEventsTableRow } from "./billableEventsMeter.projection";
+import {
+  BILLING_METER_POKE_PROCESS_NAME,
+  billingMeterPokeIntents,
+  billingMeterPokeOn,
+  billingMeterPokeStateSchema,
+  initBillingMeterPokeState,
+} from "./billingMeterPoke.process";
+import {
+  BILLING_METER_SWEEP_PROCESS_NAME,
+  type BillingMeterSweepPorts,
+  billingMeterSweepIntents,
+  billingMeterSweepOn,
+  billingMeterSweepOnWake,
+  billingMeterSweepStateSchema,
+  initBillingMeterSweepState,
+} from "./billingMeterSweep.process";
+import { BILLING_PIPELINE_NAME, BILLING_PIPELINE_PREFIX, billingReportingEvents } from "./events";
+import {
+  type RecordBillableEventPorts,
+  billableSourceEventSchema,
+  recordBillableEvent,
+} from "./recordBillableEvent.command";
+import type { OrganizationCache } from "./reportUsage";
+import { billableEventsTable } from "./table";
 
-import { BILLING_REPORTING_PIPELINE_NAME } from "./constants";
-import {
-  BILLABLE_EVENT_TYPES,
-  type BillableEventMeterRecord,
-  billableEventMeterRecordSchema,
-  createBillableEventsMeterProjection,
-} from "./meter/billableEventsMeter";
-import { billableEventsTable } from "./meter/billableEventsTable";
-import {
-  type BillingMeterPokeMount,
-  createBillingMeterPokeMount,
-} from "./reporting/billingMeterPoke";
-import {
-  type BillingMeterSweepDeps,
-  type BillingMeterSweepMount,
-  createBillingMeterSweepMount,
-} from "./reporting/billingMeterSweep";
-import { reportUsageForMonthDispatchOptions } from "./reporting/dispatchOptions";
-import {
-  type ReportUsageForMonthData,
-  reportUsageForMonth,
-} from "./reporting/reportUsageForMonth";
+const ORG_CACHE_TTL_MS = 60 * 1000;
+/** A `__global__` marker, not a real organization id: the sweep is one
+ *  instance for the whole deployment, so it has no owning organization. */
+const GLOBAL_SWEEP_KEY = "__global__";
 
-export {
-  BILLING_GRACE_PERIOD_DAYS,
-  BILLING_REPORTING_PIPELINE_NAME,
-} from "./constants";
-export {
-  BILLABLE_EVENT_TYPES,
-  type BillableEventMeterRecord,
-  type BillableSourceEvent,
-  billableEventsMeterGroupKey,
-  createBillableEventsMeterProjection,
-  extractDeduplicationKey,
-  mapBillableEvent,
-  renderBillableEventsMeterGroupKey,
-} from "./meter/billableEventsMeter";
-export { billableEventsTable } from "./meter/billableEventsTable";
-export {
-  type BillableEventForPoke,
-  type BillingMeterPokeDeps,
-  type BillingMeterPokeMount,
-  billingMeterPokeDedupId,
-  billingMeterPokeGroupKey,
-  createBillingMeterPokeMount,
-  handleBillableEventPoke,
-} from "./reporting/billingMeterPoke";
-export {
-  BILLING_METER_SWEEP_NAME,
-  type BillingMeterSweepDeps,
-  type BillingMeterSweepMount,
-  billingMonthsForSweep,
-  createBillingMeterSweepMount,
-  runBillingMeterSweep,
-} from "./reporting/billingMeterSweep";
-export {
-  type ReportUsageForMonthDispatchOptions,
-  reportUsageForMonthDispatchOptions,
-  reportUsageForMonthGroupKey,
-} from "./reporting/dispatchOptions";
-export {
-  type ReportUsageForMonthData,
-  type ReportUsageForMonthDeps,
-  reportUsageForMonth,
-} from "./reporting/reportUsageForMonth";
+/** ADR-100 decision 4: content-addressed, one lane per source event. */
+export function recordBillableEventGroupKey(args: { tenantId: string; eventId: string }): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "command", name: "recordBillableEvent" },
+    scope: { kind: "aggregate", aggregateType: BILLING_PIPELINE_NAME, aggregateId: args.eventId },
+  };
+}
 
-const logger = createLogger(
-  "langwatch:billing-reporting:billable-events-meter",
-);
+/** A `partition` lane per project: this store is append-shaped, so any
+ *  number of events sharing a lane may coalesce into one insert. */
+export function billableEventsMeterGroupKey(args: { tenantId: string }): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "map", name: "billableEventsMeter" },
+    scope: { kind: "partition", parts: [args.tenantId] },
+  };
+}
+
+/** One poke instance per organization: two organizations' pokes must never
+ *  share a lane. */
+export function billingMeterPokeGroupKey(args: { organizationId: string }): GroupKey {
+  return processGroupKey(
+    { name: BILLING_METER_POKE_PROCESS_NAME },
+    { tenantId: args.organizationId, processKey: args.organizationId },
+  );
+}
+
+/** The sweep is one instance for the whole deployment, waking on a fixed
+ *  interval rather than on any organization's events. */
+export function billingMeterSweepGroupKey(): GroupKey {
+  return processGroupKey(
+    { name: BILLING_METER_SWEEP_PROCESS_NAME },
+    { tenantId: GLOBAL_SWEEP_KEY, processKey: GLOBAL_SWEEP_KEY },
+  );
+}
 
 export interface BillingReportingPipelineDeps {
-  readonly organizations: Pick<
-    OrganizationService,
-    "getOrganizationForBilling"
-  >;
+  readonly client: ClickHouseClient;
+  readonly organizations: Pick<OrganizationService, "getOrganizationForBilling">;
   readonly billingCheckpoints: BillingCheckpointService;
   /** Read per dispatch: usage reporting is SaaS-only, absent from a
    *  self-hosted build entirely. */
   readonly getUsageReportingService: () => UsageReportingService | undefined;
   readonly queryBillableEventsTotal: typeof QueryBillableEventsTotalFn;
-  readonly resolveOrganizationId?: (
-    projectId: string,
-  ) => Promise<string | undefined>;
+  /** Organizations whose month total must be re-read for the sweep — see
+   *  `billingMeterSweep.process.ts`. */
+  readonly listOrganizationsToReport: (params: { billingMonth: string }) => Promise<string[]>;
+  readonly pruneDispatchedIntentsBefore: (params: { before: number }) => Promise<number>;
+  readonly resolveOrganizationId?: (projectId: string) => Promise<string | undefined>;
+  /** Defaulted to a TTL cache; injected so a test never has to reach through
+   *  the module graph to stub it. */
+  readonly organizationCache?: OrganizationCache;
   /**
-   * Resolves the `@langwatch/clickhouse` client for an organization's
-   * ClickHouse target. No function with this signature exists yet —
-   * `~/server/clickhouse/clickhouseClient.ts` hands back a raw
-   * `@clickhouse/client` instead — so the composition root owes the bridge.
+   * The poke is gated on this; the sweep is not. On a self-hosted build the
+   * candidate query and the Stripe call both degrade to nothing on their
+   * own, so the sweep costs an empty read an hour and dispatches nothing —
+   * the poke has no equivalent self-gate, since it runs off every billable
+   * event rather than a bounded schedule.
    */
-  readonly getClickHouseClientForOrganization: (
-    organizationId: string,
-  ) => Promise<ClickHouseClient | null>;
   readonly isSaas: boolean;
 }
 
-/** One billable-events row, once the batch's organization and tenant are
- *  attached. Both are batch-level, so they are merged in per `writeBatch`
- *  rather than carried on every record. */
-const billableEventRowSchema = billableEventMeterRecordSchema.extend({
-  organizationId: z.string(),
-  tenantId: z.string(),
-});
-type BillableEventRow = z.infer<typeof billableEventRowSchema>;
+export function createBillingReportingPipeline(deps: BillingReportingPipelineDeps) {
+  const resolveOrganizationId = deps.resolveOrganizationId ?? resolveOrganizationIdDefault;
+  const organizationCache =
+    deps.organizationCache ?? new TtlCache<OrganizationForBilling>(ORG_CACHE_TTL_MS, "ttlcache:billing:orgData:");
 
-const toBillableEventRow = deriveAppendMapping({
-  table: billableEventsTable,
-  record: billableEventRowSchema,
-  fill: { UpdatedAt: () => new Date() },
-});
-
-/**
- * The meter's store. The organization is resolved once per batch, not once per
- * record: every record in one `writeBatch` shares a `BatchContext.tenantId`, so
- * it shares an organization too. `clickhouseAppend` needs one fixed client at
- * construction while the resolver hands back a different client per
- * organization, so the inner stores are memoised by client instance —
- * organizations sharing one ClickHouse target share one store.
- */
-function createBillableEventsMeterStore(deps: {
-  readonly resolveOrganizationId: (
-    projectId: string,
-  ) => Promise<string | undefined>;
-  readonly getClickHouseClientForOrganization: (
-    organizationId: string,
-  ) => Promise<ClickHouseClient | null>;
-}): AppendStore<BillableEventMeterRecord> {
-  const innerStores = new WeakMap<
-    ClickHouseClient,
-    AppendStore<BillableEventRow>
-  >();
-
-  const innerStoreFor = (
-    client: ClickHouseClient,
-  ): AppendStore<BillableEventRow> => {
-    const existing = innerStores.get(client);
-    if (existing) return existing;
-    const built = clickhouseAppend({
-      client,
-      table: billableEventsTable,
-      toRow: toBillableEventRow,
-    });
-    innerStores.set(client, built);
-    return built;
-  };
-
-  return {
-    kind: "append",
-
-    async writeBatch(
-      records: readonly BillableEventMeterRecord[],
-      context: BatchContext,
-    ): Promise<void> {
-      if (records.length === 0) return;
-
-      const organizationId = await deps.resolveOrganizationId(context.tenantId);
-      if (!organizationId) {
-        logger.warn(
-          { projectId: context.tenantId },
-          "orphan project detected, has no organization -- skipping billable event insert",
-        );
-        return;
-      }
-
-      const client =
-        await deps.getClickHouseClientForOrganization(organizationId);
-      if (!client) {
-        logger.debug(
-          "ClickHouse not configured, skipping billable event insert",
-        );
-        return;
-      }
-
-      await innerStoreFor(client).writeBatch(
-        records.map((record) => ({
-          ...record,
-          organizationId,
-          tenantId: context.tenantId,
-        })),
-        context,
-      );
-    },
-  };
-}
-
-/**
- * The pipeline's whole topology in one place: the meter with its store built at
- * the mount, and the two triggers that both dispatch through one bound
- * `reportUsageForMonth` closure — never a copy per caller, which is what lets a
- * sweep dispatch collapse into a pending poke's.
- */
-export function createBillingReportingPipeline(
-  deps: BillingReportingPipelineDeps,
-) {
-  const dispatch = (data: ReportUsageForMonthData): Promise<void> =>
-    reportUsageForMonth(data, {
-      organizations: deps.organizations,
-      billingCheckpoints: deps.billingCheckpoints,
-      getUsageReportingService: deps.getUsageReportingService,
-      queryBillableEventsTotal: deps.queryBillableEventsTotal,
-      selfDispatch: (next) => dispatch(next),
-    });
-
-  const meterStore = createBillableEventsMeterStore({
-    resolveOrganizationId:
-      deps.resolveOrganizationId ?? resolveOrganizationIdDefault,
-    getClickHouseClientForOrganization: deps.getClickHouseClientForOrganization,
+  const meterStore = clickhouseAppend({
+    client: deps.client,
+    table: billableEventsTable,
+    toRow: toBillableEventsTableRow,
   });
 
-  return {
-    name: BILLING_REPORTING_PIPELINE_NAME,
-
-    meter: {
-      table: billableEventsTable,
-      eventTypes: BILLABLE_EVENT_TYPES,
-      store: meterStore,
-      projection: createBillableEventsMeterProjection({ store: meterStore }),
-    },
-
-    reportUsageForMonth: dispatch,
-    dispatchOptions: reportUsageForMonthDispatchOptions,
-
-    /** Called once per source pipeline, each with its own slice of
-     *  `BILLABLE_EVENT_TYPES` — the poke is mounted on all 4. */
-    createPokeMount: (eventTypes: readonly string[]): BillingMeterPokeMount =>
-      createBillingMeterPokeMount({
-        eventTypes,
-        isSaas: deps.isSaas,
-        resolveOrganizationId: deps.resolveOrganizationId,
-        dispatchReport: dispatch,
-      }),
-
-    createSweepMount: (
-      sweepDeps: Omit<BillingMeterSweepDeps, "dispatchReport">,
-    ): BillingMeterSweepMount =>
-      createBillingMeterSweepMount({ ...sweepDeps, dispatchReport: dispatch }),
+  const reportUsagePorts = {
+    organizations: deps.organizations,
+    organizationCache,
+    billingCheckpoints: deps.billingCheckpoints,
+    getUsageReportingService: deps.getUsageReportingService,
+    queryBillableEventsTotal: deps.queryBillableEventsTotal,
   };
+  const sweepPorts: BillingMeterSweepPorts = {
+    ...reportUsagePorts,
+    listOrganizationsToReport: deps.listOrganizationsToReport,
+    pruneDispatchedIntentsBefore: deps.pruneDispatchedIntentsBefore,
+  };
+  const recordPorts: RecordBillableEventPorts = { resolveOrganizationId };
+
+  return definePipeline(BILLING_PIPELINE_NAME)
+    .prefix(BILLING_PIPELINE_PREFIX)
+    .events(billingReportingEvents)
+    .id({ billableEventRecorded: (data) => data.organizationId })
+    .withCommand("recordBillableEvent", {
+      input: billableSourceEventSchema,
+      handle: recordBillableEvent(recordPorts),
+    })
+    .withMap("billableEventsMeter", {
+      on: { billableEventRecorded: toBillableEventRow },
+      store: meterStore,
+    })
+    .withProcessManager(BILLING_METER_POKE_PROCESS_NAME, {
+      state: billingMeterPokeStateSchema,
+      init: initBillingMeterPokeState,
+      intents: billingMeterPokeIntents(reportUsagePorts),
+      on: billingMeterPokeOn,
+      enabled: deps.isSaas,
+    })
+    .withProcessManager(BILLING_METER_SWEEP_PROCESS_NAME, {
+      state: billingMeterSweepStateSchema,
+      init: initBillingMeterSweepState,
+      intents: billingMeterSweepIntents(sweepPorts),
+      on: billingMeterSweepOn,
+      onWake: billingMeterSweepOnWake,
+    })
+    .build();
 }

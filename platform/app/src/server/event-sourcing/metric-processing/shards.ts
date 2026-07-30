@@ -19,14 +19,6 @@ export function clampMetricShardCount(value: number): number {
   );
 }
 
-export function resolveMetricShardCount(value: string | undefined): number {
-  if (!value) return DEFAULT_METRIC_SHARD_COUNT;
-  const parsed = Number(value);
-  return Number.isFinite(parsed)
-    ? clampMetricShardCount(parsed)
-    : DEFAULT_METRIC_SHARD_COUNT;
-}
-
 /** Stable per identity, which is what makes the lane a serialisation boundary. */
 export function metricShardLabel(args: {
   identity: string;

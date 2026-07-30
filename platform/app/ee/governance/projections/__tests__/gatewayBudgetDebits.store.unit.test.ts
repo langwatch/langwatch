@@ -1,5 +1,6 @@
 /**
- * Unit tests for the ADR-075 Class C `gatewayBudgetDebits` write side.
+ * Unit tests for the ADR-075 Class C (retired; ground now ADR-098)
+ * `gatewayBudgetDebits` write side.
  *
  * The properties that matter here are the two the reactor could not offer:
  *

@@ -1,54 +1,82 @@
 import type { ClickHouseClient } from "@langwatch/clickhouse";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  topicClustering,
+  createTopicClusteringProcessingPipeline,
   topicClusteringCommandGroupKey,
+  topicClusteringFoldGroupKey,
   topicClusteringProcessGroupKey,
-  topicClusteringProcessing,
 } from "./index";
 
-/** Never called: these tests exercise composition, not I/O. */
-const client = {} as ClickHouseClient;
+function fakeClient(overrides: Partial<ClickHouseClient> = {}): ClickHouseClient {
+  return {
+    query: vi.fn().mockResolvedValue({ rows: [] }),
+    stream: vi.fn(),
+    insert: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
 
-describe("topic-clustering-processing composition", () => {
-  it("mounts the aggregate, three folds and the process manager without throwing", () => {
-    const pipeline = topicClusteringProcessing({ client });
+function baseDeps() {
+  return { client: fakeClient(), ports: { runClusteringPage: vi.fn(async () => undefined) } };
+}
 
-    expect(pipeline.aggregate.name).toBe("topic_clustering");
-    expect(Object.keys(pipeline.folds).sort()).toEqual([
+describe("createTopicClusteringProcessingPipeline", () => {
+  it("names itself 'topic_clustering' and derives the dotted event types already in event_log", () => {
+    const built = createTopicClusteringProcessingPipeline(baseDeps());
+    expect(built.name).toBe("topic_clustering");
+    expect([...built.eventTypes].sort()).toEqual([
+      "lw.obs.topic_clustering.requested",
+      "lw.obs.topic_clustering.run_completed",
+      "lw.obs.topic_clustering.run_failed",
+      "lw.obs.topic_clustering.run_started",
+      "lw.obs.topic_clustering.topics_recorded",
+    ]);
+  });
+
+  it("mounts the three folds, five commands and the process manager", () => {
+    const built = createTopicClusteringProcessingPipeline(baseDeps());
+    expect(Object.keys(built.folds).sort()).toEqual([
       "topicClusteringRunHistory",
       "topicClusteringRunStatus",
       "topicModel",
     ]);
-    expect(pipeline.process.definition.name).toBe("topicClustering");
+    expect(Object.keys(built.commands).sort()).toEqual([
+      "recordClusteringRunCompleted",
+      "recordClusteringRunFailed",
+      "recordClusteringRunStarted",
+      "recordTopics",
+      "requestClustering",
+    ]);
+    expect(Object.keys(built.processManagers)).toEqual(["topicClustering"]);
+  });
+
+  it("pins each fold's stamp to its own deployed version rather than deriving one", () => {
+    const built = createTopicClusteringProcessingPipeline(baseDeps());
+    expect(built.folds.topicClusteringRunStatus!.stateVersion).toBe("2026-07-17");
+    // topicClusteringRunHistory and topicModel shipped on the same deploy
+    // (TOPIC_CLUSTERING_PROJECTION_VERSIONS), so their pins are equal on
+    // purpose — the pin travels with the fold, not with schema-hash
+    // uniqueness.
+    expect(built.folds.topicClusteringRunHistory!.stateVersion).toBe("2026-07-20");
+    expect(built.folds.topicModel!.stateVersion).toBe("2026-07-20");
+
+    for (const fold of Object.values(built.folds)) {
+      expect(fold.schemaHash).not.toBe(fold.stateVersion);
+    }
   });
 
   it("mounts every fold as an aggregate-scoped, batching replace store", () => {
-    const pipeline = topicClusteringProcessing({ client });
-
-    for (const fold of Object.values(pipeline.folds)) {
-      expect(fold.mount).toEqual({
-        projection: "fold",
-        store: "replace",
-        scope: "aggregate",
-        collapse: "batch",
-      });
+    const built = createTopicClusteringProcessingPipeline(baseDeps());
+    for (const fold of Object.values(built.folds)) {
+      expect(fold.eventTypes.every((type) => built.eventTypes.includes(type))).toBe(true);
     }
   });
 
   it("gives every lane of one project the same aggregate scope", () => {
-    const pipeline = topicClusteringProcessing({ client });
-    const scope = {
-      kind: "aggregate",
-      aggregateType: "topic_clustering",
-      aggregateId: "project-1",
-    };
+    const scope = { kind: "aggregate", aggregateType: "topic_clustering", aggregateId: "project-1" } as const;
 
-    expect(
-      pipeline.folds.topicClusteringRunStatus.groupKey({
-        tenantId: "project-1",
-      }),
-    ).toEqual({
+    expect(topicClusteringFoldGroupKey({ tenantId: "project-1", projection: "topicClusteringRunStatus" })).toEqual({
       tenantId: "project-1",
       lane: { kind: "fold", name: "topicClusteringRunStatus" },
       scope,
@@ -65,22 +93,37 @@ describe("topic-clustering-processing composition", () => {
     });
   });
 
-  it("gives each fold its own state version, derived from its own schema", () => {
-    const pipeline = topicClusteringProcessing({ client });
-    const versions = Object.values(pipeline.folds).map(
-      (fold) => fold.projection.version,
-    );
-    expect(new Set(versions).size).toBe(versions.length);
+  describe("the requestClustering command", () => {
+    it("stamps its emitted event with the derived persisted type", async () => {
+      const built = createTopicClusteringProcessingPipeline(baseDeps());
+      const input = { projectId: "project-1", trigger: "manual" as const, occurredAt: 1_700_000_000_000 };
+      const events = await built.commands.requestClustering!.handle(input, { now: 1, tenantId: "project-1" });
+      expect(events).toEqual([{ type: "lw.obs.topic_clustering.requested", data: input }]);
+    });
   });
 
-  it("subscribes every fold only to events the aggregate declares", () => {
-    const pipeline = topicClusteringProcessing({ client });
-    const declared = new Set<string>(topicClustering.eventTypes);
+  describe("the topicClustering process manager", () => {
+    it("delivers the run intent through the injected port", async () => {
+      const runClusteringPage = vi.fn(async () => undefined);
+      const built = createTopicClusteringProcessingPipeline({ client: fakeClient(), ports: { runClusteringPage } });
 
-    for (const fold of Object.values(pipeline.folds)) {
-      for (const eventType of fold.projection.eventTypes) {
-        expect(declared.has(eventType)).toBe(true);
-      }
-    }
+      const payload = { runId: "run-1", page: 1, searchAfter: null };
+      await built.processManagers.topicClustering!.intents.run!.deliver(payload, { now: 1, tenantId: "project-1" });
+
+      expect(runClusteringPage).toHaveBeenCalledWith(payload, { now: 1, tenantId: "project-1" });
+    });
+
+    it("evolves on the project's own events", () => {
+      const built = createTopicClusteringProcessingPipeline(baseDeps());
+      const step = built.processManagers.topicClustering!.evolve(
+        built.processManagers.topicClustering!.init(),
+        {
+          type: "lw.obs.topic_clustering.requested",
+          data: { projectId: "project-1", trigger: "manual", occurredAt: 1_700_000_000_000 },
+        },
+        { now: 1_700_000_000_000, tenantId: "project-1", processKey: "project-1" },
+      );
+      expect(step?.intents).toHaveLength(1);
+    });
   });
 });

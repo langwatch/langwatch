@@ -33,7 +33,8 @@ function nextWake({ cron, after }: { cron: string; after: number }): number {
 }
 
 /**
- * The content boundary (ADR-052): narrows a committed pull event to the
+ * The content boundary (ADR-052, retired; ground now ADR-098): narrows a
+ * committed pull event to the
  * identities and cursors the process may see.
  */
 export function buildProcessEventView(

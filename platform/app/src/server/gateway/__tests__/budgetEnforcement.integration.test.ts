@@ -4,7 +4,8 @@
  * A blocking budget must actually block, and must warn before it does.
  *
  * Real Postgres + real ClickHouse, no mocks. Spend is derived by the real
- * `gatewayBudgetDebits` map projection (ADR-075 Class C) and read back through
+ * `gatewayBudgetDebits` map projection (ADR-075 Class C, retired; ground now
+ * ADR-098) and read back through
  * the real service, so this covers the whole control-plane path the gateway
  * enforces from: span -> derivation -> ledger -> rollup -> decision.
  *

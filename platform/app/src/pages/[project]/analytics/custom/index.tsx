@@ -386,7 +386,7 @@ function AnalyticsCustomGraphContent({
                   />
                   <HStack gap={2}>
                     {/*
-                     * ADR-034 Phase 8: both the bell-icon (edit) and the
+                     * ADR-034 (retired; ground now ADR-099) Phase 8: both the bell-icon (edit) and the
                      * "Add alert" (create) paths open the automations
                      * drawer pre-filled with this graph + its first series,
                      * mirroring the dashboard chart card flow from Phase
@@ -711,7 +711,8 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
-    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2 —
+    // Alert-writing moved to the automations drawer (ADR-034, retired;
+    // ground now ADR-099, Phase 5.2 —
     // the chart-card `Add alert` bell opens `automation` drawer with
     // `prefilledGraphId`). This graph mutation is graph-shape only.
 
@@ -740,7 +741,8 @@ function CustomGraphForm({
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
 
-    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2).
+    // Alert-writing moved to the automations drawer (ADR-034, retired;
+    // ground now ADR-099, Phase 5.2).
     // This graph mutation is graph-shape only; edits to the alert go
     // through the bell icon → automation drawer edit path.
 

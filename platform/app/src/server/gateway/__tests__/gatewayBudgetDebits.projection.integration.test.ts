@@ -21,7 +21,8 @@
  * trace-processing pipeline. The pipeline itself is covered by its own
  * integration suite; this test proves only the projection+CH+service triangle.
  *
- * **What ADR-075 Class C changed under these tests.** They used to drive
+ * **What ADR-075 Class C (retired; ground now ADR-098) changed under these
+ * tests.** They used to drive
  * `gatewayBudgetSync`, a reactor that folded TRACE state and swallowed every
  * failure. It is now a map projection over SPANS with an append store that
  * throws, plus a `virtualKeyLastUsed` subscriber for the one thing in the old
@@ -650,7 +651,8 @@ describe("gatewayBudgetDebits projection — real PG + real CH", () => {
   });
 
   /**
-   * The other half of the ADR-075 Class C split. The retired reactor touched
+   * The other half of the ADR-075 Class C (retired; ground now ADR-098)
+   * split. The retired reactor touched
    * `VirtualKey.lastUsedAt` on every gateway trace (its "EC6" branch) because
    * `/budget/check` only fires when the gateway has budgets to precheck, so
    * keys without budgets read `lastUsedAt = null` forever and admin oversight

@@ -11,11 +11,9 @@ const logger = createLogger("langwatch:automations:subscribers");
 
 /**
  * An event subscriber (ADR-098 decision 1): at-most-once, never replayed, no
- * projection state, and no retry budget behind the routing path — a lost job
- * is lost permanently. So a subscriber may only carry work whose loss is
- * acceptable. Both subscribers here do nothing but submit a `recordMatch`
- * command or nudge an evaluation; a stake-bearing effect belongs in
- * `process-managers/`.
+ * projection state, no retry budget — a lost job is lost permanently, so a
+ * subscriber may only carry work whose loss is acceptable. A stake-bearing
+ * effect belongs in a `*.process.ts` process manager.
  */
 export interface AutomationSubscriber<SourceEvent> {
   readonly name: string;
@@ -57,8 +55,6 @@ export const DEDUP_TTL_MS = 30_000;
 /** Replay floods, resyncs and late results never raise a live alert. */
 const MAX_AGE_MS = 60 * 60 * 1000;
 
-const TERMINAL_EVALUATION_STATUSES = new Set(["processed", "error", "skipped"]);
-
 /**
  * The two things this subscriber acts on, read off the committed event rather
  * than a fold: a terminal status, and the trace the outcome belongs to.
@@ -70,14 +66,13 @@ const TERMINAL_EVALUATION_STATUSES = new Set(["processed", "error", "skipped"]);
  */
 function readAlertableOutcome(
   event: EvaluationOutcomeEvent,
+  isTerminalStatus: (status: string) => boolean,
 ): { traceId: string } | null {
   const data: unknown = event.data;
   if (typeof data !== "object" || data === null) return null;
   if (!("status" in data) || !("traceId" in data)) return null;
   const { status, traceId } = data;
-  if (typeof status !== "string" || !TERMINAL_EVALUATION_STATUSES.has(status)) {
-    return null;
-  }
+  if (typeof status !== "string" || !isTerminalStatus(status)) return null;
   if (typeof traceId !== "string" || traceId.length === 0) return null;
   return { traceId };
 }
@@ -105,24 +100,26 @@ export interface EvaluationTriggerMatchPorts {
  * `triggerMatch`: matches a finished evaluation against a project's
  * evaluation-filtered automations and submits a `recordMatch` command per hit.
  *
- * A trace whose summary cannot be read THROWS rather than skipping. A miss is
- * "we could not find out", not "this matches nothing" — the summary is written
- * by a different pipeline, so no debounce orders the two. Returning would drop
- * that evaluation's alerts permanently, since a terminal outcome arrives once
- * and the dedup key covers it.
+ * A trace whose summary cannot be read THROWS rather than skipping: a miss is
+ * "we could not find out", not "this matches nothing", and returning would drop
+ * that evaluation's alerts permanently.
  */
 export function createEvaluationTriggerMatchSubscriber(params: {
-  /** The evaluation pipeline's terminal outcome events. Supplied by the
-   *  composition root from that pipeline's own declaration — this pipeline
-   *  cannot see another's event vocabulary (ADR-102 decision 5). */
+  /** The evaluation pipeline's terminal outcome events, and which of its
+   *  statuses are terminal. Both supplied by the composition root from that
+   *  pipeline's own declaration — this pipeline cannot see another's
+   *  vocabulary (ADR-102 decision 5). */
   eventTypes: readonly string[];
+  isTerminalStatus: (status: string) => boolean;
   ports: EvaluationTriggerMatchPorts;
 }): AutomationSubscriber<EvaluationOutcomeEvent> {
-  const { ports } = params;
+  const { ports, isTerminalStatus } = params;
   return {
     name: "triggerMatch",
     eventTypes: params.eventTypes,
-    enqueue: { filter: (event) => readAlertableOutcome(event) !== null },
+    enqueue: {
+      filter: (event) => readAlertableOutcome(event, isTerminalStatus) !== null,
+    },
     options: {
       delay: MATCH_DELAY_MS,
       deduplication: {
@@ -134,7 +131,7 @@ export function createEvaluationTriggerMatchSubscriber(params: {
 
     async handle(event, context): Promise<void> {
       if (event.occurredAt < Date.now() - MAX_AGE_MS) return;
-      const outcome = readAlertableOutcome(event);
+      const outcome = readAlertableOutcome(event, isTerminalStatus);
       if (!outcome) return;
       const { traceId } = outcome;
 

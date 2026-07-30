@@ -70,10 +70,10 @@ export function canonicalAnyValue(
 }
 
 /**
- * Flattens the tagged shape {@link canonicalAttributes} produces back into
- * scalars. Ints stay as decimal strings; structured values (bytes, arrays,
- * kvlists) are dropped, because every consumer of this only ever keys off
- * scalars — a fact-lifting step, never the record of truth.
+ * Flatten a canonical KeyValue array — the shape {@link canonicalAttributes}
+ * produces and `pointAttributesJson` stores — back into a scalar record.
+ * Ints stay as their decimal strings; structured values (bytes, arrays,
+ * kvlists) stay behind: fact-lifting consumers only ever key off scalars.
  */
 export function scalarsFromCanonicalAttributes(
   attributes: unknown,
@@ -87,16 +87,19 @@ export function scalarsFromCanonicalAttributes(
     switch (wrapped.type) {
       case "string":
       case "int":
-        if (typeof wrapped.value === "string")
+        if (typeof wrapped.value === "string") {
           scalars[attribute.key] = wrapped.value;
+        }
         break;
       case "bool":
-        if (typeof wrapped.value === "boolean")
+        if (typeof wrapped.value === "boolean") {
           scalars[attribute.key] = wrapped.value;
+        }
         break;
       case "double":
-        if (typeof wrapped.value === "number")
+        if (typeof wrapped.value === "number") {
           scalars[attribute.key] = wrapped.value;
+        }
         break;
       default:
         break;

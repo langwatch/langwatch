@@ -1053,7 +1053,8 @@ function LangyPanel({
       });
   }, [stop, projectId, stopTurn, foldInFlightTurnId]);
 
-  // Seed the LOCAL turn projection from the snapshot (ADR-059): its cursor is
+  // Seed the LOCAL turn projection from the snapshot (ADR-059, retired;
+  // ground now ADR-098): its cursor is
   // where the durable-tail fold starts, and an in-flight turn id is what a
   // refreshed tab adopts (making Stop + live signals work again). The seed
   // reducer never rewinds a fresher local fold, so refetches are harmless.

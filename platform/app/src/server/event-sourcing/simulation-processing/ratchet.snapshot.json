@@ -1,0 +1,13 @@
+{
+  "simulation_run": [
+    "lw.simulation_run.queued",
+    "lw.simulation_run.started",
+    "lw.simulation_run.message_snapshot",
+    "lw.simulation_run.text_message_start",
+    "lw.simulation_run.text_message_end",
+    "lw.simulation_run.finished",
+    "lw.simulation_run.metrics_recorded",
+    "lw.simulation_run.cancel_requested",
+    "lw.simulation_run.deleted"
+  ]
+}

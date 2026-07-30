@@ -9,7 +9,8 @@
  *
  * The BullMQ queue this file used to describe has had no producer and no
  * consumer for some time; dispatch is the `scenarioExecution` process
- * manager's leased outbox (ADR-073). What survives is the one number that
+ * manager's leased outbox (ADR-073, retired; ground now ADR-103). What
+ * survives is the one number that
  * still decides something: how many scenario children a worker holds at once,
  * which the outbox reads as its dispatch concurrency.
  */

@@ -6,7 +6,7 @@
  * LANGWATCH_API_KEY and LANGWATCH_ENDPOINT env vars.
  *
  * Execution is triggered by the `scenarioExecution` process manager's leased
- * outbox (ADR-073 step 2), which holds the run's lease for the whole child
+ * outbox (ADR-073 step 2, retired; ground now ADR-103), which holds the run's lease for the whole child
  * process and therefore bounds concurrency itself.
  *
  * @see specs/scenarios/simulation-runner.feature
@@ -178,7 +178,8 @@ const logger = createLogger("langwatch:scenarios:processor");
  * the failure, but nothing waits for it — and when that race is lost the run
  * sits non-terminal until the process manager's deadline fires against it,
  * roughly half an hour later. Writing it here costs a second. This is the
- * mitigation ADR-073 names in "Deleting the drain costs deploy latency".
+ * mitigation ADR-073 (retired; ground now ADR-103) names in "Deleting the
+ * drain costs deploy latency".
  *
  * It does NOT replace the deadline, and is not written as though it could: a
  * hard kill reaches none of this, `finishRun` is idempotent so a child that
@@ -734,7 +735,8 @@ export async function startScenarioProcessor(
   //
   // The `scenarioExecution` process manager on the simulation pipeline holds
   // that guarantee continuously now. Every progress event re-arms its durable
-  // deadline; when one fires, it writes the terminal state itself. See ADR-073.
+  // deadline; when one fires, it writes the terminal state itself. See
+  // ADR-073 (retired; ground now ADR-103).
   // The graceful drain survives alongside it (`settleInFlightRuns`, on
   // `close()` below) — not as the guarantee, but because waiting out a
   // half-hour deadline for something the worker knew at SIGTERM is a bad deal

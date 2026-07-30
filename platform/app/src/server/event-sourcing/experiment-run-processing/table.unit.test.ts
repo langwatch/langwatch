@@ -1,6 +1,6 @@
 import { createRowCodec } from "@langwatch/clickhouse";
 import { describe, expect, it } from "vitest";
-import { mapTargetResult } from "./itemsMapping";
+import { mapTargetResult } from "./experimentRunItems.projection";
 import {
   type ExperimentRunItemsRow,
   experimentRunItemsTable,

@@ -94,6 +94,12 @@ export interface PipelineNamedPrefixed<Name extends string, Prefix extends strin
   ): PipelineChain<Name, Prefix, Events>;
 }
 
+/**
+ * The outer chain earns currying — each step's type depends on the one
+ * before it, and `.id()` decides whether `.withFold` / `.withProcessManager`
+ * exist at all. A mount is different: nothing inside it is gated, so every
+ * `.withX` below takes a plain record rather than a builder callback.
+ */
 export interface PipelineChain<
   Name extends string,
   Prefix extends string | undefined,
@@ -103,17 +109,17 @@ export interface PipelineChain<
 
   withCommand<Input extends z.ZodTypeAny>(
     name: string,
-    builder: (c: CommandStart<Events>) => CommandBuilt<Events, Input>,
+    record: CommandBuilt<Events, Input>,
   ): PipelineChain<Name, Prefix, Events>;
 
   withMap<Handle extends MapHandlerMap<Events, unknown>>(
     name: string,
-    builder: (m: MapStart<Events>) => MapWithStore<Events, MappedRow<Handle>>,
+    record: MapWithStore<Events, Handle>,
   ): PipelineChain<Name, Prefix, Events>;
 
   withSubscriber(
     name: string,
-    builder: (s: SubscriberStart<Events>) => SubscriberOn<Events>,
+    record: SubscriberOn<Events>,
   ): PipelineChain<Name, Prefix, Events>;
 
   build(ports?: PipelinePorts): BuiltPipeline<Name, Prefix>;
@@ -126,45 +132,36 @@ export interface PipelineChainWithId<
 > extends PipelineChain<Name, Prefix, Events> {
   withCommand<Input extends z.ZodTypeAny>(
     name: string,
-    builder: (c: CommandStart<Events>) => CommandBuilt<Events, Input>,
+    record: CommandBuilt<Events, Input>,
   ): PipelineChainWithId<Name, Prefix, Events>;
 
-  withFold<State>(
+  withFold<StateSchema extends z.ZodTypeAny>(
     name: string,
-    builder: (f: FoldStart<Events>) => FoldWithStore<Events, State>,
+    record: FoldWithStore<Events, StateSchema>,
   ): PipelineChainWithId<Name, Prefix, Events>;
 
   withMap<Handle extends MapHandlerMap<Events, unknown>>(
     name: string,
-    builder: (m: MapStart<Events>) => MapWithStore<Events, MappedRow<Handle>>,
+    record: MapWithStore<Events, Handle>,
   ): PipelineChainWithId<Name, Prefix, Events>;
 
-  withProcessManager<State, Intents extends IntentMap>(
+  withProcessManager<StateSchema extends z.ZodTypeAny, Intents extends IntentMap>(
     name: string,
-    builder: (pm: ProcessManagerStart<Events>) => ProcessManagerOn<Events, State, Intents>,
+    record: ProcessManagerOn<Events, StateSchema, Intents>,
   ): PipelineChainWithId<Name, Prefix, Events>;
 
   withSubscriber(
     name: string,
-    builder: (s: SubscriberStart<Events>) => SubscriberOn<Events>,
+    record: SubscriberOn<Events>,
   ): PipelineChainWithId<Name, Prefix, Events>;
 }
 
-// ---- command ----
+// ---------------------------------------------------------------------------
+// the five mount records
+// ---------------------------------------------------------------------------
 
-export interface CommandStart<Events extends EventSchemaMap> {
-  input<Input extends z.ZodTypeAny>(schema: Input): CommandWithInput<Events, Input>;
-}
-
-export interface CommandWithInput<Events extends EventSchemaMap, Input extends z.ZodTypeAny> {
-  handle(
-    fn: (
-      input: z.infer<Input>,
-      ctx: HandlerContext,
-    ) => Promise<readonly EmittedEvent<Events>[]>,
-  ): CommandBuilt<Events, Input>;
-}
-
+/** A command: what its input decodes to, and how it turns that input into the
+ * events it emits. */
 export interface CommandBuilt<Events extends EventSchemaMap, Input extends z.ZodTypeAny> {
   readonly input: Input;
   readonly handle: (
@@ -173,103 +170,56 @@ export interface CommandBuilt<Events extends EventSchemaMap, Input extends z.Zod
   ) => Promise<readonly EmittedEvent<Events>[]>;
 }
 
-// ---- fold ----
-
-export interface FoldStart<Events extends EventSchemaMap> {
-  state<StateSchema extends z.ZodTypeAny>(
-    schema: StateSchema,
-    init: () => z.output<StateSchema>,
-    pin?: string,
-  ): FoldStated<Events, z.output<StateSchema>>;
+/** A fold: its state schema, how it initialises and evolves, and the store it
+ * reads back before every apply. `state` fixes `StateSchema`; `init`, `on` and
+ * `store` are contextually typed from it. */
+export interface FoldWithStore<Events extends EventSchemaMap, StateSchema extends z.ZodTypeAny> {
+  readonly state: StateSchema;
+  readonly init: () => z.output<StateSchema>;
+  readonly pin?: string;
+  readonly on: FoldHandlerMap<Events, NoInfer<z.output<StateSchema>>>;
+  readonly store: ReplaceStore<NoInfer<z.output<StateSchema>>>;
 }
 
-export interface FoldStated<Events extends EventSchemaMap, State> {
-  on(handlers: FoldHandlerMap<Events, State>): FoldOn<Events, State>;
-}
-
-export interface FoldOn<Events extends EventSchemaMap, State> {
-  store(store: ReplaceStore<State>): FoldWithStore<Events, State>;
-}
-
-export interface FoldWithStore<Events extends EventSchemaMap, State> {
-  readonly stateSchema: z.ZodTypeAny;
-  readonly init: () => State;
-  readonly pin: string | undefined;
-  readonly on: FoldHandlerMap<Events, State>;
-  readonly store: ReplaceStore<State>;
-}
-
-// ---- map ----
-
-export interface MapStart<Events extends EventSchemaMap> {
-  on<Handle extends MapHandlerMap<Events, unknown>>(
-    handlers: Handle,
-  ): MapOn<Events, MappedRow<Handle>>;
-}
-
-export interface MapOn<Events extends EventSchemaMap, Row> {
-  store(store: AppendStore<Row> | MergeStore<Row>): MapWithStore<Events, Row>;
-}
-
-export interface MapWithStore<Events extends EventSchemaMap, Row> {
-  /** Loose in the row type on purpose: `Row` is recovered from these handlers'
-   * own return types, so re-deriving it here would be circular. */
-  readonly on: MapHandlerMap<Events, unknown>;
-  readonly store: AppendStore<Row> | MergeStore<Row>;
-}
-
-// ---- process manager ----
-
-export interface ProcessManagerStart<Events extends EventSchemaMap> {
-  state<StateSchema extends z.ZodTypeAny>(
-    schema: StateSchema,
-    init: () => z.output<StateSchema>,
-    pin?: string,
-  ): ProcessManagerStated<Events, z.output<StateSchema>>;
-}
-
-export interface ProcessManagerStated<Events extends EventSchemaMap, State> {
-  intents<Intents extends IntentMap>(
-    intents: Intents,
-  ): ProcessManagerIntented<Events, State, Intents>;
-}
-
-export interface ProcessManagerIntented<
+/** A map: its handlers and the store they write to. `on` fixes `Handle`, and
+ * `MappedRow<Handle>` — the row type `store` must accept — is recovered from
+ * its handlers' own return types rather than declared a second time. */
+export interface MapWithStore<
   Events extends EventSchemaMap,
-  State,
-  Intents extends IntentMap,
+  Handle extends MapHandlerMap<Events, unknown>,
 > {
-  on(
-    handlers: ProcessManagerHandlerMap<Events, State, Intents>,
-  ): ProcessManagerOn<Events, State, Intents>;
+  readonly on: Handle;
+  readonly store:
+    | AppendStore<NoInfer<MappedRow<Handle>>>
+    | MergeStore<NoInfer<MappedRow<Handle>>>;
 }
 
+/** A process manager: its state, its intents, its event handlers, and
+ * optionally how it wakes itself and whether it runs at all. `onWake` and
+ * `enabled` are ordinary optional fields — they exist on every declaration,
+ * present or not, rather than extra chain steps that only sometimes appear. */
 export interface ProcessManagerOn<
   Events extends EventSchemaMap,
-  State,
+  StateSchema extends z.ZodTypeAny,
   Intents extends IntentMap,
 > {
-  readonly stateSchema: z.ZodTypeAny;
-  readonly init: () => State;
-  readonly pin: string | undefined;
+  readonly state: StateSchema;
+  readonly init: () => NoInfer<z.output<StateSchema>>;
+  readonly pin?: string;
   readonly intents: Intents;
-  readonly on: ProcessManagerHandlerMap<Events, State, Intents>;
-  readonly onWakeFn:
-    | ((state: State, ctx: ProcessContext) => EvolveStep<State, Intents>)
-    | undefined;
-  readonly isEnabled: boolean;
-  onWake(
-    fn: (state: State, ctx: ProcessContext) => EvolveStep<State, Intents>,
-  ): ProcessManagerOn<Events, State, Intents>;
-  enabled(flag: boolean): ProcessManagerOn<Events, State, Intents>;
+  readonly on: ProcessManagerHandlerMap<
+    Events,
+    NoInfer<z.output<StateSchema>>,
+    NoInfer<Intents>
+  >;
+  readonly onWake?: (
+    state: NoInfer<z.output<StateSchema>>,
+    ctx: ProcessContext,
+  ) => EvolveStep<NoInfer<z.output<StateSchema>>, NoInfer<Intents>>;
+  readonly enabled?: boolean;
 }
 
-// ---- subscriber ----
-
-export interface SubscriberStart<Events extends EventSchemaMap> {
-  on(handlers: SubscriberHandlerMap<Events>): SubscriberOn<Events>;
-}
-
+/** A subscriber: at-most-once work keyed by event, nothing else. */
 export interface SubscriberOn<Events extends EventSchemaMap> {
   readonly on: SubscriberHandlerMap<Events>;
 }
@@ -346,8 +296,8 @@ const FOLD_SCOPE: ScopeKind = "aggregate";
 const UNDECLARED_SCOPE: ScopeKind = "aggregate";
 const UNDECLARED_COLLAPSE: CollapseKind = "none";
 
-/** Already guaranteed by construction (`FOLD_SCOPE`, and `FoldOn.store`'s
- * `ReplaceStore`-only signature); checked anyway as a backstop. */
+/** Already guaranteed by construction (`FOLD_SCOPE`, and `FoldWithStore`'s
+ * `ReplaceStore`-only field); checked anyway as a backstop. */
 const FOLD_DECIDABLE_RULES: ReadonlySet<string> = new Set([
   "fold-scope-must-be-aggregate",
   "fold-store-must-be-replace",
@@ -415,16 +365,16 @@ function chainStage<
       state.id = idMap;
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
-    withCommand(name, builder) {
-      mountCommand(state, name, builder);
+    withCommand(name, record) {
+      mountCommand(state, name, record);
       return chainStage<Name, Prefix, Events>(state);
     },
-    withMap(name, builder) {
-      mountMap(state, name, builder);
+    withMap(name, record) {
+      mountMap(state, name, record);
       return chainStage<Name, Prefix, Events>(state);
     },
-    withSubscriber(name, builder) {
-      mountSubscriber(state, name, builder);
+    withSubscriber(name, record) {
+      mountSubscriber(state, name, record);
       return chainStage<Name, Prefix, Events>(state);
     },
     build(ports) {
@@ -463,24 +413,24 @@ function chainWithIdStage<
       state.id = idMap;
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
-    withCommand(name, builder) {
-      mountCommand(state, name, builder);
+    withCommand(name, record) {
+      mountCommand(state, name, record);
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
-    withFold(name, builder) {
-      mountFold(state, name, builder);
+    withFold(name, record) {
+      mountFold(state, name, record);
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
-    withMap(name, builder) {
-      mountMap(state, name, builder);
+    withMap(name, record) {
+      mountMap(state, name, record);
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
-    withProcessManager(name, builder) {
-      mountProcessManager(state, name, builder);
+    withProcessManager(name, record) {
+      mountProcessManager(state, name, record);
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
-    withSubscriber(name, builder) {
-      mountSubscriber(state, name, builder);
+    withSubscriber(name, record) {
+      mountSubscriber(state, name, record);
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
     build(ports) {
@@ -491,85 +441,58 @@ function chainWithIdStage<
 
 // ---- mounts ----
 
-function commandStart<Events extends EventSchemaMap>(): CommandStart<Events> {
-  return {
-    input<Input extends z.ZodTypeAny>(schema: Input) {
-      return {
-        handle(fn) {
-          return { input: schema, handle: fn };
-        },
-      };
-    },
-  };
-}
-
 function mountCommand<Events extends EventSchemaMap, Input extends z.ZodTypeAny>(
   state: ChainState,
   name: string,
-  builder: (c: CommandStart<Events>) => CommandBuilt<Events, Input>,
+  record: CommandBuilt<Events, Input>,
 ): void {
   assertNameNotTaken(state, name);
-  const built = builder(commandStart<Events>());
   const typeOf = typeOfEventIn(state);
   state.commands.set(name, {
     name,
-    input: built.input,
+    input: record.input,
     async handle(input, ctx) {
-      const emitted = await built.handle(input, ctx);
+      const emitted = await record.handle(input, ctx);
       return emitted.map((event) => ({ type: typeOf(event.type), data: event.data }));
     },
   });
 }
 
-function foldStart<Events extends EventSchemaMap>(): FoldStart<Events> {
-  return {
-    state(schema, init, pin) {
-      return {
-        on(handlers) {
-          return {
-            store(store) {
-              return { stateSchema: schema, init, pin, on: handlers, store };
-            },
-          };
-        },
-      };
-    },
-  };
-}
-
-function mountFold<Events extends EventSchemaMap, State>(
+function mountFold<Events extends EventSchemaMap, StateSchema extends z.ZodTypeAny>(
   state: ChainState,
   name: string,
-  builder: (f: FoldStart<Events>) => FoldWithStore<Events, State>,
+  record: FoldWithStore<Events, StateSchema>,
 ): void {
   assertNameNotTaken(state, name);
-  const built = builder(foldStart<Events>());
   const dispatch = resolveDispatch({
-    handlers: built.on,
+    handlers: record.on,
     typeOf: typeOfEventIn(state),
     what: "fold",
     owner: name,
   });
   const { version, schemaHash } = resolveStateVersion({
-    schema: built.stateSchema,
-    pinned: built.pin,
+    schema: record.state,
+    pinned: record.pin,
   });
   state.mounts.push({
     member: name,
     mount: {
       projection: "fold",
-      store: built.store.kind,
+      store: record.store.kind,
       scope: FOLD_SCOPE,
       collapse: UNDECLARED_COLLAPSE,
       idempotency: undefined,
     },
   });
   state.folds.set(name, (metrics) => {
-    const executor = createFoldExecutor<State, WireEvent>({
-      store: built.store,
-      init: built.init,
+    const executor = createFoldExecutor<z.output<StateSchema>, WireEvent>({
+      store: record.store,
+      init: record.init,
       apply(foldState, event) {
-        const handler = wireHandler<[State, unknown], State>(dispatch, event.type);
+        const handler = wireHandler<[z.output<StateSchema>, unknown], z.output<StateSchema>>(
+          dispatch,
+          event.type,
+        );
         return handler ? handler(foldState, event.data) : foldState;
       },
       stateVersion: version,
@@ -586,27 +509,14 @@ function mountFold<Events extends EventSchemaMap, State>(
   });
 }
 
-function mapStart<Events extends EventSchemaMap>(): MapStart<Events> {
-  return {
-    on(handlers) {
-      return {
-        store(store) {
-          return { on: handlers, store };
-        },
-      };
-    },
-  };
-}
-
-function mountMap<Events extends EventSchemaMap, Row>(
+function mountMap<Events extends EventSchemaMap, Handle extends MapHandlerMap<Events, unknown>>(
   state: ChainState,
   name: string,
-  builder: (m: MapStart<Events>) => MapWithStore<Events, Row>,
+  record: MapWithStore<Events, Handle>,
 ): void {
   assertNameNotTaken(state, name);
-  const built = builder(mapStart<Events>());
   const dispatch = resolveDispatch({
-    handlers: built.on,
+    handlers: record.on,
     typeOf: typeOfEventIn(state),
     what: "map",
     owner: name,
@@ -614,30 +524,30 @@ function mountMap<Events extends EventSchemaMap, Row>(
   state.mounts.push({
     member: name,
     mount:
-      built.store.kind === "merge"
+      record.store.kind === "merge"
         ? {
             projection: "map",
             store: "merge",
             scope: UNDECLARED_SCOPE,
             collapse: UNDECLARED_COLLAPSE,
-            idempotency: built.store.idempotency,
+            idempotency: record.store.idempotency,
           }
         : {
             projection: "map",
-            store: built.store.kind,
+            store: record.store.kind,
             scope: UNDECLARED_SCOPE,
             collapse: UNDECLARED_COLLAPSE,
             idempotency: undefined,
           },
   });
   state.maps.set(name, (metrics) => {
-    const executor = createMapExecutor<WireEvent, Row>({
-      store: built.store,
+    const executor = createMapExecutor<WireEvent, MappedRow<Handle>>({
+      store: record.store,
       map(event) {
-        const handler = wireHandler<[unknown], Row | readonly Row[] | null>(
-          dispatch,
-          event.type,
-        );
+        const handler = wireHandler<
+          [unknown],
+          MappedRow<Handle> | readonly MappedRow<Handle>[] | null
+        >(dispatch, event.type);
         return handler ? handler(event.data) : null;
       },
       projectionName: name,
@@ -651,63 +561,11 @@ function mountMap<Events extends EventSchemaMap, Row>(
   });
 }
 
-function processManagerStart<Events extends EventSchemaMap>(
-  owner: string,
-): ProcessManagerStart<Events> {
-  return {
-    state(schema, init, pin) {
-      return {
-        intents(intents) {
-          const keys = Object.keys(intents);
-          if (keys.length === 0) {
-            throw new ConfigurationError(
-              `process manager "${owner}" declares no intents`,
-              { processManager: owner },
-            );
-          }
-          for (const key of keys) {
-            assertNoSeparators(key, "intent key", { processManager: owner, key });
-          }
-          return {
-            on(handlers) {
-              return processManagerOn({
-                stateSchema: schema,
-                init,
-                pin,
-                intents,
-                on: handlers,
-                onWakeFn: undefined,
-                isEnabled: true,
-              });
-            },
-          };
-        },
-      };
-    },
-  };
-}
-
-/** `.onWake()` and `.enabled()` return a fresh declaration rather than mutating
- * one, so a builder callback cannot change a mount it has already returned. */
-function processManagerOn<Events extends EventSchemaMap, State, Intents extends IntentMap>(
-  fields: Omit<ProcessManagerOn<Events, State, Intents>, "onWake" | "enabled">,
-): ProcessManagerOn<Events, State, Intents> {
-  return {
-    ...fields,
-    onWake(fn) {
-      return processManagerOn<Events, State, Intents>({ ...fields, onWakeFn: fn });
-    },
-    enabled(flag) {
-      return processManagerOn<Events, State, Intents>({ ...fields, isEnabled: flag });
-    },
-  };
-}
-
-function mountProcessManager<Events extends EventSchemaMap, State, Intents extends IntentMap>(
-  state: ChainState,
-  name: string,
-  builder: (pm: ProcessManagerStart<Events>) => ProcessManagerOn<Events, State, Intents>,
-): void {
+function mountProcessManager<
+  Events extends EventSchemaMap,
+  StateSchema extends z.ZodTypeAny,
+  Intents extends IntentMap,
+>(state: ChainState, name: string, record: ProcessManagerOn<Events, StateSchema, Intents>): void {
   if (state.id === undefined) {
     throw new ConfigurationError(
       `pipeline "${state.name}" mounts a process manager before declaring .id()`,
@@ -715,21 +573,31 @@ function mountProcessManager<Events extends EventSchemaMap, State, Intents exten
     );
   }
   assertNameNotTaken(state, name);
-  const built = builder(processManagerStart<Events>(name));
+
+  const intentKeys = Object.keys(record.intents);
+  if (intentKeys.length === 0) {
+    throw new ConfigurationError(`process manager "${name}" declares no intents`, {
+      processManager: name,
+    });
+  }
+  for (const key of intentKeys) {
+    assertNoSeparators(key, "intent key", { processManager: name, key });
+  }
+
   const dispatch = resolveDispatch({
-    handlers: built.on,
+    handlers: record.on,
     typeOf: typeOfEventIn(state),
     what: "process manager",
     owner: name,
   });
   const { version, schemaHash } = resolveStateVersion({
-    schema: built.stateSchema,
-    pinned: built.pin,
+    schema: record.state,
+    pinned: record.pin,
   });
 
   const intentTypeFor = (key: string): string => intentTypeOf(name, key);
   const intents: Record<string, BuiltProcessManagerIntent> = {};
-  for (const [key, intent] of Object.entries(built.intents)) {
+  for (const [key, intent] of Object.entries(record.intents)) {
     intents[key] = {
       payload: intent.payload,
       messageKey: (payload) => intent.messageKey(payload),
@@ -739,21 +607,21 @@ function mountProcessManager<Events extends EventSchemaMap, State, Intents exten
   const toIntentRows = (emitted: readonly { type: string; payload: unknown }[]) =>
     emitted.map((intent) => ({ type: intentTypeFor(intent.type), payload: intent.payload }));
 
-  const { onWakeFn } = built;
+  const { onWake: onWakeFn } = record;
   state.processManagers.set(name, {
     name,
-    enabled: built.isEnabled,
+    enabled: record.enabled ?? true,
     eventTypes: [...dispatch.keys()],
-    intentTypes: Object.keys(built.intents).map(intentTypeFor),
-    stateSchema: built.stateSchema,
+    intentTypes: intentKeys.map(intentTypeFor),
+    stateSchema: record.state,
     stateVersion: version,
     schemaHash,
     intents,
-    init: built.init,
+    init: record.init,
     evolve(evolveState, event, ctx) {
       const handler = wireHandler<
         [unknown, unknown, ProcessContext],
-        EvolveStep<State, Intents>
+        EvolveStep<z.output<StateSchema>, Intents>
       >(dispatch, event.type);
       if (!handler) return null;
       const step = handler(evolveState, event.data, ctx);
@@ -763,30 +631,21 @@ function mountProcessManager<Events extends EventSchemaMap, State, Intents exten
       ? (wakeState, ctx) => {
           // Same seam as `wireHandler`: the runtime loaded this state as
           // `unknown`, and the declaration is what says its shape.
-          const step = onWakeFn(wakeState as State, ctx);
+          const step = onWakeFn(wakeState as z.output<StateSchema>, ctx);
           return { ...step, intents: toIntentRows(step.intents) };
         }
       : undefined,
   });
 }
 
-function subscriberStart<Events extends EventSchemaMap>(): SubscriberStart<Events> {
-  return {
-    on(handlers) {
-      return { on: handlers };
-    },
-  };
-}
-
 function mountSubscriber<Events extends EventSchemaMap>(
   state: ChainState,
   name: string,
-  builder: (s: SubscriberStart<Events>) => SubscriberOn<Events>,
+  record: SubscriberOn<Events>,
 ): void {
   assertNameNotTaken(state, name);
-  const built = builder(subscriberStart<Events>());
   const dispatch = resolveDispatch({
-    handlers: built.on,
+    handlers: record.on,
     typeOf: typeOfEventIn(state),
     what: "subscriber",
     owner: name,

@@ -23,7 +23,6 @@ import {
   getClickHouseClientForOrganization,
   getClickHouseClientForProject,
   getSharedClickHouseClient,
-  isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
@@ -78,15 +77,9 @@ import {
 } from "../event-sourcing.old/pipelineRegistry";
 import { buildAutomationDispatchPorts } from "../event-sourcing.old/pipelines/automations/automationDispatch.adapter";
 import { createExperimentRunItemAppendStore } from "../event-sourcing.old/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
-import {
-  ExperimentRunStateRepositoryClickHouse,
-  ExperimentRunStateRepositoryMemory,
-} from "../event-sourcing.old/pipelines/experiment-run-processing/repositories";
+import { ExperimentRunStateRepositoryClickHouse } from "../event-sourcing.old/pipelines/experiment-run-processing/repositories";
 import { LangyAnalyticsEventAppendStore } from "../event-sourcing.old/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
-import {
-  SimulationRunStateRepositoryClickHouse,
-  SimulationRunStateRepositoryMemory,
-} from "../event-sourcing.old/pipelines/simulation-processing/repositories";
+import { SimulationRunStateRepositoryClickHouse } from "../event-sourcing.old/pipelines/simulation-processing/repositories";
 import {
   InMemoryProcessStore,
   PrismaProcessStore,
@@ -124,6 +117,9 @@ import { TriggerService } from "./automations/trigger.service";
 import { testFireTrigger } from "./automations/trigger-template.service";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
+import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
+import { createAppClickHouseClient } from "./clients/clickhouseClient.factory";
+import { clickhouseClientMetrics } from "./clients/clickhouseClient.metrics";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { createRedisConnectionFromConfig } from "./clients/redis.factory";
@@ -159,9 +155,7 @@ import { EvaluationExecutionService } from "./evaluations/evaluation-execution.s
 import { EvaluationRunService } from "./evaluations/evaluation-run.service";
 import { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
 import { EvaluationAnalyticsClickHouseRepository } from "./evaluations/repositories/evaluation-analytics.clickhouse.repository";
-import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/evaluation-analytics.repository";
 import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
-import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
@@ -179,7 +173,6 @@ import {
   type RedisLike,
 } from "./langy/langyGithubAppToken";
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
-import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { PrismaLangyConversationRepository } from "./langy/repositories/langy-conversation.prisma.repository";
 import { NullLangyConversationRepository } from "./langy/repositories/langy-conversation.repository";
 import { PrismaLangyConversationProjectionRepository } from "./langy/repositories/langy-conversation-projection.prisma.repository";
@@ -194,7 +187,6 @@ import { NullLangyTurnAdmissionRepository } from "./langy/repositories/langy-tur
 import { CanonicalLogRecordClickHouseRepository } from "./logs/repositories/canonical-log-record.clickhouse.repository";
 import { NullCanonicalLogRecordRepository } from "./logs/repositories/canonical-log-record.repository";
 import { MetricDataPointClickHouseRepository } from "./metrics/repositories/metric-data-point.clickhouse.repository";
-import { NullMetricDataPointRepository } from "./metrics/repositories/metric-data-point.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { BlobStoreService } from "./ops/blob-store.service";
@@ -260,9 +252,7 @@ import { NullLogRecordStorageRepository } from "./traces/repositories/log-record
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
-import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
-import { NullTraceAnalyticsRollupRepository } from "./traces/repositories/trace-analytics-rollup.repository";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
@@ -315,8 +305,6 @@ export function initializeDefaultApp(options?: {
   const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
-  const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
-
   // Resolver: given a tenantId (projectId), returns the right ClickHouse client
   const resolveClickHouseClient: ClickHouseClientResolver = async (
     tenantId: string,
@@ -326,6 +314,18 @@ export function initializeDefaultApp(options?: {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+
+  // ADR-104 composition seam: the new client, constructed once, alongside the
+  // legacy one above rather than in place of it. Only wired for the shared
+  // deployment (`config.clickhouseUrl`) — a private per-org ClickHouse URL
+  // still resolves through the legacy resolver until a caller needs the new
+  // client to route through `mappedTenantRouter` too (ADR-102 decision 6).
+  // Repositories take this as a constructor argument; nothing imports it
+  // ambiently.
+  const newClickHouseClient = createAppClickHouseClient({
+    url: config.clickhouseUrl,
+    observability: { metrics: clickhouseClientMetrics },
+  });
 
   const redis = config.skipRedis
     ? null
@@ -376,28 +376,24 @@ export function initializeDefaultApp(options?: {
   // composition root passes its own ClickHouse decision/resolver so the
   // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
   const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
-    clickhouseEnabled,
+    clickhouseEnabled: true,
     resolveClickHouseClient,
   });
   // Shared between SpanStorageService and TraceSummaryService's full read.
-  const spanStorageRepository = clickhouseEnabled
-    ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
-    : new NullSpanStorageRepository();
+  const spanStorageRepository = new SpanStorageClickHouseRepository(
+    resolveClickHouseClient,
+  );
 
   const traceSummary = traced(
     new TraceSummaryService(
-      clickhouseEnabled
-        ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
-        : new NullTraceSummaryRepository(),
+      new TraceSummaryClickHouseRepository(resolveClickHouseClient),
       { spanStorageRepository, blobStore, ioExtractionService },
     ),
     "TraceSummaryService",
   );
   const evaluationRuns = traced(
     new EvaluationRunService(
-      clickhouseEnabled
-        ? new EvaluationRunClickHouseRepository(resolveClickHouseClient)
-        : new NullEvaluationRunRepository(),
+      new EvaluationRunClickHouseRepository(resolveClickHouseClient),
     ),
     "EvaluationRunService",
   );
@@ -407,9 +403,7 @@ export function initializeDefaultApp(options?: {
   );
   const traceList = traced(
     new TraceListService(
-      clickhouseEnabled
-        ? new TraceListClickHouseRepository(resolveClickHouseClient)
-        : new NullTraceListRepository(),
+      new TraceListClickHouseRepository(resolveClickHouseClient),
       evaluationRuns,
       topics,
     ),
@@ -444,12 +438,12 @@ export function initializeDefaultApp(options?: {
   );
   const logRecordStorage = traced(
     new LogRecordStorageService({
-      repository: clickhouseEnabled
-        ? new LogRecordStorageClickHouseRepository(resolveClickHouseClient)
-        : new NullLogRecordStorageRepository(),
-      canonical: clickhouseEnabled
-        ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
-        : new NullCanonicalLogRecordRepository(),
+      repository: new LogRecordStorageClickHouseRepository(
+        resolveClickHouseClient,
+      ),
+      canonical: new CanonicalLogRecordClickHouseRepository(
+        resolveClickHouseClient,
+      ),
     }),
     "LogRecordStorageService",
   );
@@ -491,18 +485,17 @@ export function initializeDefaultApp(options?: {
 
   const dspySteps = traced(
     new DspyStepService(
-      clickhouseEnabled
-        ? new DspyStepClickHouseRepository(
-            resolveClickHouseClient,
-            retentionPolicyCache,
-          )
-        : new NullDspyStepRepository(),
+      // ADR-104: query/insert on the new client, DELETE on the legacy one —
+      // the new client has no mutation path.
+      new DspyStepClickHouseRepository(
+        newClickHouseClient.resolveClient,
+        retentionPolicyCache,
+        resolveClickHouseClient,
+      ),
     ),
     "DspyStepService",
   );
-  const simulationReads = SimulationRunService.create(
-    clickhouseEnabled ? resolveClickHouseClient : null,
-  );
+  const simulationReads = SimulationRunService.create(resolveClickHouseClient);
   // SuiteRunService is created after pipeline registration (needs queueRun command)
 
   const evaluations = {
@@ -510,9 +503,7 @@ export function initializeDefaultApp(options?: {
     execution: evaluationExecution,
     performance: traced(
       new MonitorPerformanceService(
-        clickhouseEnabled
-          ? new MonitorPerformanceClickHouseRepository(resolveClickHouseClient)
-          : new NullMonitorPerformanceRepository(),
+        new MonitorPerformanceClickHouseRepository(resolveClickHouseClient),
       ),
       "MonitorPerformanceService",
     ),
@@ -648,10 +639,10 @@ export function initializeDefaultApp(options?: {
     },
   );
   const retroactiveUpdateService = new RetroactiveUpdateService(
-    clickhouseEnabled ? resolveClickHouseClient : null,
+    resolveClickHouseClient,
   );
   const storageMeterService = new StorageMeterService({
-    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
+    resolveClickHouseClient,
   });
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
@@ -693,51 +684,49 @@ export function initializeDefaultApp(options?: {
     messages: createLangyTrustedMessageReader(langyMessageRepository),
   });
 
-  // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
+  // Construct repositories at the composition root — ClickHouse is required,
+  // so every one of these is ClickHouse-backed.
   const repositories: PipelineRepositories = {
-    simulationRunState: clickhouseEnabled
-      ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
-      : new SimulationRunStateRepositoryMemory(),
-    experimentRunState: clickhouseEnabled
-      ? new ExperimentRunStateRepositoryClickHouse(resolveClickHouseClient)
-      : new ExperimentRunStateRepositoryMemory(),
-    traceSummaryFold: clickhouseEnabled
-      ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
-      : traceSummary.repository,
-    canonicalLogStorage: clickhouseEnabled
-      ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
-      : new NullCanonicalLogRecordRepository(),
-    codingAgentSession: clickhouseEnabled
-      ? new CodingAgentSessionClickHouseRepository(resolveClickHouseClient)
-      : new NullCodingAgentSessionRepository(),
-    codingAgentTraceSession: clickhouseEnabled
-      ? new CodingAgentTraceSessionClickHouseRepository(resolveClickHouseClient)
-      : new NullCodingAgentTraceSessionRepository(),
-    sessionMetricSeries: clickhouseEnabled
-      ? new SessionMetricSeriesClickHouseRepository(resolveClickHouseClient)
-      : new NullSessionMetricSeriesRepository(),
-    metricDataPointStorage: clickhouseEnabled
-      ? new MetricDataPointClickHouseRepository({
-          resolveClient: resolveClickHouseClient,
-          resolveOrganizationClient: getClickHouseClientForOrganization,
-        })
-      : new NullMetricDataPointRepository(),
-    traceAnalyticsRollup: clickhouseEnabled
-      ? new TraceAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
-      : new NullTraceAnalyticsRollupRepository(),
-    traceAnalytics: clickhouseEnabled
-      ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
-      : new NullTraceAnalyticsRepository(),
-    evaluationAnalyticsRollup: clickhouseEnabled
-      ? new EvaluationAnalyticsRollupClickHouseRepository(
-          resolveClickHouseClient,
-        )
-      : new NullEvaluationAnalyticsRollupRepository(),
-    evaluationAnalytics: clickhouseEnabled
-      ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
-      : new NullEvaluationAnalyticsRepository(),
+    simulationRunState: new SimulationRunStateRepositoryClickHouse(
+      resolveClickHouseClient,
+    ),
+    experimentRunState: new ExperimentRunStateRepositoryClickHouse(
+      resolveClickHouseClient,
+    ),
+    traceSummaryFold: new TraceSummaryClickHouseRepository(
+      resolveClickHouseClient,
+    ),
+    canonicalLogStorage: new CanonicalLogRecordClickHouseRepository(
+      resolveClickHouseClient,
+    ),
+    codingAgentSession: new CodingAgentSessionClickHouseRepository(
+      resolveClickHouseClient,
+    ),
+    codingAgentTraceSession: new CodingAgentTraceSessionClickHouseRepository(
+      resolveClickHouseClient,
+    ),
+    sessionMetricSeries: new SessionMetricSeriesClickHouseRepository(
+      resolveClickHouseClient,
+    ),
+    metricDataPointStorage: new MetricDataPointClickHouseRepository({
+      resolveClient: resolveClickHouseClient,
+      resolveOrganizationClient: getClickHouseClientForOrganization,
+    }),
+    traceAnalyticsRollup: new TraceAnalyticsRollupClickHouseRepository(
+      resolveClickHouseClient,
+    ),
+    traceAnalytics: new TraceAnalyticsClickHouseRepository(
+      resolveClickHouseClient,
+    ),
+    evaluationAnalyticsRollup:
+      new EvaluationAnalyticsRollupClickHouseRepository(
+        resolveClickHouseClient,
+      ),
+    evaluationAnalytics: new EvaluationAnalyticsClickHouseRepository(
+      resolveClickHouseClient,
+    ),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
-      clickhouseEnabled ? resolveClickHouseClient : null,
+      resolveClickHouseClient,
     ),
     langyConversationState: new PrismaLangyConversationProjectionRepository(
       prisma,
@@ -745,10 +734,12 @@ export function initializeDefaultApp(options?: {
     langyConversationTurnState:
       new PrismaLangyConversationTurnProjectionRepository(prisma),
     langyMessageStorage: new PrismaLangyMessageProjectionRepository(prisma),
+    // ADR-104 reference migration: the first repository moved onto the new
+    // client (`createAppClickHouseClient`) rather than the legacy resolver.
     langyAnalyticsEventStorage: new LangyAnalyticsEventAppendStore(
-      clickhouseEnabled
-        ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
-        : new NullLangyAnalyticsEventRepository(),
+      new ClickHouseLangyAnalyticsEventRepository(
+        newClickHouseClient.resolveClient,
+      ),
     ),
     processStore: new PrismaProcessStore(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
@@ -760,37 +751,33 @@ export function initializeDefaultApp(options?: {
     langyTurnAdmission,
   };
 
-  const gatewayBudgetSync = clickhouseEnabled
-    ? {
-        prisma,
-        budgetRepository: new GatewayBudgetRepository(prisma),
-        budgetCHRepository: new GatewayBudgetClickHouseRepository(
-          resolveClickHouseClient,
-        ),
-        // The debit store emits BUDGET_UPDATED so the Go gateway evicts its
-        // cached bundles. The reactor built this inline; passing the repository
-        // keeps the store's dependencies visible and testable.
-        changeEvents: new ChangeEventRepository(prisma),
-      }
-    : undefined;
+  const gatewayBudgetSync = {
+    prisma,
+    budgetRepository: new GatewayBudgetRepository(prisma),
+    budgetCHRepository: new GatewayBudgetClickHouseRepository(
+      resolveClickHouseClient,
+    ),
+    // The debit store emits BUDGET_UPDATED so the Go gateway evicts its
+    // cached bundles. The reactor built this inline; passing the repository
+    // keeps the store's dependencies visible and testable.
+    changeEvents: new ChangeEventRepository(prisma),
+  };
 
-  const governanceKpisSync = clickhouseEnabled
-    ? {
-        governanceKpisRepository: new GovernanceKpisClickHouseRepository(
-          resolveClickHouseClient,
-        ),
-      }
-    : undefined;
+  const governanceKpisSync = {
+    governanceKpisRepository: new GovernanceKpisClickHouseRepository(
+      newClickHouseClient.resolveClient,
+    ),
+  };
 
-  const governanceOcsfEventsSync = clickhouseEnabled
-    ? {
-        governanceOcsfEventsRepository:
-          new GovernanceOcsfEventsClickHouseRepository(resolveClickHouseClient),
-      }
-    : undefined;
+  const governanceOcsfEventsSync = {
+    governanceOcsfEventsRepository:
+      new GovernanceOcsfEventsClickHouseRepository(
+        newClickHouseClient.resolveClient,
+      ),
+  };
 
   const es = new EventSourcing({
-    clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
+    clickhouse: resolveClickHouseClient,
     redis,
     enabled: true,
     isSaas: config.isSaas,
@@ -1201,15 +1188,17 @@ export function initializeDefaultApp(options?: {
     name: string;
     close: () => Promise<void>;
   }> = [];
-  if (clickhouseEnabled) {
-    gracefulCloseables.push({
-      name: "clickhouse",
-      close: async () => {
-        await clearCustomClientCache();
-        await closeClickHouseClient();
-      },
-    });
-  }
+  gracefulCloseables.push({
+    name: "clickhouse",
+    close: async () => {
+      await clearCustomClientCache();
+      await closeClickHouseClient();
+    },
+  });
+  gracefulCloseables.push({
+    name: "clickhouse-new",
+    close: () => newClickHouseClient.close(),
+  });
   if (redis) {
     gracefulCloseables.push({
       name: "redis",
@@ -1349,6 +1338,7 @@ export function initializeDefaultApp(options?: {
     dataRetention,
     share,
     sharedTraceCache,
+    newClickHouseClient,
     commands,
     ops,
     _eventSourcing: es,
@@ -1385,6 +1375,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const config: AppConfig = {
     nodeEnv: "test",
     databaseUrl: "postgresql://test@localhost/test",
+    clickhouseUrl: "http://localhost:8123/test",
     ...overrides?.config,
   };
 
@@ -1730,6 +1721,17 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     // No Redis in the test preset: every open counts as a viewing and nothing
     // is cached, which is the stricter behaviour of both.
     sharedTraceCache: createSharedTracePayloadCache(null),
+    // No ClickHouse in the test preset — tests wire Null*Repository doubles
+    // directly instead. A caller that reaches for the raw client (rather than
+    // an injected repository) has a wiring bug the throw surfaces immediately.
+    newClickHouseClient: {
+      resolveClient: () => {
+        throw new Error("newClickHouseClient not wired in test app");
+      },
+      close: async () => {
+        /* noop */
+      },
+    },
     ...overrides,
   });
 }

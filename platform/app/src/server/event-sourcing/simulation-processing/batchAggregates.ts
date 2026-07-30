@@ -1,4 +1,4 @@
-import { bindIdentifiers, type ClickHouseClient } from "@langwatch/clickhouse";
+import { bindIdentifiers } from "@langwatch/clickhouse";
 import { simulationRunsTable } from "./table";
 
 /**
@@ -39,9 +39,14 @@ export interface BatchAggregateQuery {
 }
 
 /**
- * The `BatchRunId` filter applies to the outer scope only, never inside the
- * dedup subquery. The argument list is closed, so there is nowhere for a
- * caller to narrow the inner scope at all.
+ * Which batch a run counts towards is decided on its deduped row, so the
+ * `BatchRunId` predicate that counts sits outside the dedup subquery: a run
+ * whose older version named another batch must not be counted there too.
+ *
+ * The dedup itself is bounded by run membership rather than by batch, so it
+ * reads only the versions of runs one of these batches ever named — the
+ * `max(UpdatedAt)` it elects is still taken over every one of that run's
+ * versions, whichever batch each names.
  */
 export function buildBatchAggregateQuery(args: {
   readonly tenantId: string;
@@ -52,13 +57,20 @@ export function buildBatchAggregateQuery(args: {
   const tenant = names.of("TenantId");
   const status = names.of("Status");
   const batchRunId = names.of("BatchRunId");
+  const scenarioRunId = names.of("ScenarioRunId");
   const updatedAt = names.of("UpdatedAt");
   const dedupKey = names.list(DEDUP_KEY_COLUMNS);
+
+  const membershipSubquery =
+    `SELECT ${scenarioRunId} FROM ${table} ` +
+    `WHERE ${tenant} = {tenantId:String} ` +
+    `AND ${batchRunId} IN {batchRunIds:Array(String)}`;
 
   const dedupSubquery =
     `SELECT ${dedupKey}, max(${updatedAt}) ` +
     `FROM ${table} ` +
     `WHERE ${tenant} = {tenantId:String} ` +
+    `AND ${scenarioRunId} IN (${membershipSubquery}) ` +
     `GROUP BY ${dedupKey}`;
 
   const sql =
@@ -120,20 +132,4 @@ export function decodeBatchAggregateRows(
       runningCount: toNumber(byName.RunningCount),
     };
   });
-}
-
-/** Runs {@link buildBatchAggregateQuery} and decodes the result in one call. */
-export async function queryBatchAggregates(args: {
-  readonly client: ClickHouseClient;
-  readonly tenantId: string;
-  readonly batchRunIds: readonly string[];
-}): Promise<BatchAggregate[]> {
-  if (args.batchRunIds.length === 0) return [];
-  const query = buildBatchAggregateQuery(args);
-  const result = await args.client.query({
-    tenantId: args.tenantId,
-    sql: query.sql,
-    params: query.params,
-  });
-  return decodeBatchAggregateRows(result.rows);
 }

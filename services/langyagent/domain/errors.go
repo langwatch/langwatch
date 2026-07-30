@@ -12,7 +12,8 @@ import (
 )
 
 // ErrTurnHandedOff is the internal sentinel a stream returns when the turn ended
-// on an ADR-048 handoff (the worker checkpointed on shutdown-imminent and emitted
+// on an ADR-048 (retired; ground now dev/docs/adr/098-event-sourcing-core.md)
+// handoff (the worker checkpointed on shutdown-imminent and emitted
 // a terminal frames.Handoff). It is NOT an HTTP status — the app treats it as a
 // non-completion: the resume-token frame has already been pushed, so the app skips
 // its own terminal frame but still posts the durable final, exactly as the old

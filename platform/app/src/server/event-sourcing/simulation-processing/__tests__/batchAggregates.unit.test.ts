@@ -43,27 +43,53 @@ describe("buildBatchAggregateQuery", () => {
   });
 
   it("does not group the dedup subquery by BatchRunId or ScenarioSetId", () => {
-    // Isolate the dedup subquery first, so a BatchRunId in the outer scope —
-    // which is correct — cannot make this a false negative.
-    const dedupSubquery = sql.slice(
-      sql.indexOf("IN ("),
-      sql.indexOf(")", sql.indexOf("GROUP BY TenantId, ScenarioRunId")) + 1,
-    );
-    expect(dedupSubquery).not.toMatch(/BatchRunId/);
-    expect(dedupSubquery).not.toMatch(/ScenarioSetId/);
+    const groupBy = sql.slice(sql.indexOf("GROUP BY"));
+    expect(groupBy.startsWith("GROUP BY TenantId, ScenarioRunId")).toBe(true);
+    expect(groupBy).not.toMatch(/ScenarioSetId/);
   });
 
   /** @scenario "A batch id filter narrows the outer query, not the dedup subquery" */
-  it("places the batch id predicate outside the dedup subquery", () => {
+  it("places the counting batch id predicate outside the dedup subquery", () => {
     const dedupEnd = sql.indexOf(
       ")",
       sql.indexOf("GROUP BY TenantId, ScenarioRunId"),
     );
-    const batchIdPredicateIndex = sql.indexOf(
+    const countingPredicateIndex = sql.lastIndexOf(
       "BatchRunId IN {batchRunIds:Array(String)}",
     );
 
-    expect(batchIdPredicateIndex).toBeGreaterThan(dedupEnd);
+    expect(countingPredicateIndex).toBeGreaterThan(dedupEnd);
+  });
+
+  /** @scenario "One run's several stored versions count as a single row" */
+  it("elects the deduped version over every version of a run, not only the batch's own", () => {
+    // The dedup's own WHERE bounds it to runs the batches name, never to rows
+    // carrying the batch id: a run whose newest version moved to another batch
+    // must still be elected by that newest version, so the outer predicate can
+    // then leave it out of this batch's counts.
+    const dedupSubquery = sql.slice(
+      sql.indexOf("IN ("),
+      sql.indexOf(")", sql.indexOf("GROUP BY TenantId, ScenarioRunId")) + 1,
+    );
+    expect(dedupSubquery).toMatch(
+      /ScenarioRunId IN \(SELECT ScenarioRunId FROM simulation_runs/,
+    );
+    // The dedup's own predicate list — not the nested membership subquery a
+    // few lines below it, which legitimately names BatchRunId to find which
+    // runs to dedup in the first place.
+    const dedupOwnWhere = dedupSubquery.slice(
+      dedupSubquery.indexOf("WHERE"),
+      dedupSubquery.indexOf("ScenarioRunId IN ("),
+    );
+    expect(dedupOwnWhere).not.toContain("BatchRunId IN");
+  });
+
+  it("bounds the dedup to the runs the requested batches name", () => {
+    const dedupSubquery = sql.slice(
+      sql.indexOf("IN ("),
+      sql.indexOf(")", sql.indexOf("GROUP BY TenantId, ScenarioRunId")) + 1,
+    );
+    expect(dedupSubquery).toContain("BatchRunId IN {batchRunIds:Array(String)}");
   });
 
   it("binds the batch ids, tenant id and status lists as query parameters", () => {
@@ -77,12 +103,13 @@ describe("buildBatchAggregateQuery", () => {
     expect(built.sql).not.toContain("STALLED");
   });
 
-  it("scopes the dedup subquery to the same tenant as the outer query", () => {
+  it("scopes every subquery to the same tenant as the outer query", () => {
     const occurrences = sql.match(/TenantId = \{tenantId:String\}/g) ?? [];
-    // Once in the outer WHERE, once in the dedup subquery's own WHERE — a
-    // dedup subquery missing this predicate would compare this tenant's rows
-    // against every tenant's rows.
-    expect(occurrences.length).toBe(2);
+    // Once in the outer WHERE, once in the dedup subquery's own WHERE, once in
+    // the nested membership subquery — three separate FROM simulation_runs,
+    // and a predicate missing from any one of them scans that subquery across
+    // every tenant's rows.
+    expect(occurrences.length).toBe(3);
   });
 });
 

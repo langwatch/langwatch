@@ -1,5 +1,6 @@
 /**
- * Unit tests for the ADR-075 Class C `gatewayBudgetDebits` map projection.
+ * Unit tests for the ADR-075 Class C (retired; ground now ADR-098)
+ * `gatewayBudgetDebits` map projection.
  *
  * The derivation is the half of the conversion that has to be REPRODUCIBLE:
  * replay re-runs `map` over the same events and the debits it produces must be
@@ -249,7 +250,8 @@ describe("GatewayBudgetDebitsMapProjection", () => {
   });
 
   /**
-   * The gate is also the subscriber's ADR-069 enqueue filter, a seam with no
+   * The gate is also the subscriber's ADR-069 (retired; ground now ADR-098)
+   * enqueue filter, a seam with no
    * retry: a throw there loses the job outright rather than reading as "not
    * relevant". So it has to survive whatever the wire hands it.
    */

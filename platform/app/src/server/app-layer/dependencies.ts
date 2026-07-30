@@ -19,6 +19,7 @@ import type {
   TestFireTriggerInput,
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
+import type { AppClickHouseClient } from "./clients/clickhouseClient.factory";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
@@ -157,6 +158,13 @@ export interface AppDependencies {
   sharedTraceCache: SharedTracePayloadCache;
   commands: AppCommands;
   ops?: OpsDependencies;
+
+  /**
+   * ADR-104 composition-root client, exposed so callers outside presets.ts
+   * (governance router, puller worker) resolve through the same pool
+   * instead of building their own.
+   */
+  newClickHouseClient: AppClickHouseClient;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
   _eventSourcing?: EventSourcing;

@@ -366,7 +366,8 @@ export class SpendSpikeAnomalyEvaluator {
    *   - `HourBucket` is bounded in the dedup scope, not only outside it. That
    *     is safe here and required for partition pruning: `HourBucket` is part
    *     of the sorting key, so a row's versions cannot straddle the bound and
-   *     the ADR-071 movable-column trap does not apply.
+   *     the ADR-071 (retired; ground now ADR-099) movable-column trap does
+   *     not apply.
    */
   private async queryGovernanceKpis(input: {
     ch: ClickHouseClient;

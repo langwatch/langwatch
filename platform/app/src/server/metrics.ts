@@ -190,7 +190,7 @@ export const workerRestartsCounter = new Counter({
   help: "Number of times the worker has been restarted",
 });
 
-// ADR-022: edge-spool fail-open counter. The edge spool falls back to
+// ADR-022 (retired; ground now ADR-099): edge-spool fail-open counter. The edge spool falls back to
 // unmodified command data when the feature-flag store or S3 errors, so
 // ingestion is never blocked. A healthy fleet emits this at ~zero rate;
 // sustained increments (esp. reason="spool") indicate an S3 outage worth
@@ -502,7 +502,8 @@ const esFoldRefoldOnMissTotal = new Counter({
 });
 
 /**
- * Makes the ADR-066 transitional net observable. `refoldOnStoreMiss` survives on
+ * Makes the ADR-066 (retired; ground now ADR-099) transitional net
+ * observable. `refoldOnStoreMiss` survives on
  * the three read-back folds ONLY to rebuild aggregates whose committed row
  * predates their read-back columns, and its deletion condition is "it stopped
  * firing" — which without this counter is an assumption, not an observation. A
@@ -633,7 +634,7 @@ export const observeEsSubscriberDuration = ({
 
 /**
  * Outcome of a subscriber's enqueue-time fan-out decision (payload-cost
- * doctrine invariant 4 — ADR-069):
+ * doctrine invariant 4 — ADR-069, retired; ground now ADR-098):
  *
  * - `filtered` — the predicate declined; no job was minted.
  * - `staged` — a job carrying the full event was handed off to the
@@ -660,7 +661,8 @@ export const observeEsSubscriberDuration = ({
  *
  * - `killed` — an operator disabled this subscriber for the event's tenant, so
  *   the seam never judged relevance. Counted rather than skipped silently:
- *   subscriber fan-out is never replayed (ADR-069), so a kill drops those
+ *   subscriber fan-out is never replayed (ADR-069, retired; ground now
+ *   ADR-098), so a kill drops those
  *   events permanently, and an operator must be able to tell a killed
  *   subscriber from an idle one — which is exactly when they are looking.
  *
@@ -834,7 +836,8 @@ export const observeEsProcessOutboxDispatchLag = ({
 
 // Commits whose intents were dropped as already-dispatched (ADR-054).
 // Legitimate on event redelivery — but a sustained per-process rate is
-// exactly how the ADR-051 lost-day scheduling bug hid, so it is measured,
+// exactly how the ADR-051 (retired; ground now ADR-098) lost-day scheduling
+// bug hid, so it is measured,
 // logged AND alertable rather than only logged.
 register.removeSingleMetric("es_process_intents_suppressed_total");
 const esProcessIntentsSuppressed = new Counter({
@@ -851,7 +854,7 @@ export const incrementEsProcessIntentsSuppressed = ({
   count: number;
 }) => esProcessIntentsSuppressed.labels(processName).inc(count);
 
-// --- Topic clustering domain metrics (ADR-051/ADR-054) ---
+// --- Topic clustering domain metrics (ADR-051 [retired; ground now ADR-098]/ADR-054) ---
 // Run-page outcomes as the domain sees them, not just generic es_* counters:
 // `failed_final` is the alertable one (retries exhausted, run_failed
 // recorded); `failed_retryable` is expected noise under provider hiccups.
@@ -1230,7 +1233,8 @@ const codingAgentSessionListReadDuration = new Histogram({
   help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
   labelNames: ["table", "outcome"] as const,
   // Runs to 30s deliberately. This metric's job is to catch the unpruned scan
-  // becoming expensive enough to promote ADR-071's writer freeze from "next" to
+  // becoming expensive enough to promote ADR-071's (retired; ground now
+  // ADR-099) writer freeze from "next" to
   // "now", and a top bucket at 5s would put exactly that degradation into
   // `+Inf`, where a p99 cannot be resolved — the histogram would go blind at
   // the moment it was supposed to speak.
@@ -1238,7 +1242,8 @@ const codingAgentSessionListReadDuration = new Histogram({
 });
 
 /**
- * Prices ADR-071 sequencing step 2. `findManyRecent`'s inner `max(UpdatedAt)`
+ * Prices ADR-071 (retired; ground now ADR-099) sequencing step 2.
+ * `findManyRecent`'s inner `max(UpdatedAt)`
  * subquery dropped its `StartedAt` bound, because a bound on a moving column
  * inside a dedup scope returns a stale version. The scope therefore no longer
  * prunes partitions and scans this tenant's sessions rather than the window's

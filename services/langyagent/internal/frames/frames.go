@@ -252,7 +252,8 @@ type handoffFrame struct {
 	ResumeToken string `json:"resumeToken,omitempty"`
 }
 
-// Handoff is terminal (ADR-048): the worker checkpointed the in-flight turn on a
+// Handoff is terminal (ADR-048, retired; ground now
+// dev/docs/adr/098-event-sourcing-core.md): the worker checkpointed the in-flight turn on a
 // shutdown-imminent notice and hands back an opaque resume token the control plane
 // persists, so the NEXT turn resumes from it. The token is opaque here — authored
 // and consumed by opencode, only persisted by the relay.

@@ -63,7 +63,8 @@ export interface IngestionPullDispatchDeps {
   runPort: IngestionPullRunPort;
   /**
    * This same pipeline's write surface. No longer late-bound: the pipeline
-   * builds these from command-bus ports (ADR-082 §5), which resolve by class
+   * builds these from command-bus ports (ADR-082 §5, retired; ground now
+   * ADR-102), which resolve by class
    * identity at send time, so an executor declared mid-`.build()` can name
    * commands the builder has not registered yet.
    */

@@ -40,9 +40,11 @@ import type { IngestionPullProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (state, intents, handlers, outbox tuning) is declared
- *  inline below, ADR-052 "Approved builder API", like the core domains.
+ *  inline below, ADR-052 "Approved builder API" (retired; ground now
+ *  ADR-098), like the core domains.
  *
- *  ADR-082 Rule 1: the executor's dispatch bundle is built here, from the run
+ *  ADR-082 Rule 1 (retired; ground now ADR-102): the executor's dispatch
+ *  bundle is built here, from the run
  *  port and this pipeline's own commands, so nothing in this interface is a
  *  value the builder registers and nothing has to be resolved after `.build()`. */
 export interface IngestionPullProcessingPipelineDeps {
@@ -50,7 +52,7 @@ export interface IngestionPullProcessingPipelineDeps {
   runStatusStore: StateProjectionStore<IngestionPullRunStatusData>;
   /** Runs one pull attempt from the durable cursor — the effect's domain function. */
   runPort: IngestionPullRunPort;
-  /** ADR-082 §5 — identity-keyed dispatch into this pipeline's own commands. */
+  /** ADR-082 §5 (retired; ground now ADR-102) — identity-keyed dispatch into this pipeline's own commands. */
   commands: CommandBus;
 }
 
@@ -91,7 +93,8 @@ export function ingestionPullPM(
  * Aggregate: `ingestion_pull` (aggregateId = sourceId, TenantId = hidden
  * governance project id) — one ordered stream per ingestion source.
  *
- * Process manager: `ingestionPull` (ADR-052 builder) — owns each source's
+ * Process manager: `ingestionPull` (ADR-052 builder, retired; ground now
+ * ADR-098) — owns each source's
  * cron wake, the pull run lifecycle, and the durable cursor. It deliberately
  * declares no `.schedule()`: the cadence is each source's own cron
  * expression, so every handler returns its explicit `nextWakeAt`.

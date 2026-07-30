@@ -1345,7 +1345,8 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
-          // Single-trace header read: resolve offloaded (ADR-022) IO back to
+          // Single-trace header read: resolve offloaded (ADR-022, retired;
+          // ground now ADR-099) IO back to
           // the full value, exactly like legacy traces.getById. The list read
           // never passes this.
           full: true,
@@ -1931,7 +1932,8 @@ export const tracesV2Router = createTRPCRouter({
     }),
 
   /**
-   * The pre-folded coding-agent session rollup for one trace (ADR-056).
+   * The pre-folded coding-agent session rollup for one trace (ADR-056,
+   * retired; ground now ADR-105).
    *
    * Returns null for an ordinary LLM trace — the fold writes no row for those,
    * so null is the normal answer rather than an error, and the caller simply
@@ -1953,7 +1955,7 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
+      // Two keyed seeks (ADR-056 §4, retired; ground now ADR-105): the (trace → session) map, then the
       // session row — which already spans every trace of the run, so no
       // conversation-membership fan-out is needed here anymore.
       return app.codingAgents.sessions.getSessionForTrace({

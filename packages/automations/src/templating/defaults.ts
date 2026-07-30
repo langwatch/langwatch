@@ -5,7 +5,7 @@
  * the email chrome (`emailLayout.ts`) so every email keeps it consistently,
  * regardless of what a customer template prints.
  *
- * ADR-034 Phase 5: a SECOND default family targets custom-graph threshold
+ * ADR-034 (retired; ground now ADR-099) Phase 5: a SECOND default family targets custom-graph threshold
  * ALERTS (`alertDefaults` below). The shape of an alert is "metric X
  * crossed threshold Y" — not "this trace happened matching filters" —
  * so the default subject + body + Slack mrkdwn all read in metric-
@@ -69,7 +69,7 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
  * DEFAULT_SLACK_TEMPLATE comment above.
  */
 /**
- * ADR-034 Phase 5/8.1: alert-default templates for custom-graph threshold
+ * ADR-034 (retired; ground now ADR-099) Phase 5/8.1: alert-default templates for custom-graph threshold
  * alerts. Render in metric-crossed-threshold language against
  * `GraphAlertTemplateContext` — `trigger`, `graph`, `metric`,
  * `condition`, `currentValue`, `occurredAt`, `reason`, `project`.

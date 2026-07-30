@@ -36,7 +36,8 @@ type chatRequest struct {
 	// checks its own `validate:"required"` fields (see domain.Credentials).
 	Credentials   domain.Credentials `json:"credentials"`
 	ModelOverride string             `json:"modelOverride,omitempty"`
-	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a
+	// ResumeToken (ADR-048, retired; ground now
+	// dev/docs/adr/098-event-sourcing-core.md) is an opaque, worker-authored checkpoint from a
 	// prior turn that handed off on shutdown. The control plane sets it on the
 	// next turn's /chat body when it found a pending handoff for the
 	// conversation; the manager forwards it verbatim into the worker, never

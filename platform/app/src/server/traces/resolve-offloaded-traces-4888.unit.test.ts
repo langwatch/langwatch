@@ -137,7 +137,7 @@ function unconfiguredBlobStore(): BlobStore {
   return {
     getFromEventLog: vi.fn(async () => {
       throw new Error(
-        "ClickHouseClient not configured — cannot read from event_log (ADR-022)",
+        "ClickHouseClient not configured — cannot read from event_log (ADR-022, retired; ground now ADR-099)",
       );
     }),
     putSpool: vi.fn(),

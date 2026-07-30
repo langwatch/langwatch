@@ -36,6 +36,10 @@ export interface CanonicalPointValues {
   quantileValues: Array<{ quantile: number | null; value: number | null }>;
 }
 
+function signedInteger(value: unknown): number {
+  return Number(integerDecimal(value ?? 0, { signed: true }));
+}
+
 function canonicalQuantiles(
   value: unknown,
 ): CanonicalPointValues["quantileValues"] {
@@ -82,14 +86,17 @@ export function canonicalPointValues(args: {
     max: finiteNumber(point.max),
     explicitBounds: finiteNumbers(point.explicitBounds),
     bucketCounts: integerDecimals(point.bucketCounts),
-    exponentialScale: isExponential ? Number(point.scale ?? 0) : null,
+    // scale and the two offsets are OTLP sint32s, so they arrive in every
+    // encoding `integerDecimal` knows — including protobuf-JSON's `{low,high}`,
+    // which a bare `Number()` turns into the NaN that then indexes every bucket.
+    exponentialScale: isExponential ? signedInteger(point.scale) : null,
     exponentialZeroThreshold: isExponential
       ? finiteNumber(point.zeroThreshold ?? 0)
       : null,
     zeroCount: isExponential ? integerDecimal(point.zeroCount) : null,
-    positiveOffset: isExponential ? Number(positive.offset ?? 0) : null,
+    positiveOffset: isExponential ? signedInteger(positive.offset) : null,
     positiveBucketCounts: integerDecimals(positive.bucketCounts),
-    negativeOffset: isExponential ? Number(negative.offset ?? 0) : null,
+    negativeOffset: isExponential ? signedInteger(negative.offset) : null,
     negativeBucketCounts: integerDecimals(negative.bucketCounts),
     quantileValues:
       kind === "summary" ? canonicalQuantiles(point.quantileValues) : [],

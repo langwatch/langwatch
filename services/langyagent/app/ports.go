@@ -50,7 +50,8 @@ type WorkerPool interface {
 	KillSessionVanished(conversationID string)
 	// StartReaper begins the idle-worker sweep.
 	StartReaper()
-	// ShutdownHandoff (ADR-048) is the pre-drain SIGTERM step: it notifies each
+	// ShutdownHandoff (ADR-048, retired; ground now
+	// dev/docs/adr/098-event-sourcing-core.md) is the pre-drain SIGTERM step: it notifies each
 	// live worker that shutdown is imminent (so opencode checkpoints the
 	// in-flight turn and emits a terminal handoff frame) and waits, bounded by
 	// deadline, for those turns to quiesce. Runs BEFORE Shutdown so the handoff

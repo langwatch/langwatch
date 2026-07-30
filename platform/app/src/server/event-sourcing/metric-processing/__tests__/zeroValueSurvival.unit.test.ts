@@ -1,18 +1,12 @@
-import type { AppendStore, BatchContext } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
-import { metric } from "../aggregate";
-import { createMetricProcessingProjections } from "../index";
+import { createMetricProcessingPipeline } from "../index";
 import { buildMetricRollups } from "../rollup/buildRollups";
-import type { CanonicalMetricDataPoint } from "../schema";
+import { createFakeClient, insertedCell } from "./fakeClient";
 import { gaugeMetric, point, prepare, requestForMetric } from "./fixtures";
 
 /**
- * The one behaviour this rewrite must never regress: an OTLP metric of value
- * `0` is a real observation, and a falsy check anywhere on its way from the
- * wire to a written row would silently discard it. Each scenario below
- * exercises a different stage of the pipeline the old code's incident
- * touched — canonicalisation, the map projection's write, and the rollup
- * recompute.
+ * An OTLP metric of value `0` is a real observation: a falsy check anywhere
+ * between the wire and a written row would silently discard it.
  */
 describe("zero-value survival", () => {
   describe("when the project sends a gauge data point whose value is 0", () => {
@@ -53,21 +47,8 @@ describe("zero-value survival", () => {
   describe("when a data point whose value is 0 is received as an event", () => {
     /** @scenario "A zero value survives into the map projection's written row" */
     it("the metricDataPointStorage projection writes a row whose value is 0", async () => {
-      const written: CanonicalMetricDataPoint[][] = [];
-      const store: AppendStore<CanonicalMetricDataPoint> = {
-        kind: "append",
-        async writeBatch(
-          records: readonly CanonicalMetricDataPoint[],
-          _context: BatchContext,
-        ) {
-          written.push([...records]);
-        },
-      };
-      const { metricDataPointStorage } = createMetricProcessingProjections({
-        metricDataPointStore: store,
-        metricSeriesCatalogStore: store,
-        metricTimeRollupStore: store,
-      });
+      const client = createFakeClient();
+      const built = createMetricProcessingPipeline({ client });
 
       const result = await prepare({
         request: requestForMetric({
@@ -78,15 +59,18 @@ describe("zero-value survival", () => {
       });
       const canonical = result.accepted[0]!.dataPoint;
 
-      const outcome = await metricDataPointStorage.apply({
+      const outcome = await built.maps.metricDataPointStorage!.apply({
         tenantId: canonical.tenantId,
-        events: [metric.events.dataPointReceived(canonical)],
+        events: [{ type: "lw.obs.metric.data_point_received", data: canonical }],
       });
 
       expect(outcome.written).toBe(1);
-      expect(written).toHaveLength(1);
-      expect(written[0]![0]!.valueDouble).toBe(0);
-      expect(written[0]![0]!.valueType).toBe("double");
+      expect(
+        insertedCell({ client, table: "metric_data_points", column: "ValueDouble" }),
+      ).toBe(0);
+      expect(
+        insertedCell({ client, table: "metric_data_points", column: "ValueType" }),
+      ).toBe("double");
     });
   });
 

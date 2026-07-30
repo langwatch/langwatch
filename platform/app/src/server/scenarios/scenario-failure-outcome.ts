@@ -6,7 +6,8 @@ import { ScenarioRunStatus } from "./scenario-event.enums";
  * How a run ended when it did not end itself.
  *
  * One modelled outcome rather than a set of mutually-exclusive booleans
- * (ADR-073 step 2). The predecessor was a lone `cancelled?: boolean` on
+ * (ADR-073 step 2, retired; ground now ADR-103). The predecessor was a lone
+ * `cancelled?: boolean` on
  * `FailureEventParams`; adding a second flag for "stalled" beside it would
  * have made two of the four combinations meaningless and left the caller to
  * remember which one wins.

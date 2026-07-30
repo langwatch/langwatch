@@ -2,7 +2,7 @@
 
 /**
  * `AppendStore` adapter for the `governanceOcsfEvents` map projection
- * (ADR-075 Class C). Thin by design — the derivation lives in the
+ * (ADR-075 Class C, retired; ground now ADR-098). Thin by design — the derivation lives in the
  * projection, the tenancy and insert shape live in the repository, and
  * this only bridges the two.
  *

@@ -1,6 +1,6 @@
 /**
  * Event and command type constants for the langy-conversation-processing
- * pipeline (ADR-046).
+ * pipeline (ADR-046, retired; ground now ADR-098).
  *
  * A Langy conversation is an event-sourced aggregate: `aggregateId` is the
  * conversationId and `TenantId` is the projectId. Writes are imperative
@@ -58,9 +58,9 @@ export const LANGY_CONVERSATION_EVENT_TYPES = {
   AGENT_RESPONDED: "lw.langy_conversation.agent_responded",
   ARCHIVED: "lw.langy_conversation.conversation_archived",
   // Beyond the prescribed vocabulary — preserves the PATCH rename/share route.
-  // See ADR-046 open question 1.
+  // See the retired ADR-046 (ground now ADR-098) open question 1.
   METADATA_UPDATED: "lw.langy_conversation.conversation_metadata_updated",
-  // ADR-048 shutdown-handoff: a turn checkpointed on pod termination and left an
+  // ADR-048 (retired; ground now ADR-098) shutdown-handoff: a turn checkpointed on pod termination and left an
   // opaque, worker-authored resume token for the next turn to pick up
   // (CONVERSATION_HANDOFF_PENDING); the next turn threaded it to a fresh worker
   // and cleared it (CONVERSATION_HANDOFF_CONSUMED).
@@ -98,7 +98,8 @@ export type LangyConversationProcessingEventType =
 
 /**
  * EPHEMERAL signal type identifiers — NOT durable events. They are never
- * written to `event_log`, the fold, or the map projection (ADR-046). They flow
+ * written to `event_log`, the fold, or the map projection (ADR-046, retired;
+ * ground now ADR-098). They flow
  * through a short-lived, per-conversation Redis buffer (see `../ephemeral.ts`)
  * that backs the live UI stream, and are dropped when the turn ends or the TTL
  * lapses. Persisting one per tick/token would flood `event_log` and leave a
@@ -107,7 +108,8 @@ export type LangyConversationProcessingEventType =
  * The same durable/ephemeral split applies to simulations
  * (`text_message_start` / `text_message_end` / `message_snapshot` flood
  * `simulation_runs` today), so this classification is a candidate to graduate
- * to a framework-level concept shared across pipelines (ADR-046 open question 4).
+ * to a framework-level concept shared across pipelines (the retired ADR-046,
+ * ground now ADR-098, open question 4).
  */
 export const LANGY_EPHEMERAL_SIGNAL_TYPES = {
   STATUS_REPORTED: "lw.langy_conversation.status_reported",
@@ -137,7 +139,7 @@ export const LANGY_CONVERSATION_COMMAND_TYPES = {
   RECORD_AGENT_RESPONSE: "lw.langy_conversation.record_agent_response",
   ARCHIVE: "lw.langy_conversation.archive_conversation",
   UPDATE_METADATA: "lw.langy_conversation.update_metadata",
-  // ADR-048 shutdown-handoff write surface.
+  // ADR-048 (retired; ground now ADR-098) shutdown-handoff write surface.
   RECORD_TURN_HANDOFF: "lw.langy_conversation.record_turn_handoff",
   CONSUME_TURN_HANDOFF: "lw.langy_conversation.consume_turn_handoff",
   // Dispatched by the process-outbox title effect (1:1 → title_generated).

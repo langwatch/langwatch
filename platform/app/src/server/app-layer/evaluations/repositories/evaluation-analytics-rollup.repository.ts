@@ -27,18 +27,3 @@ export interface EvaluationAnalyticsRollupRepository {
     retentionDays?: number,
   ): Promise<void>;
 }
-
-/** No-op implementation for tests and ClickHouse-less environments. */
-export class NullEvaluationAnalyticsRollupRepository
-  implements EvaluationAnalyticsRollupRepository
-{
-  async insertRow(
-    _row: EvaluationAnalyticsRollupRow,
-    _retentionDays?: number,
-  ): Promise<void> {}
-
-  async insertRows(
-    _rows: EvaluationAnalyticsRollupRow[],
-    _retentionDays?: number,
-  ): Promise<void> {}
-}

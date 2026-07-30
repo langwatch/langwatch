@@ -1,3 +1,4 @@
+import type { EmittedEvent } from "@langwatch/event-sourcing";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -20,10 +21,11 @@ import type { PreconditionTraceData } from "~/server/filters/precondition-matche
 import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { extractErrorMessage } from "~/utils/captureError";
-import { type EvaluationEvent, evaluation } from "../aggregate";
+import { evaluationEvents } from "../events";
+import { reportEvaluation } from "../report.command";
 
 /**
- * The orchestration around `evaluation.commands.report`: fetch the monitor,
+ * The orchestration around `reportEvaluation`: fetch the monitor,
  * sample, check preconditions, run the evaluator, record cost, offload
  * oversized inputs — all I/O, all before an event is decided, none of it
  * expressible in a command handler, which is synchronous and pure.
@@ -126,7 +128,7 @@ async function buildReportedEvent(
     costId?: string | null;
   },
   offloadInputs?: ExecuteEvaluationDeps["offloadInputs"],
-): Promise<readonly EvaluationEvent[]> {
+): Promise<readonly EmittedEvent<typeof evaluationEvents>[]> {
   const inputs =
     offloadInputs && result.inputs
       ? await offloadInputs({
@@ -136,34 +138,30 @@ async function buildReportedEvent(
         })
       : (result.inputs ?? null);
 
-  return evaluation.commands.report.handle(
-    evaluation.init(),
-    {
-      evaluationId: input.evaluationId,
-      evaluatorId: input.evaluatorId,
-      evaluatorType: input.evaluatorType,
-      evaluatorName: input.evaluatorName,
-      traceId: input.traceId,
-      isGuardrail: input.isGuardrail,
-      occurredAt: input.occurredAt,
-      status: result.status,
-      score: result.score ?? null,
-      passed: result.passed ?? null,
-      label: result.label ?? null,
-      details: result.details ?? null,
-      inputs,
-      error: result.error ?? null,
-      errorDetails: result.errorDetails ?? null,
-      costId: result.costId ?? null,
-    },
-    evaluation.events,
-  );
+  return reportEvaluation({
+    evaluationId: input.evaluationId,
+    evaluatorId: input.evaluatorId,
+    evaluatorType: input.evaluatorType,
+    evaluatorName: input.evaluatorName,
+    traceId: input.traceId,
+    isGuardrail: input.isGuardrail,
+    occurredAt: input.occurredAt,
+    status: result.status,
+    score: result.score ?? null,
+    passed: result.passed ?? null,
+    label: result.label ?? null,
+    details: result.details ?? null,
+    inputs,
+    error: result.error ?? null,
+    errorDetails: result.errorDetails ?? null,
+    costId: result.costId ?? null,
+  });
 }
 
 export async function executeEvaluation(
   deps: ExecuteEvaluationDeps,
   input: ExecuteEvaluationInput,
-): Promise<readonly EvaluationEvent[]> {
+): Promise<readonly EmittedEvent<typeof evaluationEvents>[]> {
   const { tenantId } = input;
 
   logger.debug(
@@ -359,10 +357,8 @@ export async function executeEvaluation(
       });
     }
 
-    // Not customer-fixable: a genuine, unclassified failure. Re-thrown, not
-    // recorded as a permanent "error" result — see the module docblock's
-    // "Defect #1" section for why swallowing it here would be exactly the
-    // silent-absorption failure this rewrite must not reintroduce.
+    // Not customer-fixable: re-thrown rather than recorded as a permanent
+    // "error" result, which would manufacture finality a retry could fix.
     logger.error(
       {
         tenantId,

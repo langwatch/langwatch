@@ -61,7 +61,8 @@ function deriveId(resource: string, parts: readonly string[]): string {
  * The batch a given submit always produces.
  *
  * Keyed by the active set as well as the idempotency key, because the batch
- * carries its own denominator: every child stamps `BatchTotal` (ADR-072), so a
+ * carries its own denominator: every child stamps `BatchTotal` (ADR-072,
+ * retired; ground now ADR-103), so a
  * batch is only meaningful if every member agrees what the total is.
  *
  * Without the set in the key, a retry of the same key against a changed set —

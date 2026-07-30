@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  *
- * ADR-059's authorization half, end to end across the two paths a member can
+ * ADR-059's (retired; ground now ADR-098) authorization half, end to end
+ * across the two paths a member can
  * learn about a conversation: the tenant-wide freshness signal and the
  * authorized catch-up read.
  *

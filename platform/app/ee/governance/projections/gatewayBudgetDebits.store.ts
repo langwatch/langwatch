@@ -22,7 +22,7 @@ const STORE_NAME = "GatewayBudgetDebitsAppendStore";
 export interface GatewayBudgetDebitsAppendStoreDeps {
   /**
    * Decides which budgets a request may move and shapes the rows that move
-   * them (ADR-082 layer 3). Kept out of this store on purpose: a store that
+   * them (ADR-082 layer 3, retired; ground now ADR-102). Kept out of this store on purpose: a store that
    * also authorises needs four "and"s to describe.
    */
   debits: GatewayBudgetDebitService;
@@ -36,7 +36,8 @@ export interface GatewayBudgetDebitsAppendStoreDeps {
 }
 
 /**
- * Write side of the ADR-075 Class C `gatewayBudgetDebits` map projection:
+ * Write side of the ADR-075 Class C (retired; ground now ADR-098)
+ * `gatewayBudgetDebits` map projection:
  * appends the resolved ClickHouse ledger rows and tells the gateway when
  * spend actually moved.
  *
@@ -142,7 +143,8 @@ export class GatewayBudgetDebitsAppendStore
    * authorising once the budget is exhausted" even when "the process that would
    * have notified the gateway dies first". Making it durable would buy a faster
    * eviction at the price of an outbox row per gateway request, which is the
-   * Postgres-row cost ADR-075 explicitly says to watch. So a failure here is
+   * Postgres-row cost the retired ADR-075 (ground now ADR-098) explicitly
+   * says to watch. So a failure here is
    * logged and swallowed: the ledger row is already committed, and throwing
    * would retry the whole map job — re-probing ClickHouse — to re-send a hint.
    */

@@ -5,7 +5,8 @@ import { langyConversationUpdateSignalSchema } from "../langy.schemas";
 /**
  * The client half of the freshness signal contract. The broadcast payload
  * carries server-side authorization fields (ownerUserId / isShared) that must
- * NEVER survive the client parse, and — since ADR-059 — the projection cursor
+ * NEVER survive the client parse, and — since ADR-059 (retired; ground now
+ * ADR-098) — the projection cursor
  * that MUST. Strip-by-parse is the mechanism, so the schema itself is the
  * security boundary this file pins.
  */

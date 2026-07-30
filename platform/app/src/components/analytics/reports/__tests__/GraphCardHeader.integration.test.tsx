@@ -1,5 +1,6 @@
 /**
- * Tests for GraphCardHeader's alert-button wiring (Phase 5.2 of ADR-034).
+ * Tests for GraphCardHeader's alert-button wiring (Phase 5.2 of ADR-034,
+ * retired; ground now ADR-099).
  *
  * The header used to open the legacy `customGraphAlert` drawer; it now
  * opens the unified `automation` drawer pre-filled with the graph + series

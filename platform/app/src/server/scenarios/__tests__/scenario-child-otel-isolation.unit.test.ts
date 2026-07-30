@@ -8,7 +8,8 @@
  * survive this function.
  *
  * Nothing pinned it before. That mattered less when dispatch was a
- * fire-and-forget reactor; under ADR-073 step 2 the spawn happens inside the
+ * fire-and-forget reactor; under ADR-073 step 2 (retired; ground now
+ * ADR-103) the spawn happens inside the
  * outbox's own CONSUMER span, on a worker that carries the platform's telemetry
  * configuration, with up to `SCENARIO_EXECUTION_CONCURRENCY` runs interleaved in
  * one process. Each of those is a way for one run's telemetry to become
@@ -104,7 +105,8 @@ describe("scenario child process telemetry env", () => {
     });
 
     /**
-     * Since ADR-073 step 2 the spawn happens inside the outbox dispatcher's
+     * Since ADR-073 step 2 (retired; ground now ADR-103) the spawn happens
+     * inside the outbox dispatcher's
      * CONSUMER span, whose parent is restored from the committing request's
      * W3C carrier. If that context reached the child, every scenario's spans
      * would hang off the dispatch that started them — and a redelivery would

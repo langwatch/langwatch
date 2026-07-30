@@ -106,7 +106,7 @@ async function seedOffloadedTrace() {
   await insertEventLogRow({
     client: ch,
     tenantId,
-    aggregateId: traceId, // ADR-022: aggregateId for trace-processing IS the traceId
+    aggregateId: traceId, // ADR-022 (retired; ground now ADR-099): aggregateId for trace-processing IS the traceId
     eventId,
     eventType: SPAN_RECEIVED_EVENT_TYPE,
     eventVersion: SPAN_RECEIVED_EVENT_VERSION_LATEST,

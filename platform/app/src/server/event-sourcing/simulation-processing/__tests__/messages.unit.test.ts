@@ -1,63 +1,44 @@
 import { describe, expect, it } from "vitest";
-import { simulationRun } from "../aggregate";
-import { simulationRunMessages } from "../index";
 import {
   buildRunMessagesQuery,
   decodeRunMessageRows,
   mapMessageSnapshot,
   mapTextMessageEnd,
+  simulationMessageRecordSchema,
 } from "../messages";
 import { simulationRunMessagesTable } from "../table";
 
 /**
  * @see specs/event-sourcing/simulation-run-aggregate.feature
+ *
+ * "subscribes to the two events that carry message content" and "produces no
+ * row for a message that has only started" are bound in index.unit.test.ts,
+ * against the built map's own `.eventTypes` and `.apply()` — this pipeline's
+ * `.withMap(name, { on: {...} })` declaration is what the mount actually
+ * dispatches on, not a standalone `map()` function.
  */
 
 const RUN_ID = "run-1";
 
-describe("the simulationRunMessages map projection", () => {
-  it("subscribes to the two events that carry message content", () => {
-    expect([...simulationRunMessages.eventTypes].sort()).toEqual([
-      "lw.simulation_run.message_snapshot",
-      "lw.simulation_run.text_message_end",
-    ]);
-  });
-
-  /** @scenario "A message that has only started carries no transcript row yet" */
-  it("produces no row for a message that has only started", () => {
-    expect(
-      simulationRunMessages.map(
-        simulationRun.events.textMessageStart({
-          scenarioRunId: RUN_ID,
-          messageId: "m1",
-          role: "assistant",
-          messageIndex: 0,
-          occurredAt: 1,
-        }),
-      ),
-    ).toBeNull();
-  });
-
-  /** @scenario "A redelivered message does not duplicate the run's transcript" */
-  it("re-derives the same row key for a redelivered message", () => {
-    const event = simulationRun.events.textMessageEnd({
+describe("the simulationRunMessages map handlers", () => {
+  /** @scenario A redelivered message does not duplicate the run's transcript */
+  it("re-derives the same row for a redelivered message", () => {
+    const data = {
       scenarioRunId: RUN_ID,
       messageId: "m1",
       role: "assistant",
       content: "hi",
       messageIndex: 0,
       occurredAt: 10,
-    });
+    };
 
-    expect(simulationRunMessages.map(event)).toEqual(
-      simulationRunMessages.map(event),
-    );
+    expect(mapTextMessageEnd(data)).toEqual(mapTextMessageEnd(data));
   });
 });
 
 describe("mapMessageSnapshot", () => {
-  it("emits one row per message, numbered by its position", () => {
-    const rows = mapMessageSnapshot({
+  it("emits one record per message, numbered by its position", () => {
+    const records = mapMessageSnapshot({
       scenarioRunId: RUN_ID,
       messages: [
         { id: "m1", role: "user", content: "hello", trace_id: "trace-1" },
@@ -67,59 +48,72 @@ describe("mapMessageSnapshot", () => {
       occurredAt: 1,
     });
 
-    expect(rows).toEqual([
+    expect(records).toEqual([
       {
-        ScenarioRunId: RUN_ID,
-        MessageId: "m1",
-        MessageIndex: 0,
-        Role: "user",
-        Content: "hello",
-        TraceId: "trace-1",
-        Rest: "",
+        scenarioRunId: RUN_ID,
+        messageId: "m1",
+        messageIndex: 0,
+        role: "user",
+        content: "hello",
+        traceId: "trace-1",
+        rest: "",
       },
       {
-        ScenarioRunId: RUN_ID,
-        MessageId: "m2",
-        MessageIndex: 1,
-        Role: "assistant",
-        Content: "hi",
-        TraceId: "",
-        Rest: "",
+        scenarioRunId: RUN_ID,
+        messageId: "m2",
+        messageIndex: 1,
+        role: "assistant",
+        content: "hi",
+        traceId: "",
+        rest: "",
       },
     ]);
   });
 
   it("keys a message with no id of its own by its position", () => {
-    const [row] = mapMessageSnapshot({
+    const [record] = mapMessageSnapshot({
       scenarioRunId: RUN_ID,
       messages: [{ role: "user", content: "hello" }],
       traceIds: [],
       occurredAt: 1,
     });
 
-    expect(row!.MessageId).toBe("#0");
+    expect(record!.messageId).toBe("#0");
   });
 
   it("caps a message that carries inline media rather than storing it", () => {
-    const [row] = mapMessageSnapshot({
+    const [record] = mapMessageSnapshot({
       scenarioRunId: RUN_ID,
       messages: [{ id: "m1", role: "user", content: "x".repeat(200_000) }],
       traceIds: [],
       occurredAt: 1,
     });
 
-    expect(row!.Content).toMatch(/^\[truncated: 200000 bytes/);
+    expect(record!.content).toMatch(/^\[truncated: 200000 bytes/);
   });
 
   it("keeps the AG-UI fields it has no column for as JSON", () => {
-    const [row] = mapMessageSnapshot({
+    const [record] = mapMessageSnapshot({
       scenarioRunId: RUN_ID,
       messages: [{ id: "m1", role: "user", content: "hi", toolCalls: ["a"] }],
       traceIds: [],
       occurredAt: 1,
     });
 
-    expect(JSON.parse(row!.Rest)).toEqual({ toolCalls: ["a"] });
+    expect(JSON.parse(record!.rest)).toEqual({ toolCalls: ["a"] });
+  });
+
+  it("emits a domain record, never the row the store writes", () => {
+    const [record] = mapMessageSnapshot({
+      scenarioRunId: RUN_ID,
+      messages: [{ id: "m1", role: "user", content: "hi" }],
+      traceIds: [],
+      occurredAt: 1,
+    });
+
+    expect(Object.keys(record!)).toEqual(
+      Object.keys(simulationMessageRecordSchema.shape),
+    );
   });
 });
 
@@ -136,14 +130,54 @@ describe("mapTextMessageEnd", () => {
         occurredAt: 10,
       }),
     ).toEqual({
-      ScenarioRunId: RUN_ID,
-      MessageId: "m1",
-      MessageIndex: 3,
-      Role: "assistant",
-      Content: "hi",
-      TraceId: "trace-2",
-      Rest: "",
+      scenarioRunId: RUN_ID,
+      messageId: "m1",
+      messageIndex: 3,
+      role: "assistant",
+      content: "hi",
+      traceId: "trace-2",
+      rest: "",
     });
+  });
+});
+
+describe("the transcript's numbering", () => {
+  /**
+   * Both writers reach the same row for one message id, so which delivery
+   * merged last cannot reorder the transcript.
+   */
+  it("gives one message the same index whether it arrived streamed or snapshotted", () => {
+    const streamed = mapTextMessageEnd({
+      scenarioRunId: RUN_ID,
+      messageId: "m2",
+      role: "assistant",
+      content: "hi",
+      messageIndex: 1,
+      occurredAt: 10,
+    });
+    const [, snapshotted] = mapMessageSnapshot({
+      scenarioRunId: RUN_ID,
+      messages: [
+        { id: "m1", role: "user", content: "hello" },
+        { id: "m2", role: "assistant", content: "hi" },
+      ],
+      traceIds: [],
+      occurredAt: 20,
+    });
+
+    expect(streamed.messageIndex).toBe(snapshotted!.messageIndex);
+  });
+
+  it("refuses a streamed message that numbers itself by default", () => {
+    expect(() =>
+      simulationRun.commands.endTextMessage.input.parse({
+        scenarioRunId: RUN_ID,
+        messageId: "m2",
+        role: "assistant",
+        content: "hi",
+        occurredAt: 10,
+      }),
+    ).toThrow();
   });
 });
 

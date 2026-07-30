@@ -25,7 +25,8 @@ export const TRACE_ALERT_TRIGGER_MATCH_DEDUP_TTL_MS = 30_000;
  * What the match needs from the trace domain.
  *
  * The committed trace summary is read here rather than handed in as fold state:
- * the trace-alert match is a plain event subscriber now (ADR-075 Class B), and
+ * the trace-alert match is a plain event subscriber now (ADR-075 Class B,
+ * retired; ground now ADR-098), and
  * a subscriber has no projection bound to it.
  *
  * The debounce window makes a committed summary the overwhelmingly likely case,
@@ -60,7 +61,8 @@ export interface TraceAlertTriggerMatchDeps {
  *
  * **A trace whose summary cannot be read throws.** The handler's own lane is
  * the one seam here that retries: unlike the routing/enqueue hooks — where a
- * throw loses the job for good (ADR-069/ADR-075) — a subscriber job that
+ * throw loses the job for good (ADR-069/ADR-075, both retired; ground now
+ * ADR-098) — a subscriber job that
  * rejects is re-leased by the group queue with backoff, and parks its group
  * once the budget is spent. Parking is per (subscriber, tenant, trace), so a
  * trace that never folds is visible and self-limiting.

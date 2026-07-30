@@ -173,7 +173,7 @@ describe("ScenarioFailureHandler", () => {
         outcome: "stalled",
       });
 
-      // Before ADR-073 step 2 this wrote ERROR and the UI derived STALLED from
+      // Before ADR-073 step 2 (retired; ground now ADR-103) this wrote ERROR and the UI derived STALLED from
       // how long ago the row was last touched, so the same run read as two
       // different statuses depending on when you looked.
       expect(mockFinishRun).toHaveBeenCalledWith(

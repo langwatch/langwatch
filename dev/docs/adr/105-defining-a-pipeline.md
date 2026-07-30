@@ -66,35 +66,41 @@ export function createTracePipeline(deps: TraceDeps) {
       originResolved: (data) => data.traceId,
     })
 
-    .withCommand("recordSpan", (c) => c
-      .input(rawSpanSchema)
-      .handle(recordSpan(deps)))
+    .withCommand("recordSpan", {
+      input: rawSpanSchema,
+      handle: recordSpan(deps),
+    })
 
-    .withFold("traceSummary", (f) => f
-      .state(traceSummaryStateSchema, initTraceSummary)
-      .on({ spanReceived: applySpanReceived, topicAssigned: applyTopicAssigned })
-      .store(clickhouseReplacing({
+    .withFold("traceSummary", {
+      state: traceSummaryStateSchema,
+      init: initTraceSummary,
+      on: { spanReceived: applySpanReceived, topicAssigned: applyTopicAssigned },
+      store: clickhouseReplacing({
         client: deps.client,
         table: traceSummaryTable,
         cache: deps.summaryCache,
-      })))
+      }),
+    })
 
-    .withMap("spanStorage", (m) => m
-      .on({ spanReceived: toSpanRow })
-      .store(clickhouseAppend({ client: deps.client, table: storedSpansTable })))
+    .withMap("spanStorage", {
+      on: { spanReceived: toSpanRow },
+      store: clickhouseAppend({ client: deps.client, table: storedSpansTable }),
+    })
 
-    .withProcessManager("settlement", (pm) => pm
-      .state(settlementStateSchema, initSettlement)
-      .intents({
+    .withProcessManager("settlement", {
+      state: settlementStateSchema,
+      init: initSettlement,
+      intents: {
         notifyDigest: {
           payload: digestSchema,
           messageKey: (p) => `digest:${p.traceId}`,
           deliver: (payload) => deps.notifier.send(payload),
         },
-      })
-      .on({ spanReceived: onSpanReceived })
-      .onWake(onSettlementDue)
-      .enabled(deps.flags.traceSettlement))
+      },
+      on: { spanReceived: onSpanReceived },
+      onWake: onSettlementDue,
+      enabled: deps.flags.traceSettlement,
+    })
 
     .build();
 }
@@ -106,9 +112,18 @@ stated anywhere else.
 
 ### 2. Five members, one mount shape
 
-Every member mounts as `.withX(name, builder)`. The name is the member's
-identity in metrics, logs and stored rows; the builder is a callback handed a
-chain already typed against `.events()`.
+Every member mounts as `.withX(name, record)`. The name is the member's
+identity in metrics, logs and stored rows; the record is a plain object
+literal, typed against `.events()`.
+
+**Curry where the next step depends on the previous one; use a record where it
+does not.** The outer chain earns currying — `.events()` fixes the vocabulary
+everything below is typed against, and `.id()` decides whether `.withFold` and
+`.withProcessManager` exist at all. A mount is not like that: a command is
+always `input` then `handle`, both required, always in that order — nothing
+inside it is gated on anything else inside it. That is a record wearing a
+chain. `onWake` and `enabled` follow the same rule: ordinary optional fields on
+a process manager's record, not extra chain steps that only sometimes exist.
 
 | member | accumulates | writes to | gets a context |
 | --- | --- | --- | --- |
@@ -206,8 +221,8 @@ they were, because there is no `nextWakeAt` a manufactured no-op could return
 that is always right except "do not touch it", which is a decision not to run a
 step rather than a value a step can return.
 
-Subscribing to an event the pipeline does not declare is unreachable: the
-builder can only key on the map `.events()` fixed.
+Subscribing to an event the pipeline does not declare is unreachable: an `on`
+record can only key on the map `.events()` fixed.
 
 ### 6. Collaborators arrive by construction, at the mount
 
@@ -215,14 +230,14 @@ A handler that needs a redactor, a notifier or a repository is constructed with
 one, on the line that mounts it:
 
 ```ts
-.withCommand("recordSpan", (c) => c.input(rawSpanSchema).handle(recordSpan(deps)))
-.withFold("traceSummary", (f) => f.state(…).on({…}).store(clickhouseReplacing({ client: deps.client, … })))
+.withCommand("recordSpan", { input: rawSpanSchema, handle: recordSpan(deps) })
+.withFold("traceSummary", { state: …, on: {…}, store: clickhouseReplacing({ client: deps.client, … }) })
 ```
 
 Those two lines are the same shape. A store is built from `deps` at the mount
-and handed to `.store()`; a handler is built from `deps` at the mount and handed
-to `.handle()`. There is one way collaborators reach a pipeline's members, and
-it is the way the store already did.
+and handed to the `store` field; a handler is built from `deps` at the mount
+and handed to the `handle` field. There is one way collaborators reach a
+pipeline's members, and it is the way the store already did.
 
 The pipeline itself therefore takes no dependencies. There is no context type
 parameter, because `deps` is already in scope in the function that declares the
@@ -277,13 +292,13 @@ or not.
 ### 8. An intent declares its payload, its key and its delivery together
 
 ```ts
-.intents({
+intents: {
   notifyDigest: {
     payload:    digestSchema,
     messageKey: (p) => `digest:${p.traceId}`,
     deliver:    (payload, ctx) => ctx.notifier.send(payload),
   },
-})
+},
 ```
 
 Three facts about one thing, in one place. A declared intent with no delivery
@@ -350,8 +365,9 @@ disagreement under reordering, so it is worth keeping cheap to run.
 
 ### 12. Where the code lives
 
-The chain holds names, schemas and stores. Handler bodies live in files beside
-it.
+The chain holds names, schemas and stores — each mount is a record literal,
+held directly in `index.ts`, not assembled by calling into the file it names.
+Handler bodies live in files beside it.
 
 ```
 trace-processing/
@@ -373,13 +389,15 @@ in the directory imports `index.ts`.
 
 ## Rationale / Trade-offs
 
-**Why a chain rather than one object literal?** Because each step's types depend
-on the step before it. `.events()` is what makes every handler below it typed
-with no annotations, and `.id()` is what makes `.withFold` available at all. A
-literal has no ordering to hang that on, so the same guarantees would have to be
-runtime checks over an object's shape after the fact. The chain also makes
-illegal states unreachable rather than merely refused: a fold on a pipeline with
-no identity is not a mistake you can write.
+**Why a chain rather than one object literal?** This is about the outer chain —
+`.prefix()`, `.events()`, `.id()` and `.build()` — not about a mount, which is a
+literal precisely because decision 2's rule cuts the other way there. The outer
+chain's steps' types depend on the step before it: `.events()` is what makes
+every handler below it typed with no annotations, and `.id()` is what makes
+`.withFold` available at all. A literal has no ordering to hang that on, so the
+same guarantees would have to be runtime checks over an object's shape after
+the fact. The chain also makes illegal states unreachable rather than merely
+refused: a fold on a pipeline with no identity is not a mistake you can write.
 
 **Why derive the type string from the key rather than author it?** Because the
 artefact a developer reads should be the one they wrote. Deriving removes three

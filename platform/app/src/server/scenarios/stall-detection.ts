@@ -3,7 +3,8 @@
  * it any more.
  *
  * This module used to also derive a `STALLED` status at read time, which meant
- * the stored status and the displayed status disagreed by design. ADR-073 made
+ * the stored status and the displayed status disagreed by design. ADR-073
+ * (retired; ground now ADR-103) made
  * `STALLED` a stored status written by the `scenarioExecution` process
  * manager's deadline, and the last read-time consumer went with it — so what is
  * left is the horizon itself, which the two boot reconcilers still measure

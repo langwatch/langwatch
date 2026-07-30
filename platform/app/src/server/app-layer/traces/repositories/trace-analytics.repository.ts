@@ -59,27 +59,3 @@ export interface TraceAnalyticsRepository {
     window?: { fromMs: number; toMs: number };
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null>;
 }
-
-/** No-op implementation for tests and ClickHouse-less environments. */
-export class NullTraceAnalyticsRepository implements TraceAnalyticsRepository {
-  async upsert(
-    _row: TraceAnalyticsRow,
-    _retentionDays?: number,
-    _appliedEventIds?: readonly string[],
-  ): Promise<void> {}
-
-  async upsertBatch(
-    _entries: Array<{
-      row: TraceAnalyticsRow;
-      retentionDays?: number;
-      appliedEventIds?: readonly string[];
-    }>,
-  ): Promise<void> {}
-
-  async findByTraceIdWithApplied(): Promise<{
-    row: TraceAnalyticsRow;
-    appliedEventIds: string[];
-  } | null> {
-    return null;
-  }
-}

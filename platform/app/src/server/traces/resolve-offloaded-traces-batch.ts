@@ -1,5 +1,6 @@
 /**
- * Bulk read-path resolution of offloaded trace event refs (ADR-022, #4991).
+ * Bulk read-path resolution of offloaded trace event refs (ADR-022, retired;
+ * ground now ADR-099, #4991).
  *
  * The per-trace {@link ./resolve-offloaded-traces#resolveOffloadedTraces} is the
  * right tool for a single-trace detail read (#4984). The BULK consumers —
@@ -192,7 +193,7 @@ export async function resolveOffloadedTracesBatch({
         );
       }
 
-      // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
+      // ADR-022 (retired; ground now ADR-099): aggregateId for the trace-processing pipeline IS the traceId.
       const aggregateId = span.traceId;
       const refs = eventrefEntries.map(({ attrKey, field, eventId }) => {
         const fetchKey = fetchKeyOf({ aggregateId, eventId, field });

@@ -1,154 +1,59 @@
-import type { GroupKey } from "@langwatch/event-sourcing";
-import { triggerAggregate } from "./aggregate";
+import { type GroupKey, definePipeline, processGroupKey } from "@langwatch/event-sourcing";
+import { AUTOMATIONS_PIPELINE_NAME, AUTOMATIONS_PIPELINE_PREFIX, automationsEvents, matchRecordedDataSchema } from "./events";
 import {
-  createEvaluateGraphHandler,
   GRAPH_ALERT_SWEEP_PROCESS_NAME,
   type GraphAlertSweepPorts,
-  graphAlertSweep,
-} from "./process-managers/graphAlertSweep";
+  graphAlertSweepIntents,
+  graphAlertSweepOn,
+  graphAlertSweepOnWake,
+  graphAlertSweepStateSchema,
+  initGraphAlertSweepState,
+} from "./graphAlertSweep.process";
+import { recordMatch } from "./recordMatch.command";
 import {
   TRIGGER_SETTLEMENT_PROCESS_NAME,
-  triggerSettlement,
-} from "./process-managers/triggerSettlement";
-import {
-  createLogOverflowHandler,
-  createNotifyDigestHandler,
-  createPersistMatchHandler,
   type TriggerDispatchPorts,
-} from "./process-managers/triggerSettlement.intentHandlers";
+  initTriggerSettlementState,
+  triggerSettlementIntents,
+  triggerSettlementOn,
+  triggerSettlementOnWake,
+  triggerSettlementStateSchema,
+} from "./triggerSettlement.process";
 import {
-  createPruneHandler,
   WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
   type WebhookDeliveryPrunePorts,
-  webhookDeliveryPrune,
-} from "./process-managers/webhookDeliveryPrune";
-import {
-  createEvaluationTriggerMatchSubscriber,
-  createGraphTriggerActivitySubscriber,
-  type EvaluationTriggerMatchPorts,
-  type GraphTriggerActivityPorts,
-} from "./subscribers";
+  initWebhookDeliveryPruneState,
+  webhookDeliveryPruneIntents,
+  webhookDeliveryPruneOn,
+  webhookDeliveryPruneOnWake,
+  webhookDeliveryPruneStateSchema,
+} from "./webhookDeliveryPrune.process";
 
-export type {
-  MatchRecordedData,
-  TriggerActionClass,
-  TriggerAggregate,
-  TriggerAggregateState,
-} from "./aggregate";
-export { triggerAggregate } from "./aggregate";
-export type { IntentContext, IntentHandler } from "./intentDispatch";
-export {
-  isTerminalDispatchError,
-  TerminalDispatchError,
-} from "./intentDispatch";
-export type {
-  EvaluateGraphIntent,
-  GraphAlertSweepCandidate,
-  GraphAlertSweepPorts,
-  GraphAlertSweepState,
-} from "./process-managers/graphAlertSweep";
-export {
-  createEvaluateGraphHandler,
-  GRAPH_ALERT_SWEEP_INTERVAL_MS,
-  GRAPH_ALERT_SWEEP_PROCESS_NAME,
-  graphAlertSweep,
-} from "./process-managers/graphAlertSweep";
-export type {
-  LogOverflowIntent,
-  NotifyDigestIntent,
-  PendingMatch,
-  PersistMatchIntent,
-  TriggerSettlementState,
-} from "./process-managers/triggerSettlement";
-export {
-  addPending,
-  digestBatchKey,
-  drainDue,
-  MAX_PENDING_MATCHES,
-  settleBoundary,
-  TRIGGER_SETTLEMENT_PROCESS_NAME,
-  triggerSettlement,
-} from "./process-managers/triggerSettlement";
-export type { TriggerDispatchPorts } from "./process-managers/triggerSettlement.intentHandlers";
-export {
-  createLogOverflowHandler,
-  createNotifyDigestHandler,
-  createPersistMatchHandler,
-} from "./process-managers/triggerSettlement.intentHandlers";
-export type {
-  PruneIntent,
-  WebhookDeliveryPrunePorts,
-  WebhookDeliveryPruneState,
-} from "./process-managers/webhookDeliveryPrune";
-export {
-  createPruneHandler,
-  WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
-  WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
-  webhookDeliveryPrune,
-} from "./process-managers/webhookDeliveryPrune";
-export { settleWindowBucket } from "./settleWindow";
-export type {
-  AutomationSubscriber,
-  EvaluationOutcomeEvent,
-  EvaluationTriggerMatchPorts,
-  GraphTriggerActivityPorts,
-  TraceActivityEvent,
-} from "./subscribers";
-export {
-  createEvaluationTriggerMatchSubscriber,
-  createGraphTriggerActivitySubscriber,
-  DEDUP_TTL_MS,
-  GRAPH_TRIGGER_ACTIVITY_DEBOUNCE_MS,
-  graphTriggerActivityDedupId,
-  MATCH_DELAY_MS,
-} from "./subscribers";
-
-/**
- * A `__global__` tenant marker, not a real tenant id. `GroupKey.tenantId` is
- * always present so no scope can place two tenants' work in one lane; a
- * singleton process has no owning tenant, so it needs an unmistakable
- * placeholder rather than an empty string.
- */
+/** A `__global__` tenant marker, not a real tenant id: `GroupKey.tenantId` is
+ *  always present so no scope can place two tenants' work in one lane, and a
+ *  singleton process has no owning tenant. */
 export const GLOBAL_TENANT = "__global__";
 
 /** ADR-100 decision 4: a command lane is scoped to the aggregate, so every
  *  command type for one trigger serialises into a single lane. */
-export function recordMatchGroupKey(params: {
-  tenantId: string;
-  triggerId: string;
-}): GroupKey {
+export function recordMatchGroupKey(params: { tenantId: string; triggerId: string }): GroupKey {
   return {
     tenantId: params.tenantId,
     lane: { kind: "command" },
-    scope: {
-      kind: "aggregate",
-      aggregateType: triggerAggregate.name,
-      aggregateId: params.triggerId,
-    },
+    scope: { kind: "aggregate", aggregateType: AUTOMATIONS_PIPELINE_NAME, aggregateId: params.triggerId },
   };
 }
 
 /** One settlement instance per trigger: two triggers matching the same trace
  *  have independent settle windows, caps and send claims, so they must never
  *  share a lane. */
-export function triggerSettlementGroupKey(params: {
-  tenantId: string;
-  triggerId: string;
-}): GroupKey {
-  return {
-    tenantId: params.tenantId,
-    lane: { kind: "processManager", name: TRIGGER_SETTLEMENT_PROCESS_NAME },
-    scope: {
-      kind: "aggregate",
-      aggregateType: triggerAggregate.name,
-      aggregateId: params.triggerId,
-    },
-  };
+export function triggerSettlementGroupKey(params: { tenantId: string; triggerId: string }): GroupKey {
+  return processGroupKey({ name: TRIGGER_SETTLEMENT_PROCESS_NAME }, { tenantId: params.tenantId, processKey: params.triggerId });
 }
 
 /** The sweep and the prune are one instance for the whole deployment, waking
  *  on a fixed interval rather than on any trigger's events — the one case
- *  ADR-100 says `scope: global` is correct rather than dangerous. */
+ *  where `scope: global` is correct rather than dangerous. */
 export function singletonProcessManagerGroupKey(processName: string): GroupKey {
   return {
     tenantId: GLOBAL_TENANT,
@@ -157,81 +62,63 @@ export function singletonProcessManagerGroupKey(processName: string): GroupKey {
   };
 }
 
+export function graphAlertSweepGroupKey(): GroupKey {
+  return singletonProcessManagerGroupKey(GRAPH_ALERT_SWEEP_PROCESS_NAME);
+}
+
+export function webhookDeliveryPruneGroupKey(): GroupKey {
+  return singletonProcessManagerGroupKey(WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME);
+}
+
 export interface AutomationsPipelineDeps {
-  dispatch: TriggerDispatchPorts;
-  sweep: GraphAlertSweepPorts;
-  prune: WebhookDeliveryPrunePorts;
-  evaluationTriggerMatch: EvaluationTriggerMatchPorts;
-  graphTriggerActivity: GraphTriggerActivityPorts;
-  /**
-   * Event types owned by other pipelines, supplied by the composition root
-   * from their own declarations: this pipeline cannot see another pipeline's
-   * event vocabulary (ADR-102 decision 5, dependencies point downward only).
-   * `evaluationOutcome` is the evaluation pipeline's terminal outcomes;
-   * `graphTriggerActivity` is whatever trace-side commits should nudge
-   * graph-threshold triggers.
-   */
-  evaluationOutcomeEventTypes: readonly string[];
-  graphTriggerActivityEventTypes: readonly string[];
+  readonly dispatch: TriggerDispatchPorts;
+  readonly sweep: GraphAlertSweepPorts;
+  readonly prune: WebhookDeliveryPrunePorts;
 }
 
 /**
- * The whole topology in one place: the aggregate, each process manager with
- * its group key and intent handlers, each subscriber. `groupKey` is a function
- * on the per-trigger process and a value on the two singletons — a real
- * asymmetry: settlement has one lane per trigger, the sweep and the prune have
- * exactly one lane each.
+ * The whole `trigger` topology: one command recording a match, and three
+ * process managers reacting to it — `triggerSettlement` per trigger, and the
+ * two singleton schedulers `graphAlertSweep` / `webhookDeliveryPrune`
+ * (ADR-105 §12; group keys above are hand-written because `.id()`'s per-event
+ * extractor governs a fold's own row key, not a process manager's, which the
+ * dispatch plane supplies as `ctx.processKey`).
+ *
+ * `triggerMatch` and `graphTriggerActivity` (`subscribers.ts`) are not mounted
+ * here: they consume other pipelines' own events, which `.events()` cannot
+ * see (ADR-105 consequences — cross-pipeline subscription is not
+ * expressible), so they stay standalone factories the composition root
+ * registers against each source pipeline.
  */
 export function createAutomationsPipeline(deps: AutomationsPipelineDeps) {
-  return {
-    name: "automations" as const,
-    aggregate: triggerAggregate,
-
-    commands: {
-      recordMatch: { groupKey: recordMatchGroupKey },
-    },
-
-    processManagers: {
-      [TRIGGER_SETTLEMENT_PROCESS_NAME]: {
-        process: triggerSettlement,
-        groupKey: triggerSettlementGroupKey,
-        intentHandlers: {
-          notifyDigest: createNotifyDigestHandler(deps.dispatch),
-          persistMatch: createPersistMatchHandler(deps.dispatch),
-          logOverflow: createLogOverflowHandler(),
-        },
-      },
-      [GRAPH_ALERT_SWEEP_PROCESS_NAME]: {
-        process: graphAlertSweep,
-        groupKey: singletonProcessManagerGroupKey(
-          GRAPH_ALERT_SWEEP_PROCESS_NAME,
-        ),
-        intentHandlers: {
-          evaluateGraph: createEvaluateGraphHandler(deps.sweep),
-        },
-      },
-      [WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME]: {
-        process: webhookDeliveryPrune,
-        groupKey: singletonProcessManagerGroupKey(
-          WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
-        ),
-        intentHandlers: {
-          prune: createPruneHandler(deps.prune),
-        },
-      },
-    },
-
-    subscribers: {
-      triggerMatch: createEvaluationTriggerMatchSubscriber({
-        eventTypes: deps.evaluationOutcomeEventTypes,
-        ports: deps.evaluationTriggerMatch,
-      }),
-      graphTriggerActivity: createGraphTriggerActivitySubscriber({
-        eventTypes: deps.graphTriggerActivityEventTypes,
-        ports: deps.graphTriggerActivity,
-      }),
-    },
-  };
+  return definePipeline(AUTOMATIONS_PIPELINE_NAME)
+    .prefix(AUTOMATIONS_PIPELINE_PREFIX)
+    .events(automationsEvents)
+    .id({ matchRecorded: (data) => data.triggerId })
+    .withCommand("recordMatch", {
+      input: matchRecordedDataSchema,
+      handle: recordMatch,
+    })
+    .withProcessManager("triggerSettlement", {
+      state: triggerSettlementStateSchema,
+      init: initTriggerSettlementState,
+      intents: triggerSettlementIntents(deps.dispatch),
+      on: triggerSettlementOn,
+      onWake: triggerSettlementOnWake,
+    })
+    .withProcessManager("graphAlertSweep", {
+      state: graphAlertSweepStateSchema,
+      init: initGraphAlertSweepState,
+      intents: graphAlertSweepIntents(deps.sweep),
+      on: graphAlertSweepOn,
+      onWake: graphAlertSweepOnWake,
+    })
+    .withProcessManager("webhookDeliveryPrune", {
+      state: webhookDeliveryPruneStateSchema,
+      init: initWebhookDeliveryPruneState,
+      intents: webhookDeliveryPruneIntents(deps.prune),
+      on: webhookDeliveryPruneOn,
+      onWake: webhookDeliveryPruneOnWake,
+    })
+    .build();
 }
-
-export type AutomationsPipeline = ReturnType<typeof createAutomationsPipeline>;

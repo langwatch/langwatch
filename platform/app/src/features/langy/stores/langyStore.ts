@@ -19,7 +19,8 @@ import { persist } from "zustand/middleware";
 import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
 
 /**
- * Single client/UI-state store for the Langy panel (ADR-046 frontend).
+ * Single client/UI-state store for the Langy panel (ADR-046 frontend,
+ * retired; ground now ADR-098).
  *
  * Everything the panel needs to *decide what to render* lives here — panel
  * visibility, which conversation is active, the composer draft + model
@@ -441,7 +442,8 @@ interface LangyState extends TurnPhaseState {
   /** A genuine end-of-turn frame settled the turn: go `idle` immediately. */
   settleTurn: (turnId: string | null) => void;
   /**
-   * The LOCAL turn projection (ADR-059): the durable event tail folded through
+   * The LOCAL turn projection (ADR-059, retired; ground now ADR-098): the
+   * durable event tail folded through
    * the same reducer the server projection runs. Seeded from the conversation
    * snapshot, advanced by `applyTurnEvents`, and composed with the phase
    * machine — a folded terminal settles the phase, a folded running turn
@@ -903,7 +905,8 @@ export const useLangyStore = create<LangyState>()(
         set((s) => reduceObserveBackendTurn(s, inFlight)),
       settleTurn: (turnId) => set((s) => reduceSettleTurn(s, turnId)),
 
-      // The local turn projection (ADR-059) — pure reducers from
+      // The local turn projection (ADR-059, retired; ground now ADR-098) —
+      // pure reducers from
       // @langwatch/langy, composed with the phase machine in the two places
       // durable truth arrives: the snapshot seed and the folded tail.
       turnProjection: initialLangyTurnProjection,

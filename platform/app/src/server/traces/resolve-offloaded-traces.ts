@@ -1,5 +1,6 @@
 /**
- * Read-time recompute of offloaded trace event refs (ADR-022).
+ * Read-time recompute of offloaded trace event refs (ADR-022, retired;
+ * ground now ADR-099).
  *
  * When the `release_trace_blob_offload` flag is on at ingestion time, the
  * live pipeline writes the FULL event to event_log and dispatches a leaned
@@ -151,7 +152,7 @@ export async function resolveOffloadedTraces({
         };
       }
 
-      // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
+      // ADR-022 (retired; ground now ADR-099): aggregateId for the trace-processing pipeline IS the traceId.
       // The eventref carries the eventId, written by leanForProjection from
       // event.id at lean time — see lean-for-projection.ts:120.
       const aggregateId = span.traceId;

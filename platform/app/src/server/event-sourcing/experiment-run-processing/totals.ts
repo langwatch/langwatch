@@ -8,17 +8,14 @@ import { experimentRunItemsTable } from "./table";
 
 /**
  * "A run's totals are a query over its items, never counters on the run row"
- * (ADR-103 decision 1). There is no cache and nothing to invalidate: a late
- * item changes the answer on the very next call.
+ * (ADR-103 decision 1) — so a late item changes the answer on the next call.
  *
- * `totalDirectCost` sums only what the items recorded for themselves. Pricing
- * an item from its trace, and splitting one trace's cost across the targets
- * that share it, lives in `experiments-v3/execution` and layers on top.
+ * `totalDirectCost` sums only what the items recorded for themselves; pricing
+ * an item from its trace lives in `experiments-v3/execution`, on top of this.
  *
- * The dedup subquery picks the latest `OccurredAt` per item, so an unmerged
- * redelivery cannot inflate a count. `occurredAtRange` bounds the outer scope
- * only, for partition pruning — never the dedup scope, because nothing
- * guarantees `OccurredAt` is identical across a logical item's redeliveries.
+ * `occurredAtRange` bounds the outer scope only, for partition pruning — never
+ * the dedup scope, because nothing guarantees `OccurredAt` is identical across
+ * a logical item's redeliveries.
  */
 
 export interface ExperimentRunTotals {
@@ -39,16 +36,22 @@ export interface ExperimentRunTotals {
   readonly totalDirectCost: number;
 }
 
+/**
+ * Each column is the wire type its expression returns: `countIf` is a
+ * non-null `UInt64`, a `sumIf` over a `Nullable` column is nullable and is
+ * `NULL` — not 0 — when nothing matched, and summing a rounded `Float64`
+ * stays a `Float64` however integral its values are.
+ */
 const SUMMARY_COLUMNS = {
   completedCount: ch.uint64(),
   failedCount: ch.uint64(),
-  durationSumMs: ch.uint64(),
+  durationSumMs: ch.nullable(ch.uint64()),
   durationCount: ch.uint64(),
-  scoreSumBps: ch.uint64(),
+  scoreSumBps: ch.nullable(ch.float64()),
   scoreCount: ch.uint64(),
   gradedCount: ch.uint64(),
   passedCount: ch.uint64(),
-  totalDirectCost: ch.float64(),
+  totalDirectCost: ch.nullable(ch.float64()),
 } as const;
 
 type SummaryColumnName = keyof typeof SUMMARY_COLUMNS;
@@ -58,7 +61,9 @@ const SUMMARY_COLUMN_NAMES = Object.keys(
 const SUMMARY_WIRE_COLUMNS = SUMMARY_COLUMN_NAMES.map(
   (name) => SUMMARY_COLUMNS[name],
 );
-type SummaryRow = { readonly [K in SummaryColumnName]: bigint | number };
+type SummaryRow = {
+  readonly [K in SummaryColumnName]: bigint | number | null;
+};
 
 interface TotalsQuery {
   readonly sql: string;
@@ -168,20 +173,21 @@ export async function deriveExperimentRunTotals(
   const scoreCount = Number(decoded.scoreCount);
   const gradedCount = Number(decoded.gradedCount);
   const passedCount = Number(decoded.passedCount);
-  const scoreSumBps = Number(decoded.scoreSumBps);
+  const scoreSumBps = Number(decoded.scoreSumBps ?? 0);
 
   return {
     completedCount,
     failedCount,
     progress: completedCount + failedCount,
-    totalDurationMs: durationCount > 0 ? Number(decoded.durationSumMs) : null,
+    totalDurationMs:
+      durationCount > 0 ? Number(decoded.durationSumMs ?? 0) : null,
     avgScoreBps: scoreCount > 0 ? Math.round(scoreSumBps / scoreCount) : null,
     passRateBps:
       gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null,
     scoreCount,
     gradedCount,
     passedCount,
-    totalDirectCost: Number(decoded.totalDirectCost),
+    totalDirectCost: Number(decoded.totalDirectCost ?? 0),
   };
 }
 

@@ -1,32 +1,69 @@
-import { ch, defineTable, replacing, type ColumnDef } from "@langwatch/clickhouse";
+import {
+  ch,
+  defineTable,
+  replacing,
+  type TableRow,
+} from "@langwatch/clickhouse";
 
 /**
- * `AcceptedAt` is both tables' ADR-099 storage anchor: partition key, TTL
- * anchor, and frozen once per trace. `OccurredAt` is customer-stamped and
- * moves backwards, so it anchors nothing.
+ * `AcceptedAt` is every table's ADR-099 storage anchor: partition key and TTL
+ * anchor. `OccurredAt` is customer-stamped and moves backwards, so it anchors
+ * nothing.
  */
 
-function smallUint(bits: 8 | 16 | 32): ColumnDef<number> {
-  const chType = `UInt${bits}`;
-  const max = 2 ** bits - 1;
-  const schema = ch.float64().schema.refine(
-    (value) => Number.isInteger(value) && value >= 0 && value <= max,
-    (value) => ({ message: `"${String(value)}" is not a valid ${chType} wire value` }),
-  );
-  return {
-    chType,
-    schema,
-    decode: (cell: unknown) => schema.parse(cell),
-    encode: (value: number) => value,
-    frozen: false,
-    platformControlled: false,
-    nullable: false,
-  };
-}
+/**
+ * One row per canonicalized span, and the item table every trace-level total is
+ * a query over (ADR-103). The engine key is the span's own identity, so a
+ * redelivered span collapses to one row and a `sum()` over the rows is
+ * idempotent by construction.
+ */
+export const storedSpansTable = defineTable({
+  name: "stored_spans",
+  merge: replacing({ version: "WrittenAt" }),
+  sortKey: ["TenantId", "TraceId", "SpanId"],
+  partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
+  tenant: ["TenantId"],
+  ttl: { anchor: "AcceptedAt" },
+  columns: {
+    TenantId: ch.string(),
+    TraceId: ch.string(),
+    SpanId: ch.string(),
+    ParentSpanId: ch.nullable(ch.string()),
+    Name: ch.string(),
+    Kind: ch.lowCardinality(ch.string()),
+    /** The `langwatch.span.type` attribute, `""` when the span set none. */
+    SpanType: ch.lowCardinality(ch.string()),
+    StartTimeUnixMs: ch.uint64(),
+    EndTimeUnixMs: ch.uint64(),
+    DurationMs: ch.uint64(),
+    StatusCode: ch.lowCardinality(ch.string()),
+    StatusMessage: ch.nullable(ch.string()),
+    InstrumentationScopeName: ch.lowCardinality(ch.string()),
+    Model: ch.lowCardinality(ch.string()),
+    Cost: ch.nullable(ch.float64()),
+    NonBilledCost: ch.nullable(ch.float64()),
+    PromptTokens: ch.nullable(ch.uint64()),
+    CompletionTokens: ch.nullable(ch.uint64()),
+    CacheReadTokens: ch.nullable(ch.uint64()),
+    CacheWriteTokens: ch.nullable(ch.uint64()),
+    ReasoningTokens: ch.nullable(ch.uint64()),
+    TokensEstimated: ch.boolean(),
+    AttributesJson: ch.string(),
+    ResourceAttributesJson: ch.string(),
+    PiiRedactionStatus: ch.lowCardinality(ch.string()),
+    OccurredAt: ch.occurredAt(),
+    AcceptedAt: ch.acceptedAt(),
+    WrittenAt: ch.writtenAt(),
+    _retention_days: ch.uint16(),
+  },
+});
+export type StoredSpansRow = TableRow<typeof storedSpansTable.columns>;
 
-const lowCardinalityString = () => ch.lowCardinality(ch.string());
-const jsonText = () => ch.string(); // JSON payload carried as a plain String column, per ADR-099's "The codec is positional and compiled".
-
+/**
+ * The trace detail row: the summary fold's derived view plus the stamps and
+ * candidates a read-back needs to keep folding. It carries no span count and no
+ * cost or token total — those are `totals.ts`'s query over `stored_spans`.
+ */
 export const traceSummariesTable = defineTable({
   name: "trace_summaries",
   merge: replacing({ version: "UpdatedAt" }),
@@ -37,31 +74,21 @@ export const traceSummariesTable = defineTable({
   columns: {
     TenantId: ch.string(),
     TraceId: ch.string(),
-    /** The fold's own state-version gate (ADR-098 decision 6). */
+    /** The fold's own state-shape gate (ADR-098 decision 6). */
     Version: ch.string(),
 
-    SpanCount: ch.uint64(),
-    DerivationCapped: ch.boolean(),
     TotalDurationMs: ch.uint64(),
 
     ComputedInput: ch.nullable(ch.string()),
     ComputedOutput: ch.nullable(ch.string()),
     TimeToFirstTokenMs: ch.nullable(ch.uint64()),
     TimeToLastTokenMs: ch.nullable(ch.uint64()),
-    TokensPerSecond: ch.nullable(ch.uint64()),
 
     ContainsErrorStatus: ch.boolean(),
     ContainsOKStatus: ch.boolean(),
     ErrorMessage: ch.nullable(ch.string()),
 
     Models: ch.array(ch.string()),
-
-    TotalCost: ch.nullable(ch.float64()),
-    NonBilledCost: ch.nullable(ch.float64()),
-    HasTokenUsage: ch.boolean(),
-    TokensEstimated: ch.boolean(),
-    TotalPromptTokenCount: ch.nullable(ch.uint64()),
-    TotalCompletionTokenCount: ch.nullable(ch.uint64()),
 
     BlockedByGuardrail: ch.boolean(),
     ContainsAi: ch.boolean(),
@@ -72,31 +99,35 @@ export const traceSummariesTable = defineTable({
     LastUsedPromptVersionId: ch.nullable(ch.string()),
 
     TraceName: ch.string(),
-    RootSpanType: ch.nullable(lowCardinalityString()),
+    RootSpanType: ch.nullable(ch.string()),
     RootSpanStartTimeMs: ch.nullable(ch.uint64()),
     TraceNameFromFallback: ch.boolean(),
 
     TopicId: ch.nullable(ch.string()),
     SubTopicId: ch.nullable(ch.string()),
+    /** The assigner's own stamp, so a stale re-run cannot win on read-back. */
+    TopicAssignedAt: ch.uint64(),
+    TraceNameChangedAt: ch.uint64(),
 
     AnnotationIds: ch.array(ch.string()),
-
-    /** The full, un-flattened attribute bag, JSON-encoded. */
-    AttributesJson: jsonText(),
+    AttributesJson: ch.string(),
 
     OccurredAt: ch.occurredAt(),
-    /** This table's own ADR-099 anchor — see the module docblock. */
     AcceptedAt: ch.acceptedAt(),
     UpdatedAt: ch.writtenAt(),
-    _retention_days: smallUint(16),
+    _retention_days: ch.uint16(),
   },
 });
-export type TraceSummariesRow = ReturnType<typeof traceSummariesTable.rowSchema.parse>;
+export type TraceSummariesRow = TableRow<typeof traceSummariesTable.columns>;
 
+/**
+ * The slim analytics sibling: the dimensions a dashboard filters and groups on.
+ * Its measures are `totals.ts`'s query, for the same reason.
+ */
 export const traceAnalyticsTable = defineTable({
   name: "trace_analytics",
   merge: replacing({ version: "UpdatedAt" }),
-  sortKey: ["TenantId", "AcceptedAt", "TraceId"],
+  sortKey: ["TenantId", "TraceId"],
   partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
   tenant: ["TenantId"],
   ttl: { anchor: "AcceptedAt" },
@@ -105,50 +136,35 @@ export const traceAnalyticsTable = defineTable({
     TraceId: ch.string(),
     Version: ch.string(),
 
-    /** The fold's own frozen storage anchor (`traceAnalytics.ts`'s `storageAnchorMs`). */
-    AcceptedAt: ch.acceptedAt(),
     EarliestSpanStartMs: ch.uint64(),
-
-    SpanCount: ch.uint64(),
-    DerivationCapped: ch.boolean(),
+    TotalDurationMs: ch.uint64(),
+    TimeToFirstTokenMs: ch.nullable(ch.uint64()),
 
     TraceName: ch.string(),
     TopicId: ch.nullable(ch.string()),
     SubTopicId: ch.nullable(ch.string()),
+    TopicAssignedAt: ch.uint64(),
+    TraceNameChangedAt: ch.uint64(),
     UserId: ch.nullable(ch.string()),
     ConversationId: ch.nullable(ch.string()),
     CustomerId: ch.nullable(ch.string()),
-    Origin: ch.nullable(lowCardinalityString()),
+    Origin: ch.nullable(ch.string()),
     Models: ch.array(ch.string()),
     Labels: ch.array(ch.string()),
-
-    TotalCost: ch.nullable(ch.float64()),
-    NonBilledCost: ch.nullable(ch.float64()),
-    TotalDurationMs: ch.uint64(),
-    TimeToFirstTokenMs: ch.nullable(ch.uint64()),
-    TokensPerSecond: ch.nullable(ch.uint64()),
-    PromptTokens: ch.uint64(),
-    CompletionTokens: ch.uint64(),
-    CacheReadTokens: ch.uint64(),
-    CacheWriteTokens: ch.uint64(),
-    ReasoningTokens: ch.uint64(),
 
     HasError: ch.boolean(),
     HasAnnotation: ch.boolean(),
     AnnotationIds: ch.array(ch.string()),
 
-    AttributesJson: jsonText(),
+    AttributesJson: ch.string(),
 
-    /** Read-back-only columns — exist so `store.read()` can reconstruct the
-     * fold's accumulator from a plain row, per ADR-098 decision 3 ("a fold
-     * that needs continuity earns it by persisting enough typed state to
-     * reconstruct its accumulator"). Never a dimension anyone filters on. */
     RootSpanStartTimeMs: ch.nullable(ch.uint64()),
     TraceNameFromFallback: ch.boolean(),
 
     OccurredAt: ch.occurredAt(),
+    AcceptedAt: ch.acceptedAt(),
     UpdatedAt: ch.writtenAt(),
-    _retention_days: smallUint(16),
+    _retention_days: ch.uint16(),
   },
 });
-export type TraceAnalyticsRow = ReturnType<typeof traceAnalyticsTable.rowSchema.parse>;
+export type TraceAnalyticsRow = TableRow<typeof traceAnalyticsTable.columns>;

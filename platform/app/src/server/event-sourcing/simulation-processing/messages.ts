@@ -1,21 +1,30 @@
-import { bindIdentifiers, type ClickHouseClient } from "@langwatch/clickhouse";
+import { bindIdentifiers } from "@langwatch/clickhouse";
+import { z } from "zod";
 import type {
-  MessageSnapshotData,
-  TextMessageEndData,
+  messageSnapshotDataSchema,
+  textMessageEndDataSchema,
 } from "./schema";
-import {
-  type SimulationRunMessagesRow,
-  simulationRunMessagesTable,
-} from "./table";
+import { simulationRunMessagesTable } from "./table";
 
 /**
  * A run's messages are item rows, written by a map projection and read back by
- * the query below (ADR-103). The columns the store owns are stamped by its own
- * `toRow`; a handler produces only what the event carries.
+ * the query below (ADR-103). A handler produces the domain record; the columns
+ * the store owns are stamped by the derived append mapping in `index.ts`.
  */
-export type SimulationMessageRecord = Omit<
-  SimulationRunMessagesRow,
-  "TenantId" | "AcceptedAt" | "UpdatedAt" | "_retention_days"
+export const simulationMessageRecordSchema = z.object({
+  scenarioRunId: z.string(),
+  messageId: z.string(),
+  /** The producer's own numbering. A snapshot numbers by position because the
+   * snapshot IS the conversation in order; a streamed message carries the same
+   * number. Neither invents one, so the two never disagree for one message. */
+  messageIndex: z.number().int().nonnegative(),
+  role: z.string(),
+  content: z.string(),
+  traceId: z.string(),
+  rest: z.string(),
+});
+export type SimulationMessageRecord = z.infer<
+  typeof simulationMessageRecordSchema
 >;
 
 /**
@@ -54,21 +63,21 @@ function snapshotMessageId(id: string, index: number): string {
 }
 
 export function mapMessageSnapshot(
-  data: MessageSnapshotData,
+  data: z.infer<typeof messageSnapshotDataSchema>,
 ): SimulationMessageRecord[] {
   return data.messages.map((message, index) => {
     const record = isRecord(message) ? message : {};
     return {
-      ScenarioRunId: data.scenarioRunId,
-      MessageId: snapshotMessageId(
+      scenarioRunId: data.scenarioRunId,
+      messageId: snapshotMessageId(
         typeof record.id === "string" ? record.id : "",
         index,
       ),
-      MessageIndex: index,
-      Role: typeof record.role === "string" ? record.role : "",
-      Content: capOversizedString(messageContent(record.content)),
-      TraceId: typeof record.trace_id === "string" ? record.trace_id : "",
-      Rest: capOversizedString(restJson(record)),
+      messageIndex: index,
+      role: typeof record.role === "string" ? record.role : "",
+      content: capOversizedString(messageContent(record.content)),
+      traceId: typeof record.trace_id === "string" ? record.trace_id : "",
+      rest: capOversizedString(restJson(record)),
     };
   });
 }
@@ -79,16 +88,16 @@ export function mapMessageSnapshot(
  * end would blank a message that was already complete.
  */
 export function mapTextMessageEnd(
-  data: TextMessageEndData,
+  data: z.infer<typeof textMessageEndDataSchema>,
 ): SimulationMessageRecord {
   return {
-    ScenarioRunId: data.scenarioRunId,
-    MessageId: data.messageId,
-    MessageIndex: data.messageIndex ?? 0,
-    Role: data.role,
-    Content: capOversizedString(data.content),
-    TraceId: data.traceId ?? "",
-    Rest: capOversizedString(
+    scenarioRunId: data.scenarioRunId,
+    messageId: data.messageId,
+    messageIndex: data.messageIndex,
+    role: data.role,
+    content: capOversizedString(data.content),
+    traceId: data.traceId ?? "",
+    rest: capOversizedString(
       restJson((data.message ?? {}) as Record<string, unknown>),
     ),
   };
@@ -103,11 +112,6 @@ export interface SimulationRunMessage {
   readonly rest: string;
 }
 
-export interface RunMessagesQuery {
-  readonly sql: string;
-  readonly params: Record<string, unknown>;
-}
-
 /**
  * One row per logical message, latest version only. The dedup subquery groups
  * by the table's own engine key; grouping wider would return one row per
@@ -116,15 +120,14 @@ export interface RunMessagesQuery {
 export function buildRunMessagesQuery(args: {
   readonly tenantId: string;
   readonly scenarioRunId: string;
-}): RunMessagesQuery {
+}): { readonly sql: string; readonly params: Record<string, unknown> } {
   const names = bindIdentifiers();
   const table = names.of(simulationRunMessagesTable.name);
   const tenant = names.of("TenantId");
   const run = names.of("ScenarioRunId");
   const updatedAt = names.of("UpdatedAt");
   const dedupKey = names.list(simulationRunMessagesTable.sortKey);
-  const scope =
-    `WHERE ${tenant} = {tenantId:String} AND ${run} = {scenarioRunId:String}`;
+  const scope = `WHERE ${tenant} = {tenantId:String} AND ${run} = {scenarioRunId:String}`;
 
   const sql =
     `SELECT ${names.list(RESULT_COLUMNS)} ` +
@@ -166,19 +169,4 @@ export function decodeRunMessageRows(
     traceId: String(row[4] ?? ""),
     rest: String(row[5] ?? ""),
   }));
-}
-
-/** Runs {@link buildRunMessagesQuery} and decodes the result in one call. */
-export async function queryRunMessages(args: {
-  readonly client: ClickHouseClient;
-  readonly tenantId: string;
-  readonly scenarioRunId: string;
-}): Promise<SimulationRunMessage[]> {
-  const query = buildRunMessagesQuery(args);
-  const result = await args.client.query({
-    tenantId: args.tenantId,
-    sql: query.sql,
-    params: query.params,
-  });
-  return decodeRunMessageRows(result.rows);
 }

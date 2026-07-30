@@ -3,7 +3,8 @@
  * actually spawns children.
  *
  * The pool is created during worker startup, after the pipeline registry has
- * been built, so something has to be late-bound. What changed in ADR-073 step 2
+ * been built, so something has to be late-bound. What changed in ADR-073
+ * step 2 (retired; ground now ADR-103)
  * is what happens in the window before it is: the retired reactor logged
  * "Execution pool not yet wired, skipping" and dropped the job, orphaning the
  * run at QUEUED. This throws instead, which leaves the outbox row pending and

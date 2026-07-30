@@ -1,10 +1,4 @@
-/**
- * The slice of the OTLP `AnyValue`/`KeyValue` wire shape this pipeline reads.
- *
- * Deliberately local and minimal rather than imported from the trace pipeline
- * — this pipeline does not depend on another pipeline's schema module, and an
- * OTLP attribute's shape is a protocol fact this file can state on its own.
- */
+/** The slice of the OTLP `AnyValue`/`KeyValue` wire shape this pipeline reads. */
 
 export interface OtlpAnyValue {
   stringValue?: string | null;

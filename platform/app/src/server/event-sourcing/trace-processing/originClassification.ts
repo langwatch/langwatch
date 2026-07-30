@@ -1,11 +1,8 @@
 /**
  * Trace origin classification (specs/traces/trace-type-classification.feature).
- * Absent/empty `langwatch.origin` is PENDING, not "application" — defaulting
- * it fired online evaluations on evaluation and simulation traces whenever a
- * child span arrived before the root span carrying the origin.
- *
- * Root/non-root origin ties break bytewise on the span id, never
- * `localeCompare` (which inverts base62 KSUIDs at the `Z`->`a` step).
+ * An absent or empty `langwatch.origin` is PENDING, never "application":
+ * defaulting it fired online evaluations on evaluation and simulation traces
+ * whenever a child span arrived before the root span carrying the origin.
  */
 
 export const TRACE_ORIGINS = [
@@ -21,11 +18,7 @@ function isTraceOrigin(value: string): value is TraceOrigin {
   return (TRACE_ORIGINS as readonly string[]).includes(value);
 }
 
-/**
- * Bytewise comparison, never `localeCompare` (ADR-098 §5: ICU collation
- * inverts base62 KSUIDs at the `Z` → `a` step, so two workers would order the
- * same pair of span ids differently under locale rules).
- */
+/** Never `localeCompare`: ICU collation inverts base62 KSUIDs at `Z` → `a`. */
 function isBytewiseSmaller(a: string, b: string): boolean {
   return a < b;
 }
@@ -33,19 +26,12 @@ function isBytewiseSmaller(a: string, b: string): boolean {
 /** One span's origin-relevant signals, already extracted from its raw attributes. */
 export interface SpanOriginSignals {
   readonly spanId: string;
-  /** `true` for the span whose `parentSpanId` is null/absent. */
   readonly isRoot: boolean;
-  /** The span's own `langwatch.origin` attribute value, if it set one. */
   readonly explicitOrigin?: string;
-  /** `instrumentationScope.name`, for the legacy-inference ladder. */
   readonly instrumentationScopeName?: string;
-  /** `metadata.platform`, pre-hoist. */
   readonly metadataPlatform?: string;
-  /** `metadata.labels`, pre-hoist. */
   readonly metadataLabels?: readonly string[];
-  /** Whether this span's resource attributes carry a `scenario.labels` key. */
   readonly hasScenarioLabelsResource?: boolean;
-  /** Whether this span carries an `evaluation.run_id` attribute. */
   readonly hasEvaluationRunId?: boolean;
 }
 
@@ -60,8 +46,13 @@ export interface OriginState {
   readonly hasScenarioRunnerLabel: boolean;
   readonly hasScenarioLabelsResource: boolean;
   readonly hasEvaluationRunId: boolean;
-  /** Preserved so a legitimate, non-legacy `metadata.platform` value survives stripping. */
-  readonly lastMetadataPlatform: string | null;
+  /**
+   * Kept so a legitimate, non-legacy `metadata.platform` survives stripping.
+   * Owned by the bytewise-smallest contributing span, the same rule the
+   * attribute map uses, so stripping decides on the value a reader will see.
+   */
+  readonly metadataPlatform: string | null;
+  readonly metadataPlatformSpanId: string | null;
 }
 
 export function initOriginState(): OriginState {
@@ -76,7 +67,8 @@ export function initOriginState(): OriginState {
     hasScenarioRunnerLabel: false,
     hasScenarioLabelsResource: false,
     hasEvaluationRunId: false,
-    lastMetadataPlatform: null,
+    metadataPlatform: null,
+    metadataPlatformSpanId: null,
   };
 }
 
@@ -85,7 +77,6 @@ const SCENARIO_SCOPE_NAME = "@langwatch/scenario";
 const OPTIMIZATION_STUDIO_PLATFORM = "optimization_studio";
 const SCENARIO_RUNNER_LABEL = "scenario-runner";
 
-/** Folds one span's signals into the accumulator. Order-invariant — see the module docblock. */
 export function applyOriginSpan(
   state: OriginState,
   span: SpanOriginSignals,
@@ -98,13 +89,21 @@ export function applyOriginSpan(
         next.rootOriginSpanId === null ||
         isBytewiseSmaller(span.spanId, next.rootOriginSpanId)
       ) {
-        next = { ...next, rootOriginSpanId: span.spanId, rootOrigin: span.explicitOrigin };
+        next = {
+          ...next,
+          rootOriginSpanId: span.spanId,
+          rootOrigin: span.explicitOrigin,
+        };
       }
     } else if (
       next.nonRootOriginSpanId === null ||
       isBytewiseSmaller(span.spanId, next.nonRootOriginSpanId)
     ) {
-      next = { ...next, nonRootOriginSpanId: span.spanId, nonRootOrigin: span.explicitOrigin };
+      next = {
+        ...next,
+        nonRootOriginSpanId: span.spanId,
+        nonRootOrigin: span.explicitOrigin,
+      };
     }
   }
 
@@ -117,8 +116,16 @@ export function applyOriginSpan(
   if (span.metadataPlatform === OPTIMIZATION_STUDIO_PLATFORM) {
     next = { ...next, hasOptimizationStudioPlatform: true };
   }
-  if (span.metadataPlatform !== undefined) {
-    next = { ...next, lastMetadataPlatform: span.metadataPlatform };
+  if (
+    span.metadataPlatform !== undefined &&
+    (next.metadataPlatformSpanId === null ||
+      isBytewiseSmaller(span.spanId, next.metadataPlatformSpanId))
+  ) {
+    next = {
+      ...next,
+      metadataPlatform: span.metadataPlatform,
+      metadataPlatformSpanId: span.spanId,
+    };
   }
   if (span.metadataLabels?.includes(SCENARIO_RUNNER_LABEL)) {
     next = { ...next, hasScenarioRunnerLabel: true };
@@ -133,19 +140,15 @@ export function applyOriginSpan(
   return next;
 }
 
-/**
- * The explicit origin, root-wins-if-set (spec "Hoisting"). `null` when no
- * span set one at all.
- */
+/** The explicit origin, root-wins-if-set. `null` when no span set one. */
 function explicitOrigin(state: OriginState): string | null {
   return state.rootOrigin ?? state.nonRootOrigin;
 }
 
 /**
- * The 7-tier legacy inference ladder (spec "Step 3"), only consulted when no
- * span set `langwatch.origin` explicitly. Priority order matches the spec
- * exactly; each tier is a boolean OR, so which span carried the signal never
- * matters, only whether one did.
+ * The legacy inference ladder, consulted only when no span set
+ * `langwatch.origin`. Each tier is a boolean OR, so which span carried the
+ * signal never matters — only whether one did.
  */
 function inferOrigin(state: OriginState): TraceOrigin | null {
   if (state.hasEvaluationScope) return "evaluation";
@@ -158,64 +161,44 @@ function inferOrigin(state: OriginState): TraceOrigin | null {
 }
 
 /**
- * Resolves the trace's origin. `null` means PENDING — not yet determined,
- * never defaulted to "application" (spec preamble).
+ * `null` means PENDING — not yet determined, never defaulted. An unrecognised
+ * wire value falls through to inference rather than polluting the closed enum
+ * the trace-list filters read.
  */
 export function resolveOrigin(state: OriginState): TraceOrigin | null {
   const explicit = explicitOrigin(state);
-  if (explicit !== null) {
-    // An unrecognised wire value is treated the same as "no explicit value" —
-    // it falls through to inference rather than being surfaced as a made-up
-    // origin, so a future SDK sending a new spelling degrades to PENDING/
-    // inferred instead of polluting the closed enum trace-list filters read.
-    if (isTraceOrigin(explicit)) return explicit;
-    return inferOrigin(state);
-  }
+  if (explicit !== null && isTraceOrigin(explicit)) return explicit;
   return inferOrigin(state);
 }
 
 /**
- * Legacy-marker stripping (spec "Step 1d"): once a trace carries an explicit
- * origin, the platform-specific markers that origin superseded are dropped
- * from the summary's attributes so a new trace looks clean immediately.
- * Exact-match only, and only these two keys — generic keys like
- * `metadata.environment` are left untouched regardless of origin.
+ * Once a trace carries an explicit origin, the platform markers that origin
+ * superseded are dropped from the summary's attributes. Exact-match only:
+ * generic keys like `metadata.environment` are left alone.
  */
 export interface LegacyMarkerStripping {
-  /** `true` when `langwatch.platform` should be omitted from summary attributes. */
   readonly stripPlatform: boolean;
-  /** `true` when the single `"scenario-runner"` entry should be removed from `langwatch.labels`. */
   readonly stripScenarioRunnerLabel: boolean;
 }
 
-export function legacyMarkerStripping(state: OriginState): LegacyMarkerStripping {
+export function legacyMarkerStripping(
+  state: OriginState,
+): LegacyMarkerStripping {
   const hasExplicitOrigin = explicitOrigin(state) !== null;
   return {
     stripPlatform:
-      hasExplicitOrigin && state.lastMetadataPlatform === OPTIMIZATION_STUDIO_PLATFORM,
+      hasExplicitOrigin &&
+      state.metadataPlatform === OPTIMIZATION_STUDIO_PLATFORM,
     stripScenarioRunnerLabel: hasExplicitOrigin && state.hasScenarioRunnerLabel,
   };
 }
 
-/**
- * Removes the platform-specific legacy markers from an already-hoisted
- * attribute map, per {@link legacyMarkerStripping}. `attributes` and `labels`
- * are the summary's own hoisted views — `langwatch.platform` and
- * `langwatch.labels` — never the raw span attributes.
- */
 const LANGWATCH_ORIGIN_ATTR = "langwatch.origin";
 const METADATA_PLATFORM_ATTR = "metadata.platform";
 const METADATA_LABELS_ATTR = "metadata.labels";
 const SCENARIO_LABELS_RESOURCE_ATTR = "scenario.labels";
 const EVALUATION_RUN_ID_ATTR = "evaluation.run_id";
 
-/**
- * Adapts a `CanonicalSpan` (already flattened by `canonicalizeSpan.ts`) into
- * the signal shape `applyOriginSpan` folds. Kept here, next to the state and
- * transition it feeds, rather than in `spanDerivation.ts` — origin is the one
- * concern with a whole dedicated module, so its own extraction belongs beside
- * it.
- */
 export function extractOriginSignals(span: {
   readonly spanId: string;
   readonly parentSpanId: string | null;
@@ -223,21 +206,21 @@ export function extractOriginSignals(span: {
   readonly attributes: Readonly<Record<string, unknown>>;
   readonly resourceAttributes: Readonly<Record<string, unknown>>;
 }): SpanOriginSignals {
-  const explicitOrigin = span.attributes[LANGWATCH_ORIGIN_ATTR];
-  const metadataPlatform = span.attributes[METADATA_PLATFORM_ATTR];
-  const metadataLabelsRaw = span.attributes[METADATA_LABELS_ATTR];
-  const metadataLabels = Array.isArray(metadataLabelsRaw)
-    ? metadataLabelsRaw.filter((v): v is string => typeof v === "string")
-    : undefined;
+  const explicit = span.attributes[LANGWATCH_ORIGIN_ATTR];
+  const platform = span.attributes[METADATA_PLATFORM_ATTR];
+  const rawLabels = span.attributes[METADATA_LABELS_ATTR];
 
   return {
     spanId: span.spanId,
     isRoot: span.parentSpanId === null,
-    explicitOrigin: typeof explicitOrigin === "string" ? explicitOrigin : undefined,
+    explicitOrigin: typeof explicit === "string" ? explicit : undefined,
     instrumentationScopeName: span.instrumentationScopeName || undefined,
-    metadataPlatform: typeof metadataPlatform === "string" ? metadataPlatform : undefined,
-    metadataLabels,
-    hasScenarioLabelsResource: SCENARIO_LABELS_RESOURCE_ATTR in span.resourceAttributes,
+    metadataPlatform: typeof platform === "string" ? platform : undefined,
+    metadataLabels: Array.isArray(rawLabels)
+      ? rawLabels.filter((value): value is string => typeof value === "string")
+      : undefined,
+    hasScenarioLabelsResource:
+      SCENARIO_LABELS_RESOURCE_ATTR in span.resourceAttributes,
     hasEvaluationRunId: EVALUATION_RUN_ID_ATTR in span.attributes,
   };
 }

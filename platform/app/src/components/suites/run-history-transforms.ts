@@ -46,7 +46,8 @@ export type RunGroup = {
   timestamp: number;
   scenarioRuns: ScenarioRunData[];
   /**
-   * How many runs the batch set out to queue (ADR-072).
+   * How many runs the batch set out to queue (ADR-072, retired; ground now
+   * ADR-103).
    *
    * Only batch groups carry one — a scenario or target group is a slice across
    * batches, so there is no single number it could be. Absent for batches

@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Layer 3 (ADR-082) for the `gatewayBudgetDebits` map projection: given the
+ * Layer 3 (ADR-082, retired; ground now ADR-102) for the
+ * `gatewayBudgetDebits` map projection: given the
  * debit facts derived from a gateway span, decide *which budgets it may move*
  * and shape the ledger rows that move them.
  *
- * **Why this is not the store.** ADR-082's layer-3 membership test is "does it
+ * **Why this is not the store.** ADR-082's (retired; ground now ADR-102)
+ * layer-3 membership test is "does it
  * *decide* anything — retry, cache, coalesce, fan out, validate, authorise?".
  * Everything here does: it authorises the write against the VK's organization
  * AND against the projects that VK's spans can legally land in (see

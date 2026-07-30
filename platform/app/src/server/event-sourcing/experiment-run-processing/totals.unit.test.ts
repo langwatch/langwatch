@@ -2,24 +2,29 @@ import type { ClickHouseClient, QueryOptions } from "@langwatch/clickhouse";
 import { describe, expect, it } from "vitest";
 import { deriveExperimentRunTotals } from "./totals";
 
-/** Matches `totals.ts`'s private `SUMMARY_COLUMN_NAMES` order. */
+/**
+ * The wire forms ClickHouse's JSONCompact family actually emits for this
+ * query's expressions: `countIf` is a `UInt64` and crosses as a decimal
+ * string, a `sumIf` over a `Nullable` column is nullable and is `null` — not
+ * `0` — when nothing matched, and a `Float64` crosses as a bare JSON number.
+ */
 function summaryRow(values: {
   completedCount: number;
   failedCount: number;
-  durationSumMs: number;
+  durationSumMs: number | null;
   durationCount: number;
-  scoreSumBps: number;
+  scoreSumBps: number | null;
   scoreCount: number;
   gradedCount: number;
   passedCount: number;
-  totalDirectCost: number;
+  totalDirectCost: number | null;
 }): unknown[] {
   return [
     String(values.completedCount),
     String(values.failedCount),
-    String(values.durationSumMs),
+    values.durationSumMs === null ? null : String(values.durationSumMs),
     String(values.durationCount),
-    String(values.scoreSumBps),
+    values.scoreSumBps,
     String(values.scoreCount),
     String(values.gradedCount),
     String(values.passedCount),
@@ -42,13 +47,13 @@ const HEADER = {
   types: [
     "UInt64",
     "UInt64",
+    "Nullable(UInt64)",
+    "UInt64",
+    "Nullable(Float64)",
     "UInt64",
     "UInt64",
     "UInt64",
-    "UInt64",
-    "UInt64",
-    "UInt64",
-    "Float64",
+    "Nullable(Float64)",
   ],
 };
 
@@ -76,9 +81,8 @@ function createFakeClient(
 
 /** Substitutes each bound `Identifier` back in, so a shape is readable. */
 function readable(call: QueryOptions): string {
-  return call.sql.replace(
-    /\{(id\d+):Identifier\}/g,
-    (_match, key: string) => String((call.params as Record<string, unknown>)[key]),
+  return call.sql.replace(/\{(id\d+):Identifier\}/g, (_match, key: string) =>
+    String((call.params as Record<string, unknown>)[key]),
   );
 }
 
@@ -142,18 +146,43 @@ describe("deriveExperimentRunTotals", () => {
       expect(totals.totalDirectCost).toBeCloseTo(1.23, 5);
     });
 
+    it("reads a graded score sum as the bare JSON number ClickHouse sends for a Float64", async () => {
+      const client = createFakeClient([
+        summaryRow({
+          completedCount: 1,
+          failedCount: 0,
+          durationSumMs: null,
+          durationCount: 0,
+          scoreSumBps: 8_500,
+          scoreCount: 1,
+          gradedCount: 1,
+          passedCount: 1,
+          totalDirectCost: null,
+        }),
+      ]);
+
+      const totals = await deriveExperimentRunTotals({
+        client,
+        tenantId: "tenant-1",
+        runId: "run-1",
+        experimentId: "exp-1",
+      });
+
+      expect(totals.avgScoreBps).toBe(8_500);
+    });
+
     it("reports totalDurationMs as null when no item carried a duration, distinct from a total of 0", async () => {
       const client = createFakeClient([
         summaryRow({
           completedCount: 1,
           failedCount: 0,
-          durationSumMs: 0,
+          durationSumMs: null,
           durationCount: 0,
-          scoreSumBps: 0,
+          scoreSumBps: null,
           scoreCount: 0,
           gradedCount: 0,
           passedCount: 0,
-          totalDirectCost: 0,
+          totalDirectCost: null,
         }),
       ]);
 
@@ -168,26 +197,48 @@ describe("deriveExperimentRunTotals", () => {
       expect(totals.avgScoreBps).toBeNull();
       expect(totals.passRateBps).toBeNull();
     });
+
+    it("reads a run whose items carried no cost as zero, not as a failure", async () => {
+      const client = createFakeClient([
+        summaryRow({
+          completedCount: 2,
+          failedCount: 0,
+          durationSumMs: null,
+          durationCount: 0,
+          scoreSumBps: null,
+          scoreCount: 0,
+          gradedCount: 0,
+          passedCount: 0,
+          totalDirectCost: null,
+        }),
+      ]);
+
+      const totals = await deriveExperimentRunTotals({
+        client,
+        tenantId: "tenant-1",
+        runId: "run-1",
+        experimentId: "exp-1",
+      });
+
+      expect(totals.totalDirectCost).toBe(0);
+      expect(totals.completedCount).toBe(2);
+    });
   });
 
   describe("given a run that already reads as finished", () => {
     /** @scenario "A late item changes the run immediately" */
     it("reflects a straggling item on the very next call — there is no cache to go stale", async () => {
-      // `deriveExperimentRunTotals` holds no state of its own between calls,
-      // so the fixture models "before" and "after" as two independent
-      // queries against the item rows — exactly what a real caller does: it
-      // never proactively pushes an update, it just re-reads.
       const before = createFakeClient([
         summaryRow({
           completedCount: 9,
           failedCount: 0,
           durationSumMs: 9_000,
           durationCount: 9,
-          scoreSumBps: 0,
+          scoreSumBps: null,
           scoreCount: 0,
           gradedCount: 0,
           passedCount: 0,
-          totalDirectCost: 0,
+          totalDirectCost: null,
         }),
       ]);
       const beforeTotals = await deriveExperimentRunTotals({
@@ -198,18 +249,17 @@ describe("deriveExperimentRunTotals", () => {
       });
       expect(beforeTotals.completedCount).toBe(9);
 
-      // A further item result is recorded for the run between the two reads.
       const after = createFakeClient([
         summaryRow({
           completedCount: 10,
           failedCount: 0,
           durationSumMs: 10_000,
           durationCount: 10,
-          scoreSumBps: 0,
+          scoreSumBps: null,
           scoreCount: 0,
           gradedCount: 0,
           passedCount: 0,
-          totalDirectCost: 0,
+          totalDirectCost: null,
         }),
       ]);
       const afterTotals = await deriveExperimentRunTotals({

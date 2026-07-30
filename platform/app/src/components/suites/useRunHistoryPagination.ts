@@ -77,7 +77,8 @@ export function useRunHistoryPagination({
 
   // A run's status is whatever was written for it. There is no client-side
   // stall re-check any more: STALLED is stored by the `scenarioExecution`
-  // process when a run's deadline fires (ADR-073 step 2), so re-deriving it
+  // process when a run's deadline fires (ADR-073 step 2, retired; ground
+  // now ADR-103), so re-deriving it
   // here from `timestamp` would only ever disagree with the server — which is
   // exactly what the old safety net did whenever a re-projection moved
   // ClickHouse's UpdatedAt.

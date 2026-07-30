@@ -48,7 +48,8 @@ export interface LangyMessagesResult {
    */
   shouldAskFeedback: boolean;
   /**
-   * The projection's event cursor at this snapshot (ADR-059): where the local
+   * The projection's event cursor at this snapshot (ADR-059, retired;
+   * ground now ADR-098): where the local
    * fold seeds itself before catching up on the durable tail. Null until the
    * snapshot lands (or from servers predating the field).
    */

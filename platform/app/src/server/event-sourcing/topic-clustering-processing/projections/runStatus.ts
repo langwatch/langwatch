@@ -1,11 +1,10 @@
-import {
-  defineFoldProjection,
-  deriveStateVersion,
-} from "@langwatch/event-sourcing";
 import { z } from "zod";
-import { topicClustering } from "../aggregate";
 import { runIsNewer } from "../runIdentity";
 import {
+  type RequestedData,
+  type RunCompletedData,
+  type RunFailedData,
+  type RunStartedData,
   type TopicClusteringRunMode,
   type TopicClusteringSkipReason,
   type TopicClusteringTrigger,
@@ -89,76 +88,83 @@ function withCurrentRun(
   return state;
 }
 
-export const topicClusteringRunStatus = defineFoldProjection({
-  name: "topicClusteringRunStatus",
-  aggregate: topicClustering,
-  version: deriveStateVersion(runStatusStateSchema),
-  init: initRunStatusState,
-  handle: {
-    requested: (state, data) => {
-      // An older or simultaneous request observed after a newer one carries no
-      // new information for this pair of fields.
-      if (
-        state.lastRequestedAt !== null &&
-        state.lastRequestedAt >= data.occurredAt
-      ) {
-        return state;
-      }
-      return {
-        ...state,
-        lastRequestedAt: data.occurredAt,
-        lastRequestTrigger: data.trigger,
-      };
+export function handleRequested(
+  state: RunStatusState,
+  data: RequestedData,
+): RunStatusState {
+  // An older or simultaneous request observed after a newer one carries no new
+  // information for this pair of fields.
+  if (
+    state.lastRequestedAt !== null &&
+    state.lastRequestedAt >= data.occurredAt
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    lastRequestedAt: data.occurredAt,
+    lastRequestTrigger: data.trigger,
+  };
+}
+
+export function handleRunStarted(
+  state: RunStatusState,
+  data: RunStartedData,
+): RunStatusState {
+  return withCurrentRun(state, data.runId, (current) => current);
+}
+
+export function handleRunCompleted(
+  state: RunStatusState,
+  data: RunCompletedData,
+): RunStatusState {
+  return withCurrentRun(state, data.runId, (current) => {
+    const currentRunPages = {
+      ...current.currentRunPages,
+      [data.page]: data.tracesProcessed,
+    };
+    if (data.nextSearchAfter !== undefined) {
+      return { ...current, currentRunPages };
+    }
+    return {
+      ...current,
+      currentRunPages,
+      // A run has at most one terminal event in practice; freezing the first
+      // keeps the field well-defined if that ever stops holding.
+      currentRunTerminal: current.currentRunTerminal ?? {
+        kind: "finished",
+        finishedAt: data.occurredAt,
+        mode: data.mode,
+        skippedReason: data.skippedReason ?? null,
+        errorMessage: null,
+        errorCode: null,
+        isErrorUserActionable: false,
+        topicsCount: data.topicsCount,
+        subtopicsCount: data.subtopicsCount,
+      },
+    };
+  });
+}
+
+export function handleRunFailed(
+  state: RunStatusState,
+  data: RunFailedData,
+): RunStatusState {
+  return withCurrentRun(state, data.runId, (current) => ({
+    ...current,
+    currentRunTerminal: current.currentRunTerminal ?? {
+      kind: "failed",
+      finishedAt: data.occurredAt,
+      mode: null,
+      skippedReason: null,
+      errorMessage: data.error,
+      errorCode: data.errorCode ?? null,
+      isErrorUserActionable: data.isUserActionable ?? false,
+      topicsCount: 0,
+      subtopicsCount: 0,
     },
-
-    runStarted: (state, data) =>
-      withCurrentRun(state, data.runId, (current) => current),
-
-    runCompleted: (state, data) =>
-      withCurrentRun(state, data.runId, (current) => {
-        const currentRunPages = {
-          ...current.currentRunPages,
-          [data.page]: data.tracesProcessed,
-        };
-        if (data.nextSearchAfter !== undefined) {
-          return { ...current, currentRunPages };
-        }
-        return {
-          ...current,
-          currentRunPages,
-          // A run has at most one terminal event in practice; freezing the
-          // first keeps the field well-defined if that ever stops holding.
-          currentRunTerminal: current.currentRunTerminal ?? {
-            kind: "finished",
-            finishedAt: data.occurredAt,
-            mode: data.mode,
-            skippedReason: data.skippedReason ?? null,
-            errorMessage: null,
-            errorCode: null,
-            isErrorUserActionable: false,
-            topicsCount: data.topicsCount,
-            subtopicsCount: data.subtopicsCount,
-          },
-        };
-      }),
-
-    runFailed: (state, data) =>
-      withCurrentRun(state, data.runId, (current) => ({
-        ...current,
-        currentRunTerminal: current.currentRunTerminal ?? {
-          kind: "failed",
-          finishedAt: data.occurredAt,
-          mode: null,
-          skippedReason: null,
-          errorMessage: data.error,
-          errorCode: data.errorCode ?? null,
-          isErrorUserActionable: data.isUserActionable ?? false,
-          topicsCount: 0,
-          subtopicsCount: 0,
-        },
-      })),
-  },
-});
+  }));
+}
 
 export interface RunStatusView {
   readonly lastRequestedAt: number | null;

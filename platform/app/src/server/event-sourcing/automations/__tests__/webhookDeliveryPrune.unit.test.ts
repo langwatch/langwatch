@@ -1,71 +1,49 @@
+import type { ProcessContext } from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
-import { TRIGGER_SETTLEMENT_PROCESS_NAME } from "../process-managers/triggerSettlement";
+import { TRIGGER_SETTLEMENT_PROCESS_NAME } from "../triggerSettlement.process";
 import {
-  createPruneHandler,
   WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
   WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
   type WebhookDeliveryPrunePorts,
-  webhookDeliveryPrune,
-} from "../process-managers/webhookDeliveryPrune";
+  initWebhookDeliveryPruneState,
+  webhookDeliveryPruneIntents,
+  webhookDeliveryPruneOn,
+  webhookDeliveryPruneOnWake,
+} from "../webhookDeliveryPrune.process";
 
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }),
+  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-function intentContext() {
+const ctx: ProcessContext = { processKey: WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME, tenantId: "__global__", now: 10_000 };
+
+function makePorts(overrides: Partial<WebhookDeliveryPrunePorts> = {}): WebhookDeliveryPrunePorts {
   return {
-    processName: WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
-    tenantId: "__global__",
-    processKey: WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
-    messageKey: "prune:10000",
-    attempt: 1,
+    pruneExpiredDeliveries: vi.fn().mockResolvedValue(0),
+    pruneDispatchedIntentsBefore: vi.fn().mockResolvedValue(0),
+    ...overrides,
   };
 }
 
 describe("webhook delivery prune process", () => {
-  describe("when the process manager is built", () => {
-    it("declares a scheduled singleton wake once a day", () => {
-      expect(webhookDeliveryPrune.kind).toBe("schedule");
-      expect(webhookDeliveryPrune.everyMs).toBe(
-        WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
-      );
-    });
+  describe("given the scheduled process wakes", () => {
+    it("emits exactly one prune intent keyed on the wake instant, re-arming every day", () => {
+      const wake = webhookDeliveryPruneOnWake(initWebhookDeliveryPruneState(), ctx);
 
-    it("derives its one intent type from the intents map's own key", () => {
-      expect(webhookDeliveryPrune.intentTypes).toEqual([
-        "webhookDeliveryPrune/prune",
-      ]);
+      expect(wake).toEqual({
+        state: { lastPruneAt: 10_000, nextWakeAt: 10_000 + WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS },
+        intents: [{ type: "prune", payload: { scheduledFor: 10_000 } }],
+        nextWakeAt: 10_000 + WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
+      });
     });
   });
 
-  describe("given the scheduled process wakes", () => {
-    it("emits exactly one prune intent keyed on the wake instant", () => {
-      const wake = webhookDeliveryPrune.onWake(
-        { lastPruneAt: null },
-        webhookDeliveryPrune.intents,
-        {
-          processKey: WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
-          tenantId: "__global__",
-          at: 10_000,
-          now: 10_000,
-        },
-      );
+  describe("given an event this singleton scheduler does not act on", () => {
+    it("leaves state and the armed wake untouched", () => {
+      const armed = { lastPruneAt: 1_000, nextWakeAt: 86_401_000 };
+      const step = webhookDeliveryPruneOn.matchRecorded!(armed, {} as never, ctx);
 
-      expect(wake).toEqual({
-        state: { lastPruneAt: 10_000 },
-        intents: [
-          {
-            messageKey: "prune:10000",
-            intentType: "webhookDeliveryPrune/prune",
-            payload: { scheduledFor: 10_000 },
-          },
-        ],
-      });
+      expect(step).toEqual({ state: armed, intents: [], nextWakeAt: 86_401_000 });
     });
   });
 
@@ -73,26 +51,16 @@ describe("webhook delivery prune process", () => {
     it("prunes the log, then both processes' own dispatched-outbox retention", async () => {
       const pruneExpiredDeliveries = vi.fn().mockResolvedValue(12);
       const pruneDispatchedIntentsBefore = vi.fn().mockResolvedValue(1);
-      const ports: WebhookDeliveryPrunePorts = {
-        pruneExpiredDeliveries,
-        pruneDispatchedIntentsBefore,
-      };
+      const ports = makePorts({ pruneExpiredDeliveries, pruneDispatchedIntentsBefore });
 
-      await createPruneHandler(ports)(
-        { scheduledFor: 10_000 },
-        intentContext(),
-      );
+      await webhookDeliveryPruneIntents(ports).prune.deliver({ scheduledFor: 10_000 }, { now: 10_000, tenantId: "__global__" });
 
       expect(pruneExpiredDeliveries).toHaveBeenCalledTimes(1);
       expect(pruneDispatchedIntentsBefore).toHaveBeenCalledWith(
-        expect.objectContaining({
-          processName: WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
-        }),
+        expect.objectContaining({ processName: WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME }),
       );
       expect(pruneDispatchedIntentsBefore).toHaveBeenCalledWith(
-        expect.objectContaining({
-          processName: TRIGGER_SETTLEMENT_PROCESS_NAME,
-        }),
+        expect.objectContaining({ processName: TRIGGER_SETTLEMENT_PROCESS_NAME }),
       );
     });
   });
@@ -100,16 +68,13 @@ describe("webhook delivery prune process", () => {
   describe("given the outbox retention delete fails", () => {
     it("still completes the prune without throwing", async () => {
       const pruneExpiredDeliveries = vi.fn().mockResolvedValue(3);
-      const pruneDispatchedIntentsBefore = vi
-        .fn()
-        .mockRejectedValue(new Error("boom"));
-      const ports: WebhookDeliveryPrunePorts = {
+      const ports = makePorts({
         pruneExpiredDeliveries,
-        pruneDispatchedIntentsBefore,
-      };
+        pruneDispatchedIntentsBefore: vi.fn().mockRejectedValue(new Error("boom")),
+      });
 
       await expect(
-        createPruneHandler(ports)({ scheduledFor: 10_000 }, intentContext()),
+        webhookDeliveryPruneIntents(ports).prune.deliver({ scheduledFor: 10_000 }, { now: 10_000, tenantId: "__global__" }),
       ).resolves.toBeUndefined();
       expect(pruneExpiredDeliveries).toHaveBeenCalledTimes(1);
     });

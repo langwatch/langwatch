@@ -1,23 +1,22 @@
 import { z } from "zod";
 
 /**
- * The `trace` aggregate's event/command payloads — what crosses `event_log`,
- * not raw OTLP. Normalization, PII redaction and cost enrichment all run in
- * `canonicalizeSpan.ts` before `recordSpan` sees the input.
+ * The `trace` aggregate's payloads — what crosses `event_log`, not raw OTLP.
+ * Normalization, PII redaction and cost enrichment run upstream, before
+ * `recordSpan` sees the input.
  */
 
-// ---------------------------------------------------------------------------
-// The canonical span (recordSpan's input / spanReceived's data)
-// ---------------------------------------------------------------------------
-
-export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
+export const piiRedactionLevelSchema = z.enum([
+  "STRICT",
+  "ESSENTIAL",
+  "DISABLED",
+]);
 export type PIIRedactionLevel = z.infer<typeof piiRedactionLevelSchema>;
 export const DEFAULT_PII_REDACTION_LEVEL: PIIRedactionLevel = "ESSENTIAL";
 
 export const piiRedactionStatusSchema = z.enum(["partial", "none"]);
 export type PIIRedactionStatus = z.infer<typeof piiRedactionStatusSchema>;
 
-/** OTel SpanKind, both the numeric wire enum and normalized here to a name. */
 export const spanKindSchema = z.enum([
   "UNSPECIFIED",
   "INTERNAL",
@@ -32,13 +31,8 @@ export const spanStatusCodeSchema = z.enum(["UNSET", "OK", "ERROR"]);
 export type SpanStatusCode = z.infer<typeof spanStatusCodeSchema>;
 
 /**
- * An attribute value after OTLP `AnyValue` flattening. Zero, `0.0` and
- * `false` are legitimate reported values and must decode as themselves, never
- * as absence (specs/trace-processing/zero-valued-attribute-ingestion.feature)
- * — this schema does not special-case any of them because a plain
- * `z.union` already round-trips a JS `0`/`false` without coercion; the
- * discipline lives in `canonicalizeSpan.ts`'s *extraction* helpers, which
- * must read a reported zero as present rather than skip it as falsy.
+ * Zero, `0.0` and `false` are reported values and decode as themselves, never
+ * as absence (specs/trace-processing/zero-valued-attribute-ingestion.feature).
  */
 export const attributeValueSchema = z.union([
   z.string(),
@@ -66,13 +60,9 @@ export const canonicalSpanLinkSchema = z.object({
 export type CanonicalSpanLink = z.infer<typeof canonicalSpanLinkSchema>;
 
 /**
- * The per-span cost split. `cost` is the total; `nonBilledCost` is the
- * portion covered by a flat plan (the `langwatch.cost.non_billable` marker —
- * Claude Code subscription usage, codex bundled usage) so `cost -
- * nonBilledCost` is what actually bills
- * (specs/trace-processing/codex-bundled-cost.feature). Cost is rounded once,
- * by `canonicalizeSpan.ts`, never again by a fold — re-rounding every step
- * makes trace-level sums order-dependent.
+ * `cost` is the total; `nonBilledCost` is the portion a flat plan covers, so
+ * `cost - nonBilledCost` is what bills
+ * (specs/trace-processing/codex-bundled-cost.feature). Rounded once, upstream.
  */
 export const spanCostSchema = z.object({
   cost: z.number().nullable(),
@@ -80,32 +70,20 @@ export const spanCostSchema = z.object({
 });
 export type SpanCost = z.infer<typeof spanCostSchema>;
 
-/**
- * Token usage, zero-safe throughout
- * (specs/trace-processing/zero-valued-attribute-ingestion.feature): a field
- * is `null` only when the SDK never reported it at all, never when it
- * reported zero. `canonicalizeSpan.ts` is the only place these are read off
- * raw attributes; the fold never re-parses an attribute bag for them.
- */
+/** A field is `null` only when the SDK never reported it, never when it reported zero. */
 export const spanUsageSchema = z.object({
   inputTokens: z.number().nullable(),
   outputTokens: z.number().nullable(),
   reasoningTokens: z.number().nullable(),
   cacheReadTokens: z.number().nullable(),
   cacheWriteTokens: z.number().nullable(),
-  /** True when at least one of the above was estimated (tiktoken) rather than SDK-reported. */
   estimated: z.boolean(),
 });
 export type SpanUsage = z.infer<typeof spanUsageSchema>;
 
-/**
- * A span's contribution to trace-level IO. Text extraction is
- * `TraceIOExtractionService`'s job; the fold only decides which span's
- * already-extracted text wins trace-wide.
- */
+/** Text extraction is `TraceIOExtractionService`'s job; a fold only picks a winner. */
 export const spanIOSchema = z.object({
   inputText: z.string().nullable(),
-  /** `true` when `inputText` came from `gen_ai.input.messages`/`langwatch.input` explicitly. */
   inputIsExplicit: z.boolean(),
   outputText: z.string().nullable(),
   outputIsExplicit: z.boolean(),
@@ -127,13 +105,9 @@ export const canonicalSpanSchema = z.object({
 
   statusCode: spanStatusCodeSchema,
   statusMessage: z.string().nullable(),
-  /** The newest `exception` span event's `exception.message`, if any — see
-   * `spanDerivation.ts`'s error-message rank 3. */
   exceptionMessage: z.string().nullable(),
 
-  /** Flattened, dedup'd, capped (256 KiB/value) attribute map — span-scoped. */
   attributes: attributeMapSchema,
-  /** Flattened resource attributes — same span, resource-scoped. */
   resourceAttributes: attributeMapSchema,
   instrumentationScopeName: z.string(),
   instrumentationScopeVersion: z.string().nullable(),
@@ -141,20 +115,15 @@ export const canonicalSpanSchema = z.object({
   events: z.array(canonicalSpanEventSchema),
   links: z.array(canonicalSpanLinkSchema),
 
-  /** The `langwatch.span.type` attribute, already extracted — `null` when absent. */
   spanType: z.string().nullable(),
   /** `gen_ai.response.model` if present, else `gen_ai.request.model`. */
   model: z.string().nullable(),
   usage: spanUsageSchema,
   cost: spanCostSchema,
   io: spanIOSchema,
-  /** Milliseconds from span start to first token, already resolved through
-   * the stream-event/attribute/`langwatch.timestamps` fallback ladder
-   * (specs/trace-processing/sdk-timing-and-metrics-canonicalisation.feature). */
   timeToFirstTokenMs: z.number().nullable(),
   timeToLastTokenMs: z.number().nullable(),
 
-  /** A prompt (LangWatch Prompt Management) this span used, if any. */
   prompt: z
     .object({
       promptId: z.string(),
@@ -164,17 +133,13 @@ export const canonicalSpanSchema = z.object({
     .nullable(),
 
   piiRedactionLevel: piiRedactionLevelSchema,
-  /** Set only when at least one attribute exceeded the PII scan's max length. */
+  /** Set only when an attribute exceeded the PII scan's max length. */
   piiRedactionStatus: piiRedactionStatusSchema.nullable(),
 
   occurredAt: z.number().int().nonnegative(),
   acceptedAt: z.number().int().nonnegative(),
 });
 export type CanonicalSpan = z.infer<typeof canonicalSpanSchema>;
-
-// ---------------------------------------------------------------------------
-// Topic assignment
-// ---------------------------------------------------------------------------
 
 export const topicAssignmentSchema = z.object({
   traceId: z.string(),
@@ -184,20 +149,13 @@ export const topicAssignmentSchema = z.object({
   subtopicName: z.string().nullable(),
   isIncremental: z.boolean(),
   /**
-   * Stamped by the assigner (the topic-clustering job, or the manual
-   * assignment service) at the moment the classification decision was made —
-   * our own boundary's clock, not the customer's. LWW ordering for
-   * `topicId`/`subTopicId` uses this, never `occurredAt`, so a stale
-   * clustering re-run racing a fresher manual assignment can never win
-   * (ADR-098 §4).
+   * Stamped by the assigner when the classification was decided — our own
+   * boundary's clock, so a stale re-run racing a fresher manual assignment can
+   * never win (ADR-098 §4).
    */
   assignedAt: z.number().int().nonnegative(),
 });
 export type TopicAssignment = z.infer<typeof topicAssignmentSchema>;
-
-// ---------------------------------------------------------------------------
-// Origin resolution
-// ---------------------------------------------------------------------------
 
 export const originResolutionSchema = z.object({
   traceId: z.string(),
@@ -206,15 +164,7 @@ export const originResolutionSchema = z.object({
 });
 export type OriginResolution = z.infer<typeof originResolutionSchema>;
 
-// ---------------------------------------------------------------------------
-// Annotations
-// ---------------------------------------------------------------------------
-
-/**
- * `actedAt` is stamped by the command layer when the user acts — our
- * boundary, not the customer's — so `applyAnnotationChange` can be genuine
- * last-write-wins rather than an add/remove asymmetry.
- */
+/** `actedAt` is stamped by the command layer when the user acts, so add and remove are one lattice. */
 export const annotationRefSchema = z.object({
   traceId: z.string(),
   annotationId: z.string(),
@@ -229,10 +179,6 @@ export const annotationsBulkSyncSchema = z.object({
 });
 export type AnnotationsBulkSync = z.infer<typeof annotationsBulkSyncSchema>;
 
-// ---------------------------------------------------------------------------
-// Trace name
-// ---------------------------------------------------------------------------
-
 export const TRACE_NAME_MIN_LENGTH = 1;
 export const TRACE_NAME_MAX_LENGTH = 200;
 
@@ -240,16 +186,15 @@ export const traceNameChangeSchema = z.object({
   traceId: z.string(),
   newName: z.string().min(TRACE_NAME_MIN_LENGTH).max(TRACE_NAME_MAX_LENGTH),
   changedByUserId: z.string().nullable(),
+  /** The rename's own stamp, set by the command layer — the LWW ordering key. */
+  changedAt: z.number().int().nonnegative(),
 });
 export type TraceNameChange = z.infer<typeof traceNameChangeSchema>;
 
-// ---------------------------------------------------------------------------
-// Log contribution (bridged from log-processing — ADR-098 decision 9: keys
-// differ (log's aggregate is `log`, keyed by recordId; trace's is `trace`,
-// keyed by traceId), so this crosses via a command bridge, never a direct
-// subscription.
-// ---------------------------------------------------------------------------
-
+/**
+ * Bridged from `log-processing`: `log` is keyed by recordId and `trace` by
+ * traceId, so it crosses via a command bridge (ADR-098 decision 9).
+ */
 export const logContributionSchema = z.object({
   traceId: z.string(),
   spanId: z.string(),
@@ -266,15 +211,15 @@ export const logContributionSchema = z.object({
 });
 export type LogContribution = z.infer<typeof logContributionSchema>;
 
-// ---------------------------------------------------------------------------
-// Metric correlation (bridged from metric-processing — same reasoning: the
-// metric aggregate is keyed by the point's own content hash, trace by
-// traceId, so a command bridge re-keys onto trace's FIFO lane).
-// ---------------------------------------------------------------------------
-
-export const metricKindSchema = z.enum(["counter", "gauge", "histogram", "summary"]);
+export const metricKindSchema = z.enum([
+  "counter",
+  "gauge",
+  "histogram",
+  "summary",
+]);
 export type MetricKind = z.infer<typeof metricKindSchema>;
 
+/** Bridged from `metric-processing`, whose aggregate id is the point's content hash. */
 export const metricCorrelationSchema = z.object({
   traceId: z.string().regex(/^[a-f0-9]{32}$/i),
   spanId: z.string().regex(/^[a-f0-9]{16}$/i),
@@ -288,10 +233,7 @@ export const metricCorrelationSchema = z.object({
 });
 export type MetricCorrelation = z.infer<typeof metricCorrelationSchema>;
 
-/**
- * All-zero-hex is a "null" sentinel in tracing systems, not a real id.
- * `recordMetricCorrelation` drops such a correlation, emitting no event.
- */
+/** All-zero hex is a "null" sentinel in tracing systems, not a real id. */
 const ALL_ZERO_HEX = /^0+$/;
 
 export function isValidMetricCorrelation(data: MetricCorrelation): boolean {

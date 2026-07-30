@@ -1,195 +1,25 @@
+import { type ClickHouseClient, clickhouseAppend } from "@langwatch/clickhouse";
 import {
-  type AggregateEvent,
-  type AppendStore,
   ConfigurationError,
-  createMapExecutor,
-  defineMapProjection,
-  type GroupKey,
-  type MapProjection,
-  type Metrics,
-  type Mount,
+  definePipeline,
   validateMount,
+  type AppendStore,
+  type GroupKey,
+  type Mount,
 } from "@langwatch/event-sourcing";
-import { metric } from "./aggregate";
-import type { CanonicalMetricDataPoint } from "./schema";
+import { METRIC_PIPELINE_NAME, METRIC_PIPELINE_PREFIX, metricProcessingEvents } from "./events";
+import {
+  stampPoints,
+  toDataPointRow,
+  toMetricDataPointStorageRow,
+} from "./metricDataPointStorage.projection";
+import { toMetricSeriesCatalogRow, toSeriesRow } from "./metricSeriesCatalog.projection";
+import { toMetricTimeRollupRow } from "./metricTimeRollup.projection";
+import { recordDataPoint } from "./recordDataPoint.command";
+import { createMetricTimeRollupStore } from "./rollupStore";
+import { canonicalMetricDataPointSchema, type CanonicalMetricDataPoint } from "./schema";
 import { DEFAULT_METRIC_SHARD_COUNT, metricShardLabel } from "./shards";
-
-/**
- * Canonical OTLP metric ingestion: one immutable, content-addressed event per
- * data point, and three `map` projections mounted on it — never a `fold`,
- * because a point has no lifetime to accumulate (ADR-098, ADR-105;
- * specs/otlp/metric-processing-pipeline.feature).
- */
-
-export { metric } from "./aggregate";
-export type { PreparedMetricPoint } from "./canonical/buildPoint";
-export { buildPoint } from "./canonical/buildPoint";
-export type {
-  PiiRedactionLevel,
-  RedactionService,
-} from "./canonical/redaction";
-export {
-  MAX_CANONICAL_METRIC_PAYLOAD_BYTES,
-  METRIC_MAP_COALESCE_MAX_BATCH,
-  METRIC_ROLLUP_INTERVAL_MS,
-} from "./constants";
-export type { MetricPreparationResult } from "./prepareMetricDataPoints";
-export { prepareMetricDataPoints } from "./prepareMetricDataPoints";
-export {
-  affectedRollupBuckets,
-  buildMetricRollups,
-} from "./rollup/buildRollups";
-export type {
-  AggregationTemporality,
-  CanonicalMetricDataPoint,
-  MetricKind,
-  MetricRollupRow,
-  MetricTraceCorrelation,
-} from "./schema";
-export {
-  canonicalMetricDataPointSchema,
-  metricKindSchema,
-} from "./schema";
-export {
-  clampMetricShardCount,
-  DEFAULT_METRIC_SHARD_COUNT,
-  MAX_METRIC_SHARD_COUNT,
-  MIN_METRIC_SHARD_COUNT,
-  metricShardLabel,
-  resolveMetricShardCount,
-} from "./shards";
-
-/** The canonical row: one event in, one row out. */
-export const metricDataPointStorage = defineMapProjection({
-  name: "metricDataPointStorage",
-  aggregate: metric,
-  handle: { dataPointReceived: (data): CanonicalMetricDataPoint => data },
-});
-
-/**
- * Per-series metadata (resource, scope, description, unit), kept out of the hot
- * row. The store dedups on `(TenantId, SeriesId)` with `LastSeenAt` as the
- * version, so a late point cannot overwrite a newer observation.
- */
-export const metricSeriesCatalog = defineMapProjection({
-  name: "metricSeriesCatalog",
-  aggregate: metric,
-  handle: { dataPointReceived: (data): CanonicalMetricDataPoint => data },
-});
-
-/**
- * The 30-second buckets a new point affects, recomputed whole from the
- * authoritative raw points rather than accumulated. The read, recompute
- * (`rollup/`) and whole-bucket write happen inside the injected store, because
- * a map's own function is pure and synchronous by contract (ADR-098 §2).
- */
-export const metricTimeRollup = defineMapProjection({
-  name: "metricTimeRollup",
-  aggregate: metric,
-  handle: { dataPointReceived: (data): CanonicalMetricDataPoint => data },
-});
-
-/**
- * `store` is a fact about the ClickHouse table's merge strategy (ADR-099), not
- * about which store interface the executor runs on: a map never reads its store
- * back, so all three run on an `AppendStore` regardless. `metric_data_points`
- * collapses on a content-addressed `PointId`, while `metric_series` and
- * `metric_time_rollups` elect a winner between competing versions of one row.
- */
-export const metricProcessingMounts = {
-  metricDataPointStorage: {
-    projection: "map",
-    store: "append",
-    scope: "partition",
-    collapse: "batch",
-  },
-  metricSeriesCatalog: {
-    projection: "map",
-    store: "replace",
-    scope: "partition",
-    collapse: "batch",
-  },
-  metricTimeRollup: {
-    projection: "map",
-    store: "replace",
-    scope: "partition",
-    collapse: "batch",
-  },
-} as const satisfies Record<string, Mount>;
-
-/** Refuses an illegal mount at composition, not on the first delivery (ADR-106). */
-export function assertMetricProcessingMountsAreLegal(): void {
-  for (const [projection, mount] of Object.entries(metricProcessingMounts)) {
-    const violations = validateMount(mount);
-    if (violations.length > 0) {
-      throw new ConfigurationError(
-        `metric-processing's ${projection} mount is illegal: ${violations
-          .map((v) => `${v.rule} — ${v.message}`)
-          .join("; ")}`,
-        { pipeline: "metric_processing", projection, violations },
-      );
-    }
-  }
-}
-
-export function metricMapGroupKey(args: {
-  tenantId: string;
-  projectionName: string;
-  identity: string;
-  shardCount: number;
-}): GroupKey {
-  return {
-    tenantId: args.tenantId,
-    lane: { kind: "map", name: args.projectionName },
-    scope: { kind: "partition", parts: ["metric", metricShardLabel(args)] },
-  };
-}
-
-/** Keyed on the point itself: nothing else names the same measurement. */
-export function metricDataPointStorageGroupKey(args: {
-  tenantId: string;
-  point: CanonicalMetricDataPoint;
-  shardCount: number;
-}): GroupKey {
-  return metricMapGroupKey({
-    tenantId: args.tenantId,
-    projectionName: metricDataPointStorage.name,
-    identity: metric.id(args.point),
-    shardCount: args.shardCount,
-  });
-}
-
-/**
- * Keyed on the series, not the point: this projection's write is a
- * read-modify-write over the series, and two concurrent writers would compute
- * conflicting versions of the same row.
- */
-export function metricSeriesCatalogGroupKey(args: {
-  tenantId: string;
-  point: CanonicalMetricDataPoint;
-  shardCount: number;
-}): GroupKey {
-  return metricMapGroupKey({
-    tenantId: args.tenantId,
-    projectionName: metricSeriesCatalog.name,
-    identity: args.point.seriesId,
-    shardCount: args.shardCount,
-  });
-}
-
-/** Keyed on the series for the same reason as `metricSeriesCatalogGroupKey`. */
-export function metricTimeRollupGroupKey(args: {
-  tenantId: string;
-  point: CanonicalMetricDataPoint;
-  shardCount: number;
-}): GroupKey {
-  return metricMapGroupKey({
-    tenantId: args.tenantId,
-    projectionName: metricTimeRollup.name,
-    identity: args.point.seriesId,
-    shardCount: args.shardCount,
-  });
-}
+import { metricDataPointsTable, metricSeriesTable } from "./table";
 
 /**
  * Sharded rather than aggregate-scoped: no two commands ever share a
@@ -209,7 +39,7 @@ export function metricCommandGroupKey(args: {
       parts: [
         "metric-cmd",
         metricShardLabel({
-          identity: metric.id(args.point),
+          identity: args.point.pointId,
           shardCount: args.shardCount ?? DEFAULT_METRIC_SHARD_COUNT,
         }),
       ],
@@ -217,40 +47,156 @@ export function metricCommandGroupKey(args: {
   };
 }
 
-/**
- * The stores cross from the composition root (ADR-102 decision 6) because this
- * pipeline's three tables are written by repositories the app already owns.
- */
-export interface MetricProcessingDeps {
-  readonly metricDataPointStore: AppendStore<CanonicalMetricDataPoint>;
-  readonly metricSeriesCatalogStore: AppendStore<CanonicalMetricDataPoint>;
-  readonly metricTimeRollupStore: AppendStore<CanonicalMetricDataPoint>;
-  readonly metrics?: Metrics;
+/** A bounded hashed shard, so a delivery's writes coalesce (ADR-100 decision 2). */
+export function metricMapGroupKey(args: {
+  tenantId: string;
+  projectionName: string;
+  identity: string;
+  shardCount?: number;
+}): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "map", name: args.projectionName },
+    scope: {
+      kind: "partition",
+      parts: ["metric", metricShardLabel({ identity: args.identity, shardCount: args.shardCount ?? DEFAULT_METRIC_SHARD_COUNT })],
+    },
+  };
 }
 
-export function createMetricProcessingProjections(deps: MetricProcessingDeps) {
-  assertMetricProcessingMountsAreLegal();
+export function metricDataPointStorageGroupKey(args: {
+  tenantId: string;
+  point: CanonicalMetricDataPoint;
+  shardCount?: number;
+}): GroupKey {
+  return metricMapGroupKey({
+    tenantId: args.tenantId,
+    projectionName: "metricDataPointStorage",
+    identity: args.point.pointId,
+    shardCount: args.shardCount,
+  });
+}
 
-  const executor = (
-    projection: MapProjection<CanonicalMetricDataPoint>,
-    store: AppendStore<CanonicalMetricDataPoint>,
-  ) =>
-    createMapExecutor<AggregateEvent, CanonicalMetricDataPoint>({
-      store,
-      projectionName: projection.name,
-      map: projection.map,
-      metrics: deps.metrics,
-    });
+/**
+ * Keyed on the series, not the point: this projection's write is a
+ * read-modify-write over the series, and two concurrent writers would compute
+ * conflicting versions of the same row.
+ */
+export function metricSeriesCatalogGroupKey(args: {
+  tenantId: string;
+  point: CanonicalMetricDataPoint;
+  shardCount?: number;
+}): GroupKey {
+  return metricMapGroupKey({
+    tenantId: args.tenantId,
+    projectionName: "metricSeriesCatalog",
+    identity: args.point.seriesId,
+    shardCount: args.shardCount,
+  });
+}
 
+/** Keyed on the series for the same reason as `metricSeriesCatalogGroupKey`. */
+export function metricTimeRollupGroupKey(args: {
+  tenantId: string;
+  point: CanonicalMetricDataPoint;
+  shardCount?: number;
+}): GroupKey {
+  return metricMapGroupKey({
+    tenantId: args.tenantId,
+    projectionName: "metricTimeRollup",
+    identity: args.point.seriesId,
+    shardCount: args.shardCount,
+  });
+}
+
+/**
+ * A point has no lifetime to accumulate, so nothing here reads its own prior
+ * state back — every projection is a map, and `store` is whichever interface
+ * the injected store actually implements.
+ */
+export function metricMount(store: AppendStore<CanonicalMetricDataPoint>): Mount {
   return {
-    metricDataPointStorage: executor(
-      metricDataPointStorage,
-      deps.metricDataPointStore,
-    ),
-    metricSeriesCatalog: executor(
-      metricSeriesCatalog,
-      deps.metricSeriesCatalogStore,
-    ),
-    metricTimeRollup: executor(metricTimeRollup, deps.metricTimeRollupStore),
+    projection: "map",
+    store: store.kind,
+    scope: "partition",
+    collapse: "batch",
   };
+}
+
+/** Refuses an illegal mount at composition, not on the first delivery (ADR-106). */
+function assertMountIsLegal(projection: string, mount: Mount): Mount {
+  const violations = validateMount(mount);
+  if (violations.length > 0) {
+    throw new ConfigurationError(
+      `metric-processing's ${projection} mount is illegal: ${violations
+        .map((v) => `${v.rule} — ${v.message}`)
+        .join("; ")}`,
+      { pipeline: METRIC_PIPELINE_NAME, projection, violations },
+    );
+  }
+  return mount;
+}
+
+function createMetricDataPointStore(
+  client: ClickHouseClient,
+): AppendStore<CanonicalMetricDataPoint> {
+  const points = clickhouseAppend({ client, table: metricDataPointsTable, toRow: toDataPointRow });
+  return {
+    kind: "append",
+    async writeBatch(batch, context) {
+      await points.writeBatch(stampPoints(batch, context.retentionDays), context);
+    },
+  };
+}
+
+function createMetricSeriesCatalogStore(
+  client: ClickHouseClient,
+): AppendStore<CanonicalMetricDataPoint> {
+  const series = clickhouseAppend({ client, table: metricSeriesTable, toRow: toSeriesRow });
+  return {
+    kind: "append",
+    async writeBatch(batch, context) {
+      // `LastSeenAt` is the engine version, so only the newest point per series
+      // can win: collapsing here writes one row per series rather than one per
+      // point, and leaves the merge nothing to undo.
+      const latest = new Map<string, CanonicalMetricDataPoint>();
+      for (const point of batch) {
+        const current = latest.get(point.seriesId);
+        if (!current || point.timeUnixMs > current.timeUnixMs) {
+          latest.set(point.seriesId, point);
+        }
+      }
+      await series.writeBatch(stampPoints([...latest.values()], context.retentionDays), context);
+    },
+  };
+}
+
+export function createMetricProcessingPipeline(deps: { readonly client: ClickHouseClient }) {
+  const dataPointStore = createMetricDataPointStore(deps.client);
+  const seriesStore = createMetricSeriesCatalogStore(deps.client);
+  const rollupStore = createMetricTimeRollupStore(deps.client);
+  assertMountIsLegal("metricDataPointStorage", metricMount(dataPointStore));
+  assertMountIsLegal("metricSeriesCatalog", metricMount(seriesStore));
+  assertMountIsLegal("metricTimeRollup", metricMount(rollupStore));
+
+  return definePipeline(METRIC_PIPELINE_NAME)
+    .prefix(METRIC_PIPELINE_PREFIX)
+    .events(metricProcessingEvents)
+    .withCommand("recordDataPoint", {
+      input: canonicalMetricDataPointSchema,
+      handle: recordDataPoint,
+    })
+    .withMap("metricDataPointStorage", {
+      on: { dataPointReceived: toMetricDataPointStorageRow },
+      store: dataPointStore,
+    })
+    .withMap("metricSeriesCatalog", {
+      on: { dataPointReceived: toMetricSeriesCatalogRow },
+      store: seriesStore,
+    })
+    .withMap("metricTimeRollup", {
+      on: { dataPointReceived: toMetricTimeRollupRow },
+      store: rollupStore,
+    })
+    .build();
 }

@@ -8,7 +8,7 @@ import type { HandlerContext, ProcessContext } from "./pipeline.types";
 
 /**
  * `definePipeline` is the one chain a pipeline is declared in (ADR-105). These
- * tests are about what the chain buys: derivation instead of restatement, the
+ * tests are about what the chain buys: derivation instead of restating, the
  * `.id` gate, context reaching only the members that leave the pipeline, and
  * the guards that keep a declaration routable.
  */
@@ -44,8 +44,8 @@ function memoryAppendStore<Row>(): { kind: "append"; rows: Row[]; writeBatch: (r
   };
 }
 
-/** A `MergeStore` — legal by `MapOn.store`'s type, and the one combination
- * ADR-106 closes unconditionally (decision 5). */
+/** A `MergeStore` — legal by `MapWithStore.store`'s type, and the one
+ * combination ADR-106 closes unconditionally (decision 5). */
 function memoryMergeStore<Row>(): MergeStore<Row> & { rows: Row[] } {
   const rows: Row[] = [];
   return {
@@ -182,17 +182,17 @@ describe("definePipeline", () => {
       definePipeline("trace")
         .events({ spanReceived, topicAssigned })
         .id({ spanReceived: (d) => d.traceId, topicAssigned: (d) => d.traceId })
-        .withFold("traceSummary", (f) =>
-          f
-            .state(z.object({ spanIds: z.array(z.string()) }), () => ({ spanIds: [] }))
-            .on({
-              spanReceived: (state, data) => {
-                expectTypeOf(data).toEqualTypeOf<{ traceId: string; spanId: string }>();
-                return { spanIds: [...state.spanIds, data.spanId] };
-              },
-            })
-            .store(memoryReplaceStore()),
-        )
+        .withFold("traceSummary", {
+          state: z.object({ spanIds: z.array(z.string()) }),
+          init: () => ({ spanIds: [] }),
+          on: {
+            spanReceived: (state, data) => {
+              expectTypeOf(data).toEqualTypeOf<{ traceId: string; spanId: string }>();
+              return { spanIds: [...state.spanIds, data.spanId] };
+            },
+          },
+          store: memoryReplaceStore<{ spanIds: string[] }>(),
+        })
         .build();
 
     /** @scenario a fold's handler receives only the payload its own event key carries */
@@ -227,9 +227,10 @@ describe("definePipeline", () => {
       const store = memoryAppendStore<{ TraceId: string }>();
       const built = definePipeline("trace")
         .events({ spanReceived, topicAssigned })
-        .withMap("spanStorage", (m) =>
-          m.on({ spanReceived: (data) => ({ TraceId: data.traceId }) }).store(store),
-        )
+        .withMap("spanStorage", {
+          on: { spanReceived: (data) => ({ TraceId: data.traceId }) },
+          store,
+        })
         .build();
 
       await built.maps.spanStorage!.apply({
@@ -244,13 +245,13 @@ describe("definePipeline", () => {
       const calls: string[] = [];
       const built = definePipeline("trace")
         .events({ spanReceived, topicAssigned })
-        .withSubscriber("audit", (s) =>
-          s.on({
+        .withSubscriber("audit", {
+          on: {
             spanReceived: () => {
               calls.push("spanReceived");
             },
-          }),
-        )
+          },
+        })
         .build();
 
       await built.subscribers.audit!.handle(
@@ -266,20 +267,20 @@ describe("definePipeline", () => {
       const built = definePipeline("trace")
         .events({ spanReceived, topicAssigned })
         .id({ spanReceived: (d) => d.traceId, topicAssigned: (d) => d.traceId })
-        .withProcessManager("settlement", (pm) =>
-          pm
-            .state(z.object({ seen: z.number() }), () => ({ seen: 0 }))
-            .intents({
-              notifyDigest: {
-                payload: z.object({ traceId: z.string() }),
-                messageKey: (p) => `digest:${p.traceId}`,
-                deliver: (payload) => notifier.send(payload),
-              },
-            })
-            .on({
-              spanReceived: (state) => ({ state: { seen: state.seen + 1 }, intents: [], nextWakeAt: null }),
-            }),
-        )
+        .withProcessManager("settlement", {
+          state: z.object({ seen: z.number() }),
+          init: () => ({ seen: 0 }),
+          intents: {
+            notifyDigest: {
+              payload: z.object({ traceId: z.string() }),
+              messageKey: (p) => `digest:${p.traceId}`,
+              deliver: (payload) => notifier.send(payload),
+            },
+          },
+          on: {
+            spanReceived: (state) => ({ state: { seen: state.seen + 1 }, intents: [], nextWakeAt: null }),
+          },
+        })
         .build();
 
       const step = built.processManagers.settlement!.evolve(
@@ -296,23 +297,26 @@ describe("definePipeline", () => {
         definePipeline("trace")
           .events({ spanReceived })
           .id({ spanReceived: (d) => d.traceId })
-          .withFold("f", (f) =>
-            f.state(z.object({}), () => ({})).on({}).store(memoryReplaceStore()),
-          )
+          .withFold("f", {
+            state: z.object({}),
+            init: () => ({}),
+            on: {},
+            store: memoryReplaceStore<{}>(),
+          })
           .build(),
       ).toThrow(ConfigurationError);
 
       expect(() =>
         definePipeline("trace")
           .events({ spanReceived })
-          .withMap("m", (m) => m.on({}).store(memoryAppendStore()))
+          .withMap("m", { on: {}, store: memoryAppendStore() })
           .build(),
       ).toThrow(ConfigurationError);
 
       expect(() =>
         definePipeline("trace")
           .events({ spanReceived })
-          .withSubscriber("s", (s) => s.on({}))
+          .withSubscriber("s", { on: {} })
           .build(),
       ).toThrow(ConfigurationError);
 
@@ -320,18 +324,18 @@ describe("definePipeline", () => {
         definePipeline("trace")
           .events({ spanReceived })
           .id({ spanReceived: (d) => d.traceId })
-          .withProcessManager("pm", (pm) =>
-            pm
-              .state(z.object({}), () => ({}))
-              .intents({
-                notify: {
-                  payload: z.object({}),
-                  messageKey: () => "x",
-                  deliver: () => undefined,
-                },
-              })
-              .on({}),
-          )
+          .withProcessManager("pm", {
+            state: z.object({}),
+            init: () => ({}),
+            intents: {
+              notify: {
+                payload: z.object({}),
+                messageKey: () => "x",
+                deliver: () => undefined,
+              },
+            },
+            on: {},
+          })
           .build(),
       ).toThrow(ConfigurationError);
     });
@@ -344,17 +348,17 @@ describe("definePipeline", () => {
       definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withFold("f", (f) =>
-          f
-            .state(z.object({ n: z.number() }), () => ({ n: 0 }))
-            .on({
-              spanReceived: (...args) => {
-                receivedArgCount = args.length;
-                return { n: 1 };
-              },
-            })
-            .store(memoryReplaceStore()),
-        );
+        .withFold("f", {
+          state: z.object({ n: z.number() }),
+          init: () => ({ n: 0 }),
+          on: {
+            spanReceived: (...args) => {
+              receivedArgCount = args.length;
+              return { n: 1 };
+            },
+          },
+          store: memoryReplaceStore<{ n: number }>(),
+        });
       // The handler is only invoked once the fold actually applies an event —
       // asserted below via the arity captured at declaration time.
       expect(receivedArgCount).toBe(0);
@@ -365,9 +369,10 @@ describe("definePipeline", () => {
       const store = memoryAppendStore<{ ok: boolean }>();
       const built = definePipeline("trace")
         .events({ spanReceived })
-        .withMap("m", (m) =>
-          m.on({ spanReceived: (...args) => ({ ok: args.length === 1 }) }).store(store),
-        )
+        .withMap("m", {
+          on: { spanReceived: (...args) => ({ ok: args.length === 1 }) },
+          store,
+        })
         .build();
 
       await built.maps.m!.apply({
@@ -383,13 +388,14 @@ describe("definePipeline", () => {
       let seen: unknown;
       const built = definePipeline("trace")
         .events({ spanReceived })
-        .withCommand("recordSpan", (c) =>
-          c.input(spanReceived).handle(async (input, ctx) => {
+        .withCommand("recordSpan", {
+          input: spanReceived,
+          handle: async (input, ctx) => {
             notifier.send(input);
             seen = ctx;
             return [{ type: "spanReceived", data: input }];
-          }),
-        )
+          },
+        })
         .build();
 
       await built.commands.recordSpan!.handle({ traceId: "t", spanId: "s" }, ctx);
@@ -404,23 +410,23 @@ describe("definePipeline", () => {
       const built = definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withProcessManager("pm", (pm) =>
-          pm
-            .state(z.object({}), () => ({}))
-            .intents({
-              notify: {
-                payload: z.object({}),
-                messageKey: () => "x",
-                deliver: (payload) => notifier.send(payload),
-              },
-            })
-            .on({
-              spanReceived: (state, _data, ctx) => {
-                seen = ctx;
-                return { state, intents: [], nextWakeAt: null };
-              },
-            }),
-        )
+        .withProcessManager("pm", {
+          state: z.object({}),
+          init: () => ({}),
+          intents: {
+            notify: {
+              payload: z.object({}),
+              messageKey: () => "x",
+              deliver: (payload) => notifier.send(payload),
+            },
+          },
+          on: {
+            spanReceived: (state, _data, ctx) => {
+              seen = ctx;
+              return { state, intents: [], nextWakeAt: null };
+            },
+          },
+        })
         .build();
 
       built.processManagers.pm!.evolve(
@@ -436,13 +442,13 @@ describe("definePipeline", () => {
       let seen: unknown;
       const built = definePipeline("trace")
         .events({ spanReceived })
-        .withSubscriber("s", (s) =>
-          s.on({
+        .withSubscriber("s", {
+          on: {
             spanReceived: (_data, ctx) => {
               seen = ctx;
             },
-          }),
-        )
+          },
+        })
         .build();
 
       await built.subscribers.s!.handle(
@@ -458,9 +464,10 @@ describe("definePipeline", () => {
     it("stamps an emitted event with the pipeline's derived persisted type", async () => {
       const built = definePipeline("trace")
         .events({ spanReceived })
-        .withCommand("recordSpan", (c) =>
-          c.input(spanReceived).handle(async (input) => [{ type: "spanReceived", data: input }]),
-        )
+        .withCommand("recordSpan", {
+          input: spanReceived,
+          handle: async (input) => [{ type: "spanReceived", data: input }],
+        })
         .build();
 
       const events = await built.commands.recordSpan!.handle({ traceId: "t", spanId: "s" }, ctx);
@@ -471,12 +478,13 @@ describe("definePipeline", () => {
     it("emits every event a handler decides to return", async () => {
       const built = definePipeline("trace")
         .events({ spanReceived, topicAssigned })
-        .withCommand("recordSpan", (c) =>
-          c.input(spanReceived).handle(async (input) => [
+        .withCommand("recordSpan", {
+          input: spanReceived,
+          handle: async (input) => [
             { type: "spanReceived", data: input },
             { type: "topicAssigned", data: { traceId: input.traceId, topic: "unknown" } },
-          ]),
-        )
+          ],
+        })
         .build();
 
       const events = await built.commands.recordSpan!.handle({ traceId: "t", spanId: "s" }, ctx);
@@ -487,7 +495,7 @@ describe("definePipeline", () => {
     it("emits nothing when the handler decides nothing needs to happen", async () => {
       const built = definePipeline("trace")
         .events({ spanReceived })
-        .withCommand("recordSpan", (c) => c.input(spanReceived).handle(async () => []))
+        .withCommand("recordSpan", { input: spanReceived, handle: async () => [] })
         .build();
 
       expect(await built.commands.recordSpan!.handle({ traceId: "t", spanId: "s" }, ctx)).toEqual([]);
@@ -499,20 +507,20 @@ describe("definePipeline", () => {
       definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withProcessManager("settlement", (pm) =>
-          pm
-            .state(z.object({}), () => ({}))
-            .intents({
-              notifyDigest: {
-                payload: z.object({ traceId: z.string() }),
-                messageKey: (p) => `digest:${p.traceId}`,
-                deliver: (payload) => notifier.send(payload),
-              },
-            })
-            .on({
-              spanReceived: (state) => ({ state, intents: [], nextWakeAt: null }),
-            }),
-        )
+        .withProcessManager("settlement", {
+          state: z.object({}),
+          init: () => ({}),
+          intents: {
+            notifyDigest: {
+              payload: z.object({ traceId: z.string() }),
+              messageKey: (p) => `digest:${p.traceId}`,
+              deliver: (payload) => notifier.send(payload),
+            },
+          },
+          on: {
+            spanReceived: (state) => ({ state, intents: [], nextWakeAt: null }),
+          },
+        })
         .build();
 
     /** @scenario an intent's type is qualified by the process manager that declared it */
@@ -545,12 +553,12 @@ describe("definePipeline", () => {
         definePipeline("trace")
           .events({ spanReceived })
           .id({ spanReceived: (d) => d.traceId })
-          .withProcessManager("pm", (pm) =>
-            pm
-              .state(z.object({}), () => ({}))
-              .intents({})
-              .on({}),
-          ),
+          .withProcessManager("pm", {
+            state: z.object({}),
+            init: () => ({}),
+            intents: {},
+            on: {},
+          }),
       ).toThrow(ConfigurationError);
     });
   });
@@ -563,20 +571,20 @@ describe("definePipeline", () => {
       definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withProcessManager("pm", (pm) => {
-          const stated = pm
-            .state(z.object({ seen: z.number() }), () => ({ seen: 0 }))
-            .intents({
-              notify: { payload: z.object({}), messageKey: () => "x", deliver: () => undefined },
-            })
-            .on({
-              spanReceived: (state, _data, ctx) => ({
-                state,
-                intents: [],
-                nextWakeAt: handler(state, ctx).nextWakeAt,
-              }),
-            });
-          return enabled === undefined ? stated : stated.enabled(enabled);
+        .withProcessManager("pm", {
+          state: z.object({ seen: z.number() }),
+          init: () => ({ seen: 0 }),
+          intents: {
+            notify: { payload: z.object({}), messageKey: () => "x", deliver: () => undefined },
+          },
+          on: {
+            spanReceived: (state, _data, ctx) => ({
+              state,
+              intents: [],
+              nextWakeAt: handler(state, ctx).nextWakeAt,
+            }),
+          },
+          enabled,
         })
         .build();
 
@@ -603,13 +611,13 @@ describe("definePipeline", () => {
     });
 
     /** @scenario a process manager is enabled by default */
-    it("is enabled when .enabled is never called", () => {
+    it("is enabled when .enabled is never declared", () => {
       const built = buildPm(() => ({ nextWakeAt: null }));
       expect(built.processManagers.pm!.enabled).toBe(true);
     });
 
     /** @scenario a process manager can be gated off explicitly */
-    it("reports disabled when declared with .enabled(false)", () => {
+    it("reports disabled when declared with enabled: false", () => {
       const built = buildPm(() => ({ nextWakeAt: null }), false);
       expect(built.processManagers.pm!.enabled).toBe(false);
     });
@@ -622,17 +630,15 @@ describe("definePipeline", () => {
         definePipeline("trace")
           .events({ spanReceived })
           .id({ spanReceived: (d) => d.traceId })
-          .withFold("f", (f) =>
-            f
-              .state(
-                fieldOrder === "ab"
-                  ? z.object({ a: z.number(), b: z.string() })
-                  : z.object({ b: z.string(), a: z.number() }),
-                () => ({ a: 0, b: "" }),
-              )
-              .on({ spanReceived: (state) => state })
-              .store(memoryReplaceStore()),
-          )
+          .withFold("f", {
+            state:
+              fieldOrder === "ab"
+                ? z.object({ a: z.number(), b: z.string() })
+                : z.object({ b: z.string(), a: z.number() }),
+            init: () => ({ a: 0, b: "" }),
+            on: { spanReceived: (state) => state },
+            store: memoryReplaceStore<{ a: number; b: string }>(),
+          })
           .build();
 
       expect(build("ab").folds.f!.stateVersion).toBe(build("ba").folds.f!.stateVersion);
@@ -643,22 +649,22 @@ describe("definePipeline", () => {
       const before = definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withFold("f", (f) =>
-          f
-            .state(z.object({ a: z.number() }), () => ({ a: 0 }))
-            .on({ spanReceived: (state) => state })
-            .store(memoryReplaceStore()),
-        )
+        .withFold("f", {
+          state: z.object({ a: z.number() }),
+          init: () => ({ a: 0 }),
+          on: { spanReceived: (state) => state },
+          store: memoryReplaceStore<{ a: number }>(),
+        })
         .build();
       const after = definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withFold("f", (f) =>
-          f
-            .state(z.object({ a: z.number(), b: z.string() }), () => ({ a: 0, b: "" }))
-            .on({ spanReceived: (state) => state })
-            .store(memoryReplaceStore()),
-        )
+        .withFold("f", {
+          state: z.object({ a: z.number(), b: z.string() }),
+          init: () => ({ a: 0, b: "" }),
+          on: { spanReceived: (state) => state },
+          store: memoryReplaceStore<{ a: number; b: string }>(),
+        })
         .build();
 
       expect(before.folds.f!.stateVersion).not.toBe(after.folds.f!.stateVersion);
@@ -669,12 +675,13 @@ describe("definePipeline", () => {
       const built = definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withFold("f", (f) =>
-          f
-            .state(z.object({ a: z.number() }), () => ({ a: 0 }), "legacy-3")
-            .on({ spanReceived: (state) => state })
-            .store(memoryReplaceStore()),
-        )
+        .withFold("f", {
+          state: z.object({ a: z.number() }),
+          init: () => ({ a: 0 }),
+          pin: "legacy-3",
+          on: { spanReceived: (state) => state },
+          store: memoryReplaceStore<{ a: number }>(),
+        })
         .build();
 
       expect(built.folds.f!.stateVersion).toBe("legacy-3");
@@ -689,14 +696,14 @@ describe("definePipeline", () => {
       const built = definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withFold("f", (f) =>
-          f
-            .state(z.object({ spanIds: z.array(z.string()) }), () => ({ spanIds: [] }))
-            .on({
-              spanReceived: (state, data) => ({ spanIds: [...state.spanIds, data.spanId] }),
-            })
-            .store(store),
-        )
+        .withFold("f", {
+          state: z.object({ spanIds: z.array(z.string()) }),
+          init: () => ({ spanIds: [] }),
+          on: {
+            spanReceived: (state, data) => ({ spanIds: [...state.spanIds, data.spanId] }),
+          },
+          store,
+        })
         .build();
 
       const original = { spanIds: ["existing"] };
@@ -719,8 +726,11 @@ describe("definePipeline", () => {
       expect(() =>
         definePipeline("trace")
           .events({ spanReceived })
-          .withMap("shared", (m) => m.on({ spanReceived: (d) => ({ id: d.traceId }) }).store(memoryAppendStore()))
-          .withSubscriber("shared", (s) => s.on({ spanReceived: () => undefined })),
+          .withMap("shared", {
+            on: { spanReceived: (d) => ({ id: d.traceId }) },
+            store: memoryAppendStore(),
+          })
+          .withSubscriber("shared", { on: { spanReceived: () => undefined } }),
       ).toThrow(ConfigurationError);
     });
   });
@@ -751,14 +761,14 @@ describe("definePipeline", () => {
         definePipeline("trace")
           .events({ spanReceived })
           .id({ spanReceived: (d) => d.traceId })
-          .withProcessManager("pm", (pm) =>
-            pm
-              .state(z.object({}), () => ({}))
-              .intents({
-                "bad/key": { payload: z.object({}), messageKey: () => "x", deliver: () => undefined },
-              })
-              .on({}),
-          ),
+          .withProcessManager("pm", {
+            state: z.object({}),
+            init: () => ({}),
+            intents: {
+              "bad/key": { payload: z.object({}), messageKey: () => "x", deliver: () => undefined },
+            },
+            on: {},
+          }),
       ).toThrow(ConfigurationError);
     });
   });
@@ -767,15 +777,10 @@ describe("definePipeline", () => {
     /** @scenario mounting a process manager without a preceding .id is refused */
     it("refuses a process manager force-mounted before .id", () => {
       const chain = definePipeline("trace").events({ spanReceived }) as unknown as {
-        withProcessManager: (
-          name: string,
-          builder: (pm: unknown) => unknown,
-        ) => unknown;
+        withProcessManager: (name: string, record: unknown) => unknown;
       };
 
-      expect(() =>
-        chain.withProcessManager("pm", (pm) => pm),
-      ).toThrow(ConfigurationError);
+      expect(() => chain.withProcessManager("pm", {})).toThrow(ConfigurationError);
     });
   });
 
@@ -786,12 +791,12 @@ describe("definePipeline", () => {
         definePipeline("trace")
           .events({ spanReceived })
           .id({ spanReceived: (d) => d.traceId })
-          .withFold("summary", (f) =>
-            f
-              .state(z.object({ n: z.number() }), () => ({ n: 0 }))
-              .on({ spanReceived: (state) => state })
-              .store(memoryReplaceStore()),
-          )
+          .withFold("summary", {
+            state: z.object({ n: z.number() }),
+            init: () => ({ n: 0 }),
+            on: { spanReceived: (state) => state },
+            store: memoryReplaceStore<{ n: number }>(),
+          })
           .build(),
       ).not.toThrow();
     });
@@ -800,9 +805,10 @@ describe("definePipeline", () => {
       expect(() =>
         definePipeline("trace")
           .events({ spanReceived })
-          .withMap("spans", (m) =>
-            m.on({ spanReceived: (d) => ({ id: d.spanId }) }).store(memoryAppendStore()),
-          )
+          .withMap("spans", {
+            on: { spanReceived: (d) => ({ id: d.spanId }) },
+            store: memoryAppendStore(),
+          })
           .build(),
       ).not.toThrow();
     });
@@ -813,9 +819,10 @@ describe("definePipeline", () => {
       try {
         definePipeline("trace")
           .events({ spanReceived })
-          .withMap("rollup", (m) =>
-            m.on({ spanReceived: (d) => ({ id: d.spanId }) }).store(memoryMergeStore()),
-          )
+          .withMap("rollup", {
+            on: { spanReceived: (d) => ({ id: d.spanId }) },
+            store: memoryMergeStore(),
+          })
           .build();
       } catch (error) {
         caught = error;
@@ -833,12 +840,14 @@ describe("definePipeline", () => {
       try {
         definePipeline("trace")
           .events({ spanReceived })
-          .withMap("rollupA", (m) =>
-            m.on({ spanReceived: (d) => ({ id: d.spanId }) }).store(memoryMergeStore()),
-          )
-          .withMap("rollupB", (m) =>
-            m.on({ spanReceived: (d) => ({ id: d.spanId }) }).store(memoryMergeStore()),
-          )
+          .withMap("rollupA", {
+            on: { spanReceived: (d) => ({ id: d.spanId }) },
+            store: memoryMergeStore(),
+          })
+          .withMap("rollupB", {
+            on: { spanReceived: (d) => ({ id: d.spanId }) },
+            store: memoryMergeStore(),
+          })
           .build();
       } catch (error) {
         caught = error;
@@ -855,12 +864,12 @@ describe("definePipeline", () => {
       const built = definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withFold("summary", (f) =>
-          f
-            .state(z.object({ n: z.number() }), () => ({ n: 0 }))
-            .on({ spanReceived: (state) => ({ n: state.n + 1 }) })
-            .store(memoryReplaceStore()),
-        )
+        .withFold("summary", {
+          state: z.object({ n: z.number() }),
+          init: () => ({ n: 0 }),
+          on: { spanReceived: (state) => ({ n: state.n + 1 }) },
+          store: memoryReplaceStore<{ n: number }>(),
+        })
         .build({ metrics });
 
       await built.folds.summary!.apply({
@@ -880,9 +889,10 @@ describe("definePipeline", () => {
       const metrics = fakeMetrics();
       const built = definePipeline("trace")
         .events({ spanReceived })
-        .withMap("spans", (m) =>
-          m.on({ spanReceived: (d) => ({ id: d.spanId }) }).store(memoryAppendStore()),
-        )
+        .withMap("spans", {
+          on: { spanReceived: (d) => ({ id: d.spanId }) },
+          store: memoryAppendStore(),
+        })
         .build({ metrics });
 
       await built.maps.spans!.apply({
@@ -901,12 +911,12 @@ describe("definePipeline", () => {
       const built = definePipeline("trace")
         .events({ spanReceived })
         .id({ spanReceived: (d) => d.traceId })
-        .withFold("summary", (f) =>
-          f
-            .state(z.object({ n: z.number() }), () => ({ n: 0 }))
-            .on({ spanReceived: (state) => state })
-            .store(memoryReplaceStore()),
-        )
+        .withFold("summary", {
+          state: z.object({ n: z.number() }),
+          init: () => ({ n: 0 }),
+          on: { spanReceived: (state) => state },
+          store: memoryReplaceStore<{ n: number }>(),
+        })
         .build();
 
       await expect(

@@ -1,11 +1,9 @@
-import {
-  defineFoldProjection,
-  deriveStateVersion,
-} from "@langwatch/event-sourcing";
 import { z } from "zod";
-import { topicClustering } from "../aggregate";
 import { isManualRun, runRank } from "../runIdentity";
 import {
+  type RunCompletedData,
+  type RunFailedData,
+  type RunStartedData,
   type TopicClusteringRunMode,
   type TopicClusteringSkipReason,
   topicClusteringRunModeSchema,
@@ -94,54 +92,59 @@ function withRun(
   };
 }
 
-export const topicClusteringRunHistory = defineFoldProjection({
-  name: "topicClusteringRunHistory",
-  aggregate: topicClustering,
-  version: deriveStateVersion(runHistoryStateSchema),
-  init: initRunHistoryState,
-  handle: {
-    // Opens the entry on its first observed announcement; later pages of the
-    // same run leave it alone.
-    runStarted: (state, data) => withRun(state, data.runId, (entry) => entry),
+/** Opens the entry on its first observed announcement; later pages of the same
+ * run leave it alone. */
+export function handleRunStarted(
+  state: RunHistoryState,
+  data: RunStartedData,
+): RunHistoryState {
+  return withRun(state, data.runId, (entry) => entry);
+}
 
-    runCompleted: (state, data) =>
-      withRun(state, data.runId, (entry) => {
-        const pages = { ...entry.pages, [data.page]: data.tracesProcessed };
-        if (data.nextSearchAfter !== undefined) return { ...entry, pages };
-        return {
-          ...entry,
-          pages,
-          terminal: entry.terminal ?? {
-            failed: false,
-            finishedAt: data.occurredAt,
-            mode: data.mode,
-            skippedReason: data.skippedReason ?? null,
-            errorCode: null,
-            isErrorUserActionable: false,
-            topicsCount: data.topicsCount,
-            subtopicsCount: data.subtopicsCount,
-          },
-        };
-      }),
+export function handleRunCompleted(
+  state: RunHistoryState,
+  data: RunCompletedData,
+): RunHistoryState {
+  return withRun(state, data.runId, (entry) => {
+    const pages = { ...entry.pages, [data.page]: data.tracesProcessed };
+    if (data.nextSearchAfter !== undefined) return { ...entry, pages };
+    return {
+      ...entry,
+      pages,
+      terminal: entry.terminal ?? {
+        failed: false,
+        finishedAt: data.occurredAt,
+        mode: data.mode,
+        skippedReason: data.skippedReason ?? null,
+        errorCode: null,
+        isErrorUserActionable: false,
+        topicsCount: data.topicsCount,
+        subtopicsCount: data.subtopicsCount,
+      },
+    };
+  });
+}
 
-    runFailed: (state, data) =>
-      withRun(state, data.runId, (entry) => ({
-        ...entry,
-        terminal: entry.terminal ?? {
-          failed: true,
-          finishedAt: data.occurredAt,
-          mode: null,
-          skippedReason: null,
-          errorCode: data.errorCode ?? null,
-          isErrorUserActionable: data.isUserActionable ?? false,
-          // A failed run produced no usable counts, and history must never
-          // disagree with status about the same run.
-          topicsCount: 0,
-          subtopicsCount: 0,
-        },
-      })),
-  },
-});
+export function handleRunFailed(
+  state: RunHistoryState,
+  data: RunFailedData,
+): RunHistoryState {
+  return withRun(state, data.runId, (entry) => ({
+    ...entry,
+    terminal: entry.terminal ?? {
+      failed: true,
+      finishedAt: data.occurredAt,
+      mode: null,
+      skippedReason: null,
+      errorCode: data.errorCode ?? null,
+      isErrorUserActionable: data.isUserActionable ?? false,
+      // A failed run produced no usable counts, and history must never disagree
+      // with status about the same run.
+      topicsCount: 0,
+      subtopicsCount: 0,
+    },
+  }));
+}
 
 export type RunHistoryOutcome =
   | "running"

@@ -2,7 +2,8 @@
  * Typed error thrown by outbox dispatch endpoints to signal whether the
  * failure is worth retrying.
  *
- * See dev/docs/adr/027-typed-dispatcherror-contract.md.
+ * ADR-027 defined this contract and is retired; the handled-error boundary
+ * that now owns this ground is dev/docs/adr/045-domain-errors-handled-boundary.md.
  *
  * Dispatch endpoints (alert dispatch, dataset append, etc.) should
  * catch provider/transport errors and re-throw as DispatchError with

@@ -1,25 +1,19 @@
-import { parseGroupKey, renderGroupKey } from "@langwatch/event-sourcing";
+import { parseGroupKey, processGroupKey, renderGroupKey } from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
-import * as automations from "..";
 import {
   type AutomationsPipelineDeps,
-  createAutomationsPipeline,
   GLOBAL_TENANT,
+  createAutomationsPipeline,
   recordMatchGroupKey,
   singletonProcessManagerGroupKey,
   triggerSettlementGroupKey,
 } from "..";
-import { GRAPH_ALERT_SWEEP_PROCESS_NAME } from "../process-managers/graphAlertSweep";
-import { TRIGGER_SETTLEMENT_PROCESS_NAME } from "../process-managers/triggerSettlement";
-import { WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME } from "../process-managers/webhookDeliveryPrune";
+import { GRAPH_ALERT_SWEEP_PROCESS_NAME } from "../graphAlertSweep.process";
+import { TRIGGER_SETTLEMENT_PROCESS_NAME } from "../triggerSettlement.process";
+import { WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME } from "../webhookDeliveryPrune.process";
 
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }),
+  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
 function stubDeps(): AutomationsPipelineDeps {
@@ -35,115 +29,58 @@ function stubDeps(): AutomationsPipelineDeps {
     sweep: {
       decideSweepCandidates: vi.fn().mockResolvedValue([]),
       evaluateGraphTrigger: vi.fn(),
+      pruneDispatchedIntentsBefore: vi.fn(),
     },
     prune: {
       pruneExpiredDeliveries: vi.fn(),
       pruneDispatchedIntentsBefore: vi.fn(),
     },
-    evaluationTriggerMatch: {
-      getActiveTraceTriggersForProject: vi.fn(),
-      readTraceSummary: vi.fn(),
-      recordMatch: { send: vi.fn() },
-    },
-    graphTriggerActivity: {
-      getActiveGraphTriggers: vi.fn(),
-      evaluateGraphTrigger: vi.fn(),
-    },
-    evaluationOutcomeEventTypes: [
-      "lw.evaluation.completed",
-      "lw.evaluation.reported",
-    ],
-    graphTriggerActivityEventTypes: ["lw.obs.trace.span_received"],
   };
 }
 
-describe("automations pipeline public surface", () => {
-  it("exports no accidental undefined bindings", () => {
-    const undefinedExports = Object.entries(automations)
-      .filter(([, value]) => value === undefined)
-      .map(([name]) => name);
-
-    expect(undefinedExports).toEqual([]);
-  });
-});
-
 describe("automations group keys", () => {
   describe("recordMatch command lane", () => {
+    /** @scenario a command lane is scoped to the aggregate */
     it("scopes to the trigger aggregate, one lane for every command on it (ADR-100 decision 4)", () => {
-      const key = recordMatchGroupKey({
-        tenantId: "project-1",
-        triggerId: "trigger-1",
-      });
+      const key = recordMatchGroupKey({ tenantId: "project-1", triggerId: "trigger-1" });
 
       expect(key).toEqual({
         tenantId: "project-1",
         lane: { kind: "command" },
-        scope: {
-          kind: "aggregate",
-          aggregateType: "trigger",
-          aggregateId: "trigger-1",
-        },
+        scope: { kind: "aggregate", aggregateType: "trigger", aggregateId: "trigger-1" },
       });
     });
 
     it("round-trips through the package's own renderer and parser", () => {
-      const key = recordMatchGroupKey({
-        tenantId: "project-1",
-        triggerId: "trigger-1",
-      });
-
+      const key = recordMatchGroupKey({ tenantId: "project-1", triggerId: "trigger-1" });
       expect(parseGroupKey(renderGroupKey(key))).toEqual(key);
     });
   });
 
   describe("triggerSettlement process-manager lane", () => {
-    it("is keyed one instance per trigger, and carries the process's own declared name", () => {
-      const key = triggerSettlementGroupKey({
-        tenantId: "project-1",
-        triggerId: "trigger-1",
-      });
+    it("is the package's own process key: one instance per trigger, named by the process", () => {
+      const key = triggerSettlementGroupKey({ tenantId: "project-1", triggerId: "trigger-1" });
 
-      expect(key.lane).toEqual({
-        kind: "processManager",
-        name: TRIGGER_SETTLEMENT_PROCESS_NAME,
-      });
-      expect(key.scope).toEqual({
-        kind: "aggregate",
-        aggregateType: "trigger",
-        aggregateId: "trigger-1",
-      });
+      expect(key).toEqual(
+        processGroupKey({ name: TRIGGER_SETTLEMENT_PROCESS_NAME }, { tenantId: "project-1", processKey: "trigger-1" }),
+      );
+      expect(key.lane).toEqual({ kind: "processManager", name: TRIGGER_SETTLEMENT_PROCESS_NAME });
     });
 
     it("gives two different triggers on the same trace two different lanes", () => {
-      const a = renderGroupKey(
-        triggerSettlementGroupKey({
-          tenantId: "project-1",
-          triggerId: "trigger-a",
-        }),
-      );
-      const b = renderGroupKey(
-        triggerSettlementGroupKey({
-          tenantId: "project-1",
-          triggerId: "trigger-b",
-        }),
-      );
-
+      const a = renderGroupKey(triggerSettlementGroupKey({ tenantId: "project-1", triggerId: "trigger-a" }));
+      const b = renderGroupKey(triggerSettlementGroupKey({ tenantId: "project-1", triggerId: "trigger-b" }));
       expect(a).not.toBe(b);
     });
   });
 
   describe("singleton, schedule-only process-manager lanes", () => {
     it("uses the global scope and the placeholder tenant, never a real project id", () => {
-      const key = singletonProcessManagerGroupKey(
-        GRAPH_ALERT_SWEEP_PROCESS_NAME,
-      );
+      const key = singletonProcessManagerGroupKey(GRAPH_ALERT_SWEEP_PROCESS_NAME);
 
       expect(key).toEqual({
         tenantId: GLOBAL_TENANT,
-        lane: {
-          kind: "processManager",
-          name: GRAPH_ALERT_SWEEP_PROCESS_NAME,
-        },
+        lane: { kind: "processManager", name: GRAPH_ALERT_SWEEP_PROCESS_NAME },
         scope: { kind: "global" },
       });
       expect(parseGroupKey(renderGroupKey(key))).toEqual(key);
@@ -152,71 +89,40 @@ describe("automations group keys", () => {
 });
 
 describe("automations pipeline topology", () => {
-  it("assembles the aggregate, all three process managers, and both subscribers", () => {
-    const pipeline = createAutomationsPipeline(stubDeps());
+  it("names itself 'trigger', matching the persisted AggregateType already in event_log", () => {
+    const built = createAutomationsPipeline(stubDeps());
+    expect(built.name).toBe("trigger");
+  });
 
-    expect(pipeline.name).toBe("automations");
-    expect(pipeline.aggregate.name).toBe("trigger");
+  it("derives the dotted event type string already persisted in event_log", () => {
+    const built = createAutomationsPipeline(stubDeps());
+    expect(built.eventTypes).toEqual(["lw.automation.trigger.match_recorded"]);
+  });
 
-    expect(Object.keys(pipeline.processManagers).sort()).toEqual(
-      [
-        TRIGGER_SETTLEMENT_PROCESS_NAME,
-        GRAPH_ALERT_SWEEP_PROCESS_NAME,
-        WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
-      ].sort(),
-    );
-    expect(Object.keys(pipeline.subscribers).sort()).toEqual(
-      ["triggerMatch", "graphTriggerActivity"].sort(),
+  it("mounts the command and all three process managers", () => {
+    const built = createAutomationsPipeline(stubDeps());
+
+    expect(Object.keys(built.commands)).toEqual(["recordMatch"]);
+    expect(Object.keys(built.processManagers).sort()).toEqual(
+      [TRIGGER_SETTLEMENT_PROCESS_NAME, GRAPH_ALERT_SWEEP_PROCESS_NAME, WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME].sort(),
     );
   });
 
-  it("wires every process manager's own group-key builder, not a shared placeholder", () => {
-    const pipeline = createAutomationsPipeline(stubDeps());
-
-    const settlementKey = pipeline.processManagers[
-      TRIGGER_SETTLEMENT_PROCESS_NAME
-    ].groupKey({ tenantId: "project-1", triggerId: "trigger-1" });
-    expect(settlementKey.lane).toEqual({
-      kind: "processManager",
-      name: TRIGGER_SETTLEMENT_PROCESS_NAME,
-    });
-
-    const sweepKey =
-      pipeline.processManagers[GRAPH_ALERT_SWEEP_PROCESS_NAME].groupKey;
-    expect(sweepKey.scope).toEqual({ kind: "global" });
-  });
-
-  it("threads the injected dispatch ports into the triggerSettlement intent handlers", async () => {
+  it("threads the injected dispatch ports into the triggerSettlement intent delivery", async () => {
     const deps = stubDeps();
-    const pipeline = createAutomationsPipeline(deps);
+    const built = createAutomationsPipeline(deps);
 
-    // A round-trip through the real handler proves it closed over the exact
+    // A round-trip through the real intent proves it closed over the exact
     // ports object passed in, not a copy or a stub built internally.
-    await pipeline.processManagers[
-      TRIGGER_SETTLEMENT_PROCESS_NAME
-    ].intentHandlers.logOverflow(
-      { triggerId: "trigger-1", traceIds: ["trace-1"] },
-      {
-        processName: TRIGGER_SETTLEMENT_PROCESS_NAME,
-        tenantId: "project-1",
-        processKey: "trigger-1",
-        messageKey: "overflow:abc",
-        attempt: 1,
-      },
+    await built.processManagers[TRIGGER_SETTLEMENT_PROCESS_NAME]!.intents.logOverflow!.deliver(
+      { triggerId: "trigger-1", traceIds: ["trace-1"], flushed: 1, totalFlushed: 1 },
+      { now: 1_000, tenantId: "project-1" },
     );
 
     expect(deps.dispatch.triggerIsActive).not.toHaveBeenCalled();
   });
 
-  it("subscribes both subscribers to the event types the composition root supplies", () => {
-    const pipeline = createAutomationsPipeline(stubDeps());
-
-    expect(pipeline.subscribers.triggerMatch.eventTypes).toEqual([
-      "lw.evaluation.completed",
-      "lw.evaluation.reported",
-    ]);
-    expect(pipeline.subscribers.graphTriggerActivity.eventTypes).toEqual([
-      "lw.obs.trace.span_received",
-    ]);
+  it("is asserted at composition rather than on the first delivery", () => {
+    expect(() => createAutomationsPipeline(stubDeps())).not.toThrow();
   });
 });

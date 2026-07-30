@@ -35,7 +35,7 @@ export interface VirtualKeyLastUsedSubscriberDeps {
  * Total, non-throwing enqueue predicate: does this raw span carry a virtual
  * key marker?
  *
- * ADR-069 gives the enqueue seam no retry, so a throw here permanently loses
+ * ADR-069 (retired; ground now ADR-098) gives the enqueue seam no retry, so a throw here permanently loses
  * the job rather than reading as "not relevant" — which is why the scan it
  * delegates to reads the RAW OTLP attribute list with array guards and
  * equality checks only, no decoding and no normalization.
@@ -59,7 +59,7 @@ export function spanCarriesVirtualKeyMarker(
 }
 
 /**
- * ADR-075 Class C (the split half): touch `VirtualKey.lastUsedAt` when a
+ * ADR-075 Class C (retired; ground now ADR-098) (the split half): touch `VirtualKey.lastUsedAt` when a
  * gateway span lands.
  *
  * The reactor this comes from did two unrelated things. Writing the budget

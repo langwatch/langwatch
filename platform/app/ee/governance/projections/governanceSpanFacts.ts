@@ -2,7 +2,7 @@
 
 /**
  * The governance gate, shared by both governance projections (ADR-075
- * Class C).
+ * Class C, retired; ground now ADR-098).
  *
  * Governance ingest is identified by attributes the RECEIVER stamps on
  * every span it accepts (`langwatch/src/server/routes/ingest/ingestionRoutes.ts`
@@ -35,7 +35,8 @@
  *    produces the identity every governance row is keyed by.
  *
  * Spec: specs/ai-gateway/governance/folds.feature
- * ADR:  dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md
+ * ADR:  dev/docs/adr/098-event-sourcing-core.md (successor to the retired
+ *       ADR-075)
  */
 
 import {

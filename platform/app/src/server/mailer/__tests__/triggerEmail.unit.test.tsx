@@ -331,7 +331,8 @@ describe("sendTriggerEmail", () => {
       expect((err as DispatchError).retryable).toBe(true);
     });
 
-    // A socket timeout carries no HTTP status at all. ADR-027 makes the unknown
+    // A socket timeout carries no HTTP status at all. ADR-027 (retired;
+    // ground now ADR-045) makes the unknown
     // case retryable on purpose: dead-lettering an alert we never classified is
     // worse than paying for the retries.
     it("classifies a transport timeout with no status as retryable", async () => {

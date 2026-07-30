@@ -1,9 +1,11 @@
 /**
- * Unit tests for the ADR-075 Class C split: the half of `gatewayBudgetSync`
- * that is a best-effort Prisma side effect rather than derived state.
+ * Unit tests for the ADR-075 Class C (retired; ground now ADR-098) split:
+ * the half of `gatewayBudgetSync` that is a best-effort Prisma side effect
+ * rather than derived state.
  *
  * Two things are load-bearing. The enqueue filter has to be TOTAL — ADR-069
- * gives it no retry, so a throw there permanently loses the job rather than
+ * (retired; ground now ADR-098) gives it no retry, so a throw there
+ * permanently loses the job rather than
  * reading as "not relevant". And the handler has to stay silent on failure:
  * this lane carries nothing worth wedging a queue over.
  */

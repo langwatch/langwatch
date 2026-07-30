@@ -1,7 +1,7 @@
 /**
  * Unit tests for the scheduled blob-cleanup sweep — driven directly off
- * `runBlobCleanup`'s clock and its `sweep`/`recordTick` ports, never off an
- * event, since the pipeline carries none.
+ * `createBlobCleanupMount`'s clock and its `sweep`/`recordTick` ports, never
+ * off an event, since the pipeline carries none.
  *
  * @see specs/event-sourcing/blob-cleanup-sweep.feature
  */
@@ -27,7 +27,6 @@ import {
   type BlobCleanupDeps,
   type BlobSweepOutcome,
   createBlobCleanupMount,
-  runBlobCleanup,
 } from "..";
 
 function outcome(overrides: Partial<BlobSweepOutcome> = {}): BlobSweepOutcome {
@@ -56,17 +55,23 @@ function makeDeps(overrides: Partial<BlobCleanupDeps> = {}): MockedDeps {
 }
 
 function makeMetrics() {
-  const inc = vi.fn();
+  const counters = new Map<string, { inc: ReturnType<typeof vi.fn> }>();
   return {
     metrics: {
-      counter: vi.fn().mockReturnValue({ inc }),
+      counter: vi.fn(({ name }: { name: string }) => {
+        const existing = counters.get(name);
+        if (existing) return existing;
+        const created = { inc: vi.fn() };
+        counters.set(name, created);
+        return created;
+      }),
       histogram: vi.fn().mockReturnValue({ observe: vi.fn() }),
     },
-    inc,
+    counterFor: (name: string) => counters.get(name),
   };
 }
 
-describe("runBlobCleanup", () => {
+describe("the blob-cleanup sweep tick", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -78,7 +83,7 @@ describe("runBlobCleanup", () => {
         sweep: vi.fn().mockResolvedValue(outcome({ scanned: 9, reclaimed: 3 })),
       });
 
-      await runBlobCleanup(deps)();
+      await createBlobCleanupMount(deps).run();
 
       expect(deps.sweep).toHaveBeenCalledOnce();
       expect(deps.recordTick).toHaveBeenCalledOnce();
@@ -94,7 +99,7 @@ describe("runBlobCleanup", () => {
           .mockResolvedValue(outcome({ scanned: 50_000, truncated: true })),
       });
 
-      await expect(runBlobCleanup(deps)()).resolves.toBeUndefined();
+      await expect(createBlobCleanupMount(deps).run()).resolves.toBeUndefined();
       // Truncation looks exactly like a healthy sweep in the reclaim/repair
       // totals, so it must be visible on its own line rather than folded
       // silently into a "tick succeeded" report.
@@ -115,23 +120,26 @@ describe("runBlobCleanup", () => {
 
     /** @scenario "Candidate failures are counted on the same metric as successes" */
     it("counts both the succeeded and the failed blobs on one metric", async () => {
-      const { metrics, inc } = makeMetrics();
+      const { metrics, counterFor } = makeMetrics();
       const d = deps();
 
-      await expect(runBlobCleanup({ ...d, metrics })()).rejects.toThrow();
+      await expect(
+        createBlobCleanupMount({ ...d, metrics }).run(),
+      ).rejects.toThrow();
 
-      expect(metrics.counter).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "es_blob_cleanup_candidates_total" }),
-      );
-      expect(inc).toHaveBeenCalledWith({ outcome: "success" }, 6);
-      expect(inc).toHaveBeenCalledWith({ outcome: "failure" }, 4);
+      expect(
+        counterFor("es_blob_cleanup_items_total")?.inc,
+      ).toHaveBeenCalledWith({ outcome: "success" }, 6);
+      expect(
+        counterFor("es_blob_cleanup_items_total")?.inc,
+      ).toHaveBeenCalledWith({ outcome: "failure" }, 4);
     });
 
     /** @scenario "A tick with any candidate failures is retried" */
     it("raises so the whole tick is retried", async () => {
       const d = deps();
 
-      await expect(runBlobCleanup(d)()).rejects.toThrow(
+      await expect(createBlobCleanupMount(d).run()).rejects.toThrow(
         /failed to evaluate 4 of 10/,
       );
 
@@ -148,7 +156,9 @@ describe("runBlobCleanup", () => {
         sweep: vi.fn().mockRejectedValue(new Error("redis unavailable")),
       });
 
-      await expect(runBlobCleanup(deps)()).rejects.toThrow("redis unavailable");
+      await expect(createBlobCleanupMount(deps).run()).rejects.toThrow(
+        "redis unavailable",
+      );
 
       expect(deps.recordTick).toHaveBeenCalledOnce();
     });
@@ -164,7 +174,7 @@ describe("runBlobCleanup", () => {
           .mockRejectedValue(new Error("bookkeeping store unavailable")),
       });
 
-      await expect(runBlobCleanup(deps)()).resolves.toBeUndefined();
+      await expect(createBlobCleanupMount(deps).run()).resolves.toBeUndefined();
     });
   });
 
@@ -178,25 +188,27 @@ describe("runBlobCleanup", () => {
           .mockRejectedValue(new Error("bookkeeping store unavailable")),
       });
 
-      await expect(runBlobCleanup(deps)()).rejects.toThrow("redis unavailable");
+      await expect(createBlobCleanupMount(deps).run()).rejects.toThrow(
+        "redis unavailable",
+      );
       expect(deps.recordTick).toHaveBeenCalledOnce();
     });
   });
-});
 
-describe("createBlobCleanupMount", () => {
-  /** @scenario "The mount carries the five-minute interval and runs the same sweep logic" */
-  it("names itself, carries the interval, and runs the same sweep through run()", async () => {
-    const deps = makeDeps({
-      sweep: vi.fn().mockResolvedValue(outcome({ scanned: 1, reclaimed: 1 })),
+  describe("createBlobCleanupMount", () => {
+    /** @scenario "The mount carries the five-minute interval and runs the same sweep logic" */
+    it("names itself, carries the interval, and runs the same sweep through run()", async () => {
+      const deps = makeDeps({
+        sweep: vi.fn().mockResolvedValue(outcome({ scanned: 1, reclaimed: 1 })),
+      });
+      const mount = createBlobCleanupMount(deps);
+
+      expect(mount.name).toBe(BLOB_CLEANUP_NAME);
+      expect(mount.intervalMs).toBe(5 * 60 * 1000);
+
+      await mount.run();
+
+      expect(deps.sweep).toHaveBeenCalledOnce();
     });
-    const mount = createBlobCleanupMount(deps);
-
-    expect(mount.name).toBe(BLOB_CLEANUP_NAME);
-    expect(mount.intervalMs).toBe(5 * 60 * 1000);
-
-    await mount.run();
-
-    expect(deps.sweep).toHaveBeenCalledOnce();
   });
 });

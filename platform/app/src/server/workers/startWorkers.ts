@@ -61,7 +61,7 @@ async function bootStorageStatsCollection(
 // Scenario simulation executor: the registry of child processes this worker
 // holds, late-bound into the `scenarioExecution` process outbox. Until it is
 // bound, dispatches for this worker stay pending and are retried rather than
-// dropped (ADR-073 step 2).
+// dropped (ADR-073 step 2, retired; ground now ADR-103).
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
@@ -251,7 +251,7 @@ export async function startWorkers(
   try {
     // Ingestion pulls self-drive through durable process wakes and the
     // transactional process outbox; there is no BullMQ worker to boot.
-    // Topic clustering self-drives (ADR-051): the process wake worker and
+    // Topic clustering self-drives (ADR-051, retired; ground now ADR-098): the process wake worker and
     // process outbox in the event-sourcing runtime own scheduling and
     // execution; there is no BullMQ worker to boot.
     await bootStorageStatsCollection(shutdownHandles);

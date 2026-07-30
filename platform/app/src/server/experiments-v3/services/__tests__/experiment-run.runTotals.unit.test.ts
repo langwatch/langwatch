@@ -1,5 +1,6 @@
 /**
- * The run's totals are derived the same way its items are (ADR-072).
+ * The run's totals are derived the same way its items are (ADR-072, retired;
+ * ground now ADR-103).
  *
  * `getRun` prices a cost-less target item from the trace it produced, so the
  * dataset table shows a figure per row. The run total the footer adds up comes

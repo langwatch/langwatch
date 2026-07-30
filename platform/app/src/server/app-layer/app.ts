@@ -51,6 +51,7 @@ export class App {
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
   readonly sharedTraceCache: AppDependencies["sharedTraceCache"];
+  readonly newClickHouseClient: AppDependencies["newClickHouseClient"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
@@ -58,6 +59,11 @@ export class App {
   get eventSourcing(): EventSourcing | undefined {
     return this._eventSourcing;
   }
+
+  /** ADR-104: the one client, for callers outside the composition root. */
+  resolveClickHouseClient = (tenantId: string) =>
+    this.newClickHouseClient.resolveClient(tenantId);
+
   private readonly _gracefulCloseables: Array<{
     name: string;
     close: () => Promise<void>;
@@ -104,6 +110,7 @@ export class App {
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;
     this.sharedTraceCache = deps.sharedTraceCache;
+    this.newClickHouseClient = deps.newClickHouseClient;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }

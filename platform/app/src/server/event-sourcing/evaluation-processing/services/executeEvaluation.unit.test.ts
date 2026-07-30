@@ -150,7 +150,8 @@ describe("executeEvaluation", () => {
      * customer-fixable or not, into a permanent `reported` event with
      * `status: "error"` — manufacturing false finality for a failure a retry
      * might have fixed. This function must re-throw instead, so the caller's
-     * at-least-once redelivery (ADR-075's leased-outbox process manager, one
+     * at-least-once redelivery (ADR-075's, retired, ground now ADR-098,
+     * leased-outbox process manager, one
      * layer up) gets the chance the old code silently denied it.
      * @scenario "A genuine evaluator failure surfaces for the caller to retry, never recorded as done"
      */

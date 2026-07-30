@@ -339,7 +339,8 @@ function ClusteringStatusCard({
 
 /**
  * What one history row says about its run, in the customer's terms. The
- * server never sends raw error text (ADR-051 §8) — a failed run's detail is
+ * server never sends raw error text (ADR-051 §8, retired; ground now
+ * ADR-098) — a failed run's detail is
  * the same fixed guidance the status card uses.
  */
 function runDetail(run: {

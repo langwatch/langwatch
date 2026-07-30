@@ -91,9 +91,33 @@ function subscriberFor(ports: EvaluationTriggerMatchPorts) {
       EVALUATION_COMPLETED_EVENT_TYPE,
       EVALUATION_REPORTED_EVENT_TYPE,
     ],
+    isTerminalStatus,
     ports,
   });
 }
+
+/** Stands in for what the composition root binds: the evaluation pipeline's own
+ *  terminal-status predicate, narrowed from the unvalidated string an event
+ *  payload carries. This pipeline declares no status vocabulary of its own. */
+const isTerminalStatus = (status: string): boolean =>
+  ["processed", "error", "skipped"].includes(status);
+
+describe("the injected terminal-status predicate", () => {
+  describe("given a status the composition root calls non-terminal", () => {
+    it("decides the subscriber's answer — the subscriber holds no set of its own", () => {
+      const subscriber = createEvaluationTriggerMatchSubscriber({
+        eventTypes: [EVALUATION_COMPLETED_EVENT_TYPE],
+        isTerminalStatus: (status) => status === "in_progress",
+        ports: deps(),
+      });
+
+      expect(subscriber.enqueue?.filter(completedEvent())).toBe(false);
+      expect(
+        subscriber.enqueue?.filter(completedEvent({ status: "in_progress" })),
+      ).toBe(true);
+    });
+  });
+});
 
 describe("evaluation trigger match subscriber", () => {
   describe("given a terminal evaluation carrying its trace id", () => {

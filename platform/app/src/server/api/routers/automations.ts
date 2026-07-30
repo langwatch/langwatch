@@ -96,7 +96,7 @@ const templateDraftSchema = z.object({
 
 const notificationCadenceSchema = z.enum(NOTIFICATION_CADENCES);
 
-// ADR-026: per-trigger trace-readiness debounce. Constrained on the wire so a
+// ADR-026 (retired; ground now ADR-098): per-trigger trace-readiness debounce. Constrained on the wire so a
 // hostile or buggy client can't pin a trace in the settle stage indefinitely.
 const traceDebounceMsSchema = z
   .number()
@@ -104,7 +104,7 @@ const traceDebounceMsSchema = z
   .min(MIN_TRACE_DEBOUNCE_MS)
   .max(MAX_TRACE_DEBOUNCE_MS);
 
-// ADR-026: cadence applies to notify actions only. New notify triggers default
+// ADR-026 (retired; ground now ADR-098): cadence applies to notify actions only. New notify triggers default
 // to a 5-minute digest (operator-friendly storm protection); persist actions
 // are pinned to immediate at the storage boundary so a stale value can't leak
 // into the dispatch path.

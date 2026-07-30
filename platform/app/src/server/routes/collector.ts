@@ -575,7 +575,8 @@ secured
         const results = await Promise.allSettled(
           freshSpans.map((span) =>
             // Route through ingestNormalizedSpan (not recordSpan directly) so the
-            // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
+            // REST collector shares the (tenant, trace, span) dedup gate +
+            // ADR-022 (retired; ground now ADR-099)
             // spool hook with the OTLP path — a retry storm here must not bypass
             // dedup. occurredAt is stamped inside ingestNormalizedSpan.
             getApp().traces.collection.ingestNormalizedSpan({

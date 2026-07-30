@@ -1,9 +1,4 @@
-import {
-  defineFoldProjection,
-  deriveStateVersion,
-} from "@langwatch/event-sourcing";
 import { z } from "zod";
-import { topicClustering } from "../aggregate";
 import { type TopicsRecordedData, topicModelEntrySchema } from "../schema";
 
 /**
@@ -53,45 +48,40 @@ function withFirstSeenAt(
   return next;
 }
 
-export const topicModel = defineFoldProjection({
-  name: "topicModel",
-  aggregate: topicClustering,
-  version: deriveStateVersion(topicModelStateSchema),
-  init: initTopicModelState,
-  handle: {
-    topicsRecorded: (state, data) => {
-      // The seed is content-gated rather than time-ordered: a project's boot
-      // seed can only ever be minted before that project clusters anything, so
-      // "the model already has topics" means the seed is already superseded.
-      if (data.source === "seed" && Object.keys(state.topics).length > 0) {
-        return state;
-      }
+export function applyTopicsRecorded(
+  state: TopicModelState,
+  data: TopicsRecordedData,
+): TopicModelState {
+  // The seed is content-gated rather than time-ordered: a project's boot
+  // seed can only ever be minted before that project clusters anything, so
+  // "the model already has topics" means the seed is already superseded.
+  if (data.source === "seed" && Object.keys(state.topics).length > 0) {
+    return state;
+  }
 
-      const firstSeenAt = withFirstSeenAt(state.firstSeenAt, data);
-      if (data.occurredAt < state.watermark) return { ...state, firstSeenAt };
+  const firstSeenAt = withFirstSeenAt(state.firstSeenAt, data);
+  if (data.occurredAt < state.watermark) return { ...state, firstSeenAt };
 
-      const topics = { ...state.topics };
-      for (const topic of data.topics) {
-        const existing = topics[topic.id];
-        if (existing !== undefined && existing.asOf > data.occurredAt) continue;
-        const { firstRecordedAt: _firstRecordedAt, ...content } = topic;
-        topics[topic.id] = { ...content, asOf: data.occurredAt };
-      }
+  const topics = { ...state.topics };
+  for (const topic of data.topics) {
+    const existing = topics[topic.id];
+    if (existing !== undefined && existing.asOf > data.occurredAt) continue;
+    const { firstRecordedAt: _firstRecordedAt, ...content } = topic;
+    topics[topic.id] = { ...content, asOf: data.occurredAt };
+  }
 
-      if (data.mode !== "replace") return { ...state, topics, firstSeenAt };
+  if (data.mode !== "replace") return { ...state, topics, firstSeenAt };
 
-      const incomingIds = new Set(data.topics.map((topic) => topic.id));
-      for (const [id, topic] of Object.entries(topics)) {
-        // A topic this replace never mentioned survives only if something
-        // newer than the replace wrote it.
-        if (!incomingIds.has(id) && topic.asOf < data.occurredAt) {
-          delete topics[id];
-        }
-      }
-      return { watermark: data.occurredAt, topics, firstSeenAt };
-    },
-  },
-});
+  const incomingIds = new Set(data.topics.map((topic) => topic.id));
+  for (const [id, topic] of Object.entries(topics)) {
+    // A topic this replace never mentioned survives only if something newer
+    // than the replace wrote it.
+    if (!incomingIds.has(id) && topic.asOf < data.occurredAt) {
+      delete topics[id];
+    }
+  }
+  return { watermark: data.occurredAt, topics, firstSeenAt };
+}
 
 export interface ProjectedTopic extends TopicContent {
   readonly firstRecordedAt: number;

@@ -23,7 +23,7 @@ export interface AppConfig {
 
   // Infrastructure
   databaseUrl: string;
-  clickhouseUrl?: string;
+  clickhouseUrl: string;
   redisUrl?: string;
   redisClusterEndpoints?: string;
   redisDbIndex?: number;
@@ -66,6 +66,14 @@ export function createAppConfigFromEnv(overrides?: {
   processRole?: ProcessRole;
 }): AppConfig {
   const env = createEnvConfig();
+
+  // ClickHouse is not optional for this product — fail boot with a clear,
+  // actionable message instead of pushing a nullable client to every caller.
+  if (!env.CLICKHOUSE_URL) {
+    throw new Error(
+      "CLICKHOUSE_URL is required. Set it in your environment before starting LangWatch.",
+    );
+  }
 
   return {
     nodeEnv: env.NODE_ENV,

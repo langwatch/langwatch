@@ -93,7 +93,9 @@ export function buildPoint(args: {
   const temporality = aggregationTemporalityOf({ metricData, kind });
   const monotonic = kind === "sum" ? Boolean(metricData.isMonotonic) : null;
   const values = canonicalPointValues({ point, kind });
-  const flags = Number(point.flags ?? 0);
+  // `flags` reaches both the Flags column and the PointId hash, and OTLP's
+  // protobuf-JSON carries a uint32 as `{low,high}` on some clients.
+  const flags = Number(integerDecimal(point.flags ?? 0));
 
   const seriesIdentity = {
     tenantId: args.tenantId,

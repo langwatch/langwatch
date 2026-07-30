@@ -1,0 +1,10 @@
+{
+	"trigger": ["lw.automation.trigger.match_recorded"],
+	"triggerSettlement": [
+		"triggerSettlement/notifyDigest",
+		"triggerSettlement/persistMatch",
+		"triggerSettlement/logOverflow"
+	],
+	"graphAlertSweep": ["graphAlertSweep/evaluateGraph"],
+	"webhookDeliveryPrune": ["webhookDeliveryPrune/prune"]
+}

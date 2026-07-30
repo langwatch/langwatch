@@ -1,54 +1,78 @@
 import {
-  bindIdentifiers,
   type ClickHouseClient,
   clickhouseAppend,
-  createRowCodec,
+  clickhouseReplacing,
   deriveRowMapping,
 } from "@langwatch/clickhouse";
 import {
-  type AggregateEvent,
-  createFoldExecutor,
-  createMapExecutor,
-  defineMapProjection,
+  ConfigurationError,
+  definePipeline,
+  validateMount,
+  type GroupKey,
   type Metrics,
-  type ReplaceStore,
-  type StateRead,
-  type StoreContext,
-  type StoredState,
+  type Mount,
 } from "@langwatch/event-sourcing";
-import { experimentRun, parseExperimentRunAggregateId } from "./aggregate";
+import { completeExperimentRun } from "./completeExperimentRun.command";
 import {
-  type ExperimentRunItemRecord,
+  deliverExperimentRunExecutionFailRun,
+  EXPERIMENT_RUN_STALLED_CODE,
+  experimentRunExecutionFailRunIntentSchema,
+  experimentRunExecutionStateSchema,
+  handleExperimentRunCompleted,
+  handleExperimentRunEvaluatorResult,
+  handleExperimentRunStarted,
+  handleExperimentRunTargetResult,
+  initExperimentRunExecutionState,
+  onExperimentRunExecutionWake,
+  type ExperimentRunExecutionDeps,
+} from "./experimentRunExecution.process";
+import {
   generateItemProjectionId,
   mapEvaluatorResult,
   mapTargetResult,
-} from "./itemsMapping";
-import { type ExperimentRunState, experimentRunStateSchema } from "./schema";
+  type ExperimentRunItemRecord,
+} from "./experimentRunItems.projection";
+import {
+  applyRunCompleted,
+  applyRunStarted,
+  EXPERIMENT_RUN_STATE_VERSION_PIN,
+} from "./experimentRunState.projection";
+import { EXPERIMENT_RUN_PIPELINE_NAME, EXPERIMENT_RUN_PIPELINE_PREFIX, experimentRunEvents } from "./events";
+import { recordEvaluatorResult } from "./recordEvaluatorResult.command";
+import { recordTargetResult } from "./recordTargetResult.command";
+import {
+  experimentRunAggregateId,
+  experimentRunStateSchema,
+  initExperimentRunState,
+  parseExperimentRunAggregateId,
+  type ExperimentRunState,
+} from "./schema";
+import { startExperimentRun } from "./startExperimentRun.command";
 import {
   type ExperimentRunsRow,
   experimentRunItemsTable,
   experimentRunsTable,
 } from "./table";
 
-export { experimentRun } from "./aggregate";
+export { EXPERIMENT_RUN_STALLED_CODE } from "./experimentRunExecution.process";
+export { experimentRunAggregateId, parseExperimentRunAggregateId } from "./schema";
+export { EXPERIMENT_RUN_PIPELINE_NAME, EXPERIMENT_RUN_PIPELINE_PREFIX } from "./events";
 
-const FOLD_PROJECTION_NAME = "experimentRunState";
-const MAP_PROJECTION_NAME = "experimentRunItems";
 const DEFAULT_RETENTION_DAYS = 308;
-const READ_YOUR_WRITES_SETTINGS = { select_sequential_consistency: 1 } as const;
 
 const runRowMapping = deriveRowMapping<
   ExperimentRunState,
   typeof experimentRunsTable.columns
 >({
   table: experimentRunsTable,
-  state: experimentRunStateSchema,
-  key: "RunId",
+  state: experimentRunStateSchema.omit({ targets: true }),
+  key: ["RunId", "ExperimentId"],
   tenant: "TenantId",
   stateVersionColumn: "Version",
   fill: {
     ProjectionId: (state) => `${state.experimentId}:${state.runId}`,
     CreatedAt: () => new Date(),
+    Targets: (state) => JSON.stringify(state.targets),
   },
 });
 
@@ -63,172 +87,129 @@ function decodeTargets(cell: string): ExperimentRunState["targets"] {
   }
 }
 
-/**
- * The `experiment_runs` store.
- *
- * `clickhouseReplacing` is not used here, and this is the only reason: it
- * binds ONE key column, while this aggregate's id is the composite
- * `experimentId:runId` and the deployed engine key is
- * `(TenantId, RunId, ExperimentId)`. Reading on `RunId` alone would collapse
- * two experiments that share a run slug, which run slugs routinely do. The
- * mapping, the identifier binding and the codec are all the package's.
- */
-function createExperimentRunsStore(args: {
-  readonly client: ClickHouseClient;
-  readonly version: string;
-}): ReplaceStore<ExperimentRunState> {
-  const { client, version } = args;
-  const codec = createRowCodec();
-  const columns = experimentRunsTable.columns;
-  const wireColumns = experimentRunsTable.columnNames.map(
-    (name) => columns[name],
-  );
-  const versionIndex = experimentRunsTable.columnNames.indexOf("Version");
+const runRowFromRow = (row: ExperimentRunsRow): ExperimentRunState => ({
+  ...runRowMapping.fromRow(row),
+  targets: decodeTargets(row.Targets),
+});
 
-  const names = bindIdentifiers();
-  const readSql =
-    `SELECT ${names.list(experimentRunsTable.columnNames)} ` +
-    `FROM ${names.of(experimentRunsTable.name)} ` +
-    `WHERE ${names.of("TenantId")} = {tenantId:String} ` +
-    `AND ${names.of("RunId")} = {runId:String} ` +
-    `AND ${names.of("ExperimentId")} = {experimentId:String} ` +
-    `ORDER BY ${names.of("UpdatedAt")} DESC LIMIT 1`;
-
+/** One lane per run: two concurrent applies would race the fold's own
+ * read-modify-write cycle (ADR-100 decision 2). */
+export function experimentRunStateGroupKey(args: {
+  readonly tenantId: string;
+  readonly aggregateId: string;
+}): GroupKey {
   return {
-    kind: "replace",
-
-    async read(key, context): Promise<StateRead<ExperimentRunState>> {
-      const { experimentId, runId } = parseExperimentRunAggregateId(key);
-      const result = await client.query({
-        tenantId: context.tenantId,
-        sql: readSql,
-        params: {
-          ...names.params,
-          tenantId: context.tenantId,
-          runId,
-          experimentId,
-        },
-        settings: READ_YOUR_WRITES_SETTINGS,
-      });
-
-      const row = result.rows[0];
-      if (!row) return { kind: "absent" };
-
-      // The gate runs on the version cell alone, before anything else is
-      // decoded: an old shape must never reach this build's decoders.
-      let storedVersion: string | undefined;
-      try {
-        storedVersion = columns.Version.decode(row[versionIndex]);
-      } catch (cause) {
-        return { kind: "undecodable", storedVersion: undefined, cause };
-      }
-      if (storedVersion !== version) {
-        return { kind: "undecodable", storedVersion };
-      }
-
-      try {
-        const [decoded] = codec.decodeRows<ExperimentRunsRow>({
-          columns: wireColumns,
-          columnNames: experimentRunsTable.columnNames,
-          header: result.header,
-          rows: [row],
-        });
-        if (!decoded) return { kind: "undecodable", storedVersion };
-        return {
-          kind: "found",
-          stored: {
-            state: {
-              ...runRowMapping.fromRow(decoded),
-              targets: decodeTargets(decoded.Targets),
-            },
-            version: storedVersion,
-          },
-        };
-      } catch (cause) {
-        return { kind: "undecodable", storedVersion, cause };
-      }
-    },
-
-    async write(
-      key: string,
-      stored: StoredState<ExperimentRunState>,
-      context: StoreContext,
-    ): Promise<void> {
-      const writtenAt = new Date();
-      const row = runRowMapping.toRow(stored.state, {
-        tenantId: context.tenantId,
-        key,
-        version: stored.version,
-        writtenAt,
-        retentionDays: context.retentionDays ?? DEFAULT_RETENTION_DAYS,
-      });
-      // Two columns the derived mapping cannot produce: `Targets` is a JSON
-      // cell, and `StartedAt` is the partition column, so it cannot hold the
-      // null a run that has not started carries in state.
-      row.Targets = JSON.stringify(stored.state.targets);
-      if (stored.state.startedAt === null) row.StartedAt = writtenAt;
-
-      await client.insert({
-        tenantId: context.tenantId,
-        table: experimentRunsTable.name,
-        rows: codec.encodeRows({
-          columns: wireColumns,
-          columnNames: experimentRunsTable.columnNames,
-          rows: [row],
-        }),
-        columns: experimentRunsTable.columnNames,
-        target: { kind: "replacing" },
-      });
+    tenantId: args.tenantId,
+    lane: { kind: "fold", name: "experimentRunState" },
+    scope: {
+      kind: "aggregate",
+      aggregateType: EXPERIMENT_RUN_PIPELINE_NAME,
+      aggregateId: args.aggregateId,
     },
   };
 }
 
-/** One item row per result event, never read back into any fold (ADR-098 §2). */
-export const experimentRunItems = defineMapProjection({
-  name: MAP_PROJECTION_NAME,
-  aggregate: experimentRun,
-  handle: {
-    targetResult: mapTargetResult,
-    evaluatorResult: mapEvaluatorResult,
-  },
-});
+/** One lane per dataset row, so an entry's target and evaluator results
+ * coalesce into a single insert. */
+export function experimentRunItemsGroupKey(args: {
+  readonly tenantId: string;
+  readonly experimentId: string;
+  readonly runId: string;
+  readonly index: number;
+}): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "map", name: "experimentRunItems" },
+    scope: {
+      kind: "partition",
+      parts: [args.experimentId, args.runId, String(args.index)],
+    },
+  };
+}
 
-export type ExperimentRunCommandName = keyof typeof experimentRun.commands;
+/** The `experimentRunExecution` process manager's own lane, aggregate-scoped
+ * to the run it watches. */
+export function experimentRunExecutionGroupKey(args: {
+  readonly tenantId: string;
+  readonly aggregateId: string;
+}): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "processManager", name: "experimentRunExecution" },
+    scope: {
+      kind: "aggregate",
+      aggregateType: EXPERIMENT_RUN_PIPELINE_NAME,
+      aggregateId: args.aggregateId,
+    },
+  };
+}
 
-export interface ExperimentRunPipelineDeps {
+/** Refuses an illegal mount at composition, not on the first delivery (ADR-106). */
+function assertMountIsLegal(projection: string, mount: Mount): Mount {
+  const violations = validateMount(mount);
+  if (violations.length > 0) {
+    throw new ConfigurationError(
+      `experiment-run-processing's ${projection} mount is illegal: ${violations
+        .map((v) => `${v.rule} — ${v.message}`)
+        .join("; ")}`,
+      { pipeline: EXPERIMENT_RUN_PIPELINE_NAME, projection, violations },
+    );
+  }
+  return mount;
+}
+
+/** Structurally what `billing-reporting`'s `createPokeMount(...).handle`
+ * already is — accepted by shape, never by importing that pipeline, so this
+ * directory names no client belonging to another one (ADR-105 decision 6). */
+export interface ExperimentRunBillingPoke {
+  handle(event: { readonly tenantId: string }): Promise<void>;
+}
+
+export interface ExperimentRunProcessingDeps {
   readonly client: ClickHouseClient;
   readonly metrics?: Metrics;
+  /**
+   * Required-but-nullable (ADR-102): every composition site has to say on
+   * purpose whether stuck runs are watched, rather than silently getting no
+   * reaper by omission. `null` means this deployment mounts no liveness
+   * watchdog.
+   */
+  readonly experimentRunExecution: ExperimentRunExecutionDeps | null;
+  /**
+   * The billing usage poke, built by the composition root from the
+   * billing-reporting pipeline's own `createPokeMount`. Absent means no
+   * billing signal is dispatched from this pipeline's events — correct for a
+   * self-hosted build, wrong for SaaS if forgotten.
+   */
+  readonly billingPoke?: ExperimentRunBillingPoke;
 }
 
-export interface ApplyExperimentRunCommandArgs<
-  Command extends ExperimentRunCommandName,
-> {
-  readonly tenantId: string;
-  readonly command: Command;
-  /** Parsed against the named command's own `input` schema before `handle`. */
-  readonly input: unknown;
-  readonly retentionDays?: number;
-}
-
-export interface ExperimentRunPipeline {
-  readonly aggregate: typeof experimentRun;
-  applyExperimentRunCommand<Command extends ExperimentRunCommandName>(
-    args: ApplyExperimentRunCommandArgs<Command>,
-  ): Promise<{ events: number }>;
-  storeItems(delivery: {
-    readonly tenantId: string;
-    readonly events: readonly AggregateEvent[];
-    readonly retentionDays?: number;
-  }): Promise<{ written: number }>;
-}
-
-/** Mounts this pipeline's two projections, each beside the store it writes to. */
-export function createExperimentRunPipeline(
-  deps: ExperimentRunPipelineDeps,
-): ExperimentRunPipeline {
-  const runStore = createExperimentRunsStore({
+/** Mounts every projection beside the store it writes to. */
+export function createExperimentRunProcessingPipeline(
+  deps: ExperimentRunProcessingDeps,
+) {
+  const runStore = clickhouseReplacing({
     client: deps.client,
-    version: experimentRun.stateVersion,
+    table: experimentRunsTable,
+    version: EXPERIMENT_RUN_STATE_VERSION_PIN,
+    // The deployed engine key is composite: reading on `RunId` alone would
+    // collapse two experiments that share a run slug, which run slugs do.
+    key: {
+      columns: ["RunId", "ExperimentId"],
+      split: (key) => {
+        const { experimentId, runId } = parseExperimentRunAggregateId(key);
+        return [runId, experimentId];
+      },
+    },
+    stateVersionColumn: "Version",
+    row: { toRow: runRowMapping.toRow, fromRow: runRowFromRow },
+    retentionDays: DEFAULT_RETENTION_DAYS,
+  });
+  assertMountIsLegal("experimentRunState", {
+    projection: "fold",
+    store: runStore.kind,
+    scope: "aggregate",
+    collapse: "batch",
   });
 
   const itemsStore = clickhouseAppend<
@@ -253,54 +234,93 @@ export function createExperimentRunPipeline(
       _retention_days: context.retentionDays ?? DEFAULT_RETENTION_DAYS,
     }),
   });
-
-  const fold = createFoldExecutor<ExperimentRunState, AggregateEvent>({
-    store: runStore,
-    init: experimentRun.init,
-    apply: experimentRun.apply,
-    stateVersion: experimentRun.stateVersion,
-    projectionName: FOLD_PROJECTION_NAME,
-    metrics: deps.metrics,
+  assertMountIsLegal("experimentRunItems", {
+    projection: "map",
+    store: itemsStore.kind,
+    scope: "partition",
+    collapse: "batch",
   });
 
-  const items = createMapExecutor<AggregateEvent, ExperimentRunItemRecord>({
-    store: itemsStore,
-    map: experimentRunItems.map,
-    projectionName: MAP_PROJECTION_NAME,
-    metrics: deps.metrics,
-  });
+  const chain = definePipeline(EXPERIMENT_RUN_PIPELINE_NAME)
+    .prefix(EXPERIMENT_RUN_PIPELINE_PREFIX)
+    .events(experimentRunEvents)
+    .id({
+      started: experimentRunAggregateId,
+      targetResult: experimentRunAggregateId,
+      evaluatorResult: experimentRunAggregateId,
+      completed: experimentRunAggregateId,
+    })
+    .withCommand("startExperimentRun", {
+      input: experimentRunEvents.started,
+      handle: startExperimentRun,
+    })
+    .withCommand("recordTargetResult", {
+      input: experimentRunEvents.targetResult,
+      handle: recordTargetResult,
+    })
+    .withCommand("recordEvaluatorResult", {
+      input: experimentRunEvents.evaluatorResult,
+      handle: recordEvaluatorResult,
+    })
+    .withCommand("completeExperimentRun", {
+      input: experimentRunEvents.completed,
+      handle: completeExperimentRun,
+    })
+    .withFold("experimentRunState", {
+      state: experimentRunStateSchema,
+      init: initExperimentRunState,
+      pin: EXPERIMENT_RUN_STATE_VERSION_PIN,
+      on: {
+        started: applyRunStarted,
+        completed: applyRunCompleted,
+      },
+      store: runStore,
+    })
+    .withMap("experimentRunItems", {
+      on: {
+        targetResult: mapTargetResult,
+        evaluatorResult: mapEvaluatorResult,
+      },
+      store: itemsStore,
+    })
+    .withSubscriber("billingMeterPoke", {
+      on: {
+        started: (_data, ctx) => deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
+        targetResult: (_data, ctx) => deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
+        evaluatorResult: (_data, ctx) => deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
+      },
+    });
 
-  return {
-    aggregate: experimentRun,
+  const withExecution =
+    deps.experimentRunExecution === null
+      ? chain
+      : chain.withProcessManager("experimentRunExecution", {
+          state: experimentRunExecutionStateSchema,
+          init: initExperimentRunExecutionState,
+          intents: {
+            failRun: {
+              payload: experimentRunExecutionFailRunIntentSchema,
+              messageKey: (payload) => `fail:${payload.runId}`,
+              deliver: (payload, ctx) =>
+                deliverExperimentRunExecutionFailRun(
+                  payload,
+                  ctx,
+                  deps.experimentRunExecution!,
+                ),
+            },
+          },
+          on: {
+            started: handleExperimentRunStarted,
+            targetResult: handleExperimentRunTargetResult,
+            evaluatorResult: handleExperimentRunEvaluatorResult,
+            completed: handleExperimentRunCompleted,
+          },
+          onWake: onExperimentRunExecutionWake,
+        });
 
-    /**
-     * Reads current state, lets the named command decide which events to try,
-     * folds them and writes the result back. The executor re-reads before it
-     * writes, so a row this build cannot decode fails there rather than being
-     * folded onto genesis here.
-     */
-    async applyExperimentRunCommand(args) {
-      const command = experimentRun.commands[args.command];
-      const input = command.input.parse(args.input);
-      const key = experimentRun.id(input);
-
-      const read = await runStore.read(key, {
-        tenantId: args.tenantId,
-        retentionDays: args.retentionDays,
-      });
-      const state =
-        read.kind === "found" ? read.stored.state : experimentRun.init();
-
-      return fold.apply({
-        key,
-        tenantId: args.tenantId,
-        events: command.handle(state, input, experimentRun.events),
-        retentionDays: args.retentionDays,
-      });
-    },
-
-    storeItems(delivery) {
-      return items.apply(delivery);
-    },
-  };
+  return withExecution.build({ metrics: deps.metrics });
 }
+
+export type ExperimentRunProcessingPipeline = ReturnType<
+  typeof createExperimentRunProcessingPipeline
+>;

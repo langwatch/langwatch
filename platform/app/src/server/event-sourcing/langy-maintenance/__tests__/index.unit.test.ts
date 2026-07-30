@@ -1,7 +1,6 @@
 /**
- * Unit tests for the scheduled Langy session-key reap — driven directly off
- * `runLangySessionKeyReap`'s `reap`/`recordTick` ports, never off an event,
- * since the pipeline carries none.
+ * The scheduled Langy session-key reap, driven off its `reap`/`recordTick`
+ * ports — never off an event, since the pipeline carries none.
  *
  * @see specs/langy/langy-session-key-reap-sweep.feature
  */
@@ -26,7 +25,6 @@ import {
   createLangySessionKeyReapMount,
   LANGY_SESSION_KEY_REAP_NAME,
   type LangySessionKeyReapDeps,
-  runLangySessionKeyReap,
 } from "..";
 
 type MockedDeps = {
@@ -39,23 +37,28 @@ function makeDeps(
   return {
     reap: vi.fn().mockResolvedValue(0),
     recordTick: vi.fn().mockResolvedValue(undefined),
-    now: vi.fn().mockReturnValue(10_000_000),
     ...overrides,
   } as MockedDeps;
 }
 
 function makeMetrics() {
-  const inc = vi.fn();
+  const counters = new Map<string, { inc: ReturnType<typeof vi.fn> }>();
   return {
     metrics: {
-      counter: vi.fn().mockReturnValue({ inc }),
+      counter: vi.fn(({ name }: { name: string }) => {
+        const existing = counters.get(name);
+        if (existing) return existing;
+        const created = { inc: vi.fn() };
+        counters.set(name, created);
+        return created;
+      }),
       histogram: vi.fn().mockReturnValue({ observe: vi.fn() }),
     },
-    inc,
+    counterFor: (name: string) => counters.get(name),
   };
 }
 
-describe("runLangySessionKeyReap", () => {
+describe("the langy session-key reap tick", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -65,7 +68,7 @@ describe("runLangySessionKeyReap", () => {
     it("reaps and records the tick once", async () => {
       const deps = makeDeps({ reap: vi.fn().mockResolvedValue(3) });
 
-      await runLangySessionKeyReap(deps)();
+      await createLangySessionKeyReapMount(deps).run();
 
       expect(deps.reap).toHaveBeenCalledOnce();
       expect(deps.recordTick).toHaveBeenCalledOnce();
@@ -74,30 +77,49 @@ describe("runLangySessionKeyReap", () => {
     it("does not log a second success line of its own — reap owns that report", async () => {
       const deps = makeDeps({ reap: vi.fn().mockResolvedValue(3) });
 
-      await runLangySessionKeyReap(deps)();
+      await createLangySessionKeyReapMount(deps).run();
 
       expect(mockLogger.info).not.toHaveBeenCalled();
+    });
+
+    it("counts the keys as items and the tick as one tick, on separate metrics", async () => {
+      const { metrics, counterFor } = makeMetrics();
+      const deps = makeDeps({ reap: vi.fn().mockResolvedValue(3) });
+
+      await createLangySessionKeyReapMount({ ...deps, metrics }).run();
+
+      // A ratio off a counter that mixes ticks and revoked keys means nothing,
+      // so the two units never share a series.
+      expect(
+        counterFor("es_langy_session_key_reap_items_total")?.inc,
+      ).toHaveBeenCalledWith({ outcome: "success" }, 3);
+      expect(
+        counterFor("es_langy_session_key_reap_ticks_total")?.inc,
+      ).toHaveBeenCalledWith({ outcome: "success" });
+      expect(
+        counterFor("es_langy_session_key_reap_ticks_total")?.inc,
+      ).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("given the reap fails", () => {
     /** @scenario "A failed reap is counted as one failed candidate" */
-    it("counts the failure on the same metric successes are counted on", async () => {
-      const { metrics, inc } = makeMetrics();
+    it("counts one failed tick, and no items it never got to look at", async () => {
+      const { metrics, counterFor } = makeMetrics();
       const deps = makeDeps({
         reap: vi.fn().mockRejectedValue(new Error("database unavailable")),
       });
 
       await expect(
-        runLangySessionKeyReap({ ...deps, metrics })(),
+        createLangySessionKeyReapMount({ ...deps, metrics }).run(),
       ).rejects.toThrow();
 
-      expect(metrics.counter).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "es_langy_session_key_reap_candidates_total",
-        }),
-      );
-      expect(inc).toHaveBeenCalledWith({ outcome: "failure" });
+      expect(
+        counterFor("es_langy_session_key_reap_ticks_total")?.inc,
+      ).toHaveBeenCalledWith({ outcome: "failure" });
+      expect(
+        counterFor("es_langy_session_key_reap_items_total")?.inc,
+      ).not.toHaveBeenCalled();
     });
 
     /** @scenario "A failed reap is retried" */
@@ -106,12 +128,12 @@ describe("runLangySessionKeyReap", () => {
         reap: vi.fn().mockRejectedValue(new Error("database unavailable")),
       });
 
-      await expect(runLangySessionKeyReap(deps)()).rejects.toThrow(
-        "database unavailable",
-      );
+      await expect(
+        createLangySessionKeyReapMount(deps).run(),
+      ).rejects.toThrow("database unavailable");
 
-      // Retrying is free — a key already revoked stays revoked — so the
-      // whole tick, not a partial replay, is what gets retried.
+      // Retrying is free — a key already revoked stays revoked — so the whole
+      // tick, not a partial replay, is what gets retried.
       expect(deps.recordTick).toHaveBeenCalledOnce();
     });
   });
@@ -126,7 +148,9 @@ describe("runLangySessionKeyReap", () => {
           .mockRejectedValue(new Error("bookkeeping store unavailable")),
       });
 
-      await expect(runLangySessionKeyReap(deps)()).resolves.toBeUndefined();
+      await expect(
+        createLangySessionKeyReapMount(deps).run(),
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -140,25 +164,25 @@ describe("runLangySessionKeyReap", () => {
           .mockRejectedValue(new Error("bookkeeping store unavailable")),
       });
 
-      await expect(runLangySessionKeyReap(deps)()).rejects.toThrow(
-        "database unavailable",
-      );
+      await expect(
+        createLangySessionKeyReapMount(deps).run(),
+      ).rejects.toThrow("database unavailable");
       expect(deps.recordTick).toHaveBeenCalledOnce();
     });
   });
-});
 
-describe("createLangySessionKeyReapMount", () => {
-  /** @scenario "The mount carries the hourly interval and runs the same reap logic" */
-  it("names itself, carries the interval, and runs the same reap through run()", async () => {
-    const deps = makeDeps({ reap: vi.fn().mockResolvedValue(1) });
-    const mount = createLangySessionKeyReapMount(deps);
+  describe("createLangySessionKeyReapMount", () => {
+    /** @scenario "The mount carries the hourly interval and runs the same reap logic" */
+    it("names itself, carries the interval, and runs the same reap through run()", async () => {
+      const deps = makeDeps({ reap: vi.fn().mockResolvedValue(1) });
+      const mount = createLangySessionKeyReapMount(deps);
 
-    expect(mount.name).toBe(LANGY_SESSION_KEY_REAP_NAME);
-    expect(mount.intervalMs).toBe(60 * 60 * 1000);
+      expect(mount.name).toBe(LANGY_SESSION_KEY_REAP_NAME);
+      expect(mount.intervalMs).toBe(60 * 60 * 1000);
 
-    await mount.run();
+      await mount.run();
 
-    expect(deps.reap).toHaveBeenCalledOnce();
+      expect(deps.reap).toHaveBeenCalledOnce();
+    });
   });
 });

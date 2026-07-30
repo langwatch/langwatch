@@ -4,7 +4,8 @@
  * It used to be a queue as well: jobs arrived fire-and-forget from a reactor,
  * ran up to a concurrency limit, and overflowed into a plain array field that a
  * hard kill lost. Dispatch is now a leased process-outbox message (ADR-073
- * step 2), so pending work is a Postgres row and concurrency is the
+ * step 2, retired; ground now ADR-103), so pending work is a Postgres row
+ * and concurrency is the
  * dispatcher's — what remains here is the one thing an in-process object is
  * actually the right home for: the map of live children, which cancellation
  * uses to find and signal one, and which shutdown uses to know which runs it is

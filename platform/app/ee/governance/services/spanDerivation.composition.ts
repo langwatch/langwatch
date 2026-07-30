@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * Layer-0 composition root (ADR-082) for the stateless span-derivation
- * services the governance stream projections and the `virtualKeyLastUsed`
- * subscriber all read spans through.
+ * Layer-0 composition root (ADR-082, retired; ground now ADR-102) for the
+ * stateless span-derivation services the governance stream projections and
+ * the `virtualKeyLastUsed` subscriber all read spans through.
  *
- * **Why a module and not a `Deps` member.** ADR-082 adds layer 0 so that
+ * **Why a module and not a `Deps` member.** ADR-082 (retired; ground now
+ * ADR-102) adds layer 0 so that
  * construction has an *address*; a `const x = new Y()` at the top of four
  * unrelated domain files is construction with no address, and it had already
  * produced four `CanonicalizeSpanAttributesService` instances (seventeen

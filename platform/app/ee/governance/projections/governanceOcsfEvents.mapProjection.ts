@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * `governance_ocsf_events` as a real projection (ADR-075 Class C).
+ * `governance_ocsf_events` as a real projection (ADR-075 Class C, retired;
+ * ground now ADR-098).
  *
  * WHY THIS IS A PROJECTION AND NOT A HANDLER
  * ------------------------------------------
@@ -44,7 +45,8 @@
  *
  * Spec: specs/ai-gateway/governance/folds.feature §"governance_ocsf_events"
  *       specs/ai-gateway/governance/siem-export.feature
- * ADR:  dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md
+ * ADR:  dev/docs/adr/098-event-sourcing-core.md (successor to the retired
+ *       ADR-075)
  */
 
 import {

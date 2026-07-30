@@ -22,22 +22,3 @@ export interface TraceAnalyticsRollupRepository {
     retentionDays?: number,
   ): Promise<void>;
 }
-
-/** No-op implementation for tests and ClickHouse-less environments. */
-export class NullTraceAnalyticsRollupRepository
-  implements TraceAnalyticsRollupRepository
-{
-  async insertRow(
-    _row: TraceAnalyticsRollupRow,
-    _retentionDays?: number,
-  ): Promise<void> {
-    // no-op: the Null repository intentionally discards rollup writes
-  }
-
-  async insertRows(
-    _rows: TraceAnalyticsRollupRow[],
-    _retentionDays?: number,
-  ): Promise<void> {
-    // no-op: the Null repository intentionally discards rollup writes
-  }
-}

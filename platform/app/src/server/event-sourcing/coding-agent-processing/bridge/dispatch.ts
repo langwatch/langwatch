@@ -1,7 +1,11 @@
-import type { Metrics } from "@langwatch/event-sourcing";
-import { noopMetrics } from "@langwatch/event-sourcing";
+import { type Metrics, noopMetrics } from "@langwatch/event-sourcing";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
+import type {
+  OtlpInstrumentationScope,
+  OtlpResource,
+  OtlpSpan,
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import type {
   LogFactsContribution,
   MetricFactsContribution,
@@ -12,15 +16,14 @@ import type { CodingAgentDetectionPort } from "./detection.types";
 import type { CodingAgentBridgeSubscriber } from "./subscriber.types";
 
 /**
- * The three source -> session bridges. A bridge, not a direct subscription,
- * because the session id is neither a trace id, a log record id nor a metric
- * point id (ADR-098 §9).
+ * The three source -> session bridges. All three resolve the session the same
+ * way and drop the same way — counted, never silent. They differ only in what
+ * they can supply as `traceId`: a span always carries one, a log record only
+ * when correlation resolved, a metric point never. Each poke is losable and
+ * at-most-once; `contributionSweep.ts` is the guarantee.
  *
- * All three resolve the session the same way and drop the same way — counted,
- * never silent. They differ only in what they can supply as `traceId`: a span
- * always carries one, a log record only when correlation resolved, a metric
- * point never. Each poke is losable and at-most-once;
- * `contributionSweep.ts` is the guarantee.
+ * `eventTypes` comes from the composition root, from the source pipeline's own
+ * declaration (ADR-102 decision 5, dependencies point downward only).
  */
 
 const DROP_METRIC_NAME = "es_coding_agent_bridge_drop_total";
@@ -35,29 +38,22 @@ function dropCounter(metrics: Metrics) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Span bridge
-// ---------------------------------------------------------------------------
-
-export const SPAN_RECEIVED_EVENT_TYPE = "lw.obs.trace.span_received";
-
-/** The minimal shape this bridge reads off trace-processing's (unconverted) `span_received` event. */
+/** The minimal shape this bridge reads off trace-processing's `span_received` event. */
 export interface SpanReceivedEvent {
   readonly type: string;
   readonly tenantId: string;
   readonly occurredAt: number;
   readonly data: {
-    readonly span: { readonly name?: unknown } & Record<string, unknown>;
-    readonly resource: Record<string, unknown>;
-    readonly instrumentationScope: Record<string, unknown>;
+    readonly span: OtlpSpan;
+    readonly resource: OtlpResource;
+    readonly instrumentationScope: OtlpInstrumentationScope;
   };
 }
 
 export interface SpanFactsBridgeDeps {
+  readonly eventTypes: readonly string[];
   readonly detection: CodingAgentDetectionPort;
-  readonly contributeSpanFacts: (
-    data: ContributeSpanFactsCommandInput,
-  ) => Promise<void>;
+  readonly contributeSpanFacts: (data: SpanFactsContribution) => Promise<void>;
   readonly metrics?: Metrics;
   readonly now?: () => number;
 }
@@ -72,22 +68,17 @@ export function createSpanFactsBridge(
     new CanonicalizeSpanAttributesService(),
   );
 
-  const isCodingAgentSpan = (event: SpanReceivedEvent): boolean => {
-    const rawName = event.data.span.name;
-    return (
-      typeof rawName === "string" &&
-      deps.detection.isCodingAgentSpanName(rawName)
-    );
-  };
+  const isCodingAgentSpan = (event: SpanReceivedEvent): boolean =>
+    deps.detection.isCodingAgentSpanName(event.data.span.name);
 
   return {
     name: "codingAgentSpanFactsBridge",
-    eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+    eventTypes: deps.eventTypes,
     enqueue: { filter: isCodingAgentSpan },
     options: {
       deduplication: {
         makeId: (event) =>
-          `coding-agent-span-facts:${event.tenantId}:${String((event.data.span as { spanId?: unknown }).spanId ?? "")}`,
+          `coding-agent-span-facts:${event.tenantId}:${event.data.span.spanId}`,
         ttlMs: 60_000,
       },
     },
@@ -109,19 +100,17 @@ export function createSpanFactsBridge(
         traceId: span.traceId,
       });
       if (resolved === null) {
-        // Unreachable for spans — every span carries a traceId — but
-        // counted rather than assumed.
+        // Unreachable for spans — every span carries a traceId — but counted
+        // rather than assumed.
         drops.inc({ signal: "span", reason: "no_session_key" });
         return;
       }
 
+      const serviceName = span.resourceAttributes["service.name"];
       const agent = deps.detection.detectAgent({
         recordName: span.name,
-        scopeName: (span.instrumentationScope as { name?: string }).name,
-        serviceName:
-          typeof span.resourceAttributes["service.name"] === "string"
-            ? (span.resourceAttributes["service.name"] as string)
-            : null,
+        scopeName: span.instrumentationScope.name,
+        serviceName: typeof serviceName === "string" ? serviceName : null,
       });
       if (agent === "unknown") {
         drops.inc({ signal: "span", reason: "unknown_agent" });
@@ -142,20 +131,13 @@ export function createSpanFactsBridge(
         endTimeUnixMs: span.endTimeUnixMs,
         statusCode: span.statusCode ?? 0,
         facts: deps.detection.liftSpanFacts(span.spanAttributes),
-        scopeName:
-          (span.instrumentationScope as { name?: string }).name || null,
+        scopeName: span.instrumentationScope.name || null,
       });
     },
   };
 }
 
-// ---------------------------------------------------------------------------
-// Log bridge
-// ---------------------------------------------------------------------------
-
-export const CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE = "log/recordReceived";
-
-/** The fields this bridge reads off log-processing's canonical record — see `log-processing/schema.ts`. */
+/** The fields this bridge reads off log-processing's canonical record. */
 export interface LogRecordReceivedEvent {
   readonly type: string;
   readonly tenantId: string;
@@ -178,10 +160,9 @@ export interface LogRecordReceivedEvent {
 }
 
 export interface LogFactsBridgeDeps {
+  readonly eventTypes: readonly string[];
   readonly detection: CodingAgentDetectionPort;
-  readonly contributeLogFacts: (
-    data: ContributeLogFactsCommandInput,
-  ) => Promise<void>;
+  readonly contributeLogFacts: (data: LogFactsContribution) => Promise<void>;
   readonly metrics?: Metrics;
   readonly parseFlatAttributes: (
     json: string,
@@ -196,7 +177,7 @@ export function createLogFactsBridge(
 
   return {
     name: "codingAgentLogFactsBridge",
-    eventTypes: [CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE],
+    eventTypes: deps.eventTypes,
     options: {
       deduplication: {
         makeId: (event) =>
@@ -219,18 +200,14 @@ export function createLogFactsBridge(
         scopeName: record.scopeName,
         attributes,
       });
-      if (facts === null) {
-        // Not a coding-agent record at all — the cheap gate, not a drop.
-        return;
-      }
+      // Not a coding-agent record at all — the cheap gate, not a drop.
+      if (facts === null) return;
 
       const resourceAttributes = deps.parseFlatAttributes(
         record.resourceAttributesFlatJson,
       );
-      const serviceName =
-        typeof resourceAttributes?.["service.name"] === "string"
-          ? (resourceAttributes["service.name"] as string)
-          : null;
+      const serviceName = resourceAttributes?.["service.name"];
+      const recordName = attributes["event.name"];
 
       const providerSessionKey =
         deps.detection.resolveConversationKey(attributes) ??
@@ -250,11 +227,8 @@ export function createLogFactsBridge(
 
       const agent = deps.detection.detectAgent({
         scopeName: record.scopeName,
-        recordName:
-          typeof attributes["event.name"] === "string"
-            ? (attributes["event.name"] as string)
-            : null,
-        serviceName,
+        recordName: typeof recordName === "string" ? recordName : null,
+        serviceName: typeof serviceName === "string" ? serviceName : null,
       });
       if (agent === "unknown") {
         drops.inc({ signal: "log", reason: "unknown_agent" });
@@ -262,15 +236,13 @@ export function createLogFactsBridge(
       }
 
       await deps.contributeLogFacts({
-        tenantId: record.tenantId ? String(record.tenantId) : event.tenantId,
+        tenantId: event.tenantId,
         sessionId: resolved.sessionId,
         sessionKeySource: resolved.sessionKeySource,
         agent,
         occurredAt: record.timeUnixMs,
-        // The canonical log record's own `acceptedAt` — our platform's real
-        // ingest boundary for THIS record, not a value re-derived at bridge
-        // dispatch time (unlike the span bridge, which has no such field
-        // available from its unconverted source pipeline yet).
+        // The canonical record's own ingest stamp — this record's real platform
+        // boundary, not a value re-derived at bridge dispatch time.
         acceptedAt: record.acceptedAt,
         recordId: record.recordId,
         traceId: correlationTraceId,
@@ -288,13 +260,7 @@ export function createLogFactsBridge(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Metric bridge
-// ---------------------------------------------------------------------------
-
-export const METRIC_DATA_POINT_RECEIVED_EVENT_TYPE = "metric/dataPointReceived";
-
-/** The fields this bridge reads off metric-processing's canonical data point — see `metric-processing/schema.ts`. */
+/** The fields this bridge reads off metric-processing's canonical data point. */
 export interface MetricDataPointReceivedEvent {
   readonly type: string;
   readonly tenantId: string;
@@ -316,9 +282,10 @@ export interface MetricDataPointReceivedEvent {
 }
 
 export interface MetricFactsBridgeDeps {
+  readonly eventTypes: readonly string[];
   readonly detection: CodingAgentDetectionPort;
   readonly contributeMetricFacts: (
-    data: ContributeMetricFactsCommandInput,
+    data: MetricFactsContribution,
   ) => Promise<void>;
   readonly metrics?: Metrics;
   readonly parseKeyValueAttributes: (
@@ -337,7 +304,7 @@ export function createMetricFactsBridge(
 
   return {
     name: "codingAgentMetricFactsBridge",
-    eventTypes: [METRIC_DATA_POINT_RECEIVED_EVENT_TYPE],
+    eventTypes: deps.eventTypes,
     enqueue: { filter: isCodingAgentMetric },
     options: {
       deduplication: {
@@ -350,9 +317,9 @@ export function createMetricFactsBridge(
       const point = event.data;
       if (!isCodingAgentMetric(event)) return;
       if (point.valueType === "none") {
-        // Histograms/summaries carry no scalar total — nothing in the
-        // session vocabulary maps a distribution today. A real gap, not a
-        // failure: counted distinctly so it can be told apart from one.
+        // Histograms and summaries carry no scalar total, and nothing in the
+        // session vocabulary maps a distribution today. Counted distinctly so a
+        // gap can be told apart from a failure.
         drops.inc({ signal: "metric", reason: "no_scalar_value" });
         return;
       }
@@ -367,9 +334,8 @@ export function createMetricFactsBridge(
 
       const providerSessionKey =
         deps.detection.resolveConversationKey(attributes);
-      // Metric datapoints carry no inline trace correlation — see the
-      // module docblock. `traceId: null` is honest about the signal, not a
-      // fourth give-up behaviour.
+      // A metric point carries no inline trace correlation, so `traceId: null`
+      // is honest about the signal rather than a fourth give-up behaviour.
       const resolved = resolveCodingAgentSessionId({
         providerSessionKey,
         traceId: null,
@@ -393,20 +359,19 @@ export function createMetricFactsBridge(
       const resourceAttributes = deps.parseKeyValueAttributes(
         point.resourceAttributesJson,
       );
-      const serviceName =
-        typeof resourceAttributes?.["service.name"] === "string"
-          ? (resourceAttributes["service.name"] as string)
-          : null;
+      const serviceName = resourceAttributes?.["service.name"];
       const agent = deps.detection.detectAgent({
         recordName: point.metricName,
         scopeName: point.scopeName,
-        serviceName,
+        serviceName: typeof serviceName === "string" ? serviceName : null,
       });
       if (agent === "unknown") {
         drops.inc({ signal: "metric", reason: "unknown_agent" });
         return;
       }
 
+      // A delta point is its own series of one: adding deltas is exactly what
+      // ADR-103 forbids, so each is keyed by the point that carried it.
       const isDelta = point.aggregationTemporality === "delta";
 
       await deps.contributeMetricFacts({
@@ -415,8 +380,6 @@ export function createMetricFactsBridge(
         sessionKeySource: resolved.sessionKeySource,
         agent,
         occurredAt: point.timeUnixMs,
-        // The canonical metric point's own `acceptedAt` — genuinely
-        // platform-set, per `metric-processing/schema.ts`.
         acceptedAt: point.acceptedAt,
         seriesId: isDelta ? point.pointId : point.seriesId,
         metricName: point.metricName,

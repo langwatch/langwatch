@@ -1,5 +1,6 @@
 /**
- * The WIRE contract of one turn event, as the tail read serves it (ADR-059 §3):
+ * The WIRE contract of one turn event, as the tail read serves it (ADR-059
+ * §3, retired; ground now ADR-098):
  * the event's identity, its cursor coordinates (`createdAt` is the log-accept
  * time — the same clock as `LangyEventCursor.acceptedAt` — `id` the KSUID
  * tie-break), the fold clock (`occurredAt`), and the typed payload. No tenant,

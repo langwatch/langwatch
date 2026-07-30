@@ -13,12 +13,12 @@ const logger = createLogger(
  * The durability guarantee behind `dispatch.ts`'s three losable pokes: a
  * scheduled re-list and re-dispatch of the whole candidate set every tick,
  * never a diff against what already landed. Every contribution command is
- * idempotent under its own natural key, so a repeat dispatch is a no-op at
- * the fold and a collapsed row at the contributions store.
+ * idempotent under its own natural key, so a repeat dispatch is a no-op at the
+ * fold and a collapsed row at the contributions store.
  */
 
 export interface ContributionSweepDeps {
-  /** Every span-derived contribution that should exist as of this tick, for the window `listSpanCandidates` itself decides. See the module docblock. */
+  /** Every contribution that should exist as of this tick, over a window the lister itself decides. */
   readonly listSpanCandidates: () => Promise<readonly SpanFactsContribution[]>;
   readonly listLogCandidates: () => Promise<readonly LogFactsContribution[]>;
   readonly listMetricCandidates: () => Promise<
@@ -31,9 +31,7 @@ export interface ContributionSweepDeps {
     data: MetricFactsContribution,
   ) => Promise<void>;
 
-  /** Records that this tick ran — see `billingMeterSweep.ts`'s identical `recordTick` for the known gap this narrows around (no process-manager/outbox primitive exists yet). */
   readonly recordTick: () => Promise<void>;
-  readonly now?: () => number;
 }
 
 export interface ContributionSweepOutcome {
@@ -42,11 +40,9 @@ export interface ContributionSweepOutcome {
 }
 
 /**
- * One tick: list every signal's candidate set independently, dispatch each
- * one, record the tick, then raise if anything failed. A candidate-listing
- * failure for one signal never prevents the other two from running — the
- * same "each attempted independently" shape `billingMeterSweep.ts` uses for
- * its grace-window months.
+ * One tick: list every signal's candidates, dispatch each, record the tick,
+ * then raise if anything failed. One signal's listing failure never stops the
+ * other two.
  */
 export function runContributionSweep(deps: ContributionSweepDeps) {
   return async (): Promise<ContributionSweepOutcome> => {
@@ -118,11 +114,10 @@ export function runContributionSweep(deps: ContributionSweepDeps) {
     }
 
     if (failures.length > 0) {
+      // Whatever schedules this tick retries the whole thing. Re-dispatching
+      // candidates that already landed is free — every command is idempotent
+      // under its own natural key.
       const [firstFailure] = failures;
-      // Raised, not swallowed — whatever schedules this tick must retry the
-      // whole thing. Re-dispatching candidates that already succeeded is
-      // free (idempotent by natural key), so a retried tick costs nothing
-      // beyond the wasted writes.
       throw firstFailure;
     }
 
@@ -132,15 +127,7 @@ export function runContributionSweep(deps: ContributionSweepDeps) {
 
 export const CONTRIBUTION_SWEEP_NAME = "codingAgentContributionSweep" as const;
 
-/**
- * Mount descriptor for a future scheduler — no process-manager/scheduler
- * runtime exists in `@langwatch/event-sourcing` yet (the same gap
- * `billing-reporting/reporting/billingMeterSweep.ts` documents), so this
- * stays a plain descriptor rather than a call into a mount API that does
- * not exist. The pre-existing, generic
- * `~/server/app-layer/scheduler/scheduler.service.ts` is the most likely
- * home, exactly as billing's own sweep names.
- */
+/** What a scheduler needs to run this sweep. */
 export interface ContributionSweepMount {
   readonly name: typeof CONTRIBUTION_SWEEP_NAME;
   readonly intervalMs: number;

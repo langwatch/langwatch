@@ -2,7 +2,8 @@
  * Unit tests for ScenarioExecutionPool.
  *
  * The pool is a registry of live children, not a queue: pending work is an
- * outbox row and concurrency is the dispatcher's (ADR-073 step 2). What is
+ * outbox row and concurrency is the dispatcher's (ADR-073 step 2, retired;
+ * ground now ADR-103). What is
  * left to test is what cancellation depends on.
  *
  * @see specs/scenarios/scenario-execution-process-manager.feature

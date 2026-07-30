@@ -62,26 +62,15 @@ export { noopMetrics } from "./ports/metrics";
 export { EVENT_SOURCING_TRACER, tracer, withSpan } from "./ports/tracing";
 export type {
   CommandBuilt,
-  CommandStart,
-  CommandWithInput,
-  FoldOn,
-  FoldStart,
-  FoldStated,
   FoldWithStore,
-  MapOn,
-  MapStart,
   MapWithStore,
   PipelineChain,
   PipelineChainWithId,
   PipelineNamed,
   PipelineNamedPrefixed,
   PipelinePorts,
-  ProcessManagerIntented,
   ProcessManagerOn,
-  ProcessManagerStart,
-  ProcessManagerStated,
   SubscriberOn,
-  SubscriberStart,
 } from "./pipeline/definePipeline";
 export { definePipeline } from "./pipeline/definePipeline";
 export type {

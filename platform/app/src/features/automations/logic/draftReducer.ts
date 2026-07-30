@@ -100,11 +100,13 @@ export interface AutomationDraft {
   /** Report content + schedule. Only meaningful when `source === "report"`;
    *  carried around so type-switching doesn't wipe it. */
   report: ReportDraft;
-  /** Per-trigger digest cadence (ADR-026). Ignored at storage and dispatch
+  /** Per-trigger digest cadence (ADR-026, retired; ground now ADR-098).
+   *  Ignored at storage and dispatch
    *  time for persist actions, so the draft value can sit dormant while the
    *  user is type-switching. */
   notificationCadence: NotificationCadence;
-  /** Per-trigger trace-readiness debounce in ms (ADR-026). The settle stage
+  /** Per-trigger trace-readiness debounce in ms (ADR-026, retired; ground
+   *  now ADR-098). The settle stage
    *  holds the trace this long before re-evaluating filters; only meaningful
    *  for notify actions (persist actions ignore it). */
   traceDebounceMs: number;
@@ -159,11 +161,13 @@ export const INITIAL_DRAFT: AutomationDraft = {
   customGraphId: null,
   graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
   report: INITIAL_REPORT_DRAFT,
-  // Matches the app-layer create-default for notify triggers (ADR-026).
+  // Matches the app-layer create-default for notify triggers (ADR-026,
+  // retired; ground now ADR-098).
   // Persist actions ignore this at the router boundary, so leaving it set
   // here while the user is picking an action is safe.
   notificationCadence: "5min_digest",
-  // Matches the `Trigger.traceDebounceMs` column default (ADR-026). Persist
+  // Matches the `Trigger.traceDebounceMs` column default (ADR-026, retired;
+  // ground now ADR-098). Persist
   // actions ignore this at dispatch time, so a non-zero default is harmless
   // even while the user is type-switching.
   traceDebounceMs: DEFAULT_TRACE_DEBOUNCE_MS,

@@ -1,6 +1,7 @@
 /**
  * The Langy turn fold — the WHOLE reduction of a turn's durable events into its
- * render document, as one pure module (ADR-059 §1).
+ * render document, as one pure module (ADR-059 §1, retired; ground now
+ * ADR-098).
  *
  * `src/server/event-sourcing/langy-conversation-processing/` (ADR-098/105
  * greenfield rewrite) and the browser's local projection (`turnProjection.ts`)
@@ -139,7 +140,8 @@ export const langyTurnToolCallSchema = z
  *
  * `QuestionParts` is reserved: it is populated once the conversation flow shares
  * a turnId between the user message (`message_recorded`) and the response
- * (`agent_turn_accepted`) — see ADR-046. Until then the
+ * (`agent_turn_accepted`) — see the retired ADR-046 (ground now ADR-098).
+ * Until then the
  * answer parts already carry everything renderable (text + tool-output cards +
  * enrichment card + actions).
  */

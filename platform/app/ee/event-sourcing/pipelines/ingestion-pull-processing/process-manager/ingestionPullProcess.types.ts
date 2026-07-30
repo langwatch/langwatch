@@ -45,7 +45,7 @@ export interface IngestionPullProcessState {
 
 /**
  * The content-stripped view of a pipeline event the process consumes
- * (ADR-052 content boundary). Pull events carry provider payload counts and
+ * (ADR-052 content boundary, retired; ground now ADR-098). Pull events carry provider payload counts and
  * cursors, never customer content, but the boundary keeps the same shape
  * discipline as the other process managers.
  */

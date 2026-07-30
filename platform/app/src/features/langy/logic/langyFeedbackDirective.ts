@@ -1,5 +1,6 @@
 /**
- * Structured, hidden directive channel for Langy (ADR-046 frontend).
+ * Structured, hidden directive channel for Langy (ADR-046 frontend, retired;
+ * ground now ADR-098).
  *
  * Langy emits hidden in-stream directives the client parses and strips from the
  * displayed text — the same pattern the codebase already uses for

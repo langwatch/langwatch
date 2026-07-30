@@ -1,163 +1,85 @@
-import type { ClickHouseClient, TableDefinition } from "@langwatch/clickhouse";
-import { clickhouseReplacing } from "@langwatch/clickhouse";
-import type {
-  FoldProjection,
-  GroupKey,
-  Metrics,
-  Mount,
-} from "@langwatch/event-sourcing";
+import { type ClickHouseClient, clickhouseReplacing } from "@langwatch/clickhouse";
 import {
   ConfigurationError,
-  createFoldExecutor,
+  definePipeline,
   validateMount,
+  type GroupKey,
+  type Metrics,
+  type Mount,
 } from "@langwatch/event-sourcing";
-import { topicClustering } from "./aggregate";
-import { topicClusteringProcess } from "./process";
-import { topicClusteringRunHistory } from "./projections/runHistory";
-import { topicClusteringRunStatus } from "./projections/runStatus";
-import { topicModel } from "./projections/topicModel";
+import { TOPIC_CLUSTERING_PIPELINE_NAME, TOPIC_CLUSTERING_PIPELINE_PREFIX, topicClusteringEvents } from "./events";
 import {
-  type FoldStateColumns,
-  foldStateRow,
-  topicClusteringRunHistoryTable,
-  topicClusteringRunStatusTable,
-  topicModelTable,
-} from "./tables";
-
-export {
-  recordClusteringRunCompletedIdempotencyKey,
-  recordClusteringRunFailedIdempotencyKey,
-  recordClusteringRunStartedIdempotencyKey,
-  recordTopicsIdempotencyKey,
-  requestClusteringIdempotencyKey,
-  type TopicClusteringAggregate,
-  topicClustering,
-} from "./aggregate";
-export type {
-  TopicClusteringDispatchPorts,
-  TopicClusteringRunIntentPayload,
-  TopicClusteringScheduleState,
-} from "./process";
-export {
-  initTopicClusteringScheduleState,
-  nextDailySlot,
-  onTopicClusteringWake,
-  TOPIC_CLUSTERING_PROCESS_NAME,
-  TOPIC_CLUSTERING_STALE_RUN_MS,
   topicClusteringProcess,
-  topicClusteringRunIntentPayloadSchema,
-  topicClusteringScheduleStateSchema,
+  type TopicClusteringDispatchPorts,
 } from "./process";
-export type {
-  RunHistoryEntry,
-  RunHistoryOutcome,
-  RunHistoryState,
-  RunHistoryViewEntry,
-} from "./projections/runHistory";
-export {
-  deriveRunHistoryView,
-  initRunHistoryState,
-  RUN_HISTORY_LIMIT,
-  runHistoryStateSchema,
-  topicClusteringRunHistory,
-} from "./projections/runHistory";
-export type {
-  RunStatusState,
-  RunStatusView,
-  TerminalOutcome,
-} from "./projections/runStatus";
-export {
-  deriveRunStatusView,
-  initRunStatusState,
-  runStatusStateSchema,
-  topicClusteringRunStatus,
-} from "./projections/runStatus";
-export type {
-  ProjectedTopic,
-  TopicModelState,
-  TopicModelView,
-} from "./projections/topicModel";
-export {
-  deriveTopicModelView,
+import {
+  applyTopicsRecorded,
   initTopicModelState,
-  topicModel,
   topicModelStateSchema,
 } from "./projections/topicModel";
-export {
-  isManualRun,
-  mintManualRunId,
-  mintScheduledRunId,
-  runIsNewer,
-  runRank,
-} from "./runIdentity";
-export type {
-  RequestedData,
-  RunCompletedData,
-  RunFailedData,
-  RunStartedData,
-  TopicClusteringRunMode,
-  TopicClusteringSearchAfter,
-  TopicClusteringSkipReason,
-  TopicClusteringTrigger,
-  TopicModelEntry,
-  TopicModelRecordMode,
-  TopicModelRecordSource,
-  TopicsRecordedData,
-} from "./schema";
-export {
-  requestedDataSchema,
-  runCompletedDataSchema,
-  runFailedDataSchema,
-  runStartedDataSchema,
-  topicClusteringRunModeSchema,
-  topicClusteringSearchAfterSchema,
-  topicClusteringSkipReasonSchema,
-  topicClusteringTriggerSchema,
-  topicModelEntrySchema,
-  topicModelRecordModeSchema,
-  topicModelRecordSourceSchema,
-  topicsRecordedDataSchema,
-} from "./schema";
-export {
-  topicClusteringRunHistoryTable,
-  topicClusteringRunStatusTable,
-  topicModelTable,
-} from "./tables";
+import {
+  handleRunCompleted as applyRunHistoryRunCompleted,
+  handleRunFailed as applyRunHistoryRunFailed,
+  handleRunStarted as applyRunHistoryRunStarted,
+  initRunHistoryState,
+  runHistoryStateSchema,
+} from "./projections/runHistory";
+import {
+  handleRequested as applyRunStatusRequested,
+  handleRunCompleted as applyRunStatusRunCompleted,
+  handleRunFailed as applyRunStatusRunFailed,
+  handleRunStarted as applyRunStatusRunStarted,
+  initRunStatusState,
+  runStatusStateSchema,
+} from "./projections/runStatus";
+import { recordClusteringRunCompleted } from "./recordClusteringRunCompleted.command";
+import { recordClusteringRunFailed } from "./recordClusteringRunFailed.command";
+import { recordClusteringRunStarted } from "./recordClusteringRunStarted.command";
+import { recordTopics } from "./recordTopics.command";
+import { requestClustering } from "./requestClustering.command";
+import { foldStateRow, topicClusteringRunHistoryTable, topicClusteringRunStatusTable, topicModelTable } from "./tables";
+
+export { TOPIC_CLUSTERING_PIPELINE_NAME, TOPIC_CLUSTERING_PIPELINE_PREFIX } from "./events";
+export type { TopicClusteringDispatchPorts, TopicClusteringRunIntentPayload } from "./process";
+export { TOPIC_CLUSTERING_STALE_RUN_MS, nextDailySlot } from "./process";
+export type { RunStatusView } from "./projections/runStatus";
+export { deriveRunStatusView } from "./projections/runStatus";
+export type { RunHistoryViewEntry, RunHistoryOutcome } from "./projections/runHistory";
+export { deriveRunHistoryView, RUN_HISTORY_LIMIT } from "./projections/runHistory";
+export type { TopicModelView, ProjectedTopic } from "./projections/topicModel";
+export { deriveTopicModelView } from "./projections/topicModel";
+
+/**
+ * The deployed stamps from `event-sourcing.old/pipelines/topic-clustering-processing/schemas/constants.ts`'s
+ * `TOPIC_CLUSTERING_PROJECTION_VERSIONS`. `.old` kept these three read models
+ * in Postgres; wiring them to ClickHouse here is a storage-backend change this
+ * conversion does not resolve — the pin travels with the fold regardless, so
+ * a later migration that copies rows across storage keeps the same version
+ * identity rather than inventing a new one.
+ */
+export const TOPIC_CLUSTERING_RUN_STATUS_VERSION_PIN = "2026-07-17";
+export const TOPIC_CLUSTERING_RUN_HISTORY_VERSION_PIN = "2026-07-20";
+export const TOPIC_MODEL_VERSION_PIN = "2026-07-20";
 
 /** One lane per project everywhere: the aggregate is the project's clustering
  * stream, and every fold, command and the process manager mirror it 1:1. */
 function projectScope(tenantId: string) {
-  return {
-    kind: "aggregate",
-    aggregateType: topicClustering.name,
-    aggregateId: tenantId,
-  } as const;
+  return { kind: "aggregate", aggregateType: TOPIC_CLUSTERING_PIPELINE_NAME, aggregateId: tenantId } as const;
 }
 
-export function topicClusteringCommandGroupKey(args: {
-  tenantId: string;
-}): GroupKey {
+export function topicClusteringCommandGroupKey(args: { tenantId: string }): GroupKey {
+  return { tenantId: args.tenantId, lane: { kind: "command" }, scope: projectScope(args.tenantId) };
+}
+
+export function topicClusteringProcessGroupKey(args: { tenantId: string }): GroupKey {
   return {
     tenantId: args.tenantId,
-    lane: { kind: "command" },
+    lane: { kind: "processManager", name: "topicClustering" },
     scope: projectScope(args.tenantId),
   };
 }
 
-export function topicClusteringProcessGroupKey(args: {
-  tenantId: string;
-}): GroupKey {
-  return {
-    tenantId: args.tenantId,
-    lane: { kind: "processManager", name: topicClusteringProcess.name },
-    scope: projectScope(args.tenantId),
-  };
-}
-
-export function topicClusteringFoldGroupKey(args: {
-  tenantId: string;
-  projection: string;
-}): GroupKey {
+export function topicClusteringFoldGroupKey(args: { tenantId: string; projection: string }): GroupKey {
   return {
     tenantId: args.tenantId,
     lane: { kind: "fold", name: args.projection },
@@ -166,14 +88,14 @@ export function topicClusteringFoldGroupKey(args: {
 }
 
 /** Refused at composition, never at the first delivery (ADR-106). */
-function legalMount(projection: string, mount: Mount): Mount {
+function assertMountIsLegal(projection: string, mount: Mount): Mount {
   const violations = validateMount(mount);
   if (violations.length > 0) {
     throw new ConfigurationError(
       `topic-clustering-processing's ${projection} mount is illegal: ${violations
-        .map((violation) => `${violation.rule} — ${violation.message}`)
+        .map((v) => `${v.rule} — ${v.message}`)
         .join("; ")}`,
-      { pipeline: "topic_clustering_processing", projection, violations },
+      { pipeline: TOPIC_CLUSTERING_PIPELINE_NAME, projection, violations },
     );
   }
   return mount;
@@ -182,64 +104,117 @@ function legalMount(projection: string, mount: Mount): Mount {
 export interface TopicClusteringProcessingDeps {
   readonly client: ClickHouseClient;
   readonly metrics?: Metrics;
+  /** The clustering effect itself and the pipeline's own commands, adapted by
+   * the composition root (ADR-105 decision 6). */
+  readonly ports: TopicClusteringDispatchPorts;
 }
 
-/** All three folds share one table shape — the whole state in one JSON column,
- * keyed by project — so they share one mount, one lane shape and one store. */
-function projectFold<State>(
-  projection: FoldProjection<State>,
-  table: TableDefinition<FoldStateColumns<State>>,
-  deps: TopicClusteringProcessingDeps,
-) {
-  return {
-    projection,
-    mount: legalMount(projection.name, {
-      projection: "fold",
-      store: "replace",
-      scope: "aggregate",
-      collapse: "batch",
-    }),
-    groupKey: (args: { tenantId: string }): GroupKey =>
-      topicClusteringFoldGroupKey({ ...args, projection: projection.name }),
-    executor: createFoldExecutor({
-      store: clickhouseReplacing<State, FoldStateColumns<State>>({
-        client: deps.client,
-        table,
-        version: projection.version,
-        key: "ProjectId",
-        stateVersionColumn: "StateVersion",
-        row: foldStateRow<State>(),
-      }),
-      init: projection.init,
-      apply: projection.apply,
-      stateVersion: projection.version,
-      projectionName: projection.name,
-      metrics: deps.metrics,
-    }),
+export function createTopicClusteringProcessingPipeline(deps: TopicClusteringProcessingDeps) {
+  const runStatusStore = clickhouseReplacing({
+    client: deps.client,
+    table: topicClusteringRunStatusTable,
+    version: TOPIC_CLUSTERING_RUN_STATUS_VERSION_PIN,
+    key: "ProjectId",
+    stateVersionColumn: "StateVersion",
+    row: foldStateRow<ReturnType<typeof initRunStatusState>>(),
+  });
+  assertMountIsLegal("topicClusteringRunStatus", {
+    projection: "fold",
+    store: runStatusStore.kind,
+    scope: "aggregate",
+    collapse: "batch",
+  });
+
+  const runHistoryStore = clickhouseReplacing({
+    client: deps.client,
+    table: topicClusteringRunHistoryTable,
+    version: TOPIC_CLUSTERING_RUN_HISTORY_VERSION_PIN,
+    key: "ProjectId",
+    stateVersionColumn: "StateVersion",
+    row: foldStateRow<ReturnType<typeof initRunHistoryState>>(),
+  });
+  assertMountIsLegal("topicClusteringRunHistory", {
+    projection: "fold",
+    store: runHistoryStore.kind,
+    scope: "aggregate",
+    collapse: "batch",
+  });
+
+  const topicModelStore = clickhouseReplacing({
+    client: deps.client,
+    table: topicModelTable,
+    version: TOPIC_MODEL_VERSION_PIN,
+    key: "ProjectId",
+    stateVersionColumn: "StateVersion",
+    row: foldStateRow<ReturnType<typeof initTopicModelState>>(),
+  });
+  assertMountIsLegal("topicModel", {
+    projection: "fold",
+    store: topicModelStore.kind,
+    scope: "aggregate",
+    collapse: "batch",
+  });
+
+  const idByProjectId = {
+    requested: (data: { projectId: string }) => data.projectId,
+    runStarted: (data: { projectId: string }) => data.projectId,
+    runCompleted: (data: { projectId: string }) => data.projectId,
+    runFailed: (data: { projectId: string }) => data.projectId,
+    topicsRecorded: (data: { projectId: string }) => data.projectId,
   };
+
+  return definePipeline(TOPIC_CLUSTERING_PIPELINE_NAME)
+    .prefix(TOPIC_CLUSTERING_PIPELINE_PREFIX)
+    .events(topicClusteringEvents)
+    .id(idByProjectId)
+    .withCommand("requestClustering", { input: topicClusteringEvents.requested, handle: requestClustering })
+    .withCommand("recordClusteringRunStarted", {
+      input: topicClusteringEvents.runStarted,
+      handle: recordClusteringRunStarted,
+    })
+    .withCommand("recordClusteringRunCompleted", {
+      input: topicClusteringEvents.runCompleted,
+      handle: recordClusteringRunCompleted,
+    })
+    .withCommand("recordClusteringRunFailed", {
+      input: topicClusteringEvents.runFailed,
+      handle: recordClusteringRunFailed,
+    })
+    .withCommand("recordTopics", { input: topicClusteringEvents.topicsRecorded, handle: recordTopics })
+    .withFold("topicClusteringRunStatus", {
+      state: runStatusStateSchema,
+      init: initRunStatusState,
+      pin: TOPIC_CLUSTERING_RUN_STATUS_VERSION_PIN,
+      on: {
+        requested: applyRunStatusRequested,
+        runStarted: applyRunStatusRunStarted,
+        runCompleted: applyRunStatusRunCompleted,
+        runFailed: applyRunStatusRunFailed,
+      },
+      store: runStatusStore,
+    })
+    .withFold("topicClusteringRunHistory", {
+      state: runHistoryStateSchema,
+      init: initRunHistoryState,
+      pin: TOPIC_CLUSTERING_RUN_HISTORY_VERSION_PIN,
+      on: {
+        runStarted: applyRunHistoryRunStarted,
+        runCompleted: applyRunHistoryRunCompleted,
+        runFailed: applyRunHistoryRunFailed,
+      },
+      store: runHistoryStore,
+    })
+    .withFold("topicModel", {
+      state: topicModelStateSchema,
+      init: initTopicModelState,
+      pin: TOPIC_MODEL_VERSION_PIN,
+      on: { topicsRecorded: applyTopicsRecorded },
+      store: topicModelStore,
+    })
+    .withProcessManager("topicClustering", topicClusteringProcess(deps.ports))
+    .build({ metrics: deps.metrics });
 }
 
-/** The whole topology: one aggregate, three folds, one process manager. */
-export function topicClusteringProcessing(deps: TopicClusteringProcessingDeps) {
-  return {
-    aggregate: topicClustering,
-    commandGroupKey: topicClusteringCommandGroupKey,
-    process: {
-      definition: topicClusteringProcess,
-      groupKey: topicClusteringProcessGroupKey,
-    },
-    folds: {
-      topicClusteringRunStatus: projectFold(
-        topicClusteringRunStatus,
-        topicClusteringRunStatusTable,
-        deps,
-      ),
-      topicClusteringRunHistory: projectFold(
-        topicClusteringRunHistory,
-        topicClusteringRunHistoryTable,
-        deps,
-      ),
-      topicModel: projectFold(topicModel, topicModelTable, deps),
-    },
-  };
-}
+export type TopicClusteringProcessingPipeline = ReturnType<
+  typeof createTopicClusteringProcessingPipeline
+>;

@@ -64,29 +64,3 @@ export interface EvaluationAnalyticsRepository {
     appliedEventIds: string[];
   } | null>;
 }
-
-/** No-op implementation for tests and ClickHouse-less environments. */
-export class NullEvaluationAnalyticsRepository
-  implements EvaluationAnalyticsRepository
-{
-  async upsert(
-    _row: EvaluationAnalyticsRow,
-    _retentionDays?: number,
-    _appliedEventIds?: readonly string[],
-  ): Promise<void> {}
-
-  async upsertBatch(
-    _entries: Array<{
-      row: EvaluationAnalyticsRow;
-      retentionDays?: number;
-      appliedEventIds?: readonly string[];
-    }>,
-  ): Promise<void> {}
-
-  async findByEvaluationIdWithApplied(): Promise<{
-    row: EvaluationAnalyticsRow;
-    appliedEventIds: string[];
-  } | null> {
-    return null;
-  }
-}

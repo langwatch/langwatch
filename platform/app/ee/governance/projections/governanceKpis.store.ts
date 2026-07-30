@@ -2,7 +2,7 @@
 
 /**
  * `AppendStore` adapter for the `governanceKpis` map projection
- * (ADR-075 Class C). Mirrors the OCSF store: the derivation lives in the
+ * (ADR-075 Class C, retired; ground now ADR-098). Mirrors the OCSF store: the derivation lives in the
  * projection, the insert shape in the repository, and this only bridges
  * them.
  *

@@ -25,14 +25,14 @@ function smallUint(chType: "UInt16" | "UInt32"): ColumnDef<number> {
 }
 
 /**
- * The run row (ADR-099): the run's own facts, one row per run, nothing that
- * grows. The deployed table's `Messages.*` arrays, `LastSnapshotOccurredAt`,
- * `TraceMetricsJson` and `_size_bytes` are real columns this fold no longer
- * writes, so none is declared — each keeps its DDL default on new rows.
+ * The run row (ADR-099): one row per run, nothing that grows. The deployed
+ * table's `Messages.*` arrays, `LastSnapshotOccurredAt`, `TraceMetricsJson` and
+ * `_size_bytes` are real columns this fold no longer writes, so none is
+ * declared — each keeps its DDL default on new rows.
  *
- * `StartedAt` is the deployed partition column and is the earliest time the
- * run was observed running, so `ch.acceptedAt()` is a role mapping onto
- * today's column rather than a claim it was always frozen.
+ * `StartedAt` is the deployed partition column, so it holds the platform's own
+ * accept stamp, frozen on the row's first write. A partition anchored on a
+ * customer stamp moves, and two versions in two partitions never collapse.
  */
 export const simulationRunsTable = defineTable({
   name: "simulation_runs",
@@ -63,6 +63,8 @@ export const simulationRunsTable = defineTable({
     TotalCost: ch.nullable(ch.float64()),
     RoleCosts: ch.map(ch.string(), ch.array(ch.float64())),
     RoleLatencies: ch.map(ch.string(), ch.array(ch.float64())),
+    /** The stamp the stored measurement carried. */
+    MetricsAsOf: ch.nullable(ch.dateTime64(3)),
     StartedAt: ch.acceptedAt(),
     QueuedAt: ch.nullable(ch.dateTime64(3)),
     CreatedAt: ch.dateTime64(3),
@@ -79,11 +81,9 @@ export const simulationRunsTable = defineTable({
 export type SimulationRunsRow = TableRow<typeof simulationRunsTable.columns>;
 
 /**
- * The item table a run's messages live in, one row per message. The sort key
- * is the logical message, so a redelivered message collapses to a single row
- * at merge instead of accumulating (ADR-103 decision 2).
- *
- * NOT YET DEPLOYED — see this pipeline's report for the migration it needs.
+ * The item table a run's messages live in, one row per message. The sort key is
+ * the logical message, so a redelivered message collapses to a single row at
+ * merge instead of accumulating (ADR-103 decision 2).
  */
 export const simulationRunMessagesTable = defineTable({
   name: "simulation_run_messages",

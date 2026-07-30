@@ -256,12 +256,12 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   metric_series: "traces",
   metric_time_rollups: "traces",
   trace_summaries: "traces",
-  // ADR-034: both analytics projections derive from trace events and age with
+  // ADR-034 (retired; ground now ADR-099): both analytics projections derive from trace events and age with
   // the same per-project retention policy as trace_summaries.
   trace_analytics: "traces",
   trace_analytics_rollup: "traces",
   evaluation_runs: "traces",
-  // ADR-034 Phase 6: eval analytics tables age with the same per-project
+  // ADR-034 (retired; ground now ADR-099) Phase 6: eval analytics tables age with the same per-project
   // retention policy as evaluation_runs (and trace_summaries — both currently
   // categorised "traces" until eval split-out lands).
   evaluation_analytics: "traces",

@@ -890,7 +890,7 @@ describe("auto-shutdown signal handlers", () => {
     resetObservabilitySdkConfig();
   });
 
-  it("registers beforeExit, SIGINT, and SIGTERM handlers by default", () => {
+  it("registers a beforeExit handler by default, and never touches SIGINT/SIGTERM", () => {
     const logger = new MockLogger({});
     createAndStartNodeSdk(
       { ...defaultOptions, debug: { logger } },
@@ -899,11 +899,11 @@ describe("auto-shutdown signal handlers", () => {
     );
 
     expect(processOnCalls).toContain("beforeExit");
-    expect(processOnCalls).toContain("SIGINT");
-    expect(processOnCalls).toContain("SIGTERM");
+    expect(processOnCalls).not.toContain("SIGINT");
+    expect(processOnCalls).not.toContain("SIGTERM");
   });
 
-  it("does not register signal handlers when disableAutoShutdown is true", () => {
+  it("does not register beforeExit when disableAutoShutdown is true", () => {
     const logger = new MockLogger({});
     createAndStartNodeSdk(
       {

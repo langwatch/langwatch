@@ -379,7 +379,8 @@ describe("ClickHouse trace dedup (integration)", () => {
 
         // Two versions of the same span. `UpdatedAt` is what separates them —
         // the writer stamps it fresh on every insert, and it is the only
-        // column on stored_spans that orders writes (ADR-083). StartTime
+        // column on stored_spans that orders writes (ADR-083, retired;
+        // ground now ADR-099). StartTime
         // differs here too, but only because this fixture predates that and
         // the other assertions below read the durations off it.
         await insertSpan(
@@ -718,7 +719,7 @@ describe("ClickHouse trace dedup (integration)", () => {
      * This is the case the old `max(StartTime)` dedup could not handle. Both
      * versions tie on StartTime, so both satisfy the IN-tuple, and with no
      * `LIMIT 1 BY SpanId` behind it the read emitted the span once per
-     * unmerged version. See ADR-083.
+     * unmerged version. See ADR-083 (retired; ground now ADR-099).
      */
     describe("when a span is re-reported with the same start time", () => {
       const traceId = `trace-rereport-${nanoid()}`;
@@ -793,7 +794,7 @@ describe("ClickHouse trace dedup (integration)", () => {
 
       // The trace-detail page and the trace-scoped span listing are separate
       // queries over the same table, and they elected versions differently
-      // until ADR-083: one on `max(StartTime)`, one on `max(UpdatedAt)`. Two
+      // until ADR-083 (retired; ground now ADR-099): one on `max(StartTime)`, one on `max(UpdatedAt)`. Two
       // readers disagreeing about which report is current is the same defect
       // as showing the wrong one, so they are asserted against each other
       // rather than each against a literal.
@@ -819,7 +820,7 @@ describe("ClickHouse trace dedup (integration)", () => {
      * wrong rather than merely useless: a correction that moves the span's
      * start time EARLIER. Electing the greatest start time picks the version
      * being corrected — it prefers the stale row on purpose. Only the write
-     * time orders reports. See ADR-083.
+     * time orders reports. See ADR-083 (retired; ground now ADR-099).
      */
     describe("when a span is re-reported with an earlier start time", () => {
       const traceId = `trace-restart-${nanoid()}`;

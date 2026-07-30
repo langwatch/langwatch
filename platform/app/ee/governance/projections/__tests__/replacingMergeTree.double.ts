@@ -3,7 +3,8 @@
 /**
  * A `ReplacingMergeTree` the rebuild tests can actually run against.
  *
- * The rebuild guarantees ADR-075 Class C has to satisfy are properties of
+ * The rebuild guarantees ADR-075 Class C (retired; ground now ADR-098) has
+ * to satisfy are properties of
  * the projection AND the table's engine together: the derivation makes a
  * re-derived row identical, and the engine collapses it onto the row it
  * re-derives. Asserting only on the derivation would leave the half that

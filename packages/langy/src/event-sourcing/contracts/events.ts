@@ -1,8 +1,9 @@
 /**
- * Event PAYLOAD schemas for the `langy_conversation` aggregate (ADR-046) — the
+ * Event PAYLOAD schemas for the `langy_conversation` aggregate (ADR-046,
+ * retired; ground now ADR-098) — the
  * `data` half of every durable event, shared by the server pipeline (which
  * wraps them in its own branded event envelope) and the browser (which folds
- * them locally, ADR-059). Payloads are pure Zod: no server types, no branding.
+ * them locally, ADR-059, also retired into ADR-098). Payloads are pure Zod: no server types, no branding.
  *
  * The full event schemas — envelope + `type`/`version` literals — stay in the
  * server pipeline (`langy-conversation-processing/schemas/events.ts`): the
@@ -264,7 +265,7 @@ export type LangyAgentRespondedEventData = z.infer<
 
 /**
  * ConversationArchived — soft-delete. Flips the fold's status/ArchivedAt.
- * No ClickHouse hard-deletion (ADR-046, out of scope).
+ * No ClickHouse hard-deletion (ADR-046, retired; ground now ADR-098, out of scope).
  */
 export const langyConversationArchivedEventDataSchema = z.object({
   conversationId: z.string(),
@@ -275,7 +276,8 @@ export type LangyConversationArchivedEventData = z.infer<
 
 /**
  * ConversationMetadataUpdated — rename and/or share toggle. Beyond the
- * prescribed vocabulary; preserves the PATCH route (ADR-046 open question 1).
+ * prescribed vocabulary; preserves the PATCH route (the retired ADR-046,
+ * ground now ADR-098, open question 1).
  * Any field left undefined is unchanged by the fold.
  */
 export const langyConversationMetadataUpdatedEventDataSchema = z.object({
@@ -289,7 +291,7 @@ export type LangyConversationMetadataUpdatedEventData = z.infer<
 >;
 
 /**
- * ConversationHandoffPending (ADR-048) — a turn checkpointed on pod termination
+ * ConversationHandoffPending (ADR-048, retired; ground now ADR-098) — a turn checkpointed on pod termination
  * and left an opaque, worker-authored resume token. The fold stores the token
  * (PendingHandoffToken/PendingHandoffTurnId), clears CurrentTurnId (the turn
  * handed off, it did not fail), and returns the conversation to idle. The token
@@ -306,7 +308,7 @@ export type LangyConversationHandoffPendingEventData = z.infer<
 >;
 
 /**
- * ConversationHandoffConsumed (ADR-048) — the next turn threaded the pending
+ * ConversationHandoffConsumed (ADR-048, retired; ground now ADR-098) — the next turn threaded the pending
  * resume token to a fresh worker and cleared it from the fold. Idempotency on
  * the command collapses a double-consume to a single event.
  */

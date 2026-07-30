@@ -563,7 +563,8 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
   });
 
   /**
-   * The end of the denominator's route (ADR-072). `BatchTotal` is written per
+   * The end of the denominator's route (ADR-072, retired; ground now
+   * ADR-103). `BatchTotal` is written per
    * child run and read back per batch, but until it reached this panel a batch
    * that lost part of its fan-out rendered as a smaller batch that finished
    * everything it started — the shortfall was unobservable in the product.

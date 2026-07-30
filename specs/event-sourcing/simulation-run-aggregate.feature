@@ -14,7 +14,7 @@ Feature: The simulation_run aggregate, rewritten onto the new event-sourcing pac
   about one of the three defects.
 
   Background:
-    Given the simulation_run aggregate declared in aggregate.ts
+    Given the simulation_run pipeline's fold declared in simulationRunState.projection.ts
 
   # ---------------------------------------------------------------------------
   # Defect 1 — a cancelled run must never be resurrected as SUCCESS

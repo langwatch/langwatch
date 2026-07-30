@@ -84,7 +84,8 @@ function mapVerdict(verdict: string | null): Verdict | undefined {
  *
  * The status is read, not derived. A stalled run is one the
  * `scenarioExecution` process wrote `STALLED` for when its deadline fired
- * (ADR-073 step 2), so what is stored and what is displayed cannot disagree —
+ * (ADR-073 step 2, retired; ground now ADR-103), so what is stored and what
+ * is displayed cannot disagree —
  * which the read-time derivation this replaced could not promise, because it
  * answered differently depending on when the row was read.
  */

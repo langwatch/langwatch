@@ -125,3 +125,26 @@ export const runCompletedDataSchema = z.object({
   stoppedAt: z.number().nullable().optional(),
 });
 export type RunCompletedData = z.infer<typeof runCompletedDataSchema>;
+
+/** RunId slugs are not unique across experiments, so the aggregate id is the
+ * composite every event's payload can produce (ADR-105 decision 4). */
+export function experimentRunAggregateId(data: {
+  readonly experimentId: string;
+  readonly runId: string;
+}): string {
+  return `${data.experimentId}:${data.runId}`;
+}
+
+/** The inverse of {@link experimentRunAggregateId}, for the store's
+ * two-column read. */
+export function parseExperimentRunAggregateId(compositeKey: string): {
+  experimentId: string;
+  runId: string;
+} {
+  const separatorIndex = compositeKey.indexOf(":");
+  if (separatorIndex === -1) return { experimentId: "", runId: compositeKey };
+  return {
+    experimentId: compositeKey.slice(0, separatorIndex),
+    runId: compositeKey.slice(separatorIndex + 1),
+  };
+}

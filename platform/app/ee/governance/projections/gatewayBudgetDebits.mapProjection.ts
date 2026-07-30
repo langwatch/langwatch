@@ -60,7 +60,8 @@ export const GATEWAY_MODEL_PROVIDER_ID_ATTR = "langwatch.model_provider_id";
  * that actually decide belong after normalisation, where they can be exact.
  * Deliberately defensive for the same reason the governance gate is: this
  * reads wire data behind a Zod-typed cast, and it is also used as an ADR-069
- * enqueue filter, a seam with no retry — so a missing/!array `attributes`, a
+ * (retired; ground now ADR-098) enqueue filter, a seam with no retry — so a
+ * missing/!array `attributes`, a
  * null entry or a non-object entry all read as "not gateway" rather than
  * throwing a job away.
  */
@@ -217,7 +218,7 @@ export function deriveGatewayDebitRecord(
 }
 
 /**
- * ADR-075 Class C: gateway spend as derived state, so replay can rebuild it.
+ * ADR-075 Class C (retired; ground now ADR-098): gateway spend as derived state, so replay can rebuild it.
  *
  * Replaces `gatewayBudgetSync.reactor.ts`'s ClickHouse half. The reactor's
  * writes sat outside the event-sourced guarantee — the projection router only

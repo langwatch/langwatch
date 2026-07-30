@@ -1,6 +1,5 @@
+import type { PIIRedactionLevel } from "~/server/event-sourcing/trace-processing/schema";
 import { isRecord, type UnknownRecord } from "./serialization";
-
-export type PiiRedactionLevel = "STRICT" | "ESSENTIAL" | "DISABLED";
 
 /** The redaction port this pipeline needs — narrowed to exactly one method. */
 export interface RedactionService {
@@ -9,7 +8,7 @@ export interface RedactionService {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
     },
-    piiRedactionLevel: PiiRedactionLevel,
+    piiRedactionLevel: PIIRedactionLevel,
     tenantId?: string,
   ): Promise<void>;
 }
@@ -56,7 +55,7 @@ export async function redactTypedAttributes(args: {
   pointAttributes: unknown;
   exemplarAttributes: unknown;
   redactionService: RedactionService;
-  piiRedactionLevel: PiiRedactionLevel;
+  piiRedactionLevel: PIIRedactionLevel;
   tenantId: string;
 }): Promise<void> {
   const refs: StringRef[] = [];

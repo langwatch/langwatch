@@ -14,7 +14,7 @@ const logger = createLogger("langwatch:enterprise:event-sourcing");
 export interface EnterprisePipelineSetConfig {
   prisma: PrismaClient;
   runsWorkers: boolean;
-  /** ADR-082 §5 — identity-keyed dispatch, handed to the pipelines below. */
+  /** ADR-082 §5 (retired; ground now ADR-102) — identity-keyed dispatch, handed to the pipelines below. */
   commands: CommandBus;
 }
 
@@ -30,7 +30,8 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
       ),
       runPort: { run: runIngestionPull },
       // The pipeline binds its own outcome commands through the bus, so
-      // nothing here is resolved after `.build()` (ADR-082 §5).
+      // nothing here is resolved after `.build()` (ADR-082 §5, retired;
+      // ground now ADR-102).
       commands: deps.commands,
     }),
   );
@@ -63,7 +64,8 @@ function registerIngestionPullPipeline(deps: EnterprisePipelineRuntimeDeps) {
 /**
  * Registers the complete enterprise pipeline set with the shared
  * event-sourcing runtime. Domain definitions stay under /ee; their process
- * managers are declared on the pipelines (ADR-052 builder), so the shared
+ * managers are declared on the pipelines (ADR-052 builder, retired; ground
+ * now ADR-098), so the shared
  * ProcessRuntime owns all workers — the core registry only composes this set
  * with the core pipelines.
  */

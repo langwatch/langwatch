@@ -130,7 +130,8 @@ export function GraphCardHeader({
            * Add-alert / edit-alert entry points for this graph.
            *
            * Both buttons open the automations drawer (the unified alert-
-           * authoring flow introduced in Phase 5.1 of ADR-034) pre-filled
+           * authoring flow introduced in Phase 5.1 of ADR-034, retired;
+           * ground now ADR-099) pre-filled
            * with this chart's graphId + series; the bell additionally
            * passes `automationId` so the drawer hydrates the existing
            * trigger row in edit mode. The legacy `customGraphAlert`

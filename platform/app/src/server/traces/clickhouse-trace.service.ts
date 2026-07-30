@@ -61,7 +61,8 @@ import type {
 
 /**
  * Callback injected from TraceService that resolves offloaded blob refs for
- * a single trace's normalized spans (ADR-088 decision B: read-time recompute).
+ * a single trace's normalized spans (ADR-088, retired; ground now ADR-099,
+ * decision B: read-time recompute).
  * When present, called after fetching spans but before mapping to legacy Span.
  */
 export type ResolveTraceSpansFn = (
@@ -896,7 +897,7 @@ export class ClickHouseTraceService {
           //
           // resolveBlobs stays opt-in, so the list/search grid and the
           // aggregations still issue ZERO event_log reads (#4888 AC2 /
-          // ADR-022 — AC5): they never ask for full IO, so nothing resolves,
+          // ADR-022 (retired; ground now ADR-099) — AC5): they never ask for full IO, so nothing resolves,
           // whether or not they ask for spans.
           const wantsSpans = options.includeSpans === true;
           const wantsFullIo = options.resolveBlobs === true;
@@ -2397,7 +2398,8 @@ export class ClickHouseTraceService {
      * Per-call gate (#4888/#4991): resolve offloaded eventref pointers from
      * event_log ONLY when true. The resolver is constructed on the instance,
      * but the read path opts in per call so list/search/collapsed reads keep
-     * the preview and issue zero event_log SELECTs (ADR-022). Defaults to false.
+     * the preview and issue zero event_log SELECTs (ADR-022, retired; ground
+     * now ADR-099). Defaults to false.
      */
     resolveBlobs?: boolean;
   }): Promise<Trace[]> {
@@ -2594,7 +2596,7 @@ export class ClickHouseTraceService {
     //
     // resolveBlobs is gated by the CALLER: the list/search grid leaves it false
     // so it keeps the ≤64 KB preview and issues zero event_log SELECTs (#4888
-    // AC2 / ADR-022). Only the download/export path opts in (#4991 AC1).
+    // AC2 / ADR-022, retired; ground now ADR-099). Only the download/export path opts in (#4991 AC1).
     const enrichable = traces
       .map((trace, index) => ({
         index,
@@ -2956,7 +2958,7 @@ export class ClickHouseTraceService {
           -- (The table's engine is \`ReplacingMergeTree(StartTime)\`, so the
           -- background merge elects on StartTime too and can outlive a
           -- corrected span. That is a defect in the DDL, not a reason to
-          -- read stale rows; see ADR-083.)
+          -- read stale rows; see ADR-083, retired, ground now ADR-099.)
           AND (t.TenantId, t.TraceId, t.SpanId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
             FROM stored_spans

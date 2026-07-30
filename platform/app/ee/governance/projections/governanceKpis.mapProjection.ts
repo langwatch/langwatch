@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * `governance_kpis` as a real projection (ADR-075 Class C).
+ * `governance_kpis` as a real projection (ADR-075 Class C, retired; ground
+ * now ADR-098).
  *
- * THE PROBLEM ADR-075 NAMES
+ * THE PROBLEM ADR-075 NAMES (ADR-075 retired; ground now ADR-098)
  * -------------------------
  * ADR-075 calls this "the one that needs work: it is an incrementing
  * aggregate per (org, source, hour_bucket), so re-deriving it means
@@ -51,7 +52,8 @@
  * -----------------------------------------------
  * Both collapse rows by summing them, so they cannot tell a re-derivation
  * from a second event: a rebuild would ADD the window again. That is
- * precisely the `suite_runs` failure ADR-072 removed, and migration
+ * precisely the `suite_runs` failure ADR-072 (retired; ground now ADR-103)
+ * removed, and migration
  * 00031's own header already rejected SummingMergeTree for it. An
  * additive engine is only safe behind exactly-once delivery, which the
  * event log deliberately does not offer. Making the ROW SET idempotent
@@ -69,7 +71,8 @@
  * read, and no contention.
  *
  * Spec: specs/ai-gateway/governance/folds.feature §"governance_kpis"
- * ADR:  dev/docs/adr/075-post-event-work-subscribers-and-process-managers.md
+ * ADR:  dev/docs/adr/098-event-sourcing-core.md (successor to the retired
+ *       ADR-075)
  */
 
 import type { GovernanceKpiContribution } from "@ee/governance/services/governanceKpis.clickhouse.repository";

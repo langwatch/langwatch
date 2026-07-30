@@ -130,11 +130,13 @@ export function createLogProcessingPipeline(deps: {
   return definePipeline(LOG_PIPELINE_NAME)
     .prefix(LOG_PIPELINE_PREFIX)
     .events(logProcessingEvents)
-    .withCommand("recordCanonicalLog", (c) =>
-      c.input(canonicalLogRecordSchema).handle(recordCanonicalLog),
-    )
-    .withMap("canonicalLogStorage", (m) =>
-      m.on({ recordReceived: toCanonicalLogRecord }).store(store),
-    )
+    .withCommand("recordCanonicalLog", {
+      input: canonicalLogRecordSchema,
+      handle: recordCanonicalLog,
+    })
+    .withMap("canonicalLogStorage", {
+      on: { recordReceived: toCanonicalLogRecord },
+      store,
+    })
     .build();
 }

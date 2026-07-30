@@ -1,7 +1,7 @@
 {
 	"coding_agent_session": [
-		"coding_agent_session/logFactsContributed",
-		"coding_agent_session/metricFactsContributed",
-		"coding_agent_session/spanFactsContributed"
+		"lw.obs.coding_agent_session.log_facts_contributed",
+		"lw.obs.coding_agent_session.metric_facts_contributed",
+		"lw.obs.coding_agent_session.span_facts_contributed"
 	]
 }

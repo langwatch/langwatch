@@ -79,7 +79,7 @@ type ProjectClickHouseClient = NonNullable<
  * to the trace's own price. Both derivations (`enrichItemsWithTraceCosts` for
  * the rows, `computeTraceDerivedRunCosts` for the total) go through here, so
  * the footer and the table cannot disagree; that they used to is exactly the
- * defect ADR-072's cost section describes.
+ * defect ADR-072's (retired; ground now ADR-103) cost section describes.
  */
 function splitTraceCostAcrossTargets({
   traceCost,
@@ -915,7 +915,7 @@ export class ExperimentRunService {
    * and therefore counted once in the total, and a target that reported its
    * own cost is left alone (the two are alternative sources for one figure,
    * not addends — adding them is what double-counted a traced target before
-   * ADR-072).
+   * ADR-072 (retired; ground now ADR-103)).
    *
    * Two reads rather than one join: resolving a trace's latest version needs a
    * dedup over `trace_summaries` that cannot be expressed inside the item

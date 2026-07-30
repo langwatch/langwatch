@@ -26,7 +26,8 @@ const defaultResolveClickHouseClient: ClickHouseClientResolver = async (
 };
 
 /**
- * Builds the ADR-022 blob-resolution dependencies ({@link BlobResolutionDeps})
+ * Builds the ADR-022 (retired; ground now ADR-099) blob-resolution
+ * dependencies ({@link BlobResolutionDeps})
  * used by the opt-in `full=true` trace-detail read path (#4888).
  *
  * The tRPC/REST request layer has no DI container — `ctx` carries only

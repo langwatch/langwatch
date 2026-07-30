@@ -1,12 +1,14 @@
 /**
  * The Langy conversation SPINE fold — the whole reduction of a conversation's
- * durable events into its operational state, as one pure module (ADR-059 §1),
- * exactly like `turnFold.ts` for the per-turn document.
+ * durable events into its operational state, as one pure module (ADR-059 §1,
+ * retired; ground now ADR-098), exactly like `turnFold.ts` for the per-turn
+ * document.
  *
  * `src/server/event-sourcing/langy-conversation-processing/` (ADR-098/105
  * greenfield rewrite) wires this function directly into a
  * `@langwatch/event-sourcing` fold executor as its `apply`; a browser spine
- * fold (ADR-059 Phase 4, client half) will call the same function. NOTE the
+ * fold (ADR-059 Phase 4, client half, retired; ground now ADR-098) will call
+ * the same function. NOTE the
  * state deliberately models the server-only columns (RunToken,
  * PendingHandoffToken) — they are part of the fold's truth — but they never
  * ride the client wire: the tail read serves only the turn vocabulary, and
@@ -77,12 +79,13 @@ export interface LangyConversationStateData {
    * The turn currently in flight, or null when idle. Set by the durable
    * `agent_turn_accepted`, cleared by `agent_responded` / `agent_response_failed`.
    * Turn LIVENESS (is the worker still alive?) is NOT tracked here — it is a
-   * purely ephemeral concern that lives in the Redis signal buffer (ADR-046).
+   * purely ephemeral concern that lives in the Redis signal buffer (ADR-046,
+   * retired; ground now ADR-098).
    */
   CurrentTurnId: string | null;
   LastError: string | null;
   /**
-   * ADR-048 shutdown-handoff. When a turn checkpoints on pod termination it
+   * ADR-048 (retired; ground now ADR-098) shutdown-handoff. When a turn checkpoints on pod termination it
    * leaves an opaque, worker-authored resume token here; the next turn threads
    * it to a fresh worker and clears it. Null when there is nothing to resume.
    * SERVER-ONLY: never surfaced to a client.
@@ -428,7 +431,7 @@ export function foldLangyConversationState<
       }
       return next;
     }
-    // ADR-048: a turn checkpointed on shutdown. Store the opaque resume token
+    // ADR-048 (retired; ground now ADR-098): a turn checkpointed on shutdown. Store the opaque resume token
     // and the turn it belongs to, CLEAR CurrentTurnId (the turn handed off —
     // it did not fail), and return the conversation to idle so the next
     // message can pick the token up. Never un-archives (nextStatus guards it).
@@ -443,7 +446,7 @@ export function foldLangyConversationState<
         LastActivityAt: latestActivity(state.LastActivityAt, event.occurredAt),
       };
     }
-    // ADR-048: the next turn threaded the pending token to a fresh worker.
+    // ADR-048 (retired; ground now ADR-098): the next turn threaded the pending token to a fresh worker.
     // Clear it so it is consumed exactly once. Idempotent on the command, so
     // replaying this is a no-op on an already-cleared fold.
     case LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED: {

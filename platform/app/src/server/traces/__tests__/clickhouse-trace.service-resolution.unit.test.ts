@@ -1,5 +1,6 @@
 /**
- * Unit tests for the ClickHouseTraceService → blob-resolution seam (ADR-022).
+ * Unit tests for the ClickHouseTraceService → blob-resolution seam
+ * (ADR-022, retired; ground now ADR-099).
  *
  * Mocks only the lowest-level CH driver (getClickHouseClientForProject) and
  * wires a real BlobStore (via getFromEventLog stub) + real TraceIOExtractionService

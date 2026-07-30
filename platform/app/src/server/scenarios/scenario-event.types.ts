@@ -61,7 +61,8 @@ export type BatchHistoryItem = {
   batchRunId: string;
   totalCount: number;
   /**
-   * How many runs the batch set out to queue (ADR-072), carried on each child
+   * How many runs the batch set out to queue (ADR-072, retired; ground now
+   * ADR-103), carried on each child
    * row. Equal to `totalCount` for a fully dispatched batch, and larger when
    * some of the fan-out never reached the queue — which is the difference
    * between "this batch is five runs" and "this batch lost one".
