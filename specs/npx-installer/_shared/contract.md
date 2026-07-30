@@ -347,8 +347,8 @@ holds no Python of its own.
 
 ## 12. Open questions
 
-- [x] Postgres in or out of pre-deps? **In** — Prisma needs it, helm chart has it, infra/compose.dev.yml has it.
-- [ ] Quickwit/Elasticsearch? Currently not in infra/compose.dev.yml — test if app boots without it. If yes, skip; if no, add as a fifth predep or shim with a no-op.
+- [x] Postgres in or out of pre-deps? **In** — Prisma needs it, helm chart has it, dev/compose.dev.yml has it.
+- [ ] Quickwit/Elasticsearch? Currently not in dev/compose.dev.yml — test if app boots without it. If yes, skip; if no, add as a fifth predep or shim with a no-op.
 - [ ] Should we ship the langwatch next.js app **prebuilt** in the npm tarball, or build on first run? Prebuilt = faster first-run, larger tarball. **Recommend prebuilt** (build at publish, not at install).
 - [ ] When the user has an `OPENAI_API_KEY` in env, should the CLI propagate it into `~/.langwatch/langwatch.env`? **Yes**, but read-only — don't persist user secrets to disk.
 

@@ -718,12 +718,12 @@ func resolveKnob(
 	return v, ok
 }
 
-// dotenvKnobs loads the dotenv layers once per process, from the langwatch/
-// directory of the checkout haven was invoked in.
+// dotenvKnobs loads the dotenv layers once per process, from the
+// platform/app directory of the checkout haven was invoked in.
 func dotenvKnobs() map[string]string {
 	dotenvOnce.Do(func() {
 		cwd, _ := os.Getwd()
-		dotenvVars = domain.LoadDotenv(filepath.Join(gitTopLevel(cwd), "langwatch"))
+		dotenvVars = domain.LoadDotenv(filepath.Join(gitTopLevel(cwd), "platform", "app"))
 	})
 	return dotenvVars
 }

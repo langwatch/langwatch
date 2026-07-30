@@ -88,7 +88,7 @@ make down             # Stop all
 ```
 
 **Key files:**
-- `infra/compose.dev.yml` - Docker Compose configuration
+- `dev/compose.dev.yml` - Docker Compose configuration
 - `dev/scripts/dev.sh` - Interactive profile chooser
 - `Makefile` - Convenience targets
 
@@ -145,7 +145,7 @@ The 2026-03 worktree-isolation amendment treated **every** volume as per-worktre
 | `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
 | `full-local` | `--profile full` (workers, scenarios, bullboard, ai-server) | all five infrastructure URLs |
 
-Migration mode uses `infra/compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
+Migration mode uses `dev/compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
 
 `make quickstart` accepts a positional mode arg (`make quickstart frontend-only`) for non-interactive runs. `make quickstart-help` (or `./dev/scripts/dev.sh help`) prints the mode reference.
 

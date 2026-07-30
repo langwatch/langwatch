@@ -75,7 +75,7 @@ P1 output contract & agent mode · P2 HandledError-driven errors · P3 discovera
 - Drift guard `sdks/typescript/src/cli/__tests__/feature-map-drift.unit.test.ts`
   (regex-parses `program.ts` like the app-side capabilityCatalog test; exclusion
   set `PLUMBING_COMMANDS` shared with the status summary) + leaf-level completeness
-  in `cli/utils/__tests__/commandCatalog.unit.test.ts`. It lives in typescript-sdk
+  in `cli/utils/__tests__/commandCatalog.unit.test.ts`. It lives in sdks/typescript
   because the app's node_modules aren't required there — the app-side test keeps
   guarding the Langy catalog.
 

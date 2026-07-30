@@ -60,7 +60,7 @@ stack keeps **no volume**, so stopping it reclaims every byte regardless. Overri
 
 ## What ships where
 
-| Signal  | Backend    | TS app (`langwatch/`)                   | Go services (nlpgo, aigateway)                        |
+| Signal  | Backend    | TS app (`platform/app/`)                | Go services (nlpgo, aigateway)                        |
 | ------- | ---------- | --------------------------------------- | ---------------------------------------------------- |
 | Traces  | Tempo      | `OTEL_EXPORTER_OTLP_ENDPOINT`           | dual-export via `OTEL_DEBUG_COLLECTOR_ENDPOINT`      |
 | Logs    | Loki       | `PINO_OTEL_ENABLED=true`                | zap teed to OTLP via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
@@ -107,7 +107,7 @@ fallbacks).
 
 ## The stack
 
-The `otel-lgtm` service lives in `infra/compose.dev.yml` under the optional
+The `otel-lgtm` service lives in `dev/compose.dev.yml` under the optional
 `observability` profile — one `grafana/otel-lgtm` container that bundles the
 OpenTelemetry Collector (OTLP on `:4317` gRPC / `:4318` HTTP, fanning traces →
 Tempo, logs → Loki, metrics → Prometheus) and a pre-provisioned Grafana on

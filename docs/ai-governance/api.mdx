@@ -88,7 +88,7 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `langwatch/openapiLangWatch.json`, and both SDKs regenerate from it on the standard build target.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI spec lives at `platform/app/src/app/api/openapiLangWatch.json`, and both SDKs regenerate from it on the standard build target.
 
 ```bash
 pnpm openapi:emit                  # regenerate openapiLangWatch.json from Hono routes

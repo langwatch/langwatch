@@ -260,7 +260,7 @@ jobs:
           sleep 5
 
           # Run tests from the self-contained e2e package
-          cd agentic-e2e-tests && pnpm test
+          cd tests/agentic-e2e && pnpm test
           TEST_EXIT=$?
 
           # Cleanup

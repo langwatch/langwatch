@@ -244,7 +244,7 @@ jobs:
       - name: Extract test failures
         if: failure()
         working-directory: platform/app
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -252,7 +252,7 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
         working-directory: platform/app
-        run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
+        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
         if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
@@ -445,7 +445,7 @@ jobs:
       - name: Extract test failures
         if: failure()
         working-directory: platform/app
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -453,7 +453,7 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
         working-directory: platform/app
-        run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
+        run: bash ../../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
         if: always() && hashFiles('platform/app/coverage/lcov.info') != ''
@@ -866,7 +866,7 @@ jobs:
 
       - name: Stage canary fixture inside vitest root
         working-directory: platform/app
-        run: cp ../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
+        run: cp ../../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
 
       - name: Run intentional failure
         id: canary
@@ -879,7 +879,7 @@ jobs:
       - name: Extract failures
         if: always()
         working-directory: platform/app
-        run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
+        run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Assert detection worked
         if: always()
