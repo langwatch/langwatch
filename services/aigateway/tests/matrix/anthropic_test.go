@@ -40,7 +40,7 @@ func TestAnthropic_StructuredOutputs(t *testing.T) {
 	runCell(t, anthropicCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
 
-// @scenario "client cap verifiably bounds output on every translated lane"
+// @scenario "client cap verifiably bounds output on the anthropic and bedrock lanes"
 // REPRO of the production canary finding: max_tokens: 5 through the
 // anthropic lane answered with ~26 completion tokens and finish_reason
 // "stop" because the translated lane dropped the alias and dispatched

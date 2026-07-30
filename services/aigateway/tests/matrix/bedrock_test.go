@@ -50,7 +50,7 @@ func TestBedrock_StructuredOutputs(t *testing.T) {
 	runCell(t, bedrockCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
 
-// @scenario "client cap verifiably bounds output on every translated lane"
+// @scenario "client cap verifiably bounds output on the anthropic and bedrock lanes"
 // REPRO of the production canary finding: max_tokens: 5 through the
 // bedrock lane answered with ~28 completion tokens and finish_reason
 // "stop" because the translated lane dropped the alias and the Converse

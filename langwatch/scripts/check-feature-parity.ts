@@ -263,7 +263,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/license-gate-governance.feature",
   "specs/ai-gateway/model-disambiguation.feature",
   "specs/ai-gateway/model-provider-scoping.feature",
-  "specs/ai-gateway/openai-param-compat.feature",
   "specs/ai-gateway/payload-capture.feature",
   "specs/ai-gateway/policy-rules.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
