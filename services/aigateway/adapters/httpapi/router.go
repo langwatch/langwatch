@@ -741,6 +741,7 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 
 	var once sync.Once
 	materializedBody := &lazyPooledBody{
+		ctx:    r.Context(),
 		reader: body,
 		buf:    buf,
 		release: func() {
@@ -755,6 +756,7 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 }
 
 type lazyPooledBody struct {
+	ctx     context.Context
 	reader  io.Reader
 	buf     *bytes.Buffer
 	release func()
@@ -764,6 +766,16 @@ func (l *lazyPooledBody) Read(p []byte) (n int, err error) {
 	n, err = l.reader.Read(p)
 	if n > 0 {
 		l.buf.Write(p[:n])
+	}
+	// This reader is handed to the application pipeline, which materializes it
+	// well past the transport. The rest of the body can still fail there — a
+	// decoded payload only crosses its ceiling once enough of it has been read
+	// — and an unclassified error at that depth answers 500 instead of the
+	// 400 / 413 the transport already knows the request earned. Classifying it
+	// as a herr here keeps that answer intact: MaterializeBody wraps with %w,
+	// so writeError still unwraps to the gateway code.
+	if err != nil && !errors.Is(err, io.EOF) {
+		return n, herr.New(l.ctx, bodyReadErrorCode(err), herr.M{"message": err.Error()})
 	}
 	return n, err
 }

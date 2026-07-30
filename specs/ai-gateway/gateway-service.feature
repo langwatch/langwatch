@@ -206,6 +206,18 @@ Feature: Gateway service — public HTTP surface and operational basics
       And error.type equals "payload_too_large"
       And no provider dispatch occurs
 
+    # The peek lane hands the rest of the body to the pipeline as a reader, so a
+    # ceiling above the peek window is crossed after the transport has already
+    # let the request through. An unclassified failure at that depth answers
+    # 500, hiding a limit the client could have acted on.
+    @integration
+    Scenario: a compression bomb caught after the peek is still a 413
+      Given GATEWAY_MAX_REQUEST_BODY_BYTES = 65536
+      When I POST /v1/embeddings with a zstd body that decodes to 4 MiB, past the 32 KiB peek window
+      Then the response status is 413
+      And error.type equals "payload_too_large"
+      And no provider dispatch occurs
+
   Rule: Graceful SIGTERM drain (iter 24, `ea167ca`)
 
     # Four-phase shutdown guarantees in-flight requests complete before pod exit.

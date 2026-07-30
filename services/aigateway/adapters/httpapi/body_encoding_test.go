@@ -358,6 +358,32 @@ func TestRouter_PeekLane_CompressionBombIsPayloadTooLarge(t *testing.T) {
 	assert.Equal(t, string(domain.ErrPayloadTooLarge), errResp.Error.Type)
 }
 
+// With the ceiling above the peek window, the bomb clears the peek and only
+// crosses the limit once the pipeline materializes the rest. That read happens
+// past the transport, where an unclassified failure answers 500.
+/** @scenario "a compression bomb caught after the peek is still a 413" */
+func TestRouter_PeekLane_CompressionBombPastThePeekWindow(t *testing.T) {
+	const maxBytes = 64 * 1024
+	require.Greater(t, int64(maxBytes), int64(defaultPeekBytes),
+		"the ceiling must sit past the peek window for the overflow to land in the pipeline")
+	router := encodingRouterWithLimit(t, maxBytes)
+
+	bomb := zstdBytes(t, bytes.Repeat([]byte("a"), 4*1024*1024))
+	require.Less(t, len(bomb), maxBytes, "the compressed body must fit under the raw ceiling")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewReader(bomb))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "zstd")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+	var errResp herr.ErrorResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&errResp))
+	assert.Equal(t, string(domain.ErrPayloadTooLarge), errResp.Error.Type)
+}
+
 // The passthrough lane forwards the client's headers upstream. Once the
 // gateway has decoded the body, a surviving Content-Encoding would describe
 // bytes the provider never receives.
