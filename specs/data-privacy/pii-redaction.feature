@@ -153,3 +153,16 @@ Feature: Redacting personal data from traces
   Scenario: An unsafe exception pattern is rejected when saving the rule
     When an admin tries to save a PII exception pattern that is a catastrophic-backtracking regex
     Then the request is rejected with a validation error
+
+  # An exception is the only pattern in this feature that REMOVES redaction, so
+  # a catch-all fails open rather than closed: anchored to the whole detected
+  # span, something like ".*" or "\d+" matches every finding and turns the PII
+  # pass off entirely while the level still reads as active in the UI. Save-time
+  # validation rejects a pattern that matches values of unrelated kinds, so an
+  # exception has to describe one identifier shape. A too-broad custom SECRET
+  # pattern only over-redacts, so it is not held to this.
+  @integration
+  Scenario: An over-broad exception pattern is rejected when saving the rule
+    When an admin tries to save a PII exception pattern that matches any value
+    Then the request is rejected with a validation error
+    And a pattern describing one specific identifier shape is still accepted

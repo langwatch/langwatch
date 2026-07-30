@@ -52,6 +52,51 @@ function assertSafePatterns(patterns: string[], label: string): void {
 }
 
 /**
+ * A PII exception is the one pattern here that REMOVES redaction, so an
+ * over-broad one fails open: compiled anchored as `^(?:pattern)$`, something
+ * like `.*` or `\d+` matches every detected span and silently turns the whole
+ * PII pass off while the UI still reports the level as active. A custom secret
+ * pattern that is too broad only over-redacts, which is why this check is not
+ * applied to those.
+ *
+ * The test is that the pattern cannot match a string of a kind it was not
+ * written for: an exception exists to name a specific business identifier, so
+ * it must not match both a digit run and a plain word.
+ */
+const OVER_BROAD_EXCEPTION_PROBES = [
+  "4111111111111111",
+  "12345678901234",
+  "someone@example.com",
+  "Jane Doe",
+  "+1 555 0100",
+] as const;
+
+function assertNotOverBroadExceptions(patterns: string[]): void {
+  for (const pattern of patterns) {
+    let anchored: RegExp;
+    try {
+      anchored = new RegExp(`^(?:${pattern})$`);
+    } catch {
+      // Compile failure already reported by assertSafePatterns.
+      continue;
+    }
+    const matched = OVER_BROAD_EXCEPTION_PROBES.filter((probe) =>
+      anchored.test(probe),
+    );
+    if (matched.length > 1) {
+      throw new InvalidDataPrivacyConfigError(
+        `PII exception pattern ${JSON.stringify(
+          pattern,
+        )} is too broad: it matches unrelated values (${matched
+          .map((probe) => JSON.stringify(probe))
+          .join(", ")}), so it would keep real personal data. ` +
+          "Describe the specific identifier, including its length and any fixed prefix.",
+      );
+    }
+  }
+}
+
+/**
  * A custom attribute pattern of only wildcards would match every span
  * attribute, and as a drop rule it would strip the observability metadata the
  * feature promises to always keep. Require at least one literal character.
@@ -136,6 +181,7 @@ export class DataPrivacyPolicyService {
       parsed.data.pii?.exceptPatterns ?? [],
       "PII exception pattern",
     );
+    assertNotOverBroadExceptions(parsed.data.pii?.exceptPatterns ?? []);
     assertSafeAttributePatterns(parsed.data.customAttributes);
 
     const organizationId =

@@ -312,6 +312,43 @@ describe("DataPrivacyPolicyService integration", () => {
       });
     });
 
+    describe("when a PII exception pattern is over-broad", () => {
+      // An exception REMOVES redaction, so a catch-all fails open: anchored to
+      // the whole detected span, it matches every finding and turns the PII
+      // pass off while the level still reads as active in the UI.
+      const catchAlls = [".*", ".+", "\\d+", "\\w+", "[\\s\\S]*", "\\S+"];
+
+      for (const pattern of catchAlls) {
+        /** @scenario An over-broad exception pattern is rejected when saving the rule */
+        it(`rejects ${pattern}, which would keep every detected value`, async () => {
+          await expect(
+            service.setForScope({
+              scope: { scopeType: "PROJECT", scopeId: project.id },
+              personalOnly: false,
+              config: {
+                pii: { level: "essential", exceptPatterns: [pattern] },
+              },
+            }),
+          ).rejects.toThrow(/too broad/);
+        });
+      }
+
+      it("still accepts a specific business identifier of the same shape", async () => {
+        await service.setForScope({
+          scope: { scopeType: "PROJECT", scopeId: project.id },
+          personalOnly: false,
+          config: {
+            pii: { level: "essential", exceptPatterns: ["\\d{14}"] },
+          },
+        });
+
+        const resolved = await service.getResolvedForProject({
+          projectId: project.id,
+        });
+        expect(resolved.pii.exceptPatterns).toEqual(["\\d{14}"]);
+      });
+    });
+
     describe("when the scope target does not exist", () => {
       it("rejects the write before storing anything", async () => {
         await expect(
