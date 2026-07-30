@@ -31,7 +31,15 @@ func (o *Orchestrator) ensureDeps(ctx context.Context, dir string, withLifecycle
 	// used to pass langwatch/, depsStale found no lockfile there, and haven
 	// silently installed nothing. A caller-side fix leaves the same mistake
 	// open to the next caller; resolving here makes the class unreachable.
-	rootDir := findWorkspaceRoot(dir)
+	rootDir, found := findWorkspaceRoot(dir)
+	if !found {
+		// Pre-ADR-076, "no lockfile" quietly meant "nothing to install" — the
+		// exact misread that let `haven up` start every service against absent
+		// dependencies. The repo tracks its lockfile, so not finding one
+		// anywhere up the tree means a broken or truncated checkout, and the
+		// only helpful thing to do is say so before the services fail worse.
+		return fmt.Errorf("no pnpm-lock.yaml found at or above %s — is this a complete checkout?", dir)
+	}
 	if !depsStale(rootDir) {
 		return nil
 	}
@@ -52,16 +60,15 @@ func (o *Orchestrator) ensureDeps(ctx context.Context, dir string, withLifecycle
 // pnpm-lock.yaml — the workspace root, the only place the lockfile and
 // node_modules exist since ADR-076. Handed the root itself it returns it
 // unchanged; handed a member (langwatch/, a sandbox's langwatch/) it climbs
-// out. If no lockfile exists anywhere up the tree, the original dir comes
-// back and depsStale correctly reports nothing to install.
-func findWorkspaceRoot(dir string) string {
+// out. found=false means no lockfile exists anywhere up the tree.
+func findWorkspaceRoot(dir string) (root string, found bool) {
 	for d := dir; ; {
 		if _, err := os.Stat(filepath.Join(d, "pnpm-lock.yaml")); err == nil {
-			return d
+			return d, true
 		}
 		parent := filepath.Dir(d)
 		if parent == d {
-			return dir
+			return dir, false
 		}
 		d = parent
 	}

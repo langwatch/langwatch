@@ -164,18 +164,25 @@ func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
 			}
 		})
 
-		t.Run("when no lockfile exists anywhere above, nothing installs", func(t *testing.T) {
+		t.Run("when no lockfile exists anywhere above, the up fails loudly", func(t *testing.T) {
+			// "No lockfile" used to read as "nothing to install" — the silent
+			// no-op this whole test exists to prevent. A checkout without one
+			// is broken, and every service would otherwise fail later, worse.
 			dir := filepath.Join(t.TempDir(), "langwatch")
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				t.Fatal(err)
 			}
 			sup := &fakeSupervisor{}
 			o := &Orchestrator{sup: sup, log: zap.NewNop()}
-			if err := o.ensureDeps(context.Background(), dir, true); err != nil {
-				t.Fatalf("ensureDeps: %v", err)
+			err := o.ensureDeps(context.Background(), dir, true)
+			if err == nil {
+				t.Fatal("ensureDeps = nil, want an error naming the missing lockfile")
+			}
+			if !strings.Contains(err.Error(), "pnpm-lock.yaml") {
+				t.Fatalf("err = %v, want it to name pnpm-lock.yaml", err)
 			}
 			if len(sup.dirs) != 0 {
-				t.Fatalf("dirs = %v, want no install", sup.dirs)
+				t.Fatalf("dirs = %v, want no install attempt", sup.dirs)
 			}
 		})
 	})
