@@ -188,21 +188,37 @@ describe("runWorkflow with a pre-1.5 published version", () => {
   });
 
   afterAll(async () => {
-    await prisma.workflow.updateMany({
-      where: { projectId },
-      data: {
-        currentVersionId: null,
-        latestVersionId: null,
-        publishedId: null,
-      },
-    });
-    await prisma.workflowVersion.deleteMany({ where: { projectId } });
-    await prisma.workflow.deleteMany({ where: { projectId } });
-    await prisma.modelProvider.deleteMany({ where: { organizationId } });
-    await prisma.project.delete({ where: { id: projectId } });
-    await prisma.team.delete({ where: { id: teamId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
-    await prisma.user.delete({ where: { id: userId } });
+    // beforeAll assigns these in sequence; a failure partway through leaves
+    // later ones undefined, and Prisma treats an undefined filter as "no
+    // filter" — updateMany/deleteMany below would touch the whole table
+    // instead of just this run's rows. The singular `.delete()` calls are
+    // safe either way (an undefined id just throws), but skip them too once
+    // there is nothing they'd successfully find.
+    if (projectId) {
+      await prisma.workflow.updateMany({
+        where: { projectId },
+        data: {
+          currentVersionId: null,
+          latestVersionId: null,
+          publishedId: null,
+        },
+      });
+      await prisma.workflowVersion.deleteMany({ where: { projectId } });
+      await prisma.workflow.deleteMany({ where: { projectId } });
+      await prisma.project.delete({ where: { id: projectId } });
+    }
+    if (organizationId) {
+      await prisma.modelProvider.deleteMany({ where: { organizationId } });
+    }
+    if (teamId) {
+      await prisma.team.delete({ where: { id: teamId } });
+    }
+    if (organizationId) {
+      await prisma.organization.delete({ where: { id: organizationId } });
+    }
+    if (userId) {
+      await prisma.user.delete({ where: { id: userId } });
+    }
   });
 
   /** @scenario Published workflows saved before the change still run with their old model */

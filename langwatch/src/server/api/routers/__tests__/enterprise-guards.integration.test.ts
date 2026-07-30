@@ -138,6 +138,12 @@ describe("enterprise feature guards", () => {
   });
 
   afterAll(async () => {
+    // beforeAll assigns organizationId as its first statement; if it threw
+    // before that, Vitest still runs this afterAll, and Prisma treats an
+    // undefined filter value as "no filter" — every deleteMany below would
+    // match the whole table instead of just this run's rows.
+    if (!organizationId) return;
+
     // First, and without a `.catch`: the bindings hold an FK to CustomRole, so
     // a failure here would otherwise resurface as a confusing error on the
     // customRole cleanup below, or vanish into a swallowed one.

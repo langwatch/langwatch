@@ -191,6 +191,12 @@ describe("organization member role plan limit enforcement", () => {
   });
 
   afterAll(async () => {
+    // beforeAll assigns organizationId as its first statement; if it threw
+    // before that, Vitest still runs this afterAll, and Prisma treats an
+    // undefined filter value as "no filter" — every deleteMany below would
+    // match the whole table instead of just this run's rows.
+    if (!organizationId) return;
+
     // Clean up in reverse creation order.
     //
     // RoleBindings go first and WITHOUT a `.catch`: they hold an FK to

@@ -4,8 +4,8 @@
  * Real-Postgres integration coverage for persisting the user-simulator and
  * judge model overrides on a Scenario and a run plan (SimulationSuite).
  *
- * Requires: PostgreSQL (Prisma). Skipped in the Testcontainers-only
- * ClickHouse suite.
+ * Requires: PostgreSQL (Prisma). Runs unconditionally — every harness
+ * provides Postgres.
  *
  * @see specs/scenarios/scenario-model-selection.feature
  * @see specs/suites/suite-model-selection.feature
@@ -50,17 +50,29 @@ describe("Scenario / run-plan model persistence (real DB)", () => {
   });
 
   afterAll(async () => {
-    await prisma.scenario.deleteMany({ where: { projectId } }).catch(() => {});
-    await prisma.simulationSuite
-      .deleteMany({ where: { projectId } })
-      .catch(() => {});
-    await prisma.project
-      .deleteMany({ where: { id: projectId } })
-      .catch(() => {});
-    await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { id: organizationId } })
-      .catch(() => {});
+    // Each guarded by its own id: beforeAll assigns organizationId, teamId and
+    // projectId in sequence, so a failure partway through leaves later ones
+    // undefined — and Prisma treats an undefined filter as "no filter", which
+    // would delete every row in the table instead of just this run's.
+    if (projectId) {
+      await prisma.scenario
+        .deleteMany({ where: { projectId } })
+        .catch(() => {});
+      await prisma.simulationSuite
+        .deleteMany({ where: { projectId } })
+        .catch(() => {});
+      await prisma.project
+        .deleteMany({ where: { id: projectId } })
+        .catch(() => {});
+    }
+    if (teamId) {
+      await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
+    }
+    if (organizationId) {
+      await prisma.organization
+        .deleteMany({ where: { id: organizationId } })
+        .catch(() => {});
+    }
   });
 
   describe("given a scenario", () => {

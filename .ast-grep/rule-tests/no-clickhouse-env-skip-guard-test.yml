@@ -18,8 +18,16 @@ invalid:
   - |
     const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
   - |
+    const isTestcontainersOnly = !!(
+      process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
+    );
+  - |
     describe.skipIf(isTestcontainersOnly)("suite", () => {});
   - |
     describe.skipIf(!!process.env.TEST_CLICKHOUSE_URL)("suite", () => {});
   - |
     describe.skipIf(process.env.TEST_CLICKHOUSE_URL)("suite", () => {});
+  - |
+    describe.skipIf(!!process.env.CI_CLICKHOUSE_URL)("suite", () => {});
+  - |
+    describe.skipIf(process.env.CI_CLICKHOUSE_URL)("suite", () => {});

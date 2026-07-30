@@ -26,6 +26,10 @@ rule:
     # The same inversion written inline, without the misleading name.
     - pattern: describe.skipIf(!!process.env.TEST_CLICKHOUSE_URL)($$$)
     - pattern: describe.skipIf(process.env.TEST_CLICKHOUSE_URL)($$$)
+    - pattern: describe.skipIf(!!process.env.CI_CLICKHOUSE_URL)($$$)
+    - pattern: describe.skipIf(process.env.CI_CLICKHOUSE_URL)($$$)
 files:
   - "langwatch/**/*.test.ts"
+  - "langwatch/**/*.test.tsx"
   - "langwatch/**/*.spec.ts"
+  - "langwatch/**/*.spec.tsx"
