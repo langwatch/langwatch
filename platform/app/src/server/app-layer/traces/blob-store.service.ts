@@ -643,13 +643,16 @@ export class BlobStore {
     const { Body } = await s3Client.send(
       new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }),
     );
-    const bytes = await Body?.transformToByteArray();
-    if (bytes == null) {
+    if (!Body) {
       throw new Error(
         `Spool object returned no body from S3 (key=${spoolRef}) — cannot reconstitute command`,
       );
     }
-    return Buffer.from(bytes);
+    // Read through the same bounded helper the v2 path uses. `transformToByteArray()`
+    // buffers the whole object first, so it would have skipped MAX_SPOOL_BYTES
+    // entirely — and a v1 reference points at an object written before this
+    // deploy, which is exactly the input the cap exists to distrust.
+    return streamToBuffer(Body as unknown as Readable, MAX_SPOOL_BYTES);
   }
 
   /**

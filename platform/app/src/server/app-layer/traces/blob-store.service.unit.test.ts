@@ -92,9 +92,9 @@ function fakeS3() {
         err.name = "NoSuchKey";
         throw err;
       }
-      return {
-        Body: { transformToByteArray: async () => new Uint8Array(stored) },
-      };
+      // A stream, as the real SDK returns — the legacy read now consumes it
+      // through the same bounded helper as the v2 path.
+      return { Body: Readable.from([stored]) };
     }
     if (command instanceof DeleteObjectCommand) {
       objects.delete(`${command.input.Bucket}/${command.input.Key}`);
@@ -477,6 +477,41 @@ describe("getSpool — given a v1 reference written before this deployment", () 
 
       expect(retrieved).toEqual(legacyBytes);
       expect(objectStore.get).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("getSpool — given a v1 object larger than the read cap", () => {
+  describe("when getSpool is called", () => {
+    it("rejects instead of buffering it whole", async () => {
+      const legacyKey = "trace-blobs/spool/orgA/trace-1/span-1";
+      const oversizedS3 = {
+        send: vi.fn(async () => ({
+          // Lazy 1 MB chunks past the cap — the same shape the v2 case uses.
+          Body: Readable.from(
+            (function* () {
+              for (let sent = 0; sent <= MAX_SPOOL_BYTES; sent += 1024 * 1024) {
+                yield Buffer.alloc(1024 * 1024);
+              }
+            })(),
+          ),
+        })),
+      };
+      const store = new BlobStore({
+        resolveS3Client: async () => ({
+          s3Client: oversizedS3 as never,
+          s3Bucket: "test-bucket",
+        }),
+        spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
+      });
+
+      // The v1 path used to call transformToByteArray(), which buffers the
+      // whole object before anything can check its size — so the cap that
+      // guards the v2 path did not apply to the one input written before this
+      // deploy, which is exactly the input it exists to distrust.
+      await expect(
+        store.getSpool({ spoolRef: legacyKey, ...spoolCoords }),
+      ).rejects.toThrow(StreamTooLargeError);
     });
   });
 });
