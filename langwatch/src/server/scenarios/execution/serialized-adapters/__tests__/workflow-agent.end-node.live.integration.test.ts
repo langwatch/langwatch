@@ -14,7 +14,8 @@
  * Skipped automatically when nlpgo is unreachable, so CI without the Go engine
  * does not red-X. Point it elsewhere with LANGWATCH_NLP_SERVICE.
  *
- *   make service svc=nlpgo      # or: go build -o /tmp/nlpgo ./cmd/service && SERVER_ADDR=:5591 /tmp/nlpgo nlpgo
+ *   make service svc=nlpgo      # binds :5561, the default this file probes
+ *   # or: go build -o /tmp/nlpgo ./cmd/service && SERVER_ADDR=:5561 /tmp/nlpgo nlpgo
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
@@ -22,7 +23,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { WorkflowAgentData } from "../../types";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
 
-const NLP = process.env.LANGWATCH_NLP_SERVICE ?? "http://127.0.0.1:5591";
+const NLP = process.env.LANGWATCH_NLP_SERVICE ?? "http://127.0.0.1:5561";
 
 let reachable = false;
 
