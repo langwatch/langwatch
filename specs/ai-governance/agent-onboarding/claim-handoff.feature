@@ -32,8 +32,19 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     Given the CLI has a valid device session
     When it POSTs the claim token to `/claim/direct`
     Then the caller becomes an owner of the ephemeral organization
+    And the placeholder that owned it is retired
     And the account is marked claimed
     And no browser is opened
+
+  @bdd @claim @unit
+  Scenario: claiming as the placeholder itself promotes it in place
+    Given the claimer proved they own the placeholder
+    When they claim
+    Then the placeholder stops being unclaimed
+    And no ownership changes hands
+    # the passkey path: the credential was enrolled against the placeholder,
+    # so the organization was already theirs and there is never a window with
+    # two admins or none.
 
   @bdd @claim @unit
   Scenario: claiming keeps the ingestion key exactly as it was

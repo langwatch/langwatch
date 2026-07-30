@@ -19,6 +19,7 @@ import type { PrismaClient } from "@prisma/client";
  *  one is a compile error rather than an `undefined` at runtime. */
 interface EphemeralAccountRow {
   id: string;
+  userId: string;
   organizationId: string;
   projectId: string;
   projectSlug: string;
@@ -45,6 +46,7 @@ export class PrismaEphemeralAccountRepository
   ): Promise<EphemeralAccount> {
     const row = await this.prisma.ephemeralAccount.create({
       data: {
+        userId: params.userId,
         organizationId: params.organizationId,
         projectId: params.projectId,
         projectSlug: params.projectSlug,
@@ -112,6 +114,7 @@ export class PrismaEphemeralAccountRepository
 function toDomain(row: EphemeralAccountRow): EphemeralAccount {
   return {
     id: row.id,
+    userId: row.userId,
     organizationId: row.organizationId,
     projectId: row.projectId,
     projectSlug: row.projectSlug,

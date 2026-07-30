@@ -92,6 +92,7 @@ export class ProvisioningService {
     });
 
     const account = await this.accounts.create({
+      userId: workspace.userId,
       organizationId: workspace.organizationId,
       projectId: workspace.projectId,
       projectSlug: workspace.projectSlug,

@@ -746,13 +746,57 @@ describe("beforeSessionCreate", () => {
     it("allows the session", async () => {
       const prisma = makePrismaMock({
         user: {
-          findUnique: vi.fn().mockResolvedValue({ deactivatedAt: null }),
+          findUnique: vi
+            .fn()
+            .mockResolvedValue({ deactivatedAt: null, unclaimedAt: null }),
           update: vi.fn(),
         },
       });
       const result = await beforeSessionCreate({
         prisma,
         session: { userId: "user_1" },
+      });
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe("when the user is an unclaimed agent-onboarding placeholder", () => {
+    // This is the single choke point that stops a temporary account being
+    // taken over: the placeholder owns a real organization but nobody has
+    // proved they own it, so no sign-in path may mint it a session.
+    /** @scenario "an unclaimed placeholder can never reach a session" */
+    it("blocks the session", async () => {
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            deactivatedAt: null,
+            unclaimedAt: new Date("2026-01-01"),
+          }),
+          update: vi.fn(),
+        },
+      });
+      const result = await beforeSessionCreate({
+        prisma,
+        session: { userId: "user_placeholder_1" },
+      });
+      expect(result).toBe(false);
+    });
+
+    /** @scenario "claiming is what lets the account sign in" */
+    it("allows the session once the account has been claimed", async () => {
+      // Claiming clears `unclaimedAt`; nothing else about the row changes,
+      // so the same user that was refused a moment ago is now ordinary.
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi
+            .fn()
+            .mockResolvedValue({ deactivatedAt: null, unclaimedAt: null }),
+          update: vi.fn(),
+        },
+      });
+      const result = await beforeSessionCreate({
+        prisma,
+        session: { userId: "user_placeholder_1" },
       });
       expect(result).toBeUndefined();
     });

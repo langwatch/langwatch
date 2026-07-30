@@ -16,6 +16,13 @@ import type {
  */
 export interface EphemeralAccount {
   id: string;
+  /**
+   * The placeholder user that owns the organization until someone claims it.
+   * Real from day 0 so every downstream row (projects, keys, role bindings)
+   * has an ordinary owner rather than a special case — it simply carries
+   * `unclaimedAt` and can never reach a session.
+   */
+  userId: string;
   organizationId: string;
   projectId: string;
   projectSlug: string;

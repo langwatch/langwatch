@@ -56,11 +56,7 @@ export class IngestionKeyService {
     ingestionTemplateId = null,
     createdByDeviceLabel = null,
   }: {
-    /**
-     * Null when nobody is behind the call — anonymous agent provisioning mints
-     * an ingest key for an organization that has no members yet.
-     */
-    callerUserId: string | null;
+    callerUserId: string;
     ownerUserId: string | null;
     organizationId: string;
     projectId: string;

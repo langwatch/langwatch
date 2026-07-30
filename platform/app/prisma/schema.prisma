@@ -72,6 +72,18 @@ model User {
   updatedAt                     DateTime                 @default(now()) @updatedAt
   lastLoginAt                   DateTime?
   deactivatedAt                 DateTime?
+  /// Set while this user is a placeholder created by anonymous agent
+  /// onboarding (`npx langwatch <agent>`) that nobody has claimed yet. It owns
+  /// a real organization and project so every downstream table has an ordinary
+  /// owner from day 0, but it is NOT a person: `email` is null, it has no
+  /// credentials, and it must never reach a session.
+  ///
+  /// The twin of `deactivatedAt` — both mean "this row exists but is not a
+  /// live actor" — and it is filtered in the same places: the sign-in gate,
+  /// member listings and seat counts. Cleared when the account is claimed.
+  ///
+  /// Spec: specs/ai-governance/agent-onboarding/
+  unclaimedAt                   DateTime?
   // User-level pin for the persona-resolver redirect target. NULL = use
   // auto-detection. When set, wins over auto-detected persona destination.
   // Spec: specs/ai-gateway/governance/persona-home-content.feature
@@ -98,6 +110,8 @@ model User {
   promptTagsCreated             PromptTag[]              @relation("promptTagCreatedBy")
   promptTagsUpdated             PromptTag[]              @relation("promptTagUpdatedBy")
   groupMemberships              GroupMembership[]
+  /// Present while this user is an unclaimed agent-onboarding placeholder.
+  ephemeralAccount              EphemeralAccount?
   roleBindings                  RoleBinding[]
   apiKeys                       ApiKey[]
   gatewayBudgetsCreated         GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
@@ -3657,6 +3671,10 @@ model BugReport {
 /// Spec: specs/ai-governance/agent-onboarding/
 model EphemeralAccount {
   id               String   @id @default(nanoid())
+  /// The placeholder that owns the organization until someone claims it.
+  /// Cascades: reaping the user reaps the account record with it.
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   organizationId   String   @unique
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   projectId        String   @unique

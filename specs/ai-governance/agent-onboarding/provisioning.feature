@@ -84,13 +84,75 @@ Feature: Anonymous agent onboarding — provision an ephemeral, claimable accoun
   # No identity anywhere in the anonymous path
   # ─────────────────────────────────────────────────────────────────────
 
-  # @unimplemented: structural: asserts the absence of request fields and of member rows
+  # @unimplemented: structural: asserts the absence of request fields
   @bdd @provisioning @privacy @unit @unimplemented
   Scenario: provisioning collects no email, no name and no password
     When the caller POSTs to `/provision`
     Then the request schema has no email field
-    And the created organization has no members
     And nothing in the flow sends an email
+
+  # ─────────────────────────────────────────────────────────────────────
+  # The placeholder owner
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @provisioning @unit
+  Scenario: the organization has a real owner from the first millisecond
+    When the caller POSTs to `/provision`
+    Then a placeholder user is created and made an admin of the organization
+    And the placeholder is marked unclaimed
+    # an ownerless organization breaks everything that reasonably assumes one
+    # exists — the support-contact fallback reads "the first admin's email",
+    # member lists render nothing, and a personal project's owner has nowhere
+    # to point. A user row that is not a live actor is already an established
+    # shape here: `deactivatedAt` means the same thing.
+
+  # @unimplemented: asserts a column the real Prisma provisioner writes; integration, not domain
+  @bdd @provisioning @privacy @unit @unimplemented
+  Scenario: the placeholder carries no email address
+    When the caller POSTs to `/provision`
+    Then the placeholder user's email is null
+    # not a synthetic address: nothing can accidentally send mail to it, and
+    # it cannot collide with the real signup that claims it later.
+
+  @bdd @provisioning @security @unit
+  Scenario: an unclaimed placeholder can never reach a session
+    Given a provisioned but unclaimed account
+    When any sign-in path tries to create a session for its placeholder
+    Then the session is refused
+    # this single gate is what stops a temporary account being taken over.
+
+  @bdd @provisioning @security @unit
+  Scenario: claiming is what lets the account sign in
+    Given the account has been claimed
+    When a session is created for that user
+    Then it is allowed
+
+  # @unimplemented: the seat query lives in the license-enforcement repository; needs a database
+  @bdd @provisioning @unit @billing @unimplemented
+  Scenario: an unclaimed placeholder is not a billable seat
+    Given an organization owned only by an unclaimed placeholder
+    When seats are counted for license enforcement
+    Then the placeholder is not counted
+    # nobody is sitting in that seat, and counting it could push a real
+    # organization over its member limit.
+
+  # @unimplemented: the member query lives in the organization repository; needs a database
+  @bdd @provisioning @unit @unimplemented
+  Scenario: an unclaimed placeholder is not shown as a member
+    Given an organization owned only by an unclaimed placeholder
+    When the members of that organization are listed
+    Then the placeholder does not appear
+    # it has no name or email to render, and it is not somebody you can
+    # invite, remove or bill for.
+
+  # @unimplemented: spans key resolution and the ingest path; integration, not domain
+  @bdd @provisioning @unit @unimplemented
+  Scenario: the ingestion key keeps working while the account is unclaimed
+    Given a provisioned but unclaimed account
+    When the agent exports traces with its ingestion key
+    Then the key resolves and the traces are accepted
+    # ingesting while unclaimed IS the product; the unclaimed filter must not
+    # reach the API-key resolution path.
 
   @bdd @provisioning @privacy @unit
   Scenario: the client fingerprint is peppered before it is stored

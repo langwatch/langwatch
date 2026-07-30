@@ -297,18 +297,36 @@ export class ClaimService {
   }
 
   /**
-   * Attach the identity and clear the deadlines. The unclaimed condition
-   * lives in the UPDATE, so two tabs approving the same handoff resolve to
-   * one winner and a reaper racing a claim resolves in the claim's favour.
+   * Settle the claim and clear the deadlines. The unclaimed condition lives in
+   * the UPDATE, so two tabs approving the same handoff resolve to one winner
+   * and a reaper racing a claim resolves in the claim's favour.
+   *
+   * Two shapes, decided by whether the claimer is the placeholder itself:
+   *
+   *   - It is (the passkey path). Nothing changes hands — the organization was
+   *     always theirs. Promoting just turns the placeholder into a real person.
+   *   - It is not (a CLI already logged in as somebody). Ownership moves to
+   *     that user and the placeholder is retired.
    */
   private async attach(params: {
     account: EphemeralAccount;
     userId: string;
+    email?: string | null;
+    name?: string | null;
   }): Promise<ClaimResult> {
-    await this.workspaces.attachOwner({
-      organizationId: params.account.organizationId,
-      userId: params.userId,
-    });
+    if (params.userId === params.account.userId) {
+      await this.workspaces.promotePlaceholder({
+        placeholderUserId: params.account.userId,
+        email: params.email ?? null,
+        name: params.name ?? null,
+      });
+    } else {
+      await this.workspaces.transferToExistingUser({
+        organizationId: params.account.organizationId,
+        placeholderUserId: params.account.userId,
+        claimingUserId: params.userId,
+      });
+    }
 
     const claimedAt = this.clock.now();
     const claimed = await this.accounts.markClaimed({

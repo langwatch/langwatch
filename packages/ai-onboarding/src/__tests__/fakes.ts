@@ -39,6 +39,7 @@ export class FakeAccountRepository implements EphemeralAccountRepository {
     const id = `acct_${++this.sequence}`;
     const account: EphemeralAccount = {
       id,
+      userId: params.userId,
       organizationId: params.organizationId,
       projectId: params.projectId,
       projectSlug: params.projectSlug,
@@ -163,7 +164,16 @@ export class FakeRateLimiter implements RateLimiter {
 }
 
 export class FakeWorkspaceProvisioner implements WorkspaceProvisioner {
-  readonly attached: Array<{ organizationId: string; userId: string }> = [];
+  readonly promoted: Array<{
+    placeholderUserId: string;
+    email?: string | null;
+    name?: string | null;
+  }> = [];
+  readonly transferred: Array<{
+    organizationId: string;
+    placeholderUserId: string;
+    claimingUserId: string;
+  }> = [];
   provisionCalls = 0;
   /** Set to make provisioning blow up, standing in for a failed key mint. */
   failure: Error | null = null;
@@ -176,6 +186,7 @@ export class FakeWorkspaceProvisioner implements WorkspaceProvisioner {
     if (this.failure) throw this.failure;
     const n = this.provisionCalls;
     return {
+      userId: `user_placeholder_${n}`,
       organizationId: `org_${n}`,
       teamId: `team_${n}`,
       projectId: `proj_${n}`,
@@ -185,11 +196,20 @@ export class FakeWorkspaceProvisioner implements WorkspaceProvisioner {
     };
   }
 
-  async attachOwner(params: {
-    organizationId: string;
-    userId: string;
+  async promotePlaceholder(params: {
+    placeholderUserId: string;
+    email?: string | null;
+    name?: string | null;
   }): Promise<void> {
-    this.attached.push(params);
+    this.promoted.push(params);
+  }
+
+  async transferToExistingUser(params: {
+    organizationId: string;
+    placeholderUserId: string;
+    claimingUserId: string;
+  }): Promise<void> {
+    this.transferred.push(params);
   }
 }
 
@@ -202,6 +222,7 @@ export function anAccount(
     overrides.provisionedAt ?? new Date("2026-01-01T00:00:00Z");
   return {
     id: "acct_seed",
+    userId: "user_placeholder_seed",
     organizationId: "org_seed",
     projectId: "proj_seed",
     projectSlug: "slug-seed",

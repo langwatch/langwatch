@@ -1,6 +1,17 @@
+-- AlterTable
+-- Twin of "deactivatedAt": the row exists but is not a live actor. Set while a
+-- user is an unclaimed placeholder created by anonymous agent onboarding.
+ALTER TABLE "User" ADD COLUMN "unclaimedAt" TIMESTAMP(3);
+
+-- CreateIndex
+-- The reaper and the member/seat filters both ask "is this one unclaimed", and
+-- the column is null for every ordinary user, so a partial index stays tiny.
+CREATE INDEX "User_unclaimedAt_idx" ON "User"("unclaimedAt") WHERE "unclaimedAt" IS NOT NULL;
+
 -- CreateTable
 CREATE TABLE "EphemeralAccount" (
     "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "projectSlug" TEXT NOT NULL,
@@ -21,6 +32,9 @@ CREATE TABLE "EphemeralAccount" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "EphemeralAccount_userId_key" ON "EphemeralAccount"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "EphemeralAccount_organizationId_key" ON "EphemeralAccount"("organizationId");
 
 -- CreateIndex
@@ -38,6 +52,9 @@ CREATE INDEX "EphemeralAccount_deleteAfter_idx" ON "EphemeralAccount"("deleteAft
 
 -- CreateIndex
 CREATE INDEX "EphemeralAccount_ingestionStopsAt_idx" ON "EphemeralAccount"("ingestionStopsAt");
+
+-- AddForeignKey
+ALTER TABLE "EphemeralAccount" ADD CONSTRAINT "EphemeralAccount_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "EphemeralAccount" ADD CONSTRAINT "EphemeralAccount_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;

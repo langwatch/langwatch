@@ -83,6 +83,25 @@ describe("provisioning a temporary account", () => {
       expect(response.account.projectName).toBe("Codex");
     });
 
+    /** @scenario "the organization has a real owner from the first millisecond" */
+    it("records the placeholder user that owns the workspace", async () => {
+      let seen: string | null = null;
+      const originalCreate = accounts.create.bind(accounts);
+      accounts.create = async (params) => {
+        seen = params.userId;
+        return originalCreate(params);
+      };
+
+      await serviceWith().provision({
+        request: { agent: "claude_code" },
+        identity,
+      });
+
+      // The organization is never ownerless: the placeholder is created with
+      // it, and the account row names it so the claim knows who to promote.
+      expect(seen).toBe("user_placeholder_1");
+    });
+
     it("points the agent at the OTLP endpoint of this deployment", async () => {
       const response = await serviceWith().provision({
         request: { agent: "claude_code" },

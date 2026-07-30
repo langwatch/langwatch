@@ -61,16 +61,41 @@ describe("claiming from a CLI that already has an identity", () => {
     beforeEach(() => seedAccount());
 
     /** @scenario "a logged-in CLI claims without opening a browser" */
-    it("makes the caller the owner", async () => {
+    it("hands ownership to the caller and retires the placeholder", async () => {
       await service.claimDirect({
         claimToken: CLAIM_TOKEN,
         userId: "user_1",
         identity,
       });
 
-      expect(workspaces.attached).toEqual([
-        { organizationId: "org_seed", userId: "user_1" },
+      expect(workspaces.transferred).toEqual([
+        {
+          organizationId: "org_seed",
+          placeholderUserId: "user_placeholder_seed",
+          claimingUserId: "user_1",
+        },
       ]);
+      expect(workspaces.promoted).toEqual([]);
+    });
+
+    /** @scenario "claiming as the placeholder itself promotes it in place" */
+    it("promotes in place when the claimer IS the placeholder", async () => {
+      // The passkey path: the credential was enrolled against the placeholder,
+      // so nothing changes hands and there is no window with two admins.
+      await service.claimDirect({
+        claimToken: CLAIM_TOKEN,
+        userId: "user_placeholder_seed",
+        identity,
+      });
+
+      expect(workspaces.promoted).toEqual([
+        {
+          placeholderUserId: "user_placeholder_seed",
+          email: null,
+          name: null,
+        },
+      ]);
+      expect(workspaces.transferred).toEqual([]);
     });
 
     /** @scenario "claiming cancels the reaper" */
@@ -131,7 +156,8 @@ describe("claiming from a CLI that already has an identity", () => {
 
       const row = await accounts.findById("acct_seed");
       expect(row?.claimedByUserId).toBe("user_first");
-      expect(workspaces.attached).toEqual([]);
+      expect(workspaces.transferred).toEqual([]);
+      expect(workspaces.promoted).toEqual([]);
     });
   });
 
@@ -327,8 +353,12 @@ describe("claiming through a browser handoff", () => {
       const code = await startHandoff();
       await service.approveHandoff({ handoffCode: code, userId: "user_1" });
 
-      expect(workspaces.attached).toEqual([
-        { organizationId: "org_seed", userId: "user_1" },
+      expect(workspaces.transferred).toEqual([
+        {
+          organizationId: "org_seed",
+          placeholderUserId: "user_placeholder_seed",
+          claimingUserId: "user_1",
+        },
       ]);
     });
 

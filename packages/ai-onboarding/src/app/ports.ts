@@ -16,6 +16,7 @@ export interface Clock {
 export const systemClock: Clock = { now: () => new Date() };
 
 export interface CreateEphemeralAccountParams {
+  userId: string;
   organizationId: string;
   projectId: string;
   projectSlug: string;
@@ -106,6 +107,8 @@ export interface RateLimiter {
 }
 
 export interface ProvisionedWorkspace {
+  /** The unclaimed placeholder that owns everything below. */
+  userId: string;
   organizationId: string;
   teamId: string;
   projectId: string;
@@ -116,20 +119,37 @@ export interface ProvisionedWorkspace {
 
 export interface WorkspaceProvisioner {
   /**
-   * Create an organization, a team, a project and an ingestion-only key for
-   * an account that has no user behind it.
+   * Create the placeholder user, its organization, team, project and an
+   * ingestion-only key.
    *
    * Atomic by contract: a partial failure must leave nothing behind, because
-   * an orphaned org has no owner to notice it and no deadline to reap it.
+   * an orphaned org has no live owner to notice it and no deadline to reap it.
    */
   provision(params: {
     projectName: string;
     agent: AgentSlug;
   }): Promise<ProvisionedWorkspace>;
 
-  /** Make a real user the owner of a previously ownerless organization. */
-  attachOwner(params: {
+  /**
+   * The claimer IS the placeholder — they proved it with a credential enrolled
+   * against it. Clear `unclaimedAt` and fill in whatever identity they gave.
+   * Ownership does not move, because it was already theirs; this is the cheap
+   * path and the one the passkey flow takes.
+   */
+  promotePlaceholder(params: {
+    placeholderUserId: string;
+    email?: string | null;
+    name?: string | null;
+  }): Promise<void>;
+
+  /**
+   * The claimer is a different, already-real user (a CLI that was logged in as
+   * somebody). Give them ownership and retire the placeholder, which has no
+   * further purpose and must not linger as a second admin.
+   */
+  transferToExistingUser(params: {
     organizationId: string;
-    userId: string;
+    placeholderUserId: string;
+    claimingUserId: string;
   }): Promise<void>;
 }
