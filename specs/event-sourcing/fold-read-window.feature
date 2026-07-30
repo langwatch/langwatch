@@ -103,3 +103,20 @@ Feature: Fold read windows are declared, not hand-rolled
     Given the fold declares a read window and does not mention trusting absence
     When an event is folded and the store reports the state absent
     Then the unwindowed retry still happens
+
+  # Trusting absence is only sound for a fold whose aggregates stay near the
+  # window in time, and only while a refusal remains distinguishable from an
+  # absence. Both are structural, so they are checked when a fold registers
+  # rather than discovered when a row goes missing.
+
+  Scenario: a trusted fold's windowed read is backed by a time-local lifetime
+    Given a fold that trusts an absent miss
+    When the platform registers it
+    Then the registration is refused unless the fold's aggregates are time-local
+    And a fold whose aggregate can stay live indefinitely may not trust absence
+
+  Scenario: trusting absence must not orphan the undecodable net
+    Given a fold that replays its history when the store misses
+    When the platform registers it
+    Then the registration is refused unless its store can report a row it refused
+    And a refusal keeps the replay that a trusted absence skips
