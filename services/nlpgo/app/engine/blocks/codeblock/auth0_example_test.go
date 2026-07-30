@@ -62,8 +62,13 @@ func newAuth0Stubs(t *testing.T, clientSecret string) *auth0Stubs {
 	s := &auth0Stubs{mintedToken: "minted-token-d41d8cd98f00"}
 
 	s.tokenServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// No require/assert in handlers (testifylint go-require): a decode
+		// failure surfaces as a 400, which fails the test at the caller.
 		var req tokenRequest
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		s.mu.Lock()
 		s.tokenRequests = append(s.tokenRequests, req)
 		reject := s.rejectToken
