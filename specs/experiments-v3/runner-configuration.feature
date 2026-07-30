@@ -9,6 +9,18 @@ Feature: Runner configuration
   # - A Prompt (versioned prompt from the Prompts system)
   # - An Agent (code executor or workflow)
 
+  # ===========================================================================
+  # What "bound" means in this file
+  # ===========================================================================
+  # The bound runner-header scenarios are pinned by unit tests over TargetHeader
+  # (experiments-v3/components/TargetSection/__tests__/TargetHeader.test.tsx).
+  # Those tests observe the header seam: which items the menu offers, and that
+  # choosing one raises that action for exactly this runner. What the workbench
+  # then does with the action — a column appearing, a column disappearing, the
+  # editor drawer's contents — belongs to the store and the drawer, and stays
+  # @unimplemented here rather than being pinned to a test that never observes
+  # it. A navigation assertion is not an outcome assertion.
+
   Background:
     Given I render the EvaluationsV3 spreadsheet table
 
@@ -161,43 +173,54 @@ Feature: Runner configuration
   # Runner header interactions
   # ============================================================================
 
-  @unimplemented
-  Scenario: Runner header shows popover on click
+  @unit
+  Scenario: Runner header shows a menu on click
     Given a prompt runner "my-assistant" is configured
     When I click on the runner header "my-assistant"
-    Then a popover menu appears with options:
+    Then a menu appears with options:
       | Edit Prompt          |
+      | Duplicate            |
+      | Switch Prompt        |
       | Remove from Workbench|
 
-  @unimplemented
+  # The play button is the last item in the header row, after a spacer, so it
+  # sits hard right. Its column-shrink behaviour is what the tests pin: on a
+  # narrow viewport everything else absorbs the squeeze so the button stays.
+  @unit
   Scenario: Runner header shows play button
     Given a prompt runner "my-assistant" is configured
-    Then the runner header shows a play button on the far right
-    # Note: Play button functionality to be implemented later
+    Then the runner header shows a play button
+    And the play button never shrinks out of its column
 
-  @unimplemented
-  Scenario: Edit prompt from header popover
+  @unit
+  Scenario: Edit prompt from the runner header menu
     Given a prompt runner "my-assistant" is configured
     When I click on the runner header "my-assistant"
-    And I click "Edit Prompt" in the popover
-    Then the PromptEditorDrawer opens with the prompt loaded
-    And I see the prompt's system prompt content
+    And I click "Edit Prompt" in the menu
+    Then the prompt editor is opened for that runner
+
+  @unimplemented
+  Scenario: Prompt editor shows the runner's prompt content
+    Given a prompt runner "my-assistant" is configured
+    When I open it with "Edit Prompt"
+    Then I see the prompt's system prompt content
     And I see the prompt's inputs section
     And I see the prompt's outputs section
 
-  @unimplemented
+  @unit
   Scenario: Remove runner from workbench
     Given a prompt runner "my-assistant" is configured
     When I click on the runner header "my-assistant"
-    And I click "Remove from Workbench" in the popover
-    Then the runner column is removed from the table
+    And I click "Remove from Workbench" in the menu
+    Then that runner is removed from the workbench
 
-  @unimplemented
-  Scenario: Agent header popover shows Edit Agent
+  @unit
+  Scenario: Agent header menu shows Edit Agent
     Given an agent runner "Python Processor" is configured
     When I click on the runner header "Python Processor"
-    Then a popover menu appears with options:
+    Then a menu appears with options:
       | Edit Agent           |
+      | Switch Agent         |
       | Remove from Workbench|
 
   @unimplemented
@@ -282,12 +305,19 @@ Feature: Runner configuration
     Then the local modifications are preserved in the runner config
     And no new version is published to the Prompts system
 
-  @unimplemented
+  @unit
   Scenario: Runner header shows orange dot for unpublished modifications
     Given a prompt runner "my-assistant" is configured
     And the runner has unpublished local modifications
     Then the runner header shows an orange dot next to the name
-    And hovering the dot shows tooltip "Unpublished modifications"
+
+  # Hover-reveal only: the tooltip is a Chakra Tooltip that never opens under
+  # jsdom, so this needs a real browser rather than a pretend unit binding.
+  @e2e @unimplemented
+  Scenario: Hovering the unpublished dot explains what it means
+    Given a prompt runner "my-assistant" has unpublished modifications
+    When I hover the orange dot on the runner header
+    Then a tooltip reads "Unpublished modifications"
 
   @unimplemented
   Scenario: Orange dot disappears after publishing
@@ -304,15 +334,34 @@ Feature: Runner configuration
     Then the evaluation uses the unpublished local configuration
     And the published version remains unchanged
 
-  @unimplemented
-  Scenario: PromptEditorDrawer header matches prompt playground
+  # ===========================================================================
+  # Prompt editor drawer: model-only header, actions in the footer
+  # ===========================================================================
+  # This scenario used to read "PromptEditorDrawer header matches prompt
+  # playground" and assert Save and version history in the drawer HEADER with
+  # no save button in the footer. That was true when it was written (2025-12-29,
+  # #1032, 2758a0a938) and stopped being true on 2026-02-15, when #1589
+  # (3da4f982d5) moved them on purpose: "Move save/history/API buttons to footer
+  # in drawer mode, keep model-only header", alongside "Add PromptEditorFooter
+  # component shared across eval-v3 and studio drawers". The drawer footer had
+  # to match the workflow studio pattern — [Discard] [Spacer] [History] [API]
+  # [Save] [Apply] — and Save belongs beside Apply, which the playground has no
+  # equivalent of.
+  #
+  # The playground did not follow and was never meant to: PromptBrowserHeader
+  # still renders PromptEditorHeader with the default variant="full", so its
+  # Save, history, Deploy and API buttons stay in the header. The two surfaces
+  # share the header COMPONENT and differ by variant deliberately. Three tests
+  # pin the drawer's footer layout — do not re-litigate this from the old text.
+  @unit
+  Scenario: Prompt editor drawer keeps the model selector in the header and the actions in the footer
     Given a prompt runner "my-assistant" is configured
     When I click "Edit Prompt" in the menu
-    Then the PromptEditorDrawer shows a header above the messages
-    And the header contains a model selector (ModelSelectFieldMini)
-    And the header contains a version history button
-    And the header contains a Save/Saved button
-    And there is no save button in the footer
+    Then the prompt editor drawer shows a header above the messages
+    And the header contains only a model selector
+    And the footer contains a version history button
+    And the footer contains a Save/Saved button
+    And there is exactly one save button
 
   @unimplemented
   Scenario: Save button shows "Saved" when no changes

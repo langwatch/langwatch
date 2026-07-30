@@ -14,7 +14,7 @@ import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 

@@ -7,7 +7,7 @@ Feature: Event-driven scenario execution
   # @scenario JSDoc against cancellation-eligibility.unit.test.ts,
   # simulation-runner.router.unit.test.ts, execution-pool.unit.test.ts) +
   # 4 KEEP. The 4 KEEP scenarios remain @unimplemented pending integration test
-  # coverage for suite-level queueRun fan-out, execution reactor on queued/cancelled,
+  # coverage for suite-level queueRun fan-out, scenarioExecution process manager on queued/cancelled,
   # and 6-pod GroupQueue distribution — tracked in PR #3458.
 
   Background:
@@ -29,20 +29,20 @@ Feature: Event-driven scenario execution
     And each has a unique pre-generated scenarioRunId
 
   # ============================================================================
-  # 3. Execution reactor picks up queued events
+  # 3. scenarioExecution process manager picks up queued events
   # ============================================================================
 
   @integration @unimplemented
-  Scenario: Execution reactor fires on queued event
-    Given the execution reactor is registered on the simulation pipeline
+  Scenario: scenarioExecution process manager fires on queued event
+    Given the scenarioExecution process manager is registered on the simulation pipeline
     When a queued event is processed by the GroupQueue
-    Then the reactor submits the job to the execution pool
+    Then the process manager submits the job to the execution pool
 
   @integration @unimplemented
-  Scenario: Execution reactor skips already-cancelled runs
+  Scenario: scenarioExecution process manager skips already-cancelled runs
     Given a scenario run has CancellationRequestedAt set in the fold projection
     When a queued event for that run is processed
-    Then the reactor does not submit the job to the execution pool
+    Then the process manager does not submit the job to the execution pool
 
   # ============================================================================
   # 4. Execution pool manages concurrency
@@ -57,5 +57,5 @@ Feature: Event-driven scenario execution
     Given 6 worker pods are running
     When 18 scenarios are queued in a suite run
     Then queued events are distributed across the 6 workers
-    And each worker's execution reactor fires for its assigned scenarios
+    And each worker's scenarioExecution process manager fires for its assigned scenarios
 

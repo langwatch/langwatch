@@ -9,9 +9,9 @@ import (
 )
 
 // Run is the migrationorder CLI: it checks every migration set against the
-// base ref and renders the findings. It returns the process exit code — 0 when
-// the migrations are in order, 1 when they are not, 2 when the repository
-// could not be read.
+// base ref, checks the goose sets' SQL, and renders the findings. It returns
+// the process exit code — 0 when the migrations pass, 1 when they do not, 2
+// when the repository could not be read.
 func Run(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("migrationorder", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -22,7 +22,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	inputs, err := Repo{Root: *root}.Inputs(context.Background(), *baseRef)
+	repo := Repo{Root: *root}
+
+	inputs, err := repo.Inputs(context.Background(), *baseRef)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	sqlInputs, err := repo.SQLInputs()
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
@@ -34,6 +41,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	for i := range inputs {
 		findings = append(findings, Check(inputs[i])...)
 	}
+	for i := range sqlInputs {
+		findings = append(findings, CheckSQL(sqlInputs[i])...)
+	}
 
 	if *asJSON {
 		if err := json.NewEncoder(stdout).Encode(findings); err != nil {
@@ -44,11 +54,11 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if len(findings) == 0 {
-		fmt.Fprintf(stdout, "Migrations are in order against %s.\n", *baseRef)
+		fmt.Fprintf(stdout, "Migrations pass every check against %s.\n", *baseRef)
 		return 0
 	}
 
-	fmt.Fprintf(stderr, "Migrations are out of order against %s.\n", *baseRef)
+	fmt.Fprintf(stderr, "Migrations fail their checks against %s.\n", *baseRef)
 	for _, finding := range findings {
 		fmt.Fprintf(stderr, "\n%s: %s %s\n", finding.Set, finding.Entry, finding.Problem)
 		if finding.Fix != "" {

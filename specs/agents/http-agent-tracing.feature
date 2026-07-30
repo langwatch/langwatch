@@ -116,6 +116,51 @@ Feature: HTTP Agent Test Tracing
     When I execute an HTTP agent test
     Then the trace captures the connection error message
 
+  @integration
+  Scenario: Trace captures a request body that is not valid JSON
+    Given the request body is not valid JSON
+    When I execute an HTTP agent test
+    Then a trace is still submitted
+    And the span is flagged as errored
+    And the span error message says the request body JSON is invalid
+
+  # ============================================================================
+  # Distributed tracing
+  #
+  # The test execution propagates W3C trace context to the endpoint it calls,
+  # so the customer's own instrumentation joins the same trace.
+  # ============================================================================
+
+  @integration
+  Scenario: Outgoing request carries a W3C traceparent header
+    When I execute an HTTP agent test
+    Then the outgoing HTTP request includes a traceparent header
+    And the traceparent header follows the W3C format "00-{traceId}-{spanId}-01"
+
+  @integration
+  Scenario: The traceparent trace ID matches the submitted trace
+    When I execute an HTTP agent test
+    Then the trace ID inside the traceparent header is the ID of the submitted trace
+
+  # ============================================================================
+  # Not an agent test
+  #
+  # Without an agent ID the proxy is a plain request, not an agent test — it
+  # must neither create a trace nor join one.
+  # ============================================================================
+
+  @integration
+  Scenario: No trace is created when there is no agent ID
+    Given the request carries no agent ID
+    When I execute the request through the HTTP proxy
+    Then no trace is submitted
+
+  @integration
+  Scenario: No traceparent header is sent when there is no agent ID
+    Given the request carries no agent ID
+    When I execute the request through the HTTP proxy
+    Then the outgoing HTTP request does not include a traceparent header
+
   # ============================================================================
   # Auth credential sanitization
   # ============================================================================

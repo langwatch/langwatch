@@ -2,8 +2,9 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SeriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesBucket } from "~/server/analytics/types";
-// The single canonical encoder for `getTimeseries` bucket keys (ADR-034
-// app-layer module). Reused — not re-implemented — so this reader can never
+// The single canonical encoder for `getTimeseries` bucket keys (ADR-034,
+// retired; ground now ADR-099, app-layer module). Reused — not
+// re-implemented — so this reader can never
 // drift from how the app-layer writes the value. Pure helper; safe client-side.
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
 import type { RecentItem } from "~/server/home/types";

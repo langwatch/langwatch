@@ -59,9 +59,10 @@ async function bootStorageStatsCollection(
   }
 }
 
-// Scenario simulation executor: an in-process pool late-bound into the
-// scenarioExecution reactor (runIn: ["worker"]). Without this the reactor
-// fires with no pool wired and simulations never execute.
+// Scenario simulation executor: the registry of child processes this worker
+// holds, late-bound into the `scenarioExecution` process outbox. Until it is
+// bound, dispatches for this worker stay pending and are retried rather than
+// dropped (ADR-073 step 2, retired; ground now ADR-103).
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
@@ -74,12 +75,7 @@ async function bootScenarioProcessor(
   const { startScenarioProcessor } = await import(
     "~/server/scenarios/scenario.processor"
   );
-  const { SCENARIO_WORKER } = await import(
-    "~/server/scenarios/scenario.constants"
-  );
-  const scenarioPool = new ScenarioExecutionPool({
-    concurrency: SCENARIO_WORKER.CONCURRENCY,
-  });
+  const scenarioPool = new ScenarioExecutionPool();
   getScenarioExecutionHandle()?.setPool(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor(scenarioPool);
   if (scenarioProcessor) {
@@ -262,7 +258,7 @@ export async function startWorkers(
   try {
     // Ingestion pulls self-drive through durable process wakes and the
     // transactional process outbox; there is no BullMQ worker to boot.
-    // Topic clustering self-drives (ADR-051): the process wake worker and
+    // Topic clustering self-drives (ADR-051, retired; ground now ADR-098): the process wake worker and
     // process outbox in the event-sourcing runtime own scheduling and
     // execution; there is no BullMQ worker to boot.
     await bootStorageStatsCollection(shutdownHandles);

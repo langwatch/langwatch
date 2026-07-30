@@ -244,7 +244,7 @@ func TestEvaluatorWorkflow_UpstreamErrorSurfacesAsNodeError(t *testing.T) {
 
 // TestEvaluatorWorkflow_TypedEvaluatorFieldShape pins the canonical
 // Studio shape: the evaluator slug lives on `data.evaluator` (typed
-// field), NOT inside `data.parameters[]`. langwatch/src/optimization_
+// field), NOT inside `data.parameters[]`. platform/app/src/optimization_
 // studio/types/dsl.ts:243 defines `evaluator?: EvaluatorTypes |
 // "custom/<id>" | "evaluators/<id>"`. Before the fix, runEvaluator
 // only read paramString(parameters, "evaluator") so any node persisted

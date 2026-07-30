@@ -82,15 +82,40 @@ LIMIT 1
 
 ## Version Columns per Table
 
+> The authority for every fact in this section and the partition-key table
+> below is `langwatch/src/server/clickhouse/schema-catalogue.ts`, which covers
+> all 33 tables and is compared to the migrations by
+> `schema-catalogue.drift.unit.test.ts` on every run. The tables here are a
+> readable extract of the tables people ask about most; when they disagree with
+> the catalogue, the catalogue is right. Both rows corrected in this file had
+> been wrong for some time precisely because nothing checked them.
+
 | Table | Engine | Version Column | Dedup Key |
 |-------|--------|---------------|-----------|
-| `simulation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, ScenarioSetId, BatchRunId, ScenarioRunId)` |
+| `simulation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, ScenarioRunId)` |
 | `trace_summaries` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, TraceId)` |
-| `stored_spans` | `ReplacingMergeTree(StartTime)` | `StartTime` | `(TenantId, TraceId, SpanId)` |
+| `stored_spans` | `ReplacingMergeTree(StartTime)` ⚠ | `UpdatedAt` | `(TenantId, TraceId, SpanId)` |
 | `evaluation_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, EvaluationId)` |
 | `experiment_runs` | `ReplacingMergeTree(UpdatedAt)` | `UpdatedAt` | `(TenantId, RunId, ExperimentId)` |
 
-**Note:** `stored_spans` uses `StartTime` as the version column, NOT `UpdatedAt`. Use `max(StartTime)` for dedup on that table.
+⚠ **`stored_spans` is the one table where the engine's version column and the
+correct one differ.** Its DDL says `ReplacingMergeTree(StartTime)`; dedup with
+**`max(UpdatedAt)`** anyway. `StartTime` is the span's own business time and is
+*unchanged* when an emitter re-reports a span, so every version of that span
+ties on it — which means `max(StartTime)` is not a dedup at all. Every tied row
+satisfies the IN-tuple, and the read returns the span once per unmerged version
+(measured: two versions in, two rows out). On the rarer re-report that does move
+`StartTime`, electing the greatest one prefers the *stale* row. `UpdatedAt` is
+stamped fresh on every insert, so it is the only column on this table that
+records *when a report was written* — which makes it the correct version
+column, not a total order. Two writers can still land on the same millisecond
+and tie; see "UpdatedAt is Monotonically Increasing" below for the
+deterministic tie-break a reader that must pick exactly one row still needs.
+
+This is a defect in the DDL, not in the readers. ClickHouse cannot `ALTER` an
+engine argument, so fixing it needs a full rebuild of the largest table in the
+system; the readers were corrected first. Do not "make them agree" by switching
+a reader to `max(StartTime)`. See [ADR-099](../adr/099-projection-storage-and-table-definition.md) (successor to the retired ADR-083).
 
 ## UpdatedAt is Monotonically Increasing
 
@@ -163,7 +188,7 @@ Keep both: the WHERE prunes partitions, the HAVING ensures exact filtering for t
 | `simulation_runs` | `toYearWeek(StartedAt)` |
 | `trace_summaries` | `toYearWeek(OccurredAt)` |
 | `stored_spans` | `toYearWeek(StartTime)` |
-| `evaluation_runs` | `toYearWeek(UpdatedAt)` |
+| `evaluation_runs` | `toYearWeek(ScheduledAt)` |
 
 ## TenantId is Always Required
 
@@ -212,6 +237,6 @@ When reviewing a PR that touches a `*.clickhouse.repository.ts` or any service h
 - **`max(<column>)` used as a pagination cursor** instead of `argMax(<column>, UpdatedAt)` — pagination cursors derived from non-version columns can read stale values.
 - **Missing partition predicate** when a date range is available — every weekly-partitioned table (`trace_summaries`, `simulation_runs`, `stored_spans`, `evaluation_runs`, ...) needs a WHERE on its partition column to enable pruning.
 - **Heavy columns in dedup subqueries** — anything like `Messages.Content`, `Inputs`, `Details`, `ComputedInput`, `SpanAttributes`, `Examples`, `LlmCalls` belongs only in the outer SELECT, never in the dedup subquery.
-- **A range filter on a MOVABLE column inside a dedup subquery** — the previous check says to add a partition predicate; this one says where it may not go. If the partition column can change after the row is written (a fold taking `min`/`max` over business time — `coding_agent_sessions.StartedAt`, `trace_analytics.OccurredAt`, `evaluation_analytics.OccurredAt` all do), then range-filtering the inner `max(<version>)` scope drops the true latest version out of its own dedup group the moment it drifts past the window edge. The group resolves to a **stale in-window version** and the outer scope returns it — non-null, plausible, and no fallback catches it. **Bound the outer scope for pruning; leave the dedup scope unbounded on that column.** Not even an upper bound is safe: a read-back miss re-runs `init()` and can re-stamp the anchor *forwards*, so "the latest version holds the smallest value" does not hold. Only the **key** narrowing (`TenantId`) belongs in both scopes. Nothing else qualifies just by looking stable: `UserId` is written by the fold, is absent from spans, and returns to `null` whenever a read-back miss re-runs `init()`, so a later version can carry an empty value, hold `max(<version>)`, and hide the true latest from a `UserId`-filtered group — the same defect in a column that never moves in a range sense. Narrow on it in the outer scope only, and accept that a session whose newest version lost the value leaves the filtered list. See ADR-071 and `coding-agent-session.clickhouse.repository.ts` (`findManyRecent` / `findLatestRecord`), which document both the rule and its scan cost.
+- **A range filter on a MOVABLE column inside a dedup subquery** — the previous check says to add a partition predicate; this one says where it may not go. If the partition column can change after the row is written (a fold taking `min`/`max` over business time — `coding_agent_sessions.StartedAt`, `trace_summaries.OccurredAt`, `evaluation_analytics.OccurredAt` all do; `trace_analytics.OccurredAt` no longer does, ADR-071 (retired; ADR-099) froze it as a storage anchor in migration 00061), then range-filtering the inner `max(<version>)` scope drops the true latest version out of its own dedup group the moment it drifts past the window edge. The group resolves to a **stale in-window version** and the outer scope returns it — non-null, plausible, and no fallback catches it. **Bound the outer scope for pruning; leave the dedup scope unbounded on that column.** Not even an upper bound is safe: a read-back miss re-runs `init()` and can re-stamp the anchor *forwards*, so "the latest version holds the smallest value" does not hold. Only the **key** narrowing (`TenantId`) belongs in both scopes. Nothing else qualifies just by looking stable: `UserId` is written by the fold, is absent from spans, and returns to `null` whenever a read-back miss re-runs `init()`, so a later version can carry an empty value, hold `max(<version>)`, and hide the true latest from a `UserId`-filtered group — the same defect in a column that never moves in a range sense. Narrow on it in the outer scope only, and accept that a session whose newest version lost the value leaves the filtered list. See ADR-099 (successor to the retired ADR-071) and `coding-agent-session.clickhouse.repository.ts` (`findManyRecent` / `findLatestRecord`), which document both the rule and its scan cost.
 
 These checks belong in code review because they're query-shape problems, not type problems — typecheck and unit tests will not catch them. CI integration tests will pass while production grinds to a halt under merge backlog.

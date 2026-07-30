@@ -185,10 +185,11 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
-   * Recent anomaly alerts produced by the anomaly-detection reactor.
-   * Service-routed read of `prisma.anomalyAlert` keyed by org, sorted
-   * by detectedAt DESC. Returns [] when no rules have fired or when
-   * ClickHouse is disabled (the reactor short-circuits without CH).
+   * Recent anomaly alerts produced by `SpendSpikeAnomalyEvaluator` on the
+   * spend-spike anomaly worker's tick. Service-routed read of
+   * `prisma.anomalyAlert` keyed by org, sorted by detectedAt DESC. Returns []
+   * when no rules have fired or when ClickHouse is disabled (the evaluator
+   * short-circuits without CH).
    */
   recentAnomalies: protectedProcedure
     .input(

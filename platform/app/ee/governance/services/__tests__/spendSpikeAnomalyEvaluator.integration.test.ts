@@ -9,9 +9,10 @@
  *   → dedup invariant on re-tick → scope filter on a mismatched source.
  *
  * Test isolation strategy: seeds CH governance_kpis rows directly
- * (no fold reactor, no async pipeline delays) so the test stays
- * deterministic + sub-second. The reactor that populates
- * governance_kpis is covered separately in 3b-iii integration tests.
+ * (no projection run, no async pipeline delays) so the test stays
+ * deterministic + sub-second. `GovernanceKpisMapProjection`, which
+ * populates governance_kpis, is covered separately in 3b-iii integration
+ * tests.
  *
  * Spec contracts:
  *   - specs/ai-gateway/governance/anomaly-rules.feature
@@ -30,7 +31,7 @@ import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 import { SpendSpikeAnomalyEvaluator } from "../spendSpikeAnomalyEvaluator.service";
 

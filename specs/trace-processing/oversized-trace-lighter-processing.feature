@@ -34,11 +34,13 @@ Feature: Oversized traces are processed lighter, never dropped
 
   Rule: Evaluations stop firing once a trace passes the processing cap
 
+    @unit
     Scenario: Evaluations run for a trace under the processing cap
       Given a trace under the processing cap with enabled monitors
       When a new span arrives for that trace
       Then its enabled evaluations are dispatched
 
+    @unit
     Scenario: Evaluations are skipped for a trace over the processing cap
       Given a trace that has passed the processing cap with enabled monitors
       When a new span arrives for that trace

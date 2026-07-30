@@ -7,8 +7,8 @@
 // SpanRecorder, and asserts on the propagation chain WITHIN nlpgo's
 // process boundary. The downstream half — OTLP roundtrip into
 // langwatch's event-sourcing pipeline, ClickHouse persistence,
-// evaluationTrigger reactor block — is covered by the langwatch-side
-// e2e test, not here.
+// evaluationTrigger process-manager block — is covered by the
+// langwatch-side e2e test, not here.
 //
 // What this test DOES prove (all internal to nlpgo):
 //   1. POSTing /go/studio/execute_sync with `traceparent` makes the
@@ -26,8 +26,8 @@
 // What this test does NOT prove (handled by the langwatch-side e2e):
 //   - Spans survive OTLP serialization and reach a real collector.
 //   - ClickHouse stores the depth attribute on the span row.
-//   - The TS evaluationTrigger reactor actually reads it and blocks
-//     re-dispatch on the real pipeline.
+//   - The TS evaluationTrigger process manager actually reads it and
+//     blocks re-dispatch on the real pipeline.
 //
 // Wiring matches production (NewBaggageAttributeProcessor from
 // pkg/otelsetup, the TraceContext+Baggage composite propagator), so a
@@ -81,7 +81,7 @@ func installProductionTracerStack(t *testing.T) *tracetest.SpanRecorder {
 		// causality_depth value carried via context baggage. Without
 		// this, only the root span set by startStudioSpan would have the
 		// attribute, and child spans emitted from goroutines would slip
-		// through the reactor's depth check.
+		// through the evaluation-trigger process manager's depth check.
 		sdktrace.WithSpanProcessor(otelsetup.NewBaggageAttributeProcessor(
 			otelsetup.AutoStampedBaggageKeys...,
 		)),
@@ -278,6 +278,7 @@ func TestCausalityPropagation_RootSpanContinuesParentTrace(t *testing.T) {
 }
 
 /** @scenario Every span emitted during an nlpgo evaluator run carries causality_depth via SpanProcessor */
+/** @scenario nlpgo handler increments causality_depth on its root span */
 func TestCausalityPropagation_AllSpansShareTraceIDAndCarryDepth(t *testing.T) {
 	rec := installProductionTracerStack(t)
 	url, _ := setupCausalityStack(t)
@@ -355,7 +356,7 @@ func TestCausalityPropagation_OutboundHTTPInjectsTraceparentAndDepth(t *testing.
 
 	// 3. X-LangWatch-Causality-Depth header set to current (1) for
 	//    non-OTel consumers (the langwatch app's collector reads this
-	//    plain header to feed the dispatcher's reactor).
+	//    plain header to feed the evaluation-trigger process manager).
 	assert.Equal(t, "1", rec.depthHeader,
 		"X-LangWatch-Causality-Depth header must be \"1\" — incoming 0 + 1")
 }

@@ -2,23 +2,21 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import type { DeepPartial } from "~/utils/types";
 import {
   type MetricPreparationResult,
   prepareMetricDataPoints,
-} from "../../event-sourcing/pipelines/metric-processing/canonicalMetric";
-import type { CanonicalMetricDataPoint } from "../../event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import {
-  piiRedactionLevelSchema,
-  type RecordMetricCorrelationCommandData,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+} from "~/server/event-sourcing/metric-processing/prepareMetricDataPoints";
+import type {
+  CanonicalMetricDataPoint,
+  MetricTraceCorrelation,
+} from "~/server/event-sourcing/metric-processing/schema";
+import { piiRedactionLevelSchema } from "~/server/event-sourcing/trace-processing/schema";
+import type { DeepPartial } from "~/utils/types";
 import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface MetricRequestCollectionDeps {
   recordDataPoints: (data: CanonicalMetricDataPoint[]) => Promise<void>;
-  recordMetricCorrelations: (
-    data: RecordMetricCorrelationCommandData[],
-  ) => Promise<void>;
+  recordMetricCorrelations: (data: MetricTraceCorrelation[]) => Promise<void>;
   piiRedactionService?: Pick<
     OtlpSpanPiiRedactionService,
     "redactMetricAttributes"

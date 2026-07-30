@@ -42,7 +42,7 @@ interface TraceLensColumns {
  * from `getTraceColumnDef`; per-evaluator `eval:<field>:<key>` columns are
  * synthesised here (def + a registry cell), reading evaluator names from
  * `evaluatorNames` for their headers. See
- * dev/docs/adr/029-trace-table-per-evaluator-columns.md.
+ * dev/docs/adr/094-trace-table-per-evaluator-columns.md.
  */
 export function useTraceLensColumns({
   logicalColumnIds,

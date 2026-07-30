@@ -29,10 +29,3 @@ export interface LangyAnalyticsEventRepository {
     retentionDays: number,
   ): Promise<void>;
 }
-
-export class NullLangyAnalyticsEventRepository
-  implements LangyAnalyticsEventRepository
-{
-  async insert(): Promise<void> {}
-  async insertBatch(): Promise<void> {}
-}

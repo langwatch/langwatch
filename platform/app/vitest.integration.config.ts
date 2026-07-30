@@ -1,6 +1,6 @@
 // IMPORTANT: setupEnv MUST be imported FIRST to set CI env vars before any other code runs
 // This handles CI_REDIS_URL -> REDIS_URL mapping and deletes BUILD_TIME
-import "./src/server/event-sourcing/__tests__/integration/setupEnv";
+import "./src/test-utils/integration/setupEnv";
 
 import { config } from "dotenv";
 import { join } from "path";
@@ -16,15 +16,13 @@ const isCI = !!process.env.CI;
 export default defineConfig({
   test: {
     // Global setup runs once before all tests - starts shared containers
-    globalSetup: [
-      "./src/server/event-sourcing/__tests__/integration/globalSetup.ts",
-    ],
+    globalSetup: ["./src/test-utils/integration/globalSetup.ts"],
     setupFiles: [
       // setupEnv.ts MUST run first - sets env vars before any application code loads
-      "./src/server/event-sourcing/__tests__/integration/setupEnv.ts",
+      "./src/test-utils/integration/setupEnv.ts",
       // setup.ts sets REDIS_URL/CLICKHOUSE_URL at module load time
       // before test-setup.ts imports any application code
-      "./src/server/event-sourcing/__tests__/integration/setup.ts",
+      "./src/test-utils/integration/setup.ts",
       "./test-setup.ts",
     ],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],

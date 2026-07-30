@@ -150,6 +150,8 @@ export function ExternalSetDetailPanel({
     }
   }, [filters, scenarioOptions, setFilters]);
 
+  const hasActiveFilters = !!(filters.scenarioId || filters.passFailStatus);
+
   // Apply filters to raw run data
   const filteredRuns = useMemo(() => {
     if (!runData) return [];
@@ -175,10 +177,21 @@ export function ExternalSetDetailPanel({
     return runs;
   }, [runData, filters.scenarioId, filters.passFailStatus]);
 
-  // Group filtered runs by batch (for groupBy "none")
+  // Group filtered runs by batch (for groupBy "none").
+  //
+  // A filter hides runs that did start, so the batch's own total would read as
+  // a shortfall the customer caused by filtering. Withhold it while filtering
+  // and every batch falls back to counting the runs on screen.
   const batchRuns = useMemo(() => {
-    return groupRunsByBatchId({ runs: filteredRuns });
-  }, [filteredRuns]);
+    return groupRunsByBatchId({
+      runs: filteredRuns,
+      expectedCounts: hasActiveFilters
+        ? undefined
+        : runDataResult && "expectedCounts" in runDataResult
+          ? runDataResult.expectedCounts
+          : undefined,
+    });
+  }, [filteredRuns, hasActiveFilters, runDataResult]);
 
   // Group filtered runs by scenario (for groupBy "scenario")
   const groups = useMemo(() => {
@@ -214,7 +227,6 @@ export function ExternalSetDetailPanel({
 
   const hasData =
     effectiveGroupBy === "none" ? batchRuns.length > 0 : groups.length > 0;
-  const hasActiveFilters = !!(filters.scenarioId || filters.passFailStatus);
 
   return (
     <VStack align="stretch" gap={0} height="100%">

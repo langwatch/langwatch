@@ -12,8 +12,6 @@
  * Real logic follows once the service layer for VirtualKey / Budget lands.
  */
 
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
-
 import { createLogger } from "@langwatch/observability";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
@@ -715,9 +713,10 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
 });
 
 // §4.5 — `/budget/debit` is removed. Cost recording is now driven by the
-// trace-fold reactor on the trace-processing pipeline
-// (platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/
-// gatewayBudgetSync.reactor.ts), which folds OTel span usage attributes
+// gateway budget debits map projection on the trace-processing pipeline
+// (`createGatewayBudgetDebitsProjection` in
+// platform/app/ee/governance/projections/governanceProjections.composition.ts,
+// mounted by pipelineRegistry.ts), which folds OTel span usage attributes
 // into the ClickHouse `gateway_budget_ledger_events` table. Single source
 // of truth, no PG dual-write — see CLAUDE.md & the migration
 // 00017_create_gateway_budget_ledger.sql for the CH schema.

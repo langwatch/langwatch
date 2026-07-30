@@ -4,7 +4,7 @@
  * A standalone GroupQueue job (registered via `registerJob`, see
  * `pipelineRegistry.ts`) that turns a raw staged upload (CSV / JSONL / JSON) in
  * object storage into the chunked-JSONL dataset layout — pure Postgres + S3, no
- * ClickHouse, no fold/reactor.
+ * ClickHouse, no folds or projections.
  *
  * Streaming/memory contract (I-MEM): the source is read as a backpressured
  * stream and records are flushed to chunk objects as soon as the in-memory

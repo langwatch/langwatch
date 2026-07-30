@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { openProtections } from "./open-protections";
 

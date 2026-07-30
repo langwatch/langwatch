@@ -109,7 +109,7 @@ const SAMPLE_PROMPTS = [
   "Triage this ClickHouse error: code 184 ILLEGAL_AGGREGATION.",
   "Generate an OpenAPI 3 schema from these example payloads.",
   "Plan a 3-step rollout for the persona-aware sidebar gating.",
-  "Explain the difference between event-sourcing folds and reactors.",
+  "Explain the difference between event-sourcing folds and event subscribers.",
 ];
 
 const SAMPLE_OUTPUTS = [
@@ -122,7 +122,7 @@ const SAMPLE_OUTPUTS = [
   "argMax(...) inside an outer sum() in the same SELECT level. Wrap in a subquery or rename the inner alias.",
   "Generated. Endpoints inferred from POST/GET pairs; auth scheme assumed Bearer JWT. Review before publishing.",
   "Ship 1: FF-gated for ADMIN. Ship 2: enable for MEMBER read-only. Ship 3: full GA + remove FF.",
-  "Folds materialise state idempotently from the event log; reactors fire side-effects (CH inserts, alerts) once per event.",
+  "Folds materialise state idempotently from the event log; map projections derive a row per event, and subscribers fire side-effects like alerts.",
 ];
 
 function parseArgs(argv: string[]): Args {

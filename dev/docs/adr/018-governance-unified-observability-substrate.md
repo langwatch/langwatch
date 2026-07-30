@@ -2,7 +2,11 @@
 
 **Date:** 2026-04-27
 
-**Status:** Accepted
+**Status:** Accepted — the unified-substrate decision (one trace store, two
+URL surfaces) is live and unchanged. Amended 2026-07-30: decisions 5 and 6
+described an in-flight state (reactor-driven folds, attribute-read TTL) that
+did not land as written — folds are now map projections and per-origin
+retention was never built. See decisions 5–6 and their consequences below.
 
 ## Context
 
@@ -49,9 +53,9 @@ Concretely:
 
 4. **Hidden Governance Project.** Per-org Project of `kind = "internal_governance"`, lazy-ensured on first IngestionSource mint via single `ensureHiddenGovernanceProject(prisma, orgId)` helper at `platform/app/src/server/governance/governanceProject.service.ts:54-110`. Internal routing/tenancy artifact only — never user-visible. Layer-1 filter at `PrismaOrganizationRepository.getAllForUser` (`kind: { not: "internal_governance" }`) covers all org/team/project list consumers; Layer-2 per-consumer assertions ship post-cutover.
 
-5. **Folds for derived views.** `governance_kpis` (KPI strip + anomaly reactor input) and `governance_ocsf_events` (SIEM read API) are reactor-driven derived projections from the unified store. Rebuildable from `event_log`. (Step 3/3 — in flight at time of writing this ADR.)
+5. **Folds for derived views.** `governance_kpis` (KPI strip + anomaly-alert input) and `governance_ocsf_events` (SIEM read API) are derived projections from the unified store, rebuildable from `event_log`. They were reactor-driven when this ADR was written; ADR-075 retired the reactor mechanism repo-wide, and both are now **map projections** (`ee/governance/projections/governanceKpis.mapProjection.ts`, `governanceOcsfEvents.mapProjection.ts`) — each event independently produces rows, with no accumulator and no reactor in the path. The anomaly evaluation that reads `governance_kpis` is likewise no longer a reactor: it is a periodic in-process interval tick (`ee/governance/services/spendSpikeAnomalyWorker.ts`), not an event reaction.
 
-6. **Per-origin retention.** `IngestionSource.retentionClass` (`thirty_days` / `one_year` / `seven_years`) drives the ClickHouse TTL policy. Set system-side per source, never user-supplied per event. (Step 2c — in flight; column exists today, TTL enforcement lands with step 3.)
+6. **Per-origin retention.** Not implemented. `IngestionSource.retentionClass` does not exist — there is no such column in `prisma/schema.prisma`, and no `retentionClass` reference anywhere in `langwatch/src`. Neither `governance_kpis` nor `governance_ocsf_events` carries a `_retention_days` column at all (migration 00032 added it to the trace/evaluation tables and deliberately not to the governance audit stream), so neither appears in `ttlReconciler.ts`'s managed-table list. Governance data currently has no retention policy of its own — it does not expire under this substrate's TTL mechanism, per-origin or otherwise. This was planned as an in-flight step when this ADR was written; it never shipped.
 
 ### Per-source-type wire-shape decisions
 
@@ -83,7 +87,7 @@ Admin clicks Create on first IngestionSource
        └─ Helper is idempotent: subsequent IngestionSources reuse the same Project
 ```
 
-Any future routing callsite (anomaly reactor, OCSF reader, future ingestion entry points) calls the same helper. There is no other lazy-create path.
+Any future routing callsite (anomaly evaluation, OCSF reader, future ingestion entry points) calls the same helper. There is no other lazy-create path.
 
 ## Rationale / Trade-offs
 
@@ -120,7 +124,7 @@ Any future routing callsite (anomaly reactor, OCSF reader, future ingestion entr
 
 - Required ripping out ~30 iterations of the parallel pipeline (mechanical delete in `f3de1ae07`, ~1,770 LOC removed).
 - Webhook-shaped sources (one row per HTTP delivery, no span tree) need a logs-OTLP adapter — not a span-OTLP adapter.
-- ClickHouse TTL has to read attribute values to decide retention class; we accept the per-attribute predicate cost.
+- Per-origin retention was expected to cost a per-attribute TTL predicate (reading `langwatch.governance.retention_class` off the row to pick a class). That mechanism was never built — see "Per-origin retention" above — and ADR-099's `defineTable` now forbids the shape outright: a TTL anchor may only be a single frozen, platform-set column (`ttl.anchor`), never a value read out of an attribute map. Per-origin retention, if it ships, will have to be a per-table policy choice under ADR-099's model, not a conditional read inside one shared table's TTL.
 - Multitenancy enforcement: governance ingest is org-scoped, but the trace store is project-scoped. Resolved via the hidden Governance Project pattern (lazy-ensure, internal routing only) — adds an indirection but reuses an otherwise-hardened model.
 
 ### Neutral / accepted complexity
@@ -164,7 +168,7 @@ Test coverage proving the contract (run with `pnpm test:integration` against Cli
 ## References
 
 - Related specs: `specs/ai-gateway/governance/{architecture-invariants, ui-contract, receiver-shapes, retention, folds, event-log-durability, compliance-baseline, siem-export}.feature`
-- Related ADRs: ADR-015 (projection-replay-coordination); ADR-017 (gateway-trace-payload-capture)
+- Related ADRs: ADR-101 (replay — offline, version-gated; ground for the retired ADR-015's projection-replay-coordination protocol); ADR-017 (gateway-trace-payload-capture); ADR-098 (map projections, the current shape of decision 5's folds); ADR-099 (TTL-anchor rule referenced in decision 6 and its consequences)
 - PR: https://github.com/langwatch/langwatch/pull/3524 (`feat/governance-platform`)
 - Code:
   - Receiver: `platform/app/src/server/routes/ingest/ingestionRoutes.ts`

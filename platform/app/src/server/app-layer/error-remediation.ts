@@ -72,9 +72,6 @@ const registry = {
       "Field names are case-sensitive",
     ],
   },
-  time_range_too_wide: {
-    tips: ["Query in smaller windows and paginate through the results"],
-  },
   clickhouse_unavailable: {
     tips: [
       "This is a temporary platform issue — retry in a few seconds",

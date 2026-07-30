@@ -70,7 +70,7 @@ export class GovernanceSetupStateService {
       }),
       // Persona-3 detection: any application-kind project that has ever
       // received its first message (firstMessage flag is set by the
-      // collectorWorker + projectMetadata reactor on the first ingested
+      // projectMetadata event subscriber on the first ingested
       // span). Excludes internal_governance projects so a freshly-minted
       // Gov Project alone does not flip persona-3 to true.
       this.prisma.project.count({

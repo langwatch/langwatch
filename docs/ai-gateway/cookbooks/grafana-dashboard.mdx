@@ -191,7 +191,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards â
     {
       "type": "timeseries",
       "title": "Budget blocks by scope",
-      "description": "The gateway does not debit budgets: cost rides the OTel span and the control plane's trace-fold reactor writes the ledger. This counter is the only gateway-side signal that a hard cap actually rejected traffic.",
+      "description": "The gateway does not debit budgets: cost rides the OTel span and the control plane's budget-debit projection writes the ledger. This counter is the only gateway-side signal that a hard cap actually rejected traffic.",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 31, "w": 12, "h": 7 },
       "targets": [{

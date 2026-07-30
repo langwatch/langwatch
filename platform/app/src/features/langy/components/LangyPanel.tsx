@@ -1053,7 +1053,8 @@ function LangyPanel({
       });
   }, [stop, projectId, stopTurn, foldInFlightTurnId]);
 
-  // Seed the LOCAL turn projection from the snapshot (ADR-059): its cursor is
+  // Seed the LOCAL turn projection from the snapshot (ADR-059, retired;
+  // ground now ADR-098): its cursor is
   // where the durable-tail fold starts, and an in-flight turn id is what a
   // refreshed tab adopts (making Stop + live signals work again). The seed
   // reducer never rewinds a fresher local fold, so refetches are harmless.
@@ -1738,8 +1739,9 @@ function LangyPanel({
   //                 subscription closes the moment a silent worker stops pushing
   //                 frames, and because `reconnectToStream()` returns null,
   //                 useChat settles to "ready" and isBusy goes false LONG before
-  //                 the turn is actually over (the liveness reactor keeps
-  //                 re-driving for up to its whole grace budget, ~90s).
+  //                 the turn is actually over (the `agentTurnLiveness`
+  //                 subscriber keeps re-driving for up to its whole grace
+  //                 budget, ~90s).
   //   serverTurnInFlight  the DURABLE truth off the fold — status `active`
   //                 (message sent, worker cold-starting) OR `running` (agent
   //                 responding), pushed by the freshness coordinator. It stays
@@ -1999,9 +2001,10 @@ function LangyPanel({
 
   // The generated title for the open conversation, read off the recents list —
   // the SAME server state, kept fresh by the useLangyFreshness SSE coordinator,
-  // so the title-generation reactor's `conversation_title_generated` event
-  // lands here without a second fetch. Null until the reactor produces one: the
-  // header shows nothing that pretends to be a title in the meantime.
+  // so the `conversation_title_generated` event raised by the conversation
+  // process manager's title-generation intent lands here without a second
+  // fetch. Null until that intent produces one: the header shows nothing that
+  // pretends to be a title in the meantime.
   const conversationTitle = useMemo(() => {
     if (!activeConversationId) return null;
     const title = conversations.find(

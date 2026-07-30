@@ -59,6 +59,7 @@ describe("DataRetentionPolicyService.previewScopeRemoval", () => {
   });
 
   describe("given a project override with only an org rule above it", () => {
+    /** @scenario "Removing a project override falls back to the next tier" */
     it("falls back to the org value", async () => {
       repository.findAllInOrganization.mockResolvedValue([
         {
@@ -99,6 +100,7 @@ describe("DataRetentionPolicyService.previewScopeRemoval", () => {
   });
 
   describe("given an organization override being removed", () => {
+    /** @scenario "The previewed fallback never leaks a rule the caller cannot read" */
     it("falls back to the platform default for every category", async () => {
       const orgScope: ScopeAssignment = {
         scopeType: "ORGANIZATION",

@@ -85,7 +85,7 @@ const buildThreadData = async (
   }
 
   // #4991: evaluators score against content, so the thread read must resolve
-  // the FULL offloaded IO (ADR-022), not the ≤64KB preview.
+  // the FULL offloaded IO (ADR-022, retired; ground now ADR-099), not the ≤64KB preview.
   const traceService = TraceService.create(
     undefined,
     buildTraceBlobResolutionDeps(),
@@ -274,7 +274,7 @@ export const runEvaluationForTrace = async ({
   workflowId?: string | null;
 }): Promise<EvaluationResultWithThreadId> => {
   // #4991: the trace being evaluated is read content-first — resolve the
-  // FULL offloaded IO (ADR-022) so the evaluator never scores a preview.
+  // FULL offloaded IO (ADR-022, retired; ground now ADR-099) so the evaluator never scores a preview.
   const traceService = TraceService.create(
     undefined,
     buildTraceBlobResolutionDeps(),

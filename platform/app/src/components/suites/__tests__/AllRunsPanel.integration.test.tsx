@@ -561,4 +561,126 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       });
     });
   });
+
+  /**
+   * The end of the denominator's route (ADR-072, retired; ground now
+   * ADR-103). `BatchTotal` is written per
+   * child run and read back per batch, but until it reached this panel a batch
+   * that lost part of its fan-out rendered as a smaller batch that finished
+   * everything it started — the shortfall was unobservable in the product.
+   */
+  describe("given a batch queued more runs than reached the list", () => {
+    function renderPartlyDispatchedBatch() {
+      mockRunDataQuery.mockReturnValue({
+        data: {
+          runs: [
+            {
+              batchRunId: "batch_short",
+              scenarioRunId: "run_1",
+              scenarioId: "scen_1",
+              status: "SUCCESS",
+              timestamp: Date.now(),
+              results: null,
+              messages: [],
+              name: null,
+              description: null,
+              durationInMs: 100,
+            },
+            {
+              batchRunId: "batch_short",
+              scenarioRunId: "run_2",
+              scenarioId: "scen_2",
+              status: "SUCCESS",
+              timestamp: Date.now(),
+              results: null,
+              messages: [],
+              name: null,
+              description: null,
+              durationInMs: 100,
+            },
+          ],
+          scenarioSetIds: { batch_short: "__internal__suite_1__suite" },
+          expectedCounts: { batch_short: 3 },
+          hasMore: false,
+          changed: true,
+        },
+        isLoading: false,
+        error: null,
+      });
+      mockScenariosQuery.mockReturnValue({
+        data: [{ id: "scen_1", name: "Login Flow" }],
+      });
+
+      return render(<RunHistoryPanel period={defaultPeriod} />, {
+        wrapper: Wrapper,
+      });
+    }
+
+    describe("when the user opens the run history", () => {
+      /** @scenario "A partly dispatched batch reports a shortfall" */
+      it("reports fewer runs than the batch expected", () => {
+        renderPartlyDispatchedBatch();
+
+        expect(screen.getByTestId("batch-shortfall")).toHaveTextContent(
+          "2 of 3 started",
+        );
+      });
+    });
+
+    describe("when the user filters the list down", () => {
+      it("stops reporting a shortfall the filter would have caused", async () => {
+        renderPartlyDispatchedBatch();
+
+        await userEvent.selectOptions(
+          screen.getByLabelText("Filter by scenario"),
+          "scen_1",
+        );
+
+        // The batch is still on screen with one of its two runs hidden, so a
+        // shortfall would render here if the filter were feeding the count.
+        expect(screen.getByTestId("run-row-header")).toBeInTheDocument();
+        expect(screen.queryByTestId("batch-shortfall")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a batch queued before the expected total was recorded", () => {
+    describe("when the user opens the run history", () => {
+      /** @scenario "A batch from before the total was recorded counts its runs" */
+      it("counts the runs it has instead of reporting a shortfall", () => {
+        mockRunDataQuery.mockReturnValue({
+          data: {
+            runs: [
+              {
+                batchRunId: "batch_legacy",
+                scenarioRunId: "run_1",
+                scenarioId: "scen_1",
+                status: "SUCCESS",
+                timestamp: Date.now(),
+                results: null,
+                messages: [],
+                name: null,
+                description: null,
+                durationInMs: 100,
+              },
+            ],
+            scenarioSetIds: { batch_legacy: "__internal__suite_1__suite" },
+            expectedCounts: {},
+            hasMore: false,
+            changed: true,
+          },
+          isLoading: false,
+          error: null,
+        });
+        mockScenariosQuery.mockReturnValue({ data: [] });
+
+        render(<RunHistoryPanel period={defaultPeriod} />, {
+          wrapper: Wrapper,
+        });
+
+        expect(screen.getByTestId("run-row-header")).toBeInTheDocument();
+        expect(screen.queryByTestId("batch-shortfall")).not.toBeInTheDocument();
+      });
+    });
+  });
 });

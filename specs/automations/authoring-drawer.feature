@@ -12,7 +12,9 @@ Feature: Staged automation authoring drawer
   test fire) is reachable inside the Configuration secondary drawer for
   notification types.
 
-  See dev/docs/adr/037-automation-operator-surfaces.md.
+  See dev/docs/adr/098-event-sourcing-core.md (successor to the retired
+  ADR-037). The drawer and its live preview shipped; the dispatch-health
+  view ADR-037 also proposed did not — see the Rule below.
 
   Background:
     Given a user authoring an automation in a project
@@ -155,6 +157,9 @@ Feature: Staged automation authoring drawer
       When the user changes the template text
       Then the preview shows the body rendered to HTML against sample data
 
+    # @unimplemented: the render computes missingVariables but no preview
+    # component reads it — never surfaced to the author.
+    @unimplemented
     Scenario: A template referencing a missing variable previews with a warning
       Given the user writes a template referencing a variable the context does not provide
       When the preview renders
@@ -173,6 +178,9 @@ Feature: Staged automation authoring drawer
       When the preview renders
       Then the interactive block is not shown in the preview
 
+    # @unimplemented: the fallback renders; usedDefault is computed but no
+    # preview component reads it — never surfaced to the author.
+    @unimplemented
     Scenario: Invalid Block Kit JSON previews as the default with a warning
       Given the user writes a Block Kit template whose output is not valid JSON
       When the preview renders
@@ -221,11 +229,15 @@ Feature: Staged automation authoring drawer
       When the user opens the automation settings list
       Then each row shows the last-triggered timestamp and total fired count
 
+    # @unimplemented: no subjectId column, no per-trigger outbox read; never built.
+    @unimplemented
     Scenario: Pending and failed counts appear once outbox-backed dispatch is live
       Given outbox-backed notify dispatch is wired in this environment
       When the user opens the automation settings list
       Then each notification row shows pending, failed, and dead counts
 
+    # @unimplemented: no such copy exists anywhere in the product; never built.
+    @unimplemented
     Scenario: Template-health warnings surface on the per-automation panel
       Given a notification dispatched with a custom template that fell back to the default
       When the user opens the automation's detail panel

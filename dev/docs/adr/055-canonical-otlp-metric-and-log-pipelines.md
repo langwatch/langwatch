@@ -181,10 +181,11 @@ pre-canonical instance can be running.
 
 ## References
 
-- Related ADRs: ADR-034 (event-sourced analytics materialization), whose
-  rollups accept non-idempotent increments with truncate-first replay where
-  these recompute instead; ADR-046 (event-sourced Langy conversations, itself
-  superseded by ADR-049 for projection storage)
+- Related ADRs: ADR-099 (successor to the retired ADR-034's event-sourced
+  analytics materialization), whose rollups accept non-idempotent increments
+  with truncate-first replay where these recompute instead; ADR-046
+  (event-sourced Langy conversations, itself superseded by ADR-049 for
+  projection storage)
 - Migration `00032` (retention and `_size_bytes` columns), whose
   never-insert-`_size_bytes` rule this ADR carves an exception to
 - PRs: #5945 (this work), superseding #5851 and #5886

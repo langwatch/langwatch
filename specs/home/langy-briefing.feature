@@ -48,8 +48,25 @@ Feature: Homepage attention briefing
     Then it asks the reader to triage the matching errors
     And it does not claim a shared shape or root cause
 
+  # Structurally true — `ReceiptSignals` carries no totals at all — but nothing
+  # asserts it, so the separation could be undone without a test noticing.
+  @unimplemented
   Scenario: Raw totals stay in the quiet overview
     Given trace, token, user, and cost totals are available
     When the briefing renders
     Then those totals do not become attention-inbox rows
     And only changed errors, repeated evidence, or meaningful latency regressions lead
+
+  # ---------------------------------------------------------------------------
+  # Landing again on a project already open: the sheet must not flash empty.
+  #
+  # `keepPreviousData` on every briefing query plus the overview's `isRefreshing`
+  # hint implement this, but no test renders the section through a refetch.
+  # ---------------------------------------------------------------------------
+
+  @integration @unimplemented
+  Scenario: A background refetch keeps the overview figures on screen
+    Given the overview is showing figures from a previous load
+    When the underlying queries refetch in the background
+    Then the previous figures stay on screen
+    And the card marks the refresh with a subtle hint rather than a skeleton swap

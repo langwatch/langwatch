@@ -19,12 +19,11 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "../../../db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
+import { prisma } from "../../../db";
 import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";

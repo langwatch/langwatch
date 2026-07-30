@@ -17,7 +17,7 @@ import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClien
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { fetchCountsFromClickHouse } from "../clustering";
 
 const TENANT_ID = `topic-counts-test-${nanoid(6)}`;

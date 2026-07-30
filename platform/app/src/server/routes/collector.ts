@@ -4,7 +4,7 @@ import { bodyLimit } from "hono/body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/trace-processing/schema";
 import {
   captureException,
   getCurrentScope,
@@ -584,7 +584,8 @@ secured
         const results = await Promise.allSettled(
           freshSpans.map((span) =>
             // Route through ingestNormalizedSpan (not recordSpan directly) so the
-            // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
+            // REST collector shares the (tenant, trace, span) dedup gate +
+            // ADR-022 (retired; ground now ADR-099)
             // spool hook with the OTLP path — a retry storm here must not bypass
             // dedup. occurredAt is stamped inside ingestNormalizedSpan.
             getApp().traces.collection.ingestNormalizedSpan({
@@ -686,22 +687,24 @@ secured
             const status =
               evaluation.status ?? (evaluation.error ? "error" : "processed");
 
-            await app.evaluations.reportEvaluation({
-              tenantId: project.id,
-              evaluationId,
-              evaluatorId,
-              evaluatorType: "custom",
-              evaluatorName: evaluation.name,
-              traceId,
-              isGuardrail: evaluation.is_guardrail ?? undefined,
-              status,
-              score: evaluation.score ?? null,
-              passed: evaluation.passed ?? null,
-              label: evaluation.label ?? null,
-              details: evaluation.details ?? null,
-              error: evaluation.error?.message ?? null,
-              occurredAt,
-            });
+            await app.evaluations.report(
+              {
+                evaluationId,
+                evaluatorId,
+                evaluatorType: "custom",
+                evaluatorName: evaluation.name,
+                traceId,
+                isGuardrail: evaluation.is_guardrail ?? undefined,
+                status,
+                score: evaluation.score ?? null,
+                passed: evaluation.passed ?? null,
+                label: evaluation.label ?? null,
+                details: evaluation.details ?? null,
+                error: evaluation.error?.message ?? null,
+                occurredAt,
+              },
+              { tenantId: project.id },
+            );
           } catch (error) {
             rejectedEvaluations++;
             evaluationErrors.push(

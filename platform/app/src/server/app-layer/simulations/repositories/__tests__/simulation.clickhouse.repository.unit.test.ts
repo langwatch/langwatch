@@ -80,7 +80,7 @@ describe("SimulationClickHouseRepository", () => {
         expect(resolver).not.toHaveBeenCalledWith("unknown");
       });
 
-      it("sends a SQL query containing the IF normalization expression", async () => {
+      it("normalizes the latest version's set id, resolved with argMax", async () => {
         const mockClient = makeMockClient();
         const resolver = vi.fn().mockResolvedValue(mockClient);
         const repo = new SimulationClickHouseRepository(resolver);
@@ -91,7 +91,15 @@ describe("SimulationClickHouseRepository", () => {
 
         const firstCallArg = (mockClient.query as ReturnType<typeof vi.fn>).mock
           .calls[0]?.[0] as { query: string } | undefined;
-        expect(firstCallArg?.query).toContain("IF(ScenarioSetId = '',");
+        expect(firstCallArg?.query).toContain("IF(LatestSetId = '',");
+        expect(firstCallArg?.query).toContain(
+          "argMax(ScenarioSetId, UpdatedAt) AS LatestSetId",
+        );
+        // Grouping by ScenarioSetId would split a run whose pre-started version
+        // still carries '' into a second group, reporting it under 'default'.
+        expect(firstCallArg?.query).toContain(
+          "GROUP BY TenantId, ScenarioRunId",
+        );
       });
     });
 
@@ -212,6 +220,79 @@ describe("SimulationClickHouseRepository", () => {
     });
   });
 
+  describe("getRunDataForScenarioSet() run read", () => {
+    /** Batch page rows, optionally carrying the page's StartedAt bounds. */
+    function makeRepoCapturingRunRead(batchRow: Record<string, string>): {
+      repo: SimulationClickHouseRepository;
+      runQuery: () =>
+        | { query: string; params: Record<string, unknown> }
+        | undefined;
+    } {
+      const { client, getCapturedQueries } = makeMockClientWithQueryCapture({
+        rowsForQuery: (query) =>
+          query.includes("GROUP BY BatchRunId") ? [batchRow] : [],
+      });
+      const repo = new SimulationClickHouseRepository(
+        vi.fn().mockResolvedValue(client),
+      );
+      return {
+        repo,
+        runQuery: () =>
+          getCapturedQueries().find((q) =>
+            q.query.includes("Messages.Content"),
+          ),
+      };
+    }
+
+    describe("when the batch page carries a StartedAt range", () => {
+      // The run read is the heaviest on the table (it materialises message
+      // content). Without a StartedAt predicate it opens every weekly partition,
+      // cold storage included, to serve one page.
+      it("bounds both the outer read and the dedup scope to the page window", async () => {
+        const { repo, runQuery } = makeRepoCapturingRunRead({
+          BatchRunId: "batch-1",
+          MaxCreatedAt: "9000",
+          MinStartedAt: "1000",
+          MaxStartedAt: "9000",
+        });
+
+        await repo.getRunDataForScenarioSet({
+          projectId: "project-1",
+          scenarioSetId: "set-1",
+        });
+
+        const runRead = runQuery();
+        expect(runRead?.query).toContain(
+          "AND t.StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String}))",
+        );
+        expect(runRead?.query).toContain(
+          "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String}))",
+        );
+        expect(runRead?.params.minStartedAtMs).toBe("1000");
+        expect(runRead?.params.maxStartedAtMs).toBe("9000");
+      });
+    });
+
+    describe("when the batch page has no usable StartedAt", () => {
+      it("runs the read unbounded rather than dropping the page", async () => {
+        const { repo, runQuery } = makeRepoCapturingRunRead({
+          BatchRunId: "batch-1",
+          MaxCreatedAt: "9000",
+          MinStartedAt: "0",
+          MaxStartedAt: "0",
+        });
+
+        await repo.getRunDataForScenarioSet({
+          projectId: "project-1",
+          scenarioSetId: "set-1",
+        });
+
+        expect(runQuery()?.query).not.toContain("minStartedAtMs");
+        expect(runQuery()?.params.minStartedAtMs).toBeUndefined();
+      });
+    });
+  });
+
   describe("startedAtBoundsForPage()", () => {
     it("spans the min and max StartedAt across the page rows", () => {
       const bounds = startedAtBoundsForPage([
@@ -253,9 +334,9 @@ describe("SimulationClickHouseRepository", () => {
   describe("buildStartedAtWindowClause()", () => {
     describe("when given a windowed fragment", () => {
       it("emits the byte-identical StartedAt predicate with String bounds", () => {
-        const { whereClause, params } = buildStartedAtWindowClause(
-          windowFragment(1000, 9000),
-        );
+        const { whereClause, params } = buildStartedAtWindowClause({
+          window: windowFragment(1000, 9000),
+        });
         expect(whereClause).toBe(
           "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
             "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
@@ -267,9 +348,24 @@ describe("SimulationClickHouseRepository", () => {
       });
     });
 
+    describe("when the outer query aliases the table", () => {
+      // LIST_COLUMNS projects `toString(...) AS StartedAt`; without the
+      // qualifier the comparison resolves to that String alias.
+      it("qualifies the column with the alias", () => {
+        const { whereClause } = buildStartedAtWindowClause({
+          window: windowFragment(1000, 9000),
+          alias: "t",
+        });
+        expect(whereClause).toBe(
+          "AND t.StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
+            "AND t.StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
+        );
+      });
+    });
+
     describe("when given a null (unbounded) fragment", () => {
       it("emits an empty clause with no params", () => {
-        expect(buildStartedAtWindowClause(null)).toEqual({
+        expect(buildStartedAtWindowClause({ window: null })).toEqual({
           whereClause: "",
           params: {},
         });

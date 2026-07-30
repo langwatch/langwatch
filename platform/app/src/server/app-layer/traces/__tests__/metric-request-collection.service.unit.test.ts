@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import type { RecordMetricCorrelationCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type {
+  CanonicalMetricDataPoint,
+  MetricTraceCorrelation,
+} from "~/server/event-sourcing/metric-processing/schema";
 import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,
@@ -26,7 +28,7 @@ function makeService(
       recordDataPointsImpl,
     );
   const recordMetricCorrelations = vi.fn<
-    (data: RecordMetricCorrelationCommandData[]) => Promise<void>
+    (data: MetricTraceCorrelation[]) => Promise<void>
   >(async () => {});
   const piiRedactionService = {
     redactMetricAttributes: async () => {},

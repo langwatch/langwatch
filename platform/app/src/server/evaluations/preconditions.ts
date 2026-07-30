@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import safe from "safe-regex2";
-import type { ExecuteEvaluationCommandData } from "../event-sourcing/pipelines/evaluation-processing/schemas/commands";
+import type { ExecuteEvaluationInput } from "~/server/event-sourcing/evaluation-processing/services/executeEvaluation";
 import {
   normalizePreconditionTraceData,
   PRECONDITION_FIELD_MATCHERS,
@@ -344,7 +344,7 @@ export function buildPreconditionTraceDataFromCommand({
   spans,
   events,
 }: {
-  data: ExecuteEvaluationCommandData;
+  data: ExecuteEvaluationInput;
   spans: Span[];
   events?: PreconditionTraceData["events"];
 }): PreconditionTraceData {

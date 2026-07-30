@@ -39,6 +39,7 @@ describe("Pre-compiled Scenario Child Process", () => {
       }
     });
 
+    /** @scenario "Build step produces a runnable JavaScript bundle" */
     it("produces a single JavaScript file at dist/scenario-child-process.js", () => {
       expect(fs.existsSync(BUNDLE_PATH)).toBe(true);
 
@@ -75,6 +76,7 @@ describe("Pre-compiled Scenario Child Process", () => {
       expect(content).toContain('require("@langwatch/scenario")');
     });
 
+    /** @scenario "Child process receives job data via stdin" */
     it("starts and reads from stdin within 5 seconds", async () => {
       const startTime = Date.now();
 

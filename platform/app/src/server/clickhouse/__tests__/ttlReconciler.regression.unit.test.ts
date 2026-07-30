@@ -76,6 +76,7 @@ describe("reconcileTTL()", () => {
      * the retention clause — MODIFY TTL replaces the whole expression
      * atomically, so the retention DELETE was silently dropped.
      */
+    /** @scenario "Retention TTL coexists with cold-storage tiering" */
     it("preserves the retention TTL when the cold TTL is rewritten", async () => {
       // Table already has both: cold TO VOLUME + retention DELETE on _retention_days
       clickhouseMocks.client.query.mockResolvedValueOnce({

@@ -9,11 +9,12 @@ const (
 	AttrVirtualKeyID = "langwatch.virtual_key_id"
 	AttrGatewayReqID = "langwatch.gateway_request_id"
 	// AttrModelProviderID is the ModelProvider row id the request was
-	// dispatched to. The control plane's trace fold reads this exact key to
-	// decide which provider-filtered budgets a debit belongs to
-	// (trace-attribute-accumulation.service.ts allowlists it,
-	// gatewayBudgetSync.reactor.ts consumes it); a dispatch without it
-	// debits unfiltered budgets only.
+	// dispatched to. The control plane reads this exact key to decide which
+	// provider-filtered budgets a debit belongs to
+	// (gatewayBudgetDebits.mapProjection.ts reads it off the span, and
+	// trace-attribute-accumulation.service.ts allowlists it onto the trace
+	// fold for everything else); a dispatch without it debits unfiltered
+	// budgets only.
 	AttrModelProviderID       = "langwatch.model_provider_id"
 	AttrGenAIUsageIn          = "gen_ai.usage.input_tokens"
 	AttrGenAIUsageCacheRead   = "gen_ai.usage.cache_read.input_tokens"

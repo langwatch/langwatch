@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { RecordSpanCommandData } from "~/server/app-layer/traces/ingest/recordSpanCommand";
 import type { BlobStore } from "../blob-store.service";
 import { maybeSpool, type SpoolLogger } from "../edge-spool";
 import { COMMAND_INLINE_THRESHOLD } from "../lean-for-projection";

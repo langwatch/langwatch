@@ -144,12 +144,17 @@ go tool pprof http://localhost:6060/debug/pprof/allocs
 
 **Symptom:** Budget scopes never approach their limit even though traffic is flowing, or `gateway_budget_blocks_total{scope}` stays flat on a scope you expect to be capped.
 
-The gateway does not send debits. Cost is captured as attributes on the OTel span the gateway emits; the control plane's trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans and writes the ClickHouse ledger rows. Budget enforcement on the gateway is a purely local precheck against the budget snapshot baked into the cached bundle, so spend only moves when the whole chain runs:
+The gateway does not send debits. Cost is captured as attributes on the OTel span the gateway emits; the control plane's `gatewayBudgetDebits` projection reads finalised spans and writes the ClickHouse ledger rows. Budget enforcement on the gateway is a purely local precheck against the budget snapshot baked into the cached bundle, so spend only moves when the whole chain runs:
 
 ```
 gateway request -> OTel span (cost attrs) -> collector -> langwatch-workers
-  -> trace-fold reactor -> ClickHouse ledger -> bundle snapshot -> gateway precheck
+  -> budget-debit projection -> ClickHouse ledger -> bundle snapshot
+  -> gateway precheck
 ```
+
+Because the ledger is a projection over the append-only event log, a debit
+that never landed is re-derived by replaying that window — the ledger is
+repairable rather than a one-shot write.
 
 **Diagnose, in order:**
 
@@ -157,7 +162,7 @@ gateway request -> OTel span (cost attrs) -> collector -> langwatch-workers
 |---|---|---|
 | Spans leaving the gateway | `sum(rate(gateway_http_requests_total[5m]))` against your collector's received-spans counter | OTLP export is broken; see [Observability](/ai-gateway/observability) |
 | Workers running | `kubectl -n langwatch get deploy langwatch-workers` | `workers.enabled: false` means the ledger is never written and hard caps never fire |
-| Ledger advancing | Query `gateway_budget_ledger_events` in ClickHouse for the scope | Reactor is stalled or the span carried no cost attrs |
+| Ledger advancing | Query `gateway_budget_ledger_events` in ClickHouse for the scope | The projection is stalled or the span carried no cost attrs |
 | Gateway seeing the new totals | Watch `gateway_internal_rtt_seconds{endpoint="changes"}` and `gateway_control_plane_requests_total{endpoint="changes"}` | The bundle is not refreshing, so the gateway is prechecking against stale spend |
 
 **Operator signal:** `gateway_budget_blocks_total{scope}` is the counter that tells you enforcement actually fired. A scope configured with `on_breach: block` whose ledger is past the limit but whose block counter is flat means the gateway has not received a refreshed bundle yet.

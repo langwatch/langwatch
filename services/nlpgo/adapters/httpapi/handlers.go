@@ -150,7 +150,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		// NodeID names the single node targeted by execute_component.
 		// Studio's "Run with manual input" sends Inputs as the typed
 		// values for THIS node, not as Entry-node outputs — see
-		// langwatch/src/optimization_studio/hooks/useComponentExecution.ts.
+		// platform/app/src/optimization_studio/hooks/useComponentExecution.ts.
 		// Absent for execute_flow / execute_evaluation.
 		NodeID string `json:"node_id,omitempty"`
 		// UntilNodeID scopes a flow run to the dependency path of the
@@ -168,7 +168,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		// carry the run_id Studio's reducer keys evaluations on.
 		RunID string `json:"run_id,omitempty"`
 		// Evaluation-only fields (execute_evaluation envelope):
-		// langwatch/src/optimization_studio/types/events.ts.
+		// platform/app/src/optimization_studio/types/events.ts.
 		WorkflowVersionID string `json:"workflow_version_id,omitempty"`
 		EvaluateOn        string `json:"evaluate_on,omitempty"`
 		DatasetEntry      *int   `json:"dataset_entry,omitempty"`

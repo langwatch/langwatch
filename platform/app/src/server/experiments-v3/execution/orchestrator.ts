@@ -38,7 +38,7 @@ import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDom
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
-import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
+import type { TargetResultData } from "~/server/event-sourcing/experiment-run-processing/schema";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import {
@@ -1756,23 +1756,20 @@ export const buildTargetMetadata = ({
  * line at the catch site, next to the trace id this row also carries.
  */
 export const buildTargetResultDispatch = ({
-  tenantId,
   runId,
   experimentId,
   event,
   datasetEntry,
   occurredAt,
 }: {
-  tenantId: string;
   runId: string;
   experimentId: string;
   event: EvaluationV3Event;
   datasetEntry: Record<string, unknown>;
   occurredAt: number;
-}): RecordTargetResultCommandData | null => {
+}): TargetResultData | null => {
   if (event.type === "target_result") {
     return {
-      tenantId,
       runId,
       experimentId,
       index: event.rowIndex,
@@ -1797,7 +1794,6 @@ export const buildTargetResultDispatch = ({
     event.targetId
   ) {
     return {
-      tenantId,
       runId,
       experimentId,
       index: event.rowIndex,
@@ -1941,15 +1937,17 @@ export async function* runOrchestrator(
   if (experimentId) {
     chDispatchTotal++;
     try {
-      await commands.startExperimentRun({
-        tenantId: projectId,
-        runId,
-        experimentId,
-        workflowVersionId: workflowVersionId ?? null,
-        total: totalCells,
-        targets: targetMetadata,
-        occurredAt: Date.now(),
-      });
+      await commands.startExperimentRun(
+        {
+          runId,
+          experimentId,
+          workflowVersionId: workflowVersionId ?? null,
+          total: totalCells,
+          targets: targetMetadata,
+          occurredAt: Date.now(),
+        },
+        { tenantId: projectId },
+      );
     } catch (err) {
       chDispatchFailures++;
       logger.error(
@@ -2023,36 +2021,39 @@ export async function* runOrchestrator(
       const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
       try {
         const app = getApp();
-        await app.evaluations.reportEvaluation({
-          tenantId: projectId,
-          evaluationId,
-          evaluatorId: event.evaluatorId,
-          evaluatorType: evaluatorConfig?.evaluatorType ?? "unknown",
-          evaluatorName: dbEvaluator?.name,
-          traceId,
-          status: evalResult.status,
-          score:
-            evalResult.status === "processed"
-              ? (evalResult.score ?? undefined)
-              : undefined,
-          passed:
-            evalResult.status === "processed"
-              ? (evalResult.passed ?? undefined)
-              : undefined,
-          // For pairwise verdicts, langevals now returns the winner's
-          // candidate id (or "tie") directly in `label`. No translation
-          // needed here; SDK / REST / MCP consumers see the winner by id.
-          label:
-            evalResult.status === "processed"
-              ? (evalResult.label ?? undefined)
-              : undefined,
-          details:
-            evalResult.status === "processed"
-              ? (evalResult.details ?? undefined)
-              : undefined,
-          error: evalResult.status === "error" ? evalResult.details : undefined,
-          occurredAt: Date.now(),
-        });
+        await app.evaluations.report(
+          {
+            evaluationId,
+            evaluatorId: event.evaluatorId,
+            evaluatorType: evaluatorConfig?.evaluatorType ?? "unknown",
+            evaluatorName: dbEvaluator?.name,
+            traceId,
+            status: evalResult.status,
+            score:
+              evalResult.status === "processed"
+                ? (evalResult.score ?? undefined)
+                : undefined,
+            passed:
+              evalResult.status === "processed"
+                ? (evalResult.passed ?? undefined)
+                : undefined,
+            // For pairwise verdicts, langevals now returns the winner's
+            // candidate id (or "tie") directly in `label`. No translation
+            // needed here; SDK / REST / MCP consumers see the winner by id.
+            label:
+              evalResult.status === "processed"
+                ? (evalResult.label ?? undefined)
+                : undefined,
+            details:
+              evalResult.status === "processed"
+                ? (evalResult.details ?? undefined)
+                : undefined,
+            error:
+              evalResult.status === "error" ? evalResult.details : undefined,
+            occurredAt: Date.now(),
+          },
+          { tenantId: projectId },
+        );
       } catch (error) {
         logger.error(
           { error, evaluationId, evaluatorId: event.evaluatorId },
@@ -2066,7 +2067,6 @@ export async function* runOrchestrator(
       const targetResultDispatch =
         event.type === "target_result" || event.type === "error"
           ? buildTargetResultDispatch({
-              tenantId: projectId,
               runId,
               experimentId,
               event,
@@ -2080,13 +2080,15 @@ export async function* runOrchestrator(
 
       if (targetResultDispatch) {
         chDispatchTotal++;
-        await commands.recordTargetResult(targetResultDispatch).catch((err) => {
-          chDispatchFailures++;
-          logger.warn(
-            { err, runId },
-            "Failed to dispatch recordTargetResult to CH",
-          );
-        });
+        await commands
+          .recordTargetResult(targetResultDispatch, { tenantId: projectId })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
       } else if (event.type === "evaluator_result") {
         const result = event.result as SingleEvaluationResult;
         const evaluatorConfig = state.evaluators.find(
@@ -2097,32 +2099,34 @@ export async function* runOrchestrator(
           : null;
         chDispatchTotal++;
         await commands
-          .recordEvaluatorResult({
-            tenantId: projectId,
-            runId,
-            experimentId,
-            index: event.rowIndex,
-            targetId: event.targetId,
-            evaluatorId: event.evaluatorId,
-            // Workflow evaluator nodes have no DB record, so fall back to the
-            // name the event carries from the DSL node.
-            evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
-            status: result.status,
-            score: result.status === "processed" ? result.score : null,
-            label: result.status === "processed" ? result.label : null,
-            passed: result.status === "processed" ? result.passed : null,
-            details:
-              result.status === "error"
-                ? result.details
-                : result.status === "processed"
+          .recordEvaluatorResult(
+            {
+              runId,
+              experimentId,
+              index: event.rowIndex,
+              targetId: event.targetId,
+              evaluatorId: event.evaluatorId,
+              // Workflow evaluator nodes have no DB record, so fall back to the
+              // name the event carries from the DSL node.
+              evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
+              status: result.status,
+              score: result.status === "processed" ? result.score : null,
+              label: result.status === "processed" ? result.label : null,
+              passed: result.status === "processed" ? result.passed : null,
+              details:
+                result.status === "error"
                   ? result.details
+                  : result.status === "processed"
+                    ? result.details
+                    : null,
+              occurredAt: Date.now(),
+              cost:
+                result.status === "processed" && result.cost
+                  ? result.cost.amount
                   : null,
-            occurredAt: Date.now(),
-            cost:
-              result.status === "processed" && result.cost
-                ? result.cost.amount
-                : null,
-          })
+            },
+            { tenantId: projectId },
+          )
           .catch((err) => {
             chDispatchFailures++;
             logger.warn(
@@ -2564,14 +2568,15 @@ export async function* runOrchestrator(
     if (experimentId) {
       chDispatchTotal++;
       await commands
-        .completeExperimentRun({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          finishedAt: aborted ? null : finishedAt,
-          stoppedAt: aborted ? finishedAt : null,
-          occurredAt: Date.now(),
-        })
+        .completeExperimentRun(
+          {
+            runId,
+            experimentId,
+            finishedAt: aborted ? null : finishedAt,
+            stoppedAt: aborted ? finishedAt : null,
+          },
+          { tenantId: projectId },
+        )
         .catch((err) => {
           chDispatchFailures++;
           logger.warn(

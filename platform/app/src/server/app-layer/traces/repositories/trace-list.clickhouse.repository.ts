@@ -1,5 +1,5 @@
+import { validateTenantId } from "@langwatch/clickhouse";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
@@ -106,7 +106,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async findAll(query: TraceListQuery): Promise<TraceListPage> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: query.tenantId },
       "TraceListClickHouseRepository.findAll",
     );
@@ -337,7 +337,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     facetExpression: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<FacetCountResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findFacetCounts",
     );
@@ -385,7 +385,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     column: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<{ min: number; max: number }> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findRangeStats",
     );
@@ -426,7 +426,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     since: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<number> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findCount",
     );
@@ -479,7 +479,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     prefix: string;
     limit: number;
   }): Promise<string[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findDistinctValues",
     );
@@ -530,7 +530,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     offset: number;
     prefix?: string;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findCategoricalFacet",
     );
@@ -597,7 +597,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     column: string;
     limit: number;
   }): Promise<DiscreteFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findDiscreteValues",
     );
@@ -659,7 +659,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     tenantId: string;
     query: FacetQuery;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findCategoricalFacetRaw",
     );
@@ -687,7 +687,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     timeColumn: string;
     column: string;
   }): Promise<{ min: number; max: number }> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findRangeStatsForTable",
     );
@@ -741,7 +741,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
   }): Promise<BatchedFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findBatchedFacets",
     );
@@ -900,7 +900,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     limit: number;
     offset: number;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findAttributeValues",
     );

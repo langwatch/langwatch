@@ -32,10 +32,12 @@ describe("Langy minimise-to-peek store transitions", () => {
         expect(useLangyStore.getState().isOpen).toBe(false);
       });
 
+      /** @scenario "Minimising leaves the conversation and the draft untouched" */
       it("keeps the conversation pointer untouched underneath", () => {
         expect(useLangyStore.getState().activeConversationId).toBe("conv-1");
       });
 
+      /** @scenario "Minimising leaves the conversation and the draft untouched" */
       it("keeps the half-typed draft untouched underneath", () => {
         expect(useLangyStore.getState().draft).toBe("half a question");
       });

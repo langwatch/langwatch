@@ -16,7 +16,8 @@ import (
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
 )
 
-// ADR-048: `handoff` must be a terminal event type so StreamSession
+// ADR-048 (retired; ground now dev/docs/adr/098-event-sourcing-core.md):
+// `handoff` must be a terminal event type so StreamSession
 // forwards the frame and returns cleanly, ending the turn.
 func TestTerminalEventTypes_IncludesHandoff(t *testing.T) {
 	if _, ok := terminalEventTypes["handoff"]; !ok {

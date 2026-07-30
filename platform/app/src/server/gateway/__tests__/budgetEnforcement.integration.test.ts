@@ -3,33 +3,33 @@
  *
  * A blocking budget must actually block, and must warn before it does.
  *
- * Real Postgres + real ClickHouse, no mocks. Spend is folded by the real
- * trace-fold reactor and read back through the real service, so this covers
- * the whole control-plane path the gateway enforces from: fold -> ledger ->
- * rollup -> decision.
+ * Real Postgres + real ClickHouse, no mocks. Spend is derived by the real
+ * `gatewayBudgetDebits` map projection (ADR-075 Class C, retired; ground now
+ * ADR-098) and read back through
+ * the real service, so this covers the whole control-plane path the gateway
+ * enforces from: span -> derivation -> ledger -> rollup -> decision.
  *
  * Regression guard for issue #6141, where budgets accrued nothing on four of
  * six windows and so never warned and never blocked however much traffic ran.
  * A budget that silently never enforces is worse than no budget, so this fails
  * if the ladder from allow to warn to block ever stops working.
  */
-import { createGatewayBudgetSyncReactor } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
+import { createGatewayBudgetDebitsProjection } from "@ee/governance/projections/governanceProjections.composition";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationReplay";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import { canonicalSpan } from "~/server/event-sourcing/trace-processing/__tests__/fixtures";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+} from "~/test-utils/integration/testContainers";
 
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "../budget.repository";
 import { GatewayBudgetService } from "../budget.service";
+import { ChangeEventRepository } from "../changeEvent.repository";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-enf-${suffix}`;
@@ -46,59 +46,74 @@ const PRE_BUDGET_ID = `bdg-preutc-${suffix}`;
 
 /** $0.001 per request against a $0.005 ceiling: 20% a request. */
 const LIMIT_USD = "0.005";
-const COST_PER_REQUEST = 0.001;
 
-function foldState(attrs: Record<string, string>): TraceSummaryData {
-  const now = Date.now();
-  return {
-    traceId: `trace-${nanoid()}`,
-    spanCount: 1,
-    totalDurationMs: 120,
-    computedIOSchemaVersion: "2025-12-18",
-    computedInput: "ping",
-    computedOutput: "pong",
-    timeToFirstTokenMs: null,
-    timeToLastTokenMs: null,
-    tokensPerSecond: null,
-    containsErrorStatus: false,
-    containsOKStatus: true,
-    errorMessage: null,
-    models: ["gpt-5-mini"],
-    totalCost: COST_PER_REQUEST,
-    nonBilledCost: null,
-    tokensEstimated: false,
-    totalPromptTokenCount: 300,
-    totalCompletionTokenCount: 150,
-    outputFromRootSpan: false,
-    outputSpanEndTimeMs: 0,
-    blockedByGuardrail: false,
-    rootSpanType: null,
-    containsAi: false,
-    containsPrompt: false,
-    selectedPromptId: null,
-    selectedPromptSpanId: null,
-    selectedPromptStartTimeMs: null,
-    lastUsedPromptId: null,
-    lastUsedPromptVersionNumber: null,
-    lastUsedPromptVersionId: null,
-    lastUsedPromptSpanId: null,
-    lastUsedPromptStartTimeMs: null,
-    topicId: null,
-    subTopicId: null,
-    traceName: "",
-    annotationIds: [],
-    attributes: attrs,
-    occurredAt: now,
-    createdAt: now,
-    updatedAt: now,
-    LastEventOccurredAt: now,
-  } as unknown as TraceSummaryData;
+/** The per-request cost the ladder below is calibrated on: 20% of LIMIT_USD. */
+const REQUEST_COST_USD = 0.001;
+const REQUEST_INPUT_TOKENS = 100;
+const REQUEST_OUTPUT_TOKENS = 50;
+
+/**
+ * Records one gateway request's spend the way production does: derive the
+ * debit from a gateway span through the real projection and append it.
+ *
+ * One writer, parameterised by project + virtual key, because every suite in
+ * this file must accrue spend through the SAME projection — a second copy of
+ * this body is a second write path, which is precisely what these tests exist
+ * to rule out.
+ */
+async function recordRequestFor({
+  projection,
+  projectId,
+  virtualKeyId,
+}: {
+  projection: ReturnType<typeof createGatewayBudgetDebitsProjection>;
+  projectId: string;
+  virtualKeyId: string;
+}): Promise<void> {
+  // The request's own start time, not ingest time: it is what the rollup
+  // buckets `PeriodStart` from, so a debit stamped anywhere but "now" lands in
+  // a period today's DAY budget never reads.
+  const startedAtMs = Date.now();
+  const span = canonicalSpan({
+    tenantId: projectId,
+    traceId: nanoid(32),
+    spanId: nanoid(16),
+    startTimeUnixMs: startedAtMs,
+    endTimeUnixMs: startedAtMs + 120,
+    occurredAt: startedAtMs,
+    statusCode: "OK",
+    model: "gpt-5-mini",
+    usage: {
+      inputTokens: REQUEST_INPUT_TOKENS,
+      outputTokens: REQUEST_OUTPUT_TOKENS,
+      reasoningTokens: null,
+      cacheReadTokens: null,
+      cacheWriteTokens: null,
+      estimated: false,
+    },
+    cost: { cost: REQUEST_COST_USD, nonBilledCost: null },
+    attributes: {
+      "langwatch.virtual_key_id": virtualKeyId,
+      "langwatch.gateway_request_id": `grq_${nanoid()}`,
+    },
+  });
+
+  const { written } = await projection.map.apply({
+    tenantId: projectId,
+    events: [{ type: "lw.obs.trace.span_received", data: span }],
+  });
+  if (written === 0) throw new Error("gateway span derived no debit record");
 }
 
 describe("given a blocking budget on traffic the gateway is serving", () => {
   let service: GatewayBudgetService;
   let recordOneRequest: () => Promise<void>;
-  let reactor: ReturnType<typeof createGatewayBudgetSyncReactor>;
+  /**
+   * Shared with the nested UTC-rebuild suite below, which records spend for
+   * its own project through the same projection rather than a second write
+   * path — the point of that suite is the rollup boundary, not the writer.
+   */
+  let projection: ReturnType<typeof createGatewayBudgetDebitsProjection>;
 
   const decide = async () =>
     await service.check({
@@ -190,30 +205,25 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     const chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
     service = GatewayBudgetService.create(prisma, chRepo);
 
-    reactor = createGatewayBudgetSyncReactor({
+    projection = createGatewayBudgetDebitsProjection({
       prisma,
       budgetRepository: new GatewayBudgetRepository(prisma),
       budgetCHRepository: chRepo,
+      changeEvents: new ChangeEventRepository(prisma),
     });
 
-    recordOneRequest = async () => {
-      const gatewayRequestId = `grq_${nanoid()}`;
-      const state = foldState({
-        "langwatch.virtual_key_id": VK_ID,
-        "langwatch.gateway_request_id": gatewayRequestId,
+    recordOneRequest = () =>
+      recordRequestFor({
+        projection,
+        projectId: PROJECT_ID,
+        virtualKeyId: VK_ID,
       });
-      await reactor.handle(
-        {} as TraceProcessingEvent,
-        {
-          tenantId: PROJECT_ID,
-          aggregateId: state.traceId,
-          foldState: state,
-        } as ReactorContext<TraceSummaryData>,
-      );
-    };
   }, 120_000);
 
   afterAll(async () => {
+    await prisma.gatewayChangeEvent.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.gatewayBudget.deleteMany({
       where: { organizationId: ORG_ID },
     });
@@ -343,21 +353,12 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
         projectedCostUsd: "0.000001",
       });
 
-    const recordOnePreProjectRequest = async () => {
-      const gatewayRequestId = `grq_${nanoid()}`;
-      const state = foldState({
-        "langwatch.virtual_key_id": PRE_VK_ID,
-        "langwatch.gateway_request_id": gatewayRequestId,
+    const recordOnePreProjectRequest = () =>
+      recordRequestFor({
+        projection,
+        projectId: PRE_PROJECT_ID,
+        virtualKeyId: PRE_VK_ID,
       });
-      await reactor.handle(
-        {} as TraceProcessingEvent,
-        {
-          tenantId: PRE_PROJECT_ID,
-          aggregateId: state.traceId,
-          foldState: state,
-        } as ReactorContext<TraceSummaryData>,
-      );
-    };
 
     beforeAll(async () => {
       await prisma.project.create({

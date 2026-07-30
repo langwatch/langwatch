@@ -92,7 +92,8 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 			application.Pool().Shutdown()
 		}),
 		lifecycle.ListenServer("http", srv),
-		// otel-early-flush (PR3, ADR-048): on SIGTERM, force-flush buffered
+		// otel-early-flush (PR3, ADR-048, retired; ground now
+		// dev/docs/adr/098-event-sourcing-core.md): on SIGTERM, force-flush buffered
 		// telemetry BEFORE the worker drain so a grace period later cut short by
 		// SIGKILL still ships what we already have. Registered BEFORE the handoff
 		// Closer below so it stops AFTER it (reverse-order). ForceFlushGlobal

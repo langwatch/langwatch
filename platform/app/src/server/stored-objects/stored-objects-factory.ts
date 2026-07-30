@@ -9,6 +9,8 @@
  * Call once per request — construction is lightweight; drivers are stateless.
  */
 import { env } from "~/env.mjs";
+import { getApp } from "~/server/app-layer/app";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { AzureBlobDriver } from "./azure-blob-driver";
 import { LocalFilesystemDriver } from "./local-filesystem-driver";
 import { S3Driver } from "./s3-driver";
@@ -67,7 +69,13 @@ export function createStoredObjectsService({
 }: {
   projectId: string;
 }): StoredObjectsService {
-  const repository = new StoredObjectsRepository();
+  // ADR-104: resolve through the composition root's client, not a second one
+  // built here. The closure defers `getApp()` to call time so this factory
+  // stays safe to import in tests that never initialize an App.
+  const repository = new StoredObjectsRepository(
+    (tenantId) => getApp().resolveClickHouseClient(tenantId),
+    getClickHouseClientForProject,
+  );
   return new StoredObjectsService(
     repository,
     createStorageRegistry({ projectId }),

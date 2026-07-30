@@ -4,8 +4,8 @@ import {
   evaluateQueryInMemory,
   queryNeeds,
 } from "~/server/app-layer/traces/filter-to-clickhouse";
+import type { DerivedTraceEvent } from "~/server/app-layer/traces/trace-event";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,

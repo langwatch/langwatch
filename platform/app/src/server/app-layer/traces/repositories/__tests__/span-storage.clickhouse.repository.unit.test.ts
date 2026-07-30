@@ -340,6 +340,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
   }
 
   describe("when a page fills to the requested limit and more spans exist", () => {
+    /** @scenario "Finishing pagination never widens into an unbounded storage scan" */
     it("over-fetches one row to derive hasMore and returns only the page", async () => {
       const { repo, query } = repoWithSpyClient([
         [summaryRow("s-1"), summaryRow("s-2"), summaryRow("s-3")],
@@ -378,6 +379,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
   });
 
   describe("when reading a cursor page", () => {
+    /** @scenario "Pagination reaches spans recorded long after the trace began" */
     it("bounds StartTime from below only — an upper bound would truncate long-running traces at the hint window's edge", async () => {
       const { repo, query } = repoWithSpyClient([[summaryRow("s-2")]]);
 
@@ -427,6 +429,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       );
     });
 
+    /** @scenario "Finishing pagination never widens into an unbounded storage scan" */
     it("treats an empty cursor page as authoritative end-of-trace instead of rescanning unhinted", async () => {
       const { repo, query } = repoWithSpyClient([[]]);
 
@@ -502,6 +505,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
   };
 
   describe("when reading the whole-tree span summary anchor", () => {
+    /** @scenario "Span tree is fetched in cursor pages, never as one response" */
     it("caps the read at the light-row ceiling", async () => {
       const { repo, query } = repoWithSpyClient();
       await repo.getSpanSummaryByTraceId(byTrace);

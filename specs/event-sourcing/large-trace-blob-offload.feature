@@ -7,12 +7,12 @@ Feature: Large trace payloads — event_log as single source of truth · transie
   Claude response, and replay produces byte-identical projection state.
 
   # Issue #4215 — https://github.com/langwatch/langwatch/issues/4215
-  # Design: ADR-022 (supersedes ADR-021's edge-permanent-S3 mechanism).
+  # Design: ADR-022 (supersedes ADR-088's edge-permanent-S3 mechanism).
   #
-  # Implementation surfaced two facts ADR-021 didn't account for:
+  # Implementation surfaced two facts ADR-088 didn't account for:
   #   1. capOversizedAttributes(256 KB) already exists at recordSpanCommand.ts:146.
   #      Everything downstream of the command worker is already bounded today.
-  #      The unbounded-payload problem is narrower than ADR-021 framed: it is
+  #      The unbounded-payload problem is narrower than ADR-088 framed: it is
   #      the edge → command-queue leg, where the full OTLP request rides
   #      through Redis BEFORE the cap fires.
   #   2. Commands go through a queue. commands.traces.recordSpan(data).send()
@@ -228,7 +228,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
 
   @integration @track2
   # Already bound to span-attribute-keys.unit.test.ts via the existing
-  # @scenario annotation on its test cases. Carry forward from ADR-021.
+  # @scenario annotation on its test cases. Carry forward from ADR-088.
   Scenario: Reserved namespace is excluded from user-visible facet enumeration
     Given a span carrying a "langwatch.reserved.eventref.langwatch.output" attribute
     When the Span Attribute Keys facet query is executed

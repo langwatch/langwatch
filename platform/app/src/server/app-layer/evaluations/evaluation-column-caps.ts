@@ -1,6 +1,6 @@
 /**
  * Belt-and-braces write-time caps for the heavy `evaluation_runs` columns
- * (ADR-040).
+ * (ADR-096).
  *
  * These run UNCONDITIONALLY at the repository write, independent of the
  * ops_evaluation_payload_offload_disabled kill switch and independent of which

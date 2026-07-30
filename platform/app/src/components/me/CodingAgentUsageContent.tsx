@@ -5,7 +5,8 @@ import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { api } from "~/utils/api";
 
 /**
- * The personal coding-agent usage figures (ADR-056, personal-usage.feature):
+ * The personal coding-agent usage figures (ADR-056 [retired; ground now
+ * ADR-105], personal-usage.feature):
  * cost, tokens, active time and session count over the trailing window, with
  * what those sessions produced beneath. Reads the session aggregate, so a
  * session that sent only metrics is counted here too.

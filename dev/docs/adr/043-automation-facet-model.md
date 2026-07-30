@@ -2,7 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-07-10
-- Builds on: ADR-037 (operator surfaces), ADR-040 (webhook channel), ADR-041 (Block Kit templates), ADR-044 (scheduled reports)
+- Builds on: ADR-098 (successor to the retired ADR-037's operator surfaces), ADR-040 (webhook channel), ADR-041 (Block Kit templates), ADR-044 (scheduled reports)
 
 ## Context
 

@@ -14,12 +14,14 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
   Background:
     Given a read scoped to a recent-time window with a declared fallback
 
+  @unit
   Scenario: a windowed read that finds its answer stays in the window
     Given the answer lies inside the scoped window
     When the read runs
     Then it answers from the window without widening
     And it is recorded as having answered inside the window
 
+  @unit
   Scenario: a windowed read that misses widens, and the widening is recorded
     Given the caller allows the read to widen within a bounded look-back when the window misses
     And the answer lies outside the scoped window but inside the look-back
@@ -28,6 +30,7 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
     And the widened read stays inside its bounded look-back, it does not scan without limit
     And the widening is recorded as an outcome distinct from an in-window answer
 
+  @unit
   Scenario: a widen that still finds nothing is recorded as an empty widen
     Given the caller allows the read to widen within a bounded look-back when the window misses
     And there is no answer inside or outside the window
@@ -35,12 +38,14 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
     Then the read widens within its look-back and still finds nothing
     And the empty widen is recorded as its own outcome, not a silent miss
 
+  @unit
   Scenario: a read that fails is recorded as a failure, not lost
     Given a read whose attempt fails outright
     When the read runs
     Then the failure is surfaced to the caller
     And the failure is recorded as its own outcome, so failed reads are never invisible
 
+  @unit
   Scenario: a caller that forbids widening stays bounded on a miss
     Given the caller declares the scoped window authoritative
     And the answer lies outside the scoped window
@@ -48,6 +53,7 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
     Then the read does not widen beyond its window
     And it returns the in-window result without a second, wider scan
 
+  @unit
   Scenario: an unlimited widen is recorded as unlimited, not as a bounded one
     Given the caller allows the read to widen to an unlimited scan
     And the answer lies outside every bounded window
@@ -55,6 +61,7 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
     Then the unlimited widen is recorded as its own outcome
     And it is distinguishable from a widen that stayed within a bounded look-back
 
+  @unit
   Scenario: a read with no time hint is recorded as unwindowed
     Given a read issued without a recent-time hint
     When the read runs
@@ -63,7 +70,7 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
 
   # ADR-068, point 3 — the rate-limited fallback ships as a separate change,
   # after the outcome counts above establish a per-table baseline for its limit.
-  @planned
+  @unimplemented @planned
   # Not yet implemented as of 2026-07-24 — this change measures the fallback so
   # its rate can be chosen from observed load; the token-bucket limiter and the
   # required / best-effort fallback declaration are the sequenced follow-up.

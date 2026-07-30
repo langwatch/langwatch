@@ -14,7 +14,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getTestClickHouseClient } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { getTestClickHouseClient } from "~/test-utils/integration/testContainers";
 import type { EvaluationRunData } from "../../types";
 import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";
 

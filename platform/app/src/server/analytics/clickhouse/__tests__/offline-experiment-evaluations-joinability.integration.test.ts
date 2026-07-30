@@ -29,7 +29,7 @@ import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClien
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import { buildTimeseriesQuery } from "../aggregation-builder";
 import { resetParamCounter } from "../filter-translator";
@@ -257,7 +257,13 @@ describe("offline-experiment evaluations on Custom Graphs", () => {
   describe("given trace_summaries rows exist for each offline-experiment cell traceId", () => {
     describe("when the analytics layer queries evaluation_score for the experiment's evaluator", () => {
       /**
-       * @scenario Offline experiment writes joinable evaluation_runs rows for boolean and numeric evaluators
+       * Offline experiment writes joinable evaluation_runs rows for boolean
+       * and numeric evaluators.
+       *
+       * Deliberately carries no spec-binding annotation: no feature file has
+       * ever declared a scenario by that name, so the marker named nothing and
+       * the checker reported it as a stale binding. The behaviour is pinned by
+       * the assertions below and by the issues cited in this file's header.
        */
       it("renders non-empty evaluation_score buckets for the offline-experiment evaluator", async () => {
         // With the #3981 SDK fix, offline-experiment cell spans now reach

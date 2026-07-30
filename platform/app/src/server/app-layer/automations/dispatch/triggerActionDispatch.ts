@@ -2,6 +2,8 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import { DispatchError } from "@langwatch/event-sourcing";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
@@ -10,7 +12,6 @@ import type { ProjectService } from "~/server/app-layer/projects/project.service
 import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   mapTraceToDatasetEntry,
@@ -187,11 +188,13 @@ export async function dispatchTriggerAction({
         dispatched = false;
         break;
       }
-      await deps.addToAnnotationQueue({
-        traceIds: [traceId],
-        projectId: tenantId,
+      await addTraceToAnnotationQueue({
+        deps,
+        trigger,
+        traceId,
+        tenantId,
+        createdByUserId: params.createdByUserId,
         annotators: (params.annotators ?? []).map((a) => a.id),
-        userId: params.createdByUserId,
       });
       break;
 
@@ -223,6 +226,66 @@ export async function dispatchTriggerAction({
     { tenantId, traceId, triggerId: trigger.id, action: trigger.action },
     "Trigger fired",
   );
+}
+
+/**
+ * Assigns the trace, classifying the one failure that waiting cannot fix.
+ *
+ * The annotators here come from the trigger's stored `actionParams`, so an
+ * unusable one is a property of the saved automation: the same string fails
+ * identically on every attempt, and only someone editing the automation
+ * changes that. Left unclassified it would ride the outbox's full attempt
+ * budget and dead-letter eight tries later at the same answer, having buried
+ * the one actionable line under seven repeats.
+ *
+ * So it is marked terminal here, per ADR-027 — the settlement handler retires
+ * a non-retryable `DispatchError` instead of rethrowing it. Deliberately
+ * narrow: anything else out of this call (a pool timeout, a lost connection)
+ * propagates untouched and keeps its retries, because for those, waiting is
+ * exactly the fix.
+ */
+async function addTraceToAnnotationQueue({
+  deps,
+  trigger,
+  traceId,
+  tenantId,
+  createdByUserId,
+  annotators,
+}: {
+  deps: TriggerActionDispatchDeps;
+  trigger: TriggerSummary;
+  traceId: string;
+  tenantId: string;
+  createdByUserId: string;
+  annotators: string[];
+}): Promise<void> {
+  try {
+    await deps.addToAnnotationQueue({
+      traceIds: [traceId],
+      projectId: tenantId,
+      annotators,
+      userId: createdByUserId,
+    });
+  } catch (error) {
+    if (
+      !HandledError.isHandled(error) ||
+      error.code !== "invalid_annotator_reference"
+    ) {
+      throw error;
+    }
+
+    // The offending value belongs in the log, next to the trigger that owns
+    // it — that pair is what an operator needs to fix the automation.
+    logger.error(
+      { tenantId, traceId, triggerId: trigger.id, annotators },
+      "ADD_TO_ANNOTATION_QUEUE trigger has an unusable annotator; not retrying",
+    );
+    throw new DispatchError({
+      message: `ADD_TO_ANNOTATION_QUEUE trigger ${trigger.id} has an unusable annotator`,
+      retryable: false,
+      cause: error,
+    });
+  }
 }
 
 async function addTraceToDataset({

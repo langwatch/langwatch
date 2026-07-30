@@ -13,7 +13,7 @@ Feature: Cancel queued and running suite jobs
   Background:
     Cancellation is implemented via event-sourcing. When the user requests
     cancellation, a `cancel_requested` event is written to the event log.
-    A reactor broadcasts the cancellation to all worker pods via Redis pub/sub.
+    A subscriber broadcasts the cancellation to all worker pods via Redis pub/sub.
     Each worker checks if it owns the scenario and kills its child process.
 
   # ---------------------------------------------------------------------------
@@ -41,12 +41,12 @@ Feature: Cancel queued and running suite jobs
     Then the original CancellationRequestedAt is preserved
 
   # ---------------------------------------------------------------------------
-  # Reactor: broadcast cancel signal to workers
+  # Subscriber: broadcast cancel signal to workers
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Cancel reactor broadcasts to Redis on cancel_requested event
-    Given the cancellation broadcast reactor is registered
+  Scenario: Cancel subscriber broadcasts to Redis on cancel_requested event
+    Given the cancellation broadcast subscriber is registered
     When a cancel_requested event is processed by the pipeline
     Then a message is published to the "scenario:cancel" Redis channel
     And the message contains the scenarioRunId
@@ -74,7 +74,7 @@ Feature: Cancel queued and running suite jobs
   Scenario: Cancellation reaches a worker on a different pod
     Given scenario X is running on worker pod 4
     And the cancel_requested event is processed by worker pod 1
-    When the reactor publishes to Redis
+    When the subscriber publishes to Redis
     Then worker pod 4 receives the broadcast
     And terminates the child process for scenario X
 
@@ -100,6 +100,14 @@ Feature: Cancel queued and running suite jobs
     Then a cancel_requested event is dispatched
     And a finished event with status CANCELLED is dispatched
     And the fold projection shows Status "CANCELLED"
+
+  @unit
+  Scenario: Cancelling a queued run updates the panel the user is watching
+    Given a simulation run has Status "QUEUED"
+    And the user is watching the suite run it belongs to
+    When the user requests cancellation
+    Then the run shows as cancelled on the open panel
+    And the user does not have to reload the page to see it
 
   # ---------------------------------------------------------------------------
   # Batch cancellation

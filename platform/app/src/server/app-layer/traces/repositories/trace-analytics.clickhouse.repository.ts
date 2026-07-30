@@ -1,4 +1,6 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
+import type { TraceAnalyticsRow } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import { READ_BACK_FOLD_INSERT_SETTINGS } from "~/server/clickhouse/queryDefaults";
@@ -10,9 +12,6 @@ import {
   asStringMap,
 } from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { queryWindowed } from "../../clients/clickhouse/windowed-read";
 import type { TraceAnalyticsRepository } from "./trace-analytics.repository";
 
@@ -162,7 +161,7 @@ export class TraceAnalyticsClickHouseRepository
     retentionDays: number = PLATFORM_DEFAULT_RETENTION_DAYS,
     appliedEventIds?: readonly string[],
   ): Promise<void> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: row.tenantId },
       "TraceAnalyticsClickHouseRepository.upsert",
     );
@@ -198,7 +197,7 @@ export class TraceAnalyticsClickHouseRepository
     if (entries.length === 0) return;
 
     const tenantId = entries[0]!.row.tenantId;
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "TraceAnalyticsClickHouseRepository.upsertBatch",
     );
@@ -282,7 +281,7 @@ export class TraceAnalyticsClickHouseRepository
     traceId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "TraceAnalyticsClickHouseRepository.findByTraceIdWithApplied",
     );

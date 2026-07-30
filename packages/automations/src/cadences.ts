@@ -31,7 +31,8 @@ export const CADENCE_WINDOW_MS: Record<NotificationCadence, number> = {
 };
 
 /**
- * Default trace-readiness debounce in milliseconds (ADR-026). The quiet
+ * Default trace-readiness debounce in milliseconds (ADR-026, retired;
+ * ground now ADR-098). The quiet
  * period after the last span arrives before a trigger's filters re-evaluate
  * against the settled fold — applied to every trigger regardless of action
  * class. Matches the `Trigger.traceDebounceMs` schema default so new

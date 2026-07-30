@@ -119,6 +119,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   });
 
   describe("when organization has 2 existing scenario sets", () => {
+    /** @scenario "Second and third scenario sets are accepted" */
     it("allows a third scenario set", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
       mockGetDistinctExternalSetIds.mockResolvedValue(
@@ -151,6 +152,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
       ).rejects.toThrow(ScenarioSetLimitExceededError);
     });
 
+    /** @scenario "Re-running an existing set is always allowed" */
     it("allows an existing scenario set to be re-used", async () => {
       await expect(
         service.checkScenarioSetLimit({
@@ -162,6 +164,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   });
 
   describe("when organization has 4 existing sets from before enforcement", () => {
+    /** @scenario "Fifth scenario set is also blocked" */
     it("blocks a new fifth set", async () => {
       vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
       mockGetDistinctExternalSetIds.mockResolvedValue(
@@ -178,6 +181,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
   });
 
   describe("when on a paid plan", () => {
+    /** @scenario "Paid plan allows unlimited scenario sets" */
     it("allows unlimited scenario sets", async () => {
       (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue(
         PAID_PLAN,
@@ -218,6 +222,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
 
   describe("cache behavior", () => {
     describe("when scenario set is already in cache", () => {
+      /** @scenario "Known scenario set ID is allowed without querying the database" */
       it("allows without querying the database", async () => {
         // Pre-populate cache
         await (
@@ -235,6 +240,7 @@ describe("UsageService.checkScenarioSetLimit", () => {
     });
 
     describe("when scenario set is not in cache", () => {
+      /** @scenario "Unknown scenario set ID triggers a database count" */
       it("queries the database and caches the result", async () => {
         vi.mocked(mockOrgService.getProjectIds).mockResolvedValue(["proj-1"]);
         mockGetDistinctExternalSetIds.mockResolvedValue(

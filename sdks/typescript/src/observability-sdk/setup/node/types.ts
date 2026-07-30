@@ -379,12 +379,19 @@ export interface SetupObservabilityOptions {
      * Disable the automatic shutdown of the observability system when the application
      * terminates.
      *
-     * When enabled (default), the SDK registers handlers for `beforeExit` (event loop
-     * drains), `SIGINT` (Ctrl+C), and `SIGTERM` (external kill / Docker stop) to flush
-     * pending traces before the process exits.
+     * When enabled (default), the SDK registers a `beforeExit` handler that flushes
+     * pending traces once the event loop naturally drains (e.g. CLI scripts, one-shot
+     * programs). `beforeExit` never changes termination semantics — the SDK never calls
+     * `process.exit()` itself, so this can never race or interfere with anything else
+     * shutting down.
      *
-     * Note: `process.exit()` calls (e.g. from test runners like vitest) bypass these
-     * handlers. In those environments, call `shutdown()` explicitly in your teardown.
+     * The SDK deliberately does NOT listen for `SIGINT`/`SIGTERM`. An observability SDK
+     * must not own the host process's lifecycle: a host almost always has its own
+     * graceful-shutdown path for those signals (its own handler, its own
+     * `process.exit()`), and the SDK racing an async flush against that exit — or
+     * intercepting the signal at all — is exactly the kind of thing that can cut work
+     * short or double-fire other listeners. If you want a flush on a signal, call the
+     * returned `shutdown()` from your own handler — see {@link ObservabilityHandle}.
      *
      * @default false
      */
@@ -393,10 +400,11 @@ export interface SetupObservabilityOptions {
 }
 
 /**
- * Handle returned from observability setup. If you disable the automatic shutdown,
- * or are running in an environment where process signals are not available (e.g.
- * test runners that call `process.exit()`), you can use the shutdown function to
- * manually shut down the observability system and ensure that no data is lost.
+ * Handle returned from observability setup. The SDK only flushes automatically on
+ * `beforeExit` (natural event-loop drain); it never listens for `SIGINT`/`SIGTERM`,
+ * since owning process termination is the host's job, not an observability SDK's. If
+ * you want pending traces flushed before a signal-driven exit, call `shutdown()` from
+ * your own signal handler, before you decide to exit.
  *
  * @example
  * ```typescript

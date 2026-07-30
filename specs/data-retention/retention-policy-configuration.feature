@@ -21,28 +21,33 @@ Feature: Data retention policy configuration
   Background:
     Given an organization "acme" with a team "platform" and a project "web-app" under that team
 
+  @unit
   Scenario: A project with no override resolves to the platform default
     Given no retention override exists for the organization, the team, or the project
     When retention is resolved for project "web-app"
     Then every category resolves to the platform default of 49 days
 
+  @unit
   Scenario: An organization override applies to every project in the org
     Given an organization-level traces retention of 49 days for "acme"
     When retention is resolved for project "web-app"
     Then traces for "web-app" are kept for 49 days
 
+  @unit
   Scenario: A project override beats an organization override
     Given an organization-level traces retention of 49 days for "acme"
     And a project-level traces retention of 91 days for "web-app"
     When retention is resolved for project "web-app"
     Then traces for "web-app" are kept for 91 days
 
+  @unit
   Scenario: A team override sits between organization and project
     Given an organization-level traces retention of 49 days for "acme"
     And a team-level traces retention of 63 days for "platform"
     When retention is resolved for project "web-app"
     Then traces for "web-app" are kept for 63 days
 
+  @unit
   Scenario: Categories resolve independently across tiers
     Given a project-level traces retention of 91 days for "web-app"
     And a team-level scenarios retention of 63 days for "platform"
@@ -52,16 +57,23 @@ Feature: Data retention policy configuration
     And scenarios for "web-app" are kept for 63 days
     And experiments for "web-app" are kept for 49 days
 
-  Scenario: Minimum retention enforced at 49 days
+  # The floor a retention value must clear to be storable at all is the paid
+  # tier's short option (5 weeks). The 49-day recovery floor still governs
+  # enterprise/self-hosted CUSTOM values, but it is a PLAN rule enforced at the
+  # write gate, not a property of the value itself — see
+  # plan-gated-retention-menu.feature.
+  @unit
+  Scenario: Retention below the minimum is rejected
     When an admin attempts to set traces retention to 14 days at any scope
-    Then the request is rejected with a validation error
-    And the error indicates the minimum retention is 49 days
+    Then the value is rejected before it can be stored
 
+  @unit
   Scenario: Retention must be a whole number of weeks
     When an admin attempts to set traces retention to 50 days at any scope
     Then the request is rejected with a validation error
     And the error indicates retention must be a multiple of 7 days
 
+  @unit
   Scenario: Removing a project override falls back to the next tier
     Given an organization-level traces retention of 63 days for "acme"
     And a project-level traces retention of 91 days for "web-app"
@@ -72,6 +84,7 @@ Feature: Data retention policy configuration
   # (the established row-actions pattern), so a customer can change a value
   # without deleting and re-creating the rule.
 
+  @integration
   Scenario: Editing a policy from the row overflow menu changes only its value
     Given a project-level traces retention of 91 days for "web-app"
     When the project admin edits that policy from the row menu and sets 182 days
@@ -82,6 +95,7 @@ Feature: Data retention policy configuration
   # data — it only changes the retention applied to newly ingested data, which
   # falls back to the next applicable tier (or the platform default).
 
+  @integration
   Scenario: Removal asks for confirmation and previews the real fallback value
     Given an organization-level traces retention of 49 days for "acme"
     And a project-level traces retention of 91 days for "web-app"
@@ -90,12 +104,14 @@ Feature: Data retention policy configuration
     And it shows the retention falling back from 91 days to 49 days
     And the policy is removed only after the admin confirms
 
+  @unit
   Scenario: The previewed fallback never leaks a rule the caller cannot read
     Given a project-level traces retention of 91 days for "web-app"
     And an organization-level traces retention the caller is not allowed to read
     When the caller previews removal of the project-level policy
     Then the response contains only the resolved day count, not the org rule's scope
 
+  @unit
   Scenario: A project admin cannot set an organization-wide override
     Given a user who can manage project "web-app" but not the organization
     When that user attempts to set an organization-level traces retention
@@ -105,17 +121,20 @@ Feature: Data retention policy configuration
   # only ever shows that project; widening to the team or organization sums the
   # storage of every project in that scope the caller is allowed to read.
 
+  @unit
   Scenario: Storage for an organization scope sums its projects
     Given the organization "acme" has projects "web-app" using 19 GB and "worker" using 0 B
     And the caller can read both projects
     When storage is shown with the organization scope selected
     Then the Data Storage figure is the sum of both projects
 
+  @unit
   Scenario: Storage never counts a project the caller cannot read
     Given the organization "acme" has a project the caller cannot read
     When storage is shown with the organization scope selected
     Then that project's storage is excluded from the total
 
+  @unimplemented
   Scenario: An override is anchored to a single organization
     When an admin sets a team-level traces retention for "platform"
     Then the override is anchored to the organization that owns "platform"
@@ -126,18 +145,21 @@ Feature: Data retention policy configuration
   # administrator — an email in the ADMIN_EMAILS allow-list, which is distinct
   # from an organization admin — may set it, on a scope they can already write.
 
+  @unit
   Scenario: A platform admin can disable retention for a scope
     Given a platform administrator
     When that administrator sets retention to "no retention" for project "web-app"
     Then the override is accepted
     And data for "web-app" is kept indefinitely with no automatic deletion
 
+  @unit
   Scenario: An organization admin who is not a platform admin cannot disable retention
     Given a user who can manage the organization but is not a platform administrator
     When that user attempts to set retention to "no retention" at any scope
     Then the request is rejected as forbidden
     And the error indicates only platform administrators can disable retention
 
+  @unimplemented
   Scenario: The "no retention" option is hidden from non-platform-admins
     Given a user who is not a platform administrator
     When they open the add-retention-policy drawer

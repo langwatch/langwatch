@@ -1,7 +1,7 @@
 """
 Structured logger for langwatch_nlp - uses JSON in production, pretty-print in development.
 
-Similar to langwatch/src/utils/logger/index.ts (pino).
+Similar to platform/app/src/utils/logger/index.ts (pino).
 """
 
 import logging

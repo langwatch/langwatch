@@ -1,4 +1,4 @@
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "../ingest/otlp";
 
 /**
  * Returns the first non-empty string value found at any of the provided

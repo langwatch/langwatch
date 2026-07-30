@@ -17,7 +17,7 @@ Enterprise customers regularly ask for:
 
 Customer-supplied templates are server-evaluated. The security boundary is critical: the template engine must not allow arbitrary code execution, filesystem access, or unbounded recursion. The product also needs the system to degrade gracefully — a customer template that throws or references missing variables must not break the dispatch path.
 
-[ADR-026](./026-per-trigger-dispatch-timing.md) introduces cadence and digest semantics. The template system must work for both single-match (`length === 1`) and digest (`length > 1`) cases without forcing the customer to write two templates.
+Per-trigger cadence and digest semantics govern how matches coalesce before a notification renders (the mechanism now rides the [ADR-098](./098-event-sourcing-core.md) dispatch plane; the original cadence spec, ADR-026, was retired 2026-07-30). The template system must work for both single-match (`length === 1`) and digest (`length > 1`) cases without forcing the customer to write two templates.
 
 ## Decision
 
@@ -61,7 +61,7 @@ Subject is Liquid → string, single line, clipped to 200 chars with `…` on ov
 Explicit type discriminator: `slackTemplateType: 'string' | 'block_kit'`.
 
 - `'string'`: Liquid output sent as a plain `text` payload.
-- `'block_kit'`: Liquid output is parsed as JSON and sent as a `blocks` payload. JSON parse failure → fall back to default template, log, surface in operator activity tab (ADR-037).
+- `'block_kit'`: Liquid output is parsed as JSON and sent as a `blocks` payload. JSON parse failure → fall back to default template, log; surfacing that in an operator activity tab (ADR-098) was specified, never built.
 
 Block Kit allowlist v1: `section | divider | context | header | image`. Interactive elements (`button`, `actions`, `input`, etc.) are stripped before sending — Slack accepts callbacks on interactive elements, and we do not want customer-authored Block Kit posting back to LangWatch.
 
@@ -86,7 +86,7 @@ Templates always iterate `{% for m in matches %}`. Immediate dispatches set `mat
 ### Validation
 
 - On `Trigger` save (Hono + tRPC): run `validateLiquid` on every non-null template column. Reject save with a syntax error message.
-- On render: try/catch the Liquid call. On failure, render the default template, log + capture, surface "rendered with the default template due to template error" in the operator activity tab (ADR-037).
+- On render: try/catch the Liquid call. On failure, render the default template, log + capture. Surfacing "rendered with the default template due to template error" in an operator activity tab (ADR-098) was specified, never built.
 - On Block Kit JSON parse failure: same fall-back-to-default semantics.
 
 ### Test fire banner
@@ -128,7 +128,7 @@ Letting templates branch on `{% if digest %}` would double the surface area cust
 
 ### Why fall-back-to-default on render failure
 
-Silent failure of customer-authored content (with operator visibility) is strictly better than blocking dispatch entirely. The customer gets *something* useful (the default message) and operators see the rendering error in the activity tab; the alternative is the customer getting nothing and having to debug from logs.
+Silent failure of customer-authored content is strictly better than blocking dispatch entirely. The customer gets *something* useful (the default message); an activity tab surfacing the rendering error to operators was specified (below) but never built, so today the alternative to this fallback is the customer getting nothing and having to debug from logs.
 
 ### Why a shared module under `src/shared/templating/`
 
@@ -137,21 +137,19 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 ## Consequences
 
 - **Four new nullable `Trigger` columns.** Single `ALTER TABLE`; trivial migration.
-- **New module at `src/shared/templating/`** wrapping engine setup, render, validation, and the Block Kit allowlist. The rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any future outbox reactor that needs customer-customizable output.
+- **New module at `src/shared/templating/`** wrapping engine setup, render, validation, and the Block Kit allowlist. The rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any future notification dispatch (a process manager, not a subscriber, under ADR-098's stake rule) that needs customer-customizable output.
 - **Default templates extracted from current hardcoded output.** Existing customers see no change.
-- **Operator-facing surfaces** (ADR-037):
+- **Operator-facing surfaces** (ADR-098):
   - Split-pane editor with live preview (Monaco + Liquid mode).
   - Email preview: Liquid → Markdown → HTML rendered with the same wrapper as production.
   - Slack preview: in-app renderer for the allowlist + "Open in Slack Block Kit Builder" deep-link.
   - Preview uses real recent-match data when available, synthetic stub otherwise.
 - **Performance budget.** 100-match digest × Liquid render × Markdown render × sanitize is ~50–200ms in Node. Acceptable for a worker. `p-limit` 10 prevents a slow render from starving siblings.
-- **`strictVariables: false` trade-off.** Missing variables render silently. Mitigation: the operator activity tab (ADR-037) surfaces "rendered with N missing variables: [list]" so authors learn about typos without dispatch failures.
+- **`strictVariables: false` trade-off.** Missing variables render silently. Mitigation: an operator activity tab (ADR-098) surfacing "rendered with N missing variables: [list]" was specified so authors would learn about typos without dispatch failures — never built; no such text exists in the product today.
 - **Future work, deferred until customer ask**: template versioning, partials/includes (`{% include %}`), per-project default templates, interactive Block Kit support, daily/weekly digest cadences.
 
 ## References
 
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
-- [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence model that produces `matches[]` of varying length
-- [ADR-037](./037-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
+- [ADR-098](./098-event-sourcing-core.md) — successor to three retired ADRs this doc cited: ADR-095 (outbox dispatch is the renderer's caller), ADR-026 (cadence model that produces `matches[]` of varying length), and ADR-037 (drawer that surfaces the live preview — built; template-health warnings — specified, never built)
 - `liquidjs` — https://liquidjs.com (engine choice)
 - `marked` — Markdown → HTML for email body

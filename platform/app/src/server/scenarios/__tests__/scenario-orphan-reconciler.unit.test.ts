@@ -4,7 +4,7 @@
  * Covers the pure orphan gate (isOrphanedQueuedRun) and the orchestrator
  * (reconcileOrphanedQueuedRuns) with injected fakes — no ClickHouse access.
  *
- * @see specs/scenarios/queued-run-orphan-recovery.feature
+ * @see specs/scenarios/orphaned-run-reconciliation.feature
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -34,6 +34,7 @@ function makeCandidate(overrides: Partial<OrphanCandidate>): OrphanCandidate {
 describe("isOrphanedQueuedRun", () => {
   describe("given a QUEUED run", () => {
     describe("when the last event is older than the threshold", () => {
+      /** @scenario "a queued run silent past the threshold is orphaned" */
       it("flags it as orphaned", () => {
         expect(
           isOrphanedQueuedRun({
@@ -47,6 +48,7 @@ describe("isOrphanedQueuedRun", () => {
     });
 
     describe("when the last event is exactly at the threshold", () => {
+      /** @scenario "the threshold boundary itself counts as orphaned" */
       it("flags it as orphaned at the exact threshold boundary", () => {
         expect(
           isOrphanedQueuedRun({
@@ -60,6 +62,7 @@ describe("isOrphanedQueuedRun", () => {
     });
 
     describe("when the run was queued recently", () => {
+      /** @scenario "a recently queued run is left alone" */
       it("does not flag it as orphaned", () => {
         expect(
           isOrphanedQueuedRun({
@@ -75,6 +78,7 @@ describe("isOrphanedQueuedRun", () => {
 
   describe("given a non-QUEUED run", () => {
     describe("when the last event is older than the threshold", () => {
+      /** @scenario "a run that is no longer queued is left alone" */
       it("does not flag it as orphaned", () => {
         expect(
           isOrphanedQueuedRun({
@@ -92,6 +96,7 @@ describe("isOrphanedQueuedRun", () => {
 describe("reconcileOrphanedQueuedRuns", () => {
   describe("given candidates with mixed status and age", () => {
     describe("when reconciling", () => {
+      /** @scenario "only the long-abandoned queued run is failed" */
       it("emits a failure only for the long-abandoned queued run", async () => {
         const oldQueued = makeCandidate({
           scenarioRunId: "old-queued",
@@ -128,6 +133,7 @@ describe("reconcileOrphanedQueuedRuns", () => {
 
   describe("given an emitFailure that rejects for one candidate", () => {
     describe("when reconciling multiple orphans", () => {
+      /** @scenario "one failing emit does not abandon the remaining orphans" */
       it("still processes the remaining orphans and counts the failures", async () => {
         const orphanA = makeCandidate({ scenarioRunId: "orphan-a" });
         const orphanB = makeCandidate({ scenarioRunId: "orphan-b" });
@@ -154,6 +160,7 @@ describe("reconcileOrphanedQueuedRuns", () => {
 
   describe("given no candidates", () => {
     describe("when reconciling", () => {
+      /** @scenario "a boot with nothing stuck does nothing" */
       it("emits nothing and returns zero counts", async () => {
         const emitFailure = vi.fn().mockResolvedValue(undefined);
 

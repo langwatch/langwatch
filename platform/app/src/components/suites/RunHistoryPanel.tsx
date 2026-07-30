@@ -67,8 +67,6 @@ type RunHistoryPanelProps = {
   period: Period;
   /** Callback for suite detail header stats */
   onStatsReady?: (stats: RunHistoryStats) => void;
-  /** For "N of M" display in suite view */
-  expectedJobCount?: number;
   /** For All Runs view to show suite names on rows */
   suiteNameMap?: Map<string, string>;
   /** When set, shows an initializing placeholder until this batch appears in the data */
@@ -81,7 +79,6 @@ export function RunHistoryPanel({
   scenarioSetId,
   period,
   onStatsReady,
-  expectedJobCount,
   suiteNameMap,
   pendingBatchRunId,
   highlightBatchId,
@@ -136,6 +133,7 @@ export function RunHistoryPanel({
   const {
     allRuns,
     allScenarioSetIds,
+    allExpectedCounts,
     hasMore,
     loadMore,
     isLoading,
@@ -193,6 +191,8 @@ export function RunHistoryPanel({
     },
   );
 
+  const hasFiltersApplied = !!(filters.scenarioId || filters.passFailStatus);
+
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
     if (allRuns.length === 0) return [];
@@ -218,14 +218,22 @@ export function RunHistoryPanel({
     return runs;
   }, [allRuns, filters]);
 
+  // A filter hides runs that did start, so the batch's own total would read as
+  // a shortfall the customer caused by filtering. Withhold it while filtering
+  // and every batch falls back to counting the runs on screen.
+  const visibleExpectedCounts = hasFiltersApplied
+    ? undefined
+    : allExpectedCounts;
+
   // Group filtered runs by batch
   const batchRuns = useMemo(
     () =>
       groupRunsByBatchId({
         runs: filteredRuns,
         scenarioSetIds: allScenarioSetIds,
+        expectedCounts: visibleExpectedCounts,
       }),
-    [filteredRuns, allScenarioSetIds],
+    [filteredRuns, allScenarioSetIds, visibleExpectedCounts],
   );
 
   // Group filtered runs by scenario or target
@@ -349,7 +357,6 @@ export function RunHistoryPanel({
 
   const isSingleSuiteView = !!scenarioSetId;
   const itemCount = groupBy === "none" ? batchRuns.length : groups.length;
-  const hasFiltersApplied = !!(filters.scenarioId || filters.passFailStatus);
 
   return (
     <VStack align="stretch" gap={0} height="100%">
@@ -381,6 +388,7 @@ export function RunHistoryPanel({
                   queuedCount: 0,
                   passRate: 0,
                   totalCount: totals.runCount,
+                  expectedCount: totals.runCount,
                   totalCost: null,
                   averageAgentLatencyMs: null,
                   totalDurationMs: null,
@@ -489,7 +497,6 @@ export function RunHistoryPanel({
                     onToggle={() => toggleExpanded(batchRun.batchRunId)}
                     resolveTargetName={resolveTargetName}
                     onScenarioRunClick={handleScenarioRunClick}
-                    expectedJobCount={expectedJobCount}
                     suiteName={suiteName}
                     viewMode={viewMode}
                     onCancelRun={

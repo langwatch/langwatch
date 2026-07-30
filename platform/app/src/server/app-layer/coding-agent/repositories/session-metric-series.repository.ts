@@ -1,9 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { SessionMetricSeriesRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/sessionMetricSeries.mapProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
+import type { SessionMetricSeriesRecord } from "~/server/event-sourcing/coding-agent-processing/schema";
 
 const TABLE_NAME = "session_metric_series" as const;
 
@@ -86,7 +85,7 @@ export class SessionMetricSeriesClickHouseRepository
     if (records.length === 0) return;
 
     const tenantId = records[0]!.tenantId;
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SessionMetricSeriesClickHouseRepository.ensure",
     );
@@ -154,7 +153,7 @@ export class SessionMetricSeriesClickHouseRepository
     toMs: number;
   }): Promise<SessionMetricTotal[]> {
     if (sessionIds.length === 0) return [];
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SessionMetricSeriesClickHouseRepository.findTotalsBySessionIds",
     );

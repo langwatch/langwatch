@@ -1,0 +1,13 @@
+{
+	"trace": [
+		"lw.obs.trace.span_received",
+		"lw.obs.trace.topic_assigned",
+		"lw.obs.trace.origin_resolved",
+		"lw.obs.trace.annotation_added",
+		"lw.obs.trace.annotation_removed",
+		"lw.obs.trace.annotations_bulk_synced",
+		"lw.obs.trace.trace_name_changed",
+		"lw.obs.trace.log_contributed",
+		"lw.obs.trace.metric_data_point_correlated"
+	]
+}

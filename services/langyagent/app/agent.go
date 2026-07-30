@@ -32,7 +32,7 @@ type CodingAgent interface {
 	// Stream tails the turn's events for sessionID and forwards them into sink
 	// until a terminal event or ctx cancellation.
 	Stream(ctx context.Context, ep Endpoint, sessionID string, sink ChatSink) error
-	// NotifyShutdownImminent (ADR-048) asks the agent to checkpoint the in-flight
+	// NotifyShutdownImminent (ADR-048, retired; ground now dev/docs/adr/098-event-sourcing-core.md) asks the agent to checkpoint the in-flight
 	// turn and emit a terminal handoff frame before its process group is killed.
 	NotifyShutdownImminent(ctx context.Context, ep Endpoint, sessionID string, deadline time.Time) error
 }

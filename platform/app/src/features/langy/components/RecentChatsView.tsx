@@ -54,7 +54,7 @@ import { useLangyConversationListQuery } from "../data/useLangyConversationListQ
 import { formatLangyConversationDate } from "../logic/langyConversationDate";
 import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 
-/** A conversation whose title reactor hasn't landed yet still needs a name. */
+/** A conversation whose generated title hasn't landed yet still needs a name. */
 const UNTITLED = "Untitled chat";
 
 /** Below this, a search field is more chrome than help. */

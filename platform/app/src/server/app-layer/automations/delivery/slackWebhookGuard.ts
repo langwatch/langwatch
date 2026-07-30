@@ -1,4 +1,4 @@
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "@langwatch/event-sourcing";
 
 /**
  * Single source of truth for the Slack incoming-webhook SSRF guard. Both the

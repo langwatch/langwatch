@@ -14,11 +14,6 @@ import {
   TABLE_TTL_CONFIG,
 } from "~/server/clickhouse/ttlReconciler";
 import {
-  getEventSubscriberMetadata,
-  getKillSwitchDescriptors,
-  getProjectionMetadata,
-} from "~/server/event-sourcing/pipelineRegistry";
-import {
   getFeatureFlagStore,
   listFeatureFlagFamilies,
   listFeatureFlags,
@@ -128,7 +123,7 @@ export const opsRouter = createTRPCRouter({
   getBadgeCounts: protectedProcedure.use(opsViewPermission).query(() => {
     const ops = getApp().ops;
     if (!ops?.metricsCollector) {
-      return { blockedCount: 0, dlqCount: 0 };
+      return { parkedCount: 0, computedAt: new Date() };
     }
     return ops.metricsCollector.getBadgeCounts();
   }),
@@ -348,10 +343,36 @@ export const opsRouter = createTRPCRouter({
       return ops.queues.retryBlocked(input);
     }),
 
+  /**
+   * The registered pipelines' projections and event subscribers. There is no
+   * introspection module (ADR-108 §1) — the registry itself is the surface,
+   * so this reads it directly and reshapes it for the Deja View / replay UIs.
+   */
   listProjections: protectedProcedure.use(opsViewPermission).query(() => {
+    const registered = getApp().eventSourcing?.registry.all() ?? [];
     return {
-      projections: getProjectionMetadata(),
-      eventSubscribers: getEventSubscriberMetadata(),
+      projections: registered.flatMap(({ pipeline, aggregateType }) => [
+        ...Object.values(pipeline.folds).map((fold) => ({
+          projectionName: fold.name,
+          pipelineName: pipeline.name,
+          aggregateType,
+          kind: "fold" as const,
+        })),
+        ...Object.values(pipeline.maps).map((map) => ({
+          projectionName: map.name,
+          pipelineName: pipeline.name,
+          aggregateType,
+          kind: "map" as const,
+        })),
+      ]),
+      eventSubscribers: registered.flatMap(({ pipeline, aggregateType }) =>
+        Object.values(pipeline.subscribers).map((subscriber) => ({
+          subscriberName: subscriber.name,
+          pipelineName: pipeline.name,
+          aggregateType,
+          eventTypes: subscriber.eventTypes,
+        })),
+      ),
     };
   }),
 
@@ -772,50 +793,11 @@ export const opsRouter = createTRPCRouter({
         };
       });
 
-      // Pre-seed every generated kill-switch key from the live pipeline
-      // graph. Operators see the full set of toggleable es-* switches
-      // even before anyone has flipped them in postgres, which was the
-      // whole point of moving them off PostHog: discoverability.
-      const generatedKillSwitches = getKillSwitchDescriptors();
-
-      // Merge: combine generated descriptors with any postgres rows
-      // that don't have an explicit registry entry. Postgres value wins
-      // the row but the descriptor provides the metadata.
-      const familyKeysSeen = new Set<string>();
-      const familyRows = generatedKillSwitches.map((desc) => {
-        familyKeysSeen.add(desc.key);
-        const row = stored.find((s) => s.key === desc.key);
-        const def = resolveFlagDefinition(desc.key);
-        const envOverride = checkFlagEnvOverride(desc.key, def?.legacyEnvVar);
-        const effective = resolveEffectiveForListing({
-          envOverride: envOverride ?? null,
-          rules: row?.rules ?? [],
-          rowEnabled: row?.enabled ?? null,
-          registryDefault: def?.defaultValue ?? false,
-        });
-        return {
-          key: desc.key,
-          scope: def?.scope ?? "SYSTEM",
-          defaultValue: def?.defaultValue ?? false,
-          description: def?.description
-            ? `${def.description} (${desc.pipelineName}: ${desc.componentType} ${desc.componentName})`
-            : `Pipeline ${desc.pipelineName} ${desc.componentType} ${desc.componentName}.`,
-          family: def?.family ?? null,
-          storedValue: row?.enabled ?? null,
-          rules: row?.rules ?? [],
-          envOverride: envOverride ?? null,
-          effective,
-          lastEditedBy: row?.lastEditedBy ?? null,
-          updatedAt: row?.updatedAt ?? null,
-        };
-      });
-
-      // Stored postgres rows that match neither an explicit registry
-      // entry nor a generated descriptor. Either orphans from removed
-      // pipeline components or rows for keys we no longer recognize;
-      // surface them so operators can clean up.
+      // Stored postgres rows with no explicit registry entry: orphans from
+      // removed components, or keys we no longer recognize. Surfaced so
+      // operators can clean them up.
       const orphanRows = stored
-        .filter((s) => !explicitKeys.has(s.key) && !familyKeysSeen.has(s.key))
+        .filter((s) => !explicitKeys.has(s.key))
         .map((s) => {
           const def = resolveFlagDefinition(s.key);
           const envOverride = checkFlagEnvOverride(s.key, def?.legacyEnvVar);
@@ -843,7 +825,7 @@ export const opsRouter = createTRPCRouter({
         });
 
       return {
-        flags: [...explicitRows, ...familyRows, ...orphanRows],
+        flags: [...explicitRows, ...orphanRows],
         families: families.map((f) => ({
           family: f.family,
           keyPrefix: f.keyPrefix,
@@ -863,18 +845,11 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Restrict writes to keys the system actively knows about:
-      // explicit registry entries or kill-switch descriptors currently
-      // advertised by the live pipeline graph. Family-prefix matching
-      // alone is too permissive — `es-foo-bar-killswitch` passes
-      // `resolveFlagDefinition` even with no pipeline component on the
-      // other end, so a typo would create an orphan row that never
-      // affects anything.
-      const isExplicitKey = listFeatureFlags().some((f) => f.key === input.key);
-      const isLiveKillSwitch = getKillSwitchDescriptors().some(
-        (d) => d.key === input.key,
-      );
-      if (!isExplicitKey && !isLiveKillSwitch) {
+      // Restrict writes to explicit registry entries. Family-prefix matching
+      // alone is too permissive — an unregistered key passes
+      // `resolveFlagDefinition`, so a typo would create an orphan row that
+      // never affects anything.
+      if (!listFeatureFlags().some((f) => f.key === input.key)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unknown feature flag key: ${input.key}`,
@@ -897,11 +872,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const isExplicitKey = listFeatureFlags().some((f) => f.key === input.key);
-      const isLiveKillSwitch = getKillSwitchDescriptors().some(
-        (d) => d.key === input.key,
-      );
-      if (!isExplicitKey && !isLiveKillSwitch) {
+      if (!listFeatureFlags().some((f) => f.key === input.key)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Unknown feature flag key: ${input.key}`,

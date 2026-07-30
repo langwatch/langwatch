@@ -1,7 +1,4 @@
-import {
-  DispatchError,
-  parseRetryAfterMs,
-} from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError, parseRetryAfterMs } from "@langwatch/event-sourcing";
 import {
   fetchWithResolvedIp,
   type SSRFValidationResult,
@@ -125,7 +122,7 @@ async function readCappedBody({
 
 /**
  * The one SSRF-fenced outbound HTTP utility every customer-endpoint dispatch
- * shares (ADR-030 Consequences / ADR-040 §4). All outbound goes through the
+ * shares (ADR-095 Consequences / ADR-040 §4). All outbound goes through the
  * audited {@link ssrfSafeFetch} — cloud-metadata denylist, private-IP blocking,
  * DNS-rebinding defeat via IP pinning, and redirect re-validation — never a
  * hand-rolled `fetch`. A total-request timeout bounds slow endpoints (enforced
@@ -202,6 +199,11 @@ export async function sendHttpDestination({
     status: response.status,
     body: responseBody,
     responseHeaders: captureResponseHeaders(response.headers),
-    retryAfterMs: parseRetryAfterMs(response.headers?.get("retry-after")),
+    // `Retry-After` may be an HTTP date, so the delay is relative to the clock
+    // now — the response has already been read by the time it is parsed.
+    retryAfterMs: parseRetryAfterMs(
+      response.headers?.get("retry-after"),
+      Date.now(),
+    ),
   };
 }

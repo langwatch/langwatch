@@ -71,27 +71,26 @@ describe("Signup identification hook", () => {
       });
     });
 
-    it("includes has_traces false and has_evaluations false in traits", () => {
+    it("includes has_traces false in traits", () => {
       fireSignupNurturingCalls(baseArgs);
 
       expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
         userId: "user-123",
         traits: expect.objectContaining({
           has_traces: false,
-          has_evaluations: false,
         }),
       });
     });
 
-    /** @scenario 'Signup defaults include has_prompts and has_simulations as false' */
-    it("includes has_prompts false and has_simulations false in traits", () => {
+    /** @scenario 'Signup defaults include has_prompts and has_traces as false' */
+    it("includes has_prompts false and has_traces false in traits", () => {
       fireSignupNurturingCalls(baseArgs);
 
       expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
         userId: "user-123",
         traits: expect.objectContaining({
           has_prompts: false,
-          has_simulations: false,
+          has_traces: false,
         }),
       });
     });

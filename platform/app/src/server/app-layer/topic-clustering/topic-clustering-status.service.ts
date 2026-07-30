@@ -1,6 +1,7 @@
-import { TOPIC_CLUSTERING_STALE_RUN_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClustering.process";
-import type { TopicClusteringRunHistoryEntry } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
-import { TOPIC_CLUSTERING_RUN_OUTCOME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
+import {
+  type RunHistoryViewEntry,
+  TOPIC_CLUSTERING_STALE_RUN_MS,
+} from "~/server/event-sourcing/topic-clustering-processing";
 import type { TopicClusteringStatusRepository } from "./repositories/topic-clustering-status.repository";
 
 export interface TopicClusteringStatus {
@@ -116,12 +117,13 @@ export class TopicClusteringStatusService {
    */
   async getRunHistoryByProjectId(params: {
     projectId: string;
-  }): Promise<TopicClusteringRunHistoryEntry[]> {
+  }): Promise<RunHistoryViewEntry[]> {
     const runs = await this.repository.findRunHistoryByProjectId(params);
     return runs.map((run) =>
-      run.outcome === TOPIC_CLUSTERING_RUN_OUTCOME.RUNNING &&
-      this.now() - run.startedAt >= TOPIC_CLUSTERING_STALE_RUN_MS
-        ? { ...run, outcome: TOPIC_CLUSTERING_RUN_OUTCOME.ABANDONED }
+      run.outcome === "running" &&
+      (run.startedAt === null ||
+        this.now() - run.startedAt >= TOPIC_CLUSTERING_STALE_RUN_MS)
+        ? { ...run, outcome: "abandoned" }
         : run,
     );
   }

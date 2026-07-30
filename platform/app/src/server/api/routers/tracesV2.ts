@@ -25,7 +25,10 @@ import {
   type CodingAgentTranscript,
 } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
-import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
+import {
+  SpanNotFoundError,
+  TraceNotFoundError,
+} from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
@@ -36,6 +39,7 @@ import type {
   SpanSummaryPage,
   SpanSummaryRow,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type { DerivedTraceEvent } from "~/server/app-layer/traces/trace-event";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -52,12 +56,11 @@ import {
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   stripRolesFromChatArrayJson,
 } from "~/server/data-privacy/dropKeyCatalog";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+  traceNameChangeSchema,
+} from "~/server/event-sourcing/trace-processing/schema";
 import type { Span, SpanInputOutput } from "~/server/tracer/types";
 import {
   findPromptReferenceInAncestors,
@@ -869,6 +872,9 @@ const sortSchema = z.object({
   direction: z.enum(["asc", "desc"]),
 });
 
+/** The rename's user-supplied half — the command supplies the rest. */
+const traceNameInputSchema = traceNameChangeSchema.pick({ newName: true });
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -1342,7 +1348,8 @@ export const tracesV2Router = createTRPCRouter({
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
             input.projectId,
           ),
-          // Single-trace header read: resolve offloaded (ADR-022) IO back to
+          // Single-trace header read: resolve offloaded (ADR-022, retired;
+          // ground now ADR-099) IO back to
           // the full value, exactly like legacy traces.getById. The list read
           // never passes this.
           full: true,
@@ -1384,7 +1391,7 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:update"))
     .mutation(async ({ input, ctx }) => {
       const trimmed = input.newName.trim();
-      const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });
+      const parsed = traceNameInputSchema.safeParse({ newName: trimmed });
       if (!parsed.success) {
         throw new ValidationError(
           `Trace name must be between ${TRACE_NAME_MIN_LENGTH} and ${TRACE_NAME_MAX_LENGTH} characters after trimming`,
@@ -1723,8 +1730,18 @@ export const tracesV2Router = createTRPCRouter({
         }),
       ]);
 
+      // The trace is still there — the drawer is rendering its waterfall. Only
+      // the span is gone, which in practice means a stale `drawer.span` in a
+      // shared link. Naming this `trace_not_found` told the reader a trace
+      // plainly on screen had been deleted, and put the span id in
+      // `meta.traceId`.
+      //
+      // A span the viewer's visibility window hides does NOT arrive here.
+      // `applyVisibilityGate` teaser-redacts an out-of-window span and returns
+      // it present (`span-storage.service.ts`), so it renders redacted rather
+      // than missing. Only a genuinely absent span reaches this branch.
       if (!span) {
-        throw new TraceNotFoundError(input.spanId);
+        throw new SpanNotFoundError(input.spanId);
       }
 
       // Coding-agent spans store their content in the trace's OTLP LOGS, not
@@ -1918,7 +1935,8 @@ export const tracesV2Router = createTRPCRouter({
     }),
 
   /**
-   * The pre-folded coding-agent session rollup for one trace (ADR-056).
+   * The pre-folded coding-agent session rollup for one trace (ADR-056,
+   * retired; ground now ADR-105).
    *
    * Returns null for an ordinary LLM trace — the fold writes no row for those,
    * so null is the normal answer rather than an error, and the caller simply
@@ -1940,7 +1958,7 @@ export const tracesV2Router = createTRPCRouter({
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input }) => {
       const app = getApp();
-      // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
+      // Two keyed seeks (ADR-056 §4, retired; ground now ADR-105): the (trace → session) map, then the
       // session row — which already spans every trace of the run, so no
       // conversation-membership fan-out is needed here anymore.
       return app.codingAgents.sessions.getSessionForTrace({

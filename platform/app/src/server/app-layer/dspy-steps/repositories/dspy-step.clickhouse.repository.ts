@@ -1,64 +1,102 @@
+import {
+  bindIdentifiers,
+  type ClickHouseClient,
+  ch,
+  createRowCodec,
+  defineTable,
+  replacing,
+  type TableRow,
+} from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import type {
   DspyExampleData,
   DspyLlmCallData,
+  DspyPredictorData,
   DspyStepData,
   DspyStepSummaryData,
 } from "../types";
 import type { DspyStepRepository } from "./dspy-step.repository";
 
-const TABLE_NAME = "dspy_steps" as const;
-
 const logger = createLogger(
   "langwatch:app-layer:dspy-steps:dspy-step-repository",
 );
 
-interface ClickHouseRecord {
-  Id: string;
-  TenantId: string;
-  ExperimentId: string;
-  RunId: string;
-  StepIndex: string;
-  WorkflowVersionId: string | null;
-  Score: number;
-  Label: string;
-  OptimizerName: string;
-  OptimizerParameters: string;
-  Predictors: string;
-  Examples: string;
-  LlmCalls: string;
-  LlmCallsTotal: number;
-  LlmCallsTotalTokens: number;
-  LlmCallsTotalCost: number;
-  CreatedAt: number;
-  InsertedAt: number;
-  UpdatedAt: number;
-  _retention_days: number;
-}
+/**
+ * `dspy_steps` (migration 00005 + 00032). `CreatedAt` anchors the partition
+ * but is caller-supplied (`param.timestamps.created_at` in `routes/misc.ts`),
+ * not stamped by our ingest boundary — a client sending arbitrary
+ * `created_at` values controls partition spread and part count directly.
+ * `upsertStep` keeps the first-write value, so it is frozen in practice, but
+ * that does not make it platform-controlled; see `structuralDebt` below.
+ */
+const table = defineTable({
+  name: "dspy_steps",
+  merge: replacing({ version: "UpdatedAt" }),
+  sortKey: ["TenantId", "ExperimentId", "RunId", "StepIndex"],
+  partition: { by: "toYearWeek(CreatedAt)", column: "CreatedAt" },
+  tenant: ["TenantId"],
+  structuralDebt: [
+    {
+      column: "CreatedAt",
+      reason:
+        "CreatedAt is caller-supplied from the DSPy client's request body, not platform accept time, so a client controls this partition's spread and part count directly",
+    },
+  ],
+  columns: {
+    Id: ch.string(),
+    TenantId: ch.string(),
+    ExperimentId: ch.string(),
+    RunId: ch.string(),
+    StepIndex: ch.string(),
+    WorkflowVersionId: ch.nullable(ch.string()),
+    Score: ch.float64(),
+    Label: ch.string(),
+    OptimizerName: ch.string(),
+    OptimizerParameters: ch.string(),
+    Predictors: ch.string(),
+    Examples: ch.string(),
+    LlmCalls: ch.string(),
+    LlmCallsTotal: ch.uint32(),
+    LlmCallsTotalTokens: ch.uint64(),
+    LlmCallsTotalCost: ch.float64(),
+    CreatedAt: ch.occurredAt(),
+    InsertedAt: ch.dateTime64(3),
+    UpdatedAt: ch.writtenAt(),
+    _retention_days: ch.uint16(),
+  },
+});
 
-type ClickHouseWriteRecord = WithDateWrites<
-  ClickHouseRecord,
-  "CreatedAt" | "InsertedAt" | "UpdatedAt"
->;
+type Row = TableRow<typeof table.columns>;
 
-interface ClickHouseSummaryRow {
-  TenantId: string;
-  ExperimentId: string;
-  RunId: string;
-  StepIndex: string;
-  WorkflowVersionId: string | null;
-  Score: number;
-  Label: string;
-  OptimizerName: string;
-  LlmCallsTotal: number;
-  LlmCallsTotalTokens: string;
-  LlmCallsTotalCost: number;
-  CreatedAt: string;
-}
+const codec = createRowCodec();
+const names = bindIdentifiers();
+
+/** Aggregated read shape for `getStepsByExperiment` — one row per step. */
+const SUMMARY_COLUMNS = {
+  TenantId: ch.string(),
+  ExperimentId: ch.string(),
+  RunId: ch.string(),
+  StepIndex: ch.string(),
+  WorkflowVersionId: ch.nullable(ch.string()),
+  Score: ch.float64(),
+  Label: ch.string(),
+  OptimizerName: ch.string(),
+  LlmCallsTotal: ch.uint32(),
+  LlmCallsTotalTokens: ch.uint64(),
+  LlmCallsTotalCost: ch.float64(),
+  CreatedAt: ch.dateTime64(3),
+} as const;
+type SummaryColumnName = keyof typeof SUMMARY_COLUMNS;
+const SUMMARY_COLUMN_NAMES = Object.keys(
+  SUMMARY_COLUMNS,
+) as readonly SummaryColumnName[];
+const SUMMARY_WIRE_COLUMNS = SUMMARY_COLUMN_NAMES.map(
+  (name) => SUMMARY_COLUMNS[name],
+);
+type SummaryRow = { readonly [K in SummaryColumnName]: unknown };
 
 function computeLlmSummary(llmCalls: DspyLlmCallData[]): {
   total: number;
@@ -89,23 +127,96 @@ function mergeByHash<T extends { hash: string }>(
   return merged;
 }
 
+function toRow(args: {
+  data: DspyStepData;
+  examples: DspyExampleData[];
+  llmCalls: DspyLlmCallData[];
+  createdAt: number;
+  insertedAt: number;
+  retentionDays: number;
+}): Row {
+  const { data, examples, llmCalls, createdAt, insertedAt, retentionDays } =
+    args;
+  const summary = computeLlmSummary(llmCalls);
+  return {
+    Id: `${data.tenantId}/${data.runId}/${data.stepIndex}`,
+    TenantId: data.tenantId,
+    ExperimentId: data.experimentId,
+    RunId: data.runId,
+    StepIndex: data.stepIndex,
+    WorkflowVersionId: data.workflowVersionId ?? null,
+    Score: data.score,
+    Label: data.label,
+    OptimizerName: data.optimizerName,
+    OptimizerParameters: JSON.stringify(data.optimizerParameters),
+    Predictors: JSON.stringify(data.predictors),
+    Examples: JSON.stringify(examples),
+    LlmCalls: JSON.stringify(llmCalls),
+    LlmCallsTotal: summary.total,
+    LlmCallsTotalTokens: BigInt(summary.totalTokens),
+    LlmCallsTotalCost: summary.totalCost,
+    CreatedAt: new Date(createdAt),
+    InsertedAt: new Date(insertedAt),
+    UpdatedAt: new Date(data.updatedAt),
+    _retention_days: retentionDays,
+  };
+}
+
+function fromRow(row: Row): DspyStepData {
+  return {
+    tenantId: row.TenantId,
+    experimentId: row.ExperimentId,
+    runId: row.RunId,
+    stepIndex: row.StepIndex,
+    workflowVersionId: row.WorkflowVersionId,
+    score: row.Score,
+    label: row.Label,
+    optimizerName: row.OptimizerName,
+    optimizerParameters: JSON.parse(row.OptimizerParameters) as Record<
+      string,
+      unknown
+    >,
+    predictors: JSON.parse(row.Predictors) as DspyPredictorData[],
+    examples: JSON.parse(row.Examples) as DspyExampleData[],
+    llmCalls: JSON.parse(row.LlmCalls) as DspyLlmCallData[],
+    createdAt: row.CreatedAt.getTime(),
+    insertedAt: row.InsertedAt.getTime(),
+    updatedAt: row.UpdatedAt.getTime(),
+  };
+}
+
 export class DspyStepClickHouseRepository implements DspyStepRepository {
   constructor(
-    private readonly resolveClient: ClickHouseClientResolver,
+    private readonly resolveClient: (tenantId: string) => ClickHouseClient,
     // dspy_steps is a traces-category retention table. Without a resolver the
     // tenant's policy can't be read, so rows fall back to the platform default.
     private readonly retentionResolver: RetentionPolicyResolver | null = null,
+    // ADR-104: the new client exposes query/insert/stream only, no DDL or
+    // mutation execution. deleteByExperiment issues `ALTER TABLE ... DELETE`,
+    // which has no home there yet, so it keeps resolving the legacy client.
+    // Unreachable from any caller in `src` today (checked at migration time).
+    private readonly legacyResolveClient?: ClickHouseClientResolver,
   ) {}
 
-  /**
-   * The tenant's resolved traces retention, stamped on every write so DSPy
-   * rows age out under the same policy as the rest of the trace family.
-   * Retention is default-on, so a missing resolver or an unresolvable project
-   * falls back to the platform default rather than 0 (indefinite).
-   */
   private async resolveTracesRetentionDays(tenantId: string): Promise<number> {
     const resolved = await this.retentionResolver?.resolve(tenantId);
     return resolved?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+  }
+
+  private async writeRow(row: Row): Promise<void> {
+    const encodedRows = codec.encodeRows({
+      columns: table.wireColumns,
+      columnNames: table.columnNames,
+      rows: [row],
+    });
+    const client = this.resolveClient(row.TenantId);
+    await client.insert({
+      tenantId: row.TenantId,
+      table: table.name,
+      rows: encodedRows,
+      columns: table.columnNames,
+      target: { kind: "replacing" },
+    });
   }
 
   /**
@@ -113,40 +224,16 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
    * source data is already complete and dedup is handled externally.
    */
   async insertStepDirect(data: DspyStepData): Promise<void> {
-    const summary = computeLlmSummary(data.llmCalls);
-    const id = `${data.tenantId}/${data.runId}/${data.stepIndex}`;
     const retentionDays = await this.resolveTracesRetentionDays(data.tenantId);
-
-    const record: ClickHouseWriteRecord = {
-      Id: id,
-      TenantId: data.tenantId,
-      ExperimentId: data.experimentId,
-      RunId: data.runId,
-      StepIndex: data.stepIndex,
-      WorkflowVersionId: data.workflowVersionId ?? null,
-      Score: data.score,
-      Label: data.label,
-      OptimizerName: data.optimizerName,
-      OptimizerParameters: JSON.stringify(data.optimizerParameters),
-      Predictors: JSON.stringify(data.predictors),
-      Examples: JSON.stringify(data.examples),
-      LlmCalls: JSON.stringify(data.llmCalls),
-      LlmCallsTotal: summary.total,
-      LlmCallsTotalTokens: summary.totalTokens,
-      LlmCallsTotalCost: summary.totalCost,
-      CreatedAt: new Date(data.createdAt),
-      InsertedAt: new Date(data.insertedAt),
-      UpdatedAt: new Date(data.updatedAt),
-      _retention_days: retentionDays,
-    };
-
-    const client = await this.resolveClient(data.tenantId);
-    await client.insert({
-      table: TABLE_NAME,
-      values: [record],
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+    const row = toRow({
+      data,
+      examples: data.examples,
+      llmCalls: data.llmCalls,
+      createdAt: data.createdAt,
+      insertedAt: data.insertedAt,
+      retentionDays,
     });
+    await this.writeRow(row);
   }
 
   async upsertStep(data: DspyStepData): Promise<void> {
@@ -161,50 +248,22 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         data.tenantId,
       );
 
-      let mergedExamples: DspyExampleData[];
-      let mergedLlmCalls: DspyLlmCallData[];
+      const mergedExamples = existing
+        ? mergeByHash(existing.examples, data.examples)
+        : data.examples;
+      const mergedLlmCalls = existing
+        ? mergeByHash(existing.llmCalls, data.llmCalls)
+        : data.llmCalls;
 
-      if (existing) {
-        mergedExamples = mergeByHash(existing.examples, data.examples);
-        mergedLlmCalls = mergeByHash(existing.llmCalls, data.llmCalls);
-      } else {
-        mergedExamples = data.examples;
-        mergedLlmCalls = data.llmCalls;
-      }
-
-      const summary = computeLlmSummary(mergedLlmCalls);
-      const id = `${data.tenantId}/${data.runId}/${data.stepIndex}`;
-
-      const record: ClickHouseWriteRecord = {
-        Id: id,
-        TenantId: data.tenantId,
-        ExperimentId: data.experimentId,
-        RunId: data.runId,
-        StepIndex: data.stepIndex,
-        WorkflowVersionId: data.workflowVersionId ?? null,
-        Score: data.score,
-        Label: data.label,
-        OptimizerName: data.optimizerName,
-        OptimizerParameters: JSON.stringify(data.optimizerParameters),
-        Predictors: JSON.stringify(data.predictors),
-        Examples: JSON.stringify(mergedExamples),
-        LlmCalls: JSON.stringify(mergedLlmCalls),
-        LlmCallsTotal: summary.total,
-        LlmCallsTotalTokens: summary.totalTokens,
-        LlmCallsTotalCost: summary.totalCost,
-        CreatedAt: new Date(existing?.createdAt ?? data.createdAt),
-        InsertedAt: new Date(existing?.insertedAt ?? data.insertedAt),
-        UpdatedAt: new Date(data.updatedAt),
-        _retention_days: retentionDays,
-      };
-
-      const client = await this.resolveClient(data.tenantId);
-      await client.insert({
-        table: TABLE_NAME,
-        values: [record],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      const row = toRow({
+        data,
+        examples: mergedExamples,
+        llmCalls: mergedLlmCalls,
+        createdAt: existing?.createdAt ?? data.createdAt,
+        insertedAt: existing?.insertedAt ?? data.insertedAt,
+        retentionDays,
       });
+      await this.writeRow(row);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -226,7 +285,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     experimentId: string,
   ): Promise<DspyStepSummaryData[]> {
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.resolveClient(tenantId);
       // The table partitions on `toYearWeek(CreatedAt)`. Without a CreatedAt
       // bound the GROUP BY walks every weekly partition for the experiment,
       // including cold-tier S3 ones. The primary key
@@ -234,13 +293,12 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       // scan cheap but the partition fan-out itself is the dominant cost.
       //
       // If/when a service-layer caller has access to the experiment's start
-      // time (e.g. derived from Prisma's experiment.createdAt), add an
-      // optional sinceMs and emit
-      //   AND CreatedAt >= fromUnixTimestamp64Milli({sinceMs:Int64})
-      // here to prune partitions. Avoiding the optional param until a real
-      // caller wires it through; otherwise it's API surface that nobody uses.
+      // time, add an optional sinceMs and a CreatedAt lower bound here to
+      // prune partitions. Avoiding the optional param until a real caller
+      // wires it through; otherwise it's API surface that nobody uses.
       const result = await client.query({
-        query: `
+        tenantId,
+        sql: `
           SELECT
             TenantId,
             ExperimentId,
@@ -251,34 +309,39 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
             argMax(Label, UpdatedAt) AS Label,
             argMax(OptimizerName, UpdatedAt) AS OptimizerName,
             argMax(LlmCallsTotal, UpdatedAt) AS LlmCallsTotal,
-            toString(argMax(LlmCallsTotalTokens, UpdatedAt)) AS LlmCallsTotalTokens,
+            argMax(LlmCallsTotalTokens, UpdatedAt) AS LlmCallsTotalTokens,
             argMax(LlmCallsTotalCost, UpdatedAt) AS LlmCallsTotalCost,
-            toString(toUnixTimestamp64Milli(min(CreatedAt))) AS CreatedAt
-          FROM ${TABLE_NAME}
+            min(CreatedAt) AS CreatedAt
+          FROM ${names.of(table.name)}
           WHERE TenantId = {tenantId:String}
             AND ExperimentId = {experimentId:String}
           GROUP BY TenantId, ExperimentId, RunId, StepIndex
           ORDER BY CreatedAt ASC
           LIMIT 10000
         `,
-        query_params: { tenantId, experimentId },
-        format: "JSONEachRow",
+        params: { ...names.params, tenantId, experimentId },
       });
 
-      const rows = await result.json<ClickHouseSummaryRow>();
+      const rows = codec.decodeRows<SummaryRow>({
+        columns: SUMMARY_WIRE_COLUMNS,
+        columnNames: SUMMARY_COLUMN_NAMES,
+        header: result.header,
+        rows: result.rows,
+      });
+
       return rows.map((row) => ({
-        tenantId: row.TenantId,
-        experimentId: row.ExperimentId,
-        runId: row.RunId,
-        stepIndex: row.StepIndex,
-        workflowVersionId: row.WorkflowVersionId,
-        score: row.Score,
-        label: row.Label,
-        optimizerName: row.OptimizerName,
-        llmCallsTotal: row.LlmCallsTotal,
-        llmCallsTotalTokens: Number(row.LlmCallsTotalTokens),
-        llmCallsTotalCost: row.LlmCallsTotalCost,
-        createdAt: Number(row.CreatedAt),
+        tenantId: row.TenantId as string,
+        experimentId: row.ExperimentId as string,
+        runId: row.RunId as string,
+        stepIndex: row.StepIndex as string,
+        workflowVersionId: row.WorkflowVersionId as string | null,
+        score: row.Score as number,
+        label: row.Label as string,
+        optimizerName: row.OptimizerName as string,
+        llmCallsTotal: row.LlmCallsTotal as number,
+        llmCallsTotalTokens: Number(row.LlmCallsTotalTokens as bigint),
+        llmCallsTotalCost: row.LlmCallsTotalCost as number,
+        createdAt: (row.CreatedAt as Date).getTime(),
       }));
     } catch (error) {
       const errorMessage =
@@ -298,43 +361,21 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     stepIndex: string,
   ): Promise<DspyStepData | null> {
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.resolveClient(tenantId);
       // IN-tuple dedup over the ReplacingMergeTree (see
-      // dev/docs/best_practices/clickhouse-queries.md). Outer SELECT must
-      // reference UpdatedAt via a table alias because the column is also
-      // projected as `toString(...) AS UpdatedAt` — without the alias
-      // ClickHouse resolves UpdatedAt to the String projection in the WHERE
-      // clause and the type mismatch breaks the query.
+      // dev/docs/best_practices/clickhouse-queries.md).
       const result = await client.query({
-        query: `
-          SELECT
-            t.Id AS Id,
-            t.TenantId AS TenantId,
-            t.ExperimentId AS ExperimentId,
-            t.RunId AS RunId,
-            t.StepIndex AS StepIndex,
-            t.WorkflowVersionId AS WorkflowVersionId,
-            t.Score AS Score,
-            t.Label AS Label,
-            t.OptimizerName AS OptimizerName,
-            t.OptimizerParameters AS OptimizerParameters,
-            t.Predictors AS Predictors,
-            t.Examples AS Examples,
-            t.LlmCalls AS LlmCalls,
-            t.LlmCallsTotal AS LlmCallsTotal,
-            toString(t.LlmCallsTotalTokens) AS LlmCallsTotalTokens,
-            t.LlmCallsTotalCost AS LlmCallsTotalCost,
-            toString(toUnixTimestamp64Milli(t.CreatedAt)) AS CreatedAt,
-            toString(toUnixTimestamp64Milli(t.InsertedAt)) AS InsertedAt,
-            toString(toUnixTimestamp64Milli(t.UpdatedAt)) AS UpdatedAt
-          FROM ${TABLE_NAME} AS t
+        tenantId,
+        sql: `
+          SELECT ${names.list(table.columnNames)}
+          FROM ${names.of(table.name)} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.ExperimentId = {experimentId:String}
             AND t.RunId = {runId:String}
             AND t.StepIndex = {stepIndex:String}
             AND (t.TenantId, t.ExperimentId, t.RunId, t.StepIndex, t.UpdatedAt) IN (
               SELECT TenantId, ExperimentId, RunId, StepIndex, max(UpdatedAt)
-              FROM ${TABLE_NAME}
+              FROM ${names.of(table.name)}
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
                 AND RunId = {runId:String}
@@ -343,31 +384,24 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
             )
           LIMIT 1
         `,
-        query_params: { tenantId, experimentId, runId, stepIndex },
-        format: "JSONEachRow",
+        params: {
+          ...names.params,
+          tenantId,
+          experimentId,
+          runId,
+          stepIndex,
+        },
       });
 
-      const rows = await result.json<ClickHouseRecord>();
-      const row = rows[0];
+      const [row] = codec.decodeRows<Row>({
+        columns: table.wireColumns,
+        columnNames: table.columnNames,
+        header: result.header,
+        rows: result.rows,
+      });
       if (!row) return null;
 
-      return {
-        tenantId: row.TenantId,
-        experimentId: row.ExperimentId,
-        runId: row.RunId,
-        stepIndex: row.StepIndex,
-        workflowVersionId: row.WorkflowVersionId,
-        score: row.Score,
-        label: row.Label,
-        optimizerName: row.OptimizerName,
-        optimizerParameters: JSON.parse(row.OptimizerParameters),
-        predictors: JSON.parse(row.Predictors),
-        examples: JSON.parse(row.Examples),
-        llmCalls: JSON.parse(row.LlmCalls),
-        createdAt: Number(row.CreatedAt),
-        insertedAt: Number(row.InsertedAt),
-        updatedAt: Number(row.UpdatedAt),
-      };
+      return fromRow(row);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -383,10 +417,15 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     tenantId: string,
     experimentId: string,
   ): Promise<void> {
+    if (!this.legacyResolveClient) {
+      throw new Error(
+        "DspyStepClickHouseRepository.deleteByExperiment requires a legacy client resolver — the new ClickHouse client has no DDL/mutation method (ADR-104)",
+      );
+    }
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.legacyResolveClient(tenantId);
       await client.command({
-        query: `DELETE FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
+        query: `DELETE FROM ${table.name} WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
         query_params: { tenantId, experimentId },
       });
     } catch (error) {

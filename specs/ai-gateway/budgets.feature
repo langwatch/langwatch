@@ -3,7 +3,7 @@ Feature: AI Gateway — Budgets
   # Four scenarios below are bound to budget.service.unit.test.ts. The
   # remaining @unimplemented scenarios are split between two unbindable
   # categories: (1) gateway data-plane behaviour (HTTP 402 on debit,
-  # /budget/check materialised view, ClickHouse ledger reactor, monthly
+  # /budget/check materialised view, ClickHouse ledger map projection, monthly
   # window reset, timezone handling) — implemented in Go and out of
   # scope for the TS parity check; and (2) UI page-level rendering
   # (budget detail drawer, banners, list columns, audit history) — needs
@@ -33,7 +33,7 @@ Feature: AI Gateway — Budgets
   Spend is derived from traces. The gateway emits one OTel span per request
   carrying gen_ai.usage.* + langwatch.virtual_key_id + langwatch.gateway_request_id.
   The trace-processing pipeline enriches the span with cost (pricing catalog ×
-  tokens), and a dedicated reactor writes one row per applicable budget to
+  tokens), and a dedicated map projection writes one row per applicable budget to
   gateway_budget_ledger_events in ClickHouse. An AggregatingMergeTree
   materialised view (gateway_budget_scope_totals) rolls up spend per (scope,
   scope_id, window, period_start). /budget/check reads from the materialised
@@ -158,7 +158,7 @@ Feature: AI Gateway — Budgets
     And the emitted span carries langwatch.virtual_key_id, gen_ai.usage.input_tokens,
       gen_ai.usage.output_tokens, and a resolved gen_ai.request.model
     And the project has three applicable budgets: org-monthly, team-monthly, project-daily
-    When the trace lands in ClickHouse and the gatewayBudgetSync reactor runs
+    When the trace lands in ClickHouse and the gatewayBudgetSync map projection runs
     Then gateway_budget_ledger_events has three rows keyed by
       (TenantId, BudgetId, GatewayRequestId)
     And each row's AmountUSD equals the enriched cost for the span
@@ -176,7 +176,7 @@ Feature: AI Gateway — Budgets
     Given a gateway request completes with provider-reported usage
       { prompt_tokens: 1000, completion_tokens: 500 }
     And the control plane's pricing catalog has per-token costs for the resolved model
-    When the span is enriched and the reactor writes to gateway_budget_ledger_events
+    When the span is enriched and the map projection writes to gateway_budget_ledger_events
     Then AmountUSD is derived from provider tokens × unit cost
     And the gateway's pre-request cost estimate is used only for pre-flight
       budget-check gating, never for the ledger
@@ -190,6 +190,54 @@ Feature: AI Gateway — Budgets
       bounded to the current month's PeriodStart
     And the response returns { spent_usd: "42.00", remaining_usd: "58.00" }
     And no Postgres gatewayBudgetLedger row is read
+
+  # ============================================================================
+  # Spend must survive the thing that recorded it
+  # ============================================================================
+  #
+  # The scenarios above cover spend being counted ONCE (idempotency by
+  # gateway_request_id). These cover it being counted AT ALL.
+  #
+  # Debits used to be written by `gatewayBudgetSync`, a reactor, and the
+  # projection router never dispatches a reactor on the replay path — the
+  # replay service rebuilds projections and never invokes a reactor at all. So
+  # a debit lost to a failed handler was lost permanently: the spend happened,
+  # the gateway trace recorded it, and the budget never learned. The same
+  # handler emitted the BUDGET_UPDATED change the gateway consumes to evict
+  # cached bundles, so losing it also left the gateway authorising against
+  # stale spend. Both failures moved measured spend DOWN, the dangerous
+  # direction for a control whose job is to stop spending.
+  #
+  # ADR-075 (Class C) has since converted the write to a map projection over
+  # gateway spans. A failed write now propagates instead of being swallowed, so
+  # the job retries; and because the debit is derived rather than emitted, a
+  # replay of the window re-derives whatever the retries never landed, and
+  # announces only what it actually repaired.
+  #
+  # What still does not exist is the reconciliation REPORT — recomputing a
+  # period's spend from its traces and naming the debits that are missing — and
+  # the restart path where the gateway is left holding a cached view no
+  # surviving process will correct. Those two stay @unimplemented.
+
+  @integration
+  Scenario: Spend recorded during a failure still counts against the budget
+    Given a gateway request that consumed budget
+    When the work recording that debit fails
+    Then the debit is recorded once the failure clears
+    And the budget reflects it
+
+  @integration @unimplemented
+  Scenario: Total spend can be reconciled against the traces that produced it
+    Given a period of gateway requests that consumed budget
+    When spend for that period is recomputed from the recorded gateway traces
+    Then it matches the spend the budget was charged
+    And any debit missing from the ledger is reported
+
+  @integration @unimplemented
+  Scenario: The gateway stops serving on stale spend after a restart
+    Given spend recorded while the gateway held a cached view of the budget
+    When the process that would have notified the gateway dies first
+    Then the gateway still stops authorising once the budget is exhausted
 
   # ============================================================================
   # Spend must read back for every window offered

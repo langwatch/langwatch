@@ -47,7 +47,8 @@ func (a *Agent) Stream(ctx context.Context, ep app.Endpoint, sessionID string, s
 	return StreamSession(ctx, ep.BaseURL, ep.BearerToken, sessionID, sink.Emit)
 }
 
-// NotifyShutdownImminent (ADR-048) posts the session-scoped shutdown notice.
+// NotifyShutdownImminent (ADR-048, retired; ground now
+// dev/docs/adr/098-event-sourcing-core.md) posts the session-scoped shutdown notice.
 func (a *Agent) NotifyShutdownImminent(ctx context.Context, ep app.Endpoint, sessionID string, deadline time.Time) error {
 	return NotifyShutdownImminent(ctx, ep.BaseURL, ep.BearerToken, sessionID, deadline)
 }

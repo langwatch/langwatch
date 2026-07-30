@@ -1,3 +1,4 @@
+import type { TenantId } from "@langwatch/event-sourcing";
 import { env } from "~/env.mjs";
 import type {
   PiiLevel,
@@ -12,7 +13,6 @@ import {
   redactStringNative,
 } from "~/server/data-privacy/redaction/applyContentRedaction";
 import { ESSENTIAL_PII_ENTITIES } from "~/server/data-privacy/redaction/essentialPii";
-import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
   batchPresidioClearPII as defaultBatchPresidioClearPII,
   googleDLPClearPII,
@@ -32,15 +32,15 @@ const STRICT_ONLY_PII_ENTITIES: readonly string[] =
   );
 
 import { createLogger } from "@langwatch/observability";
+import type { PIIRedactionLevel } from "~/server/event-sourcing/trace-processing/schema";
 import { featureFlagService } from "~/server/featureFlag";
-import type { PIIRedactionLevel } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import type {
   OtlpAnyValue,
   OtlpKeyValue,
   OtlpResource,
   OtlpSpan,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+} from "./ingest/otlp";
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.

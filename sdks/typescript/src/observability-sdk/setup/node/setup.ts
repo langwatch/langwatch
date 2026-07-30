@@ -475,36 +475,30 @@ export function createAndStartNodeSdk(
   if (!options.advanced?.disableAutoShutdown) {
     let isShuttingDown = false;
 
-    const gracefulShutdown = async ({ signal, exitAfter }: { signal: string; exitAfter: boolean }) => {
-      if (isShuttingDown) return;
-      isShuttingDown = true;
-
-      logger.debug(`${signal}: shutting down OpenTelemetry...`);
-      try {
-        await sdk.shutdown();
-        logger.debug('OpenTelemetry shutdown complete');
-      } catch (err) {
-        logger.error('Error shutting down OpenTelemetry', err);
-      } finally {
-        if (exitAfter) {
-          process.exit(0);
-        }
-      }
-    };
-
-    // Normal process exit when event loop drains (e.g. CLI scripts, one-shot programs)
+    // beforeExit is the only signal-free, side-effect-free shutdown hook: it
+    // fires once the event loop has nothing left to do and does not change
+    // whether or how the process exits, so flushing here can never surprise
+    // a host. We deliberately do NOT listen for SIGINT/SIGTERM: registering
+    // any listener on those replaces Node's default (immediate-terminate)
+    // behaviour, and a host process almost always already owns its own
+    // graceful shutdown for them (its own handler, its own process.exit).
+    // Racing our async flush against that exit can still cut it off, and a
+    // host process.exit(0) is not guaranteed to be called after any await.
+    // Hosts that want a flush on a signal call the returned shutdown() from
+    // their own handler, before they decide to exit.
     process.on('beforeExit', () => {
-      void gracefulShutdown({ signal: 'beforeExit', exitAfter: false });
-    });
+      void (async () => {
+        if (isShuttingDown) return;
+        isShuttingDown = true;
 
-    // Ctrl+C
-    process.on('SIGINT', () => {
-      void gracefulShutdown({ signal: 'SIGINT', exitAfter: true });
-    });
-
-    // External kill / Docker stop / k8s pod termination
-    process.on('SIGTERM', () => {
-      void gracefulShutdown({ signal: 'SIGTERM', exitAfter: true });
+        logger.debug('beforeExit: shutting down OpenTelemetry...');
+        try {
+          await sdk.shutdown();
+          logger.debug('OpenTelemetry shutdown complete');
+        } catch (err) {
+          logger.error('Error shutting down OpenTelemetry', err);
+        }
+      })();
     });
   }
 

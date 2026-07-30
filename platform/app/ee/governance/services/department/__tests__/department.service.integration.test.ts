@@ -7,11 +7,11 @@
 import { OrganizationUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { prisma } from "../../../../../src/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../../src/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
+import { prisma } from "../../../../../src/server/db";
 import {
   DepartmentAssignmentTargetNotFoundError,
   DepartmentService,

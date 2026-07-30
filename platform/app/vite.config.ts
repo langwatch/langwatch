@@ -4,6 +4,7 @@ import { defineConfig, type Plugin, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
+import zodCompiler from "zod-compiler/vite";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
 import { havenHmrGate } from "./vite/havenHmrGate";
 
@@ -144,7 +145,25 @@ export default defineConfig(async (): Promise<UserConfig> => {
   }
 
   return {
-  plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
+  plugins: [
+    react(),
+    patchObjectInspectBrowserStub(),
+    havenHmrGate(),
+    // Compiles zod-compiler's `compile()` call sites into generated validators
+    // at build time. This covers the browser/SSR bundle ONLY — workers run via
+    // `tsx` (no bundler ever touches them), so `compileSchema` there always
+    // takes zod-compiler's runtime `compile()` path, and that path must keep
+    // compiling lazily on first use (see packages/event-sourcing/src/schema/compiled.ts).
+    // `schemas: "explicit"` (rather than the "auto" default) means the plugin
+    // only executes files that literally import `compile()` from
+    // zod-compiler at build time, instead of statically importing and probing
+    // every zod-importing file in `include` — the narrowest scope available.
+    zodCompiler({
+      schemas: "explicit",
+      include: ["src/**/*.ts", "src/**/*.tsx"],
+      exclude: ["node_modules/**", "**/*.d.ts", "**/*.generated.ts", "src/server/**"],
+    }),
+  ],
   resolve: {
     alias: {
       // Path aliases (matching tsconfig paths)

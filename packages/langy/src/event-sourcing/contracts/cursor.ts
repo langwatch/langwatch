@@ -1,6 +1,6 @@
 /**
  * The Langy event cursor — a position in a conversation's durable event stream
- * (ADR-059 §2). The server's projection stores persist one next to every folded
+ * (ADR-059 §2, retired; ground now ADR-098). The server's projection stores persist one next to every folded
  * document; the wire carries it on snapshots and freshness signals; the browser
  * compares it to know whether a tail fetch is due and which events are already
  * folded in.

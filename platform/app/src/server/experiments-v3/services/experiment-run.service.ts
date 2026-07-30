@@ -1,9 +1,16 @@
 import { TupleParam } from "@clickhouse/client";
+import type { ClickHouseClient as EventSourcingClickHouseClient } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { parseClickHouseDateTime } from "~/server/clickhouse/dateTime";
 import { prisma as defaultPrisma } from "~/server/db";
+import {
+  deriveExperimentRunTotals,
+  type ExperimentRunTotals,
+  experimentRunTotalsKey,
+} from "~/server/event-sourcing/experiment-run-processing/totals";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
   computeOccurredAtRangeForRuns,
@@ -18,6 +25,8 @@ import type {
   ClickHouseExperimentRunRow,
 } from "./mappers";
 import {
+  EXPERIMENT_RUN_ITEM_ROW_COLUMNS,
+  EXPERIMENT_RUN_ROW_COLUMNS,
   mapClickHouseItemsToRunWithItems,
   mapClickHouseRunToExperimentRun,
 } from "./mappers";
@@ -26,6 +35,9 @@ import type {
   ExperimentRunAggregate,
   ExperimentRunWithItems,
 } from "./types";
+
+const RUN_COLUMNS = EXPERIMENT_RUN_ROW_COLUMNS.join(", ");
+const RUN_ITEM_COLUMNS = EXPERIMENT_RUN_ITEM_ROW_COLUMNS.join(", ");
 
 interface ClickHouseExperimentRunAggregateRow {
   ExperimentId: string;
@@ -37,9 +49,144 @@ interface ClickHouseCountRow {
   totalHits: number | string;
 }
 
+/**
+ * Per-run cost summary over `experiment_run_items`, plus the two counts the
+ * trace-derived half of the cost needs: how many target items priced
+ * themselves, and how many reported no cost but did produce a trace.
+ */
+interface ClickHouseRunAggregateRow extends ClickHouseCostSummaryRow {
+  datasetPricedCount: number | string;
+  tracedCostlessCount: number | string;
+}
+
+/**
+ * One (run, trace) pair, with how many of the run's target items hang off that
+ * trace and how many of those reported no cost of their own.
+ */
+interface ClickHouseRunTraceGroupRow {
+  ExperimentId: string;
+  RunId: string;
+  TraceId: string;
+  targetCount: number | string;
+  costlessCount: number | string;
+}
+
+/** What a trace contributes to one run, once its price is known. */
+interface TraceDerivedRunCost {
+  /** Summed across the run's traces. */
+  cost: number;
+  /** Target items that got their price from a trace rather than inline. */
+  pricedItemCount: number;
+}
+
 type ProjectClickHouseClient = NonNullable<
   Awaited<ReturnType<typeof getClickHouseClientForProject>>
 >;
+
+/**
+ * `deriveExperimentRunTotals` speaks `@langwatch/clickhouse`'s client
+ * contract; this service holds the tenant-routed `@clickhouse/client`
+ * instance instead, because private per-org ClickHouse routing
+ * (`getClickHouseClientForProject`) lives only there. Adapts the one method
+ * totals.ts calls.
+ *
+ * Reads `JSONEachRow`, matching every other query in this file, and turns
+ * each row object into an array in the SELECT list's own order — the same
+ * order `Object.values` walks a JSON-parsed object's string keys in. No
+ * `header` is returned, so the codec's header/type cross-check (meant for the
+ * real `WithNamesAndTypes` wire format) simply does not run; column identity
+ * still comes from the SELECT list itself.
+ */
+function asTotalsClient(
+  raw: ProjectClickHouseClient,
+): EventSourcingClickHouseClient {
+  return {
+    async query({ sql, params }) {
+      const resultSet = await raw.query({
+        query: sql,
+        query_params: params,
+        format: "JSONEachRow",
+        clickhouse_settings: { output_format_json_quote_64bit_integers: 1 },
+      });
+      const objects = (await resultSet.json()) as Record<string, unknown>[];
+      return { rows: objects.map((row) => Object.values(row)) };
+    },
+    stream() {
+      throw new Error("not used by deriveExperimentRunTotals");
+    },
+    async insert() {
+      throw new Error("not used by deriveExperimentRunTotals");
+    },
+    async close() {
+      // Lifecycle belongs to getClickHouseClientForProject.
+    },
+  };
+}
+
+/** The buffered CH-string range `computeOccurredAtRangeForRuns` produces,
+ * as the `Date` bound `deriveExperimentRunTotals` takes. */
+function toTotalsOccurredAtRange(range: {
+  minOccurredAt: string;
+  maxOccurredAt: string;
+}): { from: Date; to: Date } {
+  return {
+    from: parseClickHouseDateTime(range.minOccurredAt),
+    to: parseClickHouseDateTime(range.maxOccurredAt),
+  };
+}
+
+/**
+ * The one definition of what a trace's price is worth to a single target.
+ *
+ * A trace is produced per iteration, so several target executions can sit
+ * under one — dividing evenly is what makes the per-item figures add back up
+ * to the trace's own price. Both derivations (`enrichItemsWithTraceCosts` for
+ * the rows, `computeTraceDerivedRunCosts` for the total) go through here, so
+ * the footer and the table cannot disagree; that they used to is exactly the
+ * defect ADR-072's (retired; ground now ADR-103) cost section describes.
+ */
+function splitTraceCostAcrossTargets({
+  traceCost,
+  targetCount,
+}: {
+  traceCost: number;
+  targetCount: number;
+}): number {
+  return Number((traceCost / Math.max(targetCount, 1)).toFixed(6));
+}
+
+function toCount(value: number | string | null | undefined): number {
+  return value === null || value === undefined ? 0 : Number(value);
+}
+
+/**
+ * Fold the trace-derived cost into the run's item aggregate.
+ *
+ * `sumIf(TargetCost, …)` only ever sees the prices an item recorded for
+ * itself, so on its own it reports zero for an SDK experiment whose rows are
+ * all priced from their traces. The mean is recomputed rather than left on the
+ * SQL `avgIf` for the same reason: its denominator counted only the inline
+ * ones.
+ */
+function addTraceDerivedCost({
+  aggregate,
+  traceDerived,
+}: {
+  aggregate: ClickHouseRunAggregateRow;
+  traceDerived: TraceDerivedRunCost | undefined;
+}): ClickHouseCostSummaryRow {
+  if (!traceDerived || traceDerived.cost <= 0) return aggregate;
+
+  const datasetCost = (aggregate.datasetCost ?? 0) + traceDerived.cost;
+  const pricedCount =
+    toCount(aggregate.datasetPricedCount) + traceDerived.pricedItemCount;
+
+  return {
+    ...aggregate,
+    datasetCost,
+    datasetAverageCost: pricedCount > 0 ? datasetCost / pricedCount : null,
+  };
+}
 
 /**
  * ClickHouse backend for experiment run queries.
@@ -141,7 +288,7 @@ export class ExperimentRunService {
           // Fetch run summaries
           const runsResult = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${RUN_COLUMNS}
               FROM experiment_runs AS t
               WHERE t.TenantId = {tenantId:String}
                 AND t.ExperimentId IN ({experimentIds:Array(String)})
@@ -327,7 +474,7 @@ export class ExperimentRunService {
 
           const runsResult = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${RUN_COLUMNS}
               FROM experiment_runs AS t
               WHERE t.TenantId = {tenantId:String}
                 AND t.ExperimentId = {experimentId:String}
@@ -450,7 +597,7 @@ export class ExperimentRunService {
           // reads (listRuns) and for experiment_run_items below.
           const runResult = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${RUN_COLUMNS}
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
@@ -508,7 +655,7 @@ export class ExperimentRunService {
           // trace-dedup-oom-safety.unit.test.ts for the rationale.
           const itemsResult = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${RUN_ITEM_COLUMNS}
               FROM experiment_run_items
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
@@ -558,10 +705,19 @@ export class ExperimentRunService {
             occurredAtRange,
           );
 
+          const totals = await this.deriveTotalsForOneRun({
+            clickHouseClient,
+            projectId,
+            experimentId,
+            runId,
+            occurredAtRange,
+          });
+
           const result = mapClickHouseItemsToRunWithItems({
             runRecord,
             items: enrichedItems,
             projectId: runRecord.TenantId,
+            totals,
           });
 
           this.logger.debug(
@@ -588,6 +744,30 @@ export class ExperimentRunService {
         }
       },
     );
+  }
+
+  /** {@link deriveExperimentRunTotals} for exactly one run — `getRun`'s page of one. */
+  private async deriveTotalsForOneRun({
+    clickHouseClient,
+    projectId,
+    experimentId,
+    runId,
+    occurredAtRange,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    experimentId: string;
+    runId: string;
+    occurredAtRange: { minOccurredAt: string; maxOccurredAt: string };
+  }): Promise<ExperimentRunTotals | undefined> {
+    const runRef = { experimentId, runId };
+    const totals = await deriveExperimentRunTotals({
+      client: asTotalsClient(clickHouseClient),
+      tenantId: projectId,
+      runs: [runRef],
+      occurredAtRange: toTotalsOccurredAtRange(occurredAtRange),
+    });
+    return totals.get(experimentRunTotalsKey(runRef));
   }
 
   /**
@@ -631,6 +811,18 @@ export class ExperimentRunService {
       projectId,
       minMs: occurredAtRange.minMs,
       runCount: runRows.length,
+    });
+
+    // One query for the whole page's progress (ADR-103 decision 1) — never
+    // one per run.
+    const totalsByExperimentRun = await deriveExperimentRunTotals({
+      client: asTotalsClient(clickHouseClient),
+      tenantId: projectId,
+      runs: runRows.map((r) => ({
+        experimentId: r.ExperimentId,
+        runId: r.RunId,
+      })),
+      occurredAtRange: toTotalsOccurredAtRange(occurredAtRange),
     });
 
     // Fetch per-evaluator breakdown for all runs.
@@ -699,13 +891,22 @@ export class ExperimentRunService {
       ClickHouseEvaluatorBreakdownRow[]
     >();
     for (const row of breakdownRows) {
-      const key = `${row.ExperimentId}:${row.RunId}`;
+      const key = experimentRunTotalsKey({
+        experimentId: row.ExperimentId,
+        runId: row.RunId,
+      });
       const existing = breakdownByExperimentRun.get(key) ?? [];
       existing.push(row);
       breakdownByExperimentRun.set(key, existing);
     }
 
     // Fetch cost/duration summary per run.
+    //
+    // `datasetPricedCount` and `tracedCostlessCount` are the two counts the
+    // trace-derived half of the cost needs: how many target items priced
+    // themselves, and how many are still waiting on the trace they produced.
+    // A run with none of the latter skips the trace reads entirely.
+    //
     // Same exact-pair + OccurredAt-bounded + IN-tuple-dedup pattern as
     // the breakdown query above — see comment there for the rationale.
     const costResult = await clickHouseClient.query({
@@ -718,7 +919,9 @@ export class ExperimentRunService {
           avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
           avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
           avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
-          avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
+          avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration,
+          countIf(ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetPricedCount,
+          countIf(ResultType = 'target' AND TargetCost IS NULL AND TraceId IS NOT NULL AND TraceId != '') AS tracedCostlessCount
         FROM experiment_run_items
         WHERE TenantId = {tenantId:String}
           AND OccurredAt >= {minOccurredAt:DateTime64(3)}
@@ -753,13 +956,36 @@ export class ExperimentRunService {
       format: "JSONEachRow",
     });
 
-    const costRows = (await costResult.json()) as ClickHouseCostSummaryRow[];
+    const costRows = (await costResult.json()) as ClickHouseRunAggregateRow[];
 
     // Same composite key as breakdownByExperimentRun.
-    const costByExperimentRun = new Map<string, ClickHouseCostSummaryRow>();
+    const aggregateByExperimentRun = new Map<
+      string,
+      ClickHouseRunAggregateRow
+    >();
     for (const row of costRows) {
-      costByExperimentRun.set(`${row.ExperimentId}:${row.RunId}`, row);
+      aggregateByExperimentRun.set(
+        experimentRunTotalsKey({
+          experimentId: row.ExperimentId,
+          runId: row.RunId,
+        }),
+        row,
+      );
     }
+
+    // An SDK experiment reports no inline cost at all, so its whole dataset
+    // cost lives in the traces its targets produced. Runs that priced their
+    // items inline skip both extra reads entirely.
+    const traceCostByExperimentRun = costRows.some(
+      (row) => toCount(row.tracedCostlessCount) > 0,
+    )
+      ? await this.computeTraceDerivedRunCosts({
+          clickHouseClient,
+          projectId,
+          runPairs,
+          occurredAtRange,
+        })
+      : new Map<string, TraceDerivedRunCost>();
 
     // Fetch workflow version metadata from Prisma
     const versionIds = runRows
@@ -773,16 +999,212 @@ export class ExperimentRunService {
     });
 
     return runRows.map((row) => {
-      const compositeKey = `${row.ExperimentId}:${row.RunId}`;
+      const compositeKey = experimentRunTotalsKey({
+        experimentId: row.ExperimentId,
+        runId: row.RunId,
+      });
+      const aggregate = aggregateByExperimentRun.get(compositeKey);
       return mapClickHouseRunToExperimentRun({
         record: row,
         workflowVersion: row.WorkflowVersionId
           ? (versionsMap[row.WorkflowVersionId] ?? null)
           : null,
         evaluatorBreakdown: breakdownByExperimentRun.get(compositeKey),
-        costSummary: costByExperimentRun.get(compositeKey),
+        totals: totalsByExperimentRun.get(compositeKey),
+        costSummary: aggregate
+          ? addTraceDerivedCost({
+              aggregate,
+              traceDerived: traceCostByExperimentRun.get(compositeKey),
+            })
+          : undefined,
       });
     });
+  }
+
+  /**
+   * Price each run's cost-less target items from the traces they produced.
+   *
+   * Returns the same figure `enrichItemsWithTraceCosts` puts on the rows,
+   * summed per run: a trace shared by several targets is divided between them
+   * and therefore counted once in the total, and a target that reported its
+   * own cost is left alone (the two are alternative sources for one figure,
+   * not addends — adding them is what double-counted a traced target before
+   * ADR-072 (retired; ground now ADR-103)).
+   *
+   * Two reads rather than one join: resolving a trace's latest version needs a
+   * dedup over `trace_summaries` that cannot be expressed inside the item
+   * grouping without filtering versions by an `OccurredAt` that shifts across
+   * them. Both are skipped entirely when no run has a cost-less traced item.
+   */
+  private async computeTraceDerivedRunCosts({
+    clickHouseClient,
+    projectId,
+    runPairs,
+    occurredAtRange,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    runPairs: TupleParam[];
+    occurredAtRange: { minOccurredAt: string; maxOccurredAt: string };
+  }): Promise<Map<string, TraceDerivedRunCost>> {
+    const byExperimentRun = new Map<string, TraceDerivedRunCost>();
+
+    // Group the run's target items by the trace they produced. Only the
+    // lightweight key columns are read — the dedup resolves on
+    // (key columns, OccurredAt), never on the heavy payload columns.
+    const groupResult = await clickHouseClient.query({
+      query: `
+        SELECT
+          ExperimentId,
+          RunId,
+          TraceId,
+          count() AS targetCount,
+          countIf(TargetCost IS NULL) AS costlessCount
+        FROM experiment_run_items
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+          AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+          AND ResultType = 'target'
+          AND TraceId IS NOT NULL
+          AND TraceId != ''
+          AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+            SELECT
+              TenantId,
+              ExperimentId,
+              RunId,
+              RowIndex,
+              TargetId,
+              ResultType,
+              coalesce(EvaluatorId, ''),
+              max(OccurredAt)
+            FROM experiment_run_items
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+              AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+              AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+            GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+          )
+        GROUP BY ExperimentId, RunId, TraceId
+        LIMIT 10000
+      `,
+      query_params: {
+        tenantId: projectId,
+        runPairs,
+        minOccurredAt: occurredAtRange.minOccurredAt,
+        maxOccurredAt: occurredAtRange.maxOccurredAt,
+      },
+      format: "JSONEachRow",
+    });
+
+    const groupRows =
+      (await groupResult.json()) as ClickHouseRunTraceGroupRow[];
+    const pricedGroups = groupRows.filter(
+      (row) => toCount(row.costlessCount) > 0,
+    );
+    if (pricedGroups.length === 0) return byExperimentRun;
+
+    const costByTraceId = await this.fetchTraceCosts({
+      clickHouseClient,
+      projectId,
+      traceIds: [...new Set(pricedGroups.map((row) => row.TraceId))],
+      occurredAtRange,
+    });
+
+    for (const row of pricedGroups) {
+      const traceCost = costByTraceId.get(row.TraceId);
+      if (traceCost === undefined) continue;
+
+      const costlessCount = toCount(row.costlessCount);
+      const perTargetCost = splitTraceCostAcrossTargets({
+        traceCost,
+        targetCount: toCount(row.targetCount),
+      });
+
+      const key = experimentRunTotalsKey({
+        experimentId: row.ExperimentId,
+        runId: row.RunId,
+      });
+      const running = byExperimentRun.get(key) ?? {
+        cost: 0,
+        pricedItemCount: 0,
+      };
+      running.cost += perTargetCost * costlessCount;
+      running.pricedItemCount += costlessCount;
+      byExperimentRun.set(key, running);
+    }
+
+    return byExperimentRun;
+  }
+
+  /**
+   * Read the current price of each trace, resolving its latest version.
+   *
+   * The read carries no memory of what it answered last time, which is what
+   * makes a repricing safe: a trace whose spans land late reports its newer
+   * figure on the next read and the same figure on every read after that.
+   *
+   * Shared by the item enrichment and the run total so both quote one price
+   * per trace. Bounds `OccurredAt` to the run's lifecycle window on the outer
+   * read only — `trace_summaries` is partitioned by `toYearWeek(OccurredAt)`
+   * and a TraceId-only filter cannot prune, but `OccurredAt` can shift across
+   * ReplacingMergeTree versions (a late span can move a trace's start time),
+   * so filtering versions before resolving the latest could pick the wrong
+   * one. Filtering the already-deduped outer rows is always correct.
+   */
+  private async fetchTraceCosts({
+    clickHouseClient,
+    projectId,
+    traceIds,
+    occurredAtRange,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+    occurredAtRange: { minOccurredAt: string; maxOccurredAt: string };
+  }): Promise<Map<string, number>> {
+    const costByTraceId = new Map<string, number>();
+    if (traceIds.length === 0) return costByTraceId;
+
+    const traceCostResult = await clickHouseClient.query({
+      query: `
+        SELECT
+          TraceId,
+          TotalCost
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND TraceId IN ({traceIds:Array(String)})
+          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN ({traceIds:Array(String)})
+            GROUP BY TenantId, TraceId
+          )
+      `,
+      query_params: {
+        tenantId: projectId,
+        traceIds,
+        minOccurredAt: occurredAtRange.minOccurredAt,
+        maxOccurredAt: occurredAtRange.maxOccurredAt,
+      },
+      format: "JSONEachRow",
+    });
+
+    const traceCostRows = await traceCostResult.json<{
+      TraceId: string;
+      TotalCost: number | null;
+    }>();
+
+    for (const row of traceCostRows) {
+      if (row.TotalCost !== null && row.TotalCost > 0) {
+        costByTraceId.set(row.TraceId, row.TotalCost);
+      }
+    }
+
+    return costByTraceId;
   }
 
   /**
@@ -817,57 +1239,14 @@ export class ExperimentRunService {
     if (traceIds.length === 0) return items;
 
     try {
-      const traceCostResult = await clickHouseClient.query({
-        // Bound OccurredAt to the run's lifecycle window. trace_summaries is
-        // partitioned by toYearWeek(OccurredAt); a TraceId-only filter can't
-        // prune, so it opens every weekly partition (including cold storage)
-        // to read two light columns. A target's trace runs during its run, so
-        // its OccurredAt falls inside the buffered run window the caller
-        // already computed. The bound is applied on the outer read only, not
-        // inside the max(UpdatedAt) dedup subquery: OccurredAt can shift across
-        // ReplacingMergeTree versions (a late-arriving span can move a trace's
-        // min start time), so filtering versions by OccurredAt before resolving
-        // the latest could pick the wrong version. Filtering the already-deduped
-        // outer rows is always correct.
-        query: `
-          SELECT
-            TraceId,
-            TotalCost
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND TraceId IN ({traceIds:Array(String)})
-            AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-            AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-            AND (TenantId, TraceId, UpdatedAt) IN (
-              SELECT TenantId, TraceId, max(UpdatedAt)
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND TraceId IN ({traceIds:Array(String)})
-              GROUP BY TenantId, TraceId
-            )
-        `,
-        query_params: {
-          tenantId: projectId,
-          traceIds,
-          minOccurredAt: occurredAtRange.minOccurredAt,
-          maxOccurredAt: occurredAtRange.maxOccurredAt,
-        },
-        format: "JSONEachRow",
+      const costByTraceId = await this.fetchTraceCosts({
+        clickHouseClient,
+        projectId,
+        traceIds,
+        occurredAtRange,
       });
 
-      const traceCostRows = await traceCostResult.json<{
-        TraceId: string;
-        TotalCost: number | null;
-      }>();
-
-      if (traceCostRows.length === 0) return items;
-
-      const costByTraceId = new Map<string, number>();
-      for (const row of traceCostRows) {
-        if (row.TotalCost !== null && row.TotalCost > 0) {
-          costByTraceId.set(row.TraceId, row.TotalCost);
-        }
-      }
+      if (costByTraceId.size === 0) return items;
 
       // Count how many target items share each traceId (for cost splitting)
       const targetCountByTraceId = new Map<string, number>();
@@ -897,10 +1276,13 @@ export class ExperimentRunService {
         const traceCost = costByTraceId.get(item.TraceId);
         if (traceCost === undefined) return item;
 
-        const targetCount = targetCountByTraceId.get(item.TraceId) ?? 1;
-        const perItemCost = Number((traceCost / targetCount).toFixed(6));
-
-        return { ...item, TargetCost: perItemCost };
+        return {
+          ...item,
+          TargetCost: splitTraceCostAcrossTargets({
+            traceCost,
+            targetCount: targetCountByTraceId.get(item.TraceId) ?? 1,
+          }),
+        };
       });
     } catch (error) {
       this.logger.warn(

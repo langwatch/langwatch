@@ -46,6 +46,7 @@ describe("usePeriodSelector()", () => {
       expect(result.current.daysDifference).toBe(30);
     });
 
+    /** @scenario "Unknown or malformed period key falls back to the default" */
     it("reports relative mode", () => {
       const { result } = renderHook(() => usePeriodSelector(30));
 
@@ -54,6 +55,7 @@ describe("usePeriodSelector()", () => {
   });
 
   describe("when a relative period preset is in the URL", () => {
+    /** @scenario "A relative selection re-anchors on a later visit" */
     it("computes a 15-minute window anchored to now for period=15m", () => {
       mockQuery = { period: "15m" };
 
@@ -67,6 +69,7 @@ describe("usePeriodSelector()", () => {
       expect(Math.abs(endDate.getTime() - Date.now())).toBeLessThan(1000);
     });
 
+    /** @scenario "A relative selection re-anchors on a later visit" */
     it("re-anchors to the latest now when the hook is remounted later", () => {
       mockQuery = { period: "15m" };
 
@@ -84,6 +87,7 @@ describe("usePeriodSelector()", () => {
       vi.useRealTimers();
     });
 
+    /** @scenario "Unknown or malformed period key falls back to the default" */
     it("falls back to the default range for an unknown period key", () => {
       mockQuery = { period: "bogus" };
 
@@ -95,6 +99,7 @@ describe("usePeriodSelector()", () => {
   });
 
   describe("when explicit startDate and endDate are in the URL", () => {
+    /** @scenario "Picking explicit dates stores the selection as absolute" */
     it("reports absolute mode", () => {
       mockQuery = {
         startDate: "2026-04-20T00:00:00.000Z",
@@ -106,6 +111,7 @@ describe("usePeriodSelector()", () => {
       expect(result.current.mode).toBe("absolute");
     });
 
+    /** @scenario "An absolute selection does not move with time" */
     it("returns the exact dates from the URL", () => {
       mockQuery = {
         startDate: "2026-04-20T00:00:00.000Z",
@@ -125,6 +131,7 @@ describe("usePeriodSelector()", () => {
 
   describe("when query params have inverted date range", () => {
     /** @scenario "Selected date range limits displayed run data" */
+    /** @scenario "An inverted date range in the URL is read the right way round" */
     it("returns startDate <= endDate", () => {
       mockQuery = {
         startDate: "2025-03-20T00:00:00Z",
@@ -138,6 +145,7 @@ describe("usePeriodSelector()", () => {
       );
     });
 
+    /** @scenario "An inverted date range in the URL is read the right way round" */
     it("returns a non-negative daysDifference", () => {
       mockQuery = {
         startDate: "2025-03-20T00:00:00Z",
@@ -151,6 +159,8 @@ describe("usePeriodSelector()", () => {
   });
 
   describe("when setRelativePeriod is called", () => {
+    /** @scenario "Picking a relative quick selector stores the selection as relative" */
+    /** @scenario "Switching from absolute back to a relative quick selector clears absolute params" */
     it("writes period to the URL and clears startDate/endDate", () => {
       mockQuery = {
         startDate: "2026-04-20T00:00:00.000Z",
@@ -174,6 +184,7 @@ describe("usePeriodSelector()", () => {
   });
 
   describe("when setPeriod is called", () => {
+    /** @scenario "Picking explicit dates stores the selection as absolute" */
     it("writes startDate/endDate and clears the relative period key", () => {
       mockQuery = { period: "7d", otherFilter: "keep-me" };
 

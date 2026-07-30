@@ -21,7 +21,8 @@ export interface TemplateContext {
    * immediate dispatch (length 1) and a digest (length N). See ADR-036.
    */
   match: TemplateMatchVars | null;
-  /** Iterable matches for both immediate and digest dispatch. ADR-036 + ADR-026. */
+  /** Iterable matches for both immediate and digest dispatch. ADR-036 +
+   *  ADR-026 (retired; ground now ADR-098). */
   matches: TemplateMatchVars[];
 }
 
@@ -105,8 +106,9 @@ function matchUrl({
 }
 
 /**
- * Template-variable contract for custom-graph THRESHOLD ALERTS (ADR-034
- * Phase 8.1). Distinct from `TemplateContext` (the trace-iteration shape)
+ * Template-variable contract for custom-graph THRESHOLD ALERTS (ADR-034,
+ * retired; ground now ADR-099, Phase 8.1). Distinct from `TemplateContext`
+ * (the trace-iteration shape)
  * because an alert reads as "metric X crossed threshold Y", not "these
  * traces happened" — there is no `matches` array, just one metric value
  * compared against a condition.
@@ -274,7 +276,8 @@ function buildAutomationEditUrl({
 }
 
 /**
- * Pure builder for the alert template context (ADR-034 Phase 8.1).
+ * Pure builder for the alert template context (ADR-034, retired; ground now
+ * ADR-099, Phase 8.1).
  * `baseHost` is injected (not read from env) so the renderer stays pure
  * and testable. The graph URL points at the canonical custom-graph page
  * — same path `matchUrl` produces for graph-shaped trace matches, kept

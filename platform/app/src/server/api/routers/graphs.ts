@@ -11,7 +11,8 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 /**
  * Read-side hydration shape for the `Add / Edit alert` bell icon on the
  * graph card header (GraphCardHeader.tsx). Writes go through the
- * automations router (`automation.upsert`) as of ADR-034 Phase 5.2;
+ * automations router (`automation.upsert`) as of ADR-034 (retired; ground
+ * now ADR-099) Phase 5.2;
  * this router only reads the persisted graph-alert Trigger row.
  */
 interface AlertActionParams {
@@ -80,7 +81,8 @@ export const graphsRouter = createTRPCRouter({
       });
 
       // Alert-writing lives on `automation.upsert` with `customGraphId`
-      // as of ADR-034 Phase 5.2. The dashboard chart's `Add alert` bell
+      // as of ADR-034 (retired; ground now ADR-099) Phase 5.2. The
+      // dashboard chart's `Add alert` bell
       // opens the automations drawer; this router no longer accepts an
       // `alert` field.
 
@@ -257,7 +259,8 @@ export const graphsRouter = createTRPCRouter({
       });
 
       // Alert-writing lives on `automation.upsert` with `customGraphId`
-      // as of ADR-034 Phase 5.2. The bell icon in the chart-card header
+      // as of ADR-034 (retired; ground now ADR-099) Phase 5.2. The bell
+      // icon in the chart-card header
       // opens the automations drawer for edit; this router no longer
       // accepts an `alert` field.
 

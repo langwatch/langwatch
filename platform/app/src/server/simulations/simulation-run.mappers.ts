@@ -81,13 +81,18 @@ function mapVerdict(verdict: string | null): Verdict | undefined {
 
 /**
  * Maps a ClickHouse simulation_runs row to ScenarioRunData.
- * Applies stall detection using UpdatedAt timestamp.
+ *
+ * The status is read, not derived. A stalled run is one the
+ * `scenarioExecution` process wrote `STALLED` for when its deadline fired
+ * (ADR-073 step 2, retired; ground now ADR-103), so what is stored and what
+ * is displayed cannot disagree —
+ * which the read-time derivation this replaced could not promise, because it
+ * answered differently depending on when the row was read.
  */
 export function mapClickHouseRowToScenarioRunData(
   row: ClickHouseSimulationRunRow,
-  now = Date.now(),
 ): ScenarioRunData {
-  const baseStatus = mapStatus(row.Status);
+  const status = mapStatus(row.Status);
   const updatedAt = Number(row.UpdatedAt);
   const startedAt = row.StartedAt != null ? Number(row.StartedAt) : null;
   const createdAt = Number(row.CreatedAt);
@@ -96,13 +101,6 @@ export function mapClickHouseRowToScenarioRunData(
     row.DurationMs != null ? parseInt(row.DurationMs, 10) : null;
   // Use StartedAt for duration calculation (CreatedAt is CH insertion time, which can be after FinishedAt)
   const startTimestamp = startedAt ?? createdAt;
-
-  // Apply stall detection: if run has no finished timestamp, check if it's stalled
-  const resolvedStatus = resolveRunStatus({
-    finishedStatus: finishedAt != null ? baseStatus : undefined,
-    lastEventTimestamp: updatedAt,
-    now,
-  });
 
   const verdictEnum = mapVerdict(row.Verdict);
 
@@ -176,7 +174,7 @@ export function mapClickHouseRowToScenarioRunData(
     name: row.Name,
     description: row.Description,
     metadata,
-    status: resolvedStatus,
+    status,
     results,
     messages,
     timestamp: startedAt ?? createdAt,

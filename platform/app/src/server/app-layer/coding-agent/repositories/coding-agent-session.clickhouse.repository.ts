@@ -1,20 +1,19 @@
 import { performance } from "node:perf_hooks";
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import { asNumber, asStringArray } from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type {
-  CodingAgentSessionMetricSeriesRow,
-  CodingAgentSessionRow,
-} from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import {
   type CodingAgentSessionListReadOutcome,
   observeCodingAgentSessionListReadDuration,
 } from "~/server/metrics";
-import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
+import type {
+  CodingAgentSessionMetricSeriesRow,
+  CodingAgentSessionRepository,
+  CodingAgentSessionRow,
+} from "./coding-agent-session.repository";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
 
@@ -312,7 +311,7 @@ export class CodingAgentSessionClickHouseRepository
     retentionDays?: number,
     appliedEventIds?: readonly string[],
   ): Promise<void> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: row.tenantId },
       "CodingAgentSessionClickHouseRepository.upsert",
     );
@@ -426,7 +425,7 @@ export class CodingAgentSessionClickHouseRepository
     sessionId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<Record<string, unknown> | null> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "CodingAgentSessionClickHouseRepository.findBySessionId",
     );
@@ -568,7 +567,7 @@ export class CodingAgentSessionClickHouseRepository
     toMs: number;
     limit: number;
   }): Promise<CodingAgentSessionRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "CodingAgentSessionClickHouseRepository.findManyRecent",
     );
@@ -648,7 +647,7 @@ export class CodingAgentSessionClickHouseRepository
     if (entries.length === 0) return;
 
     const tenantId = entries[0]!.row.tenantId;
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "CodingAgentSessionClickHouseRepository.upsertBatch",
     );

@@ -47,14 +47,14 @@ import {
   IO_PREVIEW_BYTES,
 } from "~/server/app-layer/traces/lean-for-projection";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+} from "~/server/app-layer/traces/ingest/constants";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 import { ExportService } from "../export.service";
 import type { ExportRequest } from "../types";
 
@@ -106,7 +106,7 @@ async function seedOffloadedTrace() {
   await insertEventLogRow({
     client: ch,
     tenantId,
-    aggregateId: traceId, // ADR-022: aggregateId for trace-processing IS the traceId
+    aggregateId: traceId, // ADR-022 (retired; ground now ADR-099): aggregateId for trace-processing IS the traceId
     eventId,
     eventType: SPAN_RECEIVED_EVENT_TYPE,
     eventVersion: SPAN_RECEIVED_EVENT_VERSION_LATEST,

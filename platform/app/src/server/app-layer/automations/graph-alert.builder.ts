@@ -7,8 +7,9 @@ import { z } from "zod";
  * legacy "Add Alert" path on the dashboard graph card (`graphs.updateById`)
  * and the new automations-drawer path (`automation.upsert` with
  * `customGraphId` set) write the exact same row format. The downstream
- * dispatcher (cron + event-sourced reactor in ADR-034 Phase 5) reads one
- * shape; if either writer drifts, alerts silently stop firing.
+ * dispatcher (the ADR-034 Phase 5 event-sourced path: the
+ * `graphTriggerActivity` subscriber and the `graphAlertSweep` process) reads
+ * one shape; if either writer drifts, alerts silently stop firing.
  *
  * `actionParams` carries the threshold rule (`threshold`, `operator`,
  * `timePeriod`, `seriesName`) alongside the destination (`members` for

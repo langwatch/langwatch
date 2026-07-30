@@ -36,10 +36,6 @@ export class TraceSummaryService {
     private readonly fullResolutionDeps?: TraceSummaryFullResolutionDeps,
   ) {}
 
-  async upsert(data: TraceSummaryData, tenantId: string): Promise<void> {
-    await this.repository.upsert(data, tenantId);
-  }
-
   async getByTraceId(
     tenantId: string,
     traceId: string,

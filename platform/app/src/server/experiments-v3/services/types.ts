@@ -7,7 +7,7 @@
  */
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
-import type { ExperimentRunTarget } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/shared";
+import type { ExperimentRunTarget } from "~/server/event-sourcing/experiment-run-processing/schema";
 
 export type { ExperimentRunTarget };
 

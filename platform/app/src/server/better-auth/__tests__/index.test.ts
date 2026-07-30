@@ -220,6 +220,7 @@ describe("better-auth config", () => {
       AZURE_AD_TENANT_ID: undefined,
     };
 
+    /** @scenario "Signing in again through SSO does not overwrite an uploaded photo" */
     it.each([
       [
         "google",

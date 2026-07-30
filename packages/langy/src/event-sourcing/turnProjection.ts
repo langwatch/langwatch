@@ -1,5 +1,6 @@
 /**
- * The browser's LOCAL turn projection (ADR-059 §2/§3) — the whole
+ * The browser's LOCAL turn projection (ADR-059 §2/§3, retired; ground now
+ * ADR-098) — the whole
  * snapshot-then-tail state machine in one pure module, mirroring how
  * `turnPhase.ts` holds the whole send/stop machine.
  *

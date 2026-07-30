@@ -1,28 +1,20 @@
-/** Time in milliseconds after which a run without updates is considered interrupted */
+/** Time in milliseconds after which a run is considered interrupted (see BatchRunsSidebar's own staleness indicator). */
 export const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Check if a run is finished based on timestamps.
- * A run is considered finished if it has finishedAt, stoppedAt,
- * or hasn't been updated in 5 minutes (interrupted).
+ * A run is finished when it carries an explicit terminal timestamp, or when
+ * its derived progress has reached its total — the same reading `progress`
+ * itself comes from (ADR-103 decision 4), never a wall-clock guess.
  */
-export const isRunFinished = (timestamps: {
+export const isRunFinished = (run: {
   finishedAt?: number | null;
   stoppedAt?: number | null;
-  updatedAt?: number | null;
+  progress?: number | null;
+  total?: number | null;
 }): boolean => {
-  // Explicitly finished or stopped
-  if (timestamps.finishedAt ?? timestamps.stoppedAt) {
+  if (run.finishedAt ?? run.stoppedAt) {
     return true;
   }
 
-  // Consider interrupted if no updates for 5 minutes
-  if (timestamps.updatedAt) {
-    const timeSinceUpdate = Date.now() - timestamps.updatedAt;
-    if (timeSinceUpdate > INTERRUPTED_THRESHOLD_MS) {
-      return true;
-    }
-  }
-
-  return false;
+  return run.progress != null && run.total != null && run.progress >= run.total;
 };

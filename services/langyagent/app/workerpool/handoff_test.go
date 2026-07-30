@@ -71,7 +71,8 @@ func TestPool_ShutdownHandoff_NotifiesAndWaitsForQuiesce(t *testing.T) {
 }
 
 // A turn that never quiesces caps at the deadline and falls back to cold restart
-// (the honest ADR-048 limit) — it must not block past the deadline.
+// (the honest ADR-048 limit, retired; ground now
+// dev/docs/adr/098-event-sourcing-core.md) — it must not block past the deadline.
 func TestPool_ShutdownHandoff_CapsAtDeadline(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

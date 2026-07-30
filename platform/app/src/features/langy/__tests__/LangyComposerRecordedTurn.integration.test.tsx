@@ -2,7 +2,8 @@
  * @vitest-environment jsdom
  *
  * The composer's availability is a DERIVATION of the recorded turn (ADR-059
- * §4): recorded events fold through the shared `foldLangyConversationTurn`
+ * §4, retired; ground now ADR-098): recorded events fold through the shared
+ * `foldLangyConversationTurn`
  * reducer into the store's local turn projection, the projection composes with
  * the turn-phase machine, and the composer reads that one value. Nothing here
  * pokes `turnPhase` directly — the only inputs are durable events, exactly as

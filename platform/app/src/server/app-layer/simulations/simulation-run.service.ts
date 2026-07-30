@@ -69,6 +69,8 @@ export class SimulationRunService {
     endDate?: number;
   }): Promise<{
     runs: ScenarioRunData[];
+    /** Per batch, how many runs it set out to queue (ADR-072). */
+    expectedCounts: Record<string, number>;
     nextCursor?: string;
     hasMore: boolean;
   }> {

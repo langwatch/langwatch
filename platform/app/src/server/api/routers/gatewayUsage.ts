@@ -1,7 +1,7 @@
 /**
  * tRPC router for /gateway/usage. Read-only — historical spend from
  * the ClickHouse `gateway_budget_ledger_events` table (populated by the
- * trace-fold reactor), grouped by scope / model / day.
+ * `gatewayBudgetDebits` map projection), grouped by scope / model / day.
  */
 import { z } from "zod";
 

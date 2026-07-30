@@ -1,7 +1,7 @@
 /**
  * Redis pub/sub channel for distributed job cancellation.
  *
- * The cancellation broadcast reactor publishes to this channel when a
+ * The `cancellationBroadcast` subscriber publishes to this channel when a
  * cancel_requested event is processed. Worker pods subscribe and kill
  * matching child processes.
  *
@@ -15,11 +15,17 @@ const logger = createLogger("langwatch:scenarios:cancellation-channel");
 /** Redis pub/sub channel name for scenario job cancellations. */
 export const CANCELLATION_CHANNEL = "scenario:cancel";
 
-/** Payload published when a job should be cancelled. */
+/**
+ * Payload published when a job should be cancelled.
+ *
+ * The run id is the whole message. It used to carry `projectId` and
+ * `batchRunId` too, and neither was ever read: the sole subscriber
+ * (`scenario.processor.ts`) looks the child process up by `scenarioRunId`
+ * alone. Carrying them cost the publisher a projection read for a label
+ * nothing consumed, so both are gone.
+ */
 export interface CancellationMessage {
-  projectId: string;
   scenarioRunId: string;
-  batchRunId: string;
 }
 
 /** Minimal publisher interface (subset of ioredis). */
@@ -40,7 +46,7 @@ export interface CancellationSubscriber {
 /**
  * Publish a cancellation message to the Redis channel.
  *
- * Called by the cancellationBroadcast reactor when a cancel_requested
+ * Called by the `cancellationBroadcast` subscriber when a cancel_requested
  * event is processed. All worker pods subscribed to the channel receive
  * this message and check if they own the scenario.
  */
@@ -54,7 +60,7 @@ export async function publishCancellation({
   const payload = JSON.stringify(message);
   await publisher.publish(CANCELLATION_CHANNEL, payload);
   logger.debug(
-    { scenarioRunId: message.scenarioRunId, batchRunId: message.batchRunId },
+    { scenarioRunId: message.scenarioRunId },
     "Cancellation published",
   );
 }

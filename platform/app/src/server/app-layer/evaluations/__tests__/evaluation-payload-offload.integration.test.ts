@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @integration
  *
- * End-to-end integration for evaluation-inputs offload (ADR-040) against real
+ * End-to-end integration for evaluation-inputs offload (ADR-096) against real
  * infrastructure: a real ClickHouse (local native CH via TEST_CLICKHOUSE_URL,
  * or the CI service container), a real StoredObjectsService backed by a
  * LocalFilesystemDriver on a per-test temp dir, the real event_log repository,
@@ -24,26 +24,23 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  clickhouseEventLog,
+  createClickHouseClient,
+} from "@langwatch/clickhouse";
+import type { CommittedEvent, EventLog } from "@langwatch/event-sourcing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import {
-  EVALUATION_REPORTED_EVENT_TYPE,
-  EVALUATION_REPORTED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
-import type { EvaluationReportedEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
-import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { EvaluationReportedData } from "~/server/event-sourcing/evaluation-processing/schema";
 import { LocalFilesystemDriver } from "~/server/stored-objects/local-filesystem-driver";
 import { StorageRegistry } from "~/server/stored-objects/storage-registry";
 import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.repository";
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import { mintFileUri } from "~/server/stored-objects/uri";
-import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { startTestContainers } from "~/test-utils/integration/testContainers";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
@@ -73,12 +70,48 @@ const tenantId = `test-eval-offload-${nanoid()}`;
 let ch: ClickHouseClient;
 let tmpDir: string;
 let evalRepo: EvaluationRunClickHouseRepository;
-let eventRepo: EventRepositoryClickHouse;
+let esClient: ReturnType<typeof createClickHouseClient>;
+let eventLog: EventLog;
+
+/** The engine stamps these three; a test appending straight to the log has to
+ * state them itself. `lw.evaluation.reported` is what `evaluationEvents`
+ * derives from the pipeline's name and prefix. */
+function reportedEvent(args: {
+  evaluationId: string;
+  inputs: EvaluationReportedData["inputs"];
+}): CommittedEvent {
+  const occurredAt = Date.now();
+  const data: EvaluationReportedData = {
+    evaluationId: args.evaluationId,
+    evaluatorId: "evaluator-1",
+    evaluatorType: "test/evaluator",
+    evaluatorName: null,
+    status: "processed",
+    score: 1,
+    passed: true,
+    inputs: args.inputs,
+    occurredAt,
+  };
+  return {
+    tenantId,
+    aggregateType: "evaluation",
+    aggregateId: args.evaluationId,
+    eventId: nanoid(),
+    eventType: "lw.evaluation.reported",
+    eventVersion: "1",
+    idempotencyKey: `${tenantId}:${args.evaluationId}:reported`,
+    occurredAt,
+    payload: JSON.stringify(data),
+  };
+}
 
 function buildStoredObjects(): StoredObjectsService {
   const driver = new LocalFilesystemDriver();
   const registry = new StorageRegistry({ file: driver, s3: driver });
-  const repository = new StoredObjectsRepository();
+  const repository = new StoredObjectsRepository(
+    () => esClient,
+    async () => ch,
+  );
   const mintUri: MintStorageUri = async ({ projectId, sha256 }) =>
     mintFileUri({ root: tmpDir, projectId, sha256 });
   return new StoredObjectsService(repository, registry, mintUri);
@@ -153,15 +186,15 @@ async function selectEventPayload(aggregateId: string): Promise<string> {
 }
 
 beforeAll(async () => {
-  const client = getTestClickHouseClient();
-  if (!client) throw new Error("ClickHouse test container not available");
-  ch = client;
+  const containers = await startTestContainers();
+  ch = containers.clickHouseClient;
   vi.mocked(
     clickhouseClientModule.getClickHouseClientForProject,
   ).mockResolvedValue(ch);
 
   evalRepo = new EvaluationRunClickHouseRepository(async () => ch);
-  eventRepo = new EventRepositoryClickHouse(async () => ch);
+  esClient = createClickHouseClient({ url: containers.clickHouseUrl });
+  eventLog = clickhouseEventLog({ client: esClient });
 
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "eval-offload-int-"));
 }, 120_000);
@@ -209,25 +242,9 @@ describe("evaluation inputs offload (integration)", () => {
       expect(isStoredObjectMarker(offloaded)).toBe(true);
 
       // (a) event_log EventPayload carries the marker, not the full inputs.
-      const event = EventUtils.createEvent<EvaluationReportedEvent>({
-        aggregateType: "evaluation",
-        aggregateId: evaluationId,
-        tenantId: createTenantId(tenantId),
-        type: EVALUATION_REPORTED_EVENT_TYPE,
-        version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
-        data: {
-          evaluationId,
-          evaluatorId: "evaluator-1",
-          evaluatorType: "test/evaluator",
-          status: "processed",
-          score: 1,
-          passed: true,
-          inputs: offloaded,
-        } as EvaluationReportedEvent["data"],
-        occurredAt: Date.now(),
-        idempotencyKey: `${tenantId}:${evaluationId}:reported`,
-      });
-      await eventRepo.insertEventRecords([eventToRecord(event)]);
+      await eventLog.append([
+        reportedEvent({ evaluationId, inputs: offloaded }),
+      ]);
 
       const payloadStr = await selectEventPayload(evaluationId);
       expect(payloadStr).toContain(STORED_OBJECT_MARKER_KEY);
@@ -413,27 +430,9 @@ describe("evaluation inputs offload (integration)", () => {
       expect(marker.offloadFailed).toBe(true);
       expect(marker.id).toBe("");
 
-      // The evaluation still completes: the event is built and appended
-      // through the real event repository, and EventPayload stays bounded.
-      const event = EventUtils.createEvent<EvaluationReportedEvent>({
-        aggregateType: "evaluation",
-        aggregateId: evaluationId,
-        tenantId: createTenantId(tenantId),
-        type: EVALUATION_REPORTED_EVENT_TYPE,
-        version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
-        data: {
-          evaluationId,
-          evaluatorId: "evaluator-1",
-          evaluatorType: "test/evaluator",
-          status: "processed",
-          score: 1,
-          passed: true,
-          inputs: bounded,
-        } as EvaluationReportedEvent["data"],
-        occurredAt: Date.now(),
-        idempotencyKey: `${tenantId}:${evaluationId}:reported`,
-      });
-      await eventRepo.insertEventRecords([eventToRecord(event)]);
+      // The evaluation still completes: the event is appended through the real
+      // event log, and EventPayload stays bounded.
+      await eventLog.append([reportedEvent({ evaluationId, inputs: bounded })]);
 
       const payloadStr = await selectEventPayload(evaluationId);
       expect(payloadStr).toContain(STORED_OBJECT_MARKER_KEY);

@@ -1,10 +1,10 @@
+import { validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
+import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/app-layer/traces/ingest/constants";
+import { generateDeterministicTraceSummaryId } from "~/server/app-layer/traces/ingest/spanRecordId";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
@@ -28,6 +28,14 @@ type ClickHouseSummaryWriteRecord = WithDateWrites<
   "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
 >;
 
+/**
+ * A decoded row together with the projection stamp it carried. The stamp rides
+ * alongside the state rather than inside it because it describes the ROW, not
+ * the trace: it says which build's shape the columns were written in, which is
+ * what the fold's read-back gate decides on (ADR-066).
+ */
+type FoundTraceSummary = { state: TraceSummaryData; version: string };
+
 interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   ProjectionId: string;
   Version: string;
@@ -47,16 +55,13 @@ export class TraceSummaryClickHouseRepository
     tenantId: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): Promise<void> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "TraceSummaryClickHouseRepository.upsert",
-    );
+    validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
 
-    const projectionId = IdUtils.generateDeterministicTraceSummaryIdFromData(
+    const projectionId = generateDeterministicTraceSummaryId({
       tenantId,
-      data.traceId,
-      data.occurredAt,
-    );
+      traceId: data.traceId,
+      startTimeUnixMs: data.occurredAt,
+    });
 
     try {
       const client = await this.resolveClient(tenantId);
@@ -103,12 +108,11 @@ export class TraceSummaryClickHouseRepository
       const client = await this.resolveClient(tenantId);
       const records = entries.map(
         ({ data, tenantId: tid, retentionDays: rd }) => {
-          const projectionId =
-            IdUtils.generateDeterministicTraceSummaryIdFromData(
-              tid,
-              data.traceId,
-              data.occurredAt,
-            );
+          const projectionId = generateDeterministicTraceSummaryId({
+            tenantId: tid,
+            traceId: data.traceId,
+            startTimeUnixMs: data.occurredAt,
+          });
           return this.toClickHouseRecord(
             data,
             tid,
@@ -136,14 +140,32 @@ export class TraceSummaryClickHouseRepository
     }
   }
 
+  /**
+   * The trace's summary with the stamp dropped — the read for callers that
+   * render a summary rather than fold onto it. Delegates so the two reads
+   * cannot issue different SQL.
+   */
   async findByTraceId(
     tenantId: string,
     traceId: string,
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
-    EventUtils.validateTenantId(
+    const found = await this.findByTraceIdWithVersion(
+      tenantId,
+      traceId,
+      options,
+    );
+    return found?.state ?? null;
+  }
+
+  async findByTraceIdWithVersion(
+    tenantId: string,
+    traceId: string,
+    options?: FindByTraceIdOptions,
+  ): Promise<{ state: TraceSummaryData; version: string } | null> {
+    validateTenantId(
       { tenantId },
-      "TraceSummaryClickHouseRepository.findByTraceId",
+      "TraceSummaryClickHouseRepository.findByTraceIdWithVersion",
     );
 
     // Fold read-back path (ADR-066): an explicit window is applied verbatim
@@ -157,7 +179,7 @@ export class TraceSummaryClickHouseRepository
     if (options?.window) {
       const { fromMs, toMs } = options.window;
       try {
-        return await queryWindowed<TraceSummaryData | null>({
+        return await queryWindowed<FoundTraceSummary | null>({
           table: TABLE_NAME,
           hintMs: (fromMs + toMs) / 2,
           windowMs: (toMs - fromMs) / 2,
@@ -208,7 +230,7 @@ export class TraceSummaryClickHouseRepository
     const hasHint = options?.occurredAtMs !== undefined;
 
     try {
-      return await queryWindowed<TraceSummaryData | null>({
+      return await queryWindowed<FoundTraceSummary | null>({
         table: TABLE_NAME,
         hintMs: options?.occurredAtMs ?? null,
         fallback: "unbounded",
@@ -324,7 +346,7 @@ export class TraceSummaryClickHouseRepository
     tenantId: string,
     traceId: string,
     window?: { fromMs: number; toMs: number },
-  ): Promise<TraceSummaryData | null> {
+  ): Promise<FoundTraceSummary | null> {
     const outerTimeFilter = window
       ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64}) " +
         "AND t.OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})"
@@ -408,7 +430,13 @@ export class TraceSummaryClickHouseRepository
     const rows = await result.json<ClickHouseSummaryRecord>();
     const row = rows[0];
     if (!row) return null;
-    return this.fromClickHouseRecord(row);
+    return {
+      state: this.fromClickHouseRecord(row),
+      // A row written before the column existed reads back as the ClickHouse
+      // default, which is exactly the "not a stamp this build wrote" the read-
+      // back gate refuses — so no coalescing to the current version here.
+      version: row.Version ?? "",
+    };
   }
 
   private fromClickHouseRecord(

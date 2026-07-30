@@ -47,7 +47,8 @@ import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 const logger = createLogger("langwatch:langy:router");
 
 /**
- * Read-side tRPC router for Langy conversations (ADR-046 frontend).
+ * Read-side tRPC router for Langy conversations (ADR-046 frontend, retired;
+ * ground now ADR-098).
  *
  * Mirrors `tracesV2` for reads: a SLIM `list` reading only the Postgres
  * conversation projection (no content), a separate on-demand `messages` read
@@ -394,7 +395,8 @@ export const langyRouter = createTRPCRouter({
   /**
    * The conversation's durable TURN events strictly after a cursor — the tail
    * the browser folds locally with the shared @langwatch/langy reducer
-   * (ADR-059). Fired when a freshness signal's cursor is ahead of the local
+   * (ADR-059, retired; ground now ADR-098). Fired when a freshness signal's
+   * cursor is ahead of the local
    * fold's; authorized owner-or-shared exactly like the other reads (a
    * non-visible conversation reports not-found via the service's
    * HandledError). The response's `cursor` is the new local position;
@@ -504,7 +506,8 @@ export const langyRouter = createTRPCRouter({
          */
         shouldAskFeedback: boolean;
         /**
-         * The projection's event cursor at this snapshot (ADR-059): the client
+         * The projection's event cursor at this snapshot (ADR-059, retired;
+         * ground now ADR-098): the client
          * seeds its local fold here and catches up by fetching
          * `conversationEventsAfter` — never by replaying full history.
          */

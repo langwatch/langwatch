@@ -1,5 +1,5 @@
 # Trace sharing (redesign) — Gherkin Spec
-# ADR: dev/docs/adr/039-token-gated-trace-sharing.md
+# ADR: dev/docs/adr/057-token-gated-trace-sharing.md
 #
 # Supersedes the legacy PublicShare feature. The legacy model authorized
 # anonymous reads by checking whether *a share row existed* for a given

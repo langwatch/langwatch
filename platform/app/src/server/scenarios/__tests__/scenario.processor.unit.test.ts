@@ -100,12 +100,12 @@ describe("handleCancelledJobResult", () => {
     };
   });
 
-  it("passes cancelled: true to failure emitter", async () => {
+  it("tells the failure emitter the run was cancelled", async () => {
     await handleCancelledJobResult(baseJobData, "Job was cancelled", mockDeps);
 
     expect(
       mockDeps.failureEmitter.ensureFailureEventsEmitted,
-    ).toHaveBeenCalledWith(expect.objectContaining({ cancelled: true }));
+    ).toHaveBeenCalledWith(expect.objectContaining({ outcome: "cancelled" }));
   });
 
   it("includes scenario name and description from lookup", async () => {
