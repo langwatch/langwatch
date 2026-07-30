@@ -328,6 +328,14 @@ test_access_ingress() {
   assert_render_refuses "Regex ImplementationSpecific path is rejected" \
     "regex metacharacters" \
     --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/(.*)","pathType":"ImplementationSpecific"}]}}]'
+  # `.` alone is enough: under ImplementationSpecific a controller may treat the
+  # value as a regex, where /api/intern.l matches /api/internal.
+  assert_render_refuses "Dot-metachar ImplementationSpecific path is rejected" \
+    "regex metacharacters" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/intern.l","pathType":"ImplementationSpecific"}]}}]'
+  # …but a literal Prefix path containing a dot is legitimate and must render.
+  assert_render_succeeds "Literal Prefix path with a dot still renders" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/static/app.js","pathType":"Prefix"}]}}]'
   # default-backend is DEFINED as the handler for a backend with no endpoints,
   # which is exactly how the blackhole blocks — it turns the block into a proxy.
   assert_render_refuses "default-backend annotation is rejected" \

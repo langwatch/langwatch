@@ -36,8 +36,16 @@
     {{- if $blockedPaths }}
       {{- /* A regex path is not comparable segment-wise, so the nested-path
              guard below cannot reason about it at all. Refuse rather than
-             render a block the controller will rank below it. */ -}}
-      {{- if and (eq (toString ($path.pathType | default "")) "ImplementationSpecific") (regexMatch "[][(){}*+?^$\\\\|]" $path.path) }}
+             render a block the controller will rank below it.
+
+             `.` is in the class even though it is legal in a literal path
+             (/static/app.js): under ImplementationSpecific a controller MAY
+             treat the value as a regex, where `.` matches any character — so
+             /api/intern.l would match /api/internal and outrank the block.
+             The path is ambiguous by definition, so this fails closed. It only
+             bites when blockedPaths is non-empty, and a literal path should be
+             pathType: Prefix or Exact anyway. */ -}}
+      {{- if and (eq (toString ($path.pathType | default "")) "ImplementationSpecific") (regexMatch "[][().{}*+?^$\\\\|]" $path.path) }}
         {{- fail (printf "ingress.hosts path %q uses pathType: ImplementationSpecific with regex metacharacters while ingress.blockedPaths is set. Controllers that honour regex (ingress-nginx with use-regex) rank it above the blackhole's Prefix rule, re-exposing the private control plane. Use a literal Prefix path, or set ingress.blockedPaths: [] to disable the block knowingly." $path.path) }}
       {{- end }}
     {{- end }}
