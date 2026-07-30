@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import type { DatasetColumnType } from "@/client-sdk/services/datasets/types";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
@@ -32,7 +32,7 @@ export const createCommand = async (
   name: string,
   options: { columns?: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   let columnTypes: DatasetColumnType[] = [];
   if (options.columns) {

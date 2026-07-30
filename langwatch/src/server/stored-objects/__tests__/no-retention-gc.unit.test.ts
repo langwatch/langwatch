@@ -89,6 +89,11 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // clickhouse/metrics.ts lists stored_objects in MONITORED_TABLES for the
   // ops size gauges. Audited: read-only system.parts aggregation.
   /^src\/server\/clickhouse\/metrics\.ts$/,
+  // cold-scan-detector.ts lists stored_objects in TIME_PARTITIONED_TABLES,
+  // mapping it to the column that lets an unpruned READ be flagged. Audited:
+  // a static table -> column map used to inspect outbound query text; the
+  // module issues no query of its own, so no delete/update/truncate.
+  /^src\/server\/app-layer\/clients\/clickhouse\/cold-scan-detector\.ts$/,
   // storage.ts and dataset-storage.ts mention the STORED_OBJECTS_BACKEND
   // env toggle (issue #4133) in comments and a config-error message —
   // matched by this scan only because the var name contains

@@ -664,6 +664,7 @@
             "pages": [
               "ai-governance/overview",
               "ai-governance/track-your-claude-code-usage",
+              "ai-governance/explore-your-usage-with-your-own-agent",
               "ai-governance/getting-started-developer",
               "ai-governance/getting-started-admin",
               "ai-governance/open-core-licensing"
@@ -1313,7 +1314,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1785303164",
+      "source": "/ci/cache/busted/1785363984",
       "destination": "/"
     },
     {

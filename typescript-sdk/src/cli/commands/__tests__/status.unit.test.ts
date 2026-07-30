@@ -11,7 +11,7 @@ vi.mock("@/internal/api/client", () => ({
 }));
 
 vi.mock("../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 import { statusCommand } from "../status";

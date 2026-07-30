@@ -11,7 +11,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("../../../utils/apiKey", () => ({ checkApiKey: vi.fn() }));
+vi.mock("../../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
 
 vi.mock("ora", () => ({
   default: () => ({
