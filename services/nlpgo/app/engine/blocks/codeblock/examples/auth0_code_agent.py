@@ -1,0 +1,52 @@
+# Canonical authenticated code agent: OAuth2 client-credentials (Auth0 M2M).
+#
+# This is the reference implementation for a LangWatch custom code agent that
+# calls an API protected by Auth0 machine-to-machine auth. It is executed —
+# not just read — by auth0_example_test.go in the parent package, through the
+# same runner.py that runs every code agent in production. langwatch/langwatch#6337.
+#
+# Contract notes (things the sandbox enforces, in the order people trip on them):
+#   - Entry point: `class Code` with `__call__` — one of the four shapes
+#     runner.py resolves. No constructor args.
+#   - `secrets` is a namespace injected into the module globals by runner.py.
+#     It is NOT the stdlib `secrets` module — do not `import secrets`, that
+#     would shadow the injected namespace and break credential resolution.
+#   - `os.environ` is NOT populated with project secrets in the sandbox.
+#   - Every declared output key must be returned, or the run fails with
+#     KeyError("missing_output: ...").
+#   - Only `requests`, `httpx`, `pydantic` and `langwatch` are installed.
+#   - The whole call — token fetch plus downstream request — must fit the
+#     runner's wall-clock budget (60s default).
+
+import requests
+
+
+class Code:
+    def __call__(self, message: str, token_url: str, audience: str, api_url: str):
+        # Step 1: exchange the client credentials for an access token.
+        # Auth0's canonical M2M example posts JSON to /oauth/token.
+        token_response = requests.post(
+            token_url,
+            json={
+                "grant_type": "client_credentials",
+                "client_id": secrets.AUTH0_CLIENT_ID,  # noqa: F821 — injected by runner.py
+                "client_secret": secrets.AUTH0_CLIENT_SECRET,  # noqa: F821
+                "audience": audience,
+            },
+            timeout=10,
+        )
+        # raise_for_status embeds the URL and status code, never the request
+        # body — so a rejected credential fails loudly without leaking it.
+        token_response.raise_for_status()
+        access_token = token_response.json()["access_token"]
+
+        # Step 2: call the protected API with the minted token.
+        api_response = requests.post(
+            api_url,
+            json={"message": message},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        api_response.raise_for_status()
+
+        return {"output": api_response.json()["reply"]}

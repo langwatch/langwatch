@@ -62,7 +62,7 @@ Feature: Auth0-protected APIs reachable from a custom code agent
   # The example — executed, never merely read
   # ===========================================================================
 
-  @e2e @unimplemented
+  @e2e
   Scenario: The committed example completes a real client-credentials exchange
     Given the committed example is stored as a code agent unmodified
     When the agent is executed through the code-block path
@@ -71,7 +71,7 @@ Feature: Auth0-protected APIs reachable from a custom code agent
     And the returned result contains every declared output key carrying the stub API's payload
     And the run completed inside the runner's wall-clock budget
 
-  @integration @unimplemented
+  @integration
   Scenario: The credential comes from the project secret, not from a baked-in value
     Given the example has been executed once
     When the project secret's value is changed and the agent is executed again
@@ -159,7 +159,7 @@ Feature: Auth0-protected APIs reachable from a custom code agent
   # Failure modes
   # ===========================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: A rejected token request fails loudly and without the secret
     Given the stub token endpoint rejects the credentials
     When the agent is executed
