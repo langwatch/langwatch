@@ -9,8 +9,12 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { computeScheduledFor } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
+import {
+  type automationsEvents,
+  type MatchRecordedData,
+  triggerActionClassSchema,
+} from "./events";
 import { isTerminalDispatchError } from "./intentDispatch";
-import { type MatchRecordedData, automationsEvents, triggerActionClassSchema } from "./events";
 
 const logger = createLogger("langwatch:automations:trigger-settlement");
 
@@ -43,7 +47,9 @@ export const triggerSettlementStateSchema = z.object({
    *  because two overflow rounds can evict the identical set of traces. */
   overflowFlushed: z.number().int().nonnegative(),
 });
-export type TriggerSettlementState = z.infer<typeof triggerSettlementStateSchema>;
+export type TriggerSettlementState = z.infer<
+  typeof triggerSettlementStateSchema
+>;
 export type PendingMatch = TriggerSettlementState["pendingMatches"][string];
 
 export function initTriggerSettlementState(): TriggerSettlementState {
@@ -107,7 +113,10 @@ export function addPending(
   previousState: TriggerSettlementState,
   data: MatchRecordedData,
   occurredAt: number,
-): { state: TriggerSettlementState; flushed: Array<{ traceId: string; match: PendingMatch }> } {
+): {
+  state: TriggerSettlementState;
+  flushed: Array<{ traceId: string; match: PendingMatch }>;
+} {
   const settleDueAt = occurredAt + data.traceDebounceMs;
   const dispatchDueAt = computeScheduledFor({
     action: data.action,
@@ -140,7 +149,10 @@ export function addPending(
       if (bySettleDueAt !== 0) return bySettleDueAt;
       return left < right ? -1 : left > right ? 1 : 0;
     });
-    for (const traceId of oldestFirst.slice(0, traceIds.length - MAX_PENDING_MATCHES)) {
+    for (const traceId of oldestFirst.slice(
+      0,
+      traceIds.length - MAX_PENDING_MATCHES,
+    )) {
       flushed.push({ traceId, match: pendingMatches[traceId]! });
       delete pendingMatches[traceId];
     }
@@ -163,7 +175,8 @@ export function addPending(
 export function drainDue(state: TriggerSettlementState, at: number) {
   const remaining: Record<string, PendingMatch> = {};
   const notifyByBoundary = new Map<number, string[]>();
-  const settledMatches: Array<{ traceId: string; settleWindowBucket: string }> = [];
+  const settledMatches: Array<{ traceId: string; settleWindowBucket: string }> =
+    [];
 
   for (const [traceId, match] of Object.entries(state.pendingMatches)) {
     if (match.dispatchDueAt > at) {
@@ -171,7 +184,10 @@ export function drainDue(state: TriggerSettlementState, at: number) {
       continue;
     }
     if (match.actionClass === "persist") {
-      settledMatches.push({ traceId, settleWindowBucket: match.settleWindowBucket });
+      settledMatches.push({
+        traceId,
+        settleWindowBucket: match.settleWindowBucket,
+      });
       continue;
     }
     const traceIds = notifyByBoundary.get(match.dispatchDueAt) ?? [];
@@ -179,7 +195,10 @@ export function drainDue(state: TriggerSettlementState, at: number) {
     notifyByBoundary.set(match.dispatchDueAt, traceIds);
   }
 
-  const nextState: TriggerSettlementState = { ...state, pendingMatches: remaining };
+  const nextState: TriggerSettlementState = {
+    ...state,
+    pendingMatches: remaining,
+  };
   return {
     state: nextState,
     boundaries: Array.from(notifyByBoundary, ([key, traceIds]) => ({
@@ -227,7 +246,9 @@ type WithTenant<T> = T & { readonly tenantId: string };
 export interface TriggerDispatchPorts {
   /** A trigger deleted or deactivated after its match was recorded drops its
    *  pending dispatch rather than failing. */
-  triggerIsActive(params: WithTenant<Pick<PersistMatchPayload, "triggerId">>): Promise<boolean>;
+  triggerIsActive(
+    params: WithTenant<Pick<PersistMatchPayload, "triggerId">>,
+  ): Promise<boolean>;
 
   /**
    * Re-confirms a settled match still satisfies the trigger's conditions at
@@ -248,7 +269,9 @@ export interface TriggerDispatchPorts {
 
   /** Written AFTER a successful send — writing it first would make a retry of
    *  a failed send silently no-op. */
-  claimSend(params: WithTenant<Pick<PersistMatchPayload, "triggerId" | "traceId">>): Promise<void>;
+  claimSend(
+    params: WithTenant<Pick<PersistMatchPayload, "triggerId" | "traceId">>,
+  ): Promise<void>;
 
   /** Throws `TerminalDispatchError` for an outcome that must not retry;
    *  anything else thrown retries on the outbox's budget. */
@@ -276,12 +299,18 @@ async function confirmAndFilterCandidates({
 }): Promise<string[]> {
   const candidates: string[] = [];
   for (const traceId of new Set(traceIds)) {
-    const outcome = await ports.confirmSettledMatch({ tenantId, triggerId, traceId });
+    const outcome = await ports.confirmSettledMatch({
+      tenantId,
+      triggerId,
+      traceId,
+    });
     if (outcome === "trace-not-settled") {
       // Not "this match fails" — "we cannot yet tell". Throwing hands the job
       // back to the outbox; dropping it here is indistinguishable from a real
       // filter failure.
-      throw new Error(`trace ${traceId} not settled yet for trigger ${triggerId} dispatch`);
+      throw new Error(
+        `trace ${traceId} not settled yet for trigger ${triggerId} dispatch`,
+      );
     }
     if (outcome === "filters-failed") continue;
     if (await ports.isSendClaimed({ tenantId, triggerId, traceId })) continue;
@@ -309,20 +338,33 @@ async function claimAll({
       await ports.claimSend({ tenantId, triggerId, traceId });
     } catch (error) {
       logger.warn(
-        { tenantId, triggerId, traceId, error: error instanceof Error ? error.message : String(error) },
+        {
+          tenantId,
+          triggerId,
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "claimSend failed after a successful dispatch — swallowing to avoid a double-send on retry",
       );
     }
   }
 }
 
-function createNotifyDigestIntent(ports: TriggerDispatchPorts): IntentDef<typeof notifyDigestPayloadSchema> {
+function createNotifyDigestIntent(
+  ports: TriggerDispatchPorts,
+): IntentDef<typeof notifyDigestPayloadSchema> {
   return {
     payload: notifyDigestPayloadSchema,
-    messageKey: (payload) => `digest:${payload.boundary}:${digestBatchKey(payload.traceIds)}`,
+    messageKey: (payload) =>
+      `digest:${payload.boundary}:${digestBatchKey(payload.traceIds)}`,
     async deliver(payload, ctx: HandlerContext) {
       const tenantId = ctx.tenantId;
-      if (!(await ports.triggerIsActive({ tenantId, triggerId: payload.triggerId }))) {
+      if (
+        !(await ports.triggerIsActive({
+          tenantId,
+          triggerId: payload.triggerId,
+        }))
+      ) {
         logger.info(
           { tenantId, triggerId: payload.triggerId },
           "Trigger gone or deactivated since match — dropping digest",
@@ -338,14 +380,22 @@ function createNotifyDigestIntent(ports: TriggerDispatchPorts): IntentDef<typeof
       });
       if (candidates.length === 0) {
         logger.debug(
-          { tenantId, triggerId: payload.triggerId, batchSize: payload.traceIds.length },
+          {
+            tenantId,
+            triggerId: payload.triggerId,
+            batchSize: payload.traceIds.length,
+          },
           "Digest fully suppressed (filters / prior claims) — no dispatch",
         );
         return;
       }
 
       try {
-        await ports.sendNotifyDigest({ tenantId, triggerId: payload.triggerId, traceIds: candidates });
+        await ports.sendNotifyDigest({
+          tenantId,
+          triggerId: payload.triggerId,
+          traceIds: candidates,
+        });
       } catch (error) {
         if (isTerminalDispatchError(error)) {
           logger.info(
@@ -355,33 +405,56 @@ function createNotifyDigestIntent(ports: TriggerDispatchPorts): IntentDef<typeof
           return;
         }
         logger.error(
-          { tenantId, triggerId: payload.triggerId, error: error instanceof Error ? error.message : String(error) },
+          {
+            tenantId,
+            triggerId: payload.triggerId,
+            error: error instanceof Error ? error.message : String(error),
+          },
           "Notify digest dispatch failed — retrying",
         );
         throw error;
       }
 
-      await claimAll({ ports, tenantId, triggerId: payload.triggerId, traceIds: candidates });
+      await claimAll({
+        ports,
+        tenantId,
+        triggerId: payload.triggerId,
+        traceIds: candidates,
+      });
     },
   };
 }
 
 /** One settled trace runs its persist action independently of every other
  *  pending match — batching would defeat "every match is the intent". */
-function createPersistMatchIntent(ports: TriggerDispatchPorts): IntentDef<typeof persistMatchPayloadSchema> {
+function createPersistMatchIntent(
+  ports: TriggerDispatchPorts,
+): IntentDef<typeof persistMatchPayloadSchema> {
   return {
     payload: persistMatchPayloadSchema,
-    messageKey: (payload) => `persist:${payload.traceId}:${payload.settleWindowBucket}`,
+    messageKey: (payload) =>
+      `persist:${payload.traceId}:${payload.settleWindowBucket}`,
     async deliver(payload, ctx: HandlerContext) {
       const tenantId = ctx.tenantId;
-      if (!(await ports.triggerIsActive({ tenantId, triggerId: payload.triggerId }))) {
+      if (
+        !(await ports.triggerIsActive({
+          tenantId,
+          triggerId: payload.triggerId,
+        }))
+      ) {
         logger.info(
           { tenantId, triggerId: payload.triggerId, traceId: payload.traceId },
           "Trigger gone or deactivated since match — dropping persist dispatch",
         );
         return;
       }
-      if (await ports.isSendClaimed({ tenantId, triggerId: payload.triggerId, traceId: payload.traceId })) {
+      if (
+        await ports.isSendClaimed({
+          tenantId,
+          triggerId: payload.triggerId,
+          traceId: payload.traceId,
+        })
+      ) {
         return;
       }
 
@@ -398,11 +471,20 @@ function createPersistMatchIntent(ports: TriggerDispatchPorts): IntentDef<typeof
       if (outcome === "filters-failed") return;
 
       try {
-        await ports.runPersistAction({ tenantId, triggerId: payload.triggerId, traceId: payload.traceId });
+        await ports.runPersistAction({
+          tenantId,
+          triggerId: payload.triggerId,
+          traceId: payload.traceId,
+        });
       } catch (error) {
         if (isTerminalDispatchError(error)) {
           logger.info(
-            { tenantId, triggerId: payload.triggerId, traceId: payload.traceId, reason: error.message },
+            {
+              tenantId,
+              triggerId: payload.triggerId,
+              traceId: payload.traceId,
+              reason: error.message,
+            },
             "Persist dispatch dropped as terminal — not retried",
           );
           return;
@@ -419,7 +501,12 @@ function createPersistMatchIntent(ports: TriggerDispatchPorts): IntentDef<typeof
         throw error;
       }
 
-      await claimAll({ ports, tenantId, triggerId: payload.triggerId, traceIds: [payload.traceId] });
+      await claimAll({
+        ports,
+        tenantId,
+        triggerId: payload.triggerId,
+        traceIds: [payload.traceId],
+      });
     },
   };
 }
@@ -435,7 +522,11 @@ function createLogOverflowIntent(): IntentDef<typeof logOverflowPayloadSchema> {
     messageKey: (payload) => `overflow:${payload.totalFlushed}`,
     async deliver(payload) {
       logger.warn(
-        { triggerId: payload.triggerId, flushed: payload.flushed, totalFlushed: payload.totalFlushed },
+        {
+          triggerId: payload.triggerId,
+          flushed: payload.flushed,
+          totalFlushed: payload.totalFlushed,
+        },
         "Trigger settlement pending-match bound flushed oldest matches to immediate dispatch",
       );
     },
@@ -462,10 +553,18 @@ export const triggerSettlementOn: ProcessManagerHandlerMap<
   TriggerSettlementState,
   TriggerSettlementIntents
 > = {
-  matchRecorded(state, data, ctx: ProcessContext): EvolveStep<TriggerSettlementState, TriggerSettlementIntents> {
+  matchRecorded(
+    state,
+    data,
+    ctx: ProcessContext,
+  ): EvolveStep<TriggerSettlementState, TriggerSettlementIntents> {
     const { state: nextState, flushed } = addPending(state, data, ctx.now);
     if (flushed.length === 0) {
-      return { state: nextState, intents: [], nextWakeAt: nextWake(nextState, ctx.now) };
+      return {
+        state: nextState,
+        intents: [],
+        nextWakeAt: nextWake(nextState, ctx.now),
+      };
     }
 
     // The cap was hit: the oldest matches dispatch now rather than being
@@ -477,11 +576,19 @@ export const triggerSettlementOn: ProcessManagerHandlerMap<
           match.actionClass === "persist"
             ? {
                 type: "persistMatch" as const,
-                payload: { triggerId: ctx.processKey, traceId, settleWindowBucket: match.settleWindowBucket },
+                payload: {
+                  triggerId: ctx.processKey,
+                  traceId,
+                  settleWindowBucket: match.settleWindowBucket,
+                },
               }
             : {
                 type: "notifyDigest" as const,
-                payload: { triggerId: ctx.processKey, traceIds: [traceId], boundary: match.dispatchDueAt },
+                payload: {
+                  triggerId: ctx.processKey,
+                  traceIds: [traceId],
+                  boundary: match.dispatchDueAt,
+                },
               },
         ),
         {
@@ -511,7 +618,11 @@ export function triggerSettlementOnWake(
     intents: [
       ...due.boundaries.map((boundary) => ({
         type: "notifyDigest" as const,
-        payload: { triggerId: ctx.processKey, traceIds: boundary.traceIds, boundary: boundary.key },
+        payload: {
+          triggerId: ctx.processKey,
+          traceIds: boundary.traceIds,
+          boundary: boundary.key,
+        },
       })),
       ...due.settledMatches.map((match) => ({
         type: "persistMatch" as const,

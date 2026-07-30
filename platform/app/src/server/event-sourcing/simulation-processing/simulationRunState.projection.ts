@@ -1,9 +1,9 @@
 import {
-  isTerminalStatus,
-  parseStatus,
   type CancelRequestedData,
+  isTerminalStatus,
   type MessageSnapshotData,
   type MetricsRecordedData,
+  parseStatus,
   type RunDeletedData,
   type RunFinishedData,
   type RunQueuedData,
@@ -33,7 +33,9 @@ function observed(
 ): Pick<SimulationRunState, "createdAt" | "lastEventOccurredAt"> {
   return {
     createdAt:
-      state.createdAt === 0 ? occurredAt : Math.min(state.createdAt, occurredAt),
+      state.createdAt === 0
+        ? occurredAt
+        : Math.min(state.createdAt, occurredAt),
     lastEventOccurredAt: Math.max(state.lastEventOccurredAt, occurredAt),
   };
 }

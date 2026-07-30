@@ -4,7 +4,9 @@ import { type CanonicalLogRecord, canonicalLogRecordSchema } from "./schema";
 import { logRecordsTable, logUsageEstimatesTable } from "./table";
 
 /** The map's whole job: the event's payload already is the row (ADR-105 decision 5). */
-export function toCanonicalLogRecord(data: CanonicalLogRecord): CanonicalLogRecord {
+export function toCanonicalLogRecord(
+  data: CanonicalLogRecord,
+): CanonicalLogRecord {
   return data;
 }
 

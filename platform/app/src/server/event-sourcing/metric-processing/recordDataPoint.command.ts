@@ -1,5 +1,5 @@
 import type { EmittedEvent } from "@langwatch/event-sourcing";
-import { metricProcessingEvents } from "./events";
+import type { metricProcessingEvents } from "./events";
 import type { CanonicalMetricDataPoint } from "./schema";
 
 /**

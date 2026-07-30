@@ -10,9 +10,12 @@ import {
   renderSimulationRunFoldGroupKey,
   simulationRunFoldGroupKey,
 } from "../index";
-import { initSimulationRunState } from "../schema";
 import type { MetricsRecordedData, RunQueuedData } from "../schema";
-import { applyMetricsRecorded, applyQueued } from "../simulationRunState.projection";
+import { initSimulationRunState } from "../schema";
+import {
+  applyMetricsRecorded,
+  applyQueued,
+} from "../simulationRunState.projection";
 import { simulationRunMessagesTable, simulationRunsTable } from "../table";
 
 /**
@@ -61,7 +64,8 @@ function storedRunRow(args: {
     TotalCost: state.totalCost,
     RoleCosts: new Map(Object.entries(state.roleCosts)),
     RoleLatencies: new Map(Object.entries(state.roleLatencies)),
-    MetricsAsOf: state.metricsAsOf === null ? null : new Date(state.metricsAsOf),
+    MetricsAsOf:
+      state.metricsAsOf === null ? null : new Date(state.metricsAsOf),
     StartedAt: new Date(state.startedAt ?? now.getTime()),
     QueuedAt: state.queuedAt === null ? null : new Date(state.queuedAt),
     CreatedAt: new Date(state.createdAt),
@@ -81,7 +85,9 @@ function storedRunRow(args: {
   );
 }
 
-function fakeClient(overrides: Partial<ClickHouseClient> = {}): ClickHouseClient {
+function fakeClient(
+  overrides: Partial<ClickHouseClient> = {},
+): ClickHouseClient {
   return {
     query: vi.fn().mockResolvedValue({ rows: [] }),
     stream: vi.fn(),
@@ -147,7 +153,9 @@ describe("the built simulation-processing pipeline", () => {
 describe("given a fresh aggregate with no stored state", () => {
   it("applies queueRun and writes the resulting run row", async () => {
     const insert = vi.fn().mockResolvedValue(undefined);
-    const built = createSimulationProcessingPipeline({ client: fakeClient({ insert }) });
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient({ insert }),
+    });
 
     const emitted = await built.commands.queueRun!.handle(QUEUED_INPUT, ctx);
     const outcome = await built.folds.simulationRunState!.apply({
@@ -173,7 +181,10 @@ describe("given a fresh aggregate with no stored state", () => {
     const built = createSimulationProcessingPipeline({ client: fakeClient() });
 
     expect(() =>
-      built.commands.queueRun!.input.parse({ scenarioRunId: "run-1", occurredAt: 1 }),
+      built.commands.queueRun!.input.parse({
+        scenarioRunId: "run-1",
+        occurredAt: 1,
+      }),
     ).toThrow();
   });
 });
@@ -183,7 +194,9 @@ describe("given a stored row this build cannot decode", () => {
     const built = createSimulationProcessingPipeline({
       client: fakeClient({
         query: vi.fn().mockResolvedValue({
-          rows: [storedRunRow({ input: QUEUED_INPUT, version: "some-other-hash" })],
+          rows: [
+            storedRunRow({ input: QUEUED_INPUT, version: "some-other-hash" }),
+          ],
         }),
       }),
     });
@@ -211,8 +224,8 @@ describe("given a stored row this build cannot decode", () => {
 
 describe("given a stored row this build wrote", () => {
   it("folds the command onto the stored state rather than genesis", async () => {
-    const version = createSimulationProcessingPipeline({ client: fakeClient() }).folds
-      .simulationRunState!.stateVersion;
+    const version = createSimulationProcessingPipeline({ client: fakeClient() })
+      .folds.simulationRunState!.stateVersion;
     const insert = vi.fn().mockResolvedValue(undefined);
     const built = createSimulationProcessingPipeline({
       client: fakeClient({
@@ -233,14 +246,18 @@ describe("given a stored row this build wrote", () => {
       events: emitted,
     });
 
-    expect(columnValue(insert, simulationRunsTable, "CancellationRequestedAt")).not.toBeNull();
+    expect(
+      columnValue(insert, simulationRunsTable, "CancellationRequestedAt"),
+    ).not.toBeNull();
     // The stored batch total survives a command that never mentions it.
     expect(columnValue(insert, simulationRunsTable, "BatchTotal")).toBe(4);
   });
 
   it("reads with read-your-writes consistency", async () => {
     const query = vi.fn().mockResolvedValue({ rows: [] });
-    const built = createSimulationProcessingPipeline({ client: fakeClient({ query }) });
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient({ query }),
+    });
 
     const emitted = await built.commands.cancelRun!.handle(
       { scenarioRunId: "run-1", occurredAt: 1 },
@@ -263,8 +280,8 @@ describe("given a stored row this build wrote", () => {
 describe("given an event of a type this build was not built to handle", () => {
   /** @scenario A run measured under a retired event type keeps its cost on replay */
   it("keeps the stored metrics unchanged rather than resetting them to genesis", async () => {
-    const version = createSimulationProcessingPipeline({ client: fakeClient() }).folds
-      .simulationRunState!.stateVersion;
+    const version = createSimulationProcessingPipeline({ client: fakeClient() })
+      .folds.simulationRunState!.stateVersion;
     const insert = vi.fn().mockResolvedValue(undefined);
     const built = createSimulationProcessingPipeline({
       client: fakeClient({
@@ -294,7 +311,13 @@ describe("given an event of a type this build was not built to handle", () => {
       events: [
         {
           type: "lw.simulation_run.metrics_computed",
-          data: { scenarioRunId: "run-1", traceId: "t", totalCost: 0, roleCosts: {}, roleLatencies: {} },
+          data: {
+            scenarioRunId: "run-1",
+            traceId: "t",
+            totalCost: 0,
+            roleCosts: {},
+            roleLatencies: {},
+          },
         },
       ],
     });
@@ -309,7 +332,9 @@ describe("given an event of a type this build was not built to handle", () => {
 describe("given a delivery of message-bearing events", () => {
   it("writes one row per message in a single insert", async () => {
     const insert = vi.fn().mockResolvedValue(undefined);
-    const built = createSimulationProcessingPipeline({ client: fakeClient({ insert }) });
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient({ insert }),
+    });
 
     const outcome = await built.maps.simulationRunMessages!.apply({
       tenantId: "tenant-1",
@@ -349,14 +374,20 @@ describe("given a delivery of message-bearing events", () => {
         target: { kind: "replacing" },
       }),
     );
-    expect(columnValue(insert, simulationRunMessagesTable, "MessageId", 0, 2)).toBe("m3");
-    expect(columnValue(insert, simulationRunMessagesTable, "TenantId", 0, 0)).toBe("tenant-1");
+    expect(
+      columnValue(insert, simulationRunMessagesTable, "MessageId", 0, 2),
+    ).toBe("m3");
+    expect(
+      columnValue(insert, simulationRunMessagesTable, "TenantId", 0, 0),
+    ).toBe("tenant-1");
   });
 
   /** @scenario A message that has only started carries no transcript row yet */
   it("writes nothing for events that carry no message content", async () => {
     const insert = vi.fn().mockResolvedValue(undefined);
-    const built = createSimulationProcessingPipeline({ client: fakeClient({ insert }) });
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient({ insert }),
+    });
 
     const outcome = await built.maps.simulationRunMessages!.apply({
       tenantId: "tenant-1",
@@ -400,8 +431,12 @@ describe("given the durable store has not yet acknowledged the write", () => {
     );
 
     let settled = false;
-    const applying = built.folds.simulationRunState!
-      .apply({ key: "run-1", tenantId: "tenant-1", events: emitted })
+    const applying = built.folds
+      .simulationRunState!.apply({
+        key: "run-1",
+        tenantId: "tenant-1",
+        events: emitted,
+      })
       .then(() => {
         settled = true;
       });
@@ -443,7 +478,10 @@ describe("given the durable store's write fails", () => {
 describe("given the fold's dispatch lane", () => {
   /** @scenario The fold's dispatch lane is scoped to one run, never a batch or set */
   it("scopes the lane to the run alone, with no batch or set in the key", () => {
-    const key = simulationRunFoldGroupKey({ tenantId: "tenant-1", scenarioRunId: "run-1" });
+    const key = simulationRunFoldGroupKey({
+      tenantId: "tenant-1",
+      scenarioRunId: "run-1",
+    });
 
     expect(key.scope).toEqual({
       kind: "aggregate",
@@ -456,7 +494,10 @@ describe("given the fold's dispatch lane", () => {
     // pass a batch or set id through), but round-tripping the rendered key
     // confirms nothing downstream widens it either.
     const parsed = parseGroupKey(
-      renderSimulationRunFoldGroupKey({ tenantId: "tenant-1", scenarioRunId: "run-1" }),
+      renderSimulationRunFoldGroupKey({
+        tenantId: "tenant-1",
+        scenarioRunId: "run-1",
+      }),
     );
     expect(parsed).toEqual(key);
   });
@@ -464,12 +505,22 @@ describe("given the fold's dispatch lane", () => {
   it("keys two different runs into two different lanes", () => {
     expect(
       renderSimulationRunFoldGroupKey({ tenantId: "t", scenarioRunId: "a" }),
-    ).not.toBe(renderSimulationRunFoldGroupKey({ tenantId: "t", scenarioRunId: "b" }));
+    ).not.toBe(
+      renderSimulationRunFoldGroupKey({ tenantId: "t", scenarioRunId: "b" }),
+    );
   });
 
   it("keeps two runs from different tenants apart even with the same run id", () => {
     expect(
-      renderSimulationRunFoldGroupKey({ tenantId: "tenant-a", scenarioRunId: "run-1" }),
-    ).not.toBe(renderSimulationRunFoldGroupKey({ tenantId: "tenant-b", scenarioRunId: "run-1" }));
+      renderSimulationRunFoldGroupKey({
+        tenantId: "tenant-a",
+        scenarioRunId: "run-1",
+      }),
+    ).not.toBe(
+      renderSimulationRunFoldGroupKey({
+        tenantId: "tenant-b",
+        scenarioRunId: "run-1",
+      }),
+    );
   });
 });

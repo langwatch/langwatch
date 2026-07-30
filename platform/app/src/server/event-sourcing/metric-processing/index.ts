@@ -1,23 +1,33 @@
 import { type ClickHouseClient, clickhouseAppend } from "@langwatch/clickhouse";
 import {
+  type AppendStore,
   ConfigurationError,
   definePipeline,
-  validateMount,
-  type AppendStore,
   type GroupKey,
   type Mount,
+  validateMount,
 } from "@langwatch/event-sourcing";
-import { METRIC_PIPELINE_NAME, METRIC_PIPELINE_PREFIX, metricProcessingEvents } from "./events";
+import {
+  METRIC_PIPELINE_NAME,
+  METRIC_PIPELINE_PREFIX,
+  metricProcessingEvents,
+} from "./events";
 import {
   stampPoints,
   toDataPointRow,
   toMetricDataPointStorageRow,
 } from "./metricDataPointStorage.projection";
-import { toMetricSeriesCatalogRow, toSeriesRow } from "./metricSeriesCatalog.projection";
+import {
+  toMetricSeriesCatalogRow,
+  toSeriesRow,
+} from "./metricSeriesCatalog.projection";
 import { toMetricTimeRollupRow } from "./metricTimeRollup.projection";
 import { recordDataPoint } from "./recordDataPoint.command";
 import { createMetricTimeRollupStore } from "./rollupStore";
-import { canonicalMetricDataPointSchema, type CanonicalMetricDataPoint } from "./schema";
+import {
+  type CanonicalMetricDataPoint,
+  canonicalMetricDataPointSchema,
+} from "./schema";
 import { DEFAULT_METRIC_SHARD_COUNT, metricShardLabel } from "./shards";
 import { metricDataPointsTable, metricSeriesTable } from "./table";
 
@@ -59,7 +69,13 @@ export function metricMapGroupKey(args: {
     lane: { kind: "map", name: args.projectionName },
     scope: {
       kind: "partition",
-      parts: ["metric", metricShardLabel({ identity: args.identity, shardCount: args.shardCount ?? DEFAULT_METRIC_SHARD_COUNT })],
+      parts: [
+        "metric",
+        metricShardLabel({
+          identity: args.identity,
+          shardCount: args.shardCount ?? DEFAULT_METRIC_SHARD_COUNT,
+        }),
+      ],
     },
   };
 }
@@ -114,7 +130,9 @@ export function metricTimeRollupGroupKey(args: {
  * state back — every projection is a map, and `store` is whichever interface
  * the injected store actually implements.
  */
-export function metricMount(store: AppendStore<CanonicalMetricDataPoint>): Mount {
+export function metricMount(
+  store: AppendStore<CanonicalMetricDataPoint>,
+): Mount {
   return {
     projection: "map",
     store: store.kind,
@@ -140,11 +158,18 @@ function assertMountIsLegal(projection: string, mount: Mount): Mount {
 function createMetricDataPointStore(
   client: ClickHouseClient,
 ): AppendStore<CanonicalMetricDataPoint> {
-  const points = clickhouseAppend({ client, table: metricDataPointsTable, toRow: toDataPointRow });
+  const points = clickhouseAppend({
+    client,
+    table: metricDataPointsTable,
+    toRow: toDataPointRow,
+  });
   return {
     kind: "append",
     async writeBatch(batch, context) {
-      await points.writeBatch(stampPoints(batch, context.retentionDays), context);
+      await points.writeBatch(
+        stampPoints(batch, context.retentionDays),
+        context,
+      );
     },
   };
 }
@@ -152,7 +177,11 @@ function createMetricDataPointStore(
 function createMetricSeriesCatalogStore(
   client: ClickHouseClient,
 ): AppendStore<CanonicalMetricDataPoint> {
-  const series = clickhouseAppend({ client, table: metricSeriesTable, toRow: toSeriesRow });
+  const series = clickhouseAppend({
+    client,
+    table: metricSeriesTable,
+    toRow: toSeriesRow,
+  });
   return {
     kind: "append",
     async writeBatch(batch, context) {
@@ -166,12 +195,17 @@ function createMetricSeriesCatalogStore(
           latest.set(point.seriesId, point);
         }
       }
-      await series.writeBatch(stampPoints([...latest.values()], context.retentionDays), context);
+      await series.writeBatch(
+        stampPoints([...latest.values()], context.retentionDays),
+        context,
+      );
     },
   };
 }
 
-export function createMetricProcessingPipeline(deps: { readonly client: ClickHouseClient }) {
+export function createMetricProcessingPipeline(deps: {
+  readonly client: ClickHouseClient;
+}) {
   const dataPointStore = createMetricDataPointStore(deps.client);
   const seriesStore = createMetricSeriesCatalogStore(deps.client);
   const rollupStore = createMetricTimeRollupStore(deps.client);

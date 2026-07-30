@@ -1,5 +1,8 @@
 import { deriveAppendMapping } from "@langwatch/clickhouse";
-import { type StampedPoint, stampedPointSchema } from "./metricDataPointStorage.projection";
+import {
+  type StampedPoint,
+  stampedPointSchema,
+} from "./metricDataPointStorage.projection";
 import type { CanonicalMetricDataPoint } from "./schema";
 import { metricSeriesTable } from "./table";
 

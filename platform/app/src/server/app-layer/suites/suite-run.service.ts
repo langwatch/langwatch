@@ -40,7 +40,9 @@ export type SuiteRunTarget = {
 
 export class SuiteRunService {
   constructor(
-    private readonly queueSimulationRunCommand: (data: QueueRunCommandData) => Promise<void>,
+    private readonly queueSimulationRunCommand: (
+      data: QueueRunCommandData,
+    ) => Promise<void>,
   ) {}
 
   static create(params: {
@@ -134,7 +136,12 @@ export class SuiteRunService {
     // entries appear in ClickHouse immediately. The same IDs are passed to the
     // SDK via RunOptions.runId (see scenario-child-process.ts), ensuring the
     // SDK's events use matching aggregate IDs.
-    const items: Array<{ scenarioId: string; target: SuiteRunTarget; repeat: number; scenarioRunId: string }> = [];
+    const items: Array<{
+      scenarioId: string;
+      target: SuiteRunTarget;
+      repeat: number;
+      scenarioRunId: string;
+    }> = [];
     for (const scenarioId of activeScenarioIds) {
       for (const target of activeTargets) {
         for (let repeat = 0; repeat < repeatCount; repeat++) {
@@ -169,7 +176,10 @@ export class SuiteRunService {
           metadata: {
             langwatch: { targetReferenceId: item.target.referenceId },
           },
-          target: { type: item.target.type, referenceId: item.target.referenceId },
+          target: {
+            type: item.target.type,
+            referenceId: item.target.referenceId,
+          },
           // The batch denominator travels with every child (ADR-072), so the
           // suite's progress is readable from the first row that lands.
           batchTotal: total,
@@ -200,5 +210,4 @@ export class SuiteRunService {
       })),
     };
   }
-
 }

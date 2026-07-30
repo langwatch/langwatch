@@ -154,13 +154,24 @@ export class ScenarioFailureHandler {
         },
       },
       async (span) => {
-        const { projectId, scenarioId, setId, batchRunId, error, name, description } = params;
+        const {
+          projectId,
+          scenarioId,
+          setId,
+          batchRunId,
+          error,
+          name,
+          description,
+        } = params;
         const outcome = params.outcome ?? "error";
         const status = statusForFailureOutcome(outcome);
         const scenarioRunId = params.scenarioRunId;
 
         if (!scenarioRunId) {
-          logger.warn({ projectId, scenarioId, batchRunId }, "No scenarioRunId provided, cannot emit failure events");
+          logger.warn(
+            { projectId, scenarioId, batchRunId },
+            "No scenarioRunId provided, cannot emit failure events",
+          );
           return;
         }
 
@@ -204,11 +215,17 @@ export class ScenarioFailureHandler {
           });
           span.setAttribute("result.emitted_run_finished", true);
         } catch (err) {
-          logger.error({ err, scenarioRunId }, "Failed to dispatch finishRun event");
+          logger.error(
+            { err, scenarioRunId },
+            "Failed to dispatch finishRun event",
+          );
           throw err;
         }
 
-        logger.info({ projectId, scenarioId, scenarioRunId, batchRunId, status }, "Failure events emitted");
+        logger.info(
+          { projectId, scenarioId, scenarioRunId, batchRunId, status },
+          "Failure events emitted",
+        );
       },
     );
   }

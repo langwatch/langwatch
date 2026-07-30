@@ -10,7 +10,9 @@ describe("the start command", () => {
       evaluatorType: "langevals/answer_correctness",
       occurredAt: 1_000,
     };
-    expect(await startEvaluation(input)).toEqual([{ type: "started", data: input }]);
+    expect(await startEvaluation(input)).toEqual([
+      { type: "started", data: input },
+    ]);
   });
 });
 
@@ -23,6 +25,8 @@ describe("the report command", () => {
       status: "processed" as const,
       occurredAt: 2_000,
     };
-    expect(await reportEvaluation(input)).toEqual([{ type: "reported", data: input }]);
+    expect(await reportEvaluation(input)).toEqual([
+      { type: "reported", data: input },
+    ]);
   });
 });

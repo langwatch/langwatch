@@ -3,6 +3,7 @@ import type { NotificationService } from "../../../ee/billing/notifications/noti
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { AnnotationService } from "../annotations/annotation.service";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
@@ -10,7 +11,6 @@ import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCach
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import type { EventSourcing } from "../event-sourcing.old/eventSourcing";
 import type { AppCommands } from "../event-sourcing.old/pipelineRegistry";
-import type { AnnotationService } from "../annotations/annotation.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";

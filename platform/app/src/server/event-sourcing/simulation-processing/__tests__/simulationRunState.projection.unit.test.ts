@@ -1,6 +1,5 @@
 import { checkOrderInvariance } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
-import { initSimulationRunState, runStartedDataSchema } from "../schema";
 import type {
   CancelRequestedData,
   MessageSnapshotData,
@@ -13,6 +12,7 @@ import type {
   TextMessageEndData,
   TextMessageStartData,
 } from "../schema";
+import { initSimulationRunState, runStartedDataSchema } from "../schema";
 import {
   applyCancelRequested,
   applyDeleted,
@@ -70,7 +70,10 @@ const events = {
   deleted: (data: RunDeletedData): FoldEvent => ({ type: "deleted", data }),
 };
 
-function apply(state: SimulationRunState, event: FoldEvent): SimulationRunState {
+function apply(
+  state: SimulationRunState,
+  event: FoldEvent,
+): SimulationRunState {
   switch (event.type) {
     case "queued":
       return applyQueued(state, event.data);
@@ -190,7 +193,11 @@ describe("the simulationRunState fold's handlers", () => {
     it("keeps a run cancelled when a success arrives afterwards", () => {
       const cancelledFirst = fold([
         events.queued(BASE_QUEUED),
-        events.finished({ scenarioRunId: RUN_ID, status: "CANCELLED", occurredAt: 10 }),
+        events.finished({
+          scenarioRunId: RUN_ID,
+          status: "CANCELLED",
+          occurredAt: 10,
+        }),
       ]);
 
       const withLateSuccess = apply(
@@ -219,7 +226,11 @@ describe("the simulationRunState fold's handlers", () => {
 
       const withLateCancel = apply(
         succeededFirst,
-        events.finished({ scenarioRunId: RUN_ID, status: "CANCELLED", occurredAt: 20 }),
+        events.finished({
+          scenarioRunId: RUN_ID,
+          status: "CANCELLED",
+          occurredAt: 20,
+        }),
       );
 
       expect(withLateCancel.status).toBe("CANCELLED");
@@ -231,7 +242,12 @@ describe("the simulationRunState fold's handlers", () => {
         events.queued(BASE_QUEUED),
         events.finished({
           scenarioRunId: RUN_ID,
-          results: { verdict: "success", reasoning: "first", metCriteria: [], unmetCriteria: [] },
+          results: {
+            verdict: "success",
+            reasoning: "first",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
           occurredAt: 10,
         }),
       ]);
@@ -240,7 +256,12 @@ describe("the simulationRunState fold's handlers", () => {
         firstFinish,
         events.finished({
           scenarioRunId: RUN_ID,
-          results: { verdict: "success", reasoning: "second", metCriteria: [], unmetCriteria: [] },
+          results: {
+            verdict: "success",
+            reasoning: "second",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
           occurredAt: 20,
         }),
       );
@@ -284,7 +305,11 @@ describe("the simulationRunState fold's handlers", () => {
     });
 
     it("prefers the earlier of two equal-authority terminals whatever their statuses", () => {
-      const late = events.finished({ scenarioRunId: RUN_ID, status: "ERROR", occurredAt: 40 });
+      const late = events.finished({
+        scenarioRunId: RUN_ID,
+        status: "ERROR",
+        occurredAt: 40,
+      });
       const early = events.finished({
         scenarioRunId: RUN_ID,
         results: { verdict: "failure", metCriteria: [], unmetCriteria: [] },
@@ -300,7 +325,11 @@ describe("the simulationRunState fold's handlers", () => {
     it("takes a stalled run back to successful when a real outcome lands", () => {
       const stalled = fold([
         events.queued(BASE_QUEUED),
-        events.finished({ scenarioRunId: RUN_ID, status: "STALLED", occurredAt: 10 }),
+        events.finished({
+          scenarioRunId: RUN_ID,
+          status: "STALLED",
+          occurredAt: 10,
+        }),
       ]);
 
       const recovered = apply(
@@ -319,7 +348,11 @@ describe("the simulationRunState fold's handlers", () => {
     it("leaves a cancelled run cancelled when started is delivered late", () => {
       const cancelled = fold([
         events.queued(BASE_QUEUED),
-        events.finished({ scenarioRunId: RUN_ID, status: "CANCELLED", occurredAt: 10 }),
+        events.finished({
+          scenarioRunId: RUN_ID,
+          status: "CANCELLED",
+          occurredAt: 10,
+        }),
       ]);
 
       const afterLateStart = apply(cancelled, events.started(BASE_STARTED));
@@ -330,15 +363,24 @@ describe("the simulationRunState fold's handlers", () => {
 
     it("ranks a cancel above an observed outcome and a stall below one", () => {
       const at = 10;
-      expect(outranksStoredTerminal({ status: "SUCCESS", at }, { status: "CANCELLED", at })).toBe(
-        true,
-      );
-      expect(outranksStoredTerminal({ status: "CANCELLED", at }, { status: "SUCCESS", at })).toBe(
-        false,
-      );
-      expect(outranksStoredTerminal({ status: "STALLED", at }, { status: "FAILURE", at })).toBe(
-        true,
-      );
+      expect(
+        outranksStoredTerminal(
+          { status: "SUCCESS", at },
+          { status: "CANCELLED", at },
+        ),
+      ).toBe(true);
+      expect(
+        outranksStoredTerminal(
+          { status: "CANCELLED", at },
+          { status: "SUCCESS", at },
+        ),
+      ).toBe(false);
+      expect(
+        outranksStoredTerminal(
+          { status: "STALLED", at },
+          { status: "FAILURE", at },
+        ),
+      ).toBe(true);
     });
 
     it("is a total order over equal authority, so exactly one of a pair wins", () => {
@@ -393,7 +435,11 @@ describe("the simulationRunState fold's handlers", () => {
     it("stays failed when a queued event is delivered after finished", () => {
       const failed = fold([
         events.queued(BASE_QUEUED),
-        events.finished({ scenarioRunId: RUN_ID, status: "ERROR", occurredAt: 10 }),
+        events.finished({
+          scenarioRunId: RUN_ID,
+          status: "ERROR",
+          occurredAt: 10,
+        }),
       ]);
 
       const afterLateQueue = apply(failed, events.queued(BASE_QUEUED));
@@ -503,7 +549,11 @@ describe("the simulationRunState fold's handlers", () => {
             durationMs: 200,
             occurredAt: 130,
           }),
-          events.finished({ scenarioRunId: RUN_ID, status: "CANCELLED", occurredAt: 140 }),
+          events.finished({
+            scenarioRunId: RUN_ID,
+            status: "CANCELLED",
+            occurredAt: 140,
+          }),
           events.deleted({ scenarioRunId: RUN_ID, occurredAt: 200 }),
         ],
       });
@@ -525,7 +575,9 @@ describe("the simulationRunState fold's handlers", () => {
 
     /** @scenario A batch total established once is not erased by a later empty value */
     it("keeps a known batch total when a redelivered queued omits it", () => {
-      const withTotal = fold([events.queued({ ...BASE_QUEUED, batchTotal: 5 })]);
+      const withTotal = fold([
+        events.queued({ ...BASE_QUEUED, batchTotal: 5 }),
+      ]);
       const afterRedelivery = apply(withTotal, events.queued(BASE_QUEUED));
       expect(afterRedelivery.batchTotal).toBe(5);
     });

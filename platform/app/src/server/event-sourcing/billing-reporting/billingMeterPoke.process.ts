@@ -9,8 +9,13 @@ import type {
   ProcessManagerHandlerMap,
 } from "@langwatch/event-sourcing";
 import { z } from "zod";
-import { billingReportingEvents } from "./events";
-import { type ReportUsagePayload, type ReportUsagePorts, reportUsage, reportUsagePayloadSchema } from "./reportUsage";
+import type { billingReportingEvents } from "./events";
+import {
+  type ReportUsagePayload,
+  type ReportUsagePorts,
+  reportUsage,
+  reportUsagePayloadSchema,
+} from "./reportUsage";
 
 export const BILLING_METER_POKE_PROCESS_NAME = "billingMeterPoke" as const;
 
@@ -41,7 +46,8 @@ export function billingMeterPokeIntents(ports: ReportUsagePorts) {
   return {
     reportUsage: {
       payload: reportUsagePayloadSchema,
-      messageKey: (payload: ReportUsagePayload) => `${payload.organizationId}:${payload.billingMonth}`,
+      messageKey: (payload: ReportUsagePayload) =>
+        `${payload.organizationId}:${payload.billingMonth}`,
       deliver: (payload: ReportUsagePayload) => reportUsage(ports, payload),
     } satisfies IntentDef<typeof reportUsagePayloadSchema>,
   };
@@ -66,7 +72,11 @@ export const billingMeterPokeOn: ProcessManagerHandlerMap<
   BillingMeterPokeState,
   BillingMeterPokeIntents
 > = {
-  billableEventRecorded(state, data, ctx: ProcessContext): EvolveStep<BillingMeterPokeState, BillingMeterPokeIntents> {
+  billableEventRecorded(
+    state,
+    data,
+    ctx: ProcessContext,
+  ): EvolveStep<BillingMeterPokeState, BillingMeterPokeIntents> {
     const at = new Date(ctx.now);
     const billingMonths: string[] = [];
     if (at.getUTCDate() <= BILLING_GRACE_PERIOD_DAYS) {
@@ -78,7 +88,12 @@ export const billingMeterPokeOn: ProcessManagerHandlerMap<
       state,
       intents: billingMonths.map((billingMonth) => ({
         type: "reportUsage" as const,
-        payload: { organizationId: data.organizationId, billingMonth, tenantId: data.tenantId, occurredAt: ctx.now },
+        payload: {
+          organizationId: data.organizationId,
+          billingMonth,
+          tenantId: data.tenantId,
+          occurredAt: ctx.now,
+        },
       })),
       nextWakeAt: null,
     };

@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { automationsEvents } from "./events";
+import type { automationsEvents } from "./events";
 
 const logger = createLogger("langwatch:automations:graph-alert-sweep");
 
@@ -32,7 +32,9 @@ export function initGraphAlertSweepState(): GraphAlertSweepState {
   return { lastSweepAt: null, nextWakeAt: null };
 }
 
-export const evaluateGraphPayloadSchema = z.object({ scheduledFor: z.number().int() });
+export const evaluateGraphPayloadSchema = z.object({
+  scheduledFor: z.number().int(),
+});
 export type EvaluateGraphPayload = z.infer<typeof evaluateGraphPayloadSchema>;
 
 /** One tenant's graph trigger, due for a heartbeat evaluation. Shaped so the
@@ -48,7 +50,9 @@ export interface GraphAlertSweepPorts {
   /** Every graph trigger due for a heartbeat sweep right now. Skipping a tenant
    *  whose real-time path is already firing is this port's decision, not the
    *  pipeline's. */
-  decideSweepCandidates(params: { now: Date }): Promise<readonly GraphAlertSweepCandidate[]>;
+  decideSweepCandidates(params: {
+    now: Date;
+  }): Promise<readonly GraphAlertSweepCandidate[]>;
   evaluateGraphTrigger(candidate: GraphAlertSweepCandidate): Promise<void>;
   /** Deletes this process's own dispatched outbox rows older than `before`. */
   pruneDispatchedIntentsBefore(params: { before: number }): Promise<number>;
@@ -63,12 +67,16 @@ export interface GraphAlertSweepPorts {
  * candidate's failure so a single tenant's evaluation error never stalls the
  * whole sweep, and self-prunes its own outbox history.
  */
-function createEvaluateGraphIntent(ports: GraphAlertSweepPorts): IntentDef<typeof evaluateGraphPayloadSchema> {
+function createEvaluateGraphIntent(
+  ports: GraphAlertSweepPorts,
+): IntentDef<typeof evaluateGraphPayloadSchema> {
   return {
     payload: evaluateGraphPayloadSchema,
     messageKey: (payload) => `sweep:${payload.scheduledFor}`,
     async deliver(payload) {
-      const candidates = await ports.decideSweepCandidates({ now: new Date(payload.scheduledFor) });
+      const candidates = await ports.decideSweepCandidates({
+        now: new Date(payload.scheduledFor),
+      });
       let failures = 0;
       for (const candidate of candidates) {
         try {
@@ -121,7 +129,9 @@ export const graphAlertSweepOn: ProcessManagerHandlerMap<
   GraphAlertSweepState,
   GraphAlertSweepIntents
 > = {
-  matchRecorded(state): EvolveStep<GraphAlertSweepState, GraphAlertSweepIntents> {
+  matchRecorded(
+    state,
+  ): EvolveStep<GraphAlertSweepState, GraphAlertSweepIntents> {
     return { state, intents: [], nextWakeAt: state.nextWakeAt };
   },
 };

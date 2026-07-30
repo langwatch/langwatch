@@ -1,10 +1,14 @@
 import {
-    checkTypeStringRatchet,
-    definePipeline,
-    type RatchetViolation,
-    type TypeStringSnapshot,
+  checkTypeStringRatchet,
+  definePipeline,
+  type RatchetViolation,
+  type TypeStringSnapshot,
 } from "@langwatch/event-sourcing";
-import { LOG_PIPELINE_NAME, LOG_PIPELINE_PREFIX, logProcessingEvents } from "./events";
+import {
+  LOG_PIPELINE_NAME,
+  LOG_PIPELINE_PREFIX,
+  logProcessingEvents,
+} from "./events";
 import snapshot from "./ratchet.snapshot.json";
 
 /**

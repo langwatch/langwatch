@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import { type ReportUsagePorts, reportUsage } from "../reportUsage";
 
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  createLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
 }));
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
@@ -10,12 +15,23 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   withScope: async (fn: (scope: unknown) => Promise<void>) => fn({}),
 }));
 
-const org = { id: "org-1", stripeCustomerId: "cus_1", subscriptions: [{ id: "sub_1" }] };
+const org = {
+  id: "org-1",
+  stripeCustomerId: "cus_1",
+  subscriptions: [{ id: "sub_1" }],
+};
 
-function makePorts(overrides: Partial<ReportUsagePorts> = {}): ReportUsagePorts {
+function makePorts(
+  overrides: Partial<ReportUsagePorts> = {},
+): ReportUsagePorts {
   return {
-    organizations: { getOrganizationForBilling: vi.fn().mockResolvedValue(org) },
-    organizationCache: { get: vi.fn().mockResolvedValue(undefined), set: vi.fn() },
+    organizations: {
+      getOrganizationForBilling: vi.fn().mockResolvedValue(org),
+    },
+    organizationCache: {
+      get: vi.fn().mockResolvedValue(undefined),
+      set: vi.fn(),
+    },
     billingCheckpoints: {
       getCheckpoint: vi.fn().mockResolvedValue(null),
       writeIntent: vi.fn(),
@@ -23,15 +39,21 @@ function makePorts(overrides: Partial<ReportUsagePorts> = {}): ReportUsagePorts 
       incrementFailures: vi.fn(),
       clearPendingAndIncrementFailures: vi.fn(),
     } as never,
-    getUsageReportingService: () => ({
-      reportUsageDelta: vi.fn().mockResolvedValue([{ reported: true }]),
-    }) as never,
+    getUsageReportingService: () =>
+      ({
+        reportUsageDelta: vi.fn().mockResolvedValue([{ reported: true }]),
+      }) as never,
     queryBillableEventsTotal: vi.fn().mockResolvedValue(10),
     ...overrides,
   };
 }
 
-const payload = { organizationId: "org-1", billingMonth: "2026-07", tenantId: "org-1", occurredAt: 1_000 };
+const payload = {
+  organizationId: "org-1",
+  billingMonth: "2026-07",
+  tenantId: "org-1",
+  occurredAt: 1_000,
+};
 
 describe("reportUsage", () => {
   /** @scenario The project's organization is looked up once per cache window */
@@ -70,8 +92,17 @@ describe("reportUsage", () => {
 
     await reportUsage(ports, payload);
 
-    expect(reportUsageDelta).toHaveBeenCalledWith(expect.objectContaining({ stripeCustomerId: "cus_1", organizationId: "org-1" }));
-    expect(confirm).toHaveBeenCalledWith({ organizationId: "org-1", billingMonth: "2026-07", lastReportedTotal: 10 });
+    expect(reportUsageDelta).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripeCustomerId: "cus_1",
+        organizationId: "org-1",
+      }),
+    );
+    expect(confirm).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      billingMonth: "2026-07",
+      lastReportedTotal: 10,
+    });
   });
 
   it("skips reporting when the current total has not moved past the last report", async () => {
@@ -79,7 +110,9 @@ describe("reportUsage", () => {
     const ports = makePorts({
       queryBillableEventsTotal: vi.fn().mockResolvedValue(5),
       billingCheckpoints: {
-        getCheckpoint: vi.fn().mockResolvedValue({ lastReportedTotal: 5, consecutiveFailures: 0 }),
+        getCheckpoint: vi
+          .fn()
+          .mockResolvedValue({ lastReportedTotal: 5, consecutiveFailures: 0 }),
         writeIntent: vi.fn(),
         confirm: vi.fn(),
         incrementFailures: vi.fn(),
@@ -94,7 +127,11 @@ describe("reportUsage", () => {
   });
 
   it("never throws to its caller, even on an unexpected failure", async () => {
-    const ports = makePorts({ queryBillableEventsTotal: vi.fn().mockRejectedValue(new Error("clickhouse down")) });
+    const ports = makePorts({
+      queryBillableEventsTotal: vi
+        .fn()
+        .mockRejectedValue(new Error("clickhouse down")),
+    });
 
     await expect(reportUsage(ports, payload)).resolves.toBeUndefined();
   });

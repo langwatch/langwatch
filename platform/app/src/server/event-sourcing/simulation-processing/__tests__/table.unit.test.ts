@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  simulationRunMessagesTable,
-  simulationRunsTable,
-} from "../table";
+import { simulationRunMessagesTable, simulationRunsTable } from "../table";
 
 /**
  * @see specs/event-sourcing/simulation-run-aggregate.feature

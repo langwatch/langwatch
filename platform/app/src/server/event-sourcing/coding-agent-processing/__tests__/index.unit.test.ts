@@ -1,5 +1,9 @@
 import type { ClickHouseClient } from "@langwatch/clickhouse";
-import { type HandlerContext, parseGroupKey, renderGroupKey } from "@langwatch/event-sourcing";
+import {
+  type HandlerContext,
+  parseGroupKey,
+  renderGroupKey,
+} from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
 import {
   applyLogFactsContributed,
@@ -27,7 +31,9 @@ const TENANT = "tenant-1";
 const SESSION = "session-1";
 const ctx: HandlerContext = { now: 1_000, tenantId: TENANT };
 
-function spanFacts(overrides: Partial<SpanFactsContribution> = {}): SpanFactsContribution {
+function spanFacts(
+  overrides: Partial<SpanFactsContribution> = {},
+): SpanFactsContribution {
   return {
     tenantId: TENANT,
     sessionId: SESSION,
@@ -47,7 +53,9 @@ function spanFacts(overrides: Partial<SpanFactsContribution> = {}): SpanFactsCon
   };
 }
 
-function logFacts(overrides: Partial<LogFactsContribution> = {}): LogFactsContribution {
+function logFacts(
+  overrides: Partial<LogFactsContribution> = {},
+): LogFactsContribution {
   return {
     tenantId: TENANT,
     sessionId: SESSION,
@@ -67,7 +75,9 @@ function logFacts(overrides: Partial<LogFactsContribution> = {}): LogFactsContri
   };
 }
 
-function metricFacts(overrides: Partial<MetricFactsContribution> = {}): MetricFactsContribution {
+function metricFacts(
+  overrides: Partial<MetricFactsContribution> = {},
+): MetricFactsContribution {
   return {
     tenantId: TENANT,
     sessionId: SESSION,
@@ -132,7 +142,11 @@ describe("given the coding-agent-processing pipeline's composition", () => {
       ["codingAgentTraceSessions", "sessionMetricSeries"].sort(),
     );
     expect(Object.keys(built.commands).sort()).toEqual(
-      ["contributeSpanFacts", "contributeLogFacts", "contributeMetricFacts"].sort(),
+      [
+        "contributeSpanFacts",
+        "contributeLogFacts",
+        "contributeMetricFacts",
+      ].sort(),
     );
   });
 
@@ -148,9 +162,15 @@ describe("given a command's emitted event", () => {
   it("stamps it with the pipeline's derived persisted type, carrying the input through unchanged", async () => {
     const built = buildPipeline();
     const input = spanFacts();
-    const emitted = await built.commands.contributeSpanFacts!.handle(input, ctx);
+    const emitted = await built.commands.contributeSpanFacts!.handle(
+      input,
+      ctx,
+    );
     expect(emitted).toEqual([
-      { type: "lw.obs.coding_agent_session.span_facts_contributed", data: input },
+      {
+        type: "lw.obs.coding_agent_session.span_facts_contributed",
+        data: input,
+      },
     ]);
   });
 });
@@ -159,12 +179,25 @@ describe("given the codingAgentSession fold", () => {
   it("folds all three signals into one session", async () => {
     const built = buildPipeline();
     const events = [
-      { type: "lw.obs.coding_agent_session.span_facts_contributed", data: spanFacts() },
-      { type: "lw.obs.coding_agent_session.log_facts_contributed", data: logFacts() },
-      { type: "lw.obs.coding_agent_session.metric_facts_contributed", data: metricFacts() },
+      {
+        type: "lw.obs.coding_agent_session.span_facts_contributed",
+        data: spanFacts(),
+      },
+      {
+        type: "lw.obs.coding_agent_session.log_facts_contributed",
+        data: logFacts(),
+      },
+      {
+        type: "lw.obs.coding_agent_session.metric_facts_contributed",
+        data: metricFacts(),
+      },
     ];
     await expect(
-      built.folds.codingAgentSession!.apply({ key: SESSION, tenantId: TENANT, events }),
+      built.folds.codingAgentSession!.apply({
+        key: SESSION,
+        tenantId: TENANT,
+        events,
+      }),
     ).resolves.toEqual({ events: 3 });
   });
 
@@ -191,15 +224,34 @@ describe("given the codingAgentSession fold", () => {
     // agree on which agent produced them, so every ordering below shares
     // one agent throughout, exactly like real traffic.
     const events: Event[] = [
-      { kind: "span", data: spanFacts({ acceptedAt: 1_000, startTimeUnixMs: 5_000, facts: { tool_name: "Read" } }) },
-      {
-        kind: "log",
-        data: logFacts({ acceptedAt: 3_000, facts: { "event.name": "user_prompt", prompt_length: 12 } }),
-      },
-      { kind: "metric", data: metricFacts({ acceptedAt: 2_000, asOfUnixMs: 500 }) },
       {
         kind: "span",
-        data: spanFacts({ acceptedAt: 4_000, spanId: "span-2", startTimeUnixMs: 100, name: "claude_code.tool", facts: { tool_name: "Bash" } }),
+        data: spanFacts({
+          acceptedAt: 1_000,
+          startTimeUnixMs: 5_000,
+          facts: { tool_name: "Read" },
+        }),
+      },
+      {
+        kind: "log",
+        data: logFacts({
+          acceptedAt: 3_000,
+          facts: { "event.name": "user_prompt", prompt_length: 12 },
+        }),
+      },
+      {
+        kind: "metric",
+        data: metricFacts({ acceptedAt: 2_000, asOfUnixMs: 500 }),
+      },
+      {
+        kind: "span",
+        data: spanFacts({
+          acceptedAt: 4_000,
+          spanId: "span-2",
+          startTimeUnixMs: 100,
+          name: "claude_code.tool",
+          facts: { tool_name: "Bash" },
+        }),
       },
       {
         kind: "log",
@@ -211,7 +263,10 @@ describe("given the codingAgentSession fold", () => {
       },
     ];
 
-    const apply = (state: CodingAgentSessionState, event: Event): CodingAgentSessionState => {
+    const apply = (
+      state: CodingAgentSessionState,
+      event: Event,
+    ): CodingAgentSessionState => {
       switch (event.kind) {
         case "span":
           return applySpanFactsContributed(state, event.data);
@@ -222,7 +277,10 @@ describe("given the codingAgentSession fold", () => {
       }
     };
     const fold = (order: readonly number[]) =>
-      order.reduce((state, index) => apply(state, events[index]!), initCodingAgentSessionState());
+      order.reduce(
+        (state, index) => apply(state, events[index]!),
+        initCodingAgentSessionState(),
+      );
 
     const forward = fold([0, 1, 2, 3, 4]);
     const reversed = fold([4, 3, 2, 1, 0]);
@@ -239,10 +297,17 @@ describe("given the codingAgentSession fold", () => {
     // ingest, not let a later replay overwrite it.
     it("keeps the first contribution's agent label", () => {
       let state = initCodingAgentSessionState();
-      state = applySpanFactsContributed(state, spanFacts({ agent: "claude_code", acceptedAt: 1_000 }));
+      state = applySpanFactsContributed(
+        state,
+        spanFacts({ agent: "claude_code", acceptedAt: 1_000 }),
+      );
       state = applyLogFactsContributed(
         state,
-        logFacts({ agent: "claude_cowork", acceptedAt: 2_000, facts: { "event.name": "at_mention" } }),
+        logFacts({
+          agent: "claude_cowork",
+          acceptedAt: 2_000,
+          facts: { "event.name": "at_mention" },
+        }),
       );
       expect(state.agent).toBe("claude_code");
     });
@@ -252,9 +317,15 @@ describe("given the codingAgentSession fold", () => {
     /** @scenario "a session whose earliest signal arrives late is listed once, up to date" */
     it("moves startedAtMs backwards without needing a stamp, in either arrival order", () => {
       let state = initCodingAgentSessionState();
-      state = applySpanFactsContributed(state, spanFacts({ startTimeUnixMs: 5_000 }));
+      state = applySpanFactsContributed(
+        state,
+        spanFacts({ startTimeUnixMs: 5_000 }),
+      );
       expect(state.startedAtMs).toBe(5_000);
-      state = applySpanFactsContributed(state, spanFacts({ startTimeUnixMs: 1_000, spanId: "span-2" }));
+      state = applySpanFactsContributed(
+        state,
+        spanFacts({ startTimeUnixMs: 1_000, spanId: "span-2" }),
+      );
       expect(state.startedAtMs).toBe(1_000);
     });
   });
@@ -262,7 +333,10 @@ describe("given the codingAgentSession fold", () => {
   describe("when a span, a log and a metric contribution all fold", () => {
     it("establishes identity from whichever signal arrives, and counts each signal's own facts", () => {
       let state = initCodingAgentSessionState();
-      state = applySpanFactsContributed(state, spanFacts({ facts: { tool_name: "Read" } }));
+      state = applySpanFactsContributed(
+        state,
+        spanFacts({ facts: { tool_name: "Read" } }),
+      );
       state = applyLogFactsContributed(
         state,
         logFacts({ facts: { "event.name": "user_prompt", prompt_length: 12 } }),
@@ -282,7 +356,12 @@ describe("given the trace-sessions map", () => {
     const built = buildPipeline();
     const outcome = await built.maps.codingAgentTraceSessions!.apply({
       tenantId: TENANT,
-      events: [{ type: "lw.obs.coding_agent_session.span_facts_contributed", data: spanFacts() }],
+      events: [
+        {
+          type: "lw.obs.coding_agent_session.span_facts_contributed",
+          data: spanFacts(),
+        },
+      ],
     });
     expect(outcome.written).toBe(1);
   });
@@ -291,7 +370,12 @@ describe("given the trace-sessions map", () => {
     const built = buildPipeline();
     const outcome = await built.maps.codingAgentTraceSessions!.apply({
       tenantId: TENANT,
-      events: [{ type: "lw.obs.coding_agent_session.log_facts_contributed", data: logFacts({ traceId: null }) }],
+      events: [
+        {
+          type: "lw.obs.coding_agent_session.log_facts_contributed",
+          data: logFacts({ traceId: null }),
+        },
+      ],
     });
     expect(outcome.written).toBe(0);
   });
@@ -300,7 +384,12 @@ describe("given the trace-sessions map", () => {
     const built = buildPipeline();
     const outcome = await built.maps.codingAgentTraceSessions!.apply({
       tenantId: TENANT,
-      events: [{ type: "lw.obs.coding_agent_session.metric_facts_contributed", data: metricFacts() }],
+      events: [
+        {
+          type: "lw.obs.coding_agent_session.metric_facts_contributed",
+          data: metricFacts(),
+        },
+      ],
     });
     expect(outcome.written).toBe(0);
   });
@@ -312,8 +401,14 @@ describe("given the sessionMetricSeries map — restoring the deployed session_m
     const outcome = await built.maps.sessionMetricSeries!.apply({
       tenantId: TENANT,
       events: [
-        { type: "lw.obs.coding_agent_session.metric_facts_contributed", data: metricFacts() },
-        { type: "lw.obs.coding_agent_session.span_facts_contributed", data: spanFacts() },
+        {
+          type: "lw.obs.coding_agent_session.metric_facts_contributed",
+          data: metricFacts(),
+        },
+        {
+          type: "lw.obs.coding_agent_session.span_facts_contributed",
+          data: spanFacts(),
+        },
       ],
     });
     expect(outcome.written).toBe(1);
@@ -322,7 +417,10 @@ describe("given the sessionMetricSeries map — restoring the deployed session_m
 
 describe("given this pipeline's group keys", () => {
   it("is scoped to the aggregate, never a wider scope, for the fold", () => {
-    const key = codingAgentSessionGroupKey({ tenantId: TENANT, sessionId: SESSION });
+    const key = codingAgentSessionGroupKey({
+      tenantId: TENANT,
+      sessionId: SESSION,
+    });
     expect(key.lane).toEqual({ kind: "fold", name: "codingAgentSession" });
     expect(key.scope).toEqual({
       kind: "aggregate",
@@ -332,22 +430,45 @@ describe("given this pipeline's group keys", () => {
   });
 
   it("round-trips through the package's own renderer and parser", () => {
-    const key = codingAgentSessionGroupKey({ tenantId: TENANT, sessionId: SESSION });
+    const key = codingAgentSessionGroupKey({
+      tenantId: TENANT,
+      sessionId: SESSION,
+    });
     expect(parseGroupKey(renderGroupKey(key))).toEqual(key);
   });
 
   it("gives every map its own lane, all scoped to the same session", () => {
-    const traceSessions = codingAgentTraceSessionsGroupKey({ tenantId: TENANT, sessionId: SESSION });
-    const metricSeries = sessionMetricSeriesGroupKey({ tenantId: TENANT, sessionId: SESSION });
+    const traceSessions = codingAgentTraceSessionsGroupKey({
+      tenantId: TENANT,
+      sessionId: SESSION,
+    });
+    const metricSeries = sessionMetricSeriesGroupKey({
+      tenantId: TENANT,
+      sessionId: SESSION,
+    });
 
-    expect(traceSessions.lane).toEqual({ kind: "map", name: "codingAgentTraceSessions" });
-    expect(metricSeries.lane).toEqual({ kind: "map", name: "sessionMetricSeries" });
+    expect(traceSessions.lane).toEqual({
+      kind: "map",
+      name: "codingAgentTraceSessions",
+    });
+    expect(metricSeries.lane).toEqual({
+      kind: "map",
+      name: "sessionMetricSeries",
+    });
     expect(traceSessions.scope).toEqual(metricSeries.scope);
   });
 
   it("gives each contribution command its own lane, scoped to the same session", () => {
-    const span = codingAgentContributionCommandGroupKey({ tenantId: TENANT, sessionId: SESSION, command: "contributeSpanFacts" });
-    const log = codingAgentContributionCommandGroupKey({ tenantId: TENANT, sessionId: SESSION, command: "contributeLogFacts" });
+    const span = codingAgentContributionCommandGroupKey({
+      tenantId: TENANT,
+      sessionId: SESSION,
+      command: "contributeSpanFacts",
+    });
+    const log = codingAgentContributionCommandGroupKey({
+      tenantId: TENANT,
+      sessionId: SESSION,
+      command: "contributeLogFacts",
+    });
     expect(span.lane).toEqual({ kind: "command", name: "contributeSpanFacts" });
     expect(log.lane).toEqual({ kind: "command", name: "contributeLogFacts" });
     expect(span.scope).toEqual(log.scope);

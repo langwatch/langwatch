@@ -1,20 +1,24 @@
 import type { ClickHouseClient } from "@langwatch/clickhouse";
 import {
-    definePipeline,
-    type ReplaceStore,
-    type StateRead,
-    type StoreContext,
-    type StoredState,
+  definePipeline,
+  type ReplaceStore,
+  type StateRead,
+  type StoreContext,
+  type StoredState,
 } from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
 import {
-    applyEvaluationReported,
-    applyEvaluationStarted,
-    initEvaluationState,
+  applyEvaluationReported,
+  applyEvaluationStarted,
+  initEvaluationState,
 } from "./evaluationAnalytics.projection";
-import { EVALUATION_PIPELINE_NAME, EVALUATION_PIPELINE_PREFIX, evaluationEvents } from "./events";
+import {
+  EVALUATION_PIPELINE_NAME,
+  EVALUATION_PIPELINE_PREFIX,
+  evaluationEvents,
+} from "./events";
 import { evaluationProcessing } from "./index";
-import { evaluationStateSchema, type EvaluationState } from "./schema";
+import { type EvaluationState, evaluationStateSchema } from "./schema";
 
 /** A minimal in-memory `ReplaceStore`, so the fold's own wiring can be
  * exercised without the deployed table's unmet sort-key precondition
@@ -23,7 +27,10 @@ function createInMemoryStore(): ReplaceStore<EvaluationState> {
   const rows = new Map<string, StoredState<EvaluationState>>();
   return {
     kind: "replace",
-    async read(key: string, context: StoreContext): Promise<StateRead<EvaluationState>> {
+    async read(
+      key: string,
+      context: StoreContext,
+    ): Promise<StateRead<EvaluationState>> {
       const stored = rows.get(`${context.tenantId}:${key}`);
       return stored ? { kind: "found", stored } : { kind: "absent" };
     },
@@ -47,7 +54,10 @@ function buildTestPipeline(store: ReplaceStore<EvaluationState>) {
       state: evaluationStateSchema,
       init: initEvaluationState,
       pin: "2026-07-27",
-      on: { started: applyEvaluationStarted, reported: applyEvaluationReported },
+      on: {
+        started: applyEvaluationStarted,
+        reported: applyEvaluationReported,
+      },
       store,
     })
     .build();

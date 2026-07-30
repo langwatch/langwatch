@@ -13,6 +13,8 @@ describe("the assignTopic command", () => {
       isIncremental: false,
       assignedAt: 100,
     };
-    expect(await assignTopic(input)).toEqual([{ type: "topicAssigned", data: input }]);
+    expect(await assignTopic(input)).toEqual([
+      { type: "topicAssigned", data: input },
+    ]);
   });
 });

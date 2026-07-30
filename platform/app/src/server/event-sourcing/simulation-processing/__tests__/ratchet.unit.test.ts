@@ -1,9 +1,9 @@
 import { checkTypeStringRatchet } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import {
-    checkSimulationRunRatchet,
-    currentSimulationRunTypeStrings,
-    SIMULATION_RUN_TYPE_STRING_SNAPSHOT,
+  checkSimulationRunRatchet,
+  currentSimulationRunTypeStrings,
+  SIMULATION_RUN_TYPE_STRING_SNAPSHOT,
 } from "../ratchet";
 
 describe("the simulation-processing type-string ratchet (ADR-105 decision 10)", () => {

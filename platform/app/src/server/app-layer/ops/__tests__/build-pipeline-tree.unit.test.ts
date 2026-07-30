@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildPipelineTree } from "../metrics-collector";
-import type { QueueInfo, GroupInfo } from "../types";
+import type { GroupInfo, QueueInfo } from "../types";
 
 function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
   return {
@@ -168,8 +168,17 @@ describe("buildPipelineTree", () => {
     it("sorts tree nodes alphabetically", () => {
       const queue = createQueue({
         groups: [
-          createGroup({ pipelineName: "zebra", jobType: "command", jobName: "a" }),
-          createGroup({ groupId: "g2", pipelineName: "alpha", jobType: "command", jobName: "a" }),
+          createGroup({
+            pipelineName: "zebra",
+            jobType: "command",
+            jobName: "a",
+          }),
+          createGroup({
+            groupId: "g2",
+            pipelineName: "alpha",
+            jobType: "command",
+            jobName: "a",
+          }),
         ],
       });
 
@@ -183,7 +192,9 @@ describe("buildPipelineTree", () => {
   describe("when job types need normalization", () => {
     it("normalizes 'handler' to 'fold'", () => {
       const queue = createQueue({
-        groups: [createGroup({ pipelineName: "p", jobType: "handler", jobName: "n" })],
+        groups: [
+          createGroup({ pipelineName: "p", jobType: "handler", jobName: "n" }),
+        ],
       });
 
       const tree = buildPipelineTree({ queues: [queue] });
@@ -192,7 +203,13 @@ describe("buildPipelineTree", () => {
 
     it("normalizes 'projection' to 'fold'", () => {
       const queue = createQueue({
-        groups: [createGroup({ pipelineName: "p", jobType: "projection", jobName: "n" })],
+        groups: [
+          createGroup({
+            pipelineName: "p",
+            jobType: "projection",
+            jobName: "n",
+          }),
+        ],
       });
 
       const tree = buildPipelineTree({ queues: [queue] });
@@ -201,7 +218,13 @@ describe("buildPipelineTree", () => {
 
     it("passes an unrecognized job type through unchanged", () => {
       const queue = createQueue({
-        groups: [createGroup({ pipelineName: "p", jobType: "subscriber", jobName: "n" })],
+        groups: [
+          createGroup({
+            pipelineName: "p",
+            jobType: "subscriber",
+            jobName: "n",
+          }),
+        ],
       });
 
       const tree = buildPipelineTree({ queues: [queue] });

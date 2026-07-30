@@ -223,7 +223,10 @@ describe("StoredObjectsRepository", () => {
           legacyResolveClient,
         );
 
-        await repoWithLegacy.deleteByIds({ projectId: "proj-1", ids: ["a", "b"] });
+        await repoWithLegacy.deleteByIds({
+          projectId: "proj-1",
+          ids: ["a", "b"],
+        });
 
         expect(legacyResolveClient).toHaveBeenCalledWith("proj-1");
         expect(exec).toHaveBeenCalledWith(

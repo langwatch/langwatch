@@ -65,7 +65,8 @@ export function scheduledTick<Name extends string>(
         if (outcome.succeeded > 0) {
           items.inc({ outcome: "success" }, outcome.succeeded);
         }
-        if (outcome.failed > 0) items.inc({ outcome: "failure" }, outcome.failed);
+        if (outcome.failed > 0)
+          items.inc({ outcome: "failure" }, outcome.failed);
         ticks.inc({ outcome: failure ? "failure" : "success" });
       } catch (error) {
         failure = error instanceof Error ? error : new Error(String(error));

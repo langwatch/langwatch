@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -6,7 +7,6 @@ import {
   type LangyMessageRole,
   mapLangyMessageEvent,
 } from "@langwatch/langy";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 
 /** Deterministic JSON: object keys sort so the hash never depends on
@@ -25,7 +25,10 @@ function stableJson(value: unknown): string {
 
 /** Short, stable digest of an event's own payload — see `analyticsRow`. */
 function stableEventDataHash(data: unknown): string {
-  return createHash("sha256").update(stableJson(data)).digest("hex").slice(0, 16);
+  return createHash("sha256")
+    .update(stableJson(data))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 /**
@@ -53,7 +56,15 @@ export type LangyAnalyticsEventRecord = z.infer<
 >;
 
 type KnownDimensions = Partial<
-  Omit<LangyAnalyticsEventRecord, "eventId" | "eventType" | "eventVersion" | "aggregateId" | "occurredAt" | "acceptedAt">
+  Omit<
+    LangyAnalyticsEventRecord,
+    | "eventId"
+    | "eventType"
+    | "eventVersion"
+    | "aggregateId"
+    | "occurredAt"
+    | "acceptedAt"
+  >
 >;
 
 /**
@@ -255,7 +266,10 @@ export const langyAnalyticsEventRecords = {
       payload: data,
       known: { turnId: data.turnId, role: data.role, outcome: data.outcome },
     }),
-  conversationArchived: (data: { conversationId: string; occurredAt: number }) =>
+  conversationArchived: (data: {
+    conversationId: string;
+    occurredAt: number;
+  }) =>
     analyticsRow({
       type: LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED,
       eventVersion: LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED,

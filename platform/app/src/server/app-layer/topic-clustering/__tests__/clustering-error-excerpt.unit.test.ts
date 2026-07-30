@@ -13,8 +13,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  CLUSTERING_ERROR_EXCERPT_MAX_BYTES,
   boundClusteringErrorMessage,
+  CLUSTERING_ERROR_EXCERPT_MAX_BYTES,
   clusteringErrorExcerpt,
   truncateToBytes,
 } from "../clustering-error-excerpt";
@@ -43,9 +43,7 @@ describe("clusteringErrorExcerpt", () => {
 
         expect(excerpt).not.toContain(TRACE_TEXT);
         expect(excerpt).toContain("string_too_long");
-        expect(excerpt).toContain(
-          "String should have at most 8192 characters",
-        );
+        expect(excerpt).toContain("String should have at most 8192 characters");
       });
 
       it("drops echoed input nested at any depth", () => {

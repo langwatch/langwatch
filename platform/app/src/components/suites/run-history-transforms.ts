@@ -5,12 +5,20 @@
  * Computes pass rates and calculates totals.
  */
 
+import {
+  computeMetricStats,
+  type MetricStats,
+} from "~/components/shared/MetricStatsTooltip";
+import {
+  isOnPlatformSet,
+  ON_PLATFORM_DISPLAY_NAME,
+} from "~/server/scenarios/internal-set-id";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData, SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
-import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
-import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
+import type {
+  ScenarioRunData,
+  SuiteRunSummary,
+} from "~/server/scenarios/scenario-event.types";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
-
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
@@ -112,8 +120,13 @@ export function worstStatus(summary: RunGroupSummary): ScenarioRunStatus {
   return ScenarioRunStatus.SUCCESS;
 }
 
-
-type RunStatusCategory = "success" | "failure" | "stalled" | "cancelled" | "in_progress" | "queued";
+type RunStatusCategory =
+  | "success"
+  | "failure"
+  | "stalled"
+  | "cancelled"
+  | "in_progress"
+  | "queued";
 
 function categorizeRunStatus(status: ScenarioRunStatus): RunStatusCategory {
   switch (status) {
@@ -284,7 +297,7 @@ export function groupRunsByTarget({
     const label =
       targetId === UNKNOWN_GROUP_KEY
         ? "Unknown"
-        : targetNameMap.get(targetId) ?? targetId;
+        : (targetNameMap.get(targetId) ?? targetId);
     groups.push({
       groupKey: targetId,
       groupLabel: label,
@@ -358,16 +371,20 @@ export function computeGroupSummary({
   }
 
   const completedCount = passedCount + failedCount;
-  const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
+  const settledCount =
+    passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
   // The group's own total when it has one, and never below the runs actually
   // in hand: a group with no recorded total (queued before it was recorded, or
   // a scenario/target slice that spans batches) must count its runs rather than
   // report a denominator of zero.
   const expectedCount = Math.max(group.expectedCount ?? 0, totalCount);
-  const passRate = settledCount > 0
-    ? (passedCount / settledCount) * 100
-    : (totalCount > 0 ? null : 0);
+  const passRate =
+    settledCount > 0
+      ? (passedCount / settledCount) * 100
+      : totalCount > 0
+        ? null
+        : 0;
 
   let totalCost = 0;
   let totalDurationMs = 0;
@@ -540,8 +557,14 @@ export function computeRunHistoryTotals({
   for (const run of runs) {
     const category = categorizeRunStatus(run.status);
     if (category === "success") passedCount++;
-    else if (category === "failure" || category === "stalled" || category === "cancelled") failedCount++;
-    else if (category === "queued" || category === "in_progress") pendingCount++;
+    else if (
+      category === "failure" ||
+      category === "stalled" ||
+      category === "cancelled"
+    )
+      failedCount++;
+    else if (category === "queued" || category === "in_progress")
+      pendingCount++;
   }
 
   return {

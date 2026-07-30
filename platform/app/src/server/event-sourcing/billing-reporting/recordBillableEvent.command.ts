@@ -3,7 +3,9 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { billingReportingEvents } from "./events";
 
-const logger = createLogger("langwatch:billing-reporting:record-billable-event");
+const logger = createLogger(
+  "langwatch:billing-reporting:record-billable-event",
+);
 
 /** What a source pipeline's own committed event carries that this bridge
  *  needs — narrower than that pipeline's own event union on purpose: nothing

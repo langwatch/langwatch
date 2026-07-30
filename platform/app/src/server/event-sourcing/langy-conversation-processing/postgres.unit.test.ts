@@ -182,8 +182,22 @@ describe("the conversation spine store", () => {
 
   it("stamps CreatedAt only on the create branch, and OccurredAt from LastActivityAt", async () => {
     const prisma = conversationPrisma(conversationRow());
-    const { ConversationId, UserId, Title, IsShared, SharedAt, SharedById, MessageCount, LastActivityAt, CurrentTurnId, LastError, PendingHandoffToken, PendingHandoffTurnId, RunToken, ArchivedAt } =
-      conversationRow();
+    const {
+      ConversationId,
+      UserId,
+      Title,
+      IsShared,
+      SharedAt,
+      SharedById,
+      MessageCount,
+      LastActivityAt,
+      CurrentTurnId,
+      LastError,
+      PendingHandoffToken,
+      PendingHandoffTurnId,
+      RunToken,
+      ArchivedAt,
+    } = conversationRow();
     await createLangyConversationStateStore({ prisma }).write(
       "conv-1",
       {

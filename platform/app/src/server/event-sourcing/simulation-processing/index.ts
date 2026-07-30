@@ -1,41 +1,54 @@
 import {
-    type ClickHouseClient,
-    clickhouseAppend,
-    clickhouseReplacing,
-    deriveAppendMapping,
-    deriveRowMapping,
-    type FoldStateCache,
-    type RowMapping,
+  type ClickHouseClient,
+  clickhouseAppend,
+  clickhouseReplacing,
+  deriveAppendMapping,
+  deriveRowMapping,
+  type FoldStateCache,
+  type RowMapping,
 } from "@langwatch/clickhouse";
-import { definePipeline, type GroupKey, type Metrics, renderGroupKey } from "@langwatch/event-sourcing";
+import {
+  definePipeline,
+  type GroupKey,
+  type Metrics,
+  renderGroupKey,
+} from "@langwatch/event-sourcing";
 import { cancelRun } from "./cancelRun.command";
 import { deleteRun } from "./deleteRun.command";
 import { endTextMessage } from "./endTextMessage.command";
-import { SIMULATION_RUN_PIPELINE_NAME, SIMULATION_RUN_PIPELINE_PREFIX, simulationRunEvents } from "./events";
+import {
+  SIMULATION_RUN_PIPELINE_NAME,
+  SIMULATION_RUN_PIPELINE_PREFIX,
+  simulationRunEvents,
+} from "./events";
 import { finishRun } from "./finishRun.command";
 import {
-    mapMessageSnapshot,
-    mapTextMessageEnd,
-    type SimulationMessageRecord,
-    simulationMessageRecordSchema,
+  mapMessageSnapshot,
+  mapTextMessageEnd,
+  type SimulationMessageRecord,
+  simulationMessageRecordSchema,
 } from "./messages";
 import { queueRun } from "./queueRun.command";
 import { recordMetrics } from "./recordMetrics.command";
-import { initSimulationRunState, type SimulationRunState, simulationRunStateSchema } from "./schema";
+import {
+  initSimulationRunState,
+  type SimulationRunState,
+  simulationRunStateSchema,
+} from "./schema";
+import {
+  applyCancelRequested,
+  applyDeleted,
+  applyFinished,
+  applyMessageSnapshot,
+  applyMetricsRecorded,
+  applyQueued,
+  applyStarted,
+  applyTextMessageEnd,
+  applyTextMessageStart,
+} from "./simulationRunState.projection";
 import { snapshotMessages } from "./snapshotMessages.command";
 import { startRun } from "./startRun.command";
 import { startTextMessage } from "./startTextMessage.command";
-import {
-    applyCancelRequested,
-    applyDeleted,
-    applyFinished,
-    applyMessageSnapshot,
-    applyMetricsRecorded,
-    applyQueued,
-    applyStarted,
-    applyTextMessageEnd,
-    applyTextMessageStart,
-} from "./simulationRunState.projection";
 import { simulationRunMessagesTable, simulationRunsTable } from "./table";
 
 const FOLD_PROJECTION_NAME = "simulationRunState";
@@ -167,8 +180,14 @@ export function createSimulationProcessingPipeline(deps: {
       cancelRequested: (data) => data.scenarioRunId,
       deleted: (data) => data.scenarioRunId,
     })
-    .withCommand("queueRun", { input: simulationRunEvents.queued, handle: queueRun })
-    .withCommand("startRun", { input: simulationRunEvents.started, handle: startRun })
+    .withCommand("queueRun", {
+      input: simulationRunEvents.queued,
+      handle: queueRun,
+    })
+    .withCommand("startRun", {
+      input: simulationRunEvents.started,
+      handle: startRun,
+    })
     .withCommand("snapshotMessages", {
       input: simulationRunEvents.messageSnapshot,
       handle: snapshotMessages,
@@ -181,13 +200,22 @@ export function createSimulationProcessingPipeline(deps: {
       input: simulationRunEvents.textMessageEnd,
       handle: endTextMessage,
     })
-    .withCommand("finishRun", { input: simulationRunEvents.finished, handle: finishRun })
+    .withCommand("finishRun", {
+      input: simulationRunEvents.finished,
+      handle: finishRun,
+    })
     .withCommand("recordMetrics", {
       input: simulationRunEvents.metricsRecorded,
       handle: recordMetrics,
     })
-    .withCommand("cancelRun", { input: simulationRunEvents.cancelRequested, handle: cancelRun })
-    .withCommand("deleteRun", { input: simulationRunEvents.deleted, handle: deleteRun })
+    .withCommand("cancelRun", {
+      input: simulationRunEvents.cancelRequested,
+      handle: cancelRun,
+    })
+    .withCommand("deleteRun", {
+      input: simulationRunEvents.deleted,
+      handle: deleteRun,
+    })
     .withFold(FOLD_PROJECTION_NAME, {
       state: simulationRunStateSchema,
       init: initSimulationRunState,
@@ -206,7 +234,10 @@ export function createSimulationProcessingPipeline(deps: {
       store: runStore,
     })
     .withMap(MAP_PROJECTION_NAME, {
-      on: { messageSnapshot: mapMessageSnapshot, textMessageEnd: mapTextMessageEnd },
+      on: {
+        messageSnapshot: mapMessageSnapshot,
+        textMessageEnd: mapTextMessageEnd,
+      },
       store: messagesStore,
     })
     .build({ metrics: deps.metrics });

@@ -128,9 +128,9 @@ describe("the langy session-key reap tick", () => {
         reap: vi.fn().mockRejectedValue(new Error("database unavailable")),
       });
 
-      await expect(
-        createLangySessionKeyReapMount(deps).run(),
-      ).rejects.toThrow("database unavailable");
+      await expect(createLangySessionKeyReapMount(deps).run()).rejects.toThrow(
+        "database unavailable",
+      );
 
       // Retrying is free — a key already revoked stays revoked — so the whole
       // tick, not a partial replay, is what gets retried.
@@ -164,9 +164,9 @@ describe("the langy session-key reap tick", () => {
           .mockRejectedValue(new Error("bookkeeping store unavailable")),
       });
 
-      await expect(
-        createLangySessionKeyReapMount(deps).run(),
-      ).rejects.toThrow("database unavailable");
+      await expect(createLangySessionKeyReapMount(deps).run()).rejects.toThrow(
+        "database unavailable",
+      );
       expect(deps.recordTick).toHaveBeenCalledOnce();
     });
   });

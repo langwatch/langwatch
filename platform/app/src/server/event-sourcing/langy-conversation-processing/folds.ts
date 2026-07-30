@@ -7,11 +7,11 @@ import {
   LANGY_CONVERSATION_TURN_STATUS,
   LANGY_TITLE_SOURCE,
   LANGY_TURN_TOOL_CALL_STATUS,
-  langyMessagePartSchema,
   type LangyConversationStateEvent,
   type LangyConversationStateFoldState,
   type LangyConversationTurnEvent,
   type LangyConversationTurnFoldState,
+  langyMessagePartSchema,
 } from "@langwatch/langy";
 import { z } from "zod";
 
@@ -119,20 +119,32 @@ function spineHandler<Type extends LangyConversationStateEvent["type"]>(
   type: Type,
 ): (
   state: LangyConversationSpineState,
-  data: WithOccurredAt<Extract<LangyConversationStateEvent, { type: Type }>["data"]>,
+  data: WithOccurredAt<
+    Extract<LangyConversationStateEvent, { type: Type }>["data"]
+  >,
 ) => LangyConversationSpineState {
   return (state, data) =>
-    foldLangyConversationState(state, { type, occurredAt: data.occurredAt, data });
+    foldLangyConversationState(state, {
+      type,
+      occurredAt: data.occurredAt,
+      data,
+    });
 }
 
 function turnHandler<Type extends LangyConversationTurnEvent["type"]>(
   type: Type,
 ): (
   state: LangyConversationTurnState,
-  data: WithOccurredAt<Extract<LangyConversationTurnEvent, { type: Type }>["data"]>,
+  data: WithOccurredAt<
+    Extract<LangyConversationTurnEvent, { type: Type }>["data"]
+  >,
 ) => LangyConversationTurnState {
   return (state, data) =>
-    foldLangyConversationTurn(state, { type, occurredAt: data.occurredAt, data });
+    foldLangyConversationTurn(state, {
+      type,
+      occurredAt: data.occurredAt,
+      data,
+    });
 }
 
 /** Every event the spine fold reacts to, except `planUpdated` — a turn-only
@@ -144,8 +156,12 @@ export const applyLangyConversationSpineEvent = {
   conversationForked: spineHandler(
     LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED,
   ),
-  messageRecorded: spineHandler(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED),
-  messageImported: spineHandler(LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED),
+  messageRecorded: spineHandler(
+    LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED,
+  ),
+  messageImported: spineHandler(
+    LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED,
+  ),
   agentTurnAccepted: spineHandler(
     LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
   ),

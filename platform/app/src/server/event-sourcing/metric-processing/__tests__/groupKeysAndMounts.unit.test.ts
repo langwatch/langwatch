@@ -55,9 +55,9 @@ describe("mount legality (ADR-106)", () => {
   });
 
   it("takes the store kind from the store the executor runs on, not a hand-written literal", () => {
-    expect(metricMount({ kind: "append", writeBatch: async () => {} }).store).toBe(
-      "append",
-    );
+    expect(
+      metricMount({ kind: "append", writeBatch: async () => {} }).store,
+    ).toBe("append");
   });
 
   it("does not throw when asserted at composition", () => {
@@ -111,9 +111,21 @@ describe("group-key determinism (ADR-100)", () => {
 
   it("keys metricDataPointStorage by the point, and metricSeriesCatalog/metricTimeRollup by the series", () => {
     const p = point({ timeUnixMs: 1_000 });
-    const storage = metricDataPointStorageGroupKey({ tenantId: "t1", point: p, shardCount: 16 });
-    const catalog = metricSeriesCatalogGroupKey({ tenantId: "t1", point: p, shardCount: 16 });
-    const rollup = metricTimeRollupGroupKey({ tenantId: "t1", point: p, shardCount: 16 });
+    const storage = metricDataPointStorageGroupKey({
+      tenantId: "t1",
+      point: p,
+      shardCount: 16,
+    });
+    const catalog = metricSeriesCatalogGroupKey({
+      tenantId: "t1",
+      point: p,
+      shardCount: 16,
+    });
+    const rollup = metricTimeRollupGroupKey({
+      tenantId: "t1",
+      point: p,
+      shardCount: 16,
+    });
 
     expect(catalog.scope).toEqual(rollup.scope);
     expect(storage.lane).not.toEqual(catalog.lane);

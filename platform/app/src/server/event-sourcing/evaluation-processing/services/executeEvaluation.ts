@@ -21,7 +21,7 @@ import type { PreconditionTraceData } from "~/server/filters/precondition-matche
 import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { extractErrorMessage } from "~/utils/captureError";
-import { evaluationEvents } from "../events";
+import type { evaluationEvents } from "../events";
 import { reportEvaluation } from "../report.command";
 
 /**

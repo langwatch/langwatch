@@ -11,7 +11,7 @@
 
 import type { Metrics } from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
-import { scheduledTick, type ScheduledTickMount } from "../scheduledTick";
+import { type ScheduledTickMount, scheduledTick } from "../scheduledTick";
 
 const logger = createLogger("langwatch:blob-maintenance:cleanup");
 
@@ -45,7 +45,9 @@ export interface BlobCleanupDeps {
 
 export type BlobCleanupMount = ScheduledTickMount<typeof BLOB_CLEANUP_NAME>;
 
-export function createBlobCleanupMount(deps: BlobCleanupDeps): BlobCleanupMount {
+export function createBlobCleanupMount(
+  deps: BlobCleanupDeps,
+): BlobCleanupMount {
   const now = deps.now ?? Date.now;
 
   return scheduledTick({

@@ -26,16 +26,16 @@ import type {
   GovernanceKpisClickHouseRepository,
 } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { describe, expect, it } from "vitest";
-import { MapProjectionExecutor } from "~/server/event-sourcing.old/projections/mapProjectionExecutor";
-import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import {
   createSpanReceivedEvent,
   type TestSpanReceivedEventOptions,
 } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
 import type { SpanReceivedEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
-import { createGovernanceKpisProjection } from "../governanceProjections.composition";
+import { MapProjectionExecutor } from "~/server/event-sourcing.old/projections/mapProjectionExecutor";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import { GovernanceKpisMapProjection } from "../governanceKpis.mapProjection";
 import { GovernanceKpisAppendStore } from "../governanceKpis.store";
+import { createGovernanceKpisProjection } from "../governanceProjections.composition";
 import { ReplacingMergeTreeDouble } from "./replacingMergeTree.double";
 
 const TENANT_ID = "gov-project-1";
@@ -106,7 +106,8 @@ async function runProjection({
 }): Promise<void> {
   const repository = {
     insertContribution: async (row: GovernanceKpiContribution) => {
-      if (dropEventIds.has(row.eventId ?? "")) throw new Error("CH write failed");
+      if (dropEventIds.has(row.eventId ?? ""))
+        throw new Error("CH write failed");
       table.insert([row]);
     },
     insertContributions: async (rows: GovernanceKpiContribution[]) => {
@@ -185,8 +186,11 @@ describe("GovernanceKpisMapProjection", () => {
     });
 
     it("versions the row on the span event's own occurredAt, not on wall-clock", () => {
-      expect(mapOne({ occurredAt: 1_700_000_123_000 })!
-        .lastEventOccurredAt.getTime()).toBe(1_700_000_123_000);
+      expect(
+        mapOne({
+          occurredAt: 1_700_000_123_000,
+        })!.lastEventOccurredAt.getTime(),
+      ).toBe(1_700_000_123_000);
     });
 
     it("contributes nothing for a span whose usage is a redundant copy of another span's", () => {

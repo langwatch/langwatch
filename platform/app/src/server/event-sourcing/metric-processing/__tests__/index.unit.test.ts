@@ -5,17 +5,25 @@ import { point } from "./fixtures";
 
 describe("the built metric-processing pipeline", () => {
   it("names itself 'metric', matching the persisted AggregateType already in event_log", () => {
-    const built = createMetricProcessingPipeline({ client: createFakeClient() });
+    const built = createMetricProcessingPipeline({
+      client: createFakeClient(),
+    });
     expect(built.name).toBe("metric");
   });
 
   it("derives the dotted event type string already persisted in event_log", () => {
-    const built = createMetricProcessingPipeline({ client: createFakeClient() });
-    expect([...built.eventTypes]).toEqual(["lw.obs.metric.data_point_received"]);
+    const built = createMetricProcessingPipeline({
+      client: createFakeClient(),
+    });
+    expect([...built.eventTypes]).toEqual([
+      "lw.obs.metric.data_point_received",
+    ]);
   });
 
   it("stamps a command's emitted event with the pipeline's derived persisted type", async () => {
-    const built = createMetricProcessingPipeline({ client: createFakeClient() });
+    const built = createMetricProcessingPipeline({
+      client: createFakeClient(),
+    });
     const canonical = point({ timeUnixMs: 1_000 });
     const emitted = await built.commands.recordDataPoint!.handle(canonical, {
       now: Date.now(),
@@ -33,9 +41,15 @@ describe("the built metric-processing pipeline", () => {
   });
 
   it("mounts exactly the three maps and the one command this aggregate declares", () => {
-    const built = createMetricProcessingPipeline({ client: createFakeClient() });
+    const built = createMetricProcessingPipeline({
+      client: createFakeClient(),
+    });
     expect(Object.keys(built.maps).sort()).toEqual(
-      ["metricDataPointStorage", "metricSeriesCatalog", "metricTimeRollup"].sort(),
+      [
+        "metricDataPointStorage",
+        "metricSeriesCatalog",
+        "metricTimeRollup",
+      ].sort(),
     );
     expect(Object.keys(built.commands)).toEqual(["recordDataPoint"]);
     expect(built.folds).toEqual({});
@@ -54,12 +68,18 @@ describe("the metricDataPointStorage map", () => {
     });
 
     expect(outcome.written).toBe(1);
-    expect(client.insertCalls.map((call) => call.table)).toEqual(["metric_data_points"]);
+    expect(client.insertCalls.map((call) => call.table)).toEqual([
+      "metric_data_points",
+    ]);
     expect(
       insertedCell({ client, table: "metric_data_points", column: "PointId" }),
     ).toBe(canonical.pointId);
     expect(
-      insertedCell({ client, table: "metric_data_points", column: "ValueDouble" }),
+      insertedCell({
+        client,
+        table: "metric_data_points",
+        column: "ValueDouble",
+      }),
     ).toBe(7);
   });
 
@@ -69,7 +89,10 @@ describe("the metricDataPointStorage map", () => {
     await built.maps.metricDataPointStorage!.apply({
       tenantId: "project-1",
       events: [
-        { type: "lw.obs.metric.data_point_received", data: point({ timeUnixMs: 1_000 }) },
+        {
+          type: "lw.obs.metric.data_point_received",
+          data: point({ timeUnixMs: 1_000 }),
+        },
       ],
     });
     expect(client.insertCalls[0]!.target).toEqual({ kind: "replacing" });
@@ -110,7 +133,9 @@ describe("metricTimeRollup", () => {
     });
 
     expect(outcome.written).toBe(1);
-    const call = client.insertCalls.find((c) => c.table === "metric_time_rollups")!;
+    const call = client.insertCalls.find(
+      (c) => c.table === "metric_time_rollups",
+    )!;
     expect(call.rows).toHaveLength(1);
   });
 });

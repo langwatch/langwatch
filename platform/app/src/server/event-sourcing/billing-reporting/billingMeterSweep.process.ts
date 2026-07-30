@@ -1,4 +1,7 @@
-import { getBillingMonth, getPreviousBillingMonth } from "@ee/billing/services/billableEventsQuery";
+import {
+  getBillingMonth,
+  getPreviousBillingMonth,
+} from "@ee/billing/services/billableEventsQuery";
 import type {
   EvolveStep,
   IntentDef,
@@ -8,7 +11,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { BILLING_GRACE_PERIOD_DAYS } from "./billingMeterPoke.process";
-import { billingReportingEvents } from "./events";
+import type { billingReportingEvents } from "./events";
 import { type ReportUsagePorts, reportUsage } from "./reportUsage";
 
 const logger = createLogger("langwatch:billing-reporting:meter-sweep");
@@ -29,7 +32,9 @@ export const billingMeterSweepStateSchema = z.object({
    *  must leave whatever is currently armed untouched. */
   nextWakeAt: z.number().nullable(),
 });
-export type BillingMeterSweepState = z.infer<typeof billingMeterSweepStateSchema>;
+export type BillingMeterSweepState = z.infer<
+  typeof billingMeterSweepStateSchema
+>;
 
 export function initBillingMeterSweepState(): BillingMeterSweepState {
   return { lastSweepAt: null, nextWakeAt: null };
@@ -46,9 +51,13 @@ export interface BillingMeterSweepPorts extends ReportUsagePorts {
    * Read per month, because the grace window's candidate set is not the
    * current month's.
    */
-  readonly listOrganizationsToReport: (params: { billingMonth: string }) => Promise<string[]>;
+  readonly listOrganizationsToReport: (params: {
+    billingMonth: string;
+  }) => Promise<string[]>;
   /** Deletes this process's own dispatched outbox rows older than `before`. */
-  readonly pruneDispatchedIntentsBefore: (params: { before: number }) => Promise<number>;
+  readonly pruneDispatchedIntentsBefore: (params: {
+    before: number;
+  }) => Promise<number>;
 }
 
 /** Billing months one tick is responsible for: always the current one, plus
@@ -72,7 +81,9 @@ export function billingMonthsForSweep(now: Date): string[] {
  * the whole tick — re-dispatching an organization that already succeeded is
  * free, because the report reads the month total as a level.
  */
-function createSweepIntent(ports: BillingMeterSweepPorts): IntentDef<typeof sweepPayloadSchema> {
+function createSweepIntent(
+  ports: BillingMeterSweepPorts,
+): IntentDef<typeof sweepPayloadSchema> {
   return {
     payload: sweepPayloadSchema,
     messageKey: (payload) => `sweep:${payload.scheduledFor}`,
@@ -81,15 +92,19 @@ function createSweepIntent(ports: BillingMeterSweepPorts): IntentDef<typeof swee
       const months = billingMonthsForSweep(new Date(startedAt));
 
       let dispatched = 0;
-      const failures: Array<{ organizationId: string; billingMonth: string }> = [];
+      const failures: Array<{ organizationId: string; billingMonth: string }> =
+        [];
       const raise: Error[] = [];
 
       for (const billingMonth of months) {
         let organizationIds: string[];
         try {
-          organizationIds = await ports.listOrganizationsToReport({ billingMonth });
+          organizationIds = await ports.listOrganizationsToReport({
+            billingMonth,
+          });
         } catch (error) {
-          const failure = error instanceof Error ? error : new Error(String(error));
+          const failure =
+            error instanceof Error ? error : new Error(String(error));
           raise.push(failure);
           logger.error(
             { billingMonth, error: failure.message },
@@ -100,12 +115,21 @@ function createSweepIntent(ports: BillingMeterSweepPorts): IntentDef<typeof swee
 
         for (const organizationId of organizationIds) {
           try {
-            await reportUsage(ports, { organizationId, billingMonth, tenantId: organizationId, occurredAt: startedAt });
+            await reportUsage(ports, {
+              organizationId,
+              billingMonth,
+              tenantId: organizationId,
+              occurredAt: startedAt,
+            });
             dispatched++;
           } catch (error) {
             failures.push({ organizationId, billingMonth });
             logger.error(
-              { organizationId, billingMonth, error: error instanceof Error ? error.message : String(error) },
+              {
+                organizationId,
+                billingMonth,
+                error: error instanceof Error ? error.message : String(error),
+              },
               "billing meter sweep could not report usage; this organization's usage stays unreported until a later attempt succeeds",
             );
           }
@@ -113,18 +137,30 @@ function createSweepIntent(ports: BillingMeterSweepPorts): IntentDef<typeof swee
       }
 
       try {
-        await ports.pruneDispatchedIntentsBefore({ before: startedAt - SWEEP_OUTBOX_RETENTION_MS });
+        await ports.pruneDispatchedIntentsBefore({
+          before: startedAt - SWEEP_OUTBOX_RETENTION_MS,
+        });
       } catch (error) {
-        logger.warn({ error: error instanceof Error ? error.message : String(error) }, "billing meter sweep outbox retention failed");
+        logger.warn(
+          { error: error instanceof Error ? error.message : String(error) },
+          "billing meter sweep outbox retention failed",
+        );
       }
 
       if (failures.length > 0) {
-        raise.push(new Error(`billing meter sweep failed to report ${failures.length} of ${dispatched + failures.length} usage reports`));
+        raise.push(
+          new Error(
+            `billing meter sweep failed to report ${failures.length} of ${dispatched + failures.length} usage reports`,
+          ),
+        );
       }
       const [firstFailure] = raise;
       if (firstFailure) throw firstFailure;
 
-      logger.debug({ months, dispatched }, "billing meter sweep dispatched usage reports");
+      logger.debug(
+        { months, dispatched },
+        "billing meter sweep dispatched usage reports",
+      );
     },
   };
 }
@@ -143,7 +179,9 @@ export const billingMeterSweepOn: ProcessManagerHandlerMap<
   BillingMeterSweepState,
   BillingMeterSweepIntents
 > = {
-  billableEventRecorded(state): EvolveStep<BillingMeterSweepState, BillingMeterSweepIntents> {
+  billableEventRecorded(
+    state,
+  ): EvolveStep<BillingMeterSweepState, BillingMeterSweepIntents> {
     return { state, intents: [], nextWakeAt: state.nextWakeAt };
   },
 };

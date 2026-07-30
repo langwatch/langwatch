@@ -1,10 +1,14 @@
 import {
-    checkTypeStringRatchet,
-    definePipeline,
-    type RatchetViolation,
-    type TypeStringSnapshot,
+  checkTypeStringRatchet,
+  definePipeline,
+  type RatchetViolation,
+  type TypeStringSnapshot,
 } from "@langwatch/event-sourcing";
-import { TRACE_PIPELINE_NAME, TRACE_PIPELINE_PREFIX, traceEvents } from "./events";
+import {
+  TRACE_PIPELINE_NAME,
+  TRACE_PIPELINE_PREFIX,
+  traceEvents,
+} from "./events";
 import snapshot from "./ratchet.snapshot.json";
 
 /**
@@ -12,7 +16,8 @@ import snapshot from "./ratchet.snapshot.json";
  * free; a string this file remembers but the pipeline no longer declares
  * means a persisted event type just lost its route back into state.
  */
-export const TRACE_PROCESSING_TYPE_STRING_SNAPSHOT: TypeStringSnapshot = snapshot;
+export const TRACE_PROCESSING_TYPE_STRING_SNAPSHOT: TypeStringSnapshot =
+  snapshot;
 
 /**
  * What the vocabulary currently declares, in the shape the ratchet compares

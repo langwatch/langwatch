@@ -1,5 +1,5 @@
 import type { EmittedEvent } from "@langwatch/event-sourcing";
-import { evaluationEvents } from "./events";
+import type { evaluationEvents } from "./events";
 import type { EvaluationReportedData } from "./schema";
 
 /** The SDK's atomic-report path: the caller already resolved the whole

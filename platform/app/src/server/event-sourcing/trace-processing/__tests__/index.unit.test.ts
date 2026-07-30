@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
-    createTraceProcessingPipeline,
-    spanStorageGroupKey,
-    traceCommandGroupKey,
-    traceFoldGroupKey,
+  createTraceProcessingPipeline,
+  spanStorageGroupKey,
+  traceCommandGroupKey,
+  traceFoldGroupKey,
 } from "../index";
 import {
-    recordSpanCommandGroupKey,
-    resolveSpanCommandShardCount,
-    shardIndexFor,
+  recordSpanCommandGroupKey,
+  resolveSpanCommandShardCount,
+  shardIndexFor,
 } from "../spanSharding";
-import { storedSpansTable, traceAnalyticsTable, traceSummariesTable } from "../table";
+import {
+  storedSpansTable,
+  traceAnalyticsTable,
+  traceSummariesTable,
+} from "../table";
 import { canonicalSpan, createFakeClient, TRACE_ID } from "./fixtures";
 
 const ctx = { now: Date.now(), tenantId: "tenant-1" };
@@ -19,7 +23,9 @@ describe("the trace-processing composition", () => {
   describe("given the projections this pipeline mounts", () => {
     /** @scenario "A projection declares the events it subscribes to" */
     it("declares each fold's subscribed event types", () => {
-      const built = createTraceProcessingPipeline({ client: createFakeClient() });
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+      });
 
       expect([...built.folds.traceSummary!.eventTypes].sort()).toEqual(
         [...built.eventTypes].sort(),
@@ -39,13 +45,19 @@ describe("the trace-processing composition", () => {
 
     /** @scenario "A map projection declares the events it subscribes to" */
     it("declares the map's single subscribed event type", () => {
-      const built = createTraceProcessingPipeline({ client: createFakeClient() });
-      expect(built.maps.spanStorage!.eventTypes).toEqual(["lw.obs.trace.span_received"]);
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+      });
+      expect(built.maps.spanStorage!.eventTypes).toEqual([
+        "lw.obs.trace.span_received",
+      ]);
     });
 
     /** @scenario "An event the projection did not subscribe to leaves the state alone" */
     it("still counts an event it declares no handler for as applied, but runs no logic for it", async () => {
-      const built = createTraceProcessingPipeline({ client: createFakeClient() });
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+      });
 
       const result = await built.folds.traceAnalytics!.apply({
         key: TRACE_ID,
@@ -63,7 +75,9 @@ describe("the trace-processing composition", () => {
 
     /** @scenario "Skipping events" */
     it("maps nothing for an event the span store does not subscribe to", async () => {
-      const built = createTraceProcessingPipeline({ client: createFakeClient() });
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+      });
 
       const result = await built.maps.spanStorage!.apply({
         tenantId: "tenant-1",
@@ -81,16 +95,22 @@ describe("the trace-processing composition", () => {
 
   describe("given a command", () => {
     it("stamps the pipeline's derived persisted type onto the emitted event", async () => {
-      const built = createTraceProcessingPipeline({ client: createFakeClient() });
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+      });
       const span = canonicalSpan({ spanId: "s1" });
 
       const emitted = await built.commands.recordSpan!.handle(span, ctx);
 
-      expect(emitted).toEqual([{ type: "lw.obs.trace.span_received", data: span }]);
+      expect(emitted).toEqual([
+        { type: "lw.obs.trace.span_received", data: span },
+      ]);
     });
 
     it("rejects an input its own schema does not accept", () => {
-      const built = createTraceProcessingPipeline({ client: createFakeClient() });
+      const built = createTraceProcessingPipeline({
+        client: createFakeClient(),
+      });
 
       expect(() =>
         built.commands.changeTraceName!.input.parse({
@@ -111,8 +131,14 @@ describe("the trace-processing composition", () => {
       const result = await built.maps.spanStorage!.apply({
         tenantId: "tenant-1",
         events: [
-          { type: "lw.obs.trace.span_received", data: canonicalSpan({ spanId: "s1" }) },
-          { type: "lw.obs.trace.span_received", data: canonicalSpan({ spanId: "s2" }) },
+          {
+            type: "lw.obs.trace.span_received",
+            data: canonicalSpan({ spanId: "s1" }),
+          },
+          {
+            type: "lw.obs.trace.span_received",
+            data: canonicalSpan({ spanId: "s2" }),
+          },
         ],
       });
 
@@ -120,7 +146,9 @@ describe("the trace-processing composition", () => {
       expect(client.insertCalls).toHaveLength(1);
       expect(client.insertCalls[0]?.table).toBe(storedSpansTable.name);
       expect(client.insertCalls[0]?.rows).toHaveLength(2);
-      expect(client.insertCalls[0]?.columns).toEqual(storedSpansTable.columnNames);
+      expect(client.insertCalls[0]?.columns).toEqual(
+        storedSpansTable.columnNames,
+      );
     });
 
     it("folds a batch into one summary row keyed by the trace", async () => {
@@ -131,7 +159,10 @@ describe("the trace-processing composition", () => {
         key: TRACE_ID,
         tenantId: "tenant-1",
         events: [
-          { type: "lw.obs.trace.span_received", data: canonicalSpan({ spanId: "s1" }) },
+          {
+            type: "lw.obs.trace.span_received",
+            data: canonicalSpan({ spanId: "s1" }),
+          },
         ],
       });
 
@@ -148,7 +179,10 @@ describe("the trace-processing composition", () => {
         key: TRACE_ID,
         tenantId: "tenant-1",
         events: [
-          { type: "lw.obs.trace.span_received", data: canonicalSpan({ spanId: "s1" }) },
+          {
+            type: "lw.obs.trace.span_received",
+            data: canonicalSpan({ spanId: "s1" }),
+          },
         ],
       });
 
@@ -162,11 +196,19 @@ describe("the trace-processing composition", () => {
     /** @scenario "Sharding disabled keeps the historic trace-only group key" */
     it("keeps recordSpan on the trace's own lane while sharding is off", () => {
       expect(
-        recordSpanCommandGroupKey({ tenantId: "tenant-1", traceId: TRACE_ID, spanId: "s1" }),
+        recordSpanCommandGroupKey({
+          tenantId: "tenant-1",
+          traceId: TRACE_ID,
+          spanId: "s1",
+        }),
       ).toEqual({
         tenantId: "tenant-1",
         lane: { kind: "command", name: "recordSpan" },
-        scope: { kind: "aggregate", aggregateType: "trace", aggregateId: TRACE_ID },
+        scope: {
+          kind: "aggregate",
+          aggregateType: "trace",
+          aggregateId: TRACE_ID,
+        },
       });
     });
 
@@ -228,7 +270,9 @@ describe("the trace-processing composition", () => {
     });
 
     it("puts each stored span on its own lane, so nothing serialises them", () => {
-      expect(spanStorageGroupKey({ tenantId: "tenant-1", eventId: "evt-1" })).toEqual({
+      expect(
+        spanStorageGroupKey({ tenantId: "tenant-1", eventId: "evt-1" }),
+      ).toEqual({
         tenantId: "tenant-1",
         lane: { kind: "map", name: "spanStorage" },
         scope: { kind: "event", eventId: "evt-1" },
@@ -237,11 +281,19 @@ describe("the trace-processing composition", () => {
 
     it("puts every other command on the trace's own lane", () => {
       expect(
-        traceCommandGroupKey({ tenantId: "tenant-1", command: "assignTopic", traceId: TRACE_ID }),
+        traceCommandGroupKey({
+          tenantId: "tenant-1",
+          command: "assignTopic",
+          traceId: TRACE_ID,
+        }),
       ).toEqual({
         tenantId: "tenant-1",
         lane: { kind: "command", name: "assignTopic" },
-        scope: { kind: "aggregate", aggregateType: "trace", aggregateId: TRACE_ID },
+        scope: {
+          kind: "aggregate",
+          aggregateType: "trace",
+          aggregateId: TRACE_ID,
+        },
       });
     });
   });

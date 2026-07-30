@@ -10,7 +10,7 @@
  */
 
 import type { Metrics } from "@langwatch/event-sourcing";
-import { scheduledTick, type ScheduledTickMount } from "../scheduledTick";
+import { type ScheduledTickMount, scheduledTick } from "../scheduledTick";
 
 export const LANGY_SESSION_KEY_REAP_NAME = "langySessionKeyReap" as const;
 

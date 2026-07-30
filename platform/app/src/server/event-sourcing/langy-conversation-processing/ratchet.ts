@@ -5,9 +5,9 @@ import {
   type TypeStringSnapshot,
 } from "@langwatch/event-sourcing";
 import {
-  langyConversationEvents,
   LANGY_CONVERSATION_PIPELINE_NAME,
   LANGY_CONVERSATION_PIPELINE_PREFIX,
+  langyConversationEvents,
 } from "./events";
 
 /**

@@ -1,31 +1,39 @@
-import { clickhouseReplacing, type ClickHouseClient, type FoldStateCache } from "@langwatch/clickhouse";
 import {
-    ConfigurationError,
-    definePipeline,
-    validateMount,
-    type GroupKey,
-    type Metrics,
-    type Mount,
+  type ClickHouseClient,
+  clickhouseReplacing,
+  type FoldStateCache,
+} from "@langwatch/clickhouse";
+import {
+  ConfigurationError,
+  definePipeline,
+  type GroupKey,
+  type Metrics,
+  type Mount,
+  validateMount,
 } from "@langwatch/event-sourcing";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import {
-    applyEvaluationReported,
-    applyEvaluationStarted,
-    initEvaluationState,
+  applyEvaluationReported,
+  applyEvaluationStarted,
+  initEvaluationState,
 } from "./evaluationAnalytics.projection";
-import { EVALUATION_PIPELINE_NAME, EVALUATION_PIPELINE_PREFIX, evaluationEvents } from "./events";
+import {
+  EVALUATION_PIPELINE_NAME,
+  EVALUATION_PIPELINE_PREFIX,
+  evaluationEvents,
+} from "./events";
 import { reportEvaluation } from "./report.command";
 import { type EvaluationState, evaluationStateSchema } from "./schema";
 import {
-    executeEvaluation,
-    type ExecuteEvaluationDeps,
-    executeEvaluationInputSchema,
+  type ExecuteEvaluationDeps,
+  executeEvaluation,
+  executeEvaluationInputSchema,
 } from "./services/executeEvaluation";
 import { startEvaluation } from "./start.command";
 import {
-    type EvaluationAnalyticsColumns,
-    evaluationAnalyticsRow,
-    evaluationAnalyticsTable,
+  type EvaluationAnalyticsColumns,
+  evaluationAnalyticsRow,
+  evaluationAnalyticsTable,
 } from "./table";
 
 /**
@@ -99,7 +107,10 @@ export interface EvaluationProcessingDeps {
 
 /** The whole topology: three commands, one fold, its store beside it. */
 export function evaluationProcessing(deps: EvaluationProcessingDeps) {
-  const store = clickhouseReplacing<EvaluationState, EvaluationAnalyticsColumns>({
+  const store = clickhouseReplacing<
+    EvaluationState,
+    EvaluationAnalyticsColumns
+  >({
     client: deps.client,
     table: evaluationAnalyticsTable,
     version: EVALUATION_ANALYTICS_VERSION_PIN,
@@ -123,13 +134,22 @@ export function evaluationProcessing(deps: EvaluationProcessingDeps) {
       started: (data) => data.evaluationId,
       reported: (data) => data.evaluationId,
     })
-    .withCommand("start", { input: evaluationEvents.started, handle: startEvaluation })
-    .withCommand("report", { input: evaluationEvents.reported, handle: reportEvaluation })
+    .withCommand("start", {
+      input: evaluationEvents.started,
+      handle: startEvaluation,
+    })
+    .withCommand("report", {
+      input: evaluationEvents.reported,
+      handle: reportEvaluation,
+    })
     .withFold("evaluationAnalytics", {
       state: evaluationStateSchema,
       init: initEvaluationState,
       pin: EVALUATION_ANALYTICS_VERSION_PIN,
-      on: { started: applyEvaluationStarted, reported: applyEvaluationReported },
+      on: {
+        started: applyEvaluationStarted,
+        reported: applyEvaluationReported,
+      },
       store,
     })
     .build({ metrics: deps.metrics });

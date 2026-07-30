@@ -1,13 +1,15 @@
 import { checkOrderInvariance } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import {
-    applyEvaluationReported,
-    applyEvaluationStarted,
-    initEvaluationState,
+  applyEvaluationReported,
+  applyEvaluationStarted,
+  initEvaluationState,
 } from "./evaluationAnalytics.projection";
 import type { EvaluationReportedData, EvaluationStartedData } from "./schema";
 
-function started(overrides: Partial<EvaluationStartedData> = {}): EvaluationStartedData {
+function started(
+  overrides: Partial<EvaluationStartedData> = {},
+): EvaluationStartedData {
   return {
     evaluationId: "eval-1",
     evaluatorId: "monitor-1",
@@ -17,7 +19,9 @@ function started(overrides: Partial<EvaluationStartedData> = {}): EvaluationStar
   };
 }
 
-function reported(overrides: Partial<EvaluationReportedData> = {}): EvaluationReportedData {
+function reported(
+  overrides: Partial<EvaluationReportedData> = {},
+): EvaluationReportedData {
   return {
     evaluationId: "eval-1",
     evaluatorId: "monitor-1",
@@ -95,7 +99,10 @@ describe("evaluationAnalytics projection", () => {
     });
 
     it("still widens identity fields the terminal event did not carry", () => {
-      const afterReport = applyEvaluationReported(initEvaluationState(), reported());
+      const afterReport = applyEvaluationReported(
+        initEvaluationState(),
+        reported(),
+      );
 
       const afterLateStart = applyEvaluationStarted(
         afterReport,
@@ -135,7 +142,9 @@ describe("evaluationAnalytics projection", () => {
      * @scenario "A metadata key carried by both events resolves the same way in either order"
      */
     it("resolves a metadata key both events carry in favour of the report, either way round", () => {
-      const startedEvent = started({ metadata: { stage: "start", thread: "t-1" } });
+      const startedEvent = started({
+        metadata: { stage: "start", thread: "t-1" },
+      });
       const reportedEvent = reported({ metadata: { stage: "final" } });
 
       const startedThenReported = applyEvaluationReported(
@@ -151,7 +160,9 @@ describe("evaluationAnalytics projection", () => {
         stage: "final",
         thread: "t-1",
       });
-      expect(reportedThenStarted.attributes).toEqual(startedThenReported.attributes);
+      expect(reportedThenStarted.attributes).toEqual(
+        startedThenReported.attributes,
+      );
     });
   });
 

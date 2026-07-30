@@ -1,4 +1,9 @@
-import { ch, defineTable, replacing, type TableRow } from "@langwatch/clickhouse";
+import {
+  ch,
+  defineTable,
+  replacing,
+  type TableRow,
+} from "@langwatch/clickhouse";
 
 /**
  * The run row (ADR-099). The eleven counter columns ADR-103 decision 1 retires

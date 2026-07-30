@@ -16,8 +16,8 @@ import {
   sha256,
   stableStringify,
   timestampMs,
-  uint32Number,
   type UnknownRecord,
+  uint32Number,
 } from "./serialization";
 
 /** The maximum size of one record's canonical payload, before it is rejected. */

@@ -12,11 +12,7 @@ import {
   runIsNewer,
   runRank,
 } from "./runIdentity";
-import type {
-  RequestedData,
-  RunCompletedData,
-  RunFailedData,
-} from "./schema";
+import type { RequestedData, RunCompletedData, RunFailedData } from "./schema";
 import { topicClusteringSearchAfterSchema } from "./schema";
 
 /**
@@ -140,7 +136,8 @@ export function onTopicClusteringWake(
   state: TopicClusteringScheduleState,
   ctx: ProcessContext,
 ): Step {
-  if (isRunInFlight(state.currentRun, ctx.now)) return settle(state, ctx, ctx.now);
+  if (isRunInFlight(state.currentRun, ctx.now))
+    return settle(state, ctx, ctx.now);
   return startRun(mintScheduledRunId(ctx.now), ctx, ctx.now);
 }
 

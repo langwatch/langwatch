@@ -1,9 +1,9 @@
 import { checkTypeStringRatchet } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import {
-    checkEvaluationProcessingRatchet,
-    currentEvaluationProcessingTypeStrings,
-    EVALUATION_PROCESSING_TYPE_STRING_SNAPSHOT,
+  checkEvaluationProcessingRatchet,
+  currentEvaluationProcessingTypeStrings,
+  EVALUATION_PROCESSING_TYPE_STRING_SNAPSHOT,
 } from "./ratchet";
 
 describe("the evaluation-processing type-string ratchet (ADR-105 decision 10)", () => {
@@ -23,7 +23,10 @@ describe("the evaluation-processing type-string ratchet (ADR-105 decision 10)", 
   it("would fail if a committed string went missing — proving the check actually checks something", () => {
     const violations = checkTypeStringRatchet({
       snapshot: {
-        evaluation: ["lw.evaluation.started", "lw.evaluation.a_type_that_used_to_exist"],
+        evaluation: [
+          "lw.evaluation.started",
+          "lw.evaluation.a_type_that_used_to_exist",
+        ],
       },
       current: currentEvaluationProcessingTypeStrings(),
     });

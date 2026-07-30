@@ -1,8 +1,18 @@
+import type {
+  EvolveStep,
+  HandlerContext,
+  IntentDef,
+  ProcessContext,
+} from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
-import type { EvolveStep, HandlerContext, IntentDef, ProcessContext } from "@langwatch/event-sourcing";
 import { z } from "zod";
+import type {
+  EvaluatorResultData,
+  RunCompletedData,
+  RunStartedData,
+  TargetResultData,
+} from "./schema";
 import { parseExperimentRunAggregateId } from "./schema";
-import type { EvaluatorResultData, RunCompletedData, RunStartedData, TargetResultData } from "./schema";
 
 const logger = createLogger(
   "langwatch:experiment-run-processing:experiment-run-execution-process",
@@ -72,7 +82,10 @@ export interface ExperimentRunExecutionIntents {
   readonly failRun: IntentDef<typeof experimentRunExecutionFailRunIntentSchema>;
 }
 
-type Step = EvolveStep<ExperimentRunExecutionState, ExperimentRunExecutionIntents>;
+type Step = EvolveStep<
+  ExperimentRunExecutionState,
+  ExperimentRunExecutionIntents
+>;
 
 /**
  * Schedule from the present, never from business time alone. A backed-up
@@ -198,7 +211,12 @@ export function onExperimentRunExecutionWake(
     intents: [
       {
         type: "failRun",
-        payload: { runId, experimentId, stalledAt: ctx.now, code: EXPERIMENT_RUN_STALLED_CODE },
+        payload: {
+          runId,
+          experimentId,
+          stalledAt: ctx.now,
+          code: EXPERIMENT_RUN_STALLED_CODE,
+        },
       },
     ],
     nextWakeAt: null,
@@ -227,7 +245,10 @@ export interface ExperimentRunExecutionDeps {
   readonly signalStop: (params: { runId: string }) => Promise<void>;
   /** Marks the cached run-state record failed, with the failure code.
    * Best-effort: the record is routinely absent. */
-  readonly markRunFailed: (params: { runId: string; code: string }) => Promise<void>;
+  readonly markRunFailed: (params: {
+    runId: string;
+    code: string;
+  }) => Promise<void>;
 }
 
 /**
@@ -245,7 +266,11 @@ export async function deliverExperimentRunExecutionFailRun(
   deps: ExperimentRunExecutionDeps,
 ): Promise<void> {
   logger.info(
-    { tenantId: ctx.tenantId, runId: payload.runId, experimentId: payload.experimentId },
+    {
+      tenantId: ctx.tenantId,
+      runId: payload.runId,
+      experimentId: payload.experimentId,
+    },
     "Deadline fired for an experiment run with no live process — writing terminal state",
   );
 

@@ -1,6 +1,9 @@
 import { deriveAppendMapping } from "@langwatch/clickhouse";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { MetricFactsContribution, SessionMetricSeriesRecord } from "./schema";
+import type {
+  MetricFactsContribution,
+  SessionMetricSeriesRecord,
+} from "./schema";
 import { sessionMetricSeriesRecordSchema } from "./schema";
 import { sessionMetricSeriesTable } from "./table";
 

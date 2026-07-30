@@ -19,8 +19,6 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { scalarsFromCanonicalAttributes } from "../metric-processing/canonical/attributes";
-import { CODING_AGENT_REGISTRY } from "./agents";
 import type {
   CodingAgent,
   CodingAgentEvent,
@@ -28,6 +26,8 @@ import type {
   CodingAgentSignal,
   TokenType,
 } from "../agents/_types";
+import { scalarsFromCanonicalAttributes } from "../metric-processing/canonical/attributes";
+import { CODING_AGENT_REGISTRY } from "./agents";
 
 const logger = createLogger("langwatch:coding-agent:normalization");
 

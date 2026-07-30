@@ -29,7 +29,10 @@ describe("the metric-processing type-string ratchet (ADR-105 decision 10)", () =
       current: currentMetricProcessingTypeStrings(),
     });
     expect(violations).toEqual([
-      { declaration: "metric", missing: ["lw.obs.metric.a_type_that_used_to_exist"] },
+      {
+        declaration: "metric",
+        missing: ["lw.obs.metric.a_type_that_used_to_exist"],
+      },
     ]);
   });
 });

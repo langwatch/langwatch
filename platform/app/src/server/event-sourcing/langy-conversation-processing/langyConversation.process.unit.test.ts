@@ -21,11 +21,18 @@ describe("when the agent turn is accepted", () => {
       ctx,
     );
 
-    expect(step.state).toMatchObject({ currentTurnId: "turn-1", turnStatus: "running" });
+    expect(step.state).toMatchObject({
+      currentTurnId: "turn-1",
+      turnStatus: "running",
+    });
     expect(step.intents).toEqual([
       {
         type: "workerDispatch",
-        payload: { conversationId: "conv-1", turnId: "turn-1", resumeFromTurnId: null },
+        payload: {
+          conversationId: "conv-1",
+          turnId: "turn-1",
+          resumeFromTurnId: null,
+        },
       },
     ]);
   });
@@ -73,7 +80,10 @@ describe("when the agent responds", () => {
       autoTitleRequested: true,
     });
     expect(step.intents).toEqual([
-      { type: "generateTitle", payload: { conversationId: "conv-1", turnId: "turn-1" } },
+      {
+        type: "generateTitle",
+        payload: { conversationId: "conv-1", turnId: "turn-1" },
+      },
     ]);
   });
 
@@ -138,7 +148,10 @@ describe("when the response fails outright", () => {
 
     const step = handleAgentResponseFailed(running, { turnId: "turn-1" });
 
-    expect(step.state).toMatchObject({ currentTurnId: null, turnStatus: "failed" });
+    expect(step.state).toMatchObject({
+      currentTurnId: null,
+      turnStatus: "failed",
+    });
   });
 });
 
@@ -180,7 +193,10 @@ describe("when the title source changes", () => {
     const derived = handleTitleGenerated(initLangyConversationProcessState());
     expect(derived.state.titleSource).toBe("auto");
 
-    const userState = { ...initLangyConversationProcessState(), titleSource: "user" as const };
+    const userState = {
+      ...initLangyConversationProcessState(),
+      titleSource: "user" as const,
+    };
     const stillUser = handleTitleGenerated(userState);
     expect(stillUser.state.titleSource).toBe("user");
   });

@@ -7,10 +7,10 @@ import {
 import {
   ConfigurationError,
   definePipeline,
-  validateMount,
   type GroupKey,
   type Metrics,
   type Mount,
+  validateMount,
 } from "@langwatch/event-sourcing";
 import {
   applyLogFactsContributed,
@@ -40,7 +40,10 @@ import {
   metricFactsContributionSchema,
   spanFactsContributionSchema,
 } from "./schema";
-import { mapSessionMetricSeries, toSessionMetricSeriesRow } from "./sessionMetricSeries.projection";
+import {
+  mapSessionMetricSeries,
+  toSessionMetricSeriesRow,
+} from "./sessionMetricSeries.projection";
 import {
   codingAgentSessionsTable,
   codingAgentTraceSessionsTable,
@@ -92,7 +95,10 @@ export function sessionMetricSeriesGroupKey(args: {
 export function codingAgentContributionCommandGroupKey(args: {
   readonly tenantId: string;
   readonly sessionId: string;
-  readonly command: "contributeSpanFacts" | "contributeLogFacts" | "contributeMetricFacts";
+  readonly command:
+    | "contributeSpanFacts"
+    | "contributeLogFacts"
+    | "contributeMetricFacts";
 }): GroupKey {
   return {
     tenantId: args.tenantId,

@@ -244,7 +244,9 @@ export class StoredObjectsRepository {
   }): Promise<{ totalBytes: number; objectCount: number }> {
     const client = this.resolveClient(projectId);
     const purposePredicate = purpose ? "AND t.purpose = {purpose:String}" : "";
-    const innerPurposePredicate = purpose ? "AND purpose = {purpose:String}" : "";
+    const innerPurposePredicate = purpose
+      ? "AND purpose = {purpose:String}"
+      : "";
 
     const result = await client.query({
       tenantId: projectId,

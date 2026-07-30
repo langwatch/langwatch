@@ -1,74 +1,82 @@
 import {
-    type ClickHouseClient,
-    clickhouseAppend,
-    clickhouseReplacing,
-    type FoldStateCache,
+  type ClickHouseClient,
+  clickhouseAppend,
+  clickhouseReplacing,
+  type FoldStateCache,
 } from "@langwatch/clickhouse";
 import {
-    ConfigurationError,
-    definePipeline,
-    validateMount,
-    type AppendStore,
-    type GroupKey,
-    type Metrics,
-    type Mount,
-    type ReplaceStore,
+  type AppendStore,
+  ConfigurationError,
+  definePipeline,
+  type GroupKey,
+  type Metrics,
+  type Mount,
+  type ReplaceStore,
+  validateMount,
 } from "@langwatch/event-sourcing";
 import { addAnnotation } from "./addAnnotation.command";
 import { assignTopic } from "./assignTopic.command";
 import { bulkSyncAnnotations } from "./bulkSyncAnnotations.command";
 import { changeTraceName } from "./changeTraceName.command";
-import { TRACE_PIPELINE_NAME, TRACE_PIPELINE_PREFIX, traceEvents } from "./events";
+import {
+  TRACE_PIPELINE_NAME,
+  TRACE_PIPELINE_PREFIX,
+  traceEvents,
+} from "./events";
 import { recordLogContribution } from "./recordLogContribution.command";
 import { recordMetricCorrelation } from "./recordMetricCorrelation.command";
 import { recordSpan } from "./recordSpan.command";
 import { removeAnnotation } from "./removeAnnotation.command";
 import { resolveOrigin } from "./resolveOrigin.command";
 import {
-    annotationRefSchema,
-    annotationsBulkSyncSchema,
-    canonicalSpanSchema,
-    logContributionSchema,
-    metricCorrelationSchema,
-    originResolutionSchema,
-    topicAssignmentSchema,
-    traceNameChangeSchema,
+  annotationRefSchema,
+  annotationsBulkSyncSchema,
+  canonicalSpanSchema,
+  logContributionSchema,
+  metricCorrelationSchema,
+  originResolutionSchema,
+  topicAssignmentSchema,
+  traceNameChangeSchema,
 } from "./schema";
 import {
-    mapSpanReceived,
-    type StoredSpanRecord,
-    toStoredSpanRow,
+  mapSpanReceived,
+  type StoredSpanRecord,
+  toStoredSpanRow,
 } from "./spanStorage.projection";
-import { storedSpansTable, traceAnalyticsTable, traceSummariesTable } from "./table";
 import {
-    initTraceAnalyticsState,
-    traceAnalyticsRowMapping,
-    traceAnalyticsStateSchema,
-    TRACE_ANALYTICS_STATE_VERSION,
-    handleAnnotationAdded as analyticsHandleAnnotationAdded,
-    handleAnnotationRemoved as analyticsHandleAnnotationRemoved,
-    handleAnnotationsBulkSynced as analyticsHandleAnnotationsBulkSynced,
-    handleOriginResolved as analyticsHandleOriginResolved,
-    handleSpanReceived as analyticsHandleSpanReceived,
-    handleTopicAssigned as analyticsHandleTopicAssigned,
-    handleTraceNameChanged as analyticsHandleTraceNameChanged,
-    type TraceAnalyticsState,
+  storedSpansTable,
+  traceAnalyticsTable,
+  traceSummariesTable,
+} from "./table";
+import {
+  handleAnnotationAdded as analyticsHandleAnnotationAdded,
+  handleAnnotationRemoved as analyticsHandleAnnotationRemoved,
+  handleAnnotationsBulkSynced as analyticsHandleAnnotationsBulkSynced,
+  handleOriginResolved as analyticsHandleOriginResolved,
+  handleSpanReceived as analyticsHandleSpanReceived,
+  handleTopicAssigned as analyticsHandleTopicAssigned,
+  handleTraceNameChanged as analyticsHandleTraceNameChanged,
+  initTraceAnalyticsState,
+  TRACE_ANALYTICS_STATE_VERSION,
+  type TraceAnalyticsState,
+  traceAnalyticsRowMapping,
+  traceAnalyticsStateSchema,
 } from "./traceAnalytics.projection";
 import {
-    handleAnnotationAdded as summaryHandleAnnotationAdded,
-    handleAnnotationRemoved as summaryHandleAnnotationRemoved,
-    handleAnnotationsBulkSynced as summaryHandleAnnotationsBulkSynced,
-    handleLogContributed,
-    handleMetricDataPointCorrelated,
-    handleOriginResolved as summaryHandleOriginResolved,
-    handleSpanReceived as summaryHandleSpanReceived,
-    handleTopicAssigned as summaryHandleTopicAssigned,
-    handleTraceNameChanged as summaryHandleTraceNameChanged,
-    initTraceSummaryState,
-    traceSummaryRowMapping,
-    traceSummaryStateSchema,
-    TRACE_SUMMARY_STATE_VERSION,
-    type TraceSummaryState,
+  handleLogContributed,
+  handleMetricDataPointCorrelated,
+  initTraceSummaryState,
+  handleAnnotationAdded as summaryHandleAnnotationAdded,
+  handleAnnotationRemoved as summaryHandleAnnotationRemoved,
+  handleAnnotationsBulkSynced as summaryHandleAnnotationsBulkSynced,
+  handleOriginResolved as summaryHandleOriginResolved,
+  handleSpanReceived as summaryHandleSpanReceived,
+  handleTopicAssigned as summaryHandleTopicAssigned,
+  handleTraceNameChanged as summaryHandleTraceNameChanged,
+  TRACE_SUMMARY_STATE_VERSION,
+  type TraceSummaryState,
+  traceSummaryRowMapping,
+  traceSummaryStateSchema,
 } from "./traceSummary.projection";
 
 const DEFAULT_RETENTION_DAYS = 308;
@@ -122,12 +130,26 @@ export function traceCommandGroupKey(args: {
  * `batch`, not `none`: one delivery may carry several spans for one trace,
  * applied in order as a single unit of work.
  */
-export function traceSummaryMount(store: ReplaceStore<TraceSummaryState>): Mount {
-  return { projection: "fold", store: store.kind, scope: "aggregate", collapse: "batch" };
+export function traceSummaryMount(
+  store: ReplaceStore<TraceSummaryState>,
+): Mount {
+  return {
+    projection: "fold",
+    store: store.kind,
+    scope: "aggregate",
+    collapse: "batch",
+  };
 }
 
-export function traceAnalyticsMount(store: ReplaceStore<TraceAnalyticsState>): Mount {
-  return { projection: "fold", store: store.kind, scope: "aggregate", collapse: "batch" };
+export function traceAnalyticsMount(
+  store: ReplaceStore<TraceAnalyticsState>,
+): Mount {
+  return {
+    projection: "fold",
+    store: store.kind,
+    scope: "aggregate",
+    collapse: "batch",
+  };
 }
 
 /**
@@ -136,7 +158,12 @@ export function traceAnalyticsMount(store: ReplaceStore<TraceAnalyticsState>): M
  * the store's own bulk write.
  */
 export function spanStorageMount(store: AppendStore<StoredSpanRecord>): Mount {
-  return { projection: "map", store: store.kind, scope: "event", collapse: "none" };
+  return {
+    projection: "map",
+    store: store.kind,
+    scope: "event",
+    collapse: "none",
+  };
 }
 
 /** Refuses an illegal mount at composition, not on the first delivery (ADR-106). */
@@ -160,7 +187,9 @@ export interface TraceProcessingPipelineDeps {
   readonly metrics?: Metrics;
 }
 
-export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps) {
+export function createTraceProcessingPipeline(
+  deps: TraceProcessingPipelineDeps,
+) {
   const summaryStore = clickhouseReplacing({
     client: deps.client,
     table: traceSummariesTable,
@@ -185,7 +214,10 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
   });
   assertMountIsLegal("traceAnalytics", traceAnalyticsMount(analyticsStore));
 
-  const spansStore = clickhouseAppend<StoredSpanRecord, typeof storedSpansTable.columns>({
+  const spansStore = clickhouseAppend<
+    StoredSpanRecord,
+    typeof storedSpansTable.columns
+  >({
     client: deps.client,
     table: storedSpansTable,
     toRow: toStoredSpanRow,
@@ -207,16 +239,34 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
       metricDataPointCorrelated: (d) => d.traceId,
     })
 
-    .withCommand("recordSpan", { input: canonicalSpanSchema, handle: recordSpan })
-    .withCommand("assignTopic", { input: topicAssignmentSchema, handle: assignTopic })
-    .withCommand("resolveOrigin", { input: originResolutionSchema, handle: resolveOrigin })
-    .withCommand("addAnnotation", { input: annotationRefSchema, handle: addAnnotation })
-    .withCommand("removeAnnotation", { input: annotationRefSchema, handle: removeAnnotation })
+    .withCommand("recordSpan", {
+      input: canonicalSpanSchema,
+      handle: recordSpan,
+    })
+    .withCommand("assignTopic", {
+      input: topicAssignmentSchema,
+      handle: assignTopic,
+    })
+    .withCommand("resolveOrigin", {
+      input: originResolutionSchema,
+      handle: resolveOrigin,
+    })
+    .withCommand("addAnnotation", {
+      input: annotationRefSchema,
+      handle: addAnnotation,
+    })
+    .withCommand("removeAnnotation", {
+      input: annotationRefSchema,
+      handle: removeAnnotation,
+    })
     .withCommand("bulkSyncAnnotations", {
       input: annotationsBulkSyncSchema,
       handle: bulkSyncAnnotations,
     })
-    .withCommand("changeTraceName", { input: traceNameChangeSchema, handle: changeTraceName })
+    .withCommand("changeTraceName", {
+      input: traceNameChangeSchema,
+      handle: changeTraceName,
+    })
     .withCommand("recordLogContribution", {
       input: logContributionSchema,
       handle: recordLogContribution,
@@ -260,7 +310,10 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
       store: analyticsStore,
     })
 
-    .withMap("spanStorage", { on: { spanReceived: mapSpanReceived }, store: spansStore })
+    .withMap("spanStorage", {
+      on: { spanReceived: mapSpanReceived },
+      store: spansStore,
+    })
 
     .build({ metrics: deps.metrics });
 }

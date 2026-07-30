@@ -7,7 +7,12 @@ import {
 } from "../ratchet";
 
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  createLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
 }));
 
 describe("the billing-reporting type-string ratchet (ADR-105 decision 10)", () => {
@@ -17,14 +22,26 @@ describe("the billing-reporting type-string ratchet (ADR-105 decision 10)", () =
   });
 
   it("commits every type string every declaration currently produces", () => {
-    expect(BILLING_REPORTING_TYPE_STRING_SNAPSHOT).toEqual(currentBillingReportingTypeStrings());
+    expect(BILLING_REPORTING_TYPE_STRING_SNAPSHOT).toEqual(
+      currentBillingReportingTypeStrings(),
+    );
   });
 
   it("would fail if a committed intent type went missing — proving the check actually checks something", () => {
     const violations = checkTypeStringRatchet({
-      snapshot: { billingMeterPoke: ["billingMeterPoke/reportUsage", "billingMeterPoke/aTypeThatUsedToExist"] },
+      snapshot: {
+        billingMeterPoke: [
+          "billingMeterPoke/reportUsage",
+          "billingMeterPoke/aTypeThatUsedToExist",
+        ],
+      },
       current: currentBillingReportingTypeStrings(),
     });
-    expect(violations).toEqual([{ declaration: "billingMeterPoke", missing: ["billingMeterPoke/aTypeThatUsedToExist"] }]);
+    expect(violations).toEqual([
+      {
+        declaration: "billingMeterPoke",
+        missing: ["billingMeterPoke/aTypeThatUsedToExist"],
+      },
+    ]);
   });
 });

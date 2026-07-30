@@ -1,22 +1,24 @@
-import { type ClickHouseClient, clickhouseReplacing } from "@langwatch/clickhouse";
+import {
+  type ClickHouseClient,
+  clickhouseReplacing,
+} from "@langwatch/clickhouse";
 import {
   ConfigurationError,
   definePipeline,
-  validateMount,
   type GroupKey,
   type Metrics,
   type Mount,
+  validateMount,
 } from "@langwatch/event-sourcing";
-import { TOPIC_CLUSTERING_PIPELINE_NAME, TOPIC_CLUSTERING_PIPELINE_PREFIX, topicClusteringEvents } from "./events";
 import {
-  topicClusteringProcess,
+  TOPIC_CLUSTERING_PIPELINE_NAME,
+  TOPIC_CLUSTERING_PIPELINE_PREFIX,
+  topicClusteringEvents,
+} from "./events";
+import {
   type TopicClusteringDispatchPorts,
+  topicClusteringProcess,
 } from "./process";
-import {
-  applyTopicsRecorded,
-  initTopicModelState,
-  topicModelStateSchema,
-} from "./projections/topicModel";
 import {
   handleRunCompleted as applyRunHistoryRunCompleted,
   handleRunFailed as applyRunHistoryRunFailed,
@@ -32,21 +34,43 @@ import {
   initRunStatusState,
   runStatusStateSchema,
 } from "./projections/runStatus";
+import {
+  applyTopicsRecorded,
+  initTopicModelState,
+  topicModelStateSchema,
+} from "./projections/topicModel";
 import { recordClusteringRunCompleted } from "./recordClusteringRunCompleted.command";
 import { recordClusteringRunFailed } from "./recordClusteringRunFailed.command";
 import { recordClusteringRunStarted } from "./recordClusteringRunStarted.command";
 import { recordTopics } from "./recordTopics.command";
 import { requestClustering } from "./requestClustering.command";
-import { foldStateRow, topicClusteringRunHistoryTable, topicClusteringRunStatusTable, topicModelTable } from "./tables";
+import {
+  foldStateRow,
+  topicClusteringRunHistoryTable,
+  topicClusteringRunStatusTable,
+  topicModelTable,
+} from "./tables";
 
-export { TOPIC_CLUSTERING_PIPELINE_NAME, TOPIC_CLUSTERING_PIPELINE_PREFIX } from "./events";
-export type { TopicClusteringDispatchPorts, TopicClusteringRunIntentPayload } from "./process";
-export { TOPIC_CLUSTERING_STALE_RUN_MS, nextDailySlot } from "./process";
+export {
+  TOPIC_CLUSTERING_PIPELINE_NAME,
+  TOPIC_CLUSTERING_PIPELINE_PREFIX,
+} from "./events";
+export type {
+  TopicClusteringDispatchPorts,
+  TopicClusteringRunIntentPayload,
+} from "./process";
+export { nextDailySlot, TOPIC_CLUSTERING_STALE_RUN_MS } from "./process";
+export type {
+  RunHistoryOutcome,
+  RunHistoryViewEntry,
+} from "./projections/runHistory";
+export {
+  deriveRunHistoryView,
+  RUN_HISTORY_LIMIT,
+} from "./projections/runHistory";
 export type { RunStatusView } from "./projections/runStatus";
 export { deriveRunStatusView } from "./projections/runStatus";
-export type { RunHistoryViewEntry, RunHistoryOutcome } from "./projections/runHistory";
-export { deriveRunHistoryView, RUN_HISTORY_LIMIT } from "./projections/runHistory";
-export type { TopicModelView, ProjectedTopic } from "./projections/topicModel";
+export type { ProjectedTopic, TopicModelView } from "./projections/topicModel";
 export { deriveTopicModelView } from "./projections/topicModel";
 
 /**
@@ -64,14 +88,26 @@ export const TOPIC_MODEL_VERSION_PIN = "2026-07-20";
 /** One lane per project everywhere: the aggregate is the project's clustering
  * stream, and every fold, command and the process manager mirror it 1:1. */
 function projectScope(tenantId: string) {
-  return { kind: "aggregate", aggregateType: TOPIC_CLUSTERING_PIPELINE_NAME, aggregateId: tenantId } as const;
+  return {
+    kind: "aggregate",
+    aggregateType: TOPIC_CLUSTERING_PIPELINE_NAME,
+    aggregateId: tenantId,
+  } as const;
 }
 
-export function topicClusteringCommandGroupKey(args: { tenantId: string }): GroupKey {
-  return { tenantId: args.tenantId, lane: { kind: "command" }, scope: projectScope(args.tenantId) };
+export function topicClusteringCommandGroupKey(args: {
+  tenantId: string;
+}): GroupKey {
+  return {
+    tenantId: args.tenantId,
+    lane: { kind: "command" },
+    scope: projectScope(args.tenantId),
+  };
 }
 
-export function topicClusteringProcessGroupKey(args: { tenantId: string }): GroupKey {
+export function topicClusteringProcessGroupKey(args: {
+  tenantId: string;
+}): GroupKey {
   return {
     tenantId: args.tenantId,
     lane: { kind: "processManager", name: "topicClustering" },
@@ -79,7 +115,10 @@ export function topicClusteringProcessGroupKey(args: { tenantId: string }): Grou
   };
 }
 
-export function topicClusteringFoldGroupKey(args: { tenantId: string; projection: string }): GroupKey {
+export function topicClusteringFoldGroupKey(args: {
+  tenantId: string;
+  projection: string;
+}): GroupKey {
   return {
     tenantId: args.tenantId,
     lane: { kind: "fold", name: args.projection },
@@ -109,7 +148,9 @@ export interface TopicClusteringProcessingDeps {
   readonly ports: TopicClusteringDispatchPorts;
 }
 
-export function createTopicClusteringProcessingPipeline(deps: TopicClusteringProcessingDeps) {
+export function createTopicClusteringProcessingPipeline(
+  deps: TopicClusteringProcessingDeps,
+) {
   const runStatusStore = clickhouseReplacing({
     client: deps.client,
     table: topicClusteringRunStatusTable,
@@ -167,7 +208,10 @@ export function createTopicClusteringProcessingPipeline(deps: TopicClusteringPro
     .prefix(TOPIC_CLUSTERING_PIPELINE_PREFIX)
     .events(topicClusteringEvents)
     .id(idByProjectId)
-    .withCommand("requestClustering", { input: topicClusteringEvents.requested, handle: requestClustering })
+    .withCommand("requestClustering", {
+      input: topicClusteringEvents.requested,
+      handle: requestClustering,
+    })
     .withCommand("recordClusteringRunStarted", {
       input: topicClusteringEvents.runStarted,
       handle: recordClusteringRunStarted,
@@ -180,7 +224,10 @@ export function createTopicClusteringProcessingPipeline(deps: TopicClusteringPro
       input: topicClusteringEvents.runFailed,
       handle: recordClusteringRunFailed,
     })
-    .withCommand("recordTopics", { input: topicClusteringEvents.topicsRecorded, handle: recordTopics })
+    .withCommand("recordTopics", {
+      input: topicClusteringEvents.topicsRecorded,
+      handle: recordTopics,
+    })
     .withFold("topicClusteringRunStatus", {
       state: runStatusStateSchema,
       init: initRunStatusState,

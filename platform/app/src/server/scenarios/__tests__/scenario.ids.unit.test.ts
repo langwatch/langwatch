@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   deriveBatchRunId,
   deriveScenarioRunId,
-  generateScenarioRunId,
   generateBatchRunId,
+  generateScenarioRunId,
 } from "../scenario.ids";
 
 describe("generateScenarioRunId()", () => {

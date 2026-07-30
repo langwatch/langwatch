@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-    applyEvaluationReported,
-    applyEvaluationStarted,
-    initEvaluationState,
+  applyEvaluationReported,
+  applyEvaluationStarted,
+  initEvaluationState,
 } from "./evaluationAnalytics.projection";
 import type { EvaluationReportedData, EvaluationState } from "./schema";
 import { evaluationAnalyticsRow, evaluationAnalyticsTable } from "./table";
@@ -120,9 +120,9 @@ describe("evaluationAnalyticsRow mapping", () => {
         occurredAt: 1_750,
       });
 
-      expect(evaluationAnalyticsRow.toRow(reported, ROW_CONTEXT).DurationMs).toBe(
-        750n,
-      );
+      expect(
+        evaluationAnalyticsRow.toRow(reported, ROW_CONTEXT).DurationMs,
+      ).toBe(750n);
     });
 
     it("leaves the trace-hoisted columns null rather than inventing values", () => {

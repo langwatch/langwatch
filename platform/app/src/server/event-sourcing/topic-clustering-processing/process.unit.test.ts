@@ -15,7 +15,12 @@ import { mintManualRunId, mintScheduledRunId, runRank } from "./runIdentity";
 const PROJECT_ID = "project-1";
 
 function ctx(overrides: Partial<ProcessContext> = {}): ProcessContext {
-  return { processKey: PROJECT_ID, tenantId: PROJECT_ID, now: 1_700_000_000_000, ...overrides };
+  return {
+    processKey: PROJECT_ID,
+    tenantId: PROJECT_ID,
+    now: 1_700_000_000_000,
+    ...overrides,
+  };
 }
 
 describe("topicClustering process manager", () => {
@@ -25,7 +30,9 @@ describe("topicClustering process manager", () => {
       const day1 = nextDailySlot(PROJECT_ID, Date.UTC(2026, 6, 17, 0, 0, 0));
       const day2 = nextDailySlot(PROJECT_ID, day1 + 1000);
       expect(new Date(day2).getUTCHours()).toBe(new Date(day1).getUTCHours());
-      expect(new Date(day2).getUTCMinutes()).toBe(new Date(day1).getUTCMinutes());
+      expect(new Date(day2).getUTCMinutes()).toBe(
+        new Date(day1).getUTCMinutes(),
+      );
       expect(day2 - day1).toBe(24 * 60 * 60 * 1000);
     });
 
@@ -46,7 +53,11 @@ describe("topicClustering process manager", () => {
     it("starts a run immediately and reschedules the daily slot", () => {
       const step = onClusteringRequested(
         initTopicClusteringScheduleState(),
-        { projectId: PROJECT_ID, trigger: "manual", occurredAt: 1_700_000_000_000 },
+        {
+          projectId: PROJECT_ID,
+          trigger: "manual",
+          occurredAt: 1_700_000_000_000,
+        },
         ctx(),
       );
       expect(step.state.currentRun).not.toBeNull();
@@ -59,7 +70,11 @@ describe("topicClustering process manager", () => {
       const runId = mintScheduledRunId(1_700_000_000_000);
       const step = onClusteringRequested(
         { currentRun: { runId, page: 1 } },
-        { projectId: PROJECT_ID, trigger: "manual", occurredAt: 1_700_000_100_000 },
+        {
+          projectId: PROJECT_ID,
+          trigger: "manual",
+          occurredAt: 1_700_000_100_000,
+        },
         ctx({ now: 1_700_000_100_000 }),
       );
       expect(step.state.currentRun?.runId).toBe(runId);
@@ -79,17 +94,35 @@ describe("topicClustering process manager", () => {
     });
 
     it("mints the same runId, and the same message key, for a redelivered request", () => {
-      const data = { projectId: PROJECT_ID, trigger: "manual" as const, occurredAt: 1_700_000_000_000 };
-      const first = onClusteringRequested(initTopicClusteringScheduleState(), data, ctx());
-      const second = onClusteringRequested(initTopicClusteringScheduleState(), data, ctx());
+      const data = {
+        projectId: PROJECT_ID,
+        trigger: "manual" as const,
+        occurredAt: 1_700_000_000_000,
+      };
+      const first = onClusteringRequested(
+        initTopicClusteringScheduleState(),
+        data,
+        ctx(),
+      );
+      const second = onClusteringRequested(
+        initTopicClusteringScheduleState(),
+        data,
+        ctx(),
+      );
 
-      expect(first.state.currentRun?.runId).toBe(second.state.currentRun?.runId);
+      expect(first.state.currentRun?.runId).toBe(
+        second.state.currentRun?.runId,
+      );
     });
 
     it("does not start a run for a bootstrap request — it only ensures the schedule exists", () => {
       const step = onClusteringRequested(
         initTopicClusteringScheduleState(),
-        { projectId: PROJECT_ID, trigger: "bootstrap", occurredAt: 1_700_000_000_000 },
+        {
+          projectId: PROJECT_ID,
+          trigger: "bootstrap",
+          occurredAt: 1_700_000_000_000,
+        },
         ctx(),
       );
       expect(step.state.currentRun).toBeNull();
@@ -99,7 +132,11 @@ describe("topicClustering process manager", () => {
   });
 
   describe("given a run completes", () => {
-    const completed = (runId: string, page: number, nextSearchAfter?: [number, string]) => ({
+    const completed = (
+      runId: string,
+      page: number,
+      nextSearchAfter?: [number, string],
+    ) => ({
       projectId: PROJECT_ID,
       runId,
       page,
@@ -114,15 +151,26 @@ describe("topicClustering process manager", () => {
     /** @scenario A large backlog is processed page by page through durable cursors */
     it("continues the walk when a continuation cursor is returned", () => {
       const runId = mintScheduledRunId(1_700_000_000_000);
-      const step = onClusteringRunCompleted({ currentRun: { runId, page: 1 } }, completed(runId, 1, [123, "trace-1"]), ctx());
+      const step = onClusteringRunCompleted(
+        { currentRun: { runId, page: 1 } },
+        completed(runId, 1, [123, "trace-1"]),
+        ctx(),
+      );
       expect(step.state.currentRun).toEqual({ runId, page: 2 });
       expect(step.intents).toHaveLength(1);
-      expect(step.intents[0]).toMatchObject({ type: "run", payload: { runId, page: 2 } });
+      expect(step.intents[0]).toMatchObject({
+        type: "run",
+        payload: { runId, page: 2 },
+      });
     });
 
     it("clears the in-flight run once the final page (no cursor) completes", () => {
       const runId = mintScheduledRunId(1_700_000_000_000);
-      const step = onClusteringRunCompleted({ currentRun: { runId, page: 2 } }, completed(runId, 2), ctx());
+      const step = onClusteringRunCompleted(
+        { currentRun: { runId, page: 2 } },
+        completed(runId, 2),
+        ctx(),
+      );
       expect(step.state.currentRun).toBeNull();
     });
 
@@ -130,7 +178,11 @@ describe("topicClustering process manager", () => {
     it("ignores a stale completion for a run superseded by a newer one", () => {
       const older = mintScheduledRunId(Date.UTC(2026, 6, 17, 9, 30, 0));
       const newer = mintScheduledRunId(Date.UTC(2026, 6, 18, 9, 30, 0));
-      const step = onClusteringRunCompleted({ currentRun: { runId: newer, page: 1 } }, completed(older, 2, [1, "t"]), ctx());
+      const step = onClusteringRunCompleted(
+        { currentRun: { runId: newer, page: 1 } },
+        completed(older, 2, [1, "t"]),
+        ctx(),
+      );
       expect(step.state.currentRun).toEqual({ runId: newer, page: 1 });
     });
   });
@@ -147,14 +199,22 @@ describe("topicClustering process manager", () => {
     /** @scenario A failing clustering effect retries then records a visible failure */
     it("clears the in-flight run", () => {
       const runId = mintScheduledRunId(1_700_000_000_000);
-      const step = onClusteringRunFailed({ currentRun: { runId, page: 1 } }, failed(runId), ctx());
+      const step = onClusteringRunFailed(
+        { currentRun: { runId, page: 1 } },
+        failed(runId),
+        ctx(),
+      );
       expect(step.state.currentRun).toBeNull();
     });
 
     it("ignores a stale failure for a run superseded by a newer one", () => {
       const older = mintScheduledRunId(Date.UTC(2026, 6, 17, 9, 30, 0));
       const newer = mintScheduledRunId(Date.UTC(2026, 6, 18, 9, 30, 0));
-      const step = onClusteringRunFailed({ currentRun: { runId: newer, page: 1 } }, failed(older), ctx());
+      const step = onClusteringRunFailed(
+        { currentRun: { runId: newer, page: 1 } },
+        failed(older),
+        ctx(),
+      );
       expect(step.state.currentRun).toEqual({ runId: newer, page: 1 });
     });
   });
@@ -162,7 +222,10 @@ describe("topicClustering process manager", () => {
   describe("onTopicClusteringWake", () => {
     /** @scenario Daily wake runs clustering and reschedules itself */
     it("starts a scheduled run and reschedules the next daily slot", () => {
-      const step = onTopicClusteringWake(initTopicClusteringScheduleState(), ctx());
+      const step = onTopicClusteringWake(
+        initTopicClusteringScheduleState(),
+        ctx(),
+      );
       expect(step.state.currentRun).not.toBeNull();
       expect(step.intents).toHaveLength(1);
       expect(step.nextWakeAt).toBeGreaterThan(ctx().now);
@@ -171,13 +234,19 @@ describe("topicClustering process manager", () => {
     /** @scenario A run in progress is visible while it is still working */
     it("skips the slot when a run is already in flight", () => {
       const runId = mintScheduledRunId(1_700_000_000_000);
-      const step = onTopicClusteringWake({ currentRun: { runId, page: 1 } }, ctx({ now: 1_700_000_001_000 }));
+      const step = onTopicClusteringWake(
+        { currentRun: { runId, page: 1 } },
+        ctx({ now: 1_700_000_001_000 }),
+      );
       expect(step.state.currentRun?.runId).toBe(runId);
       expect(step.intents).toHaveLength(0);
     });
 
     it("mints a scheduled run id ranked at the wake's own instant", () => {
-      const step = onTopicClusteringWake(initTopicClusteringScheduleState(), ctx());
+      const step = onTopicClusteringWake(
+        initTopicClusteringScheduleState(),
+        ctx(),
+      );
       expect(runRank(step.state.currentRun?.runId ?? "")).toBe(ctx().now);
     });
   });
@@ -186,7 +255,13 @@ describe("topicClustering process manager", () => {
     it("derives the intent type from the process manager's own name and the intent key", () => {
       const ports = { runClusteringPage: vi.fn(async () => undefined) };
       const record = topicClusteringProcess(ports);
-      expect(record.intents.run.messageKey({ runId: "x", page: 1, searchAfter: null })).toBe("run:x:page-1");
+      expect(
+        record.intents.run.messageKey({
+          runId: "x",
+          page: 1,
+          searchAfter: null,
+        }),
+      ).toBe("run:x:page-1");
     });
 
     /** @scenario Duplicate event delivery cannot double-run a slot */
@@ -194,7 +269,9 @@ describe("topicClustering process manager", () => {
       const ports = { runClusteringPage: vi.fn(async () => undefined) };
       const record = topicClusteringProcess(ports);
       const payload = { runId: "x", page: 1, searchAfter: null as const };
-      expect(record.intents.run.messageKey({ ...payload })).toBe(record.intents.run.messageKey({ ...payload }));
+      expect(record.intents.run.messageKey({ ...payload })).toBe(
+        record.intents.run.messageKey({ ...payload }),
+      );
     });
 
     it("delivers through the exact port closed over at the mount", async () => {

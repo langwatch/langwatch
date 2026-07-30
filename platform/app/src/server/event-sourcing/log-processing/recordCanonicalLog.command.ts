@@ -1,5 +1,5 @@
 import type { EmittedEvent } from "@langwatch/event-sourcing";
-import { logProcessingEvents } from "./events";
+import type { logProcessingEvents } from "./events";
 import type { CanonicalLogRecord } from "./schema";
 
 /**

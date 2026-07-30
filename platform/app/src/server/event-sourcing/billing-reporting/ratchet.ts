@@ -3,14 +3,18 @@ import {
   type RatchetViolation,
   type TypeStringSnapshot,
 } from "@langwatch/event-sourcing";
-import { type BillingReportingPipelineDeps, createBillingReportingPipeline } from "./index";
+import {
+  type BillingReportingPipelineDeps,
+  createBillingReportingPipeline,
+} from "./index";
 import snapshot from "./ratchet.snapshot.json";
 
 /** The committed type-string snapshot (ADR-105 decision 10). Additions are
  *  free; a string this file remembers but the pipeline no longer declares
  *  means a persisted event or intent type just lost its route back into
  *  state. */
-export const BILLING_REPORTING_TYPE_STRING_SNAPSHOT: TypeStringSnapshot = snapshot;
+export const BILLING_REPORTING_TYPE_STRING_SNAPSHOT: TypeStringSnapshot =
+  snapshot;
 
 /**
  * What the vocabulary and the sweep's intents currently declare, derived by
@@ -19,8 +23,12 @@ export const BILLING_REPORTING_TYPE_STRING_SNAPSHOT: TypeStringSnapshot = snapsh
  * an intent.
  */
 export function currentBillingReportingTypeStrings(): TypeStringSnapshot {
-  const built = createBillingReportingPipeline({} as BillingReportingPipelineDeps);
-  const snapshot: Record<string, readonly string[]> = { [built.name]: built.eventTypes };
+  const built = createBillingReportingPipeline(
+    {} as BillingReportingPipelineDeps,
+  );
+  const snapshot: Record<string, readonly string[]> = {
+    [built.name]: built.eventTypes,
+  };
   for (const [name, processManager] of Object.entries(built.processManagers)) {
     snapshot[name] = processManager.intentTypes;
   }

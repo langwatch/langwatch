@@ -1,27 +1,37 @@
-import { checkOrderInvariance, type ProcessContext } from "@langwatch/event-sourcing";
+import {
+  checkOrderInvariance,
+  type ProcessContext,
+} from "@langwatch/event-sourcing";
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MatchRecordedData } from "../events";
 import { TerminalDispatchError } from "../intentDispatch";
 import {
-  MAX_PENDING_MATCHES,
   addPending,
   digestBatchKey,
   drainDue,
   initTriggerSettlementState,
+  MAX_PENDING_MATCHES,
   settleBoundary,
+  type TriggerDispatchPorts,
+  type TriggerSettlementState,
   triggerSettlementIntents,
   triggerSettlementOn,
   triggerSettlementOnWake,
-  type TriggerDispatchPorts,
-  type TriggerSettlementState,
 } from "../triggerSettlement.process";
 
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  createLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
 }));
 
-const match = (overrides: Partial<MatchRecordedData> = {}): MatchRecordedData => ({
+const match = (
+  overrides: Partial<MatchRecordedData> = {},
+): MatchRecordedData => ({
   triggerId: "trigger-1",
   traceId: "trace-1",
   action: TriggerAction.SEND_EMAIL,
@@ -38,10 +48,14 @@ const ctx = (overrides: Partial<ProcessContext> = {}): ProcessContext => ({
   ...overrides,
 });
 
-const recordMatch = (state: TriggerSettlementState, data: MatchRecordedData, c: ProcessContext) =>
-  triggerSettlementOn.matchRecorded!(state, data, c);
+const recordMatch = (
+  state: TriggerSettlementState,
+  data: MatchRecordedData,
+  c: ProcessContext,
+) => triggerSettlementOn.matchRecorded!(state, data, c);
 
-const wake = (state: TriggerSettlementState, c: ProcessContext) => triggerSettlementOnWake(state, c);
+const wake = (state: TriggerSettlementState, c: ProcessContext) =>
+  triggerSettlementOnWake(state, c);
 
 describe("trigger settlement process", () => {
   describe("given a trace is already pending", () => {
@@ -60,20 +74,42 @@ describe("trigger settlement process", () => {
       it("coalesces notify matches at one cadence boundary", () => {
         const state: TriggerSettlementState = {
           pendingMatches: {
-            "trace-b": { settleDueAt: 900, dispatchDueAt: 1_000, actionClass: "notify", settleWindowBucket: "30000-0" },
-            "trace-a": { settleDueAt: 800, dispatchDueAt: 1_000, actionClass: "notify", settleWindowBucket: "30000-0" },
+            "trace-b": {
+              settleDueAt: 900,
+              dispatchDueAt: 1_000,
+              actionClass: "notify",
+              settleWindowBucket: "30000-0",
+            },
+            "trace-a": {
+              settleDueAt: 800,
+              dispatchDueAt: 1_000,
+              actionClass: "notify",
+              settleWindowBucket: "30000-0",
+            },
           },
           overflowFlushed: 0,
         };
 
-        expect(drainDue(state, 1_000).boundaries).toEqual([{ key: 1_000, traceIds: ["trace-a", "trace-b"] }]);
+        expect(drainDue(state, 1_000).boundaries).toEqual([
+          { key: 1_000, traceIds: ["trace-a", "trace-b"] },
+        ]);
       });
 
       it("emits persist matches independently", () => {
         const state: TriggerSettlementState = {
           pendingMatches: {
-            "trace-a": { settleDueAt: 800, dispatchDueAt: 1_000, actionClass: "persist", settleWindowBucket: "30000-0" },
-            "trace-b": { settleDueAt: 900, dispatchDueAt: 1_000, actionClass: "persist", settleWindowBucket: "30000-0" },
+            "trace-a": {
+              settleDueAt: 800,
+              dispatchDueAt: 1_000,
+              actionClass: "persist",
+              settleWindowBucket: "30000-0",
+            },
+            "trace-b": {
+              settleDueAt: 900,
+              dispatchDueAt: 1_000,
+              actionClass: "persist",
+              settleWindowBucket: "30000-0",
+            },
           },
           overflowFlushed: 0,
         };
@@ -87,8 +123,18 @@ describe("trigger settlement process", () => {
       it("keeps the next future boundary durable", () => {
         const state: TriggerSettlementState = {
           pendingMatches: {
-            due: { settleDueAt: 800, dispatchDueAt: 1_000, actionClass: "notify", settleWindowBucket: "30000-0" },
-            future: { settleDueAt: 1_800, dispatchDueAt: 2_000, actionClass: "notify", settleWindowBucket: "30000-0" },
+            due: {
+              settleDueAt: 800,
+              dispatchDueAt: 1_000,
+              actionClass: "notify",
+              settleWindowBucket: "30000-0",
+            },
+            future: {
+              settleDueAt: 1_800,
+              dispatchDueAt: 2_000,
+              actionClass: "notify",
+              settleWindowBucket: "30000-0",
+            },
           },
           overflowFlushed: 0,
         };
@@ -101,16 +147,34 @@ describe("trigger settlement process", () => {
   describe("given a persist match completed its settle round", () => {
     describe("when later activity arrives in a new settle window", () => {
       it("creates a fresh persist intent for the later round", () => {
-        const persistMatch = () => match({ action: TriggerAction.ADD_TO_DATASET, actionClass: "persist" });
+        const persistMatch = () =>
+          match({
+            action: TriggerAction.ADD_TO_DATASET,
+            actionClass: "persist",
+          });
 
-        const firstRound = recordMatch(initTriggerSettlementState(), persistMatch(), ctx({ now: 1_000 }));
+        const firstRound = recordMatch(
+          initTriggerSettlementState(),
+          persistMatch(),
+          ctx({ now: 1_000 }),
+        );
         const firstWake = wake(firstRound.state, ctx({ now: 31_000 }));
-        const secondRound = recordMatch(firstWake.state, persistMatch(), ctx({ now: 31_001 }));
+        const secondRound = recordMatch(
+          firstWake.state,
+          persistMatch(),
+          ctx({ now: 31_001 }),
+        );
         const secondWake = wake(secondRound.state, ctx({ now: 61_001 }));
 
-        expect(firstWake.intents.map((intent) => intent.type)).toEqual(["persistMatch"]);
-        expect(firstWake.intents[0]?.payload).toMatchObject({ settleWindowBucket: "30000-0" });
-        expect(secondWake.intents[0]?.payload).toMatchObject({ settleWindowBucket: "30000-1" });
+        expect(firstWake.intents.map((intent) => intent.type)).toEqual([
+          "persistMatch",
+        ]);
+        expect(firstWake.intents[0]?.payload).toMatchObject({
+          settleWindowBucket: "30000-0",
+        });
+        expect(secondWake.intents[0]?.payload).toMatchObject({
+          settleWindowBucket: "30000-1",
+        });
       });
     });
   });
@@ -118,8 +182,16 @@ describe("trigger settlement process", () => {
   describe("given the same intent is minted twice from the same payload", () => {
     it("computes the identical message key, so a redelivery collapses", () => {
       const intents = triggerSettlementIntents({} as TriggerDispatchPorts);
-      const first = intents.notifyDigest.messageKey({ triggerId: "trigger-1", traceIds: ["b", "a"], boundary: 1_000 });
-      const retried = intents.notifyDigest.messageKey({ triggerId: "trigger-1", traceIds: ["a", "b"], boundary: 1_000 });
+      const first = intents.notifyDigest.messageKey({
+        triggerId: "trigger-1",
+        traceIds: ["b", "a"],
+        boundary: 1_000,
+      });
+      const retried = intents.notifyDigest.messageKey({
+        triggerId: "trigger-1",
+        traceIds: ["a", "b"],
+        boundary: 1_000,
+      });
 
       expect(retried).toBe(first);
     });
@@ -127,7 +199,11 @@ describe("trigger settlement process", () => {
 
   describe("given a matchRecorded event is delivered twice", () => {
     it("lands on the same state both times — nothing in it accumulates", () => {
-      const once = recordMatch(initTriggerSettlementState(), match(), ctx({ now: 1_000 }));
+      const once = recordMatch(
+        initTriggerSettlementState(),
+        match(),
+        ctx({ now: 1_000 }),
+      );
       const twice = recordMatch(once.state, match(), ctx({ now: 1_000 }));
 
       expect(twice.state).toEqual(once.state);
@@ -168,7 +244,12 @@ describe("trigger settlement process", () => {
         const pendingMatches = Object.fromEntries(
           Array.from({ length: MAX_PENDING_MATCHES }, (_, index) => [
             `trace-${index}`,
-            { settleDueAt: index, dispatchDueAt: index, actionClass: "notify" as const, settleWindowBucket: "30000-0" },
+            {
+              settleDueAt: index,
+              dispatchDueAt: index,
+              actionClass: "notify" as const,
+              settleWindowBucket: "30000-0",
+            },
           ]),
         );
 
@@ -178,10 +259,20 @@ describe("trigger settlement process", () => {
           MAX_PENDING_MATCHES + 1,
         );
 
-        expect(Object.keys(next.state.pendingMatches)).toHaveLength(MAX_PENDING_MATCHES);
+        expect(Object.keys(next.state.pendingMatches)).toHaveLength(
+          MAX_PENDING_MATCHES,
+        );
         expect(next.state.pendingMatches["trace-0"]).toBeUndefined();
         expect(next.flushed).toEqual([
-          { traceId: "trace-0", match: { settleDueAt: 0, dispatchDueAt: 0, actionClass: "notify", settleWindowBucket: "30000-0" } },
+          {
+            traceId: "trace-0",
+            match: {
+              settleDueAt: 0,
+              dispatchDueAt: 0,
+              actionClass: "notify",
+              settleWindowBucket: "30000-0",
+            },
+          },
         ]);
       });
 
@@ -192,7 +283,8 @@ describe("trigger settlement process", () => {
             {
               settleDueAt: index,
               dispatchDueAt: index === 0 ? 1_000 : index,
-              actionClass: index === 0 ? ("persist" as const) : ("notify" as const),
+              actionClass:
+                index === 0 ? ("persist" as const) : ("notify" as const),
               settleWindowBucket: "30000-0",
             },
           ]),
@@ -207,11 +299,20 @@ describe("trigger settlement process", () => {
         expect(evolution.intents).toEqual([
           {
             type: "persistMatch",
-            payload: { triggerId: "trigger-1", traceId: "trace-0", settleWindowBucket: "30000-0" },
+            payload: {
+              triggerId: "trigger-1",
+              traceId: "trace-0",
+              settleWindowBucket: "30000-0",
+            },
           },
           {
             type: "logOverflow",
-            payload: { triggerId: "trigger-1", traceIds: ["trace-0"], flushed: 1, totalFlushed: 1 },
+            payload: {
+              triggerId: "trigger-1",
+              traceIds: ["trace-0"],
+              flushed: 1,
+              totalFlushed: 1,
+            },
           },
         ]);
       });
@@ -221,10 +322,22 @@ describe("trigger settlement process", () => {
   describe("given a match delivered late, well after its own occurredAt", () => {
     describe("when the same match is redelivered later still", () => {
       it("mints the identical persist intent, so the customer's match is written once", () => {
-        const persist = () => match({ action: TriggerAction.ADD_TO_DATASET, actionClass: "persist" });
+        const persist = () =>
+          match({
+            action: TriggerAction.ADD_TO_DATASET,
+            actionClass: "persist",
+          });
 
-        const first = recordMatch(initTriggerSettlementState(), persist(), ctx({ now: 1_000 }));
-        const redelivered = recordMatch(initTriggerSettlementState(), persist(), ctx({ now: 1_000 }));
+        const first = recordMatch(
+          initTriggerSettlementState(),
+          persist(),
+          ctx({ now: 1_000 }),
+        );
+        const redelivered = recordMatch(
+          initTriggerSettlementState(),
+          persist(),
+          ctx({ now: 1_000 }),
+        );
 
         expect(wake(redelivered.state, ctx({ now: 31_000 })).intents).toEqual(
           wake(first.state, ctx({ now: 31_000 })).intents,
@@ -235,8 +348,8 @@ describe("trigger settlement process", () => {
 
   describe("given activity for one trace under one debounce configuration", () => {
     const bucketOf = (at: number, traceDebounceMs: number) =>
-      addPending(initTriggerSettlementState(), match({ traceDebounceMs }), at).state.pendingMatches["trace-1"]!
-        .settleWindowBucket;
+      addPending(initTriggerSettlementState(), match({ traceDebounceMs }), at)
+        .state.pendingMatches["trace-1"]!.settleWindowBucket;
 
     it("names one round while activity stays inside the window, a new one after it", () => {
       expect(bucketOf(1_000, 30_000)).toBe("30000-0");
@@ -253,27 +366,47 @@ describe("trigger settlement process", () => {
   describe("given two pending matches share the oldest settle instant", () => {
     describe("when the cap forces an eviction", () => {
       it("evicts the same one whatever order the two arrived in", () => {
-        const tied = { settleDueAt: 0, dispatchDueAt: 0, actionClass: "notify" as const, settleWindowBucket: "30000-0" };
+        const tied = {
+          settleDueAt: 0,
+          dispatchDueAt: 0,
+          actionClass: "notify" as const,
+          settleWindowBucket: "30000-0",
+        };
         const filler = Object.fromEntries(
           Array.from({ length: MAX_PENDING_MATCHES - 2 }, (_unused, index) => [
             `trace-${index}`,
-            { settleDueAt: index + 1, dispatchDueAt: index + 1, actionClass: "notify" as const, settleWindowBucket: "30000-0" },
+            {
+              settleDueAt: index + 1,
+              dispatchDueAt: index + 1,
+              actionClass: "notify" as const,
+              settleWindowBucket: "30000-0",
+            },
           ]),
         );
 
         const forwards = addPending(
-          { pendingMatches: { ...filler, "tie-a": tied, "tie-b": tied }, overflowFlushed: 0 },
+          {
+            pendingMatches: { ...filler, "tie-a": tied, "tie-b": tied },
+            overflowFlushed: 0,
+          },
           match({ traceId: "newest" }),
           MAX_PENDING_MATCHES + 1,
         );
         const backwards = addPending(
-          { pendingMatches: { "tie-b": tied, "tie-a": tied, ...filler }, overflowFlushed: 0 },
+          {
+            pendingMatches: { "tie-b": tied, "tie-a": tied, ...filler },
+            overflowFlushed: 0,
+          },
           match({ traceId: "newest" }),
           MAX_PENDING_MATCHES + 1,
         );
 
-        expect(forwards.flushed.map(({ traceId }) => traceId)).toEqual(["tie-a"]);
-        expect(backwards.flushed.map(({ traceId }) => traceId)).toEqual(["tie-a"]);
+        expect(forwards.flushed.map(({ traceId }) => traceId)).toEqual([
+          "tie-a",
+        ]);
+        expect(backwards.flushed.map(({ traceId }) => traceId)).toEqual([
+          "tie-a",
+        ]);
       });
     });
   });
@@ -281,7 +414,10 @@ describe("trigger settlement process", () => {
 
 // ---- intent delivery ----
 
-function makePorts(overrides: Partial<TriggerDispatchPorts> = {}): { ports: TriggerDispatchPorts; claimed: Set<string> } {
+function makePorts(overrides: Partial<TriggerDispatchPorts> = {}): {
+  ports: TriggerDispatchPorts;
+  claimed: Set<string>;
+} {
   const claimed = new Set<string>();
   const ports: TriggerDispatchPorts = {
     triggerIsActive: vi.fn().mockResolvedValue(true),
@@ -306,9 +442,19 @@ describe("trigger settlement intent delivery", () => {
 
   describe("logOverflow", () => {
     it("logs the committed flush count", async () => {
-      const { deliver } = triggerSettlementIntents(makePorts().ports).logOverflow;
+      const { deliver } = triggerSettlementIntents(
+        makePorts().ports,
+      ).logOverflow;
       await expect(
-        deliver({ triggerId: "trigger-1", traceIds: ["trace-1", "trace-2"], flushed: 2, totalFlushed: 2 }, deliverCtx),
+        deliver(
+          {
+            triggerId: "trigger-1",
+            traceIds: ["trace-1", "trace-2"],
+            flushed: 2,
+            totalFlushed: 2,
+          },
+          deliverCtx,
+        ),
       ).resolves.toBeUndefined();
     });
   });
@@ -316,7 +462,9 @@ describe("trigger settlement intent delivery", () => {
   describe("notifyDigest", () => {
     describe("given the trigger was deleted or deactivated since the match", () => {
       it("drops without confirming or sending", async () => {
-        const { ports } = makePorts({ triggerIsActive: vi.fn().mockResolvedValue(false) });
+        const { ports } = makePorts({
+          triggerIsActive: vi.fn().mockResolvedValue(false),
+        });
 
         await triggerSettlementIntents(ports).notifyDigest.deliver(
           { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 },
@@ -332,16 +480,24 @@ describe("trigger settlement intent delivery", () => {
       /** @scenario An automation does not fire when its condition is unmet */
       it("sends only the trace that still confirms, leaving the other unfired", async () => {
         const { ports } = makePorts({
-          confirmSettledMatch: vi.fn(async ({ traceId }) => (traceId === "trace-filtered" ? "filters-failed" : "confirmed")),
+          confirmSettledMatch: vi.fn(async ({ traceId }) =>
+            traceId === "trace-filtered" ? "filters-failed" : "confirmed",
+          ),
         });
 
         await triggerSettlementIntents(ports).notifyDigest.deliver(
-          { triggerId: "trigger-1", traceIds: ["trace-1", "trace-filtered"], boundary: 1_000 },
+          {
+            triggerId: "trigger-1",
+            traceIds: ["trace-1", "trace-filtered"],
+            boundary: 1_000,
+          },
           deliverCtx,
         );
 
         expect(ports.sendNotifyDigest).toHaveBeenCalledTimes(1);
-        expect(ports.sendNotifyDigest).toHaveBeenCalledWith(expect.objectContaining({ traceIds: ["trace-1"] }));
+        expect(ports.sendNotifyDigest).toHaveBeenCalledWith(
+          expect.objectContaining({ traceIds: ["trace-1"] }),
+        );
         expect(ports.claimSend).toHaveBeenCalledTimes(1);
       });
     });
@@ -352,8 +508,14 @@ describe("trigger settlement intent delivery", () => {
         const { ports } = makePorts();
         const { deliver } = triggerSettlementIntents(ports).notifyDigest;
 
-        await deliver({ triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 31_000 }, deliverCtx);
-        await deliver({ triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 61_000 }, deliverCtx);
+        await deliver(
+          { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 31_000 },
+          deliverCtx,
+        );
+        await deliver(
+          { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 61_000 },
+          deliverCtx,
+        );
 
         expect(ports.sendNotifyDigest).toHaveBeenCalledTimes(1);
         expect(ports.claimSend).toHaveBeenCalledTimes(1);
@@ -362,7 +524,9 @@ describe("trigger settlement intent delivery", () => {
 
     describe("given the trace's fold has not caught up yet", () => {
       it("throws so the outbox retries, instead of dropping the match", async () => {
-        const { ports } = makePorts({ confirmSettledMatch: vi.fn().mockResolvedValue("trace-not-settled") });
+        const { ports } = makePorts({
+          confirmSettledMatch: vi.fn().mockResolvedValue("trace-not-settled"),
+        });
 
         await expect(
           triggerSettlementIntents(ports).notifyDigest.deliver(
@@ -377,7 +541,11 @@ describe("trigger settlement intent delivery", () => {
     describe("given the dispatch port fails with a terminal error", () => {
       it("drops as a logged completion, without retrying", async () => {
         const { ports } = makePorts({
-          sendNotifyDigest: vi.fn().mockRejectedValue(new TerminalDispatchError("all recipients suppressed")),
+          sendNotifyDigest: vi
+            .fn()
+            .mockRejectedValue(
+              new TerminalDispatchError("all recipients suppressed"),
+            ),
         });
 
         await expect(
@@ -392,7 +560,11 @@ describe("trigger settlement intent delivery", () => {
 
     describe("given the dispatch port fails with a plain, retryable error", () => {
       it("rethrows for the outbox to retry with backoff", async () => {
-        const { ports } = makePorts({ sendNotifyDigest: vi.fn().mockRejectedValue(new Error("provider timeout")) });
+        const { ports } = makePorts({
+          sendNotifyDigest: vi
+            .fn()
+            .mockRejectedValue(new Error("provider timeout")),
+        });
 
         await expect(
           triggerSettlementIntents(ports).notifyDigest.deliver(
@@ -405,7 +577,11 @@ describe("trigger settlement intent delivery", () => {
 
     describe("given claimSend fails after a successful send", () => {
       it("swallows the claim failure rather than retrying and double-sending", async () => {
-        const { ports } = makePorts({ claimSend: vi.fn().mockRejectedValue(new Error("claim store unavailable")) });
+        const { ports } = makePorts({
+          claimSend: vi
+            .fn()
+            .mockRejectedValue(new Error("claim store unavailable")),
+        });
 
         await expect(
           triggerSettlementIntents(ports).notifyDigest.deliver(
@@ -421,10 +597,16 @@ describe("trigger settlement intent delivery", () => {
   describe("persistMatch", () => {
     describe("given the trace was already claimed", () => {
       it("skips without re-confirming or running the action", async () => {
-        const { ports } = makePorts({ isSendClaimed: vi.fn().mockResolvedValue(true) });
+        const { ports } = makePorts({
+          isSendClaimed: vi.fn().mockResolvedValue(true),
+        });
 
         await triggerSettlementIntents(ports).persistMatch.deliver(
-          { triggerId: "trigger-1", traceId: "trace-1", settleWindowBucket: "30000-0" },
+          {
+            triggerId: "trigger-1",
+            traceId: "trace-1",
+            settleWindowBucket: "30000-0",
+          },
           deliverCtx,
         );
 
@@ -436,12 +618,29 @@ describe("trigger settlement intent delivery", () => {
     describe("given a persist trace only passes filters in a later settle round", () => {
       it("runs the persist action once the later confirm succeeds", async () => {
         const { ports } = makePorts({
-          confirmSettledMatch: vi.fn().mockResolvedValueOnce("filters-failed").mockResolvedValueOnce("confirmed"),
+          confirmSettledMatch: vi
+            .fn()
+            .mockResolvedValueOnce("filters-failed")
+            .mockResolvedValueOnce("confirmed"),
         });
         const { deliver } = triggerSettlementIntents(ports).persistMatch;
 
-        await deliver({ triggerId: "trigger-1", traceId: "trace-1", settleWindowBucket: "30000-0" }, deliverCtx);
-        await deliver({ triggerId: "trigger-1", traceId: "trace-1", settleWindowBucket: "30000-1" }, deliverCtx);
+        await deliver(
+          {
+            triggerId: "trigger-1",
+            traceId: "trace-1",
+            settleWindowBucket: "30000-0",
+          },
+          deliverCtx,
+        );
+        await deliver(
+          {
+            triggerId: "trigger-1",
+            traceId: "trace-1",
+            settleWindowBucket: "30000-1",
+          },
+          deliverCtx,
+        );
 
         expect(ports.runPersistAction).toHaveBeenCalledTimes(1);
         expect(ports.claimSend).toHaveBeenCalledTimes(1);
@@ -450,11 +649,19 @@ describe("trigger settlement intent delivery", () => {
 
     describe("given the persist action fails with a terminal error", () => {
       it("drops as a logged completion without claiming", async () => {
-        const { ports } = makePorts({ runPersistAction: vi.fn().mockRejectedValue(new TerminalDispatchError("dataset deleted")) });
+        const { ports } = makePorts({
+          runPersistAction: vi
+            .fn()
+            .mockRejectedValue(new TerminalDispatchError("dataset deleted")),
+        });
 
         await expect(
           triggerSettlementIntents(ports).persistMatch.deliver(
-            { triggerId: "trigger-1", traceId: "trace-1", settleWindowBucket: "30000-0" },
+            {
+              triggerId: "trigger-1",
+              traceId: "trace-1",
+              settleWindowBucket: "30000-0",
+            },
             deliverCtx,
           ),
         ).resolves.toBeUndefined();

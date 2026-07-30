@@ -12,7 +12,7 @@ import type {
   MetricFactsContribution,
   SpanFactsContribution,
 } from "./schema";
-import type { codingAgentSessionsTable, CodingAgentSessionsRow } from "./table";
+import type { CodingAgentSessionsRow, codingAgentSessionsTable } from "./table";
 
 export { initCodingAgentSessionState };
 
@@ -29,15 +29,27 @@ export const CODING_AGENT_SESSION_STATE_VERSION = "2026-07-28";
 /** Identity that rides on every contribution, applied identically by all three handlers. */
 function withContributionIdentity(
   state: CodingAgentSessionState,
-  data: { sessionId: string; sessionKeySource: string; agent: string; traceId: string | null; occurredAt: number },
+  data: {
+    sessionId: string;
+    sessionKeySource: string;
+    agent: string;
+    traceId: string | null;
+    occurredAt: number;
+  },
 ): CodingAgentSessionState {
   return {
     ...state,
     sessionId: state.sessionId ?? data.sessionId,
     sessionKeySource: state.sessionKeySource || data.sessionKeySource,
     agent: state.agent ?? data.agent,
-    traceIds: data.traceId !== null ? addToBoundedSet(state.traceIds, data.traceId) : state.traceIds,
-    startedAtMs: state.startedAtMs === 0 ? data.occurredAt : Math.min(state.startedAtMs, data.occurredAt),
+    traceIds:
+      data.traceId !== null
+        ? addToBoundedSet(state.traceIds, data.traceId)
+        : state.traceIds,
+    startedAtMs:
+      state.startedAtMs === 0
+        ? data.occurredAt
+        : Math.min(state.startedAtMs, data.occurredAt),
     LastEventOccurredAt: Math.max(state.LastEventOccurredAt, data.occurredAt),
   };
 }
@@ -57,7 +69,10 @@ export function applySpanFactsContributed(
     },
     agent: data.agent,
   });
-  return withContributionIdentity({ ...state, ...next }, { ...data, occurredAt: data.startTimeUnixMs });
+  return withContributionIdentity(
+    { ...state, ...next },
+    { ...data, occurredAt: data.startTimeUnixMs },
+  );
 }
 
 export function applyLogFactsContributed(
@@ -70,7 +85,10 @@ export function applyLogFactsContributed(
     agent: data.agent,
     occurredAtMs: data.timeUnixMs,
   });
-  return withContributionIdentity({ ...state, ...next }, { ...data, occurredAt: data.timeUnixMs });
+  return withContributionIdentity(
+    { ...state, ...next },
+    { ...data, occurredAt: data.timeUnixMs },
+  );
 }
 
 export function applyMetricFactsContributed(
@@ -79,13 +97,22 @@ export function applyMetricFactsContributed(
 ): CodingAgentSessionState {
   const next = applyMetricToCodingAgentSession({
     state,
-    metric: { seriesId: data.seriesId, metricName: data.metricName, attributes: data.attributes, value: data.value },
+    metric: {
+      seriesId: data.seriesId,
+      metricName: data.metricName,
+      attributes: data.attributes,
+      value: data.value,
+    },
   });
-  return withContributionIdentity({ ...state, ...next }, { ...data, traceId: null, occurredAt: data.asOfUnixMs });
+  return withContributionIdentity(
+    { ...state, ...next },
+    { ...data, traceId: null, occurredAt: data.asOfUnixMs },
+  );
 }
 
 /** An empty string in a row column reads back as "unset" (null) in state. */
-const nullIfEmpty = (value: string): string | null => (value === "" ? null : value);
+const nullIfEmpty = (value: string): string | null =>
+  value === "" ? null : value;
 
 /**
  * Hand-written rather than `deriveRowMapping`: `Steps`/`StepStartedAt` are a
@@ -123,10 +150,14 @@ export const codingAgentSessionRow: RowMapping<
       Prompts: state.prompts,
       PromptChars: BigInt(state.promptChars),
       ResponseChars: BigInt(state.responseChars),
-      Steps: state.steps.map((s) => [s.name, s.count, s.failed] as [string, number, boolean]),
+      Steps: state.steps.map(
+        (s) => [s.name, s.count, s.failed] as [string, number, boolean],
+      ),
 
       ToolCounts: new Map(Object.entries(state.toolCounts)),
-      ToolDurationMs: new Map(Object.entries(state.toolDurationMs).map(([k, v]) => [k, BigInt(v)])),
+      ToolDurationMs: new Map(
+        Object.entries(state.toolDurationMs).map(([k, v]) => [k, BigInt(v)]),
+      ),
       FilesTouched: state.filesTouched,
       Skills: state.skills,
       SubAgentTypes: state.subAgentTypes,
@@ -194,14 +225,14 @@ export const codingAgentSessionRow: RowMapping<
       StepStartedAt: state.steps.map((s) => BigInt(s.startedAtMs)),
       MetricSeries: Object.entries(state.metricSeries).map(
         ([seriesId, fact]) =>
-          [seriesId, fact.metricName, fact.type ?? "", fact.decision ?? "", fact.language ?? "", fact.value] as [
-            string,
-            string,
-            string,
-            string,
-            string,
-            number,
-          ],
+          [
+            seriesId,
+            fact.metricName,
+            fact.type ?? "",
+            fact.decision ?? "",
+            fact.language ?? "",
+            fact.value,
+          ] as [string, string, string, string, string, number],
       ),
       LastEventOccurredAt: new Date(state.LastEventOccurredAt),
 
@@ -214,7 +245,14 @@ export const codingAgentSessionRow: RowMapping<
 
   fromRow(row): CodingAgentSessionState {
     const metricSeries: CodingAgentSessionState["metricSeries"] = {};
-    for (const [seriesId, metricName, type, decision, language, value] of row.MetricSeries) {
+    for (const [
+      seriesId,
+      metricName,
+      type,
+      decision,
+      language,
+      value,
+    ] of row.MetricSeries) {
       metricSeries[seriesId] = {
         metricName,
         type: nullIfEmpty(type),
@@ -250,7 +288,9 @@ export const codingAgentSessionRow: RowMapping<
       responseChars: Number(row.ResponseChars),
 
       toolCounts: Object.fromEntries(row.ToolCounts),
-      toolDurationMs: Object.fromEntries([...row.ToolDurationMs].map(([k, v]) => [k, Number(v)])),
+      toolDurationMs: Object.fromEntries(
+        [...row.ToolDurationMs].map(([k, v]) => [k, Number(v)]),
+      ),
       filesTouched: row.FilesTouched,
       skills: row.Skills,
       subAgentTypes: row.SubAgentTypes,

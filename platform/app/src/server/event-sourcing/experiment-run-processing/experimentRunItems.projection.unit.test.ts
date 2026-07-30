@@ -165,8 +165,9 @@ describe("mapTargetResult", () => {
   });
 
   it("clamps a negative duration to zero rather than rejecting it", () => {
-    expect(mapTargetResult({ ...targetData, duration: -50 }).TargetDurationMs)
-      .toBe(0);
+    expect(
+      mapTargetResult({ ...targetData, duration: -50 }).TargetDurationMs,
+    ).toBe(0);
   });
 });
 

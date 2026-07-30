@@ -1,5 +1,5 @@
 import type { EmittedEvent } from "@langwatch/event-sourcing";
-import { evaluationEvents } from "./events";
+import type { evaluationEvents } from "./events";
 import type { EvaluationStartedData } from "./schema";
 
 /** The trust boundary (ADR-105 decision 7): identity and occurredAt are

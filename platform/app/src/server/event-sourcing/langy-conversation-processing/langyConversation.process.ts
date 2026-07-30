@@ -69,7 +69,11 @@ export function handleAgentTurnAccepted(
     return { state, intents: [], nextWakeAt: null };
   }
   return {
-    state: { ...state, currentTurnId: data.turnId, turnStatus: "running" as const },
+    state: {
+      ...state,
+      currentTurnId: data.turnId,
+      turnStatus: "running" as const,
+    },
     intents: [
       {
         type: "workerDispatch" as const,
@@ -93,7 +97,8 @@ export function handleAgentResponded(
     return { state, intents: [], nextWakeAt: null };
   }
   const succeeded = data.outcome !== "failed";
-  const generateTitle = succeeded && !state.archived && shouldGenerateTitle(state);
+  const generateTitle =
+    succeeded && !state.archived && shouldGenerateTitle(state);
   return {
     state: {
       ...state,
@@ -129,7 +134,12 @@ export function handleAgentResponseFailed(
 
 export function handleArchived(state: LangyConversationProcessState) {
   return {
-    state: { ...state, archived: true, currentTurnId: null, turnStatus: "idle" as const },
+    state: {
+      ...state,
+      archived: true,
+      currentTurnId: null,
+      turnStatus: "idle" as const,
+    },
     intents: [],
     nextWakeAt: null,
   };

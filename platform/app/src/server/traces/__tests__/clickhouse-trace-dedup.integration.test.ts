@@ -11,11 +11,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing.old/__tests__/integration/testContainers";
-import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import type { GetAllTracesForProjectInput } from "../types";
 import { openProtections } from "./open-protections";

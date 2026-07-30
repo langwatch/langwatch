@@ -58,7 +58,10 @@ import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repo
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceRequestCollectionService } from "~/server/app-layer/traces/trace-request-collection.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
-import { type AggregateType, definePipeline } from "~/server/event-sourcing.old";
+import {
+  type AggregateType,
+  definePipeline,
+} from "~/server/event-sourcing.old";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,

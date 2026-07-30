@@ -5,8 +5,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
 import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
@@ -82,10 +82,7 @@ export function useRunHistoryPagination({
   // here from `timestamp` would only ever disagree with the server — which is
   // exactly what the old safety net did whenever a re-projection moved
   // ClickHouse's UpdatedAt.
-  const allRuns = useMemo(
-    () => pages.flatMap((p) => p.runs),
-    [pages],
-  );
+  const allRuns = useMemo(() => pages.flatMap((p) => p.runs), [pages]);
 
   // Cheap freshness probe replaces the old 30s heavy re-fetch. Matches the
   // previous auto-refresh scope: only while the user hasn't paginated deeper

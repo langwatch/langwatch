@@ -1,14 +1,14 @@
 import { renderGroupKey } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import {
-    canonicalLogStorageGroupKey,
-    logRecordCommandGroupKey,
+  canonicalLogStorageGroupKey,
+  logRecordCommandGroupKey,
 } from "../index";
 import {
-    DEFAULT_LOG_SHARD_COUNT,
-    logRecordShard,
-    MAX_LOG_SHARD_COUNT,
-    MIN_LOG_SHARD_COUNT,
+  DEFAULT_LOG_SHARD_COUNT,
+  logRecordShard,
+  MAX_LOG_SHARD_COUNT,
+  MIN_LOG_SHARD_COUNT,
 } from "../shards";
 
 describe("log-processing group keys", () => {
@@ -37,7 +37,10 @@ describe("log-processing group keys", () => {
       // Its stability across redeliveries is `recordId`'s own contract,
       // covered where it is produced: canonicalize.unit.test.ts.
       const recordId = "b".repeat(64);
-      const first = logRecordCommandGroupKey({ tenantId: "tenant-1", recordId });
+      const first = logRecordCommandGroupKey({
+        tenantId: "tenant-1",
+        recordId,
+      });
       const second = logRecordCommandGroupKey({
         tenantId: "tenant-1",
         recordId: "b".repeat(64),

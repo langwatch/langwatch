@@ -1,7 +1,7 @@
 import type { ClickHouseClient, QueryOptions } from "@langwatch/clickhouse";
-import { metricDataPointsTable } from "../table";
 import { METRIC_ROLLUP_READ_COLUMNS } from "../rollupStore";
 import type { CanonicalMetricDataPoint } from "../schema";
+import { metricDataPointsTable } from "../table";
 
 export interface FakeClient extends ClickHouseClient {
   readonly insertCalls: Array<{

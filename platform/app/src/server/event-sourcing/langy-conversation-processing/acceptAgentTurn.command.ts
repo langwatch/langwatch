@@ -7,9 +7,11 @@ const conversationStartFromAcceptSchema =
     conversationId: true,
     occurredAt: true,
   });
-const userMessageFromAcceptSchema = langyConversationEvents.messageRecorded.omit(
-  { conversationId: true, occurredAt: true },
-);
+const userMessageFromAcceptSchema =
+  langyConversationEvents.messageRecorded.omit({
+    conversationId: true,
+    occurredAt: true,
+  });
 
 export const acceptAgentTurnInputSchema =
   langyConversationEvents.agentTurnAccepted.extend({

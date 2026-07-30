@@ -5,7 +5,11 @@ import { z } from "zod";
 import type { BillingCheckpointService } from "~/server/app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import type { OrganizationForBilling } from "~/server/app-layer/organizations/repositories/organization.repository";
-import { captureException, toError, withScope } from "~/utils/posthogErrorCapture";
+import {
+  captureException,
+  toError,
+  withScope,
+} from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:billing-reporting:report-usage");
 
@@ -34,7 +38,10 @@ export interface OrganizationCache {
 /** Shared by the poke's own `reportUsage` intent and the sweep's per-organization
  *  dispatch — one Stripe-reporting path, never two. */
 export interface ReportUsagePorts {
-  readonly organizations: Pick<OrganizationService, "getOrganizationForBilling">;
+  readonly organizations: Pick<
+    OrganizationService,
+    "getOrganizationForBilling"
+  >;
   readonly organizationCache: OrganizationCache;
   readonly billingCheckpoints: BillingCheckpointService;
   /** Read per dispatch: usage reporting is SaaS-only, absent from a
@@ -51,7 +58,8 @@ function buildIdentifier(params: {
   lastReportedTotal: number;
   targetTotal: number;
 }): string {
-  const { organizationId, billingMonth, lastReportedTotal, targetTotal } = params;
+  const { organizationId, billingMonth, lastReportedTotal, targetTotal } =
+    params;
   return `${organizationId}:${billingMonth}:from:${lastReportedTotal}:to:${targetTotal}`;
 }
 
@@ -70,11 +78,18 @@ function buildIdentifier(params: {
  */
 async function reportForBillingMonth(
   ports: ReportUsagePorts,
-  params: { organizationId: string; billingMonth: string; stripeCustomerId: string },
+  params: {
+    organizationId: string;
+    billingMonth: string;
+    stripeCustomerId: string;
+  },
 ): Promise<void> {
   const { organizationId, billingMonth, stripeCustomerId } = params;
 
-  const checkpoint = await ports.billingCheckpoints.getCheckpoint({ organizationId, billingMonth });
+  const checkpoint = await ports.billingCheckpoints.getCheckpoint({
+    organizationId,
+    billingMonth,
+  });
   const lastReportedTotal = checkpoint?.lastReportedTotal ?? 0;
   const consecutiveFailures = checkpoint?.consecutiveFailures ?? 0;
   const circuitTripped = consecutiveFailures >= MAX_CONSECUTIVE_FAILURES;
@@ -90,28 +105,53 @@ async function reportForBillingMonth(
   let targetTotal: number;
   if (checkpoint?.pendingReportedTotal != null) {
     targetTotal = checkpoint.pendingReportedTotal;
-    logger.info({ organizationId, billingMonth, targetTotal, lastReportedTotal }, "recovering pending checkpoint from previous crash");
+    logger.info(
+      { organizationId, billingMonth, targetTotal, lastReportedTotal },
+      "recovering pending checkpoint from previous crash",
+    );
   } else {
-    const currentTotal = await ports.queryBillableEventsTotal({ organizationId, billingMonth });
+    const currentTotal = await ports.queryBillableEventsTotal({
+      organizationId,
+      billingMonth,
+    });
     if (currentTotal === null) return; // ClickHouse not available
     if (currentTotal <= lastReportedTotal) {
-      logger.debug({ organizationId, billingMonth, currentTotal, lastReportedTotal }, "no new billable events, skipping");
+      logger.debug(
+        { organizationId, billingMonth, currentTotal, lastReportedTotal },
+        "no new billable events, skipping",
+      );
       return;
     }
     targetTotal = currentTotal;
-    await ports.billingCheckpoints.writeIntent({ organizationId, billingMonth, lastReportedTotal, pendingReportedTotal: targetTotal });
+    await ports.billingCheckpoints.writeIntent({
+      organizationId,
+      billingMonth,
+      lastReportedTotal,
+      pendingReportedTotal: targetTotal,
+    });
   }
 
   const delta = targetTotal - lastReportedTotal;
   if (delta <= 0) {
-    logger.debug({ organizationId, billingMonth, targetTotal, lastReportedTotal }, "non-positive delta, skipping Stripe report");
+    logger.debug(
+      { organizationId, billingMonth, targetTotal, lastReportedTotal },
+      "non-positive delta, skipping Stripe report",
+    );
     return;
   }
 
-  const identifier = buildIdentifier({ organizationId, billingMonth, lastReportedTotal, targetTotal });
+  const identifier = buildIdentifier({
+    organizationId,
+    billingMonth,
+    lastReportedTotal,
+    targetTotal,
+  });
   const usageReportingService = ports.getUsageReportingService();
   if (!usageReportingService) {
-    logger.error({ organizationId, billingMonth }, "usageReportingService not available -- billing requires isSaas, this is a configuration error");
+    logger.error(
+      { organizationId, billingMonth },
+      "usageReportingService not available -- billing requires isSaas, this is a configuration error",
+    );
     return;
   }
 
@@ -119,13 +159,26 @@ async function reportForBillingMonth(
     const results = await usageReportingService.reportUsageDelta({
       stripeCustomerId,
       organizationId,
-      events: [{ eventName: BILLABLE_EVENTS_STRIPE_METER_EVENT_NAME, identifier, timestamp: Math.floor(Date.now() / 1000), value: delta }],
+      events: [
+        {
+          eventName: BILLABLE_EVENTS_STRIPE_METER_EVENT_NAME,
+          identifier,
+          timestamp: Math.floor(Date.now() / 1000),
+          value: delta,
+        },
+      ],
     });
 
     const result = results[0];
     if (!result || !result.reported) {
       logger.error(
-        { organizationId, billingMonth, identifier, delta, error: result?.error },
+        {
+          organizationId,
+          billingMonth,
+          identifier,
+          delta,
+          error: result?.error,
+        },
         "Stripe permanently rejected meter event, checkpoint NOT updated",
       );
       await withScope(async (scope) => {
@@ -134,7 +187,11 @@ async function reportForBillingMonth(
         scope.setExtra?.("identifier", identifier);
         scope.setExtra?.("delta", delta);
         scope.setExtra?.("stripeError", result?.error);
-        captureException(new Error(`Stripe rejected meter event: ${result?.error ?? "unknown"}`));
+        captureException(
+          new Error(
+            `Stripe rejected meter event: ${result?.error ?? "unknown"}`,
+          ),
+        );
       });
       // Clearing pending drops the recovered target, not the delta: the next
       // run re-reads the same level and re-submits the identical identifier.
@@ -146,10 +203,20 @@ async function reportForBillingMonth(
       return;
     }
 
-    await ports.billingCheckpoints.confirm({ organizationId, billingMonth, lastReportedTotal: targetTotal });
-    logger.debug({ organizationId, billingMonth, identifier, delta, targetTotal }, "usage reported and checkpoint updated successfully");
+    await ports.billingCheckpoints.confirm({
+      organizationId,
+      billingMonth,
+      lastReportedTotal: targetTotal,
+    });
+    logger.debug(
+      { organizationId, billingMonth, identifier, delta, targetTotal },
+      "usage reported and checkpoint updated successfully",
+    );
   } catch (error) {
-    logger.warn({ organizationId, billingMonth, error }, "transient error reporting usage to Stripe");
+    logger.warn(
+      { organizationId, billingMonth, error },
+      "transient error reporting usage to Stripe",
+    );
     await ports.billingCheckpoints.incrementFailures({
       organizationId,
       billingMonth,
@@ -161,7 +228,10 @@ async function reportForBillingMonth(
 }
 
 /** Resolves the organization, applies its skip conditions, then reports. */
-export async function reportUsage(ports: ReportUsagePorts, payload: ReportUsagePayload): Promise<void> {
+export async function reportUsage(
+  ports: ReportUsagePorts,
+  payload: ReportUsagePayload,
+): Promise<void> {
   const { organizationId, billingMonth } = payload;
   try {
     let org = (await ports.organizationCache.get(organizationId)) ?? null;
@@ -170,21 +240,37 @@ export async function reportUsage(ports: ReportUsagePorts, payload: ReportUsageP
       if (org) await ports.organizationCache.set(organizationId, org);
     }
     if (!org) {
-      logger.warn({ organizationId }, "organization not found or not SEAT_EVENT, skipping");
+      logger.warn(
+        { organizationId },
+        "organization not found or not SEAT_EVENT, skipping",
+      );
       return;
     }
     if (!org.stripeCustomerId) {
-      logger.debug({ organizationId }, "no Stripe customer ID, skipping usage reporting");
+      logger.debug(
+        { organizationId },
+        "no Stripe customer ID, skipping usage reporting",
+      );
       return;
     }
     if (org.subscriptions.length === 0) {
-      logger.debug({ organizationId }, "no active subscription, skipping usage reporting");
+      logger.debug(
+        { organizationId },
+        "no active subscription, skipping usage reporting",
+      );
       return;
     }
 
-    await reportForBillingMonth(ports, { organizationId, billingMonth, stripeCustomerId: org.stripeCustomerId });
+    await reportForBillingMonth(ports, {
+      organizationId,
+      billingMonth,
+      stripeCustomerId: org.stripeCustomerId,
+    });
   } catch (error) {
-    logger.error({ organizationId, billingMonth, error }, "unexpected error reporting usage");
+    logger.error(
+      { organizationId, billingMonth, error },
+      "unexpected error reporting usage",
+    );
     await withScope(async (scope) => {
       scope.setTag?.("handler", "reportUsageForMonth");
       scope.setExtra?.("organizationId", organizationId);

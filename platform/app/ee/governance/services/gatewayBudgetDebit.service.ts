@@ -29,21 +29,23 @@
  * null, and those are decisions, not errors.
  */
 
-import { createLogger } from "@langwatch/observability";
-import type { Prisma, PrismaClient } from "@prisma/client";
 import type { GatewayBudgetDebitRecord } from "@ee/governance/projections/gatewayBudgetDebits.mapProjection";
 import { PROJECT_KIND } from "@ee/governance/services/governanceProject.service";
+import { createLogger } from "@langwatch/observability";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type { BudgetDebitRow } from "~/server/gateway/budget.clickhouse.repository";
-import {
-  budgetAppliesToProvider,
-  type ResolvedBudget,
-} from "~/server/gateway/budgetResolution.service";
 import type {
   ApplicableScopes,
   GatewayBudgetRepository,
 } from "~/server/gateway/budget.repository";
+import {
+  budgetAppliesToProvider,
+  type ResolvedBudget,
+} from "~/server/gateway/budgetResolution.service";
 
-const logger = createLogger("langwatch:governance:gateway-budget-debit-service");
+const logger = createLogger(
+  "langwatch:governance:gateway-budget-debit-service",
+);
 
 export interface GatewayBudgetDebitServiceDeps {
   prisma: PrismaClient;
@@ -167,12 +169,17 @@ export class GatewayBudgetDebitService {
 
     const project = await this.readProjectScope(projectId);
     if (!project) {
-      for (const record of deduped.values()) this.warnMissingProjectTeam(record);
+      for (const record of deduped.values())
+        this.warnMissingProjectTeam(record);
       return [];
     }
 
     const keys = await this.deps.prisma.virtualKey.findMany({
-      where: { id: { in: [...new Set([...deduped.values()].map((r) => r.virtualKeyId))] } },
+      where: {
+        id: {
+          in: [...new Set([...deduped.values()].map((r) => r.virtualKeyId))],
+        },
+      },
       select: VIRTUAL_KEY_IDENTITY_SELECT,
     });
     const keysById = new Map(keys.map((key) => [key.id, key]));
@@ -253,9 +260,8 @@ export class GatewayBudgetDebitService {
 
     let resolvedBudgets = budgetCache?.get(vk.id);
     if (!resolvedBudgets) {
-      resolvedBudgets = await this.deps.budgetRepository.resolveForRequest(
-        scopes,
-      );
+      resolvedBudgets =
+        await this.deps.budgetRepository.resolveForRequest(scopes);
       budgetCache?.set(vk.id, resolvedBudgets);
     }
 

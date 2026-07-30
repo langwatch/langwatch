@@ -126,7 +126,9 @@ describe("experimentRunState fold", () => {
   });
 
   describe("when the run completes", () => {
-    const completed = (overrides: Partial<RunCompletedData> = {}): RunCompletedData => ({
+    const completed = (
+      overrides: Partial<RunCompletedData> = {},
+    ): RunCompletedData => ({
       runId: "run-1",
       experimentId: "exp-1",
       ...overrides,
@@ -226,7 +228,12 @@ describe("experimentRunState fold", () => {
           },
           {
             type: "completed",
-            data: { runId: "run-1", experimentId: "exp-1", finishedAt: 9_000, stoppedAt: null },
+            data: {
+              runId: "run-1",
+              experimentId: "exp-1",
+              finishedAt: 9_000,
+              stoppedAt: null,
+            },
           },
         ],
       });

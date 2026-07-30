@@ -11,8 +11,8 @@
  */
 
 import type { GatewayBudget } from "@prisma/client";
-import type { ResolvedBudget } from "~/server/gateway/budgetResolution.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ResolvedBudget } from "~/server/gateway/budgetResolution.service";
 import type { GatewayBudgetDebitRecord } from "../../projections/gatewayBudgetDebits.mapProjection";
 import { GatewayBudgetDebitService } from "../gatewayBudgetDebit.service";
 

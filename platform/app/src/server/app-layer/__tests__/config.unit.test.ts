@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  type ProcessRole,
-  roleRunsWorkers,
-} from "../config";
+import { type ProcessRole, roleRunsWorkers } from "../config";
 
 describe("roleRunsWorkers", () => {
   describe("given a role that hosts the worker stack", () => {

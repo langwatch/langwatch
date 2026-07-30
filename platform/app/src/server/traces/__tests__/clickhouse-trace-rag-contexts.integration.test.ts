@@ -16,6 +16,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import type { RAGSpan, Span } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import {
@@ -23,7 +24,6 @@ import {
   stopTestContainers,
 } from "../../event-sourcing.old/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 
 const tenantId = `test-rag-contexts-${nanoid()}`;
 const now = Date.now();

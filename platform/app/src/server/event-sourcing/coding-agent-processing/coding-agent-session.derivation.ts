@@ -1,5 +1,9 @@
 import { LOGS_ONLY_AGENT_IDS } from "./agents";
-import { normalizeEventName, normalizeMetricName, parseMcpToolName } from "./coding-agent-normalization";
+import {
+  normalizeEventName,
+  normalizeMetricName,
+  parseMcpToolName,
+} from "./coding-agent-normalization";
 import type { CodingAgentSessionState } from "./schema";
 
 /**
@@ -184,7 +188,11 @@ export function addToBoundedSet(set: string[], value: string): string[] {
   return [...set, value];
 }
 
-function bump(map: Record<string, number>, key: string, by = 1): Record<string, number> {
+function bump(
+  map: Record<string, number>,
+  key: string,
+  by = 1,
+): Record<string, number> {
   if (map[key] === undefined && Object.keys(map).length >= MAX_SET) return map;
   return { ...map, [key]: (map[key] ?? 0) + by };
 }
@@ -205,20 +213,34 @@ function appendStep(
 
   const previous = steps[index - 1];
   if (previous && previous.name === step.name) {
-    const merged = { ...previous, count: previous.count + 1, failed: previous.failed || step.failed };
+    const merged = {
+      ...previous,
+      count: previous.count + 1,
+      failed: previous.failed || step.failed,
+    };
     return [...steps.slice(0, index - 1), merged, ...steps.slice(index)];
   }
 
   const next = steps[index];
   if (next && next.name === step.name) {
-    const merged = { ...next, startedAtMs: step.startedAtMs, count: next.count + 1, failed: next.failed || step.failed };
+    const merged = {
+      ...next,
+      startedAtMs: step.startedAtMs,
+      count: next.count + 1,
+      failed: next.failed || step.failed,
+    };
     return [...steps.slice(0, index), merged, ...steps.slice(index + 1)];
   }
 
   if (steps.length >= MAX_STEPS) return steps;
   return [
     ...steps.slice(0, index),
-    { name: step.name, count: 1, failed: step.failed, startedAtMs: step.startedAtMs },
+    {
+      name: step.name,
+      count: 1,
+      failed: step.failed,
+      startedAtMs: step.startedAtMs,
+    },
     ...steps.slice(index),
   ];
 }
@@ -241,7 +263,10 @@ function withIdentity(
 ): CodingAgentSessionState {
   return {
     ...state,
-    agentVersion: state.agentVersion ?? str(attrs["app.version"]) ?? str(attrs["service.version"]),
+    agentVersion:
+      state.agentVersion ??
+      str(attrs["app.version"]) ??
+      str(attrs["service.version"]),
     terminalType: state.terminalType ?? str(attrs["terminal.type"]),
     entrypoint: state.entrypoint ?? str(attrs["app.entrypoint"]),
     userId:
@@ -275,12 +300,14 @@ function foldModelCall(
   const isRebuild =
     next.previousCallContextTokens > 0 &&
     cacheCreationTokens >= CACHE_REBUILD_MIN_TOKENS &&
-    cacheCreationTokens / next.previousCallContextTokens >= CACHE_REBUILD_RATIO_THRESHOLD;
+    cacheCreationTokens / next.previousCallContextTokens >=
+      CACHE_REBUILD_RATIO_THRESHOLD;
 
   return {
     ...next,
     modelCalls: next.modelCalls + 1,
-    modelCallMs: next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
+    modelCallMs:
+      next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
     ttftMsTotal: next.ttftMsTotal + ttft,
     ttftSamples: next.ttftSamples + (ttft > 0 ? 1 : 0),
     attempts: next.attempts + Math.max(1, num(attrs.attempt)),
@@ -328,7 +355,9 @@ export function applySpanToCodingAgentSession({
   const isLogsOnly = agent !== undefined && LOGS_ONLY_AGENT_IDS.has(agent);
 
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
-    return isLogsOnly ? withIdentity(state, attrs) : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    return isLogsOnly
+      ? withIdentity(state, attrs)
+      : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
@@ -338,12 +367,19 @@ export function applySpanToCodingAgentSession({
     return {
       ...next,
       ...(agentId !== null ? seenSubAgent(next, agentId) : {}),
-      subAgentTypes: agentType !== null ? addToBoundedSet(next.subAgentTypes, agentType) : next.subAgentTypes,
+      subAgentTypes:
+        agentType !== null
+          ? addToBoundedSet(next.subAgentTypes, agentType)
+          : next.subAgentTypes,
     };
   }
 
   if (span.name === CLAUDE.SPAN.BLOCKED_ON_USER) {
-    return { ...state, blockedOnUserMs: state.blockedOnUserMs + (num(attrs.duration_ms) || durationMs) };
+    return {
+      ...state,
+      blockedOnUserMs:
+        state.blockedOnUserMs + (num(attrs.duration_ms) || durationMs),
+    };
   }
 
   if (span.name !== CLAUDE.SPAN.TOOL) return state;
@@ -363,7 +399,17 @@ export function applySpanToCodingAgentSession({
  */
 function foldToolInvocation(
   next: CodingAgentSessionState,
-  { attrs, failed, toolMs, startedAtMs }: { attrs: Record<string, unknown>; failed: boolean; toolMs: number; startedAtMs: number },
+  {
+    attrs,
+    failed,
+    toolMs,
+    startedAtMs,
+  }: {
+    attrs: Record<string, unknown>;
+    failed: boolean;
+    toolMs: number;
+    startedAtMs: number;
+  },
 ): CodingAgentSessionState {
   const toolName = str(attrs.tool_name);
 
@@ -377,29 +423,39 @@ function foldToolInvocation(
   if (toolName === null) return withTool;
 
   withTool.toolCounts = bump(next.toolCounts, toolName);
-  if (toolMs > 0) withTool.toolDurationMs = bump(next.toolDurationMs, toolName, toolMs);
+  if (toolMs > 0)
+    withTool.toolDurationMs = bump(next.toolDurationMs, toolName, toolMs);
 
   // A sub-agent runs its own conversation; its work still counts toward the
   // totals, but its steps do not splice into the main thread's sequence.
   const toolAgentId = str(attrs.agent_id);
-  if (toolAgentId !== null) Object.assign(withTool, seenSubAgent(withTool, toolAgentId));
+  if (toolAgentId !== null)
+    Object.assign(withTool, seenSubAgent(withTool, toolAgentId));
   if (toolAgentId === null) {
-    withTool.steps = appendStep(next.steps, { name: toolName, startedAtMs, failed });
+    withTool.steps = appendStep(next.steps, {
+      name: toolName,
+      startedAtMs,
+      failed,
+    });
   }
 
   const filePath = str(attrs.file_path);
-  if (filePath !== null) withTool.filesTouched = addToBoundedSet(next.filesTouched, filePath);
+  if (filePath !== null)
+    withTool.filesTouched = addToBoundedSet(next.filesTouched, filePath);
 
   const skillName = str(attrs.skill_name);
-  if (skillName !== null) withTool.skills = addToBoundedSet(next.skills, skillName);
+  if (skillName !== null)
+    withTool.skills = addToBoundedSet(next.skills, skillName);
 
   // An MCP call announces itself in its NAME (`mcp__<server>__<tool>`), the
   // signal that actually arrives; the attributes are a bonus when present.
   const fromName = parseMcpToolName(toolName);
   const mcpServer = str(attrs["mcp_server.name"]) ?? fromName?.server ?? null;
-  if (mcpServer !== null) withTool.mcpServers = addToBoundedSet(next.mcpServers, mcpServer);
+  if (mcpServer !== null)
+    withTool.mcpServers = addToBoundedSet(next.mcpServers, mcpServer);
   const mcpTool = str(attrs["mcp_tool.name"]) ?? fromName?.tool ?? null;
-  if (mcpTool !== null) withTool.mcpTools = addToBoundedSet(next.mcpTools, mcpTool);
+  if (mcpTool !== null)
+    withTool.mcpTools = addToBoundedSet(next.mcpTools, mcpTool);
 
   return withTool;
 }
@@ -436,12 +492,18 @@ export function applyLogToCodingAgentSession({
         ...base,
         prompts: base.prompts + 1,
         promptChars: base.promptChars + num(attrs.prompt_length),
-        slashCommands: command !== null ? addToBoundedSet(base.slashCommands, command) : base.slashCommands,
+        slashCommands:
+          command !== null
+            ? addToBoundedSet(base.slashCommands, command)
+            : base.slashCommands,
       };
     }
 
     case CLAUDE.EVENT.ASSISTANT_RESPONSE:
-      return { ...base, responseChars: base.responseChars + num(attrs.response_length) };
+      return {
+        ...base,
+        responseChars: base.responseChars + num(attrs.response_length),
+      };
 
     case CLAUDE.EVENT.API_REQUEST: {
       const withCost = { ...base, costUsd: base.costUsd + num(attrs.cost_usd) };
@@ -452,10 +514,13 @@ export function applyLogToCodingAgentSession({
       const errorType = str(attrs.error_type);
       const withBytes = {
         ...base,
-        toolResultBytes: base.toolResultBytes + num(attrs.tool_result_size_bytes),
+        toolResultBytes:
+          base.toolResultBytes + num(attrs.tool_result_size_bytes),
         toolInputBytes: base.toolInputBytes + num(attrs.tool_input_size_bytes),
         errorTypes:
-          errorType !== null && scalarStr(attrs.success) === "false" ? bump(base.errorTypes, errorType) : base.errorTypes,
+          errorType !== null && scalarStr(attrs.success) === "false"
+            ? bump(base.errorTypes, errorType)
+            : base.errorTypes,
       };
       return isLogsOnly
         ? foldToolInvocation(withBytes, {
@@ -479,7 +544,9 @@ export function applyLogToCodingAgentSession({
       return {
         ...base,
         apiErrors: base.apiErrors + 1,
-        rateLimited: base.rateLimited + (scalarStr(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
+        rateLimited:
+          base.rateLimited +
+          (scalarStr(attrs.status_code) === RATE_LIMIT_STATUS ? 1 : 0),
       };
 
     case CLAUDE.EVENT.RETRIES_EXHAUSTED:
@@ -495,7 +562,10 @@ export function applyLogToCodingAgentSession({
       return {
         ...base,
         refusals: base.refusals + 1,
-        refusalCategories: category !== null ? addToBoundedSet(base.refusalCategories, category) : base.refusalCategories,
+        refusalCategories:
+          category !== null
+            ? addToBoundedSet(base.refusalCategories, category)
+            : base.refusalCategories,
       };
     }
 
@@ -503,23 +573,33 @@ export function applyLogToCodingAgentSession({
       return {
         ...base,
         compactions: base.compactions + 1,
-        compactionTokensBefore: base.compactionTokensBefore + num(attrs.pre_tokens),
-        compactionTokensAfter: base.compactionTokensAfter + num(attrs.post_tokens),
+        compactionTokensBefore:
+          base.compactionTokensBefore + num(attrs.pre_tokens),
+        compactionTokensAfter:
+          base.compactionTokensAfter + num(attrs.post_tokens),
       };
 
     case CLAUDE.EVENT.PERMISSION_MODE: {
       const mode = str(attrs.to_mode);
-      return { ...base, permissionMode: mode ?? base.permissionMode, permissionChanges: base.permissionChanges + 1 };
+      return {
+        ...base,
+        permissionMode: mode ?? base.permissionMode,
+        permissionChanges: base.permissionChanges + 1,
+      };
     }
 
     case CLAUDE.EVENT.SKILL_ACTIVATED: {
       const skill = str(attrs["skill.name"]);
-      return skill !== null ? { ...base, skills: addToBoundedSet(base.skills, skill) } : base;
+      return skill !== null
+        ? { ...base, skills: addToBoundedSet(base.skills, skill) }
+        : base;
     }
 
     case CLAUDE.EVENT.MCP_CONNECTION: {
       const server = str(attrs.server_name) ?? str(attrs["plugin.name"]);
-      return server !== null ? { ...base, mcpServers: addToBoundedSet(base.mcpServers, server) } : base;
+      return server !== null
+        ? { ...base, mcpServers: addToBoundedSet(base.mcpServers, server) }
+        : base;
     }
 
     case CLAUDE.EVENT.HOOK_COMPLETE:
@@ -583,7 +663,8 @@ export function applyMetricToCodingAgentSession({
   if (normalizeMetricName(metric.metricName) === null) return base;
 
   const isNewUnit = state.metricSeries[metric.seriesId] === undefined;
-  if (isNewUnit && Object.keys(state.metricSeries).length >= MAX_METRIC_SERIES) return base;
+  if (isNewUnit && Object.keys(state.metricSeries).length >= MAX_METRIC_SERIES)
+    return base;
 
   const attrs = metric.attributes;
   const fact = {
@@ -594,11 +675,16 @@ export function applyMetricToCodingAgentSession({
     value: total(metric.value),
   };
 
-  return recomputeMetricOverlay({ ...base, metricSeries: { ...base.metricSeries, [metric.seriesId]: fact } });
+  return recomputeMetricOverlay({
+    ...base,
+    metricSeries: { ...base.metricSeries, [metric.seriesId]: fact },
+  });
 }
 
 /** The metric-fed fields, recomputed whole from the converged units — exclusively metric-fed, so a full overwrite cannot clobber another signal's work. */
-function recomputeMetricOverlay(state: CodingAgentSessionState): CodingAgentSessionState {
+function recomputeMetricOverlay(
+  state: CodingAgentSessionState,
+): CodingAgentSessionState {
   let linesAdded = 0;
   let linesRemoved = 0;
   let commits = 0;

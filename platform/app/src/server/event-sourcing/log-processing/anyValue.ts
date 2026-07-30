@@ -1,8 +1,4 @@
-import {
-  compareOrdinal,
-  isRecord,
-  stableStringify,
-} from "./serialization";
+import { compareOrdinal, isRecord, stableStringify } from "./serialization";
 
 /** The canonical, typed rendering of one OTLP `AnyValue`. */
 export type CanonicalAnyValue =
@@ -121,9 +117,7 @@ export function canonicalAnyValue(value: unknown): CanonicalAnyValue {
  * stringification of the value: OTLP does not guarantee attribute order on the
  * wire, and a redelivered batch must hash to the same `recordId`.
  */
-export function canonicalAttributes(
-  attributes: unknown,
-): CanonicalAttribute[] {
+export function canonicalAttributes(attributes: unknown): CanonicalAttribute[] {
   if (!Array.isArray(attributes)) return [];
   return attributes
     .map((raw) => {

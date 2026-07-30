@@ -7,15 +7,21 @@ import {
 import {
   ConfigurationError,
   definePipeline,
-  validateMount,
   type GroupKey,
   type Metrics,
   type Mount,
+  validateMount,
 } from "@langwatch/event-sourcing";
 import { completeExperimentRun } from "./completeExperimentRun.command";
 import {
+  EXPERIMENT_RUN_PIPELINE_NAME,
+  EXPERIMENT_RUN_PIPELINE_PREFIX,
+  experimentRunEvents,
+} from "./events";
+import {
   deliverExperimentRunExecutionFailRun,
   EXPERIMENT_RUN_STALLED_CODE,
+  type ExperimentRunExecutionDeps,
   experimentRunExecutionFailRunIntentSchema,
   experimentRunExecutionStateSchema,
   handleExperimentRunCompleted,
@@ -24,28 +30,26 @@ import {
   handleExperimentRunTargetResult,
   initExperimentRunExecutionState,
   onExperimentRunExecutionWake,
-  type ExperimentRunExecutionDeps,
 } from "./experimentRunExecution.process";
 import {
+  type ExperimentRunItemRecord,
   generateItemProjectionId,
   mapEvaluatorResult,
   mapTargetResult,
-  type ExperimentRunItemRecord,
 } from "./experimentRunItems.projection";
 import {
   applyRunCompleted,
   applyRunStarted,
   EXPERIMENT_RUN_STATE_VERSION_PIN,
 } from "./experimentRunState.projection";
-import { EXPERIMENT_RUN_PIPELINE_NAME, EXPERIMENT_RUN_PIPELINE_PREFIX, experimentRunEvents } from "./events";
 import { recordEvaluatorResult } from "./recordEvaluatorResult.command";
 import { recordTargetResult } from "./recordTargetResult.command";
 import {
+  type ExperimentRunState,
   experimentRunAggregateId,
   experimentRunStateSchema,
   initExperimentRunState,
   parseExperimentRunAggregateId,
-  type ExperimentRunState,
 } from "./schema";
 import { startExperimentRun } from "./startExperimentRun.command";
 import {
@@ -54,9 +58,15 @@ import {
   experimentRunsTable,
 } from "./table";
 
+export {
+  EXPERIMENT_RUN_PIPELINE_NAME,
+  EXPERIMENT_RUN_PIPELINE_PREFIX,
+} from "./events";
 export { EXPERIMENT_RUN_STALLED_CODE } from "./experimentRunExecution.process";
-export { experimentRunAggregateId, parseExperimentRunAggregateId } from "./schema";
-export { EXPERIMENT_RUN_PIPELINE_NAME, EXPERIMENT_RUN_PIPELINE_PREFIX } from "./events";
+export {
+  experimentRunAggregateId,
+  parseExperimentRunAggregateId,
+} from "./schema";
 
 const DEFAULT_RETENTION_DAYS = 308;
 
@@ -285,9 +295,12 @@ export function createExperimentRunProcessingPipeline(
     })
     .withSubscriber("billingMeterPoke", {
       on: {
-        started: (_data, ctx) => deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
-        targetResult: (_data, ctx) => deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
-        evaluatorResult: (_data, ctx) => deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
+        started: (_data, ctx) =>
+          deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
+        targetResult: (_data, ctx) =>
+          deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
+        evaluatorResult: (_data, ctx) =>
+          deps.billingPoke?.handle({ tenantId: ctx.tenantId }),
       },
     });
 

@@ -1,5 +1,5 @@
 import type { EmittedEvent } from "@langwatch/event-sourcing";
-import { simulationRunEvents } from "./events";
+import type { simulationRunEvents } from "./events";
 import type { RunQueuedData } from "./schema";
 
 /** The run was scheduled. Pure: the descriptor and batch total already arrive

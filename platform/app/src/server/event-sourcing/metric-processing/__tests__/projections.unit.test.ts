@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createMetricProcessingPipeline, metricSeriesCatalogGroupKey } from "../index";
+import {
+  createMetricProcessingPipeline,
+  metricSeriesCatalogGroupKey,
+} from "../index";
 import { metricSeriesTable } from "../table";
 import { createFakeClient, insertedCell } from "./fakeClient";
 import { point } from "./fixtures";
@@ -24,11 +27,19 @@ describe("metricDataPointStorage", () => {
     });
 
     expect(outcome.written).toBe(1);
-    expect(client.insertCalls.map((call) => call.table)).toEqual(["metric_data_points"]);
-    expect(insertedCell({ client, table: "metric_data_points", column: "PointId" })).toBe(
-      canonical.pointId,
-    );
-    expect(insertedCell({ client, table: "metric_data_points", column: "ValueDouble" })).toBe(7);
+    expect(client.insertCalls.map((call) => call.table)).toEqual([
+      "metric_data_points",
+    ]);
+    expect(
+      insertedCell({ client, table: "metric_data_points", column: "PointId" }),
+    ).toBe(canonical.pointId);
+    expect(
+      insertedCell({
+        client,
+        table: "metric_data_points",
+        column: "ValueDouble",
+      }),
+    ).toBe(7);
   });
 
   it("targets a replacing table, so ADR-104 lets a failed insert be retried", async () => {
@@ -67,7 +78,11 @@ describe("metricSeriesCatalog", () => {
       events: [newer, older].map(received),
     });
 
-    const cell = insertedCell({ client, table: "metric_series", column: "LastSeenAt" });
+    const cell = insertedCell({
+      client,
+      table: "metric_series",
+      column: "LastSeenAt",
+    });
     // Compared through the same column codec the store writes with, rather
     // than a wire string spelled out a second time here.
     expect(cell).toBe(
@@ -89,7 +104,9 @@ describe("metricSeriesCatalog", () => {
 
     expect(
       metricSeriesCatalogGroupKey({ tenantId: "t1", point: b, shardCount: 16 }),
-    ).toEqual(metricSeriesCatalogGroupKey({ tenantId: "t1", point: a, shardCount: 16 }));
+    ).toEqual(
+      metricSeriesCatalogGroupKey({ tenantId: "t1", point: a, shardCount: 16 }),
+    );
   });
 });
 
@@ -105,9 +122,13 @@ describe("metricTimeRollup", () => {
     });
 
     expect(outcome.written).toBe(1);
-    const call = client.insertCalls.find((c) => c.table === "metric_time_rollups")!;
+    const call = client.insertCalls.find(
+      (c) => c.table === "metric_time_rollups",
+    )!;
     expect(call.rows).toHaveLength(1);
-    expect(insertedCell({ client, table: "metric_time_rollups", column: "Count" })).toBe("1");
+    expect(
+      insertedCell({ client, table: "metric_time_rollups", column: "Count" }),
+    ).toBe("1");
   });
 
   it("reads the points back through bound identifiers, never an interpolated name", async () => {

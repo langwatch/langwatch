@@ -19,9 +19,9 @@
 
 import { GatewayBudgetDebitService } from "@ee/governance/services/gatewayBudgetDebit.service";
 import type { GatewayBudget } from "@prisma/client";
-import type { ResolvedBudget } from "~/server/gateway/budgetResolution.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BudgetDebitRow } from "~/server/gateway/budget.clickhouse.repository";
+import type { ResolvedBudget } from "~/server/gateway/budgetResolution.service";
 import type { GatewayBudgetDebitRecord } from "../gatewayBudgetDebits.mapProjection";
 import { GatewayBudgetDebitsAppendStore } from "../gatewayBudgetDebits.store";
 
@@ -177,7 +177,11 @@ describe("GatewayBudgetDebitsAppendStore", () => {
     it("charges every applicable budget once", async () => {
       const { store, ledger } = buildStore({
         budgets: [
-          budget({ id: "budget-org", scopeType: "ORGANIZATION", scopeId: "org-1" }),
+          budget({
+            id: "budget-org",
+            scopeType: "ORGANIZATION",
+            scopeId: "org-1",
+          }),
           budget({ id: "budget-team", scopeType: "TEAM", scopeId: "team-1" }),
           budget(),
         ],
@@ -256,7 +260,10 @@ describe("GatewayBudgetDebitsAppendStore", () => {
     it("writes it and tells the gateway spend moved", async () => {
       const { store, ledger, appendChangeEvent } = buildStore();
 
-      await store.append({ ...RECORD, gatewayRequestId: "grq_lost" }, STORE_CONTEXT);
+      await store.append(
+        { ...RECORD, gatewayRequestId: "grq_lost" },
+        STORE_CONTEXT,
+      );
 
       expect(ledger.rows).toHaveLength(1);
       expect(appendChangeEvent).toHaveBeenCalledTimes(1);
@@ -302,7 +309,9 @@ describe("GatewayBudgetDebitsAppendStore", () => {
         appendChangeEvent: vi.fn().mockRejectedValue(new Error("PG down")),
       });
 
-      await expect(store.append(RECORD, STORE_CONTEXT)).resolves.toBeUndefined();
+      await expect(
+        store.append(RECORD, STORE_CONTEXT),
+      ).resolves.toBeUndefined();
       expect(ledger.rows).toHaveLength(1);
     });
   });
@@ -426,7 +435,10 @@ describe("GatewayBudgetDebitsAppendStore", () => {
 
       await store.bulkAppend(requests("grq_A", "grq_B"), BULK_CONTEXT);
       appendChangeEvent.mockClear();
-      await store.bulkAppend(requests("grq_A", "grq_B", "grq_lost"), BULK_CONTEXT);
+      await store.bulkAppend(
+        requests("grq_A", "grq_B", "grq_lost"),
+        BULK_CONTEXT,
+      );
 
       expect(appendChangeEvent).toHaveBeenCalledTimes(1);
       expect(appendChangeEvent.mock.calls[0]![0]).toMatchObject({

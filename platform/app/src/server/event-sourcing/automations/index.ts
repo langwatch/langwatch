@@ -1,5 +1,14 @@
-import { type GroupKey, definePipeline, processGroupKey } from "@langwatch/event-sourcing";
-import { AUTOMATIONS_PIPELINE_NAME, AUTOMATIONS_PIPELINE_PREFIX, automationsEvents, matchRecordedDataSchema } from "./events";
+import {
+  definePipeline,
+  type GroupKey,
+  processGroupKey,
+} from "@langwatch/event-sourcing";
+import {
+  AUTOMATIONS_PIPELINE_NAME,
+  AUTOMATIONS_PIPELINE_PREFIX,
+  automationsEvents,
+  matchRecordedDataSchema,
+} from "./events";
 import {
   GRAPH_ALERT_SWEEP_PROCESS_NAME,
   type GraphAlertSweepPorts,
@@ -11,18 +20,18 @@ import {
 } from "./graphAlertSweep.process";
 import { recordMatch } from "./recordMatch.command";
 import {
+  initTriggerSettlementState,
   TRIGGER_SETTLEMENT_PROCESS_NAME,
   type TriggerDispatchPorts,
-  initTriggerSettlementState,
   triggerSettlementIntents,
   triggerSettlementOn,
   triggerSettlementOnWake,
   triggerSettlementStateSchema,
 } from "./triggerSettlement.process";
 import {
+  initWebhookDeliveryPruneState,
   WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME,
   type WebhookDeliveryPrunePorts,
-  initWebhookDeliveryPruneState,
   webhookDeliveryPruneIntents,
   webhookDeliveryPruneOn,
   webhookDeliveryPruneOnWake,
@@ -36,19 +45,32 @@ export const GLOBAL_TENANT = "__global__";
 
 /** ADR-100 decision 4: a command lane is scoped to the aggregate, so every
  *  command type for one trigger serialises into a single lane. */
-export function recordMatchGroupKey(params: { tenantId: string; triggerId: string }): GroupKey {
+export function recordMatchGroupKey(params: {
+  tenantId: string;
+  triggerId: string;
+}): GroupKey {
   return {
     tenantId: params.tenantId,
     lane: { kind: "command" },
-    scope: { kind: "aggregate", aggregateType: AUTOMATIONS_PIPELINE_NAME, aggregateId: params.triggerId },
+    scope: {
+      kind: "aggregate",
+      aggregateType: AUTOMATIONS_PIPELINE_NAME,
+      aggregateId: params.triggerId,
+    },
   };
 }
 
 /** One settlement instance per trigger: two triggers matching the same trace
  *  have independent settle windows, caps and send claims, so they must never
  *  share a lane. */
-export function triggerSettlementGroupKey(params: { tenantId: string; triggerId: string }): GroupKey {
-  return processGroupKey({ name: TRIGGER_SETTLEMENT_PROCESS_NAME }, { tenantId: params.tenantId, processKey: params.triggerId });
+export function triggerSettlementGroupKey(params: {
+  tenantId: string;
+  triggerId: string;
+}): GroupKey {
+  return processGroupKey(
+    { name: TRIGGER_SETTLEMENT_PROCESS_NAME },
+    { tenantId: params.tenantId, processKey: params.triggerId },
+  );
 }
 
 /** The sweep and the prune are one instance for the whole deployment, waking

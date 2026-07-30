@@ -1,26 +1,26 @@
 import { checkOrderInvariance } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import type {
-    AnnotationRef,
-    AnnotationsBulkSync,
-    CanonicalSpan,
-    OriginResolution,
-    TopicAssignment,
-    TraceNameChange,
+  AnnotationRef,
+  AnnotationsBulkSync,
+  CanonicalSpan,
+  OriginResolution,
+  TopicAssignment,
+  TraceNameChange,
 } from "../schema";
 import {
-    deriveTraceAnalyticsView,
-    handleAnnotationAdded,
-    handleAnnotationRemoved,
-    handleAnnotationsBulkSynced,
-    handleOriginResolved,
-    handleSpanReceived,
-    handleTopicAssigned,
-    handleTraceNameChanged,
-    initTraceAnalyticsState,
-    TRACE_ANALYTICS_STATE_VERSION,
-    type TraceAnalyticsState,
-    traceAnalyticsRowMapping,
+  deriveTraceAnalyticsView,
+  handleAnnotationAdded,
+  handleAnnotationRemoved,
+  handleAnnotationsBulkSynced,
+  handleOriginResolved,
+  handleSpanReceived,
+  handleTopicAssigned,
+  handleTraceNameChanged,
+  initTraceAnalyticsState,
+  TRACE_ANALYTICS_STATE_VERSION,
+  type TraceAnalyticsState,
+  traceAnalyticsRowMapping,
 } from "../traceAnalytics.projection";
 import { canonicalSpan, TRACE_ID } from "./fixtures";
 
@@ -35,20 +35,34 @@ const ROW_CONTEXT = {
 /** One step this fold's own `.on({...})` map would apply for one event. */
 type Step = (state: TraceAnalyticsState) => TraceAnalyticsState;
 
-const spanReceived = (span: CanonicalSpan): Step => (state) =>
-  handleSpanReceived(state, span);
-const topicAssigned = (data: TopicAssignment): Step => (state) =>
-  handleTopicAssigned(state, data);
-const originResolved = (data: OriginResolution): Step => (state) =>
-  handleOriginResolved(state, data);
-const annotationAdded = (data: AnnotationRef): Step => (state) =>
-  handleAnnotationAdded(state, data);
-const annotationRemoved = (data: AnnotationRef): Step => (state) =>
-  handleAnnotationRemoved(state, data);
-const annotationsBulkSynced = (data: AnnotationsBulkSync): Step => (state) =>
-  handleAnnotationsBulkSynced(state, data);
-const traceNameChanged = (data: TraceNameChange): Step => (state) =>
-  handleTraceNameChanged(state, data);
+const spanReceived =
+  (span: CanonicalSpan): Step =>
+  (state) =>
+    handleSpanReceived(state, span);
+const topicAssigned =
+  (data: TopicAssignment): Step =>
+  (state) =>
+    handleTopicAssigned(state, data);
+const originResolved =
+  (data: OriginResolution): Step =>
+  (state) =>
+    handleOriginResolved(state, data);
+const annotationAdded =
+  (data: AnnotationRef): Step =>
+  (state) =>
+    handleAnnotationAdded(state, data);
+const annotationRemoved =
+  (data: AnnotationRef): Step =>
+  (state) =>
+    handleAnnotationRemoved(state, data);
+const annotationsBulkSynced =
+  (data: AnnotationsBulkSync): Step =>
+  (state) =>
+    handleAnnotationsBulkSynced(state, data);
+const traceNameChanged =
+  (data: TraceNameChange): Step =>
+  (state) =>
+    handleTraceNameChanged(state, data);
 
 function fold(steps: readonly Step[]): TraceAnalyticsState {
   return steps.reduce((state, step) => step(state), initTraceAnalyticsState());
@@ -113,13 +127,21 @@ describe("the traceAnalytics fold", () => {
             origin: "simulation",
             reason: "fallback",
           }),
-          annotationAdded({ traceId: TRACE_ID, annotationId: "ann-1", actedAt: 400 }),
+          annotationAdded({
+            traceId: TRACE_ID,
+            annotationId: "ann-1",
+            actedAt: 400,
+          }),
           annotationsBulkSynced({
             traceId: TRACE_ID,
             annotationIds: ["ann-2", "ann-3"],
             actedAt: 500,
           }),
-          annotationRemoved({ traceId: TRACE_ID, annotationId: "ann-2", actedAt: 600 }),
+          annotationRemoved({
+            traceId: TRACE_ID,
+            annotationId: "ann-2",
+            actedAt: 600,
+          }),
           traceNameChanged({
             traceId: TRACE_ID,
             newName: "Named",

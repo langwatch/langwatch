@@ -1,6 +1,9 @@
 import { deriveAppendMapping } from "@langwatch/clickhouse";
 import { z } from "zod";
-import { type CanonicalMetricDataPoint, canonicalMetricDataPointSchema } from "./schema";
+import {
+  type CanonicalMetricDataPoint,
+  canonicalMetricDataPointSchema,
+} from "./schema";
 import { metricDataPointsTable } from "./table";
 
 /** The map's whole job: the event's payload already is the row (ADR-105 decision 5). */
@@ -60,7 +63,8 @@ export const toDataPointRow = deriveAppendMapping<
   fill: {
     StartTimeUnixNano: (point) => BigInt(point.startTimeUnixNano),
     TimeUnixNano: (point) => BigInt(point.timeUnixNano),
-    ValueInt: (point) => (point.valueInt === null ? null : BigInt(point.valueInt)),
+    ValueInt: (point) =>
+      point.valueInt === null ? null : BigInt(point.valueInt),
     Count: (point) => (point.count === null ? null : BigInt(point.count)),
     BucketCounts: (point) => point.bucketCounts.map(BigInt),
     ZeroCount: (point) =>

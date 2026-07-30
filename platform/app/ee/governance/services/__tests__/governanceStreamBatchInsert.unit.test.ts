@@ -18,6 +18,7 @@
 
 import type { ClickHouseClient } from "@langwatch/clickhouse";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { GovernanceKpiContribution } from "../governanceKpis.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "../governanceKpis.clickhouse.repository";
 import {
   type GovernanceOcsfEventInput,
@@ -25,7 +26,6 @@ import {
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
-import type { GovernanceKpiContribution } from "../governanceKpis.clickhouse.repository";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -232,9 +232,7 @@ describe("GovernanceKpisClickHouseRepository.insertContributions", () => {
       ]);
 
       const [row] = insert.mock.calls[0]![0].rows;
-      expect(row[KPI_COLUMN_NAMES.indexOf("EventId")]).toBe(
-        "bbbb0000000000a1",
-      );
+      expect(row[KPI_COLUMN_NAMES.indexOf("EventId")]).toBe("bbbb0000000000a1");
     });
   });
 

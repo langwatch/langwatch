@@ -61,15 +61,25 @@ describe("zero-value survival", () => {
 
       const outcome = await built.maps.metricDataPointStorage!.apply({
         tenantId: canonical.tenantId,
-        events: [{ type: "lw.obs.metric.data_point_received", data: canonical }],
+        events: [
+          { type: "lw.obs.metric.data_point_received", data: canonical },
+        ],
       });
 
       expect(outcome.written).toBe(1);
       expect(
-        insertedCell({ client, table: "metric_data_points", column: "ValueDouble" }),
+        insertedCell({
+          client,
+          table: "metric_data_points",
+          column: "ValueDouble",
+        }),
       ).toBe(0);
       expect(
-        insertedCell({ client, table: "metric_data_points", column: "ValueType" }),
+        insertedCell({
+          client,
+          table: "metric_data_points",
+          column: "ValueType",
+        }),
       ).toBe("double");
     });
   });

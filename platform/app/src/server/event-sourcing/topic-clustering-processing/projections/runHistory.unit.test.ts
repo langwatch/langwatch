@@ -1,7 +1,11 @@
 import { checkOrderInvariance } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import { mintManualRunId, mintScheduledRunId } from "../runIdentity";
-import type { RunCompletedData, RunFailedData, RunStartedData } from "../schema";
+import type {
+  RunCompletedData,
+  RunFailedData,
+  RunStartedData,
+} from "../schema";
 import {
   deriveRunHistoryView,
   handleRunCompleted,
@@ -32,7 +36,12 @@ function apply(state: RunHistoryState, event: Event): RunHistoryState {
 
 const runStarted = (runId: string): Event => ({
   type: "runStarted",
-  data: { projectId: PROJECT_ID, runId, page: 1, occurredAt: 1_700_000_000_000 },
+  data: {
+    projectId: PROJECT_ID,
+    runId,
+    page: 1,
+    occurredAt: 1_700_000_000_000,
+  },
 });
 
 const runCompleted = (
@@ -58,7 +67,14 @@ const runFailed = (
   overrides: Partial<Omit<RunFailedData, "runId" | "projectId">> = {},
 ): Event => ({
   type: "runFailed",
-  data: { projectId: PROJECT_ID, runId, page: 1, error: "boom", occurredAt: 1_700_000_100_000, ...overrides },
+  data: {
+    projectId: PROJECT_ID,
+    runId,
+    page: 1,
+    error: "boom",
+    occurredAt: 1_700_000_100_000,
+    ...overrides,
+  },
 });
 
 describe("topicClusteringRunHistory fold", () => {
@@ -67,11 +83,19 @@ describe("topicClusteringRunHistory fold", () => {
     const runId = mintManualRunId(1_700_000_000_000);
     let state = initRunHistoryState();
     state = apply(state, runStarted(runId));
-    state = apply(state, runCompleted(runId, { tracesProcessed: 12, topicsCount: 4 }));
+    state = apply(
+      state,
+      runCompleted(runId, { tracesProcessed: 12, topicsCount: 4 }),
+    );
 
     const view = deriveRunHistoryView(state);
     expect(view).toHaveLength(1);
-    expect(view[0]).toMatchObject({ runId, outcome: "completed", tracesProcessed: 12, topicsCount: 4 });
+    expect(view[0]).toMatchObject({
+      runId,
+      outcome: "completed",
+      tracesProcessed: 12,
+      topicsCount: 4,
+    });
   });
 
   /** @scenario A multi-page run is one history entry */
@@ -79,20 +103,44 @@ describe("topicClusteringRunHistory fold", () => {
     const runId = mintManualRunId(1_700_000_000_000);
     let state = initRunHistoryState();
     state = apply(state, runStarted(runId));
-    state = apply(state, runCompleted(runId, { page: 1, tracesProcessed: 4, nextSearchAfter: [1, "t1"] }));
-    state = apply(state, runCompleted(runId, { page: 2, tracesProcessed: 6, nextSearchAfter: [2, "t2"] }));
+    state = apply(
+      state,
+      runCompleted(runId, {
+        page: 1,
+        tracesProcessed: 4,
+        nextSearchAfter: [1, "t1"],
+      }),
+    );
+    state = apply(
+      state,
+      runCompleted(runId, {
+        page: 2,
+        tracesProcessed: 6,
+        nextSearchAfter: [2, "t2"],
+      }),
+    );
     state = apply(state, runCompleted(runId, { page: 3, tracesProcessed: 2 }));
 
     const view = deriveRunHistoryView(state);
     expect(view).toHaveLength(1);
-    expect(view[0]).toMatchObject({ tracesProcessed: 12, pages: 3, outcome: "completed" });
+    expect(view[0]).toMatchObject({
+      tracesProcessed: 12,
+      pages: 3,
+      outcome: "completed",
+    });
   });
 
   /** @scenario A failed run keeps its guidance without raw error detail */
   it("carries an errorCode but never a raw error message", () => {
     const runId = mintManualRunId(1_700_000_000_000);
     const view = deriveRunHistoryView(
-      apply(initRunHistoryState(), runFailed(runId, { errorCode: "model_provider_not_configured", isUserActionable: true })),
+      apply(
+        initRunHistoryState(),
+        runFailed(runId, {
+          errorCode: "model_provider_not_configured",
+          isUserActionable: true,
+        }),
+      ),
     );
     expect(view[0]).toMatchObject({
       outcome: "failed",
@@ -123,8 +171,12 @@ describe("topicClusteringRunHistory fold", () => {
       state = apply(state, runStarted(newer));
 
       const view = deriveRunHistoryView(state);
-      expect(view.find((entry) => entry.runId === older)?.outcome).toBe("abandoned");
-      expect(view.find((entry) => entry.runId === newer)?.outcome).toBe("running");
+      expect(view.find((entry) => entry.runId === older)?.outcome).toBe(
+        "abandoned",
+      );
+      expect(view.find((entry) => entry.runId === newer)?.outcome).toBe(
+        "running",
+      );
     });
 
     it("does not abandon the newest run relative to itself", () => {
@@ -155,8 +207,12 @@ describe("topicClusteringRunHistory fold", () => {
       state = apply(state, runStarted(manual));
       state = apply(state, runStarted(scheduled));
       const view = deriveRunHistoryView(state);
-      expect(view.find((entry) => entry.runId === manual)?.trigger).toBe("manual");
-      expect(view.find((entry) => entry.runId === scheduled)?.trigger).toBe("scheduled");
+      expect(view.find((entry) => entry.runId === manual)?.trigger).toBe(
+        "manual",
+      );
+      expect(view.find((entry) => entry.runId === scheduled)?.trigger).toBe(
+        "scheduled",
+      );
     });
   });
 
@@ -166,11 +222,23 @@ describe("topicClusteringRunHistory fold", () => {
       const runId = mintManualRunId(1_700_000_000_000);
       const events: Event[] = [
         runStarted(runId),
-        runCompleted(runId, { page: 1, tracesProcessed: 4, nextSearchAfter: [1, "t1"] }),
-        runCompleted(runId, { page: 2, tracesProcessed: 6, nextSearchAfter: [2, "t2"] }),
+        runCompleted(runId, {
+          page: 1,
+          tracesProcessed: 4,
+          nextSearchAfter: [1, "t1"],
+        }),
+        runCompleted(runId, {
+          page: 2,
+          tracesProcessed: 6,
+          nextSearchAfter: [2, "t2"],
+        }),
         runCompleted(runId, { page: 3, tracesProcessed: 2 }),
       ];
-      const report = checkOrderInvariance({ init: initRunHistoryState, apply, events });
+      const report = checkOrderInvariance({
+        init: initRunHistoryState,
+        apply,
+        events,
+      });
       expect(report.invariant).toBe(true);
       expect(report.duplicatesChecked).toBe(events.length);
     });
@@ -179,20 +247,39 @@ describe("topicClusteringRunHistory fold", () => {
     it("reaches the same abandonment verdict regardless of which run's events arrive first", () => {
       const older = mintScheduledRunId(Date.UTC(2026, 6, 17, 9, 30, 0));
       const newer = mintScheduledRunId(Date.UTC(2026, 6, 18, 9, 30, 0));
-      const events: Event[] = [runStarted(older), runStarted(newer), runCompleted(newer, { tracesProcessed: 3 })];
-      const report = checkOrderInvariance({ init: initRunHistoryState, apply, events });
+      const events: Event[] = [
+        runStarted(older),
+        runStarted(newer),
+        runCompleted(newer, { tracesProcessed: 3 }),
+      ];
+      const report = checkOrderInvariance({
+        init: initRunHistoryState,
+        apply,
+        events,
+      });
       expect(report.invariant).toBe(true);
 
       const forward = events.reduce(apply, initRunHistoryState());
-      const backward = [...events].reverse().reduce(apply, initRunHistoryState());
-      expect(deriveRunHistoryView(forward)).toEqual(deriveRunHistoryView(backward));
+      const backward = [...events]
+        .reverse()
+        .reduce(apply, initRunHistoryState());
+      expect(deriveRunHistoryView(forward)).toEqual(
+        deriveRunHistoryView(backward),
+      );
     });
 
     it("reaches the same bounded population regardless of arrival order", () => {
       const events: Event[] = Array.from({ length: 8 }, (_unused, i) =>
-        runCompleted(mintScheduledRunId(Date.UTC(2026, 0, 1 + i, 9, 0, 0)), { tracesProcessed: i }),
+        runCompleted(mintScheduledRunId(Date.UTC(2026, 0, 1 + i, 9, 0, 0)), {
+          tracesProcessed: i,
+        }),
       );
-      const report = checkOrderInvariance({ init: initRunHistoryState, apply, events, maxPermutations: 40 });
+      const report = checkOrderInvariance({
+        init: initRunHistoryState,
+        apply,
+        events,
+        maxPermutations: 40,
+      });
       expect(report.invariant).toBe(true);
     });
   });

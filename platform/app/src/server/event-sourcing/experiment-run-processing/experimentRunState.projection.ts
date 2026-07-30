@@ -50,7 +50,8 @@ export function applyRunStarted(
     ...state,
     runId: data.runId,
     experimentId: data.experimentId,
-    workflowVersionId: state.workflowVersionId ?? data.workflowVersionId ?? null,
+    workflowVersionId:
+      state.workflowVersionId ?? data.workflowVersionId ?? null,
     total: Math.max(state.total, data.total),
     targets: mergeTargets(state.targets, data.targets),
     // The deployed partition column. Frozen on the first `started` this fold

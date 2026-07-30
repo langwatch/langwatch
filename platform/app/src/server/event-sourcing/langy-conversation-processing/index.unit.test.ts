@@ -1,23 +1,23 @@
+import type { ClickHouseClient } from "@langwatch/clickhouse";
 import { checkTypeStringRatchet } from "@langwatch/event-sourcing";
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import { describe, expect, it, vi } from "vitest";
-import type { ClickHouseClient } from "@langwatch/clickhouse";
 import {
   checkLangyConversationProcessingRatchet,
   createLangyConversationProcessingPipeline,
+  type LangyConversationEffects,
   langyAnalyticsEventGroupKey,
   langyConversationCommandGroupKey,
   langyConversationProcessGroupKey,
   langyConversationStateGroupKey,
   langyConversationTurnGroupKey,
   langyMessageOperationalGroupKey,
-  type LangyConversationEffects,
 } from "./index";
+import type { LangyProjectionPrisma } from "./postgres";
 import {
   currentLangyConversationProcessingTypeStrings,
   LANGY_CONVERSATION_PROCESSING_TYPE_STRING_SNAPSHOT,
 } from "./ratchet";
-import type { LangyProjectionPrisma } from "./postgres";
 
 const client = {} as ClickHouseClient;
 
@@ -49,7 +49,9 @@ describe("langy-conversation-processing composition", () => {
       "langyAnalyticsEvent",
       "langyMessageOperational",
     ]);
-    expect(Object.keys(pipeline.processManagers)).toEqual(["langyConversation"]);
+    expect(Object.keys(pipeline.processManagers)).toEqual([
+      "langyConversation",
+    ]);
     expect(Object.keys(pipeline.commands).sort()).toEqual(
       [
         "acceptAgentTurn",
@@ -97,7 +99,9 @@ describe("langy-conversation-processing composition", () => {
   it("gives the process manager the eight events event-sourcing.old wires it to", () => {
     const pipeline = build();
 
-    expect([...pipeline.processManagers.langyConversation!.eventTypes].sort()).toEqual(
+    expect(
+      [...pipeline.processManagers.langyConversation!.eventTypes].sort(),
+    ).toEqual(
       [
         LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
         LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
@@ -109,8 +113,13 @@ describe("langy-conversation-processing composition", () => {
         LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_HANDOFF_CONSUMED,
       ].sort(),
     );
-    expect(pipeline.processManagers.langyConversation!.intentTypes.sort()).toEqual(
-      ["langyConversation/generateTitle", "langyConversation/workerDispatch"].sort(),
+    expect(
+      pipeline.processManagers.langyConversation!.intentTypes.sort(),
+    ).toEqual(
+      [
+        "langyConversation/generateTitle",
+        "langyConversation/workerDispatch",
+      ].sort(),
     );
   });
 });

@@ -1,9 +1,9 @@
 import { checkTypeStringRatchet } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import {
-    checkLogProcessingRatchet,
-    currentLogProcessingTypeStrings,
-    LOG_PROCESSING_TYPE_STRING_SNAPSHOT,
+  checkLogProcessingRatchet,
+  currentLogProcessingTypeStrings,
+  LOG_PROCESSING_TYPE_STRING_SNAPSHOT,
 } from "../ratchet";
 
 describe("the log-processing type-string ratchet (ADR-105 decision 10)", () => {

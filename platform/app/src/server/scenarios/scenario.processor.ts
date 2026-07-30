@@ -14,17 +14,10 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
-import { reconcileOrphanedRunsOnBoot } from "./orphaned-run-reconciliation.clickhouse";
-import {
-  findQueuedRunCandidates,
-  LOOKBACK_MS,
-  ORPHAN_QUEUED_THRESHOLD_MS,
-  reconcileOrphanedQueuedRuns,
-} from "./scenario-orphan-reconciler";
 import { type ChildProcess, spawn } from "child_process";
 import path from "path";
 import { env } from "~/env.mjs";
+import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
 import {
   createContextFromJobData,
   type JobContextMetadata,
@@ -58,6 +51,7 @@ import type {
   ChildProcessJobData,
   ScenarioExecutionResult,
 } from "./execution/types";
+import { reconcileOrphanedRunsOnBoot } from "./orphaned-run-reconciliation.clickhouse";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
 import {
@@ -65,6 +59,12 @@ import {
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
 import { classifyScenarioInfraError } from "./scenario-infra-error";
+import {
+  findQueuedRunCandidates,
+  LOOKBACK_MS,
+  ORPHAN_QUEUED_THRESHOLD_MS,
+  reconcileOrphanedQueuedRuns,
+} from "./scenario-orphan-reconciler";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)

@@ -6,12 +6,13 @@ import type {
 } from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { automationsEvents } from "./events";
+import type { automationsEvents } from "./events";
 import { TRIGGER_SETTLEMENT_PROCESS_NAME } from "./triggerSettlement.process";
 
 const logger = createLogger("langwatch:automations:webhook-delivery-prune");
 
-export const WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME = "webhookDeliveryPrune" as const;
+export const WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME =
+  "webhookDeliveryPrune" as const;
 export const WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 /** This process wakes daily, so its own dispatched outbox rows are kept a
  *  week — long enough to read back a failed prune's history. */
@@ -25,7 +26,9 @@ export const webhookDeliveryPruneStateSchema = z.object({
    *  armed deadline untouched is by reading it back from state. */
   nextWakeAt: z.number().nullable(),
 });
-export type WebhookDeliveryPruneState = z.infer<typeof webhookDeliveryPruneStateSchema>;
+export type WebhookDeliveryPruneState = z.infer<
+  typeof webhookDeliveryPruneStateSchema
+>;
 
 export function initWebhookDeliveryPruneState(): WebhookDeliveryPruneState {
   return { lastPruneAt: null, nextWakeAt: null };
@@ -39,7 +42,10 @@ export interface WebhookDeliveryPrunePorts {
    *  row count. */
   pruneExpiredDeliveries(): Promise<number>;
   /** Deletes dispatched outbox rows older than `before` for one process. */
-  pruneDispatchedIntentsBefore(params: { processName: string; before: number }): Promise<number>;
+  pruneDispatchedIntentsBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number>;
 }
 
 async function pruneDispatchedOutbox({
@@ -54,10 +60,16 @@ async function pruneDispatchedOutbox({
   retentionMs: number;
 }): Promise<void> {
   try {
-    await ports.pruneDispatchedIntentsBefore({ processName, before: scheduledFor - retentionMs });
+    await ports.pruneDispatchedIntentsBefore({
+      processName,
+      before: scheduledFor - retentionMs,
+    });
   } catch (error) {
     logger.warn(
-      { processName, error: error instanceof Error ? error.message : String(error) },
+      {
+        processName,
+        error: error instanceof Error ? error.message : String(error),
+      },
       "Outbox retention prune failed",
     );
   }
@@ -70,7 +82,9 @@ async function pruneDispatchedOutbox({
  * pending matches, so pruning from its own wake would fire a global,
  * cross-tenant delete from every trigger at once.
  */
-function createPruneIntent(ports: WebhookDeliveryPrunePorts): IntentDef<typeof prunePayloadSchema> {
+function createPruneIntent(
+  ports: WebhookDeliveryPrunePorts,
+): IntentDef<typeof prunePayloadSchema> {
   return {
     payload: prunePayloadSchema,
     messageKey: (payload) => `prune:${payload.scheduledFor}`,
@@ -100,14 +114,18 @@ export function webhookDeliveryPruneIntents(ports: WebhookDeliveryPrunePorts) {
   return { prune: createPruneIntent(ports) };
 }
 
-type WebhookDeliveryPruneIntents = ReturnType<typeof webhookDeliveryPruneIntents>;
+type WebhookDeliveryPruneIntents = ReturnType<
+  typeof webhookDeliveryPruneIntents
+>;
 
 export const webhookDeliveryPruneOn: ProcessManagerHandlerMap<
   typeof automationsEvents,
   WebhookDeliveryPruneState,
   WebhookDeliveryPruneIntents
 > = {
-  matchRecorded(state): EvolveStep<WebhookDeliveryPruneState, WebhookDeliveryPruneIntents> {
+  matchRecorded(
+    state,
+  ): EvolveStep<WebhookDeliveryPruneState, WebhookDeliveryPruneIntents> {
     return { state, intents: [], nextWakeAt: state.nextWakeAt };
   },
 };

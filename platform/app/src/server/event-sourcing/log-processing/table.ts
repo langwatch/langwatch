@@ -1,4 +1,9 @@
-import { ch, type ColumnDef, defineTable, replacing } from "@langwatch/clickhouse";
+import {
+  type ColumnDef,
+  ch,
+  defineTable,
+  replacing,
+} from "@langwatch/clickhouse";
 
 /**
  * The two tables `canonicalLogStorage` writes into (migration `00050`,

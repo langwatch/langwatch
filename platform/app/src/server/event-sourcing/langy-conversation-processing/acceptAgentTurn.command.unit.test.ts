@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { acceptAgentTurn, acceptAgentTurnInputSchema } from "./acceptAgentTurn.command";
+import {
+  acceptAgentTurn,
+  acceptAgentTurnInputSchema,
+} from "./acceptAgentTurn.command";
 
 describe("when a command decides a batch", () => {
   it("orders the resumed handoff's consume after the accepted turn", async () => {

@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import http from "http";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
+import http from "http";
 import { register } from "prom-client";
 import { assertRedisReady } from "~/server/redis";
 
@@ -46,8 +46,9 @@ async function verifyDatabaseReady(): Promise<void> {
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getSharedClickHouseClient } =
-    await import("~/server/clickhouse/clickhouseClient");
+  const { getSharedClickHouseClient } = await import(
+    "~/server/clickhouse/clickhouseClient"
+  );
   const { startStorageStatsCollection, stopStorageStatsCollection } =
     await import("~/server/clickhouse/metrics");
   const clickHouseClient = getSharedClickHouseClient();
@@ -65,12 +66,15 @@ async function bootStorageStatsCollection(
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getScenarioExecutionHandle } =
-    await import("~/server/app-layer/presets");
-  const { ScenarioExecutionPool } =
-    await import("~/server/scenarios/execution/execution-pool");
-  const { startScenarioProcessor } =
-    await import("~/server/scenarios/scenario.processor");
+  const { getScenarioExecutionHandle } = await import(
+    "~/server/app-layer/presets"
+  );
+  const { ScenarioExecutionPool } = await import(
+    "~/server/scenarios/execution/execution-pool"
+  );
+  const { startScenarioProcessor } = await import(
+    "~/server/scenarios/scenario.processor"
+  );
   const scenarioPool = new ScenarioExecutionPool();
   getScenarioExecutionHandle()?.setPool(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor(scenarioPool);
@@ -85,8 +89,9 @@ async function bootScenarioProcessor(
 async function bootAnomalyWorker(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startAnomalyWorker } =
-    await import("~/server/observability/anomalyWorker");
+  const { startAnomalyWorker } = await import(
+    "~/server/observability/anomalyWorker"
+  );
   const anomalyWorker = startAnomalyWorker();
   if (anomalyWorker) {
     shutdownHandles.push(() => anomalyWorker.stop());
@@ -100,8 +105,9 @@ async function bootAnomalyWorker(
 async function bootSpendSpikeAnomalyWorker(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startSpendSpikeAnomalyWorker } =
-    await import("@ee/governance/services/spendSpikeAnomalyWorker");
+  const { startSpendSpikeAnomalyWorker } = await import(
+    "@ee/governance/services/spendSpikeAnomalyWorker"
+  );
   const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
   shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
   logger.info("spend spike anomaly worker ready");
@@ -186,8 +192,9 @@ export function createWorkerMetricsHandler(
 async function bootMetricsServer(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getWorkerMetricsPort, isMetricsAuthorized } =
-    await import("~/server/metrics");
+  const { getWorkerMetricsPort, isMetricsAuthorized } = await import(
+    "~/server/metrics"
+  );
   const metricsPort = getWorkerMetricsPort();
   const metricsServer = http.createServer(
     createWorkerMetricsHandler(isMetricsAuthorized),

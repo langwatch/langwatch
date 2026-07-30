@@ -1,22 +1,26 @@
-import { clickhouseAppend, type ClickHouseClient } from "@langwatch/clickhouse";
+import { type ClickHouseClient, clickhouseAppend } from "@langwatch/clickhouse";
 import {
-    ConfigurationError,
-    definePipeline,
-    validateMount,
-    type AppendStore,
-    type GroupKey,
-    type Mount,
+  type AppendStore,
+  ConfigurationError,
+  definePipeline,
+  type GroupKey,
+  type Mount,
+  validateMount,
 } from "@langwatch/event-sourcing";
 import {
-    DEFAULT_RETENTION_DAYS,
-    toCanonicalLogRecord,
-    toLogRecordRow,
-    toLogUsageEstimateRow,
-    type StampedLogRecord,
+  DEFAULT_RETENTION_DAYS,
+  type StampedLogRecord,
+  toCanonicalLogRecord,
+  toLogRecordRow,
+  toLogUsageEstimateRow,
 } from "./canonicalLogStorage.projection";
-import { LOG_PIPELINE_NAME, LOG_PIPELINE_PREFIX, logProcessingEvents } from "./events";
+import {
+  LOG_PIPELINE_NAME,
+  LOG_PIPELINE_PREFIX,
+  logProcessingEvents,
+} from "./events";
 import { recordCanonicalLog } from "./recordCanonicalLog.command";
-import { canonicalLogRecordSchema, type CanonicalLogRecord } from "./schema";
+import { type CanonicalLogRecord, canonicalLogRecordSchema } from "./schema";
 import { DEFAULT_LOG_SHARD_COUNT, logRecordShard } from "./shards";
 import { logRecordsTable, logUsageEstimatesTable } from "./table";
 
@@ -77,7 +81,11 @@ function assertMountIsLegal(mount: Mount): Mount {
       `log-processing's canonicalLogStorage mount is illegal: ${violations
         .map((v) => `${v.rule} — ${v.message}`)
         .join("; ")}`,
-      { pipeline: LOG_PIPELINE_NAME, projection: "canonicalLogStorage", violations },
+      {
+        pipeline: LOG_PIPELINE_NAME,
+        projection: "canonicalLogStorage",
+        violations,
+      },
     );
   }
   return mount;

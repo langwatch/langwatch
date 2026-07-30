@@ -94,10 +94,8 @@ export function buildExperimentRunTotalsQuery(args: {
     : "";
 
   const isTarget = `${col("ResultType")} = 'target'`;
-  const isGraded =
-    `${col("ResultType")} = 'evaluator' AND ${col("EvaluationStatus")} = 'processed'`;
-  const errored =
-    `${col("TargetError")} IS NOT NULL AND ${col("TargetError")} != ''`;
+  const isGraded = `${col("ResultType")} = 'evaluator' AND ${col("EvaluationStatus")} = 'processed'`;
+  const errored = `${col("TargetError")} IS NOT NULL AND ${col("TargetError")} != ''`;
 
   const sql =
     `SELECT ` +

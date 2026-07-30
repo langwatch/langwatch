@@ -1,4 +1,9 @@
-import { ch, type ColumnDef, defineTable, replacing } from "@langwatch/clickhouse";
+import {
+  type ColumnDef,
+  ch,
+  defineTable,
+  replacing,
+} from "@langwatch/clickhouse";
 import { z } from "zod";
 
 /**
@@ -13,7 +18,11 @@ const lowCardinalityString = () => ch.lowCardinality(ch.string());
 
 /** ClickHouse emits Int32 as a bare JSON number, so it needs its own builder. */
 function int32(): ColumnDef<number> {
-  const schema = z.number().int().min(-(2 ** 31)).max(2 ** 31 - 1);
+  const schema = z
+    .number()
+    .int()
+    .min(-(2 ** 31))
+    .max(2 ** 31 - 1);
   return {
     chType: "Int32",
     schema,

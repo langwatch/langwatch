@@ -1,30 +1,30 @@
 import { checkOrderInvariance } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import type {
-    AnnotationRef,
-    AnnotationsBulkSync,
-    CanonicalSpan,
-    LogContribution,
-    MetricCorrelation,
-    OriginResolution,
-    TopicAssignment,
-    TraceNameChange,
+  AnnotationRef,
+  AnnotationsBulkSync,
+  CanonicalSpan,
+  LogContribution,
+  MetricCorrelation,
+  OriginResolution,
+  TopicAssignment,
+  TraceNameChange,
 } from "../schema";
 import {
-    deriveTraceSummaryView,
-    handleAnnotationAdded,
-    handleAnnotationRemoved,
-    handleAnnotationsBulkSynced,
-    handleLogContributed,
-    handleMetricDataPointCorrelated,
-    handleOriginResolved,
-    handleSpanReceived,
-    handleTopicAssigned,
-    handleTraceNameChanged,
-    initTraceSummaryState,
-    TRACE_SUMMARY_STATE_VERSION,
-    type TraceSummaryState,
-    traceSummaryRowMapping,
+  deriveTraceSummaryView,
+  handleAnnotationAdded,
+  handleAnnotationRemoved,
+  handleAnnotationsBulkSynced,
+  handleLogContributed,
+  handleMetricDataPointCorrelated,
+  handleOriginResolved,
+  handleSpanReceived,
+  handleTopicAssigned,
+  handleTraceNameChanged,
+  initTraceSummaryState,
+  TRACE_SUMMARY_STATE_VERSION,
+  type TraceSummaryState,
+  traceSummaryRowMapping,
 } from "../traceSummary.projection";
 import { canonicalSpan, TRACE_ID } from "./fixtures";
 
@@ -39,24 +39,42 @@ const ROW_CONTEXT = {
 /** One step this fold's own `.on({...})` map would apply for one event. */
 type Step = (state: TraceSummaryState) => TraceSummaryState;
 
-const spanReceived = (span: CanonicalSpan): Step => (state) =>
-  handleSpanReceived(state, span);
-const topicAssigned = (data: TopicAssignment): Step => (state) =>
-  handleTopicAssigned(state, data);
-const originResolved = (data: OriginResolution): Step => (state) =>
-  handleOriginResolved(state, data);
-const annotationAdded = (data: AnnotationRef): Step => (state) =>
-  handleAnnotationAdded(state, data);
-const annotationRemoved = (data: AnnotationRef): Step => (state) =>
-  handleAnnotationRemoved(state, data);
-const traceNameChanged = (data: TraceNameChange): Step => (state) =>
-  handleTraceNameChanged(state, data);
-const logContributed = (data: LogContribution): Step => (state) =>
-  handleLogContributed(state, data);
-const metricDataPointCorrelated = (data: MetricCorrelation): Step => (state) =>
-  handleMetricDataPointCorrelated(state, data);
-const annotationsBulkSynced = (data: AnnotationsBulkSync): Step => (state) =>
-  handleAnnotationsBulkSynced(state, data);
+const spanReceived =
+  (span: CanonicalSpan): Step =>
+  (state) =>
+    handleSpanReceived(state, span);
+const topicAssigned =
+  (data: TopicAssignment): Step =>
+  (state) =>
+    handleTopicAssigned(state, data);
+const originResolved =
+  (data: OriginResolution): Step =>
+  (state) =>
+    handleOriginResolved(state, data);
+const annotationAdded =
+  (data: AnnotationRef): Step =>
+  (state) =>
+    handleAnnotationAdded(state, data);
+const annotationRemoved =
+  (data: AnnotationRef): Step =>
+  (state) =>
+    handleAnnotationRemoved(state, data);
+const traceNameChanged =
+  (data: TraceNameChange): Step =>
+  (state) =>
+    handleTraceNameChanged(state, data);
+const logContributed =
+  (data: LogContribution): Step =>
+  (state) =>
+    handleLogContributed(state, data);
+const metricDataPointCorrelated =
+  (data: MetricCorrelation): Step =>
+  (state) =>
+    handleMetricDataPointCorrelated(state, data);
+const annotationsBulkSynced =
+  (data: AnnotationsBulkSync): Step =>
+  (state) =>
+    handleAnnotationsBulkSynced(state, data);
 
 function fold(steps: readonly Step[]): TraceSummaryState {
   return steps.reduce((state, step) => step(state), initTraceSummaryState());
@@ -255,12 +273,28 @@ describe("the traceSummary fold", () => {
   describe("when an annotation is added and removed in the same instant", () => {
     it("settles on absent whichever order the two arrive in", () => {
       const removedLast = fold([
-        annotationAdded({ traceId: TRACE_ID, annotationId: "ann-1", actedAt: 42 }),
-        annotationRemoved({ traceId: TRACE_ID, annotationId: "ann-1", actedAt: 42 }),
+        annotationAdded({
+          traceId: TRACE_ID,
+          annotationId: "ann-1",
+          actedAt: 42,
+        }),
+        annotationRemoved({
+          traceId: TRACE_ID,
+          annotationId: "ann-1",
+          actedAt: 42,
+        }),
       ]);
       const addedLast = fold([
-        annotationRemoved({ traceId: TRACE_ID, annotationId: "ann-1", actedAt: 42 }),
-        annotationAdded({ traceId: TRACE_ID, annotationId: "ann-1", actedAt: 42 }),
+        annotationRemoved({
+          traceId: TRACE_ID,
+          annotationId: "ann-1",
+          actedAt: 42,
+        }),
+        annotationAdded({
+          traceId: TRACE_ID,
+          annotationId: "ann-1",
+          actedAt: 42,
+        }),
       ]);
 
       expect(deriveTraceSummaryView(removedLast).annotationIds).toEqual([]);

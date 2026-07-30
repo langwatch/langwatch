@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { mapSpanReceived, storedSpanRecordSchema } from "../spanStorage.projection";
+import {
+  mapSpanReceived,
+  storedSpanRecordSchema,
+} from "../spanStorage.projection";
 import { storedSpansTable } from "../table";
 import { canonicalSpan } from "./fixtures";
 

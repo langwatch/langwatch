@@ -20,10 +20,7 @@ import type {
   BulkAppendContext,
 } from "~/server/event-sourcing.old/projections/mapProjection.types";
 import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
-import {
-  assertRecordsTenant,
-  assertRecordTenant,
-} from "./assertRecordTenant";
+import { assertRecordsTenant, assertRecordTenant } from "./assertRecordTenant";
 
 const STORE_NAME = "GovernanceKpisAppendStore";
 

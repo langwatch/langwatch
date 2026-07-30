@@ -3,7 +3,10 @@ import {
   type RatchetViolation,
   type TypeStringSnapshot,
 } from "@langwatch/event-sourcing";
-import { type AutomationsPipelineDeps, createAutomationsPipeline } from "./index";
+import {
+  type AutomationsPipelineDeps,
+  createAutomationsPipeline,
+} from "./index";
 import snapshot from "./ratchet.snapshot.json";
 
 /** The committed type-string snapshot (ADR-105 decision 10). Additions are
@@ -21,7 +24,9 @@ export const AUTOMATIONS_TYPE_STRING_SNAPSHOT: TypeStringSnapshot = snapshot;
  */
 export function currentAutomationsTypeStrings(): TypeStringSnapshot {
   const built = createAutomationsPipeline({} as AutomationsPipelineDeps);
-  const snapshot: Record<string, readonly string[]> = { [built.name]: built.eventTypes };
+  const snapshot: Record<string, readonly string[]> = {
+    [built.name]: built.eventTypes,
+  };
   for (const [name, processManager] of Object.entries(built.processManagers)) {
     snapshot[name] = processManager.intentTypes;
   }

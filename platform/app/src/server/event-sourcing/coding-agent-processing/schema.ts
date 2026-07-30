@@ -200,7 +200,9 @@ export const codingAgentSessionStateSchema = z.object({
   /** Out-of-order checkpoint: max(prev, event.occurredAt) on every apply. Not projected as its own column beyond the row's own bookkeeping. */
   LastEventOccurredAt: z.number(),
 });
-export type CodingAgentSessionState = z.infer<typeof codingAgentSessionStateSchema>;
+export type CodingAgentSessionState = z.infer<
+  typeof codingAgentSessionStateSchema
+>;
 
 /**
  * One `(traceId -> sessionId)` mapping: the seam the trace drawer seeks on.

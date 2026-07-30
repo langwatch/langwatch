@@ -51,7 +51,9 @@ export const langyConversationEvents = {
   planUpdated: withOccurredAt(langyPlanUpdatedEventDataSchema),
   agentResponseFailed: withOccurredAt(langyAgentResponseFailedEventDataSchema),
   agentResponded: withOccurredAt(langyAgentRespondedEventDataSchema),
-  conversationArchived: withOccurredAt(langyConversationArchivedEventDataSchema),
+  conversationArchived: withOccurredAt(
+    langyConversationArchivedEventDataSchema,
+  ),
   conversationMetadataUpdated: withOccurredAt(
     langyConversationMetadataUpdatedEventDataSchema,
   ),

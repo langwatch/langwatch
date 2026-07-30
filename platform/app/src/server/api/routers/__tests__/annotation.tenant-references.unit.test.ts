@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createInnerTRPCContext } from "../../trpc";
 import { AnnotationService } from "../../../annotations/annotation.service";
+import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter } from "../annotation";
 
 vi.mock("../../../auditLog", () => ({

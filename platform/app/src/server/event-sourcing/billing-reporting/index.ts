@@ -16,13 +16,20 @@
 import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "@ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "@ee/billing/services/usageReportingService";
 import { type ClickHouseClient, clickhouseAppend } from "@langwatch/clickhouse";
-import { type GroupKey, definePipeline, processGroupKey } from "@langwatch/event-sourcing";
+import {
+  definePipeline,
+  type GroupKey,
+  processGroupKey,
+} from "@langwatch/event-sourcing";
 import type { BillingCheckpointService } from "~/server/app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import type { OrganizationForBilling } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { resolveOrganizationId as resolveOrganizationIdDefault } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { toBillableEventRow, toBillableEventsTableRow } from "./billableEventsMeter.projection";
+import {
+  toBillableEventRow,
+  toBillableEventsTableRow,
+} from "./billableEventsMeter.projection";
 import {
   BILLING_METER_POKE_PROCESS_NAME,
   billingMeterPokeIntents,
@@ -39,10 +46,14 @@ import {
   billingMeterSweepStateSchema,
   initBillingMeterSweepState,
 } from "./billingMeterSweep.process";
-import { BILLING_PIPELINE_NAME, BILLING_PIPELINE_PREFIX, billingReportingEvents } from "./events";
 import {
-  type RecordBillableEventPorts,
+  BILLING_PIPELINE_NAME,
+  BILLING_PIPELINE_PREFIX,
+  billingReportingEvents,
+} from "./events";
+import {
   billableSourceEventSchema,
+  type RecordBillableEventPorts,
   recordBillableEvent,
 } from "./recordBillableEvent.command";
 import type { OrganizationCache } from "./reportUsage";
@@ -54,17 +65,26 @@ const ORG_CACHE_TTL_MS = 60 * 1000;
 const GLOBAL_SWEEP_KEY = "__global__";
 
 /** ADR-100 decision 4: content-addressed, one lane per source event. */
-export function recordBillableEventGroupKey(args: { tenantId: string; eventId: string }): GroupKey {
+export function recordBillableEventGroupKey(args: {
+  tenantId: string;
+  eventId: string;
+}): GroupKey {
   return {
     tenantId: args.tenantId,
     lane: { kind: "command", name: "recordBillableEvent" },
-    scope: { kind: "aggregate", aggregateType: BILLING_PIPELINE_NAME, aggregateId: args.eventId },
+    scope: {
+      kind: "aggregate",
+      aggregateType: BILLING_PIPELINE_NAME,
+      aggregateId: args.eventId,
+    },
   };
 }
 
 /** A `partition` lane per project: this store is append-shaped, so any
  *  number of events sharing a lane may coalesce into one insert. */
-export function billableEventsMeterGroupKey(args: { tenantId: string }): GroupKey {
+export function billableEventsMeterGroupKey(args: {
+  tenantId: string;
+}): GroupKey {
   return {
     tenantId: args.tenantId,
     lane: { kind: "map", name: "billableEventsMeter" },
@@ -74,7 +94,9 @@ export function billableEventsMeterGroupKey(args: { tenantId: string }): GroupKe
 
 /** One poke instance per organization: two organizations' pokes must never
  *  share a lane. */
-export function billingMeterPokeGroupKey(args: { organizationId: string }): GroupKey {
+export function billingMeterPokeGroupKey(args: {
+  organizationId: string;
+}): GroupKey {
   return processGroupKey(
     { name: BILLING_METER_POKE_PROCESS_NAME },
     { tenantId: args.organizationId, processKey: args.organizationId },
@@ -92,7 +114,10 @@ export function billingMeterSweepGroupKey(): GroupKey {
 
 export interface BillingReportingPipelineDeps {
   readonly client: ClickHouseClient;
-  readonly organizations: Pick<OrganizationService, "getOrganizationForBilling">;
+  readonly organizations: Pick<
+    OrganizationService,
+    "getOrganizationForBilling"
+  >;
   readonly billingCheckpoints: BillingCheckpointService;
   /** Read per dispatch: usage reporting is SaaS-only, absent from a
    *  self-hosted build entirely. */
@@ -100,9 +125,15 @@ export interface BillingReportingPipelineDeps {
   readonly queryBillableEventsTotal: typeof QueryBillableEventsTotalFn;
   /** Organizations whose month total must be re-read for the sweep — see
    *  `billingMeterSweep.process.ts`. */
-  readonly listOrganizationsToReport: (params: { billingMonth: string }) => Promise<string[]>;
-  readonly pruneDispatchedIntentsBefore: (params: { before: number }) => Promise<number>;
-  readonly resolveOrganizationId?: (projectId: string) => Promise<string | undefined>;
+  readonly listOrganizationsToReport: (params: {
+    billingMonth: string;
+  }) => Promise<string[]>;
+  readonly pruneDispatchedIntentsBefore: (params: {
+    before: number;
+  }) => Promise<number>;
+  readonly resolveOrganizationId?: (
+    projectId: string,
+  ) => Promise<string | undefined>;
   /** Defaulted to a TTL cache; injected so a test never has to reach through
    *  the module graph to stub it. */
   readonly organizationCache?: OrganizationCache;
@@ -116,10 +147,17 @@ export interface BillingReportingPipelineDeps {
   readonly isSaas: boolean;
 }
 
-export function createBillingReportingPipeline(deps: BillingReportingPipelineDeps) {
-  const resolveOrganizationId = deps.resolveOrganizationId ?? resolveOrganizationIdDefault;
+export function createBillingReportingPipeline(
+  deps: BillingReportingPipelineDeps,
+) {
+  const resolveOrganizationId =
+    deps.resolveOrganizationId ?? resolveOrganizationIdDefault;
   const organizationCache =
-    deps.organizationCache ?? new TtlCache<OrganizationForBilling>(ORG_CACHE_TTL_MS, "ttlcache:billing:orgData:");
+    deps.organizationCache ??
+    new TtlCache<OrganizationForBilling>(
+      ORG_CACHE_TTL_MS,
+      "ttlcache:billing:orgData:",
+    );
 
   const meterStore = clickhouseAppend({
     client: deps.client,

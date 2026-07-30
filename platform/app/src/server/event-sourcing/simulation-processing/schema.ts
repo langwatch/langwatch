@@ -23,7 +23,9 @@ const TERMINAL_STATUSES = new Set<SimulationRunStatus>([
   "STALLED",
 ]);
 
-export function isTerminalStatus(status: string): status is SimulationRunStatus {
+export function isTerminalStatus(
+  status: string,
+): status is SimulationRunStatus {
   return TERMINAL_STATUSES.has(status as SimulationRunStatus);
 }
 

@@ -10,12 +10,23 @@ import {
 } from "../graphAlertSweep.process";
 
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
+  createLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
 }));
 
-const ctx: ProcessContext = { processKey: "graphAlertSweep", tenantId: "__global__", now: 10_000 };
+const ctx: ProcessContext = {
+  processKey: "graphAlertSweep",
+  tenantId: "__global__",
+  now: 10_000,
+};
 
-function makePorts(overrides: Partial<GraphAlertSweepPorts> = {}): GraphAlertSweepPorts {
+function makePorts(
+  overrides: Partial<GraphAlertSweepPorts> = {},
+): GraphAlertSweepPorts {
   return {
     decideSweepCandidates: vi.fn().mockResolvedValue([]),
     evaluateGraphTrigger: vi.fn().mockResolvedValue(undefined),
@@ -30,7 +41,10 @@ describe("graph alert sweep process", () => {
       const wake = graphAlertSweepOnWake(initGraphAlertSweepState(), ctx);
 
       expect(wake).toEqual({
-        state: { lastSweepAt: 10_000, nextWakeAt: 10_000 + GRAPH_ALERT_SWEEP_INTERVAL_MS },
+        state: {
+          lastSweepAt: 10_000,
+          nextWakeAt: 10_000 + GRAPH_ALERT_SWEEP_INTERVAL_MS,
+        },
         intents: [{ type: "evaluateGraph", payload: { scheduledFor: 10_000 } }],
         nextWakeAt: 10_000 + GRAPH_ALERT_SWEEP_INTERVAL_MS,
       });
@@ -50,13 +64,20 @@ describe("graph alert sweep process", () => {
     it("evaluates the candidate", async () => {
       const evaluateGraphTrigger = vi.fn().mockResolvedValue(undefined);
       const ports = makePorts({
-        decideSweepCandidates: vi
-          .fn()
-          .mockResolvedValue([{ triggerId: "trigger-1", tenantId: "project-1", reason: "heartbeat" as const }]),
+        decideSweepCandidates: vi.fn().mockResolvedValue([
+          {
+            triggerId: "trigger-1",
+            tenantId: "project-1",
+            reason: "heartbeat" as const,
+          },
+        ]),
         evaluateGraphTrigger,
       });
 
-      await graphAlertSweepIntents(ports).evaluateGraph.deliver({ scheduledFor: 10_000 }, { now: 10_000, tenantId: "__global__" });
+      await graphAlertSweepIntents(ports).evaluateGraph.deliver(
+        { scheduledFor: 10_000 },
+        { now: 10_000, tenantId: "__global__" },
+      );
 
       expect(evaluateGraphTrigger).toHaveBeenCalledWith({
         triggerId: "trigger-1",
@@ -66,17 +87,31 @@ describe("graph alert sweep process", () => {
     });
 
     it("does not let one candidate's failure stop the rest of the sweep", async () => {
-      const evaluateGraphTrigger = vi.fn().mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce(undefined);
+      const evaluateGraphTrigger = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce(undefined);
       const ports = makePorts({
         decideSweepCandidates: vi.fn().mockResolvedValue([
-          { triggerId: "trigger-1", tenantId: "project-1", reason: "heartbeat" as const },
-          { triggerId: "trigger-2", tenantId: "project-1", reason: "heartbeat" as const },
+          {
+            triggerId: "trigger-1",
+            tenantId: "project-1",
+            reason: "heartbeat" as const,
+          },
+          {
+            triggerId: "trigger-2",
+            tenantId: "project-1",
+            reason: "heartbeat" as const,
+          },
         ]),
         evaluateGraphTrigger,
       });
 
       await expect(
-        graphAlertSweepIntents(ports).evaluateGraph.deliver({ scheduledFor: 10_000 }, { now: 10_000, tenantId: "__global__" }),
+        graphAlertSweepIntents(ports).evaluateGraph.deliver(
+          { scheduledFor: 10_000 },
+          { now: 10_000, tenantId: "__global__" },
+        ),
       ).resolves.toBeUndefined();
       expect(evaluateGraphTrigger).toHaveBeenCalledTimes(2);
     });
@@ -87,16 +122,28 @@ describe("graph alert sweep process", () => {
       const pruneDispatchedIntentsBefore = vi.fn().mockResolvedValue(3);
       const ports = makePorts({ pruneDispatchedIntentsBefore });
 
-      await graphAlertSweepIntents(ports).evaluateGraph.deliver({ scheduledFor: 10_000 }, { now: 10_000, tenantId: "__global__" });
+      await graphAlertSweepIntents(ports).evaluateGraph.deliver(
+        { scheduledFor: 10_000 },
+        { now: 10_000, tenantId: "__global__" },
+      );
 
-      expect(pruneDispatchedIntentsBefore).toHaveBeenCalledWith({ before: 10_000 - 24 * 60 * 60 * 1000 });
+      expect(pruneDispatchedIntentsBefore).toHaveBeenCalledWith({
+        before: 10_000 - 24 * 60 * 60 * 1000,
+      });
     });
 
     it("still completes the sweep when the retention delete fails", async () => {
-      const ports = makePorts({ pruneDispatchedIntentsBefore: vi.fn().mockRejectedValue(new Error("boom")) });
+      const ports = makePorts({
+        pruneDispatchedIntentsBefore: vi
+          .fn()
+          .mockRejectedValue(new Error("boom")),
+      });
 
       await expect(
-        graphAlertSweepIntents(ports).evaluateGraph.deliver({ scheduledFor: 10_000 }, { now: 10_000, tenantId: "__global__" }),
+        graphAlertSweepIntents(ports).evaluateGraph.deliver(
+          { scheduledFor: 10_000 },
+          { now: 10_000, tenantId: "__global__" },
+        ),
       ).resolves.toBeUndefined();
     });
   });

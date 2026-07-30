@@ -1,5 +1,5 @@
 import type { EmittedEvent } from "@langwatch/event-sourcing";
-import { simulationRunEvents } from "./events";
+import type { simulationRunEvents } from "./events";
 import type { MetricsRecordedData } from "./schema";
 
 /** Deriving the values reads the trace-processing pipeline's stored spans, a

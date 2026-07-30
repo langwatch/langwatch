@@ -89,7 +89,9 @@ describe("buildBatchAggregateQuery", () => {
       sql.indexOf("IN ("),
       sql.indexOf(")", sql.indexOf("GROUP BY TenantId, ScenarioRunId")) + 1,
     );
-    expect(dedupSubquery).toContain("BatchRunId IN {batchRunIds:Array(String)}");
+    expect(dedupSubquery).toContain(
+      "BatchRunId IN {batchRunIds:Array(String)}",
+    );
   });
 
   it("binds the batch ids, tenant id and status lists as query parameters", () => {

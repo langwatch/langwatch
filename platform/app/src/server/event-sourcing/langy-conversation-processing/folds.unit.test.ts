@@ -189,7 +189,10 @@ describe("the conversation spine fold", () => {
   });
 
   it("diverges on MessageCount alone when a delivery is retried", () => {
-    const once = spineEvents.reduce(applySpine, initLangyConversationSpineState());
+    const once = spineEvents.reduce(
+      applySpine,
+      initLangyConversationSpineState(),
+    );
     const retried = spineEvents
       .concat(spineEvents)
       .reduce(applySpine, initLangyConversationSpineState());

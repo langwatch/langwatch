@@ -49,9 +49,17 @@ export interface CancelBatchRunResult {
 /** Dependencies injected into the cancellation service. */
 export interface CancellationServiceDeps {
   /** Read run state from CH/ES fold projections. */
-  getRunsForBatch: (params: { projectId: string; scenarioSetId: string; batchRunId: string }) => Promise<ScenarioRunData[]>;
+  getRunsForBatch: (params: {
+    projectId: string;
+    scenarioSetId: string;
+    batchRunId: string;
+  }) => Promise<ScenarioRunData[]>;
   /** Dispatch a cancel_requested event via the event-sourcing pipeline. */
-  dispatchCancelRequested: (params: { tenantId: string; scenarioRunId: string; occurredAt: number }) => Promise<void>;
+  dispatchCancelRequested: (params: {
+    tenantId: string;
+    scenarioRunId: string;
+    occurredAt: number;
+  }) => Promise<void>;
   /**
    * Dispatch a finished event with CANCELLED status. Used for queued jobs that
    * no worker will pick up.
@@ -105,13 +113,23 @@ export class ScenarioCancellationService {
   async cancelJob(params: CancelJobParams): Promise<CancelJobResult> {
     const { projectId, scenarioRunId, batchRunId, scenarioSetId } = params;
 
-    logger.info({ projectId, scenarioRunId, batchRunId }, "Cancelling scenario job");
+    logger.info(
+      { projectId, scenarioRunId, batchRunId },
+      "Cancelling scenario job",
+    );
 
     // Check current status from fold projection — if already terminal, skip
-    const runs = await this.getRunsForBatch({ projectId, scenarioSetId, batchRunId });
+    const runs = await this.getRunsForBatch({
+      projectId,
+      scenarioSetId,
+      batchRunId,
+    });
     const run = runs.find((r) => r.scenarioRunId === scenarioRunId);
     if (run && !isCancellableStatus(run.status)) {
-      logger.debug({ scenarioRunId, status: run.status }, "Run already terminal, nothing to cancel");
+      logger.debug(
+        { scenarioRunId, status: run.status },
+        "Run already terminal, nothing to cancel",
+      );
       return { cancelled: false };
     }
 
@@ -137,7 +155,10 @@ export class ScenarioCancellationService {
       });
     }
 
-    logger.info({ projectId, scenarioRunId, status: run?.status }, "Cancellation event dispatched");
+    logger.info(
+      { projectId, scenarioRunId, status: run?.status },
+      "Cancellation event dispatched",
+    );
     return { cancelled: true };
   }
 
@@ -146,12 +167,21 @@ export class ScenarioCancellationService {
    *
    * Reads run state from fold projections and cancels each cancellable run.
    */
-  async cancelBatchRun(params: CancelBatchRunParams): Promise<CancelBatchRunResult> {
+  async cancelBatchRun(
+    params: CancelBatchRunParams,
+  ): Promise<CancelBatchRunResult> {
     const { projectId, scenarioSetId, batchRunId } = params;
 
-    logger.info({ projectId, scenarioSetId, batchRunId }, "Cancelling batch run");
+    logger.info(
+      { projectId, scenarioSetId, batchRunId },
+      "Cancelling batch run",
+    );
 
-    const runs = await this.getRunsForBatch({ projectId, scenarioSetId, batchRunId });
+    const runs = await this.getRunsForBatch({
+      projectId,
+      scenarioSetId,
+      batchRunId,
+    });
 
     if (runs.length === 0) {
       return { cancelledCount: 0, skippedCount: 0 };

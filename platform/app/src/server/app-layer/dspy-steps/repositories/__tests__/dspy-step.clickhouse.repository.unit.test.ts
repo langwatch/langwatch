@@ -69,7 +69,14 @@ function setup(resolver: RetentionPolicyResolver | null) {
   const repo = new DspyStepClickHouseRepository(resolveClient, resolver);
   const insertedRow = (): unknown[] => insert.mock.calls[0]![0].rows[0];
   const insertedRetentionDays = () => insertedRow()[RETENTION_INDEX];
-  return { repo, resolveClient, insert, query, insertedRow, insertedRetentionDays };
+  return {
+    repo,
+    resolveClient,
+    insert,
+    query,
+    insertedRow,
+    insertedRetentionDays,
+  };
 }
 
 describe("DspyStepClickHouseRepository", () => {

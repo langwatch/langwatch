@@ -1,8 +1,16 @@
 import type { ClickHouseClient, QueryOptions } from "@langwatch/clickhouse";
-import { LEGAL_MOUNT_SHAPES, validateMount, type AppendStore, type WireEvent } from "@langwatch/event-sourcing";
+import {
+  type AppendStore,
+  LEGAL_MOUNT_SHAPES,
+  validateMount,
+  type WireEvent,
+} from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
 import { canonicalizeLogRequest } from "../canonicalize";
-import { canonicalLogStorageMount, createLogProcessingPipeline } from "../index";
+import {
+  canonicalLogStorageMount,
+  createLogProcessingPipeline,
+} from "../index";
 import type { CanonicalLogRecord } from "../schema";
 import { logRecordsTable, logUsageEstimatesTable } from "../table";
 

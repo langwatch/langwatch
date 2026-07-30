@@ -29,7 +29,10 @@ export interface MonitorWithEvaluator {
 
 export interface MonitorRepository {
   getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]>;
-  getMonitorById(params: { projectId: string; monitorId: string }): Promise<MonitorWithEvaluator | null>;
+  getMonitorById(params: {
+    projectId: string;
+    monitorId: string;
+  }): Promise<MonitorWithEvaluator | null>;
   /**
    * Full monitor rows for the given ids, scoped to the project — the
    * automations list resolves trigger filter check-keys to monitors with

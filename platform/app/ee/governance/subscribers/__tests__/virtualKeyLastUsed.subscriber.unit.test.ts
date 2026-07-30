@@ -65,18 +65,14 @@ function buildSubscriber(
     virtualKey: {
       findUnique: vi
         .fn()
-        .mockResolvedValue(
-          vk ? { organizationId: TENANT_ORG, ...vk } : null,
-        ),
+        .mockResolvedValue(vk ? { organizationId: TENANT_ORG, ...vk } : null),
       update,
     },
     project: {
       findUnique: vi
         .fn()
         .mockResolvedValue(
-          projectOrg === null
-            ? null
-            : { team: { organizationId: projectOrg } },
+          projectOrg === null ? null : { team: { organizationId: projectOrg } },
         ),
     },
   };
@@ -162,7 +158,9 @@ describe("virtualKeyLastUsed subscriber", () => {
     it("stamps it again", async () => {
       const { subscriber, update } = buildSubscriber({
         id: "vk-1",
-        lastUsedAt: new Date(Date.now() - VIRTUAL_KEY_LAST_USED_THROTTLE_MS * 2),
+        lastUsedAt: new Date(
+          Date.now() - VIRTUAL_KEY_LAST_USED_THROTTLE_MS * 2,
+        ),
       });
 
       await subscriber.handle(gatewayEvent(), CONTEXT);
