@@ -144,6 +144,10 @@ func TestAuth0CodeAgent_ClientCredentialsExchange(t *testing.T) {
 	// The secret value appears in no captured output stream.
 	assert.NotContains(t, res.Stdout, clientSecret)
 	assert.NotContains(t, res.Stderr, clientSecret)
+
+	// The whole exchange fit the runner's wall-clock budget — the bound
+	// scenario's budget clause, asserted rather than assumed.
+	assert.Less(t, res.DurationMS, int64(60_000))
 }
 
 // @scenario "A rejected token request fails loudly and without the secret"
@@ -162,6 +166,9 @@ func TestAuth0CodeAgent_RejectedCredentialsFailLoudlyWithoutTheSecret(t *testing
 	// swallows; at THIS layer the error is structured and present.
 	require.NotNil(t, res.Error, "a rejected credential must fail the run")
 	assert.Contains(t, res.Error.Message, "401")
+	// The failure names the token endpoint — the bound scenario requires the
+	// upstream rejection AND its source to be identifiable from the error.
+	assert.Contains(t, res.Error.Message, "/oauth/token")
 
 	// The failure names the auth step without reproducing the credential.
 	combined := strings.Join([]string{res.Error.Message, res.Error.Traceback, res.Stdout, res.Stderr}, "\n")

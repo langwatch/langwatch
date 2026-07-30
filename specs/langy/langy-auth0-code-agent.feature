@@ -66,7 +66,7 @@ Feature: Auth0-protected APIs reachable from a custom code agent
   Scenario: The committed example completes a real client-credentials exchange
     Given the committed example is stored as a code agent unmodified
     When the agent is executed through the code-block path
-    Then the stub token endpoint received exactly one client-credentials request carrying the seeded client id and audience, in either JSON or form encoding
+    Then the stub token endpoint received exactly one client-credentials request carrying the seeded client id and audience, JSON-encoded per Auth0's canonical M2M example
     And the stub protected API received the exact token the stub minted this run as a bearer credential
     And the returned result contains every declared output key carrying the stub API's payload
     And the run completed inside the runner's wall-clock budget

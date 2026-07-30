@@ -30,7 +30,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { SerializedCodeAgentAdapter } from "../../src/server/scenarios/execution/serialized-adapters/code-agent.adapter";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -119,6 +119,13 @@ beforeAll(async () => {
   apiUrl = `${await listen(apiServer)}/chat`;
 });
 
+beforeEach(() => {
+  // The stub servers are shared across the file; without this reset the
+  // first additional `it` would silently inherit a prior test's requests.
+  received.tokenRequests = [];
+  received.apiAuthHeaders = [];
+});
+
 afterAll(() => {
   tokenServer?.close();
   apiServer?.close();
@@ -185,10 +192,10 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
       ],
     });
 
-    // Layer 1 — the judge's verdict on the conversation.
-    if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-    expect(result.success).toBe(true);
-
+    // Layer 2 FIRST — the deterministic wire-level assertions run before the
+    // judge gate, so ordinary LLM-judge non-determinism can never mask (or be
+    // blamed for) a real regression in the credential exchange.
+    //
     // Layer 2a — the token endpoint received a real client-credentials
     // exchange with the seeded identity.
     expect(received.tokenRequests.length).toBeGreaterThan(0);
@@ -201,10 +208,18 @@ describe("Auth0-protected custom code agent as a scenario target", () => {
     // Layer 2b — the downstream call carried the exact token minted this run.
     expect(received.apiAuthHeaders).toContain(`Bearer ${MINTED_TOKEN}`);
 
-    // Layer 2c — the run-unique client secret appears nowhere in the
-    // conversation the scenario recorded.
+    // Layer 2c — the agent's answer carries the protected fact, and the
+    // transcript does not carry the secret. NOTE: the no-secret check here is
+    // a sanity check, not leak evidence — no code path in this test could put
+    // the secret into `result.messages`, so it cannot fail on its own. The
+    // load-bearing leak assertions live in the Go tests (stdout / stderr /
+    // traceback of the actual execution).
     const transcript = JSON.stringify(result.messages ?? []);
-    expect(transcript).not.toContain(CLIENT_SECRET);
     expect(transcript).toContain("Rotterdam");
+    expect(transcript).not.toContain(CLIENT_SECRET);
+
+    // Layer 1 — the judge's verdict on the conversation, gated last.
+    if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+    expect(result.success).toBe(true);
   });
 });
