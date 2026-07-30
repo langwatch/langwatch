@@ -725,6 +725,22 @@ describe("EESubscriptionService", () => {
       });
     });
 
+    describe("when the provider is unreachable for the invoice list", () => {
+      it("fails with the same retryable provider-unavailable error", async () => {
+        organizationRepository.getStripeCustomerId.mockResolvedValue("cus_123");
+        stripe.invoices.list.mockRejectedValue(
+          new Stripe.errors.StripeConnectionError({
+            message: "network down",
+            type: "api_error",
+          }),
+        );
+
+        await expect(
+          service.listInvoices({ organizationId: "org_with_stripe" }),
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
+      });
+    });
+
     describe("when the invoice list fails for a reason we cannot name", () => {
       it("lets the original error through rather than dressing it as handled", async () => {
         const providerError = new Error("No such customer");

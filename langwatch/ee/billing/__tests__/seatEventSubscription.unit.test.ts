@@ -794,6 +794,35 @@ describe("seatEventSubscription", () => {
         expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
         expect(db.$transaction).not.toHaveBeenCalled();
         expect(db.subscription.updateMany).not.toHaveBeenCalled();
+        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the provider is unreachable during the currency lookup", () => {
+      beforeEach(() => {
+        db.subscription.findMany.mockResolvedValue([]);
+        stripe.customers.retrieve.mockRejectedValue(
+          new Stripe.errors.StripeConnectionError({
+            message: "network down",
+            type: "api_error",
+          }),
+        );
+        stripe.checkout.sessions.create.mockResolvedValue({
+          url: "https://checkout.stripe.com/session",
+        });
+      });
+
+      it("fails with the same retryable provider-unavailable error", async () => {
+        await expect(
+          service.createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          }),
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
       });
     });
 
@@ -841,6 +870,7 @@ describe("seatEventSubscription", () => {
         expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
         expect(db.$transaction).not.toHaveBeenCalled();
         expect(db.subscription.updateMany).not.toHaveBeenCalled();
+        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
       });
     });
 
