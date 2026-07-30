@@ -26,21 +26,53 @@ const TEST_ROOTS = ["src", "ee", "packages"];
 
 const TEST_FILE_PATTERN = /\.(test|spec)\.(c|m)?[jt]sx?$/;
 
-function collectTestFiles(root: string): string[] {
+function isSkippedEntry(name: string): boolean {
+  return name === "node_modules" || name.startsWith(".");
+}
+
+function collectTestFiles(directory: string): string[] {
   const collected: string[] = [];
-  const walk = (directory: string): void => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
-      const full = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (TEST_FILE_PATTERN.test(entry.name)) {
-        collected.push(full);
-      }
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (isSkippedEntry(entry.name)) continue;
+    const full = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      collected.push(...collectTestFiles(full));
+    } else if (TEST_FILE_PATTERN.test(entry.name)) {
+      collected.push(full);
     }
-  };
-  walk(root);
+  }
   return collected;
+}
+
+/** Offender lines for one file, empty when it has nothing to answer for. */
+function offendersIn(file: string): string[] {
+  const sourceText = readFileSync(file, "utf8");
+  if (!sourceText.includes("deleteMany")) return [];
+  return scanTestSourceForUnsafeDeleteMany(file, sourceText).map(
+    (violation) =>
+      `${relative(LANGWATCH_ROOT, file)}:${violation.line} ` +
+      `${violation.model}.deleteMany filtered by "${violation.variable}": ` +
+      violation.reason,
+  );
+}
+
+/**
+ * Scan every configured root, returning what was found rather than asserting
+ * on it: the file count per root is the caller's proof the walk still sees a
+ * tree, and the offenders are what the rule is about.
+ */
+function scanTestRoots(): {
+  filesPerRoot: Record<string, number>;
+  offenders: string[];
+} {
+  const filesPerRoot: Record<string, number> = {};
+  const offenders: string[] = [];
+  for (const root of TEST_ROOTS) {
+    const files = collectTestFiles(resolve(LANGWATCH_ROOT, root));
+    filesPerRoot[root] = files.length;
+    offenders.push(...files.flatMap(offendersIn));
+  }
+  return { filesPerRoot, offenders };
 }
 
 describe("scanTestSourceForUnsafeDeleteMany", () => {
@@ -220,33 +252,15 @@ describe("scanTestSourceForUnsafeDeleteMany", () => {
 
   describe("when scanning the configured test roots", () => {
     it("finds none of them deleting by a reassignable id", () => {
-      const offenders: string[] = [];
+      const { filesPerRoot, offenders } = scanTestRoots();
 
+      // A root that yields nothing means the walk lost the tree and this
+      // case would pass while checking zero files.
       for (const root of TEST_ROOTS) {
-        const files = collectTestFiles(resolve(LANGWATCH_ROOT, root));
-
-        // A root that yields nothing means the walk lost the tree and this
-        // case would pass while checking zero files.
         expect(
-          files.length,
+          filesPerRoot[root],
           `no test files found under ${root}/, so nothing was scanned`,
         ).toBeGreaterThan(0);
-
-        for (const file of files) {
-          const sourceText = readFileSync(file, "utf8");
-          if (!sourceText.includes("deleteMany")) continue;
-
-          for (const violation of scanTestSourceForUnsafeDeleteMany(
-            file,
-            sourceText,
-          )) {
-            offenders.push(
-              `${relative(LANGWATCH_ROOT, file)}:${violation.line} ` +
-                `${violation.model}.deleteMany filtered by "${violation.variable}": ` +
-                violation.reason,
-            );
-          }
-        }
       }
 
       expect(

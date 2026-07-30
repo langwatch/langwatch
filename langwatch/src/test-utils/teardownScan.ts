@@ -29,20 +29,22 @@ export type TeardownViolation = {
   reason: string;
 };
 
+/** Names one `let`/`var` declaration list binds. `const` binds none. */
+function reassignableNamesIn(node: ts.Node): string[] {
+  if (!ts.isVariableDeclarationList(node)) return [];
+  if ((node.flags & ts.NodeFlags.Const) !== 0) return [];
+  const names: string[] = [];
+  for (const declaration of node.declarations) {
+    if (ts.isIdentifier(declaration.name)) names.push(declaration.name.text);
+  }
+  return names;
+}
+
 /** Mutability of every simple `let`/`var` declaration in the file. */
 function collectReassignableNames(source: ts.SourceFile): Set<string> {
   const names = new Set<string>();
   const visit = (node: ts.Node): void => {
-    if (ts.isVariableDeclarationList(node)) {
-      const isConst = (node.flags & ts.NodeFlags.Const) !== 0;
-      if (!isConst) {
-        for (const declaration of node.declarations) {
-          if (ts.isIdentifier(declaration.name)) {
-            names.add(declaration.name.text);
-          }
-        }
-      }
-    }
+    for (const name of reassignableNamesIn(node)) names.add(name);
     ts.forEachChild(node, visit);
   };
   visit(source);
@@ -73,88 +75,85 @@ function modelNameOf(callee: ts.PropertyAccessExpression): string {
   return "<unknown>";
 }
 
-/**
- * Walk a where-object expression and report every reassignable identifier
- * used as a filter value, at any depth (a `let` inside `{ in: teamIds }`
- * collapses exactly like a bare one).
- */
-function checkWhereExpression({
-  expression,
-  reassignable,
-  source,
-  model,
-  violations,
-}: {
+/** One filter expression under judgement, plus where to report it. */
+type WhereCheck = {
   expression: ts.Expression;
   reassignable: Set<string>;
   source: ts.SourceFile;
   model: string;
   violations: TeardownViolation[];
-}): void {
-  const value = unwrapExpression(expression);
+};
+
+/** A bare identifier is safe only when nothing can reassign it. */
+function checkIdentifierFilter(value: ts.Identifier, check: WhereCheck): void {
+  if (!check.reassignable.has(value.text)) return;
+  check.violations.push({
+    line: lineOf(check.source, value),
+    variable: value.text,
+    model: check.model,
+    reason:
+      `"${value.text}" is declared with let/var, so it is undefined ` +
+      "whenever setup threw before assigning it, and Prisma then " +
+      "drops it from the filter and matches every row",
+  });
+}
+
+/**
+ * The expression carrying a filter value out of one object-literal property,
+ * or undefined for a property shape that carries none.
+ */
+function filterValueOf(
+  property: ts.ObjectLiteralElementLike,
+): ts.Expression | undefined {
+  if (ts.isPropertyAssignment(property)) return property.initializer;
+  if (ts.isShorthandPropertyAssignment(property)) return property.name;
+  // `{ ...filterVars }` merges the whole object in, so what it merges is
+  // itself a filter value, the same way an array spread's target is.
+  if (ts.isSpreadAssignment(property)) return property.expression;
+  return undefined;
+}
+
+function checkObjectFilter(
+  value: ts.ObjectLiteralExpression,
+  check: WhereCheck,
+): void {
+  for (const property of value.properties) {
+    const target = filterValueOf(property);
+    if (target) checkWhereExpression({ ...check, expression: target });
+  }
+}
+
+function checkListFilter(
+  value: ts.ArrayLiteralExpression,
+  check: WhereCheck,
+): void {
+  for (const element of value.elements) {
+    // `{ in: [...teamIds] }` spreads a reassignable array into the list:
+    // check the spread expression itself, not the (nonexistent) element it
+    // would otherwise be treated as.
+    const target = ts.isSpreadElement(element) ? element.expression : element;
+    checkWhereExpression({ ...check, expression: target });
+  }
+}
+
+/**
+ * Walk a where-object expression and report every reassignable identifier
+ * used as a filter value, at any depth (a `let` inside `{ in: teamIds }`
+ * collapses exactly like a bare one).
+ */
+function checkWhereExpression(check: WhereCheck): void {
+  const value = unwrapExpression(check.expression);
 
   if (ts.isIdentifier(value)) {
-    if (reassignable.has(value.text)) {
-      violations.push({
-        line: lineOf(source, value),
-        variable: value.text,
-        model,
-        reason:
-          `"${value.text}" is declared with let/var, so it is undefined ` +
-          "whenever setup threw before assigning it, and Prisma then " +
-          "drops it from the filter and matches every row",
-      });
-    }
+    checkIdentifierFilter(value, check);
     return;
   }
-
   if (ts.isObjectLiteralExpression(value)) {
-    for (const property of value.properties) {
-      if (ts.isPropertyAssignment(property)) {
-        checkWhereExpression({
-          expression: property.initializer,
-          reassignable,
-          source,
-          model,
-          violations,
-        });
-      } else if (ts.isShorthandPropertyAssignment(property)) {
-        checkWhereExpression({
-          expression: property.name,
-          reassignable,
-          source,
-          model,
-          violations,
-        });
-      } else if (ts.isSpreadAssignment(property)) {
-        // `{ ...filterVars }` merges the whole object in: check what is
-        // being spread, the same way an array spread is checked below.
-        checkWhereExpression({
-          expression: property.expression,
-          reassignable,
-          source,
-          model,
-          violations,
-        });
-      }
-    }
+    checkObjectFilter(value, check);
     return;
   }
-
   if (ts.isArrayLiteralExpression(value)) {
-    for (const element of value.elements) {
-      // `{ in: [...teamIds] }` spreads a reassignable array into the
-      // list: check the spread expression itself, not the (nonexistent)
-      // element it would otherwise be treated as.
-      const target = ts.isSpreadElement(element) ? element.expression : element;
-      checkWhereExpression({
-        expression: target,
-        reassignable,
-        source,
-        model,
-        violations,
-      });
-    }
+    checkListFilter(value, check);
   }
 }
 

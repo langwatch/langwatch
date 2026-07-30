@@ -103,66 +103,81 @@ function sanitizeValue(
   path: string,
   collectors: SanitizeCollectors,
 ): unknown {
-  const { fatal, dropped, emptyAtArrival } = collectors;
   if (value === undefined) {
-    fatal.push(
+    collectors.fatal.push(
       `${path} is undefined, so this filter no longer identifies anything`,
     );
     return undefined;
   }
   if (value === "") {
-    fatal.push(`${path} is an empty string`);
+    collectors.fatal.push(`${path} is an empty string`);
     return undefined;
   }
-  if (Array.isArray(value)) {
-    // A list that ARRIVES empty is the accumulator pattern: `let ids = []`
-    // filled as tests create rows, legitimately empty when they created
-    // none. Prisma's `in: []` matches nothing, so a silent skip preserves
-    // the raw form's behavior exactly, and match-none is not the hazard
-    // this guard exists for; match-all is. A list that BECOMES empty
-    // because its members were dropped below is different: real ids were
-    // intended and lost, so that stays a refusal.
-    if (value.length === 0) {
-      emptyAtArrival.push(path);
-      return undefined;
-    }
-    const kept: unknown[] = [];
-    value.forEach((member, index) => {
-      if (member === undefined || member === null || member === "") {
-        dropped.push(`${path}[${index}] was ${describe(member)}; dropped`);
-        return;
-      }
-      // Object members recurse: `OR: [{ scopeId: undefined }]` collapses
-      // exactly like a bare undefined, just one level down.
-      if (Array.isArray(member) || isPlainObject(member)) {
-        kept.push(sanitizeValue(member, `${path}[${index}]`, collectors));
-        return;
-      }
-      kept.push(member);
-    });
-    if (kept.length === 0) {
-      fatal.push(
-        `${path} lost every member to the drops above, so it identifies nothing`,
-      );
-      return undefined;
-    }
-    return kept;
-  }
-  if (isPlainObject(value)) {
-    const keys = Object.keys(value);
-    if (keys.length === 0) {
-      // `{ id: {} }` is an empty nested filter: it matches every row,
-      // exactly the collapse this helper exists to prevent.
-      fatal.push(`${path} is an empty object, which matches every row`);
-      return undefined;
-    }
-    const rebuilt: Record<string, unknown> = {};
-    for (const key of keys) {
-      rebuilt[key] = sanitizeValue(value[key], `${path}.${key}`, collectors);
-    }
-    return rebuilt;
-  }
+  if (Array.isArray(value)) return sanitizeList(value, path, collectors);
+  if (isPlainObject(value)) return sanitizeObject(value, path, collectors);
   return value;
+}
+
+function sanitizeList(
+  value: unknown[],
+  path: string,
+  collectors: SanitizeCollectors,
+): unknown {
+  // A list that ARRIVES empty is the accumulator pattern: `let ids = []`
+  // filled as tests create rows, legitimately empty when they created
+  // none. Prisma's `in: []` matches nothing, so a silent skip preserves
+  // the raw form's behavior exactly, and match-none is not the hazard
+  // this guard exists for; match-all is. A list that BECOMES empty
+  // because its members were dropped below is different: real ids were
+  // intended and lost, so that stays a refusal.
+  if (value.length === 0) {
+    collectors.emptyAtArrival.push(path);
+    return undefined;
+  }
+  const kept: unknown[] = [];
+  value.forEach((member, index) => {
+    if (member === undefined || member === null || member === "") {
+      collectors.dropped.push(
+        `${path}[${index}] was ${describe(member)}; dropped`,
+      );
+      return;
+    }
+    // Object members recurse: `OR: [{ scopeId: undefined }]` collapses
+    // exactly like a bare undefined, just one level down.
+    if (Array.isArray(member) || isPlainObject(member)) {
+      kept.push(sanitizeValue(member, `${path}[${index}]`, collectors));
+      return;
+    }
+    kept.push(member);
+  });
+  if (kept.length === 0) {
+    collectors.fatal.push(
+      `${path} lost every member to the drops above, so it identifies nothing`,
+    );
+    return undefined;
+  }
+  return kept;
+}
+
+function sanitizeObject(
+  value: Record<string, unknown>,
+  path: string,
+  collectors: SanitizeCollectors,
+): unknown {
+  const keys = Object.keys(value);
+  if (keys.length === 0) {
+    // `{ id: {} }` is an empty nested filter: it matches every row,
+    // exactly the collapse this helper exists to prevent.
+    collectors.fatal.push(
+      `${path} is an empty object, which matches every row`,
+    );
+    return undefined;
+  }
+  const rebuilt: Record<string, unknown> = {};
+  for (const key of keys) {
+    rebuilt[key] = sanitizeValue(value[key], `${path}.${key}`, collectors);
+  }
+  return rebuilt;
 }
 
 function describe(value: unknown): string {
