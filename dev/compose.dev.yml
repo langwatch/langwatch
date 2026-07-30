@@ -8,7 +8,7 @@
 # sets VOLUME_PREFIX via dev/scripts/dev.sh so per-worktree volumes (goose_bin,
 # app_modules, mcp_server_modules, see the volumes block)
 # get isolated names; running
-# `docker compose -f compose.dev.yml up` directly collapses every worktree
+# `docker compose -f dev/compose.dev.yml up` directly collapses every worktree
 # onto the same volumes.
 #
 # Recommended:
@@ -38,7 +38,7 @@
 #   Start it in a second terminal alongside any compose profile above.
 #
 # Stop everything:
-#   docker compose -f compose.dev.yml --profile full down
+#   docker compose -f dev/compose.dev.yml --profile full down
 
 x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"

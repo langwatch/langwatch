@@ -30,7 +30,7 @@ Mode → (services, URL overrides):
 | `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
 | `full-local` | `--profile full` (everything) | all five |
 
-Migration mode uses a `infra/compose.dev.migration.yml` overlay that adds host port mappings to postgres + clickhouse so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
+Migration mode uses a `dev/compose.dev.migration.yml` overlay that adds host port mappings to postgres + clickhouse so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
 
 `make quickstart` accepts a positional mode arg for non-interactive usage: `make quickstart frontend-only`, `make quickstart backend-shared`, etc. `make quickstart help` continues to print the mode reference.
 
@@ -64,7 +64,7 @@ Deprecated targets (`make dev*` / `make dev-up`) become thin shims onto the new 
 
 | Deliverable | File |
 |---|---|
-| Stable named volumes for stateful services + singleton redis with host port | `infra/compose.dev.yml` (edit) |
+| Stable named volumes for stateful services + singleton redis with host port | `dev/compose.dev.yml` (edit) |
 | `quickstart help` non-interactive mode + per-mode hint + fail-fast on env mismatch + idempotency notes | `dev/scripts/dev.sh` (edit) |
 | Deprecation wrappers around `make dev*` and `make dev-up` | `Makefile` (edit) |
 | Updated dev section + new entry point | `CLAUDE.md` (edit), `dev/docs/adr/004-docker-dev-environment.md` (amendment) |
@@ -200,7 +200,7 @@ boxd-connect-issue:
 
 ## #3860 design (subset)
 
-### infra/compose.dev.yml volume changes
+### dev/compose.dev.yml volume changes
 
 ```yaml
 volumes:
@@ -282,7 +282,7 @@ if grep -qE '^IS_SAAS\s*=\s*"?true"?\s*$' platform/app/.env 2>/dev/null \
 fi
 ```
 
-(`infra/compose.dev.yml`'s common-env already sets `BLOCK_LOCAL_HTTP_CALLS: "true"` so this is a defense-in-depth check on the source `.env`, not the runtime.)
+(`dev/compose.dev.yml`'s common-env already sets `BLOCK_LOCAL_HTTP_CALLS: "true"` so this is a defense-in-depth check on the source `.env`, not the runtime.)
 
 ## AC → task mapping
 
@@ -327,9 +327,9 @@ fi
 | 1 (single entry point) | `Makefile` deprecation wrappers, `CLAUDE.md`, `ADR-004` | done |
 | 2 (intent-based prompting) | `dev/scripts/dev.sh` 5-mode prompt | done |
 | 3 (default = fastest path) | `frontend-only` mode = no compose, ~instant | done |
-| 4 (stateful shared volumes + collision detection) | `infra/compose.dev.yml`, `dev/scripts/dev.sh` | done |
-| 5 (redis singleton + host port) | `infra/compose.dev.yml` | done |
-| 6 (URL rewrite on profile flip) | `dev/scripts/dev.sh` writes `platform/app/.env.dev-up` per mode; `infra/compose.dev.yml` honours it via env_file overlay | done |
+| 4 (stateful shared volumes + collision detection) | `dev/compose.dev.yml`, `dev/scripts/dev.sh` | done |
+| 5 (redis singleton + host port) | `dev/compose.dev.yml` | done |
+| 6 (URL rewrite on profile flip) | `dev/scripts/dev.sh` writes `platform/app/.env.dev-up` per mode; `dev/compose.dev.yml` honours it via env_file overlay | done |
 | 7 (idempotent + fail-fast IS_SAAS guard) | `dev/scripts/dev.sh` | done |
 | 8 (per-mode hints + `quickstart help`) | `dev/scripts/dev.sh` | done |
 | 9 (deprecation warnings on old paths) | `Makefile`, `CLAUDE.md`, `ADR-004` | done |
@@ -365,7 +365,7 @@ fi
 4. `dev/boxd.mk` skeleton + golden + connect-* targets
 5. fork-* targets including env discovery, hostname rewrite, creds transport, port mapping
 6. Bats integration tests (mocked boxd)
-7. `infra/compose.dev.yml` shared-volume changes + redis host port
+7. `dev/compose.dev.yml` shared-volume changes + redis host port
 8. `dev/scripts/dev.sh` help mode + per-mode hints + idempotency / fail-fast / collision detection
 9. `Makefile` deprecation wrappers
 10. `CLAUDE.md` + `ADR-004` updates

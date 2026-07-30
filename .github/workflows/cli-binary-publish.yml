@@ -203,9 +203,10 @@ jobs:
 
       - name: Install dependencies
         # Full monorepo checkout: `prepare` (run by install) generates
-        # src/internal/generated/* from langwatch/ + langevals/ sources and
-        # skills/ — the Bun compile fails to resolve those otherwise (same
-        # gotcha Dockerfile.langyagent's cli-builder stage documents).
+        # src/internal/generated/* from platform/app/ + services/langevals/
+        # sources and skills/ — the Bun compile fails to resolve those
+        # otherwise (same gotcha Dockerfile.langyagent's cli-builder stage
+        # documents).
         run: pnpm install --frozen-lockfile --filter "langwatch..."
 
       - name: Resolve asset name

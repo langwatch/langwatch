@@ -3,7 +3,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   I want one command that asks what I'm working on, starts only the services I need, and overrides only the URLs whose services are local
   So that my .env stays the source of truth and I don't lose state across worktrees
 
-  # Behavior is in `infra/compose.dev.yml` + `infra/compose.dev.migration.yml` (volume
+  # Behavior is in `dev/compose.dev.yml` + `dev/compose.dev.migration.yml` (volume
   # names + env_file overlay + host port overlay), `Makefile` (deprecation
   # wrappers + positional MODE arg pass-through), and `dev/scripts/dev.sh`
   # (intent-based prompt + write_overrides + fail-fast + collision detection).

@@ -115,7 +115,7 @@ files. Full dogfood only at slice 8.
   minus the `CLAUDE_CODE_KIND_ATTR` marking block
 - misc fixes: `scripts/seed-local-admin.ts`, `workers.ts` (`.env.portless`
   overlay), `.gitignore`, `sdk-javascript-ci.yml`,
-  `typescript-sdk` installer diffs (`install.ts`, `wrapper-mode.ts`)
+  `sdks/typescript` installer diffs (`install.ts`, `wrapper-mode.ts`)
 - specs to port into `specs/coding-agent/`:
   `coding-agent-terminal-view.feature`, `coding-agent-trace-fidelity.feature`
   (from old `specs/trace-processing/`), plus diffs to

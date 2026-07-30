@@ -12,7 +12,7 @@
 set -e
 
 PROFILE="${1:-}"
-COMPOSE="docker compose -f infra/compose.dev.yml --project-directory ."
+COMPOSE="docker compose -f dev/compose.dev.yml --project-directory ."
 
 # ---------------------------------------------------------------------------
 # Derive a stable, unique prefix from the repo directory path.
@@ -142,5 +142,5 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
 done
 
 echo "WARNING: App did not respond within ${TIMEOUT}s. Check logs with: make dev-logs"
-echo "  COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} VOLUME_PREFIX=${VOLUME_PREFIX} docker compose -f infra/compose.dev.yml --project-directory . logs -f app"
+echo "  COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} VOLUME_PREFIX=${VOLUME_PREFIX} docker compose -f dev/compose.dev.yml --project-directory . logs -f app"
 exit 1

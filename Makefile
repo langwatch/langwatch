@@ -74,12 +74,12 @@ include dev/boxd.mk
 # must be evaluated after they are defined. See the include at end of file.
 
 # =============================================================================
-# DOCKER DEV ENVIRONMENT (infra/compose.dev.yml)
+# DOCKER DEV ENVIRONMENT (dev/compose.dev.yml)
 # =============================================================================
 # All services run in Docker with resource limits.
 # App is volume-mounted for hot reload.
 
-COMPOSE = docker compose -f infra/compose.dev.yml --project-directory .
+COMPOSE = docker compose -f dev/compose.dev.yml --project-directory .
 
 # Sources dev/scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
 # NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
@@ -347,7 +347,7 @@ dev-down: _dev-up-deprecation-warning
 
 # Tail logs for isolated instance
 dev-logs: _dev-up-deprecation-warning
-	@if [ -f .dev-port ]; then . ./.dev-port && COMPOSE_PROJECT_NAME=$$COMPOSE_PROJECT_NAME VOLUME_PREFIX=$$VOLUME_PREFIX docker compose -f infra/compose.dev.yml --project-directory . --profile full logs -f; \
+	@if [ -f .dev-port ]; then . ./.dev-port && COMPOSE_PROJECT_NAME=$$COMPOSE_PROJECT_NAME VOLUME_PREFIX=$$VOLUME_PREFIX docker compose -f dev/compose.dev.yml --project-directory . --profile full logs -f; \
 	else echo "No .dev-port found. Is the instance running?"; fi
 
 # Create a git worktree from issue number or feature name

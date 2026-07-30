@@ -31,7 +31,7 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
 # The CLI bundle is the package's entrypoint; packing without it produces a
@@ -246,7 +246,7 @@ if [ -z "$tarball" ]; then
   exit 1
 fi
 
-if [ -f "$ROOT/langwatch/dist/client/index.html" ]; then
+if [ -f "$ROOT/platform/app/dist/client/index.html" ]; then
   # List once into a file rather than piping into `grep -q`. grep -q exits at
   # the first match, which SIGPIPEs tar; under `pipefail` that non-zero tar
   # fails the pipeline even though the match succeeded, so the check reported
