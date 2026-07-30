@@ -651,9 +651,10 @@ describe("gateway platform REST API (real PG + real CH)", () => {
       );
       // Fail-closed via the shared org-integrity assert: the foreign scope
       // never reaches a write, and the error names the mismatch rather
-      // than a generic denial.
+      // than a generic denial. The code is the handled one both doors
+      // raise, not a prefix parsed out of the message.
       expect(status).toBe(400);
-      expect(body.error.code).toBe("scope_org_mismatch");
+      expect(body.error.code).toBe("gateway_scope_org_mismatch");
     });
 
     /** @scenario routing_mode POLICY requires a routing policy id */
@@ -1060,12 +1061,13 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         legacyAuth(FOREIGN_LEGACY_KEY),
       );
       // A cross-org provider id is refused by the shared service's
-      // org-integrity assert, which answers in the handled-error envelope:
-      // a flat `error` code plus the meta naming which scope was foreign.
+      // org-integrity assert, in this surface's one error envelope: the
+      // handled code, plus the meta naming which scope was foreign, since
+      // the copy itself never names another tenant's id.
       expect(foreign.status).toBe(400);
       const foreignBody = await foreign.json();
-      expect(foreignBody.error).toBe("gateway_scope_org_mismatch");
-      expect(foreignBody.scopeKind).toBe("model provider");
+      expect(foreignBody.error.code).toBe("gateway_scope_org_mismatch");
+      expect(foreignBody.error.meta.scopeKind).toBe("model provider");
     });
 
     /** @scenario REST budget spend is the live ClickHouse ledger, not the stale PG column */

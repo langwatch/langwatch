@@ -127,7 +127,7 @@ Feature: Public REST API — /api/gateway/v1/*
   Scenario: Cross-org scopes are rejected
     When an org-admin API key requests a scope belonging to another organization
     Then the response status is 400
-    And error.code is "scope_org_mismatch"
+    And error.code is "gateway_scope_org_mismatch"
 
   @integration @rest
   Scenario: routing_mode POLICY requires a routing policy id

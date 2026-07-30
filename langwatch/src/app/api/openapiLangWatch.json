@@ -24045,6 +24045,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]
@@ -24092,6 +24096,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]
@@ -24311,6 +24319,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]
@@ -24498,6 +24510,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]
@@ -24680,6 +24696,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]
@@ -24708,6 +24728,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]
@@ -25568,6 +25592,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]
@@ -25762,6 +25790,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]
@@ -26739,6 +26771,10 @@
 												},
 												"message": {
 													"type": "string"
+												},
+												"meta": {
+													"type": "object",
+													"additionalProperties": {}
 												}
 											},
 											"required": ["type", "code", "message"]

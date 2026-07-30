@@ -19,6 +19,7 @@
  * service-to-service write path can drop the synthetic id entirely.
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { GatewayBudget, GatewayCacheRule, Project } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -180,6 +181,8 @@ const errorSchema = z.object({
     type: z.string(),
     code: z.string(),
     message: z.string(),
+    /** Present when the refusal carries structured detail, e.g. `scopeKind`. */
+    meta: z.record(z.string(), z.unknown()).optional(),
   }),
 });
 
@@ -408,6 +411,30 @@ const ERROR_TYPE_BY_STATUS: Record<number, string> = {
  * TRPCError is rethrown for the app-level error handler.
  */
 function trpcErrorResponse(c: GatewayContext, error: unknown): Response {
+  // The service layer and the shared preconditions raise HandledErrors
+  // (ADR-045). They already carry the two things this envelope needs — a
+  // stable code and the status to answer with — so read them directly
+  // instead of scraping a prefix off the message, which is what the
+  // TRPCError branch below has to do.
+  if (error instanceof HandledError) {
+    const status = error.httpStatus as ContentfulStatusCode;
+    return c.json(
+      {
+        error: {
+          type: ERROR_TYPE_BY_STATUS[status] ?? "internal_error",
+          code: error.code,
+          message: error.message,
+          // The copy deliberately names no ids -- a mismatched scope id
+          // belongs to another tenant -- so `meta` is where the caller
+          // learns WHICH of the scopes it sent was the foreign one.
+          ...(error.meta && Object.keys(error.meta).length > 0
+            ? { meta: error.meta }
+            : {}),
+        },
+      },
+      status,
+    );
+  }
   if (!(error instanceof TRPCError)) throw error;
   const status = TRPC_HTTP_STATUS[error.code] ?? (500 as ContentfulStatusCode);
   const codeMatch = /^([a-z0-9_]+):/.exec(error.message);

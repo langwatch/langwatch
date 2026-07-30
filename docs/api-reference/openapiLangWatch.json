@@ -24384,6 +24384,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -24439,6 +24443,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -24707,6 +24715,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -24939,6 +24951,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -25142,6 +25158,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -25176,6 +25196,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -26197,6 +26221,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -26425,6 +26453,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
@@ -27554,6 +27586,10 @@
                         },
                         "message": {
                           "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
                         }
                       },
                       "required": [
