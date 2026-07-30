@@ -50,6 +50,52 @@ describe("parseTraceSearchCommand", () => {
       });
     });
 
+    describe("when the agent nests one quoting level inside another", () => {
+      // Observed live against the real agent: it wrote
+      // `-q "\"override codes\""`, and reading `\"` as a closing quote
+      // recovered `\override` — the phrase truncated at the space and a stray
+      // backslash in the query. The Explorer then searched for something the
+      // agent never searched for, which is the failure this module exists to
+      // prevent.
+      it("reads an escaped double quote as data, not as the end of the value", () => {
+        expect(
+          parseTraceSearchCommand(
+            'langwatch trace search -q "\\"override codes\\"" --origin simulation',
+          ),
+        ).toEqual({ query: '"override codes"', origins: ["simulation"] });
+      });
+
+      it("keeps an escaped space inside an unquoted value", () => {
+        expect(
+          parseTraceSearchCommand(
+            "langwatch trace search -q checkout\\ failed",
+          ).query,
+        ).toBe("checkout failed");
+      });
+
+      it("unescapes a doubled backslash inside double quotes", () => {
+        expect(
+          parseTraceSearchCommand(
+            'langwatch trace search -q "a\\\\b"',
+          ).query,
+        ).toBe("a\\b");
+      });
+
+      it("leaves a backslash that escapes nothing the shell escapes alone", () => {
+        // `sh` only treats \" \\ \$ \` as escapes inside double quotes; a
+        // Windows-style path segment must survive intact rather than losing it.
+        expect(
+          parseTraceSearchCommand('langwatch trace search -q "C:\\path"').query,
+        ).toBe("C:\\path");
+      });
+
+      it("treats a backslash inside single quotes as literal data", () => {
+        expect(
+          parseTraceSearchCommand("langwatch trace search -q 'a\\b'").query,
+        ).toBe("a\\b");
+      });
+    });
+
     describe("when flags are written as --flag=value", () => {
       it("reads the inline value", () => {
         expect(

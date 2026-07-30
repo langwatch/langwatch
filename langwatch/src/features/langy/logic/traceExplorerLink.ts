@@ -349,6 +349,20 @@ function splitFlag(token: string): [string, string | undefined] {
  * Split a shell command into tokens, honouring single and double quotes — the
  * agent writes `--query 'checkout failed'`, and splitting on whitespace would
  * turn that into two flags and a stray word.
+ *
+ * BACKSLASH ESCAPES ARE PART OF THAT, not a refinement of it. The agent composes
+ * its command as a string and routinely nests one quoting level inside another —
+ * `-q "\"override codes\""` is a shape observed live. Reading `\"` as a plain
+ * closing quote ends the token early, so `-q "\"override codes\""` recovered as
+ * `\override`: the phrase silently truncated at the space AND carrying a stray
+ * backslash. That is the exact failure this module exists to prevent — a link
+ * that quietly searches for something other than what the agent searched for —
+ * so the escapes are honoured with the same rules a POSIX shell uses:
+ *
+ *   unquoted        `\X` is a literal X (the backslash is the escape, not data)
+ *   double-quoted   only `\" \\ \$ \`` are escapes; any other backslash is
+ *                   literal data, exactly as `sh` treats it
+ *   single-quoted   nothing escapes, not even a backslash — the shell's own rule
  */
 function tokenize(command: string): string[] {
   const tokens: string[] = [];
@@ -356,12 +370,41 @@ function tokenize(command: string): string[] {
   let quote: '"' | "'" | null = null;
   let hasContent = false;
 
-  for (const char of command) {
-    if (quote) {
-      if (char === quote) quote = null;
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i]!;
+
+    if (quote === "'") {
+      // Single quotes are literal through and through — a backslash inside them
+      // is data, so this branch deliberately never looks at the next character.
+      if (char === "'") quote = null;
       else current += char;
       continue;
     }
+
+    if (char === "\\") {
+      const next = command[i + 1];
+      if (next === undefined) {
+        current += char;
+        continue;
+      }
+      // Inside double quotes a backslash only escapes the four characters the
+      // shell lets it; before anything else it stands for itself.
+      if (quote === '"' && !['"', "\\", "$", "`"].includes(next)) {
+        current += char;
+        continue;
+      }
+      current += next;
+      hasContent = true;
+      i++;
+      continue;
+    }
+
+    if (quote === '"') {
+      if (char === '"') quote = null;
+      else current += char;
+      continue;
+    }
+
     if (char === '"' || char === "'") {
       quote = char;
       hasContent = true;
