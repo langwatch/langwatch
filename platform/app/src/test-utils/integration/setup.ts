@@ -87,7 +87,7 @@ export async function setup(): Promise<void> {
 async function unrefAppRedisSingleton(): Promise<void> {
   unrefRedisSockets();
   try {
-    const redisMod = await import("../../../redis");
+    const redisMod = await import("../../server/redis");
     const conn = redisMod.connection as
       | {
           on?: (event: string, cb: () => void) => void;
@@ -155,7 +155,7 @@ export async function teardown(): Promise<void> {
  */
 async function closeAppRuntimeSingletons(): Promise<void> {
   try {
-    const dbMod = await import("../../../db");
+    const dbMod = await import("../../server/db");
     await Promise.race([
       dbMod.prisma.$disconnect(),
       new Promise<void>((resolve) => setTimeout(resolve, 2000)),
@@ -164,7 +164,7 @@ async function closeAppRuntimeSingletons(): Promise<void> {
     // No prisma client ever constructed, or already disconnected.
   }
   try {
-    const redisMod = await import("../../../redis");
+    const redisMod = await import("../../server/redis");
     const conn = redisMod.connection;
     if (conn) {
       await Promise.race([

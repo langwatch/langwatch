@@ -781,38 +781,45 @@ export const storeResults = async (
     // no-op once the projection owns the model.
     await seedProjectTopicModel({
       prisma,
-      recordTopics: (args) => getApp().topicClustering.recordTopics(args),
+      recordTopics: async (args) => {
+        await getApp().topicClustering.recordTopics(args, {
+          tenantId: args.tenantId,
+        });
+      },
       projectId,
     });
-    await getApp().topicClustering.recordTopics({
-      tenantId: projectId,
-      occurredAt: Date.now(),
-      mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
-      source: "clustering",
-      dedupeKey: runContext
-        ? `run:${runContext.runId}:page-${runContext.page}`
-        : `adhoc:${Date.now()}`,
-      topics: [
-        ...topics.map((topic) => ({
-          id: topic.id,
-          name: topic.name,
-          parentId: null,
-          embeddingsModel: embeddingsModel.model,
-          centroid: topic.centroid,
-          p95Distance: topic.p95_distance,
-          automaticallyGenerated: true,
-        })),
-        ...subtopics.map((subtopic) => ({
-          id: subtopic.id,
-          name: subtopic.name,
-          parentId: subtopic.parent_id,
-          embeddingsModel: embeddingsModel.model,
-          centroid: subtopic.centroid,
-          p95Distance: subtopic.p95_distance,
-          automaticallyGenerated: true,
-        })),
-      ],
-    });
+    await getApp().topicClustering.recordTopics(
+      {
+        tenantId: projectId,
+        occurredAt: Date.now(),
+        mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
+        source: "clustering",
+        dedupeKey: runContext
+          ? `run:${runContext.runId}:page-${runContext.page}`
+          : `adhoc:${Date.now()}`,
+        topics: [
+          ...topics.map((topic) => ({
+            id: topic.id,
+            name: topic.name,
+            parentId: null,
+            embeddingsModel: embeddingsModel.model,
+            centroid: topic.centroid,
+            p95Distance: topic.p95_distance,
+            automaticallyGenerated: true,
+          })),
+          ...subtopics.map((subtopic) => ({
+            id: subtopic.id,
+            name: subtopic.name,
+            parentId: subtopic.parent_id,
+            embeddingsModel: embeddingsModel.model,
+            centroid: subtopic.centroid,
+            p95Distance: subtopic.p95_distance,
+            automaticallyGenerated: true,
+          })),
+        ],
+      },
+      { tenantId: projectId },
+    );
   }
 
   // Emit TopicAssignedEvents via command queue
@@ -827,18 +834,21 @@ export const storeResults = async (
       // Send commands in parallel (queue handles batching internally)
       await Promise.all(
         tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-          app.traces.assignTopic({
-            tenantId: projectId,
-            traceId: trace_id,
-            topicId: topic_id,
-            topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
-            subtopicId: subtopic_id,
-            subtopicName: subtopic_id
-              ? (subtopicNameMap.get(subtopic_id) ?? null)
-              : null,
-            isIncremental,
-            occurredAt: Date.now(),
-          }),
+          app.traces.assignTopic(
+            {
+              tenantId: projectId,
+              traceId: trace_id,
+              topicId: topic_id,
+              topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
+              subtopicId: subtopic_id,
+              subtopicName: subtopic_id
+                ? (subtopicNameMap.get(subtopic_id) ?? null)
+                : null,
+              isIncremental,
+              occurredAt: Date.now(),
+            },
+            { tenantId: projectId },
+          ),
         ),
       );
 

@@ -205,14 +205,17 @@ export class ScenarioFailureHandler {
 
         // Dispatch finishRun with the outcome's terminal status
         try {
-          await getApp().simulations.finishRun({
-            tenantId: projectId,
-            scenarioRunId,
-            occurredAt: timestamp,
-            status,
-            ...runPlacement({ batchRunId, setId }),
-            results: buildFailureResults({ outcome, error }),
-          });
+          await getApp().simulations.finishRun(
+            {
+              tenantId: projectId,
+              scenarioRunId,
+              occurredAt: timestamp,
+              status,
+              ...runPlacement({ batchRunId, setId }),
+              results: buildFailureResults({ outcome, error }),
+            },
+            { tenantId: projectId },
+          );
           span.setAttribute("result.emitted_run_finished", true);
         } catch (err) {
           logger.error(

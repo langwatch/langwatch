@@ -559,7 +559,7 @@ function buildStores(deps: TraceProcessingPipelineDeps) {
     key: "TraceId",
     stateVersionColumn: "Version",
     row: traceSummaryRowMapping,
-    cache: deps.summaryCache ?? noFoldStateCache(),
+    cache: deps.summaryCache ?? noFoldStateCache<TraceSummaryState>(),
     retentionDays: DEFAULT_RETENTION_DAYS,
   });
   assertMountIsLegal("traceSummary", traceSummaryMount(summaryStore));
@@ -571,7 +571,7 @@ function buildStores(deps: TraceProcessingPipelineDeps) {
     key: "TraceId",
     stateVersionColumn: "Version",
     row: traceAnalyticsRowMapping,
-    cache: deps.analyticsCache ?? noFoldStateCache(),
+    cache: deps.analyticsCache ?? noFoldStateCache<TraceAnalyticsState>(),
     retentionDays: DEFAULT_RETENTION_DAYS,
     // Deployed `ORDER BY (TenantId, OccurredAt, TraceId)` is time-leading.
     readWindow: { column: "OccurredAt", lookbackMs: ANALYTICS_READ_WINDOW_MS },
