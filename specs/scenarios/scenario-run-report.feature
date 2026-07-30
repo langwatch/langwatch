@@ -142,6 +142,25 @@ Feature: Run report
     Then the report states how many failing conversations were read
     And every distinct kind of failure is represented among them
 
+  # Naming a criterion says what broke, never why. The conversation is the only
+  # part of the document a reader can check the rest against, so it travels with
+  # the failure group it belongs to rather than living in a separate appendix.
+  @unit
+  Scenario: I can read the conversation behind a failure
+    Given a run has a failing scenario
+    When I export a report
+    Then the failure group shows the conversation that failed
+    And each turn is labelled with who spoke and when
+
+  # The sample keeps the opening turn and the tail, because an escalation fails
+  # at its end. A reader following one needs to know where the jump was, so the
+  # gap is marked in the place it happened.
+  @unit
+  Scenario: A conversation with a dropped middle says where the gap is
+    Given a failing conversation was too long to include whole
+    When I export a report
+    Then the omitted turns are marked between the turns either side of them
+
   @unit
   Scenario: The report names the turn where a conversation went wrong
     Given a scenario failed partway through a conversation

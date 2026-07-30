@@ -106,6 +106,18 @@ export function evidenceFixture(
       signaturesCovered: 1,
       signaturesTotal: 1,
     },
+    transcripts: [
+      {
+        runId: "run_1",
+        signatureId: "s_known",
+        scenarioName: "Refund escalation",
+        turns: [
+          { index: 0, role: "user", content: "I want a refund." },
+          { index: 1, role: "assistant", content: "No." },
+        ],
+        omittedTurns: 0,
+      },
+    ],
     stillRunning: false,
     ...overrides,
   };

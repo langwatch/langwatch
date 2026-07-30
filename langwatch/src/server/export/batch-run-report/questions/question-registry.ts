@@ -322,6 +322,12 @@ function clusterBlocks(evidence: ReportEvidence): Block[] {
               : []),
             { label: "Scenarios", body: scenarios },
           ],
+          // The conversations behind this group, so a reader can check the
+          // grouping rather than take it on trust. "Why did it fail" is not
+          // answerable from a criterion name alone.
+          transcripts: evidence.transcripts.filter(
+            (transcript) => transcript.signatureId === signature.signatureId,
+          ),
         };
       }),
     },

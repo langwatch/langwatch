@@ -11,6 +11,7 @@ import type {
   ReportModel,
   ReportSection,
   ReportTier,
+  SelectedTranscript,
   Severity,
   TableCell,
   Tone,
@@ -148,6 +149,78 @@ function renderGroupDetail(detail: { label: string; body: string }[]): string {
 }
 
 /**
+ * The turns of one conversation, with the dropped middle marked where it fell.
+ *
+ * Selection keeps the opening turn and the tail, so a gap sits between two
+ * non-consecutive indices. The marker is derived from that discontinuity rather
+ * than from a count, which is what puts it in the right place instead of at the
+ * top — a reader following an escalation needs to know where the jump was.
+ */
+function renderTranscriptTurns(
+  turns: SelectedTranscript["turns"],
+  omittedTurns: number,
+): string {
+  return (
+    turns
+      .map((turn, position) => {
+        const previous = turns[position - 1];
+        const gap =
+          previous !== undefined && turn.index > previous.index + 1
+            ? `<li class="turn-gap">${escapeHtml(
+                `${turn.index - previous.index - 1} turns not shown`,
+              )}</li>`
+            : "";
+        return [
+          gap,
+          `<li class="turn">`,
+          `<p class="turn-meta"><span class="turn-role">${escapeHtml(turn.role)}</span>`,
+          `<span class="turn-index">turn ${escapeHtml(String(turn.index))}</span></p>`,
+          `<p class="turn-body">${escapeHtml(turn.content)}</p>`,
+          "</li>",
+        ].join("");
+      })
+      .join("")
+      // A conversation whose gap is not between two kept turns (nothing after the
+      // opening survived) still owes the reader the count.
+      .concat(
+        omittedTurns > 0 && turns.length <= 1
+          ? `<li class="turn-gap">${escapeHtml(`${omittedTurns} turns not shown`)}</li>`
+          : "",
+      )
+  );
+}
+
+/**
+ * The conversations behind a failure group.
+ *
+ * Read verbatim from the run record, so this is the one part of the document a
+ * reader can check the rest against. Nested disclosures: a group opens to its
+ * conversation list, and each conversation opens to its turns, so neither a
+ * forty-scenario group nor a fifty-turn transcript floods the page.
+ */
+function renderTranscripts(transcripts: SelectedTranscript[]): string {
+  if (transcripts.length === 0) return "";
+  const entries = transcripts
+    .map(
+      (transcript) =>
+        `<details class="transcript"><summary>${escapeHtml(
+          transcript.scenarioName,
+        )}<span class="group-subtitle">${escapeHtml(
+          `run ${transcript.runId}`,
+        )}</span></summary><ol class="turns">${renderTranscriptTurns(
+          transcript.turns,
+          transcript.omittedTurns,
+        )}</ol></details>`,
+    )
+    .join("");
+  return `<div class="replay"><p class="replay-heading">${escapeHtml(
+    transcripts.length === 1
+      ? "The conversation"
+      : `${transcripts.length} of these conversations`,
+  )}</p>${entries}</div>`;
+}
+
+/**
  * Failure groups, each behind a native disclosure.
  *
  * `<details>` rather than a scripted toggle so the detail is reachable by
@@ -161,7 +234,9 @@ function renderGroups(groups: GroupBlock["groups"]): string {
           group.title,
         )}<span class="group-subtitle">${escapeHtml(
           group.subtitle,
-        )}</span></summary>${renderGroupDetail(group.detail)}</details>`,
+        )}</span></summary>${renderGroupDetail(
+          group.detail,
+        )}${renderTranscripts(group.transcripts ?? [])}</details>`,
     )
     .join("");
 }

@@ -303,6 +303,77 @@ describe("Feature: Run report — every block variant", () => {
   });
 });
 
+describe("Feature: Run report — the conversation behind a failure", () => {
+  describe("when a failure group carries its conversations", () => {
+    const html = renderReportHtml({ model: makeEveryBlockModel() });
+
+    /** @scenario I can read the conversation behind a failure */
+    it("puts the conversation inside the failure group it belongs to", () => {
+      const group =
+        /<details class="tone-fail">([\s\S]*?)<\/details>\s*<p class="note/.exec(
+          html,
+        )?.[1];
+
+      expect(group).toContain('<details class="transcript">');
+      expect(group).toContain("Apply my coupon.");
+    });
+
+    /** @scenario I can read the conversation behind a failure */
+    it("labels each turn with who spoke and when", () => {
+      expect(html).toContain('<span class="turn-role">user</span>');
+      expect(html).toContain('<span class="turn-role">assistant</span>');
+      expect(html).toContain('<span class="turn-index">turn 0</span>');
+      expect(html).toContain('<span class="turn-index">turn 7</span>');
+    });
+
+    /**
+     * The count comes from the gap between two kept turns, not from
+     * `omittedTurns` — a marker that says "6" while sitting between turn 0 and
+     * turn 7 would be describing a different conversation.
+     *
+     * @scenario A conversation with a dropped middle says where the gap is
+     */
+    it("marks the dropped middle between the turns either side of it", () => {
+      expect(html).toContain(
+        '<li class="turn-gap">6 turns not shown</li><li class="turn">',
+      );
+      expect(html).toMatch(
+        /turn 0<\/span>[\s\S]*?turn-gap[\s\S]*?turn 7<\/span>/,
+      );
+    });
+  });
+
+  describe("when a group has no conversations kept", () => {
+    /** @scenario I can read the conversation behind a failure */
+    it("renders no replay section at all", () => {
+      const html = renderReportHtml({
+        model: makeModel({
+          sections: [
+            makeSection({
+              computed: [
+                {
+                  kind: "groups",
+                  groups: [
+                    {
+                      title: "Stopped reporting",
+                      subtitle: "1 scenario",
+                      detail: [{ label: "Scenarios", body: "Refund flow" }],
+                    },
+                  ],
+                },
+              ],
+            }),
+          ],
+        }),
+      });
+
+      expect(html).toContain("Stopped reporting");
+      expect(html).not.toContain('class="replay"');
+      expect(html).not.toContain('class="transcript"');
+    });
+  });
+});
+
 describe("Feature: Run report — the three acts", () => {
   describe("when the questions span all three", () => {
     /** @scenario Questions are grouped into what happened, what is true now, and what to do next */

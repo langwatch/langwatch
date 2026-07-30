@@ -105,6 +105,40 @@ details > *:not(summary) { padding: 0 0.75rem 0.75rem; }
 .group-subtitle { font-weight: 400; color: var(--ink-faint); margin-left: 0.5rem; }
 .detail dt { font-weight: 600; font-size: 0.82rem; color: var(--ink-soft); margin-top: 0.5rem; }
 .detail dd { margin: 0; white-space: pre-wrap; }
+.replay { margin-top: 0.75rem; }
+.replay-heading {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: 0 0 0.35rem;
+}
+details.transcript { background: var(--surface-soft); margin: 0 0 0.35rem; }
+details.transcript > summary { font-weight: 500; font-size: 0.9rem; }
+.turns { list-style: none; padding-left: 0; margin: 0; }
+.turn { margin: 0 0 0.5rem; }
+.turn-meta { margin: 0 0 0.15rem; font-size: 0.72rem; }
+.turn-role {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-soft);
+}
+.turn-index { color: var(--ink-faint); margin-left: 0.5rem; }
+.turn-body {
+  margin: 0;
+  white-space: pre-wrap;
+  /* Turn text is the one place a reader is reading the agent's own words, so it
+     gets a measure of its own rather than the page's full width. */
+  max-width: 46rem;
+  border-left: 2px solid var(--rule);
+  padding-left: 0.6rem;
+}
+.turn-gap {
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  font-style: italic;
+  margin: 0 0 0.5rem;
+}
 .note { color: var(--ink-soft); }
 pre { overflow-x: auto; background: var(--surface-soft); border: 1px solid var(--rule); border-radius: 6px; padding: 0.75rem; margin: 0.5rem 0; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82rem; }
@@ -169,5 +203,11 @@ footer { color: var(--ink-soft); font-size: 0.85rem; }
   }
   .chart { display: none; }
   h2, h3 { break-after: avoid; }
+  /* A transcript can run longer than a page, so it has to be allowed to break —
+     otherwise the break-inside rule above pushes the whole conversation onto a
+     fresh page and leaves the one before it half empty. Individual turns still
+     stay whole. */
+  details.transcript { break-inside: auto; }
+  .turn { break-inside: avoid; }
 }
 `;

@@ -102,6 +102,20 @@ export const EVERY_BLOCK: Block[] = [
         subtitle: "3 scenarios",
         tone: "fail",
         detail: [{ label: "Judge reasoning", body: "It never confirmed." }],
+        // Turn indices jump 0 -> 7, which is how a dropped middle reaches the
+        // renderer: selection keeps the opening turn and the tail.
+        transcripts: [
+          {
+            runId: "run-1",
+            signatureId: "sig-1",
+            scenarioName: "Checkout with a coupon",
+            turns: [
+              { index: 0, role: "user", content: "Apply my coupon." },
+              { index: 7, role: "assistant", content: "Order placed." },
+            ],
+            omittedTurns: 6,
+          },
+        ],
       },
     ],
   },

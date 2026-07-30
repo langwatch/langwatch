@@ -151,6 +151,22 @@ export interface TruncationFact {
   signaturesTotal: number;
 }
 
+/**
+ * One bounded, exemplar conversation — the same replay a reader gets, not just
+ * what the model was given.
+ *
+ * Deterministic and model-free: `transcript-budget.ts` selects which runs
+ * qualify, but the turns themselves are read verbatim from the run record. A
+ * reader can therefore see this even at the `figures_only` tier.
+ */
+export interface SelectedTranscript {
+  runId: string;
+  signatureId: string;
+  scenarioName: string;
+  turns: { index: number; role: string; content: string }[];
+  omittedTurns: number;
+}
+
 export interface ReportEvidence {
   batch: {
     batchRunId: string;
@@ -169,6 +185,13 @@ export interface ReportEvidence {
   coverage: CoverageFact;
   priorBatches: PriorBatchFact[];
   truncation: TruncationFact;
+  /**
+   * The same bounded exemplars {@link TruncationFact} counts, kept verbatim so
+   * the deterministic layer can render them next to the failure group they
+   * belong to. Populated after `buildEvidence()` returns, once transcript
+   * selection has run — empty here, same as `truncation`'s counts.
+   */
+  transcripts: SelectedTranscript[];
   /** True when scenarios were still running, so the figures cover a subset. */
   stillRunning: boolean;
 }
@@ -249,6 +272,8 @@ export type Block =
         subtitle: string;
         tone?: Tone;
         detail: { label: string; body: string }[];
+        /** Exemplar conversations for this failure group, if any were kept. */
+        transcripts?: SelectedTranscript[];
       }[];
     }
   | { kind: "note"; text: string; tone?: Tone }

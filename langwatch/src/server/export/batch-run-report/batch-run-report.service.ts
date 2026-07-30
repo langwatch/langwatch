@@ -131,6 +131,10 @@ export class BatchRunReportService {
     });
     evidence.truncation.transcriptsIncluded = selection.transcripts.length;
     evidence.truncation.signaturesCovered = selection.signaturesCovered;
+    // Kept on the evidence so the deterministic layer can show a reader the
+    // same conversations the model was given. Selection is model-free, so the
+    // replay renders at every tier, including when no model ran at all.
+    evidence.transcripts = selection.transcripts;
 
     return {
       evidence,

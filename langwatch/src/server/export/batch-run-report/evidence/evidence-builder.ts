@@ -103,6 +103,9 @@ export function buildEvidence({
       signaturesCovered: 0,
       signaturesTotal: signatures.length,
     },
+    // Filled in by the service once transcript selection has run — mirrors
+    // `truncation`'s counts above, which are completed the same way.
+    transcripts: [],
     stillRunning: counts.inProgressCount + counts.queuedCount > 0,
   };
 }

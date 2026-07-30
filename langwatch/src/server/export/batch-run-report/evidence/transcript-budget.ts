@@ -1,5 +1,9 @@
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import type { FailureSignature, RunFact } from "../report.types";
+import type {
+  FailureSignature,
+  RunFact,
+  SelectedTranscript,
+} from "../report.types";
 
 /**
  * Chooses which conversations the model gets to read.
@@ -25,14 +29,6 @@ const MAX_TRANSCRIPTS = 24;
 const MAX_TRANSCRIPT_CHARS = 6_000;
 /** Turns kept from the end of a conversation, where a failure usually lands. */
 const TAIL_TURNS = 12;
-
-export interface SelectedTranscript {
-  runId: string;
-  signatureId: string;
-  scenarioName: string;
-  turns: { index: number; role: string; content: string }[];
-  omittedTurns: number;
-}
 
 export interface TranscriptSelection {
   transcripts: SelectedTranscript[];
