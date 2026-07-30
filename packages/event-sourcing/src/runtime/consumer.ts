@@ -178,7 +178,9 @@ export async function runOnce(
   if (batch === null) return "empty";
 
   const { lane, lease } = batch;
-  const labels = { laneKind: lane.kind, laneName: lane.name };
+  // A command lane may omit its name on purpose (every command type for one
+  // aggregate then shares a lane), and a metric label has to be a string.
+  const labels = { laneKind: lane.kind, laneName: lane.name ?? "" };
 
   if (deps.enabled !== undefined && !deps.enabled(lane)) {
     await deps.queue.retry(lease, 0);
@@ -215,8 +217,12 @@ export async function runOnce(
 
   const survivors: DecodedJob[] = [];
   for (const outcome of outcomes) {
-    if (outcome.kind === "drop") {
-      dropped.inc({ ...labels, reason: outcome.reason });
+    // Narrow positively on "ok": the transient case returned above, but that
+    // check was over the array, so it tells the checker nothing about an
+    // element here.
+    if (outcome.kind !== "ok") {
+      if (outcome.kind === "drop")
+        dropped.inc({ ...labels, reason: outcome.reason });
       continue;
     }
     survivors.push(outcome.job);
@@ -237,7 +243,8 @@ export async function runOnce(
     if (firstJob === undefined) throw new Error("a claimed batch had no jobs");
     const execution: LaneExecution = {
       pipeline: member.pipeline,
-      name: lane.name,
+      // The resolved member always has one, where an unnamed command lane does not.
+      name: member.name,
       tenantId: batch.tenantId,
       aggregateId: firstJob.header.aggregateId,
       events: survivors.map((survivor) => survivor.event),

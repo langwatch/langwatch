@@ -116,7 +116,7 @@ export interface ClickHouseReplacingArgs<State, Columns extends ColumnMap> {
    * ended up the only one paying it. Pass `noFoldStateCache()` to opt out
    * deliberately.
    */
-  readonly cache: FoldStateCache<State>;
+  readonly cache: FoldStateCache<NoInfer<State>>;
   readonly retentionDays?: number;
   /**
    * Bounds the read on a sort-key column that leads the key columns, so a

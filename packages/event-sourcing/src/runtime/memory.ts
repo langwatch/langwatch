@@ -321,6 +321,8 @@ export function memoryProcessStore(): ProcessStore & {
 }
 
 interface MemoryOutboxRow extends OutboxRow {
+  /** The stored row is immutable; the in-memory stand-in counts attempts in place. */
+  attempt: number;
   leasedUntil: number;
   settledAt: number | null;
   dead: boolean;

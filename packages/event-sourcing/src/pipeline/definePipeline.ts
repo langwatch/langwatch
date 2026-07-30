@@ -101,7 +101,7 @@ export interface PipelineNamedPrefixed<
 > {
   events<const Events extends EventSchemaMap>(
     events: Events,
-  ): PipelineChain<Name, Prefix, Events, Commands>;
+  ): PipelineChain<Name, Prefix, Events>;
 }
 
 /**
@@ -446,7 +446,10 @@ function chainStage<
     },
     withCommand(name, record) {
       mountCommand(state, name, record);
-      return chainStage<Name, Prefix, Events>(state);
+      // One mutating builder underneath. `Commands` is a phantom the
+      // declaration advances per call, and a stage that returns itself gives
+      // the checker no way to follow that, so the accumulation is asserted here.
+      return chainStage<Name, Prefix, Events>(state) as never;
     },
     withMap(
       name: string,
@@ -501,7 +504,8 @@ function chainWithIdStage<
     },
     withCommand(name, record) {
       mountCommand(state, name, record);
-      return chainWithIdStage<Name, Prefix, Events>(state);
+      // Same phantom accumulation as the id-less stage above.
+      return chainWithIdStage<Name, Prefix, Events>(state) as never;
     },
     withFold(name, record) {
       mountFold(state, name, record);
