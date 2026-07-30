@@ -22,6 +22,8 @@ import http from "http";
 import { spawn } from "child_process";
 import type { AddressInfo } from "net";
 
+import { AGENT_MODE_ENV_VARS } from "../../utils/output";
+
 const CLI_PATH = path.resolve(__dirname, "../../../../dist/cli/index.js");
 
 interface FakeResponse {
@@ -102,14 +104,21 @@ interface CliResult {
 
 function runCli(args: string[], cwd: string, timeoutMs = 15000): Promise<CliResult> {
   return new Promise((resolve) => {
+    // These assertions read human-format output. Run the suite from inside a
+    // coding agent and the agent-mode markers in the ambient environment would
+    // be inherited by the child, which then answers in agents format and fails
+    // every message assertion.
+    const env: Record<string, string | undefined> = {
+      ...process.env,
+      LANGWATCH_API_KEY: "test",
+      LANGWATCH_ENDPOINT: baseUrl,
+    };
+    for (const name of AGENT_MODE_ENV_VARS) delete env[name];
+
     const child = spawn("node", [CLI_PATH, ...args], {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        LANGWATCH_API_KEY: "test",
-        LANGWATCH_ENDPOINT: baseUrl,
-      },
+      env,
     });
 
     let stdout = "";

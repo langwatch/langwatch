@@ -146,9 +146,12 @@ describe("refreshSession", () => {
 
   it("describes a non-Error rejection instead of reporting undefined", async () => {
     const outcome = await refreshSession(baseConfig(), {
-      // A polyfilled fetch can reject with a bare string; the reason still
-      // has to read as something when the wrapper prints it.
       refreshImpl: (async () => {
+        // A polyfilled fetch can reject with a bare string; the reason still
+        // has to read as something when the wrapper prints it. Throwing a
+        // non-Error is the whole point of this test, which is why the rule
+        // against it is suppressed rather than satisfied.
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw "socket hang up";
       }) as never,
       loadImpl: (() => baseConfig()) as never,
