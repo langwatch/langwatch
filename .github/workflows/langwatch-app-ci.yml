@@ -127,7 +127,7 @@ jobs:
               - 'sdks/python/**'
               - 'services/**'
               - 'pkg/**'
-              - 'langevals/**'
+              - 'services/langevals/**'
               - 'langwatch_server/**'
               - 'scripts/**'
               - '.github/workflows/langwatch-app-ci.yml'

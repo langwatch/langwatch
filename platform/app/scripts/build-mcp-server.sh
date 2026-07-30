@@ -12,7 +12,7 @@ printf 'building mcp server... '
 # deliberately excludes its build config (see mcp/typescript/.npmignore): there
 # is nothing to build from, and the shipped dist is the thing to use. Only
 # a tree that carries the build config gets rebuilt.
-mcp_root="$(cd "$(dirname "$0")/../.." && pwd)/mcp-server"
+mcp_root="$(cd "$(dirname "$0")/../../.." && pwd)/mcp/typescript"
 if [ ! -f "$mcp_root/tsup.config.ts" ]; then
   if [ -f "$mcp_root/dist/create-mcp-server.js" ]; then
     printf 'prebuilt in published artifact, skipping\n'

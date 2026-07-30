@@ -336,7 +336,7 @@ services:
     # envelope) matches the code here. See #5151.
     build:
       context: .
-      dockerfile: Dockerfile.langwatch_nlp
+      dockerfile: infra/docker/Dockerfile.langwatch_nlp
     profiles: [nlp, scenarios, full]
     # No host port - accessed via docker network as "langwatch_nlp:5561"
     environment:
@@ -357,7 +357,7 @@ services:
     # evaluators in this checkout. See #5151.
     build:
       context: .
-      dockerfile: Dockerfile.langevals
+      dockerfile: infra/docker/Dockerfile.langevals
     profiles: [nlp, full]
     # No host port - accessed via docker network as "langevals:5562"
     environment:

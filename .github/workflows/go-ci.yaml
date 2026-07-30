@@ -62,7 +62,7 @@ jobs:
               - 'cmd/**'
               - 'tools/**'
               - 'sdks/go/**'
-              - 'clickhouse-serverless/**'
+              - 'infra/clickhouse-serverless/**'
               - 'packages/handled-error/**'
               - 'go.mod'
               - 'go.sum'
