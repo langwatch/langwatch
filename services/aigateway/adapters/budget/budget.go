@@ -2,7 +2,7 @@
 //
 // Debits are NOT sent from the gateway. Cost is captured on the OTel span
 // emitted by the trace bridge; the control plane's trace-fold reactor
-// (langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/
+// (platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/
 // gatewayBudgetSync.reactor.ts) writes ClickHouse ledger rows from the
 // span attributes. Single source of truth, no PG dual-write.
 package budget
@@ -43,7 +43,7 @@ func NewChecker(opts CheckerOptions) *Checker {
 
 // SoftWarnPercent is how much of a budget must be consumed before the gateway
 // attaches a warning to the response. It mirrors the control plane's soft-warn
-// threshold (langwatch/src/server/gateway/budget.service.ts) so the response
+// threshold (platform/app/src/server/gateway/budget.service.ts) so the response
 // header, the dashboard banner and the CLI all fire at the same point instead
 // of the header staying silent through the whole band the dashboard already
 // calls a warning.

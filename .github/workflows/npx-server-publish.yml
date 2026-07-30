@@ -10,7 +10,7 @@
 #   bumps. The dispatched run reads the version from package.json — it does
 #   NOT require a release tag.
 #
-# Version lock: root package.json and langwatch/package.json must match.
+# Version lock: root package.json and platform/app/package.json must match.
 # Both are auto-bumped in lockstep by release-please-config.json (the `.`
 # package's extra-files list). The pre-publish step verifies it.
 #
@@ -66,10 +66,10 @@ jobs:
         run: |
           set -e
           pkg_version="$(node -p "require('./package.json').version")"
-          app_version="$(node -p "require('./langwatch/package.json').version")"
+          app_version="$(node -p "require('./platform/app/package.json').version")"
           tag="${GITHUB_REF_NAME:-}"
           echo "package.json version:           $pkg_version"
-          echo "langwatch/package.json version: $app_version"
+          echo "platform/app/package.json version: $app_version"
           echo "release tag (if any):           $tag"
 
           if [ "$pkg_version" != "$app_version" ]; then
@@ -173,12 +173,12 @@ jobs:
       # above already covers it and a filtered re-install here would only
       # re-resolve the same lockfile for a subset.
       #
-      # node_modules/ never reaches the tarball (scripts/pack-npm.sh excludes
+      # node_modules/ never reaches the tarball (dev/scripts/pack-npm.sh excludes
       # it), so end users still run `pnpm install` once on first start, which
       # is what generates the platform-specific Prisma client via prisma's
       # postinstall hook — see packages/server/src/services/node-deps.ts.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm -C langwatch run build
+        run: pnpm --filter "@langwatch/web..." run build
         env:
           NODE_ENV: production
 
@@ -186,7 +186,7 @@ jobs:
         id: pack
         run: |
           mkdir -p _pack
-          bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
+          bash dev/scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
           tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           echo "tarball size:"; ls -lh "$tarball"
@@ -211,21 +211,21 @@ jobs:
             "package/app/pnpm-lock.yaml"
             "package/app/pnpm-workspace.yaml"
             "package/app/package.json"
-            "package/app/langwatch/package.json"
-            "package/app/langwatch/dist/client/index.html"
-            "package/app/langwatch/dist/scenario-child-process.js"
-            "package/app/langevals/pyproject.toml"
+            "package/app/platform/app/package.json"
+            "package/app/platform/app/dist/client/index.html"
+            "package/app/platform/app/dist/scenario-child-process.js"
+            "package/app/services/langevals/pyproject.toml"
             # langevals resolves the python SDK as a local path dependency,
-            # so the tarball must ship python-sdk/pyproject.toml + src/.
-            "package/app/python-sdk/pyproject.toml"
-            "package/app/python-sdk/src"
-            # mcp-server is a workspace dependency of the app; without the
+            # so the tarball must ship sdks/python/pyproject.toml + src/.
+            "package/app/sdks/python/pyproject.toml"
+            "package/app/sdks/python/src"
+            # mcp/typescript is a workspace dependency of the app; without the
             # prebuilt dist the langwatch app crashes loading
             # "@langwatch/mcp-server/create-mcp-server".
-            "package/app/mcp-server/package.json"
-            "package/app/mcp-server/dist/create-mcp-server.js"
+            "package/app/mcp/typescript/package.json"
+            "package/app/mcp/typescript/dist/create-mcp-server.js"
             # Langy reads the platform feature map at runtime
-            # (langwatch/src/shared/langy/featureMap.ts imports it from the
+            # (platform/app/src/shared/langy/featureMap.ts imports it from the
             # repo root).
             "package/app/feature-map.json"
             # The app's prepare step imports the skills front-matter helper
@@ -238,8 +238,8 @@ jobs:
           # Every workspace package in the checkout must ship: a missing one
           # leaves dangling pnpm links in the installed tree and the app dies
           # with MODULE_NOT_FOUND at first boot; 3.6.0 shipped exactly that
-          # way (.npmignore still excluded langwatch/packages/ after runtime
-          # packages moved in). Both root packages/* and langwatch/packages/*
+          # way (.npmignore still excluded the app's packages/ after runtime
+          # packages moved in). The root packages/* members
           # are derived from a directory listing rather than named one by one,
           # so a new package on either side is covered by this gate the day
           # it appears, with nothing to remember to add here.
@@ -247,19 +247,19 @@ jobs:
           # of the single workspace, so `--frozen-lockfile` on the end user's
           # machine checks the lockfile against its manifest and fails without
           # it. Every member's package.json must ship, this one included.
-          for pkgdir in langwatch/packages/*/ packages/*/; do
+          for pkgdir in packages/*/; do
             pkgdir="${pkgdir%/}"
             [ -f "$pkgdir/package.json" ] || continue
             required+=("package/app/$pkgdir/package.json")
           done
           # The remaining members carry no source into the tarball, only the
           # manifest the workspace needs to stay coherent.
-          for member in typescript-sdk agentic-e2e-tests; do
+          for member in sdks/typescript tests/agentic-e2e; do
             required+=("package/app/$member/package.json")
           done
           forbidden=(
-            "package/app/langwatch/node_modules"
-            "package/app/langwatch/.next/cache"
+            "package/app/platform/app/node_modules"
+            "package/app/platform/app/.next/cache"
             "package/app/.env"
             # The lockfile must be under app/, never at the package root —
             # npm would delete it there and the guard above would still pass

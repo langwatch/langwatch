@@ -3,22 +3,22 @@ Feature: Docker dev environment worktree isolation and startup speed
   I want each worktree to have isolated Docker containers and dependencies
   So that parallel development work doesn't interfere
 
-  # The dev-environment scripts live in `scripts/dev.sh` (bash) +
-  # `compose.dev.yml` and a TypeScript port allocator at
+  # The dev-environment scripts live in `dev/scripts/dev.sh` (bash) +
+  # `infra/compose.dev.yml` and a TypeScript port allocator at
   # `packages/server/src/shared/ports.ts`. Tests exist for the
   # TypeScript pieces (`packages/server/test/ports.test.ts`,
   # `env.test.ts`, `cli-doctor.test.ts`) and bash worktree helpers
-  # (`scripts/__tests__/worktree.unit.bats`,
+  # (`dev/scripts/__tests__/worktree.unit.bats`,
   # `worktree.integration.bats`). The parity check's
   # DEFAULT_TEST_ROOTS doesn't scan `packages/server/test/` or
-  # `scripts/__tests__/.bats` files, so JSDoc-bound scenarios there
+  # `dev/scripts/__tests__/.bats` files, so JSDoc-bound scenarios there
   # would not be discovered. Leaving `@unimplemented` — extending
   # DEFAULT_TEST_ROOTS to cover packages/server is the right
   # structural fix.
 
   Background:
-    Given the Docker dev environment is configured via compose.dev.yml
-    And scripts/dev.sh provides an interactive launcher
+    Given the Docker dev environment is configured via infra/compose.dev.yml
+    And dev/scripts/dev.sh provides an interactive launcher
 
   @integration @unimplemented
   Scenario: Two worktrees have isolated node_modules
@@ -57,7 +57,7 @@ Feature: Docker dev environment worktree isolation and startup speed
 
   @unit @unimplemented
   Scenario: Environment variables are not duplicated across services
-    Given compose.dev.yml uses YAML anchors for shared env vars
+    Given infra/compose.dev.yml uses YAML anchors for shared env vars
     Then DATABASE_URL is defined once in x-common-env
     And REDIS_URL is defined once in x-common-env
     And services merge the anchor with service-specific overrides

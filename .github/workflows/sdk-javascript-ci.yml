@@ -36,12 +36,12 @@ jobs:
           # push-strategy diff + no release-please-manifest entry: the test
           # and e2e steps spend real LLM money, so they must not run on
           # pushes or release PRs that touched nothing under
-          # typescript-sdk/. An SDK release PR still matches via
-          # typescript-sdk/CHANGELOG.md.
+          # sdks/typescript/. An SDK release PR still matches via
+          # sdks/typescript/CHANGELOG.md.
           push-strategy: diff
           filters: |
             relevant:
-              - 'typescript-sdk/**'
+              - 'sdks/typescript/**'
               # The single lockfile, workspace definition, root manifest and
               # hoist config live at the repo root since ADR-076; a dependency
               # or override change touches only these.
@@ -61,7 +61,7 @@ jobs:
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
       run:
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
@@ -174,7 +174,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
 
     steps:
       - name: Checkout
@@ -217,15 +217,15 @@ jobs:
         run: pnpm --filter @langwatch/mcp-server run build
 
       - name: Prepare LangWatch files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Seed test project
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           # Seed the credential the SDK test process receives without putting
           # LANGWATCH_API_KEY on the platform process itself.
@@ -239,18 +239,18 @@ jobs:
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup ClickHouse
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm clickhouse:migrate
 
       # Build the app so we can run a production server (dev mode is
       # unreliable in CI — turbopack JIT compilation can hang under
       # memory pressure, causing the server to become unresponsive).
       - name: Build LangWatch app
-        working-directory: langwatch
+        working-directory: platform/app
         run: NODE_ENV=test pnpm build
 
       - name: Start LangWatch server and worker
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           # The workflow-global LANGWATCH_API_KEY is for the SDK under test.
           # Platform processes refuse to boot with it set (the self-referencing

@@ -866,7 +866,7 @@ func EnsurePlayCheckout(ctx context.Context, repoRoot string, number int, checko
 
 // playEnvDirs mirrors the directories .githooks/post-checkout copies .env files
 // into, plus the repo root.
-var playEnvDirs = []string{".", "langwatch", "langwatch_nlp", "langevals", "python-sdk", "typescript-sdk", "mcp-server"}
+var playEnvDirs = []string{".", "platform/app", "services/langevals", "sdks/python", "sdks/typescript", "mcp/typescript"}
 
 // StripInheritedEnvFiles removes every untracked .env* file from a play checkout.
 //

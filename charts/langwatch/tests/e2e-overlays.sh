@@ -614,7 +614,7 @@ load_images() {
   sep; info "Building and loading images for install tests"
 
   local ch_image="langwatch/clickhouse-serverless:next"
-  local ch_dir="${CHART_DIR}/../../clickhouse-serverless"
+  local ch_dir="${CHART_DIR}/../../infra/clickhouse-serverless"
 
   if ! docker image inspect "$ch_image" &>/dev/null 2>&1; then
     if [[ -f "$ch_dir/Dockerfile" ]]; then

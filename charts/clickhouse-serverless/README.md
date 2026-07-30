@@ -52,7 +52,7 @@ The chart deploys the `langwatch/clickhouse-serverless` Docker image, which cont
 
 You set CPU + RAM, everything else is computed. Any computed value can be overridden via the `env` map.
 
-See the [Docker image README](../../clickhouse-serverless/README.md) for the full list of computed parameters and their formulas.
+See the [Docker image README](../../infra/clickhouse-serverless/README.md) for the full list of computed parameters and their formulas.
 
 ## Parameters
 

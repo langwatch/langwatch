@@ -47,7 +47,7 @@ Concretely:
    - `langwatch.governance.retention_class` — derived governance context
    - Both namespaces are rejected if found in user-supplied OTLP — no attribute spoofing.
 
-4. **Hidden Governance Project.** Per-org Project of `kind = "internal_governance"`, lazy-ensured on first IngestionSource mint via single `ensureHiddenGovernanceProject(prisma, orgId)` helper at `langwatch/src/server/governance/governanceProject.service.ts:54-110`. Internal routing/tenancy artifact only — never user-visible. Layer-1 filter at `PrismaOrganizationRepository.getAllForUser` (`kind: { not: "internal_governance" }`) covers all org/team/project list consumers; Layer-2 per-consumer assertions ship post-cutover.
+4. **Hidden Governance Project.** Per-org Project of `kind = "internal_governance"`, lazy-ensured on first IngestionSource mint via single `ensureHiddenGovernanceProject(prisma, orgId)` helper at `platform/app/src/server/governance/governanceProject.service.ts:54-110`. Internal routing/tenancy artifact only — never user-visible. Layer-1 filter at `PrismaOrganizationRepository.getAllForUser` (`kind: { not: "internal_governance" }`) covers all org/team/project list consumers; Layer-2 per-consumer assertions ship post-cutover.
 
 5. **Folds for derived views.** `governance_kpis` (KPI strip + anomaly reactor input) and `governance_ocsf_events` (SIEM read API) are reactor-driven derived projections from the unified store. Rebuildable from `event_log`. (Step 3/3 — in flight at time of writing this ADR.)
 
@@ -111,7 +111,7 @@ Any future routing callsite (anomaly reactor, OCSF reader, future ingestion entr
 
 - Single store to query, alert on, build dashboards against, debug from. Customer mental model + engineering mental model align.
 - Single set of compliance / RBAC / multitenancy enforcement (already hardened over years of LangWatch SDK ingest).
-- Single OTLP parser. `langwatch/src/server/otel/parseOtlpBody.ts` (extracted in commit `d62fa1c41`) is consumed by both `/api/otel/v1/traces` and `/api/ingest/otel/:sourceId`. Locked at the contract level by `langwatch/src/server/otel/parseOtlpBody.test.ts` (commit `38106f768`, 18 unit tests).
+- Single OTLP parser. `platform/app/src/server/otel/parseOtlpBody.ts` (extracted in commit `d62fa1c41`) is consumed by both `/api/otel/v1/traces` and `/api/ingest/otel/:sourceId`. Locked at the contract level by `platform/app/src/server/otel/parseOtlpBody.test.ts` (commit `38106f768`, 18 unit tests).
 - Webhook + S3 receivers normalise to OTLP envelopes before handoff — keeps the downstream pipeline OTLP-only.
 - Future ingestion sources are "another origin tag", not "another pipeline".
 - Compliance auditors get one answer: "all governance data lives in our standard trace store, tagged with `langwatch.origin.*`."
@@ -167,7 +167,7 @@ Test coverage proving the contract (run with `pnpm test:integration` against Cli
 - Related ADRs: ADR-015 (projection-replay-coordination); ADR-017 (gateway-trace-payload-capture)
 - PR: https://github.com/langwatch/langwatch/pull/3524 (`feat/governance-platform`)
 - Code:
-  - Receiver: `langwatch/src/server/routes/ingest/ingestionRoutes.ts`
-  - Hidden Gov Project helper: `langwatch/src/server/governance/governanceProject.service.ts:54-110`
-  - Layer-1 filter: `langwatch/src/server/app-layer/organizations/repositories/organization.prisma.repository.ts`
-  - Shared OTLP parser: `langwatch/src/server/otel/parseOtlpBody.ts:57-159`
+  - Receiver: `platform/app/src/server/routes/ingest/ingestionRoutes.ts`
+  - Hidden Gov Project helper: `platform/app/src/server/governance/governanceProject.service.ts:54-110`
+  - Layer-1 filter: `platform/app/src/server/app-layer/organizations/repositories/organization.prisma.repository.ts`
+  - Shared OTLP parser: `platform/app/src/server/otel/parseOtlpBody.ts:57-159`

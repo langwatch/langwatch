@@ -5,7 +5,7 @@ Classified: 76
 
 | File | Scenario | Class | Rationale |
 |------|----------|-------|-----------|
-| specs/agents/agents-rest-api.feature | "List agents returns paginated non-archived agents" | DUPLICATE | Already covered by `langwatch/src/app/api/agents/__tests__/agents-rest-api.integration.test.ts` ("returns paginated non-archived agents", "excludes archived agents") |
+| specs/agents/agents-rest-api.feature | "List agents returns paginated non-archived agents" | DUPLICATE | Already covered by `platform/app/src/app/api/agents/__tests__/agents-rest-api.integration.test.ts` ("returns paginated non-archived agents", "excludes archived agents") |
 | specs/agents/agents-rest-api.feature | "List agents with page and limit parameters" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("paginates with page and limit parameters") |
 | specs/agents/agents-rest-api.feature | "List agents returns empty array for project with no agents" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("returns empty paginated response") |
 | specs/agents/agents-rest-api.feature | "Create an agent with name, type, and config" | DUPLICATE | Already covered by `agents-rest-api.integration.test.ts` ("creates an agent with name, type, and config") |
