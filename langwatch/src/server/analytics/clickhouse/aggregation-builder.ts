@@ -80,18 +80,33 @@ const SPAN_TIME_FILTER_START_END =
   "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
 
 /**
- * The same envelope for `evaluation_runs`, whose partition column is
- * `OccurredAt`. Its JOIN took no bound at all until now, so every query
- * carrying an evaluation metric or filter cold-scanned the table twice — the
- * outer read plus the dedup's full-table GROUP BY. One constant per caller date
- * regime, mirroring the span pair above.
+ * The same envelope for `evaluation_runs`, whose JOIN took no bound at all
+ * until now, so every query carrying an evaluation metric or filter cold-scanned
+ * the table twice — the outer read plus the dedup's full-table GROUP BY. One
+ * constant per caller date regime, mirroring the span pair above.
+ *
+ * The column is `ScheduledAt`: the table is `PARTITION BY toYearWeek(ScheduledAt)`
+ * and has no `OccurredAt` at all. That name belongs to `trace_summaries`, the
+ * outer scope these subqueries nest inside, so writing it here does not fail
+ * loudly — it resolves outward, which correlates the dedup subquery, which
+ * ClickHouse rejects outright.
+ *
+ * The cushion is 7 days, not the spans' 2. A span's StartTime sits inside its
+ * trace's lifetime, so that bound cannot drop a row; an evaluation is only
+ * scheduled *after* its trace arrives, and how long after is the lifecycle's
+ * business, so this cushion has to cover scheduling lag rather than clock skew.
+ * `EVALUATION_ANALYTICS_READ_WINDOW_MS` (evaluationAnalytics.foldProjection.ts)
+ * already pegs that lag at ±7 days for the same domain, and weekly partitions
+ * make the wider cushion ~1 extra partition per side. An evaluation scheduled
+ * further out than that drops from the range — the trade this bound accepts for
+ * pruning, and why it tracks the fold's number rather than inventing its own.
  */
 const EVAL_TIME_FILTER_BOTH_PERIODS =
-  "AND OccurredAt >= {previousStart:DateTime64(3)} - INTERVAL 2 DAY " +
-  "AND OccurredAt < {currentEnd:DateTime64(3)} + INTERVAL 2 DAY";
+  "AND ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY " +
+  "AND ScheduledAt < {currentEnd:DateTime64(3)} + INTERVAL 7 DAY";
 const EVAL_TIME_FILTER_START_END =
-  "AND OccurredAt >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
-  "AND OccurredAt < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
+  "AND ScheduledAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY " +
+  "AND ScheduledAt < {endDate:DateTime64(3)} + INTERVAL 7 DAY";
 
 /**
  * Returns a deduped FROM-clause expression for trace_summaries.

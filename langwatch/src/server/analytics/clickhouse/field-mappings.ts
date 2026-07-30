@@ -520,16 +520,22 @@ export function buildJoinClause({
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, EVALUATION_IDENTITY_COLUMNS)
         : EVALUATION_ANALYTICS_COLUMNS;
-      // `evaluation_runs` is PARTITION BY the same OccurredAt envelope the outer
-      // read is already bounded to, so without a predicate here BOTH scopes walk
-      // every partition — the outer read and, more expensively, the dedup's
-      // full-table GROUP BY. Rendered into both so they prune identically.
+      // `evaluation_runs` is PARTITION BY toYearWeek(ScheduledAt), so without a
+      // predicate on that column BOTH scopes walk every partition — the outer
+      // read and, more expensively, the dedup's full-table GROUP BY. Rendered
+      // into both so they prune identically.
+      //
+      // The predicate must name a column this table actually has. These
+      // subqueries nest inside a scope whose base table is `trace_summaries`, so
+      // a stray identifier does not fail loudly — it resolves outward to the
+      // trace's column, and an outward reference inside the IN makes the dedup a
+      // correlated subquery, which ClickHouse rejects (NOT_IMPLEMENTED).
       //
       // The bound goes on the dedup too, which windows "latest version" to the
       // frame rather than all of history: an evaluation whose newest row landed
       // outside it reads back one version stale. That is a read-only analytics
-      // path — stale numbers, never a wrong write — and the ±2-day cushion the
-      // caller supplies covers the drift this table actually exhibits.
+      // path — stale numbers, never a wrong write — and the ±7-day cushion the
+      // caller supplies covers the scheduling lag this table actually exhibits.
       const timeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
