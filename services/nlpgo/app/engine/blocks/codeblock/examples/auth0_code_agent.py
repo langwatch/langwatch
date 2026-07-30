@@ -22,16 +22,22 @@ import requests
 
 
 class Code:
-    def __call__(self, message: str, token_url: str, audience: str, api_url: str):
+    # The ONLY input is the conversation message. Everything else — the
+    # credentials AND the endpoint coordinates — comes from project secrets,
+    # so the whole agent is configurable from Settings -> Secrets and the one
+    # scenario mapping it needs (message <- scenario input) is creatable in
+    # the UI today. Static value mappings are deliberately avoided: they
+    # cannot be created in the editor yet (langwatch/langwatch#6371).
+    def __call__(self, message: str):
         # Step 1: exchange the client credentials for an access token.
         # Auth0's canonical M2M example posts JSON to /oauth/token.
         token_response = requests.post(
-            token_url,
+            secrets.AUTH0_TOKEN_URL,  # noqa: F821 — `secrets` is injected by runner.py
             json={
                 "grant_type": "client_credentials",
-                "client_id": secrets.AUTH0_CLIENT_ID,  # noqa: F821 — injected by runner.py
+                "client_id": secrets.AUTH0_CLIENT_ID,  # noqa: F821
                 "client_secret": secrets.AUTH0_CLIENT_SECRET,  # noqa: F821
-                "audience": audience,
+                "audience": secrets.AUTH0_AUDIENCE,  # noqa: F821
             },
             timeout=10,
         )
@@ -42,7 +48,7 @@ class Code:
 
         # Step 2: call the protected API with the minted token.
         api_response = requests.post(
-            api_url,
+            secrets.AUTH0_API_URL,  # noqa: F821
             json={"message": message},
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=30,

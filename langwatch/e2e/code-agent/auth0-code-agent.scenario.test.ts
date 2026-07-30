@@ -136,33 +136,29 @@ const model = openai("gpt-5-mini");
 describe("Auth0-protected custom code agent as a scenario target", () => {
   it("answers with data from behind the auth wall, without leaking the secret", async () => {
     // The exact config shape the scenario worker's data-prefetcher produces
-    // for a code-agent target — message mapped from the user turn, endpoint
-    // coordinates as static value mappings, credentials as project secrets.
+    // for a code-agent target.
     const agent = new SerializedCodeAgentAdapter(
       {
         type: "code",
         agentId: "agent_auth0_example",
         code: readFileSync(EXAMPLE_PATH, "utf8"),
-        inputs: [
-          { identifier: "message", type: "str" },
-          { identifier: "token_url", type: "str" },
-          { identifier: "audience", type: "str" },
-          { identifier: "api_url", type: "str" },
-        ],
+        // The conversation message is the agent's ONLY input; credentials and
+        // endpoint coordinates all ride the secrets namespace, so the whole
+        // configuration is expressible through Settings -> Secrets and the one
+        // mapping below is creatable in the editor UI today (static value
+        // mappings are not — langwatch/langwatch#6371).
+        inputs: [{ identifier: "message", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         scenarioMappings: {
           message: { type: "source", sourceId: "scenario", path: ["input"] },
-          token_url: { type: "value", value: tokenUrl },
-          audience: {
-            type: "value",
-            value: "https://api.acme-scenario.internal",
-          },
-          api_url: { type: "value", value: apiUrl },
         },
         scenarioOutputField: "output",
         secrets: {
           AUTH0_CLIENT_ID: "test-client-id",
           AUTH0_CLIENT_SECRET: CLIENT_SECRET,
+          AUTH0_TOKEN_URL: tokenUrl,
+          AUTH0_AUDIENCE: "https://api.acme-scenario.internal",
+          AUTH0_API_URL: apiUrl,
         },
       },
       NLP_SERVICE_URL,

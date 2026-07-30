@@ -19,11 +19,14 @@ A **custom code agent** closes that gap: a few lines of Python that fetch the to
 
 ## 1. Store the credentials as project secrets
 
-In **Settings → Secrets** (or via the CLI), create:
+In **Settings → Secrets** (or via the CLI), create the credentials **and** the endpoint coordinates — keeping the endpoints in secrets too means the whole agent is configurable without touching its code or any API:
 
 ```bash
 langwatch secret create AUTH0_CLIENT_ID --value "<your client id>"
 langwatch secret create AUTH0_CLIENT_SECRET --value "<your client secret>"
+langwatch secret create AUTH0_TOKEN_URL --value "https://your-tenant.us.auth0.com/oauth/token"
+langwatch secret create AUTH0_AUDIENCE --value "https://api.your-company.internal"
+langwatch secret create AUTH0_API_URL --value "https://api.your-company.internal/chat"
 ```
 
 Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted and never returned by any API.
@@ -41,15 +44,15 @@ import requests
 
 
 class Code:
-    def __call__(self, message: str, token_url: str, audience: str, api_url: str):
+    def __call__(self, message: str):
         # Step 1: exchange the client credentials for an access token.
         token_response = requests.post(
-            token_url,
+            secrets.AUTH0_TOKEN_URL,
             json={
                 "grant_type": "client_credentials",
                 "client_id": secrets.AUTH0_CLIENT_ID,
                 "client_secret": secrets.AUTH0_CLIENT_SECRET,
-                "audience": audience,
+                "audience": secrets.AUTH0_AUDIENCE,
             },
             timeout=10,
         )
@@ -58,7 +61,7 @@ class Code:
 
         # Step 2: call the protected API with the minted token.
         api_response = requests.post(
-            api_url,
+            secrets.AUTH0_API_URL,
             json={"message": message},
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=30,
@@ -77,24 +80,12 @@ Things the sandbox enforces, in the order people trip on them:
 - **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default) — keep explicit timeouts on both requests.
 - **Failure behavior**: `raise_for_status()` puts the URL and status code in the error — never the request body — so a rejected credential fails loudly without exposing the secret.
 
-## 3. Map the agent's inputs for scenarios
+## 3. Map the agent's input for scenarios
 
-For a scenario to drive this agent, its inputs need mappings: `message` comes from the conversation (`scenario` source, `input` path), while `token_url`, `audience`, and `api_url` are static values.
-
-```json
-{
-  "scenarioMappings": {
-    "message":   { "type": "source", "sourceId": "scenario", "path": ["input"] },
-    "token_url": { "type": "value", "value": "https://your-tenant.us.auth0.com/oauth/token" },
-    "audience":  { "type": "value", "value": "https://api.your-company.internal" },
-    "api_url":   { "type": "value", "value": "https://api.your-company.internal/chat" }
-  },
-  "scenarioOutputField": "output"
-}
-```
+Because everything else rides the secrets namespace, the agent has a **single input** — the conversation message — and needs exactly one mapping: `message` from the scenario's `input`. That mapping is creatable in the agent editor today.
 
 <Note>
-  Static value mappings currently have to be set through the agents API (`PATCH /api/agents/:id`, merging the block above into the agent's `config`) — the agent editor UI cannot create them yet. UI support is tracked in [#6371](https://github.com/langwatch/langwatch/issues/6371).
+  Keeping the endpoint coordinates in secrets is deliberate: the alternative — static `value` mappings on extra inputs — currently cannot be created from the editor UI, only via the agents API. UI support for static value mappings is tracked in [#6371](https://github.com/langwatch/langwatch/issues/6371).
 </Note>
 
 ## 4. Run a scenario against it

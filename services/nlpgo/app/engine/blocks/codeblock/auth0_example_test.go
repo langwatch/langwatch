@@ -100,16 +100,18 @@ func newAuth0Stubs(t *testing.T, clientSecret string) *auth0Stubs {
 func auth0Request(stubs *auth0Stubs, code, clientSecret string) codeblock.Request {
 	return codeblock.Request{
 		Code: code,
-		Inputs: map[string]any{
-			"message":   "ping",
-			"token_url": stubs.tokenServer.URL + "/oauth/token",
-			"audience":  "https://api.acme-scenario.internal",
-			"api_url":   stubs.apiServer.URL + "/chat",
-		},
+		// The conversation message is the agent's ONLY input; credentials
+		// and endpoint coordinates all ride the secrets namespace, so the
+		// whole configuration is expressible through Settings -> Secrets
+		// (no static value mappings — see langwatch/langwatch#6371).
+		Inputs:          map[string]any{"message": "ping"},
 		DeclaredOutputs: []string{"output"},
 		Secrets: map[string]string{
 			"AUTH0_CLIENT_ID":     "test-client-id",
 			"AUTH0_CLIENT_SECRET": clientSecret,
+			"AUTH0_TOKEN_URL":     stubs.tokenServer.URL + "/oauth/token",
+			"AUTH0_AUDIENCE":      "https://api.acme-scenario.internal",
+			"AUTH0_API_URL":       stubs.apiServer.URL + "/chat",
 		},
 	}
 }
