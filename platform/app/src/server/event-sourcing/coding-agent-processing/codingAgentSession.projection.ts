@@ -18,7 +18,7 @@ export { initCodingAgentSessionState };
 
 /**
  * DEPLOY-CRITICAL PIN. `coding_agent_sessions` has live rows stamped
- * `"2026-07-28"` (`event-sourcing.old/…/codingAgentSession.foldProjection.ts:80`).
+ * `"2026-07-28"`, the retired tree's `codingAgentSession.foldProjection` stamp.
  * This fold's state is now the SAME shape those rows were written in — the
  * identity-only redesign tried earlier in this conversion was reverted (see
  * the pipeline's report) — so the pin is honest: same generation, not a

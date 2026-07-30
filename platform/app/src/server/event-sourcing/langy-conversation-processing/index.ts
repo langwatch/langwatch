@@ -174,9 +174,9 @@ function assertMountIsLegal(projection: string, mount: Mount): Mount {
 /**
  * The worker-dispatch and title-generation effects a live process outbox
  * would call. Constructed outside this pipeline (ADR-105 decision 6) —
- * `event-sourcing.old`'s equivalent (`langyEffectPorts.ts`) mints session
- * keys, threads the handoff store and terminalizes a rejected turn, none of
- * which this declaration has anything to do it with.
+ * the retired tree's equivalent (`langyEffectPorts.ts`) minted session keys,
+ * threaded the handoff store and terminalized a rejected turn, none of which
+ * this declaration has anything to do with.
  */
 export interface LangyConversationEffects {
   readonly workerDispatch: {

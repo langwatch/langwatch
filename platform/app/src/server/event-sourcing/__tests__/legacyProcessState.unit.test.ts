@@ -7,7 +7,7 @@
  * not genesis, and wedges that instance rather than restarting it.
  *
  * These drive the real read-evolve-write cycle against rows shaped exactly as
- * `event-sourcing.old` wrote them. A schema that gains a required field, or
+ * the retired pipeline tree wrote them. A schema that gains a required field, or
  * renames one, fails here.
  */
 

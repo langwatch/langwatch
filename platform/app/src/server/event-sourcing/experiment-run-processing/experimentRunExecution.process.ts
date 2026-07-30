@@ -20,7 +20,7 @@ const logger = createLogger(
 
 /**
  * The `experimentRunExecution` process (ADR-073, ADR-103, restored from
- * `event-sourcing.old/pipelines/experiment-run-processing/process-manager/`
+ * the retired tree's experiment-run process manager
  * — the current draft mounted no process manager at all, so a stuck run never
  * reached a terminal state).
  *

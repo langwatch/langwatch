@@ -21,7 +21,7 @@ import { z } from "zod";
 /**
  * `prefix` + camelCase key derive `lw.langy_conversation.<snake_case>` byte-
  * equal to `LANGY_CONVERSATION_EVENT_TYPES` in `@langwatch/langy` — those
- * strings are `event-sourcing.old`'s live wire vocabulary and are not this
+ * strings are the durable wire vocabulary and are not this
  * pipeline's alone to move (see `packages/langy/src/constants.ts`).
  */
 export const LANGY_CONVERSATION_PIPELINE_NAME = "langy_conversation";

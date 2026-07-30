@@ -1,6 +1,10 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { clickhouseEventLog } from "@langwatch/clickhouse";
-import { memoryProcessStore, systemClock } from "@langwatch/event-sourcing";
+import {
+  createRegistry,
+  memoryProcessStore,
+  systemClock,
+} from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
 import { Redis as IORedisClient } from "ioredis";
 import { env } from "~/env.mjs";
@@ -827,8 +831,7 @@ export function initializeDefaultApp(options?: {
     },
     automations: {
       // `automation-dispatch.composition.ts` still builds the pre-rewrite
-      // `AutomationDispatchCollaborators` shape (and itself imports three
-      // deleted `event-sourcing.old` paths), so it cannot feed the new
+      // `AutomationDispatchCollaborators` shape, so it cannot feed the new
       // `TriggerDispatchPorts` / `GraphAlertSweepPorts` /
       // `WebhookDeliveryPrunePorts`. Safe no-op ports so the pipeline still
       // mounts — nothing here sends a real notification, sweeps a graph
@@ -871,9 +874,9 @@ export function initializeDefaultApp(options?: {
       isSaas: !!config.isSaas,
     },
     blobCleanup: {
-      // No sweep implementation exists yet — the old `BlobSweeper` lived in
-      // the deleted `event-sourcing.old` tree, and `@langwatch/groupqueue`
-      // doesn't expose an equivalent yet. Reports zero work rather than
+      // No sweep implementation exists yet — the old `BlobSweeper` went with
+      // the retired pipeline tree, and `@langwatch/groupqueue` doesn't expose
+      // an equivalent yet. Reports zero work rather than
       // fabricating a scan; a worker killed mid-flight still relies on the
       // queue's own lease expiry until this lands.
       sweep: async () => ({
@@ -914,9 +917,9 @@ export function initializeDefaultApp(options?: {
       prisma,
       effects: {
         // The real effects mint session keys, thread the handoff store and
-        // terminalize a rejected turn (`event-sourcing.old`'s
-        // `langyEffectPorts.ts`, which this pipeline's own docblock says not
-        // to reuse) — new business logic, not composition-root wiring. Noop
+        // terminalize a rejected turn (the retired tree's `langyEffectPorts`,
+        // which this pipeline's own docblock says not to reuse) — new business
+        // logic, not composition-root wiring. Noop
         // until a sibling builds the replacement.
         workerDispatch: { dispatchTurn: async () => undefined },
         titleGeneration: { generateTitle: async () => undefined },
@@ -939,6 +942,10 @@ export function initializeDefaultApp(options?: {
     trace: {
       summaryCache: foldCache("trace_summaries"),
       analyticsCache: foldCache("trace_analytics"),
+    },
+    enterprise: {
+      prisma,
+      runsWorkers: roleRunsWorkers(config.processRole),
     },
   });
   // Fail loud at boot on a genuine configuration error (an unresolvable
@@ -1213,14 +1220,14 @@ export function initializeDefaultApp(options?: {
     scheduler: new SchedulerOpsService(
       new PrismaScheduledJobRepository(prisma),
     ),
-    eventExplorer: new EventExplorerService(eventExplorerRepo),
-    // `ManagerExplorerService`'s own constructor type still imports a
-    // `ProcessStore` from the deleted `event-sourcing.old` tree, so this
-    // surface does not compile clean regardless of what is passed here —
-    // not fixable from this file. In-memory stand-in so the call site at
-    // least behaves like a real `ProcessStore` at runtime.
-    managerExplorer: new ManagerExplorerService(memoryProcessStore() as never),
-    replay: new ReplayService(replayRepo),
+    eventExplorer: new EventExplorerService(eventExplorerRepo, es.registry),
+    // The same durable store the engine folds through, so Ops reads the
+    // process state a worker actually wrote rather than a parallel copy.
+    managerExplorer: new ManagerExplorerService(esProcessStore, es.registry),
+    replay: new ReplayService(replayRepo, {
+      registry: es.registry,
+      replay: es.replay,
+    }),
     blobStore: new BlobStoreService(
       redis
         ? new BlobStoreRedisRepository(redis)
@@ -1322,6 +1329,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   // satisfies `AppCommands`'s mapped-command type, which always resolves a
   // `DispatchResult`.
   const noop = async () => ({ events: [] });
+  // The service-port sibling: a collaborator declared `Promise<void>` rejects
+  // the dispatch-shaped noop above, so the two cannot be one function.
+  const noopVoid = async (): Promise<void> => undefined;
+  // Empty by construction: this preset registers no pipeline, so every
+  // introspection read Ops performs correctly answers "nothing mounted".
+  const nullRegistry = createRegistry();
   // Clear the module-global discover broadcaster so a test app built
   // after `initializeDefaultApp` doesn't inherit the production
   // broadcaster's closure (which captured the production
@@ -1391,21 +1404,21 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         collection: traced(
           new TraceRequestCollectionService({
             dedup: createSpanDedupeService(null),
-            recordSpan: noop,
+            recordSpan: noopVoid,
           }),
           "TraceRequestCollectionService",
         ),
         logCollection: traced(
           new LogRequestCollectionService({
-            recordLogRecords: noop,
-            recordLogContributions: noop,
+            recordLogRecords: noopVoid,
+            recordLogContributions: noopVoid,
           }),
           "LogRequestCollectionService",
         ),
         metricCollection: traced(
           new MetricRequestCollectionService({
-            recordDataPoints: noop,
-            recordMetricCorrelations: noop,
+            recordDataPoints: noopVoid,
+            recordMetricCorrelations: noopVoid,
           }),
           "MetricRequestCollectionService",
         ),
@@ -1473,22 +1486,22 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     langy: {
       conversations: LangyConversationService.create(
         {
-          createConversation: noop,
-          forkConversation: noop,
-          recordMessage: noop,
-          importMessage: noop,
-          acceptAgentTurn: noop,
-          initiateToolCall: noop,
-          succeedToolCall: noop,
-          failToolCall: noop,
-          updatePlan: noop,
-          failAgentResponse: noop,
-          recordAgentResponse: noop,
-          archiveConversation: noop,
-          updateConversationMetadata: noop,
-          recordTurnHandoff: noop,
-          consumeTurnHandoff: noop,
-          generateConversationTitle: noop,
+          createConversation: noopVoid,
+          forkConversation: noopVoid,
+          recordMessage: noopVoid,
+          importMessage: noopVoid,
+          acceptAgentTurn: noopVoid,
+          initiateToolCall: noopVoid,
+          succeedToolCall: noopVoid,
+          failToolCall: noopVoid,
+          updatePlan: noopVoid,
+          failAgentResponse: noopVoid,
+          recordAgentResponse: noopVoid,
+          archiveConversation: noopVoid,
+          updateConversationMetadata: noopVoid,
+          recordTurnHandoff: noopVoid,
+          consumeTurnHandoff: noopVoid,
+          generateConversationTitle: noopVoid,
         },
         new NullLangyConversationRepository(),
       ),
@@ -1505,12 +1518,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           allowed: false,
           resetAt: 0,
         }),
-        releasePermit: noop,
+        releasePermit: noopVoid,
         perDayPrCap: 0,
         mintSessionKey: async () => {
           throw new Error("no session-key mint in test app");
         },
-        revokeSessionKey: noop,
+        revokeSessionKey: noopVoid,
         admission: new NullLangyTurnAdmissionRepository(),
         accessStore: null,
         handoffStore: null,
@@ -1550,11 +1563,16 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       scheduler: new SchedulerOpsService(new NullScheduledJobRepository()),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
+        nullRegistry,
       ),
       managerExplorer: new ManagerExplorerService(
-        memoryProcessStore() as never,
+        memoryProcessStore(),
+        nullRegistry,
       ),
-      replay: new ReplayService(new NullReplayRepository()),
+      replay: new ReplayService(new NullReplayRepository(), {
+        registry: nullRegistry,
+        replay: async () => ({ events: 0, applied: 0, skippedByVersion: 0 }),
+      }),
       blobStore: new BlobStoreService(new NullBlobStoreRepository()),
       metricsCollector: null,
     },

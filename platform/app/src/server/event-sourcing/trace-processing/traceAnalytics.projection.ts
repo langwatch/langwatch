@@ -41,7 +41,7 @@ import type { TraceAnalyticsRow, traceAnalyticsTable } from "./table";
 
 /**
  * Pinned to the version already stamped on every live `trace_analytics` row
- * (`event-sourcing.old/pipelines/trace-processing/projections/traceAnalytics.foldProjection.ts`'s
+ * (the retired tree's `traceAnalytics.foldProjection`,
  * `TRACE_ANALYTICS_PROJECTION_VERSION_LATEST`), per ADR-105 decision 9.
  */
 export const TRACE_ANALYTICS_STATE_VERSION = "2026-07-29";

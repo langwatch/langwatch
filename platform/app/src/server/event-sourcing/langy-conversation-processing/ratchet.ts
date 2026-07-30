@@ -16,7 +16,7 @@ import {
  * unconditionally. A string remembered here but no longer declared means
  * every stored event carrying it just lost its route back into state
  * (ADR-105 decision 10). These are byte-equal to `LANGY_CONVERSATION_EVENT_TYPES`
- * in `@langwatch/langy` — `event-sourcing.old`'s live wire vocabulary.
+ * in `@langwatch/langy` — the durable wire vocabulary.
  */
 export const LANGY_CONVERSATION_PROCESSING_TYPE_STRING_SNAPSHOT: TypeStringSnapshot =
   {

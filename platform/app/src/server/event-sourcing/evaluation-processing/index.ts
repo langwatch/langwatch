@@ -42,7 +42,7 @@ import {
 
 /**
  * `evaluation_analytics`'s live stamp, carried over from
- * `event-sourcing.old`'s `EvaluationAnalyticsFoldProjection` (still what
+ * the retired tree's `EvaluationAnalyticsFoldProjection` (still what
  * production writes today). Pinned per ADR-105 decision 9 — deriving a fresh
  * hash here would fail the version gate on every row already stored.
  */

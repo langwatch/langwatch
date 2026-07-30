@@ -3,7 +3,7 @@ import type {
   SpanTreeNode,
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
-import type { DerivedTraceEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { DerivedTraceEvent } from "~/server/app-layer/traces/trace-event";
 import { formatCost, formatDuration } from "../../../utils/formatters";
 import type { MarkdownConfig } from "./types";
 

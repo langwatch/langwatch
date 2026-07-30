@@ -37,7 +37,7 @@ function targetResult(
 
 describe("experimentRunState fold", () => {
   /** @scenario "The deployed stamp is pinned, not derived" */
-  it("pins the deployed stamp from event-sourcing.old's EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE", () => {
+  it("pins the deployed stamp from EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE", () => {
     expect(EXPERIMENT_RUN_STATE_VERSION_PIN).toBe("2025-02-01");
   });
 

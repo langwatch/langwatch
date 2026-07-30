@@ -1,3 +1,7 @@
+import {
+  createNoopEnterprisePipelineCommands,
+  registerEnterprisePipelineSet,
+} from "@ee/event-sourcing/pipelineSet";
 import type { ClickHouseClient } from "@langwatch/clickhouse";
 import {
   type BuiltCommand,
@@ -9,11 +13,12 @@ import {
   createRegistry,
   createReplay,
   type DispatchResult,
+  type EventSchemaMap,
   type Metrics,
   type Registry,
-  type z,
 } from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
+import type { z } from "zod";
 import { createAutomationsPipeline } from "./automations";
 import { createBillingReportingPipeline } from "./billing-reporting";
 import { createBlobCleanupMount } from "./blob-maintenance";
@@ -93,6 +98,11 @@ export interface EventSourcingRegistryDeps {
     Parameters<typeof createTraceProcessingPipeline>[0],
     "client" | "metrics"
   >;
+  /** Absent mounts no enterprise pipeline and answers its commands with noops. */
+  readonly enterprise?: Omit<
+    Parameters<typeof registerEnterprisePipelineSet>[0],
+    "metrics" | "service"
+  >;
 }
 
 type MappedCommand<Input extends z.ZodTypeAny> = (
@@ -100,8 +110,12 @@ type MappedCommand<Input extends z.ZodTypeAny> = (
   ctx: { readonly tenantId: string },
 ) => Promise<DispatchResult>;
 
-type MapCommands<T extends Record<string, BuiltCommand<never, never>>> = {
-  [K in keyof T]: T[K] extends BuiltCommand<never, infer Input>
+type AnyCommands = Readonly<
+  Record<string, BuiltCommand<EventSchemaMap, z.ZodTypeAny>>
+>;
+
+type MapCommands<T extends AnyCommands> = {
+  [K in keyof T]: T[K] extends BuiltCommand<EventSchemaMap, infer Input>
     ? MappedCommand<Input>
     : never;
 };
@@ -109,7 +123,7 @@ type MapCommands<T extends Record<string, BuiltCommand<never, never>>> = {
 /** Every dispatch goes through the shared `CommandClient` — never straight to
  * `pipeline.commands[name].handle` — so a mapped command still reaches the
  * event log and stages a job per subscriber, exactly like any other caller. */
-function mapCommands<T extends Record<string, BuiltCommand<never, never>>>(
+function mapCommands<T extends AnyCommands>(
   client: CommandClient,
   commands: T,
 ): MapCommands<T> {
@@ -257,6 +271,14 @@ export function createEventSourcingRegistry(deps: EventSourcingRegistryDeps) {
   });
   service.register(trace);
 
+  const enterprise = deps.enterprise
+    ? registerEnterprisePipelineSet({
+        ...deps.enterprise,
+        metrics: deps.metrics,
+        service,
+      })
+    : { commands: createNoopEnterprisePipelineCommands() };
+
   // Scheduled maintenance: `ScheduledTickMount`, not `BuiltPipeline` — no
   // aggregate, no events, no lane, so nothing here calls `service.register`.
   // Construction is unconditional like every other member; only the interval
@@ -297,19 +319,7 @@ export function createEventSourcingRegistry(deps: EventSourcingRegistryDeps) {
     simulations: mapCommands(service.commands, simulation.commands),
     topicClustering: mapCommands(service.commands, topicClustering.commands),
     traces: mapCommands(service.commands, trace.commands),
-    // The EE pipeline set still targets the retired `EventSourcing` class,
-    // and even importing its noop helper eagerly pulls in
-    // `ee/event-sourcing/pipelines/ingestion-pull-processing`, which itself
-    // imports a deleted `event-sourcing.old` path — so the module fails to
-    // load at all, not just the one function this file would otherwise use.
-    // Inlined rather than imported until EE ports its pipeline off the
-    // retired builder; the shape matches `createNoopEnterprisePipelineCommands()`.
-    ingestionPull: {
-      configure: async () => undefined,
-      disable: async () => undefined,
-      recordRunCompleted: async () => undefined,
-      recordRunFailed: async () => undefined,
-    },
+    ...enterprise.commands,
   };
 
   let consumingStarted = false;

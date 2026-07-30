@@ -96,7 +96,7 @@ describe("langy-conversation-processing composition", () => {
     }
   });
 
-  it("gives the process manager the eight events event-sourcing.old wires it to", () => {
+  it("gives the process manager the eight events the retired tree wired it to", () => {
     const pipeline = build();
 
     expect(

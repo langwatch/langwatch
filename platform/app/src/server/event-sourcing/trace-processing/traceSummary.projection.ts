@@ -51,7 +51,7 @@ import type { TraceSummariesRow, traceSummariesTable } from "./table";
 
 /**
  * Pinned to the version already stamped on every live `trace_summaries` row
- * (`event-sourcing.old/pipelines/trace-processing/schemas/constants.ts`'s
+ * (the retired tree's trace-processing constants,
  * `TRACE_SUMMARY_PROJECTION_VERSION_LATEST`), per ADR-105 decision 9 — an
  * unpinned derived hash would fail every row's version gate on deploy.
  */

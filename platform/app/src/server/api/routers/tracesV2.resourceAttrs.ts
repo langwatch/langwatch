@@ -1,4 +1,4 @@
-import { NON_BILLABLE_ATTR } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/span-cost.service";
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 
 /**
  * Internal cost-classification markers the receiver stamps on a span's
@@ -7,7 +7,7 @@ import { NON_BILLABLE_ATTR } from "~/server/event-sourcing.old/pipelines/trace-p
  * as real amounts), so they are filtered out of the drawer's resource view.
  */
 export const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([
-  NON_BILLABLE_ATTR,
+  ATTR_KEYS.LANGWATCH_COST_NON_BILLABLE,
 ]);
 
 export function withoutHiddenResourceAttrs(

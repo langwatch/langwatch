@@ -148,7 +148,7 @@ function turnHandler<Type extends LangyConversationTurnEvent["type"]>(
 }
 
 /** Every event the spine fold reacts to, except `planUpdated` — a turn-only
- *  concern the spine never read even in `event-sourcing.old`. */
+ *  concern the spine never read even in the retired tree. */
 export const applyLangyConversationSpineEvent = {
   conversationStarted: spineHandler(
     LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
@@ -192,7 +192,7 @@ export const applyLangyConversationSpineEvent = {
 };
 
 /** The seven events the per-turn render document folds — identical to
- *  `event-sourcing.old`'s `LangyConversationTurnFoldProjection`. */
+ *  the retired tree's `LangyConversationTurnFoldProjection`. */
 export const applyLangyConversationTurnEvent = {
   agentTurnAccepted: turnHandler(
     LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,

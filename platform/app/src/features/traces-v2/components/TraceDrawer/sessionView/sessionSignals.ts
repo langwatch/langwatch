@@ -1,4 +1,9 @@
-import type { CodingAgentSessionRow } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import type { RouterOutputs } from "~/utils/api";
+
+/** The folded session row as the Session tab receives it over tRPC. */
+export type CodingAgentSessionRow = NonNullable<
+  RouterOutputs["tracesV2"]["codingAgentSession"]
+>;
 
 /**
  * What's worth NOTICING about a coding-agent session.

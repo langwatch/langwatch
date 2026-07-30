@@ -12,34 +12,20 @@
  * DURABLE event type identifiers — written to `event_log` and consumed by the
  * fold / map projections. Format: "lw.langy_conversation.<action>".
  *
- * NOT renamed to ADR-105's `${aggregateName}/${key}` format, even though the
- * new `src/server/event-sourcing/langy-conversation-processing/` pipeline
- * (ADR-098/105 greenfield rewrite) declares its OWN aggregate via
- * `defineAggregate("langy_conversation")`, whose derived event type strings
- * ARE in that new format. Unlike `log-processing`'s equivalent cutover — the
- * precedent for accepting a new wire format on a greenfield rewrite — these
- * values are not this pipeline's alone to move: `event-sourcing.old/pipelines/
- * langy-conversation-processing/` is STILL the live, registered pipeline
- * (`event-sourcing.old/pipelineRegistry.ts` still imports and wires
- * `createLangyConversationProcessingPipeline`), and it reads these SAME
- * constants for both the events it writes and the ones its fold projections
- * switch on. Changing the values here would silently change what that live
- * pipeline persists to `event_log` today — a production behaviour change with
- * no relationship to this rewrite's actual scope. It is also the browser's
- * wire vocabulary (`turnWire.ts`, the panel, the CLI), a second independent
- * reason not to move it as a side effect of one pipeline's internal rewrite.
+ * NOT renamed to ADR-105's `${aggregateName}/${key}` format, even though
+ * `src/server/event-sourcing/langy-conversation-processing/` declares its OWN
+ * aggregate via `defineAggregate("langy_conversation")`, whose derived event
+ * type strings ARE in that new format. These values are already durable:
+ * `event_log` holds rows stamped with them, so moving them would orphan
+ * history. They are also the browser's wire vocabulary (`turnWire.ts`, the
+ * panel, the CLI), a second independent reason not to move them as a side
+ * effect of one pipeline's internal rewrite.
  *
- * The new pipeline's aggregate keeps its own, structurally different,
+ * The pipeline's aggregate keeps its own, structurally different,
  * `langy_conversation/<camelCaseKey>` event-log identity for the rows IT
  * writes, and translates between the two formats at the seam where it wires
- * the fold functions below — see
- * `src/server/event-sourcing/langy-conversation-processing/eventTypeTranslation.ts`.
- * That keeps this file, and everything it feeds (`folds/*.ts`, the browser),
- * completely unchanged by the rewrite: same values, same behaviour, only the
- * two audited defects fixed in `folds/conversationFold.ts` and
- * `folds/turnFold.ts`. Unifying the two formats is a whole-system cutover
- * decision (retiring `.old` and moving the wire format with it), not
- * something one pipeline's rewrite should force silently.
+ * the fold functions below. Unifying the two formats is a whole-system
+ * cutover with a backfill, not something one pipeline forces silently.
  */
 export const LANGY_CONVERSATION_EVENT_TYPES = {
   CONVERSATION_STARTED: "lw.langy_conversation.conversation_started",

@@ -60,6 +60,7 @@ function testDeps(): EventSourcingRegistryDeps {
         writeIntent: async () => undefined,
         confirm: async () => undefined,
         clearPendingAndIncrementFailures: async () => undefined,
+        incrementFailures: async () => undefined,
       },
       getUsageReportingService: () => undefined,
       queryBillableEventsTotal: async () => 0,
@@ -86,7 +87,7 @@ function testDeps(): EventSourcingRegistryDeps {
         spanStorage: { getSpansByTraceId: async () => [] },
         traceEvents: { getEventsByTraceId: async () => [] },
         evaluationExecution: {} as never,
-        costRecorder: { recordCost: async () => undefined },
+        costRecorder: { recordCost: async () => "cost-1" },
       },
     },
     experimentRun: {

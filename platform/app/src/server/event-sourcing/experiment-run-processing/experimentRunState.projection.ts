@@ -6,7 +6,7 @@ import type {
 } from "./schema";
 
 /**
- * The deployed stamp from `event-sourcing.old/pipelines/experiment-run-processing/schemas/constants.ts`
+ * The deployed stamp from the retired tree's experiment-run constants
  * (`EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE`). The stored `experiment_runs`
  * row already carries every field this thinner state still reads — the eleven
  * counter columns ADR-103 decision 1 retires are simply no longer read — so a

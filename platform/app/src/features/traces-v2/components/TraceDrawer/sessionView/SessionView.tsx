@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { formatCost } from "../../../utils/formatters";
 import {
   type ContextHealthTone,
@@ -11,6 +10,7 @@ import {
   contextWindowCeiling,
 } from "./contextHealth";
 import {
+  type CodingAgentSessionRow,
   deriveSessionSignals,
   formatCompact,
   formatShortDuration,

@@ -84,9 +84,9 @@ export type { ProjectedTopic, TopicModelView } from "./projections/topicModel";
 export { deriveTopicModelView } from "./projections/topicModel";
 
 /**
- * The deployed stamps from `event-sourcing.old/pipelines/topic-clustering-processing/schemas/constants.ts`'s
- * `TOPIC_CLUSTERING_PROJECTION_VERSIONS`. `.old` kept these three read models
- * in Postgres; wiring them to ClickHouse here is a storage-backend change this
+ * The deployed stamps from the retired tree's topic-clustering constants,
+ * `TOPIC_CLUSTERING_PROJECTION_VERSIONS`. That tree kept these three read
+ * models in Postgres; wiring them to ClickHouse here is a storage change this
  * conversion does not resolve — the pin travels with the fold regardless, so
  * a later migration that copies rows across storage keeps the same version
  * identity rather than inventing a new one.
