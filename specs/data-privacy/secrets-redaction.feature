@@ -54,36 +54,45 @@ Feature: Redacting secrets from traces
     When an admin tries to save a custom secret pattern that is a catastrophic-backtracking regex
     Then the request is rejected with a validation error
 
-  # The OTLP receiver stamps ingestion-key traces with provenance attributes,
-  # among them the opaque id of the ingestion key row, never the key material,
-  # overwriting anything the client sent under that name. That id lives under
-  # "langwatch.ingest_key_id", a name chosen to clear two separate filters it
-  # would otherwise die in. It is not "langwatch.api_key.id", which the
-  # sensitive-attribute-name deny-list nukes on "api_key". It is also not under
-  # "langwatch.reserved.", which the ingestion pipeline strips wholesale and the
-  # facet list hides. So the stamped id stays readable with no exemption carved
-  # into either filter. This also means "langwatch.api_key.id" itself carries no
-  # receiver-stamped guarantee and is fully covered by the deny-list for
-  # anything a client sends under that name, ingestion traffic or not.
-  @integration
-  Scenario: The receiver-stamped ingestion key id stays readable
-    When a trace is ingested with a resource attribute "langwatch.ingest_key_id" carrying an opaque key id
-    Then the stored "langwatch.ingest_key_id" attribute still contains the key id
-
-  @integration
-  Scenario: Real key material under the ingestion key id attribute is still redacted
-    When a trace is ingested with a resource attribute "langwatch.ingest_key_id" carrying an "sk-lw-" API key
-    Then the stored "langwatch.ingest_key_id" attribute is redacted
-
-  # A name under "langwatch.reserved." would be dropped by recordSpanCommand
-  # before it ever reached storage, turning a redacted-but-present id into a
-  # missing one and logging a warning on every ingest-key trace.
+  # "langwatch.api_key.id" carries the id of the ApiKey row that authenticated
+  # the request, never the key material. The sensitive-attribute-NAME deny-list
+  # matches "api_key" and was nuking it to [SECRET], hiding the one field that
+  # says which key produced a trace, so that exact name is exempt from the name
+  # rule.
+  #
+  # An attribute name is caller-supplied, so an exemption on its own would be a
+  # free slot to park a real secret in. What makes it safe is that the value can
+  # never come from the payload: every authenticated OTLP request has the
+  # attribute rewritten from the authenticated identity, with any payload copy
+  # dropped first at resource, span, event and link level. No other ingestion
+  # path can even produce this attribute name, because they build attributes
+  # from a fixed key set. So at redaction time the value is receiver-written or
+  # absent, and the exemption is safe by construction rather than by trust.
   @unit
-  Scenario: Receiver-stamped ingestion key id survives the reserved strip
-    When the receiver has stamped ingest-key provenance onto a span's resource
-    Then every stamped provenance attribute is still on the span the pipeline emits
+  Scenario: A caller cannot forge the API key id attribute
+    Given a trace whose payload sets "langwatch.api_key.id" to a value of its own choosing
+    When the request authenticates as an ordinary project API key
+    Then the stored attribute holds the id of the key that authenticated, not the submitted value
+
+  @unit
+  Scenario: Legacy project key auth leaves no API key id behind
+    Given a trace whose payload sets "langwatch.api_key.id" to a value of its own choosing
+    When the request authenticates as a legacy project key, which has no ApiKey row
+    Then the submitted value is dropped and no API key id attribute is stored
 
   @integration
-  Scenario: A non-ingestion trace can never retain an arbitrary value under the old key id attribute name
-    When a trace is ingested with a resource attribute "langwatch.api_key.id" carrying an arbitrary value
+  Scenario: The receiver-written API key id stays readable
+    When a trace is ingested with a resource attribute "langwatch.api_key.id" carrying an opaque key id
+    Then the stored "langwatch.api_key.id" attribute still contains the key id
+
+  @integration
+  Scenario: Real key material under the API key id attribute is still redacted
+    When a trace is ingested with a resource attribute "langwatch.api_key.id" carrying an "sk-lw-" API key
     Then the stored "langwatch.api_key.id" attribute is redacted
+
+  # The pipeline strips whole attribute namespaces, so a provenance name that
+  # lands in one is deleted between the receiver writing it and storage.
+  @unit
+  Scenario: The receiver-written API key id survives the ingestion pipeline
+    When the receiver has written ingest provenance onto a span's resource
+    Then the API key id is still on the span the pipeline emits

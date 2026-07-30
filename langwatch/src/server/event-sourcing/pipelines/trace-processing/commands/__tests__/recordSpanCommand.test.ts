@@ -1,4 +1,5 @@
 import {
+  enforceApiKeyIdOnTraceRequest,
   PROVENANCE_ATTR_API_KEY_ID,
   stampIngestKeyProvenanceOnTraceRequest,
 } from "@ee/governance/services/ingestKeyProvenance.utils";
@@ -387,9 +388,12 @@ describe("RecordSpanCommand", () => {
       });
     });
 
-    describe("when the receiver has stamped ingest-key provenance", () => {
-      /** @scenario Receiver-stamped ingestion key id survives the reserved strip */
-      it("keeps every stamped provenance attribute on the emitted resource", async () => {
+    describe("when the receiver has written ingest provenance", () => {
+      // The receiver's output has to survive this handler intact. Both halves
+      // have been broken here before: the handler strips whole attribute
+      // namespaces, so a provenance name that lands in one is deleted between
+      // the receiver writing it and the span being stored.
+      async function emittedResourceAfterReceiver(apiKeyId: string | null) {
         const command = createMockCommand("project-123", "trace-1", "span-1");
         const request = {
           resourceSpans: [{ resource: command.data.resource }],
@@ -399,15 +403,36 @@ describe("RecordSpanCommand", () => {
           sourceType: "claude_code",
           organizationId: "org_1",
         });
+        enforceApiKeyIdOnTraceRequest(request, apiKeyId);
         command.data.resource = request.resourceSpans[0]!.resource;
 
         const events = await handler.handle(command);
+        return events[0]!.data.resource!.attributes;
+      }
 
-        const emitted = events[0]!.data.resource!.attributes;
+      /** @scenario The receiver-written API key id survives the ingestion pipeline */
+      it("keeps the API key id on the emitted resource", async () => {
+        const emitted = await emittedResourceAfterReceiver("key_abc");
+
         const stampedId = emitted.find(
           (a) => a.key === PROVENANCE_ATTR_API_KEY_ID,
         );
         expect(stampedId?.value.stringValue).toBe("key_abc");
+      });
+
+      it("keeps the ingest-key provenance attributes alongside it", async () => {
+        const emitted = await emittedResourceAfterReceiver("key_abc");
+
+        const source = emitted.find((a) => a.key === "langwatch.source");
+        expect(source?.value.stringValue).toBe("claude_code");
+      });
+
+      it("emits no API key id when the request had no ApiKey row", async () => {
+        const emitted = await emittedResourceAfterReceiver(null);
+
+        expect(emitted.some((a) => a.key === PROVENANCE_ATTR_API_KEY_ID)).toBe(
+          false,
+        );
       });
     });
 

@@ -9,15 +9,6 @@
  * never forge a different source / key / org identity onto its own traces:
  *
  *   - langwatch.source         (ingestSourceType — drives the /me/traces filter)
- *   - langwatch.ingest_key_id   (the ingestion key id. Deliberately NOT
- *                               `langwatch.api_key.id`, which the redaction
- *                               secret-name deny-list matches on `api_key` and
- *                               replaces with [SECRET] (see
- *                               applyContentRedaction.ts), and deliberately NOT
- *                               under `langwatch.reserved.`, which
- *                               recordSpanCommand strips wholesale. This name
- *                               matches neither, so it survives ingestion and
- *                               stays readable with no special case in either.)
  *   - langwatch.origin          ("coding_agent" for a CLI coding assistant,
  *                               "ai_tool" for any other ingest source) —
  *                               discriminator the governance content-strip /
@@ -26,6 +17,13 @@
  *   - langwatch.organization_id (feeds the no-spy policy org lookup)
  *   - langwatch.template.id     (only when the key carries an ingestionTemplateId,
  *                               e.g. claude_cowork)
+ *
+ * `langwatch.api_key.id` is handled separately, by
+ * {@link enforceApiKeyIdOnTraceRequest} and its log / metric siblings, because
+ * it is NOT conditional on the key being an ingestion key. Every authenticated
+ * OTLP request gets that attribute rewritten from the authenticated identity,
+ * which is what makes the redaction deny-list exemption on that exact name safe
+ * (see applyContentRedaction.ts).
  */
 
 export interface IngestKeyProvenance {
@@ -47,7 +45,11 @@ export interface IngestKeyProvenance {
 }
 
 export const PROVENANCE_ATTR_SOURCE = "langwatch.source" as const;
-export const PROVENANCE_ATTR_API_KEY_ID = "langwatch.ingest_key_id" as const;
+/**
+ * Id of the ApiKey row that authenticated the request. Receiver-written on
+ * every authenticated OTLP request, never trusted from the payload.
+ */
+export const PROVENANCE_ATTR_API_KEY_ID = "langwatch.api_key.id" as const;
 export const PROVENANCE_ATTR_ORIGIN = "langwatch.origin" as const;
 export const PROVENANCE_ATTR_ORGANIZATION_ID =
   "langwatch.organization_id" as const;
@@ -107,11 +109,29 @@ type OtlpAttribute = {
   value: { stringValue?: string | null } & Record<string, unknown>;
 };
 type OtlpResource = { attributes?: OtlpAttribute[] | null };
-type OtlpResourceSpans = { resource?: OtlpResource | null };
+type OtlpAttributeHolder = { attributes?: OtlpAttribute[] | null };
+type OtlpSpanLike = OtlpAttributeHolder & {
+  events?: OtlpAttributeHolder[] | null;
+  links?: OtlpAttributeHolder[] | null;
+};
+type OtlpScopeSpans = { spans?: OtlpSpanLike[] | null };
+type OtlpResourceSpans = {
+  resource?: OtlpResource | null;
+  scopeSpans?: OtlpScopeSpans[] | null;
+};
 type OtlpTraceRequest = { resourceSpans?: OtlpResourceSpans[] | null };
-type OtlpResourceLogs = { resource?: OtlpResource | null };
+type OtlpScopeLogs = { logRecords?: OtlpAttributeHolder[] | null };
+type OtlpResourceLogs = {
+  resource?: OtlpResource | null;
+  scopeLogs?: OtlpScopeLogs[] | null;
+};
 type OtlpLogRequest = { resourceLogs?: OtlpResourceLogs[] | null };
-type OtlpResourceMetrics = { resource?: OtlpResource | null };
+type OtlpMetricLike = OtlpAttributeHolder;
+type OtlpScopeMetrics = { metrics?: OtlpMetricLike[] | null };
+type OtlpResourceMetrics = {
+  resource?: OtlpResource | null;
+  scopeMetrics?: OtlpScopeMetrics[] | null;
+};
 type OtlpMetricRequest = { resourceMetrics?: OtlpResourceMetrics[] | null };
 
 export function stampIngestKeyProvenanceOnTraceRequest(
@@ -171,10 +191,6 @@ function buildProvenanceAttributes(
       value: { stringValue: provenance.sourceType },
     },
     {
-      key: PROVENANCE_ATTR_API_KEY_ID,
-      value: { stringValue: provenance.apiKeyId },
-    },
-    {
       key: PROVENANCE_ATTR_ORIGIN,
       value: { stringValue: originForIngestSourceType(provenance.sourceType) },
     },
@@ -200,4 +216,108 @@ function buildProvenanceAttributes(
 
 function stripProvenanceKeys(attrs: OtlpAttribute[]): OtlpAttribute[] {
   return attrs.filter((a) => !PROVENANCE_KEYS.includes(a.key));
+}
+
+/**
+ * Rewrite `langwatch.api_key.id` from the authenticated identity, on every
+ * authenticated OTLP request rather than only on ingest-key traffic.
+ *
+ * THIS IS A SECURITY INVARIANT, not a convenience. `redactAttributeNative`
+ * exempts this exact name from the sensitive-attribute-NAME deny-list so the id
+ * stays readable instead of rendering as [SECRET]. That exemption is only sound
+ * while the stored value cannot come from the payload: an attribute name is
+ * caller-supplied, so a name the deny-list skips would otherwise be a free slot
+ * to park a real secret in and have it stored verbatim.
+ *
+ * So the rule here is total, and deliberately has no "authenticated enough"
+ * branch:
+ *
+ *   - Any payload-supplied copy of the attribute is dropped first, at every
+ *     level a caller can reach: resource, span, span event and span link. It is
+ *     resource-level provenance, so a span-level copy is never legitimate.
+ *   - When the request authenticated as an ApiKey, the true row id is written
+ *     onto each resource.
+ *   - When it authenticated as a legacy project key there IS no ApiKey row, so
+ *     nothing is written and the attribute simply stays absent. Absent is a
+ *     correct answer; a caller-supplied value is not.
+ *
+ * Only the OTLP receivers need this. Every other ingestion path builds span
+ * attributes from a fixed key set (the REST collector maps known fields through
+ * `ATTR_KEYS`, and custom metadata lands namespaced under
+ * `langwatch.metadata.*`), so no caller can produce this attribute name there.
+ */
+export function enforceApiKeyIdOnTraceRequest(
+  request: OtlpTraceRequest,
+  apiKeyId: string | null,
+): number {
+  let applied = 0;
+  for (const rs of request.resourceSpans ?? []) {
+    for (const ss of rs.scopeSpans ?? []) {
+      for (const span of ss.spans ?? []) {
+        dropApiKeyIdFromSpan(span);
+      }
+    }
+    applied += writeApiKeyIdOnResource(rs, apiKeyId);
+  }
+  return applied;
+}
+
+export function enforceApiKeyIdOnLogRequest(
+  request: OtlpLogRequest,
+  apiKeyId: string | null,
+): number {
+  let applied = 0;
+  for (const rl of request.resourceLogs ?? []) {
+    for (const sl of rl.scopeLogs ?? []) {
+      for (const record of sl.logRecords ?? []) {
+        dropApiKeyId(record);
+      }
+    }
+    applied += writeApiKeyIdOnResource(rl, apiKeyId);
+  }
+  return applied;
+}
+
+export function enforceApiKeyIdOnMetricRequest(
+  request: OtlpMetricRequest,
+  apiKeyId: string | null,
+): number {
+  let applied = 0;
+  for (const rm of request.resourceMetrics ?? []) {
+    for (const sm of rm.scopeMetrics ?? []) {
+      for (const metric of sm.metrics ?? []) {
+        dropApiKeyId(metric);
+      }
+    }
+    applied += writeApiKeyIdOnResource(rm, apiKeyId);
+  }
+  return applied;
+}
+
+function writeApiKeyIdOnResource(
+  holder: { resource?: OtlpResource | null },
+  apiKeyId: string | null,
+): number {
+  if (!holder.resource) holder.resource = { attributes: [] };
+  if (!holder.resource.attributes) holder.resource.attributes = [];
+  dropApiKeyId(holder.resource);
+  if (apiKeyId === null) return 0;
+  holder.resource.attributes.push({
+    key: PROVENANCE_ATTR_API_KEY_ID,
+    value: { stringValue: apiKeyId },
+  });
+  return 1;
+}
+
+function dropApiKeyId(holder: OtlpAttributeHolder): void {
+  if (!holder.attributes) return;
+  holder.attributes = holder.attributes.filter(
+    (a) => a.key !== PROVENANCE_ATTR_API_KEY_ID,
+  );
+}
+
+function dropApiKeyIdFromSpan(span: OtlpSpanLike): void {
+  dropApiKeyId(span);
+  for (const event of span.events ?? []) dropApiKeyId(event);
+  for (const link of span.links ?? []) dropApiKeyId(link);
 }

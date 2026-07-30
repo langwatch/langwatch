@@ -517,41 +517,43 @@ describe("OtlpSpanPiiRedactionService PII exception patterns", () => {
   });
 });
 
-describe("OtlpSpanPiiRedactionService ingestion key id attribute", () => {
-  /** @scenario The receiver-stamped ingestion key id stays readable */
-  it("keeps the receiver-stamped key id readable", async () => {
+describe("OtlpSpanPiiRedactionService api key id attribute", () => {
+  /** @scenario The receiver-written API key id stays readable */
+  it("keeps the receiver-written key id readable", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({
-      "langwatch.ingest_key_id": "key_abc123def456",
+      "langwatch.api_key.id": "key_abc123def456",
     });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.ingest_key_id")).toBe("key_abc123def456");
+    expect(attr(span, "langwatch.api_key.id")).toBe("key_abc123def456");
   });
 
-  /** @scenario Real key material under the ingestion key id attribute is still redacted */
+  /** @scenario Real key material under the API key id attribute is still redacted */
   it("scrubs actual key material under that attribute name", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({
-      "langwatch.ingest_key_id": "sk-lw-" + "a".repeat(40),
+      "langwatch.api_key.id": "sk-lw-" + "a".repeat(40),
     });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.ingest_key_id")).toContain("[SECRET]");
-    expect(attr(span, "langwatch.ingest_key_id")).not.toContain("sk-lw-");
+    expect(attr(span, "langwatch.api_key.id")).toContain("[SECRET]");
+    expect(attr(span, "langwatch.api_key.id")).not.toContain("sk-lw-");
   });
 
-  /** @scenario A non-ingestion trace can never retain an arbitrary value under the old key id attribute name */
-  it("still nukes an arbitrary value under the old langwatch.api_key.id name", async () => {
-    const { service } = makeService(mkPolicy({}));
-    const span = spanWith({ "langwatch.api_key.id": "plain text value" });
-    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
-    expect(attr(span, "langwatch.api_key.id")).toBe("[SECRET]");
-  });
-
+  // The exemption is scoped to this exact name. Everything else the
+  // sensitive-name rule covers keeps being nuked, including neighbouring
+  // api_key-shaped names that carry no receiver guarantee.
   it("still nukes other api_key-named attributes by name", async () => {
     const { service } = makeService(mkPolicy({}));
     const span = spanWith({ "user.api_key": "plain text value" });
     await service.redactSpan(span, null, "ESSENTIAL", TENANT);
     expect(attr(span, "user.api_key")).toBe("[SECRET]");
+  });
+
+  it("nukes a near-miss name that only looks like the exempt one", async () => {
+    const { service } = makeService(mkPolicy({}));
+    const span = spanWith({ "langwatch.api_key.id.extra": "plain text value" });
+    await service.redactSpan(span, null, "ESSENTIAL", TENANT);
+    expect(attr(span, "langwatch.api_key.id.extra")).toBe("[SECRET]");
   });
 });
 

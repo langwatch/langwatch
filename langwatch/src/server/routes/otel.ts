@@ -9,6 +9,9 @@
 
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import {
+  enforceApiKeyIdOnLogRequest,
+  enforceApiKeyIdOnMetricRequest,
+  enforceApiKeyIdOnTraceRequest,
   stampIngestKeyProvenanceOnLogRequest,
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
@@ -367,11 +370,22 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
+      // Receiver-authoritative `langwatch.api_key.id`, for EVERY authenticated
+      // request rather than only ingest-key traffic. Redaction exempts this
+      // attribute name from the secret-name deny-list, which is only sound
+      // while the value cannot come from the payload. See
+      // enforceApiKeyIdOnTraceRequest.
+      enforceApiKeyIdOnTraceRequest(
+        traceRequest as unknown as Parameters<
+          typeof enforceApiKeyIdOnTraceRequest
+        >[0],
+        resolved.type === "apiKey" ? resolved.apiKeyId : null,
+      );
+
       // Receiver-authoritative provenance stamp for ingestion-key traces.
       // Overwrites any payload-supplied provenance keys (langwatch.source /
-      // langwatch.ingest_key_id / langwatch.origin /
-      // langwatch.organization_id / langwatch.template.id) — even a
-      // malicious upstream cannot forge a different source / key / org
+      // langwatch.origin / langwatch.organization_id / langwatch.template.id)
+      // — even a malicious upstream cannot forge a different source / org
       // identity onto its own traces.
       if (resolved.type === "apiKey" && resolved.ingestSourceType) {
         // Whether this tool's direct-OTLP usage is bundled (non-billed per
@@ -481,6 +495,14 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
+
+      // Same receiver-authoritative rule as the trace path.
+      enforceApiKeyIdOnLogRequest(
+        logRequest as unknown as Parameters<
+          typeof enforceApiKeyIdOnLogRequest
+        >[0],
+        resolved.type === "apiKey" ? resolved.apiKeyId : null,
+      );
 
       if (resolved.type === "apiKey" && resolved.ingestSourceType) {
         // Log-based tools (Claude Code et al. emit OTLP logs, not spans)
@@ -597,10 +619,18 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       }
       const metricsRequest = parsed.request;
 
+      // Same receiver-authoritative rule as the trace path.
+      enforceApiKeyIdOnMetricRequest(
+        metricsRequest as unknown as Parameters<
+          typeof enforceApiKeyIdOnMetricRequest
+        >[0],
+        resolved.type === "apiKey" ? resolved.apiKeyId : null,
+      );
+
       // Receiver-authoritative provenance stamp for ingestion-key metrics —
-      // same contract as traces + logs, so the source / key / origin / org
-      // identity rides every OTLP signal and an upstream payload cannot forge
-      // a different one.
+      // same contract as traces + logs, so the source / origin / org identity
+      // rides every OTLP signal and an upstream payload cannot forge a
+      // different one.
       if (resolved.type === "apiKey" && resolved.ingestSourceType) {
         stampIngestKeyProvenanceOnMetricRequest(
           metricsRequest as unknown as Parameters<
