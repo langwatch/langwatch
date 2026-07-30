@@ -188,37 +188,29 @@ describe("runWorkflow with a pre-1.5 published version", () => {
   });
 
   afterAll(async () => {
-    // beforeAll assigns these in sequence; a failure partway through leaves
-    // later ones undefined, and Prisma treats an undefined filter as "no
-    // filter" — updateMany/deleteMany below would touch the whole table
-    // instead of just this run's rows. The singular `.delete()` calls are
-    // safe either way (an undefined id just throws), but skip them too once
-    // there is nothing they'd successfully find.
-    if (projectId) {
-      await prisma.workflow.updateMany({
-        where: { projectId },
-        data: {
-          currentVersionId: null,
-          latestVersionId: null,
-          publishedId: null,
-        },
-      });
-      await prisma.workflowVersion.deleteMany({ where: { projectId } });
-      await prisma.workflow.deleteMany({ where: { projectId } });
-      await prisma.project.delete({ where: { id: projectId } });
-    }
-    if (organizationId) {
-      await prisma.modelProvider.deleteMany({ where: { organizationId } });
-    }
-    if (teamId) {
-      await prisma.team.delete({ where: { id: teamId } });
-    }
-    if (organizationId) {
-      await prisma.organization.delete({ where: { id: organizationId } });
-    }
-    if (userId) {
-      await prisma.user.delete({ where: { id: userId } });
-    }
+    // beforeAll assigns these four ids in sequence and Vitest runs afterAll
+    // even when beforeAll throws, so a failure partway through leaves the
+    // later ones undefined. Prisma drops an undefined `where` key rather than
+    // matching nothing, which would turn each deleteMany below into "delete
+    // every row in the table". Setup is all-or-nothing, so teardown is too:
+    // bail before a single filter is built.
+    if (!organizationId || !teamId || !projectId || !userId) return;
+
+    await prisma.workflow.updateMany({
+      where: { projectId },
+      data: {
+        currentVersionId: null,
+        latestVersionId: null,
+        publishedId: null,
+      },
+    });
+    await prisma.workflowVersion.deleteMany({ where: { projectId } });
+    await prisma.workflow.deleteMany({ where: { projectId } });
+    await prisma.modelProvider.deleteMany({ where: { organizationId } });
+    await prisma.project.delete({ where: { id: projectId } });
+    await prisma.team.delete({ where: { id: teamId } });
+    await prisma.organization.delete({ where: { id: organizationId } });
+    await prisma.user.delete({ where: { id: userId } });
   });
 
   /** @scenario Published workflows saved before the change still run with their old model */

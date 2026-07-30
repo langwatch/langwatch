@@ -128,41 +128,31 @@ describe("workflow.create node LLM materialization", () => {
   });
 
   afterAll(async () => {
-    // beforeAll assigns these in sequence; a failure partway through leaves
-    // later ones undefined, and Prisma treats an undefined filter as "no
-    // filter" — updateMany/deleteMany below would touch the whole table
-    // instead of just this run's rows.
-    if (projectId) {
-      // Detach the required CurrentVersion/LatestVersion relations before
-      // deleting versions, or the deleteMany violates the FK.
-      await prisma.workflow.updateMany({
-        where: { projectId },
-        data: { currentVersionId: null, latestVersionId: null },
-      });
-      await prisma.workflowVersion.deleteMany({ where: { projectId } });
-      await prisma.workflow.deleteMany({ where: { projectId } });
-      await prisma.project.delete({ where: { id: projectId } });
-    }
-    if (organizationId) {
-      await prisma.modelDefaultConfig.deleteMany({
-        where: { organizationId },
-      });
-    }
-    if (teamId) {
-      await prisma.teamUser.deleteMany({ where: { teamId } });
-    }
-    if (organizationId) {
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    }
-    if (teamId) {
-      await prisma.team.delete({ where: { id: teamId } });
-    }
-    if (organizationId) {
-      await prisma.organization.delete({ where: { id: organizationId } });
-    }
-    if (userId) {
-      await prisma.user.delete({ where: { id: userId } });
-    }
+    // beforeAll assigns these four ids in sequence and Vitest runs afterAll
+    // even when beforeAll throws, so a failure partway through leaves the
+    // later ones undefined. Prisma drops an undefined `where` key rather than
+    // matching nothing, which would turn each deleteMany below into "delete
+    // every row in the table". Setup is all-or-nothing, so teardown is too:
+    // bail before a single filter is built.
+    if (!organizationId || !teamId || !projectId || !userId) return;
+
+    // Detach the required CurrentVersion/LatestVersion relations before
+    // deleting versions, or the deleteMany violates the FK.
+    await prisma.workflow.updateMany({
+      where: { projectId },
+      data: { currentVersionId: null, latestVersionId: null },
+    });
+    await prisma.workflowVersion.deleteMany({ where: { projectId } });
+    await prisma.workflow.deleteMany({ where: { projectId } });
+    await prisma.modelDefaultConfig.deleteMany({
+      where: { organizationId },
+    });
+    await prisma.teamUser.deleteMany({ where: { teamId } });
+    await prisma.organizationUser.deleteMany({ where: { organizationId } });
+    await prisma.project.delete({ where: { id: projectId } });
+    await prisma.team.delete({ where: { id: teamId } });
+    await prisma.organization.delete({ where: { id: organizationId } });
+    await prisma.user.delete({ where: { id: userId } });
   });
 
   /** @scenario Creating a workflow on a fresh install starts it with a ready-to-use model */

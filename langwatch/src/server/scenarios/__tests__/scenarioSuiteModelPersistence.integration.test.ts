@@ -50,29 +50,25 @@ describe("Scenario / run-plan model persistence (real DB)", () => {
   });
 
   afterAll(async () => {
-    // Each guarded by its own id: beforeAll assigns organizationId, teamId and
-    // projectId in sequence, so a failure partway through leaves later ones
-    // undefined — and Prisma treats an undefined filter as "no filter", which
-    // would delete every row in the table instead of just this run's.
-    if (projectId) {
-      await prisma.scenario
-        .deleteMany({ where: { projectId } })
-        .catch(() => {});
-      await prisma.simulationSuite
-        .deleteMany({ where: { projectId } })
-        .catch(() => {});
-      await prisma.project
-        .deleteMany({ where: { id: projectId } })
-        .catch(() => {});
-    }
-    if (teamId) {
-      await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-    }
-    if (organizationId) {
-      await prisma.organization
-        .deleteMany({ where: { id: organizationId } })
-        .catch(() => {});
-    }
+    // beforeAll assigns these three ids in sequence and Vitest runs afterAll
+    // even when beforeAll throws, so a failure partway through leaves the
+    // later ones undefined. Prisma drops an undefined `where` key rather than
+    // matching nothing, which would turn each deleteMany below into "delete
+    // every row in the table". Setup is all-or-nothing, so teardown is too:
+    // bail before a single filter is built.
+    if (!organizationId || !teamId || !projectId) return;
+
+    await prisma.scenario.deleteMany({ where: { projectId } }).catch(() => {});
+    await prisma.simulationSuite
+      .deleteMany({ where: { projectId } })
+      .catch(() => {});
+    await prisma.project
+      .deleteMany({ where: { id: projectId } })
+      .catch(() => {});
+    await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
+    await prisma.organization
+      .deleteMany({ where: { id: organizationId } })
+      .catch(() => {});
   });
 
   describe("given a scenario", () => {
