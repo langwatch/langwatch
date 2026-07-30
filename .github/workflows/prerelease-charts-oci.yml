@@ -1,0 +1,103 @@
+# Publishes every chart under charts/ to GHCR as an OCI artifact on each merge
+# to main, so a cluster can track main without waiting for a tagged release.
+#
+# Deliberately NOT folded into release-langwatch-chart.yml. That workflow feeds
+# the GitHub Pages Helm repo (chart-releaser writes a shared index.yaml) which
+# is the artifact self-hosters install from. Publishing a build per merge there
+# would grow that index without bound and force every `helm search`/`helm
+# upgrade` onto --devel to avoid picking up an untagged main build. OCI has no
+# shared index — each push is an independent, immutable tag — so prereleases
+# and stable releases cannot interfere with each other.
+#
+# Versions are `<chartVersion>-main.<run_number>.<shortSha>`, e.g.
+# 3.7.0-main.412.a1b2c3d. That is a valid semver PRERELEASE, so it sorts BELOW
+# the eventual 3.7.0 and `helm upgrade` never selects it by accident, and it is
+# a valid OCI tag (semver build metadata, `+sha`, is not — `+` is not a legal
+# tag character, which is why the sha goes in the prerelease segment).
+name: prerelease-charts-oci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "charts/**"
+      - ".github/workflows/prerelease-charts-oci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Serialise per branch: two merges in quick succession would otherwise race
+  # on `helm dependency build`, and the later push should win.
+  group: prerelease-charts-oci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required to push OCI artifacts to ghcr.io.
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.19.0
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | helm registry login ghcr.io \
+                --username "${{ github.actor }}" \
+                --password-stdin
+
+      - name: Add upstream Helm repositories
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Package and push each chart
+        env:
+          # `github.repository_owner` is the org; lowercased because OCI
+          # reference paths must be lowercase and GitHub org names are not.
+          OWNER: ${{ github.repository_owner }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+
+          registry="oci://ghcr.io/$(echo "$OWNER" | tr '[:upper:]' '[:lower:]')/charts"
+          short_sha="$(git rev-parse --short=7 HEAD)"
+          mkdir -p .oci-packages
+
+          # Leaf charts before the umbrella: `helm dependency build` on
+          # charts/langwatch resolves file://../<chart> paths from the working
+          # tree, so ordering only matters for the local build, not the push.
+          for chart_dir in charts/*/; do
+            [ -f "${chart_dir}Chart.yaml" ] || continue
+
+            # Read straight from Chart.yaml rather than `helm show chart`: the
+            # packaged filename is <name>-<version>.tgz using the chart NAME,
+            # which is not the directory name (charts/gateway is
+            # "langwatch-gateway"), and `helm show` needs dependencies resolved
+            # first, which is the step below.
+            chart_name="$(awk '$1=="name:"{print $2; exit}' "${chart_dir}Chart.yaml")"
+            base_version="$(awk '$1=="version:"{print $2; exit}' "${chart_dir}Chart.yaml")"
+            if [ -z "$chart_name" ] || [ -z "$base_version" ]; then
+              echo "::error::could not read name/version from ${chart_dir}Chart.yaml"
+              exit 1
+            fi
+            version="${base_version}-main.${RUN_NUMBER}.${short_sha}"
+
+            echo "::group::${chart_name} -> ${version}"
+            helm dependency build "$chart_dir"
+            helm package "$chart_dir" --version "$version" --app-version "$short_sha" -d .oci-packages
+            helm push ".oci-packages/${chart_name}-${version}.tgz" "$registry"
+            echo "::endgroup::"
+
+            echo "- \`${registry}/${chart_name}:${version}\`" >> "$GITHUB_STEP_SUMMARY"
+          done
