@@ -101,6 +101,14 @@ export const MAX_PROCESSED_SPANS = 512;
 export const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
+ * Matches TRACE_ANALYTICS_COALESCE_MAX_BATCH: this fold was the only one in the
+ * pipeline that never declared a ceiling, so it took one delivery — and one
+ * read-back — per event while its sibling folded 128 at a time. Must stay below
+ * MAX_APPLIED_EVENT_IDS; the projection router rejects a config at or above it.
+ */
+export const TRACE_SUMMARY_COALESCE_MAX_BATCH = 128;
+
+/**
  * Reserved trace-summary attribute keys holding cache / reasoning token
  * SUMS across the whole trace. The per-span `gen_ai.usage.cache_*` numbers
  * never reach the trace-level attribute map (the accumulation allowlist
@@ -499,6 +507,7 @@ export class TraceSummaryFoldProjection
     refoldOnOutOfOrder: false,
     trustAbsentMiss: true,
     readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS },
+    coalesceMaxBatch: TRACE_SUMMARY_COALESCE_MAX_BATCH,
   } as const;
 
   protected readonly events = traceSummaryEvents;
