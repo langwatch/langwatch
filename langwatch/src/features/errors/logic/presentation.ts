@@ -1225,6 +1225,19 @@ const presentations = {
     describe: () =>
       "This deployment doesn't record spend per key, so there's no figure to show.",
   },
+  spend_source_unavailable: {
+    // The public REST spelling of the refusal above. Both doors answer the
+    // same way on a deployment with no per-key spend ledger; the wire code
+    // differs because the REST one is published in the management API docs
+    // and callers already branch on it.
+    title: "Spend isn't available for this key",
+    describe: () =>
+      "This deployment doesn't record spend per key, so there's no figure to show.",
+  },
+  cache_rule_not_found: {
+    title: "Cache rule not found",
+    describe: () => "It may have been archived by someone else.",
+  },
   gateway_group_budget_unsupported: {
     // Refusing beats creating a cap that quietly means something else, so the
     // copy says what the budget would NOT have done — that is the whole reason
