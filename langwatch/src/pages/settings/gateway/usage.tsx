@@ -79,7 +79,11 @@ function GatewayUsagePage() {
   const { fromIso, toIso } = useRollingWindow(days);
 
   const summaryQuery = api.gatewayUsage.summary.useQuery(
-    { organizationId: organization?.id ?? "", fromDate: fromIso, toDate: toIso },
+    {
+      organizationId: organization?.id ?? "",
+      fromDate: fromIso,
+      toDate: toIso,
+    },
     { enabled: !!organization?.id && !virtualKeyId },
   );
   const vkSummaryQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
@@ -247,8 +251,8 @@ function GatewayUsagePage() {
                 <EmptyState.Title>No usage in this window</EmptyState.Title>
                 <EmptyState.Description>
                   Spend shows up here once the gateway has traced its first
-                  completed request. Send a few requests against a virtual
-                  key, then check back in a couple of minutes.
+                  completed request. Send a few requests against a virtual key,
+                  then check back in a couple of minutes.
                 </EmptyState.Description>
               </EmptyState.Content>
             </EmptyState.Root>

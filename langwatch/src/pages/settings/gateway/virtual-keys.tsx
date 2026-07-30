@@ -5,7 +5,6 @@ import {
   Card,
   EmptyState,
   HStack,
-  IconButton,
   Spacer,
   Spinner,
   Table,
@@ -46,6 +45,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+
+/** Deep link from a key's spend to its Usage view over the same window. */
+function usageHrefForKey(virtualKeyId: string): string {
+  return `/settings/gateway/usage?vk=${virtualKeyId}&days=mtd`;
+}
 
 type ScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -413,11 +417,17 @@ function VirtualKeysPage() {
                               onClick={(e) => e.stopPropagation()}
                               cursor="default"
                             >
-                              <HStack gap={1} justify="space-between">
-                                <Link
-                                  href={`/settings/gateway/usage?vk=${vk.id}&days=mtd`}
-                                  data-testid={`vk-spend-${vk.id}`}
-                                  aria-label={`Usage for ${vk.name}, this month`}
+                              <Link
+                                className="group"
+                                href={usageHrefForKey(vk.id)}
+                                data-testid={`vk-spend-${vk.id}`}
+                                aria-label={`Usage for ${vk.name}, this month`}
+                                width="full"
+                              >
+                                <HStack
+                                  gap={1}
+                                  justify="space-between"
+                                  width="full"
                                 >
                                   <Text
                                     fontSize="sm"
@@ -430,7 +440,9 @@ function VirtualKeysPage() {
                                         ? "fg"
                                         : "fg.muted"
                                     }
-                                    _hover={{ textDecoration: "underline" }}
+                                    _groupHover={{
+                                      textDecoration: "underline",
+                                    }}
                                   >
                                     {spendQuery.isLoading
                                       ? "…"
@@ -440,22 +452,17 @@ function VirtualKeysPage() {
                                             spendByKeyId.get(vk.id) ?? "0",
                                           )}
                                   </Text>
-                                </Link>
-                                <IconButton
-                                  asChild
-                                  size="xs"
-                                  variant="ghost"
-                                  color="fg.muted"
-                                  aria-label={`Open usage for ${vk.name}`}
-                                  data-testid={`vk-spend-chart-${vk.id}`}
-                                >
-                                  <Link
-                                    href={`/settings/gateway/usage?vk=${vk.id}&days=mtd`}
+                                  <Box
+                                    as="span"
+                                    data-testid={`vk-spend-chart-${vk.id}`}
+                                    color="fg.muted"
+                                    aria-hidden
+                                    _groupHover={{ color: "fg" }}
                                   >
                                     <LineChart size={14} />
-                                  </Link>
-                                </IconButton>
-                              </HStack>
+                                  </Box>
+                                </HStack>
+                              </Link>
                             </Table.Cell>
                             <Table.Cell>
                               {vk.lastUsedAt ? (

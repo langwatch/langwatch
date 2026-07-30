@@ -147,9 +147,7 @@ describe("Gateway usage page filter routing", () => {
     expect(screen.getByTestId("usage-key-filter")).toHaveTextContent(
       "Canary Gateway Healthcheck",
     );
-    await user.click(
-      screen.getByRole("button", { name: "Clear key filter" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Clear key filter" }));
 
     expect(screen.getByTestId("probe-pathname")).toHaveTextContent(
       "/settings/gateway/usage",

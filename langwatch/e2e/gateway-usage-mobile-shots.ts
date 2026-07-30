@@ -6,47 +6,16 @@
  */
 import { chromium } from "playwright";
 
-const BASE_URL = process.env.QA_BASE_URL ?? "http://localhost:5590";
+import { localQaSessionCookie } from "./qa-local-session";
 
-// This script writes a known password onto a real user row to obtain a
-// session, so it must only ever point at a local dev stack.
-if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(BASE_URL)) {
-  throw new Error(`refusing to run against a non-local target: ${BASE_URL}`);
-}
+const BASE_URL = process.env.QA_BASE_URL ?? "http://localhost:5590";
 const SHOT_DIR = process.env.QA_SHOT_DIR ?? "/tmp/gateway-usage-qa";
 const ORG_ID = "organization_0000USx9WDgmDaA9x5FrQykVHuuwa";
 const VIEWER_PROJECT_SLUG = "rogerio-org-z7Rkq0";
 const TARGET_VK = "vk_LtNASRpf1LqLTo5TvMAfnA";
 
 async function main() {
-  const { hash } = await import("bcrypt");
-  const { prisma } = await import("../src/server/db");
-  const user = await prisma.user.findUnique({
-    where: { email: "dogfood@langwatch.local" },
-  });
-  if (!user) throw new Error("no dogfood user");
-  const passwordHash = await hash("gateway-usage-qa-2026", 10);
-  const account = await prisma.account.findFirst({
-    where: { userId: user.id, provider: "credential" },
-  });
-  if (account) {
-    await prisma.account.update({
-      where: { id: account.id },
-      data: { password: passwordHash },
-    });
-  }
-
-  const { auth } = await import("../src/server/better-auth");
-  const res = await auth.api.signInEmail({
-    body: { email: "dogfood@langwatch.local", password: "gateway-usage-qa-2026" },
-    asResponse: true,
-  });
-  const raw = res.headers.getSetCookie?.() ?? [];
-  const found = raw
-    .map((c) => /^([^=]+)=([^;]+)/.exec(c))
-    .find((m) => m && m[1]!.includes("session_token"));
-  if (!found) throw new Error("no session cookie");
-  const cookie = { name: found[1]!, value: decodeURIComponent(found[2]!) };
+  const cookie = await localQaSessionCookie(BASE_URL);
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
@@ -55,9 +24,7 @@ async function main() {
     isMobile: true,
     hasTouch: true,
   });
-  await context.addCookies([
-    { ...cookie, domain: "localhost", path: "/", httpOnly: true, secure: false },
-  ]);
+  await context.addCookies([cookie]);
   const page = await context.newPage();
   await page.goto(`${BASE_URL}/settings`, { waitUntil: "domcontentloaded" });
   await page.evaluate(
@@ -83,7 +50,9 @@ async function main() {
     // page itself.
     const width = await page.evaluate(() => {
       let scrolled = "none";
-      for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
+      for (const el of Array.from(
+        document.querySelectorAll<HTMLElement>("*"),
+      )) {
         if (el.scrollWidth > el.clientWidth + 40 && el.clientWidth > 200) {
           el.scrollLeft = el.scrollWidth;
           scrolled = `${el.tagName}.${el.className?.toString().slice(0, 40)} ${el.clientWidth}/${el.scrollWidth}`;

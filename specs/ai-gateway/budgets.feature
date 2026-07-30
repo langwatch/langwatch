@@ -383,7 +383,7 @@ Feature: AI Gateway — Budgets
     # reading one project is how the page said "No usage" under a table
     # full of spend.
 
-  @unit
+  @integration
   Scenario: Changing the window or clearing the key filter keeps the browser on the usage page
     Given the usage page is open filtered to one key
     When the key filter is cleared or a different window is picked
