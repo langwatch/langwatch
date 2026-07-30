@@ -22,21 +22,20 @@ const record: LangyAnalyticsEventRecord = {
   acceptedAt: 2_000,
 };
 
+/** Migration parity — engine, keys, anchors, column types — is asserted against
+ *  the migration SQL in `../__tests__/tableMigrationParity.unit.test.ts`. */
 describe("langy_analytics_events", () => {
-  it("anchors its partition and TTL on the stamp we control", () => {
-    const description = langyAnalyticsEventsTable.describe();
-
-    expect(description.partition.column).toBe("AcceptedAt");
-    expect(description.ttl?.anchor).toBe("AcceptedAt");
-  });
-
-  it("declares the deployed column types", () => {
-    expect(langyAnalyticsEventsTable.describe().columnTypes).toMatchObject({
-      EventType: "LowCardinality(String)",
-      Role: "LowCardinality(Nullable(String))",
-      DurationMs: "Nullable(UInt64)",
-      OccurredAt: "DateTime64(3)",
-    });
+  it("names the debt its anchor carries, and still carries our own stamp on the row", () => {
+    const anchor = langyAnalyticsEventsTable.partition.column;
+    expect(langyAnalyticsEventsTable.columns[anchor]?.timeRole).toBe(
+      "occurredAt",
+    );
+    expect(
+      langyAnalyticsEventsTable.structuralDebt?.map((debt) => debt.column),
+    ).toEqual([anchor]);
+    expect(langyAnalyticsEventsTable.columns.AcceptedAt.timeRole).toBe(
+      "acceptedAt",
+    );
   });
 
   it("maps a record onto the row, coercing times and the 64-bit measure", () => {

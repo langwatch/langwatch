@@ -1,6 +1,6 @@
+import { DispatchError } from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
 import type { WebhookDeliveryInput } from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
-import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import { deliverWebhook } from "../deliverWebhook";
 import type { sendWebhook, WebhookSendResult } from "../sendWebhook";
 

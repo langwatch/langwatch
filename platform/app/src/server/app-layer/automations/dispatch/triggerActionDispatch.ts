@@ -2,6 +2,7 @@ import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import { DispatchError } from "@langwatch/event-sourcing";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "@prisma/client";
@@ -11,7 +12,6 @@ import type { ProjectService } from "~/server/app-layer/projects/project.service
 import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   mapTraceToDatasetEntry,

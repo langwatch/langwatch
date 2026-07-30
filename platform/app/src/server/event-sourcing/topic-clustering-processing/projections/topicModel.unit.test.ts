@@ -6,6 +6,7 @@ import {
   deriveTopicModelView,
   initTopicModelState,
   type TopicModelState,
+  topicModelStateSchema,
 } from "./topicModel";
 
 function topic(
@@ -104,6 +105,35 @@ describe("topicModel fold", () => {
     const once = deriveTopicModelView(state);
     state = apply(state, data);
     expect(deriveTopicModelView(state)).toEqual(once);
+  });
+
+  describe("when the state is stored through its JSON column and read back", () => {
+    const roundTrip = (state: TopicModelState): TopicModelState =>
+      topicModelStateSchema.parse(JSON.parse(JSON.stringify(state)));
+
+    it("round-trips a genesis state", () => {
+      expect(roundTrip(initTopicModelState())).toEqual(initTopicModelState());
+    });
+
+    it("round-trips a state a merge produced, which never advances the watermark", () => {
+      const state = apply(
+        initTopicModelState(),
+        recorded({ mode: "merge", topics: [topic("a")], occurredAt: 1_000 }),
+      );
+      expect(roundTrip(state)).toEqual(state);
+    });
+
+    it("keeps folding a merge-written state after the read-back", () => {
+      const merged = apply(
+        initTopicModelState(),
+        recorded({ mode: "merge", topics: [topic("a")], occurredAt: 1_000 }),
+      );
+      const next = apply(
+        roundTrip(merged),
+        recorded({ topics: [topic("b")], occurredAt: 2_000 }),
+      );
+      expect(topicIds(next)).toEqual(["b"]);
+    });
   });
 
   describe("firstRecordedAt", () => {

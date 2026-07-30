@@ -104,7 +104,7 @@ export type SubscriberHandlerMap<Events extends EventSchemaMap> = {
  * declared intent with no delivery does not compile and a delivery for an
  * intent nobody declared has nowhere to go.
  *
- * `messageKey`'s only parameter is the payload, which is what keeps a key
+ * `messageKey`'s only input is the declared payload, which is what keeps a key
  * from being built off the clock or off state the payload never declared —
  * the two ways a redelivery of the same logical intent computes a different
  * key and both dispatch.
@@ -245,6 +245,11 @@ export interface BuiltPipeline<
   readonly maps: Readonly<Record<string, BuiltMap>>;
   readonly processManagers: Readonly<Record<string, BuiltProcessManager>>;
   readonly subscribers: Readonly<Record<string, BuiltSubscriber>>;
+  /** The `.id()` map, applied. The engine is the only caller: it names a
+   * fold's lane and a process manager's instance, and the fold executor reads
+   * back the same value (ADR-107 decision 4). Throws `ConfigurationError`
+   * when `eventType` has no declared extractor. */
+  aggregateIdFor(eventType: string, payload: unknown): string;
 }
 
 export type { ReplaceStore, AppendStore, MergeStore };

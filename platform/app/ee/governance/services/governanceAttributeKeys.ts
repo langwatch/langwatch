@@ -13,11 +13,10 @@
  * write/read paths silently diverge (cf. the puller-tenancy bug
  * fixed in eb221e348). Anchor them once.
  *
- * NOTE: the trace-pipeline projection at
- * src/server/event-sourcing.old/pipelines/trace-processing/projections/
- *   services/trace-attribute-accumulation.service.ts also references
- * these keys verbatim. Keep that list in sync if you add an attribute
- * here that needs to be hoisted from spans into trace_summaries.
+ * NOTE: the trace pipeline's own fold (`event-sourcing/trace-processing`)
+ * hoists a subset of these keys from spans into trace_summaries and
+ * references them verbatim. Keep that list in sync if you add an
+ * attribute here that needs to be hoisted.
  */
 
 /**

@@ -1,12 +1,6 @@
 import { type Metrics, noopMetrics } from "@langwatch/event-sourcing";
-import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
-import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
 import type {
-  OtlpInstrumentationScope,
-  OtlpResource,
-  OtlpSpan,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/otlp";
-import type {
+  ContributionFacts,
   LogFactsContribution,
   MetricFactsContribution,
   SpanFactsContribution,
@@ -38,16 +32,47 @@ function dropCounter(metrics: Metrics) {
   });
 }
 
-/** The minimal shape this bridge reads off trace-processing's `span_received` event. */
+/** The minimal shape this bridge reads off trace-processing's `spanReceived`
+ * event — already normalized (ADR-105 decision 7), so no OTLP walk here. */
 export interface SpanReceivedEvent {
   readonly type: string;
   readonly tenantId: string;
   readonly occurredAt: number;
   readonly data: {
-    readonly span: OtlpSpan;
-    readonly resource: OtlpResource;
-    readonly instrumentationScope: OtlpInstrumentationScope;
+    readonly traceId: string;
+    readonly spanId: string;
+    readonly name: string;
+    readonly startTimeUnixMs: number;
+    readonly endTimeUnixMs: number;
+    readonly statusCode: "UNSET" | "OK" | "ERROR";
+    readonly attributes: Readonly<Record<string, unknown>>;
+    readonly resourceAttributes: Readonly<Record<string, unknown>>;
+    readonly instrumentationScopeName: string;
   };
+}
+
+/** `SpanFactsContribution.statusCode` is the legacy numeric OTLP code; the
+ * canonical span's is the string enum it was derived from. */
+const SPAN_STATUS_CODES = { UNSET: 0, OK: 1, ERROR: 2 } as const;
+
+/**
+ * `service.version` is a RESOURCE attribute, so it is not in the span's own
+ * lifted facts — without this the session's `AgentVersion` is blank for every
+ * agent that reports its version at resource scope. A numeric-looking version
+ * ("1.0", "2024") deserialises as a number, which is still the fact.
+ */
+function withServiceVersion(
+  facts: ContributionFacts,
+  resourceAttributes: Record<string, unknown>,
+): ContributionFacts {
+  const version = resourceAttributes["service.version"];
+  if (typeof version === "string" && version.length > 0) {
+    return { ...facts, "service.version": version };
+  }
+  if (typeof version === "number" && Number.isFinite(version)) {
+    return { ...facts, "service.version": String(version) };
+  }
+  return facts;
 }
 
 export interface SpanFactsBridgeDeps {
@@ -64,36 +89,20 @@ export function createSpanFactsBridge(
   const metrics = deps.metrics ?? noopMetrics;
   const drops = dropCounter(metrics);
   const now = deps.now ?? Date.now;
-  const normalization = new SpanNormalizationPipelineService(
-    new CanonicalizeSpanAttributesService(),
-  );
 
   const isCodingAgentSpan = (event: SpanReceivedEvent): boolean =>
-    deps.detection.isCodingAgentSpanName(event.data.span.name);
+    deps.detection.isCodingAgentSpanName(event.data.name);
 
   return {
     name: "codingAgentSpanFactsBridge",
     eventTypes: deps.eventTypes,
     enqueue: { filter: isCodingAgentSpan },
-    options: {
-      deduplication: {
-        makeId: (event) =>
-          `coding-agent-span-facts:${event.tenantId}:${event.data.span.spanId}`,
-        ttlMs: 60_000,
-      },
-    },
     async handle(event) {
       if (!isCodingAgentSpan(event)) return;
-
-      const span = normalization.normalizeSpanReceived(
-        event.tenantId,
-        event.data.span,
-        event.data.resource,
-        event.data.instrumentationScope,
-      );
+      const span = event.data;
 
       const providerSessionKey = deps.detection.resolveConversationKey(
-        span.spanAttributes,
+        span.attributes,
       );
       const resolved = resolveCodingAgentSessionId({
         providerSessionKey,
@@ -109,7 +118,7 @@ export function createSpanFactsBridge(
       const serviceName = span.resourceAttributes["service.name"];
       const agent = deps.detection.detectAgent({
         recordName: span.name,
-        scopeName: span.instrumentationScope.name,
+        scopeName: span.instrumentationScopeName,
         serviceName: typeof serviceName === "string" ? serviceName : null,
       });
       if (agent === "unknown") {
@@ -129,9 +138,12 @@ export function createSpanFactsBridge(
         name: span.name,
         startTimeUnixMs: span.startTimeUnixMs,
         endTimeUnixMs: span.endTimeUnixMs,
-        statusCode: span.statusCode ?? 0,
-        facts: deps.detection.liftSpanFacts(span.spanAttributes),
-        scopeName: span.instrumentationScope.name || null,
+        statusCode: SPAN_STATUS_CODES[span.statusCode],
+        facts: withServiceVersion(
+          deps.detection.liftSpanFacts(span.attributes),
+          span.resourceAttributes,
+        ),
+        scopeName: span.instrumentationScopeName || null,
       });
     },
   };

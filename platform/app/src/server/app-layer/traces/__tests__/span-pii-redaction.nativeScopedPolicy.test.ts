@@ -23,10 +23,9 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: vi.fn(async () => false) },
 }));
 
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import { featureFlagService } from "~/server/featureFlag";
 
-const TENANT = createTenantId("project-web-app");
+const TENANT = "project-web-app";
 
 function mkPolicy({
   piiLevel = "essential" as PiiLevel,

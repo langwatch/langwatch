@@ -48,11 +48,11 @@ vi.mock("~/server/api/rbac", async (importActual) => {
 
 import { hasProjectPermission } from "~/server/api/rbac";
 import { prisma } from "~/server/db";
+import { connection as redisConnection } from "~/server/redis";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
+} from "~/test-utils/integration/testContainers";
 import { app as meApp } from "../../../app/api/me/[[...route]]/app";
 import { app } from "../auth-cli";
 

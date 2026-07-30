@@ -19,11 +19,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
-import { seedSpans } from "../../../../analytics/clickhouse/__tests__/test-utils/clickhouse-fixtures";
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
+import { seedSpans } from "../../../../analytics/clickhouse/__tests__/test-utils/clickhouse-fixtures";
 import { buildSpanAttributeKeysFacetQuery } from "../span-attribute-keys";
 
 const TENANT_ID = "facet-span-attr-keys-test";

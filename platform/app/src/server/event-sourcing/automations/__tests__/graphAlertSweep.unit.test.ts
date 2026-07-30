@@ -2,6 +2,7 @@ import type { ProcessContext } from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
+  GRAPH_ALERT_SWEEP_PROCESS_NAME,
   type GraphAlertSweepPorts,
   graphAlertSweepIntents,
   graphAlertSweepOn,
@@ -118,7 +119,7 @@ describe("graph alert sweep process", () => {
   });
 
   describe("given the sweep's own dispatched outbox rows have accumulated", () => {
-    it("prunes rows older than a day, keyed to the wake instant", async () => {
+    it("prunes only its own rows older than a day, keyed to the wake instant", async () => {
       const pruneDispatchedIntentsBefore = vi.fn().mockResolvedValue(3);
       const ports = makePorts({ pruneDispatchedIntentsBefore });
 
@@ -128,6 +129,7 @@ describe("graph alert sweep process", () => {
       );
 
       expect(pruneDispatchedIntentsBefore).toHaveBeenCalledWith({
+        processName: GRAPH_ALERT_SWEEP_PROCESS_NAME,
         before: 10_000 - 24 * 60 * 60 * 1000,
       });
     });

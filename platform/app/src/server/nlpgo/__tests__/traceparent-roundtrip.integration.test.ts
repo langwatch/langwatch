@@ -63,10 +63,6 @@ import {
   definePipeline,
 } from "~/server/event-sourcing.old";
 import {
-  getTestClickHouseClient,
-  getTestRedisConnection,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import {
   cleanupTestDataForTenant,
   createTestTenantId,
   getTenantIdString,
@@ -82,6 +78,10 @@ import type { TraceProcessingEvent } from "~/server/event-sourcing.old/pipelines
 import { EventStoreClickHouse } from "~/server/event-sourcing.old/stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing.old/stores/repositories/eventRepositoryClickHouse";
 import { makeQueueName } from "~/server/queues/makeQueueName";
+import {
+  getTestClickHouseClient,
+  getTestRedisConnection,
+} from "~/test-utils/integration/testContainers";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const otlpRoot = require("@opentelemetry/otlp-transformer/build/src/generated/root");

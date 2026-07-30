@@ -8,6 +8,10 @@ import {
   validateMount,
 } from "@langwatch/event-sourcing";
 import {
+  createMetricFactsBridge,
+  type MetricFactsBridgeDeps,
+} from "../coding-agent-processing/bridge/dispatch";
+import {
   METRIC_PIPELINE_NAME,
   METRIC_PIPELINE_PREFIX,
   metricProcessingEvents,
@@ -205,6 +209,10 @@ function createMetricSeriesCatalogStore(
 
 export function createMetricProcessingPipeline(deps: {
   readonly client: ClickHouseClient;
+  /** Cross-pipeline dispatch (ADR-107 §13): lifts coding-agent facts off a
+   *  canonical metric point into the session pipeline. Absent means a coding
+   *  agent's metric-carried signals never reach a session. */
+  readonly codingAgentMetricFacts?: Omit<MetricFactsBridgeDeps, "eventTypes">;
 }) {
   const dataPointStore = createMetricDataPointStore(deps.client);
   const seriesStore = createMetricSeriesCatalogStore(deps.client);
@@ -213,7 +221,7 @@ export function createMetricProcessingPipeline(deps: {
   assertMountIsLegal("metricSeriesCatalog", metricMount(seriesStore));
   assertMountIsLegal("metricTimeRollup", metricMount(rollupStore));
 
-  return definePipeline(METRIC_PIPELINE_NAME)
+  let chain = definePipeline(METRIC_PIPELINE_NAME)
     .prefix(METRIC_PIPELINE_PREFIX)
     .events(metricProcessingEvents)
     .withCommand("recordDataPoint", {
@@ -231,6 +239,24 @@ export function createMetricProcessingPipeline(deps: {
     .withMap("metricTimeRollup", {
       on: { dataPointReceived: toMetricTimeRollupRow },
       store: rollupStore,
-    })
-    .build();
+    });
+
+  if (deps.codingAgentMetricFacts) {
+    const bridge = createMetricFactsBridge({
+      ...deps.codingAgentMetricFacts,
+      eventTypes: ["dataPointReceived"],
+    });
+    chain = chain.withSubscriber("codingAgentMetricFactsDispatch", {
+      on: {
+        dataPointReceived: (data, ctx) =>
+          bridge.handle({
+            type: "dataPointReceived",
+            tenantId: ctx.tenantId,
+            data,
+          }),
+      },
+    });
+  }
+
+  return chain.build();
 }

@@ -41,11 +41,6 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
-import {
   createSpanReceivedEvent,
   msToUnixNano,
 } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
@@ -53,6 +48,10 @@ import type {
   SpanReceivedEvent,
   TraceProcessingEvent,
 } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "../budget.repository";
 import { GatewayBudgetService } from "../budget.service";
@@ -137,7 +136,7 @@ function gatewaySpanEvent({
 function testClickHouseRepository(): GatewayBudgetClickHouseRepository {
   return new GatewayBudgetClickHouseRepository(async () => {
     const { getTestClickHouseClient } = await import(
-      "~/server/event-sourcing.old/__tests__/integration/testContainers"
+      "~/test-utils/integration/testContainers"
     );
     const client = getTestClickHouseClient();
     if (!client) throw new Error("Test CH client not initialised");
@@ -165,7 +164,7 @@ async function derive(
   if (!record) throw new Error("gateway span derived no debit record");
   await projection.store.append(record, {
     aggregateId: event.aggregateId,
-    tenantId: createTenantId(event.tenantId),
+    tenantId: event.tenantId,
   });
 }
 
@@ -178,7 +177,7 @@ async function deriveWindow(
     .map((event) => projection.map(event))
     .filter((record): record is GatewayBudgetDebitRecord => record !== null);
   await projection.store.bulkAppend!(records, {
-    tenantId: createTenantId(PROJECT_ID),
+    tenantId: PROJECT_ID,
   });
 }
 

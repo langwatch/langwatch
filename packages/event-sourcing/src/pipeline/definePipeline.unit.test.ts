@@ -1,8 +1,13 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 import { ConfigurationError } from "../errors";
-import type { Metrics, MetricLabels } from "../ports/metrics";
-import type { MergeStore, ReplaceStore, StateRead, StoredState } from "../projections/store.types";
+import type { MetricLabels, Metrics } from "../ports/metrics";
+import type {
+  MergeStore,
+  ReplaceStore,
+  StateRead,
+  StoredState,
+} from "../projections/store.types";
 import { definePipeline } from "./definePipeline";
 import type { HandlerContext, ProcessContext } from "./pipeline.types";
 
@@ -17,7 +22,9 @@ const spanReceived = z.object({ traceId: z.string(), spanId: z.string() });
 const topicAssigned = z.object({ traceId: z.string(), topic: z.string() });
 
 /** An in-memory `ReplaceStore`, good enough to drive a fold executor end to end. */
-function memoryReplaceStore<State>(): ReplaceStore<State> & { rows: Map<string, StoredState<State>> } {
+function memoryReplaceStore<State>(): ReplaceStore<State> & {
+  rows: Map<string, StoredState<State>>;
+} {
   const rows = new Map<string, StoredState<State>>();
   return {
     kind: "replace",
@@ -33,7 +40,11 @@ function memoryReplaceStore<State>(): ReplaceStore<State> & { rows: Map<string, 
 }
 
 /** An in-memory `AppendStore`, good enough to drive a map executor end to end. */
-function memoryAppendStore<Row>(): { kind: "append"; rows: Row[]; writeBatch: (records: readonly Row[]) => Promise<void> } {
+function memoryAppendStore<Row>(): {
+  kind: "append";
+  rows: Row[];
+  writeBatch: (records: readonly Row[]) => Promise<void>;
+} {
   const rows: Row[] = [];
   return {
     kind: "append",
@@ -60,7 +71,9 @@ function memoryMergeStore<Row>(): MergeStore<Row> & { rows: Row[] } {
 
 /** Records every counter increment so a test can assert an executor actually
  * used the metrics port `.build()` was given. */
-function fakeMetrics(): Metrics & { incs: { name: string; labels: MetricLabels | undefined }[] } {
+function fakeMetrics(): Metrics & {
+  incs: { name: string; labels: MetricLabels | undefined }[];
+} {
   const incs: { name: string; labels: MetricLabels | undefined }[] = [];
   return {
     incs,
@@ -115,7 +128,9 @@ describe("definePipeline", () => {
 
     /** @scenario declaring no events at all is refused */
     it("refuses a pipeline that declares no events", () => {
-      expect(() => definePipeline("trace").events({})).toThrow(ConfigurationError);
+      expect(() => definePipeline("trace").events({})).toThrow(
+        ConfigurationError,
+      );
     });
 
     /** @scenario an event key containing the type-string separator is refused */
@@ -187,7 +202,10 @@ describe("definePipeline", () => {
           init: () => ({ spanIds: [] }),
           on: {
             spanReceived: (state, data) => {
-              expectTypeOf(data).toEqualTypeOf<{ traceId: string; spanId: string }>();
+              expectTypeOf(data).toEqualTypeOf<{
+                traceId: string;
+                spanId: string;
+              }>();
               return { spanIds: [...state.spanIds, data.spanId] };
             },
           },
@@ -201,7 +219,9 @@ describe("definePipeline", () => {
       await built.folds.traceSummary!.apply({
         key: "t1",
         tenantId: "tenant-1",
-        events: [{ type: "trace/spanReceived", data: { traceId: "t1", spanId: "s1" } }],
+        events: [
+          { type: "trace/spanReceived", data: { traceId: "t1", spanId: "s1" } },
+        ],
       });
       const read = await built.folds.traceSummary!.apply({
         key: "t1",
@@ -217,7 +237,12 @@ describe("definePipeline", () => {
       const result = await built.folds.traceSummary!.apply({
         key: "t1",
         tenantId: "tenant-1",
-        events: [{ type: "trace/topicAssigned", data: { traceId: "t1", topic: "billing" } }],
+        events: [
+          {
+            type: "trace/topicAssigned",
+            data: { traceId: "t1", topic: "billing" },
+          },
+        ],
       });
       expect(result.events).toBe(1);
     });
@@ -235,7 +260,12 @@ describe("definePipeline", () => {
 
       await built.maps.spanStorage!.apply({
         tenantId: "tenant-1",
-        events: [{ type: "trace/topicAssigned", data: { traceId: "t1", topic: "billing" } }],
+        events: [
+          {
+            type: "trace/topicAssigned",
+            data: { traceId: "t1", topic: "billing" },
+          },
+        ],
       });
       expect(store.rows).toEqual([]);
     });
@@ -255,7 +285,10 @@ describe("definePipeline", () => {
         .build();
 
       await built.subscribers.audit!.handle(
-        { type: "trace/topicAssigned", data: { traceId: "t1", topic: "billing" } },
+        {
+          type: "trace/topicAssigned",
+          data: { traceId: "t1", topic: "billing" },
+        },
         ctx,
       );
       expect(calls).toEqual([]);
@@ -278,14 +311,21 @@ describe("definePipeline", () => {
             },
           },
           on: {
-            spanReceived: (state) => ({ state: { seen: state.seen + 1 }, intents: [], nextWakeAt: null }),
+            spanReceived: (state) => ({
+              state: { seen: state.seen + 1 },
+              intents: [],
+              nextWakeAt: null,
+            }),
           },
         })
         .build();
 
       const step = built.processManagers.settlement!.evolve(
         { seen: 0 },
-        { type: "trace/topicAssigned", data: { traceId: "t1", topic: "billing" } },
+        {
+          type: "trace/topicAssigned",
+          data: { traceId: "t1", topic: "billing" },
+        },
         processCtx,
       );
       expect(step).toBeNull();
@@ -377,7 +417,9 @@ describe("definePipeline", () => {
 
       await built.maps.m!.apply({
         tenantId: "tenant-1",
-        events: [{ type: "trace/spanReceived", data: { traceId: "t", spanId: "s" } }],
+        events: [
+          { type: "trace/spanReceived", data: { traceId: "t", spanId: "s" } },
+        ],
       });
       expect(store.rows).toEqual([{ ok: true }]);
     });
@@ -398,7 +440,10 @@ describe("definePipeline", () => {
         })
         .build();
 
-      await built.commands.recordSpan!.handle({ traceId: "t", spanId: "s" }, ctx);
+      await built.commands.recordSpan!.handle(
+        { traceId: "t", spanId: "s" },
+        ctx,
+      );
       expect(notifier.sent).toEqual([{ traceId: "t", spanId: "s" }]);
       expect(seen).toEqual(ctx);
     });
@@ -470,8 +515,13 @@ describe("definePipeline", () => {
         })
         .build();
 
-      const events = await built.commands.recordSpan!.handle({ traceId: "t", spanId: "s" }, ctx);
-      expect(events).toEqual([{ type: "trace/spanReceived", data: { traceId: "t", spanId: "s" } }]);
+      const events = await built.commands.recordSpan!.handle(
+        { traceId: "t", spanId: "s" },
+        ctx,
+      );
+      expect(events).toEqual([
+        { type: "trace/spanReceived", data: { traceId: "t", spanId: "s" } },
+      ]);
     });
 
     /** @scenario a command may emit more than one event */
@@ -482,23 +532,40 @@ describe("definePipeline", () => {
           input: spanReceived,
           handle: async (input) => [
             { type: "spanReceived", data: input },
-            { type: "topicAssigned", data: { traceId: input.traceId, topic: "unknown" } },
+            {
+              type: "topicAssigned",
+              data: { traceId: input.traceId, topic: "unknown" },
+            },
           ],
         })
         .build();
 
-      const events = await built.commands.recordSpan!.handle({ traceId: "t", spanId: "s" }, ctx);
-      expect(events.map((e) => e.type)).toEqual(["trace/spanReceived", "trace/topicAssigned"]);
+      const events = await built.commands.recordSpan!.handle(
+        { traceId: "t", spanId: "s" },
+        ctx,
+      );
+      expect(events.map((e) => e.type)).toEqual([
+        "trace/spanReceived",
+        "trace/topicAssigned",
+      ]);
     });
 
     /** @scenario a command may emit no events at all */
     it("emits nothing when the handler decides nothing needs to happen", async () => {
       const built = definePipeline("trace")
         .events({ spanReceived })
-        .withCommand("recordSpan", { input: spanReceived, handle: async () => [] })
+        .withCommand("recordSpan", {
+          input: spanReceived,
+          handle: async () => [],
+        })
         .build();
 
-      expect(await built.commands.recordSpan!.handle({ traceId: "t", spanId: "s" }, ctx)).toEqual([]);
+      expect(
+        await built.commands.recordSpan!.handle(
+          { traceId: "t", spanId: "s" },
+          ctx,
+        ),
+      ).toEqual([]);
     });
   });
 
@@ -526,15 +593,23 @@ describe("definePipeline", () => {
     /** @scenario an intent's type is qualified by the process manager that declared it */
     it("derives the intent type from the process manager's own name and the intent key", () => {
       const built = buildSettlement(makeNotifier());
-      expect(built.processManagers.settlement!.intentTypes).toEqual(["settlement/notifyDigest"]);
+      expect(built.processManagers.settlement!.intentTypes).toEqual([
+        "settlement/notifyDigest",
+      ]);
     });
 
     /** @scenario messageKey computes the same key for a retried intent carrying the same payload */
     it("computes the identical key for the same payload on a retry", () => {
       const built = buildSettlement(makeNotifier());
       const payload = { traceId: "t1" };
-      const first = built.processManagers.settlement!.intents.notifyDigest!.messageKey(payload);
-      const retried = built.processManagers.settlement!.intents.notifyDigest!.messageKey({ ...payload });
+      const first =
+        built.processManagers.settlement!.intents.notifyDigest!.messageKey(
+          payload,
+        );
+      const retried =
+        built.processManagers.settlement!.intents.notifyDigest!.messageKey({
+          ...payload,
+        });
       expect(retried).toBe(first);
     });
 
@@ -543,7 +618,10 @@ describe("definePipeline", () => {
       const notifier = makeNotifier();
       const built = buildSettlement(notifier);
 
-      built.processManagers.settlement!.intents.notifyDigest!.deliver({ traceId: "t1" }, ctx);
+      built.processManagers.settlement!.intents.notifyDigest!.deliver(
+        { traceId: "t1" },
+        ctx,
+      );
       expect(notifier.sent).toEqual([{ traceId: "t1" }]);
     });
 
@@ -565,7 +643,10 @@ describe("definePipeline", () => {
 
   describe("given a process manager arms and clears its own wake, and may be gated off", () => {
     const buildPm = (
-      handler: (state: { seen: number }, ctx: ProcessContext) => { nextWakeAt: number | null },
+      handler: (
+        state: { seen: number },
+        ctx: ProcessContext,
+      ) => { nextWakeAt: number | null },
       enabled?: boolean,
     ) =>
       definePipeline("trace")
@@ -575,7 +656,11 @@ describe("definePipeline", () => {
           state: z.object({ seen: z.number() }),
           init: () => ({ seen: 0 }),
           intents: {
-            notify: { payload: z.object({}), messageKey: () => "x", deliver: () => undefined },
+            notify: {
+              payload: z.object({}),
+              messageKey: () => "x",
+              deliver: () => undefined,
+            },
           },
           on: {
             spanReceived: (state, _data, ctx) => ({
@@ -641,7 +726,9 @@ describe("definePipeline", () => {
           })
           .build();
 
-      expect(build("ab").folds.f!.stateVersion).toBe(build("ba").folds.f!.stateVersion);
+      expect(build("ab").folds.f!.stateVersion).toBe(
+        build("ba").folds.f!.stateVersion,
+      );
     });
 
     /** @scenario changing a fold's state schema changes its derived version */
@@ -667,7 +754,9 @@ describe("definePipeline", () => {
         })
         .build();
 
-      expect(before.folds.f!.stateVersion).not.toBe(after.folds.f!.stateVersion);
+      expect(before.folds.f!.stateVersion).not.toBe(
+        after.folds.f!.stateVersion,
+      );
     });
 
     /** @scenario an explicit pin overrides the derived version without switching off the hash */
@@ -700,7 +789,9 @@ describe("definePipeline", () => {
           state: z.object({ spanIds: z.array(z.string()) }),
           init: () => ({ spanIds: [] }),
           on: {
-            spanReceived: (state, data) => ({ spanIds: [...state.spanIds, data.spanId] }),
+            spanReceived: (state, data) => ({
+              spanIds: [...state.spanIds, data.spanId],
+            }),
           },
           store,
         })
@@ -708,12 +799,17 @@ describe("definePipeline", () => {
 
       const original = { spanIds: ["existing"] };
       const snapshot = { spanIds: [...original.spanIds] };
-      store.rows.set("t1", { state: original, version: built.folds.f!.stateVersion });
+      store.rows.set("t1", {
+        state: original,
+        version: built.folds.f!.stateVersion,
+      });
 
       await built.folds.f!.apply({
         key: "t1",
         tenantId: "tenant-1",
-        events: [{ type: "trace/spanReceived", data: { traceId: "t1", spanId: "s2" } }],
+        events: [
+          { type: "trace/spanReceived", data: { traceId: "t1", spanId: "s2" } },
+        ],
       });
 
       expect(original).toEqual(snapshot);
@@ -744,7 +840,9 @@ describe("definePipeline", () => {
 
     /** @scenario a pipeline prefix containing the unprefixed-form separator is refused */
     it("refuses a prefix containing the unprefixed-form separator", () => {
-      expect(() => definePipeline("trace").prefix("bad/prefix")).toThrow(ConfigurationError);
+      expect(() => definePipeline("trace").prefix("bad/prefix")).toThrow(
+        ConfigurationError,
+      );
     });
 
     it("allows a dot-joined, multi-segment prefix", () => {
@@ -765,7 +863,11 @@ describe("definePipeline", () => {
             state: z.object({}),
             init: () => ({}),
             intents: {
-              "bad/key": { payload: z.object({}), messageKey: () => "x", deliver: () => undefined },
+              "bad/key": {
+                payload: z.object({}),
+                messageKey: () => "x",
+                deliver: () => undefined,
+              },
             },
             on: {},
           }),
@@ -776,11 +878,15 @@ describe("definePipeline", () => {
   describe("given a process manager cannot be mounted before the pipeline has an id", () => {
     /** @scenario mounting a process manager without a preceding .id is refused */
     it("refuses a process manager force-mounted before .id", () => {
-      const chain = definePipeline("trace").events({ spanReceived }) as unknown as {
+      const chain = definePipeline("trace").events({
+        spanReceived,
+      }) as unknown as {
         withProcessManager: (name: string, record: unknown) => unknown;
       };
 
-      expect(() => chain.withProcessManager("pm", {})).toThrow(ConfigurationError);
+      expect(() => chain.withProcessManager("pm", {})).toThrow(
+        ConfigurationError,
+      );
     });
   });
 
@@ -831,7 +937,9 @@ describe("definePipeline", () => {
       const err = caught as ConfigurationError;
       expect(err.context).toMatchObject({
         pipeline: "trace",
-        violations: [{ member: "rollup", rule: "merge-closed-to-new-adopters" }],
+        violations: [
+          { member: "rollup", rule: "merge-closed-to-new-adopters" },
+        ],
       });
     });
 
@@ -853,8 +961,122 @@ describe("definePipeline", () => {
         caught = error;
       }
       const err = caught as ConfigurationError;
-      const members = (err.context.violations as { member: string }[]).map((v) => v.member);
+      const members = (err.context.violations as { member: string }[]).map(
+        (v) => v.member,
+      );
       expect(members.sort()).toEqual(["rollupA", "rollupB"]);
+    });
+  });
+
+  describe("given the builder accepts a pre-built member (ADR-107 decision 17)", () => {
+    it("mounts a pre-built subscriber and dispatches to it by name", async () => {
+      const calls: unknown[] = [];
+      const built = definePipeline("trace")
+        .events({ spanReceived })
+        .withSubscriber("eeSubscriber", {
+          name: "eeSubscriber",
+          eventTypes: ["trace/spanReceived"],
+          handle: (event, ctx) => {
+            calls.push({ event, ctx });
+          },
+        })
+        .build();
+
+      await built.subscribers.eeSubscriber!.handle(
+        { type: "trace/spanReceived", data: { traceId: "t", spanId: "s" } },
+        ctx,
+      );
+      expect(calls).toEqual([
+        {
+          event: {
+            type: "trace/spanReceived",
+            data: { traceId: "t", spanId: "s" },
+          },
+          ctx,
+        },
+      ]);
+    });
+
+    it("keeps a pre-built subscriber's name distinct from a declared subscriber's", () => {
+      expect(() =>
+        definePipeline("trace")
+          .events({ spanReceived })
+          .withSubscriber("declared", { on: { spanReceived: () => undefined } })
+          .withSubscriber("declared", {
+            name: "declared",
+            eventTypes: ["trace/spanReceived"],
+            handle: () => undefined,
+          })
+          .build(),
+      ).toThrow(ConfigurationError);
+    });
+
+    it("mounts a pre-built map and delegates apply to it verbatim", async () => {
+      const written: unknown[] = [];
+      const built = definePipeline("trace")
+        .events({ spanReceived })
+        .withMap(
+          "eeMap",
+          {
+            name: "eeMap",
+            eventTypes: ["trace/spanReceived"],
+            apply: async (delivery) => {
+              written.push(...delivery.events);
+              return { written: delivery.events.length };
+            },
+          },
+          {
+            projection: "map",
+            store: "append",
+            scope: "aggregate",
+            collapse: "none",
+          },
+        )
+        .build();
+
+      const result = await built.maps.eeMap!.apply({
+        tenantId: "tenant-1",
+        events: [
+          { type: "trace/spanReceived", data: { traceId: "t", spanId: "s" } },
+        ],
+      });
+      expect(result).toEqual({ written: 1 });
+      expect(written).toEqual([
+        { type: "trace/spanReceived", data: { traceId: "t", spanId: "s" } },
+      ]);
+    });
+
+    it("refuses a pre-built map whose stated mount breaks ADR-106", () => {
+      let caught: unknown;
+      try {
+        definePipeline("trace")
+          .events({ spanReceived })
+          .withMap(
+            "eeRollup",
+            {
+              name: "eeRollup",
+              eventTypes: ["trace/spanReceived"],
+              apply: async () => ({ written: 0 }),
+            },
+            {
+              projection: "map",
+              store: "merge",
+              scope: "aggregate",
+              collapse: "none",
+              idempotency: "whole-bucket-replace",
+            },
+          )
+          .build();
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(ConfigurationError);
+      const err = caught as ConfigurationError;
+      expect(err.context).toMatchObject({
+        violations: [
+          { member: "eeRollup", rule: "merge-closed-to-new-adopters" },
+        ],
+      });
     });
   });
 
@@ -875,12 +1097,16 @@ describe("definePipeline", () => {
       await built.folds.summary!.apply({
         key: "t1",
         tenantId: "tenant-1",
-        events: [{ type: "trace/spanReceived", data: { traceId: "t1", spanId: "s1" } }],
+        events: [
+          { type: "trace/spanReceived", data: { traceId: "t1", spanId: "s1" } },
+        ],
       });
 
       expect(
         metrics.incs.some(
-          (c) => c.name === "es_fold_apply_outcomes_total" && c.labels?.kind === "applied",
+          (c) =>
+            c.name === "es_fold_apply_outcomes_total" &&
+            c.labels?.kind === "applied",
         ),
       ).toBe(true);
     });
@@ -897,12 +1123,16 @@ describe("definePipeline", () => {
 
       await built.maps.spans!.apply({
         tenantId: "tenant-1",
-        events: [{ type: "trace/spanReceived", data: { traceId: "t1", spanId: "s1" } }],
+        events: [
+          { type: "trace/spanReceived", data: { traceId: "t1", spanId: "s1" } },
+        ],
       });
 
       expect(
         metrics.incs.some(
-          (c) => c.name === "es_map_write_batch_total" && c.labels?.outcome === "written",
+          (c) =>
+            c.name === "es_map_write_batch_total" &&
+            c.labels?.outcome === "written",
         ),
       ).toBe(true);
     });
@@ -923,7 +1153,12 @@ describe("definePipeline", () => {
         built.folds.summary!.apply({
           key: "t1",
           tenantId: "tenant-1",
-          events: [{ type: "trace/spanReceived", data: { traceId: "t1", spanId: "s1" } }],
+          events: [
+            {
+              type: "trace/spanReceived",
+              data: { traceId: "t1", spanId: "s1" },
+            },
+          ],
         }),
       ).resolves.toEqual({ events: 1 });
     });

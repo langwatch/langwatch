@@ -1,5 +1,5 @@
 # Implementation:
-#   langwatch/src/server/event-sourcing/blob-maintenance/index.ts
+#   platform/app/src/server/event-sourcing/blob-maintenance/index.ts
 #
 # Greenfield rewrite of event-sourcing.old/pipelines/blob-maintenance/
 # (read-only reference for this rewrite) onto @langwatch/event-sourcing

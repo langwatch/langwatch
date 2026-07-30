@@ -3,9 +3,9 @@
 #
 # This used to be six independent install roots with six lockfiles: the repo
 # root, platform/app/, sdks/typescript/, mcp/typescript/, skills/ and
-# tests/agentic-e2e/. mcp/typescript was BOTH its own root and a member of
+# dev/tests/agentic-e2e/. mcp/typescript was BOTH its own root and a member of
 # platform/app/'s workspace, so CI installed it twice on every app build; skills/
-# and tests/agentic-e2e/ needed `--ignore-workspace` to escape a workspace they
+# and dev/tests/agentic-e2e/ needed `--ignore-workspace` to escape a workspace they
 # were never members of; and each root carried its own `overrides` block, so a
 # security pin applied in one could be silently absent from another.
 #
@@ -16,7 +16,7 @@ packages:
   - "mcp/typescript"
   - "sdks/typescript"
   - "skills"
-  - "tests/agentic-e2e"
+  - "dev/tests/agentic-e2e"
 
 # pnpm 10 already defaults this to false. It is stated explicitly because the
 # merge is what made it load-bearing: sdks/typescript/ is the package `langwatch`

@@ -2,11 +2,11 @@ import {
   CADENCE_WINDOW_MS,
   NOTIFICATION_CADENCES,
 } from "@langwatch/automations/cadences";
+import { isDispatchError } from "@langwatch/event-sourcing";
 import { TriggerAction } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { InvalidAnnotatorReferenceError } from "~/server/annotations/errors";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { isDispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import {
   computeScheduledFor,
   dispatchTriggerAction,

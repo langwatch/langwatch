@@ -32,7 +32,7 @@ import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { AzureBlobDriver } from "../azure-blob-driver";
 import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";

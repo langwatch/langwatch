@@ -11,7 +11,7 @@ Feature: License enforcement when one click creates two billable resources
   #
   # "Create a workflow agent" and "create a workflow evaluator" each create
   # a workflow AND a second resource. `checkCompoundLimits`
-  # (langwatch/src/hooks/useCompoundLicenseCheck.ts) chains the per-resource
+  # (platform/app/src/hooks/useCompoundLicenseCheck.ts) chains the per-resource
   # `useLicenseEnforcement` checks in array order and runs the create
   # callback only once every check has passed. Both drawers pass
   # `[workflowEnforcement, <resource>Enforcement]`, so the workflow limit is
@@ -19,7 +19,7 @@ Feature: License enforcement when one click creates two billable resources
   #
   # All copy quoted below is what the UI actually renders:
   #   - the upgrade modal body, from
-  #     langwatch/src/components/upgrade-modal/LimitContent.tsx
+  #     platform/app/src/components/upgrade-modal/LimitContent.tsx
   #   - each toast title, from the `fallbackTitle` the create site hands to
   #     `showErrorToast`.
   # Resource names in the modal come from LIMIT_TYPE_LABELS and are

@@ -1,5 +1,6 @@
 import { deriveAppendMapping } from "@langwatch/clickhouse";
 import { z } from "zod";
+import { firstAcceptanceWins } from "../firstAcceptanceWins";
 import {
   type CanonicalMetricDataPoint,
   canonicalMetricDataPointSchema,
@@ -15,17 +16,6 @@ export function toMetricDataPointStorageRow(
 
 /** Mirrors the deployed migration's `_retention_days` column default. */
 export const DEFAULT_RETENTION_DAYS = 308;
-
-const MAX_UINT64 = (1n << 64n) - 1n;
-
-/**
- * The engine keeps the largest version, so inverting the acceptance
- * millisecond makes the first accepted delivery of a `PointId` the one that
- * survives.
- */
-export function firstAcceptanceWins(acceptedAt: number): bigint {
-  return MAX_UINT64 - BigInt(acceptedAt);
-}
 
 /** A point plus the bookkeeping the store needs and the point itself does not carry. */
 export const stampedPointSchema = canonicalMetricDataPointSchema.extend({

@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 
 const tenantId = `test-trace-prefix-${nanoid()}`;

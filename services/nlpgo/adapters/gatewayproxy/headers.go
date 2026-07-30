@@ -6,7 +6,7 @@
 //
 // Three TS callsites talk to /proxy/v1/*:
 //   - platform/app/src/server/routes/playground.ts
-//   - langwatch/src/server/modelProviders/model.factory.ts
+//   - platform/app/src/server/modelProviders/model.factory.ts
 //   - platform/app/src/server/modelProviders/utils.ts
 //
 // All three send the customer's provider credentials as

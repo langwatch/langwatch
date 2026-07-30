@@ -1,10 +1,10 @@
 import type { LangyConversationStateData } from "@langwatch/langy";
 import type { Prisma } from "@prisma/client";
-import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing.old/projections/stateProjection.types";
+  LegacyProjectionStoreContext,
+  LegacyStateProjectionStore,
+  LegacyStoredProjection,
+} from "~/server/app-layer/_shared/legacyProjectionStore.types";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
 
@@ -17,7 +17,7 @@ type ConversationProjectionPrismaClient = {
   };
 };
 
-function fromRow(row: Row): StoredProjection<LangyConversationStateData> {
+function fromRow(row: Row): LegacyStoredProjection<LangyConversationStateData> {
   const {
     id: _id,
     projectId: _projectId,
@@ -39,14 +39,14 @@ function fromRow(row: Row): StoredProjection<LangyConversationStateData> {
 
 /** Postgres row I/O for the type-aware conversation projection. */
 export class PrismaLangyConversationProjectionRepository
-  implements StateProjectionStore<LangyConversationStateData>
+  implements LegacyStateProjectionStore<LangyConversationStateData>
 {
   constructor(private readonly prisma: ConversationProjectionPrismaClient) {}
 
   async load(
     ConversationId: string,
-    context: ProjectionStoreContext,
-  ): Promise<StoredProjection<LangyConversationStateData> | null> {
+    context: LegacyProjectionStoreContext,
+  ): Promise<LegacyStoredProjection<LangyConversationStateData> | null> {
     const projectId = String(context.tenantId);
     const row = await this.prisma.langyConversationProjection.findUnique({
       where: {
@@ -60,8 +60,8 @@ export class PrismaLangyConversationProjectionRepository
   }
 
   async store(
-    projection: StoredProjection<LangyConversationStateData>,
-    context: ProjectionStoreContext,
+    projection: LegacyStoredProjection<LangyConversationStateData>,
+    context: LegacyProjectionStoreContext,
   ): Promise<void> {
     const projectId = String(context.tenantId);
     const ConversationId = context.aggregateId;

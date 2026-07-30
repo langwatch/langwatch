@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29
 
-**Status:** Accepted — the boundary rule is in force and enforced by a test; the
+**Status:** Superseded by [ADR-110](./110-topology.md) (2026-07-30). Previously: Accepted — the boundary rule is in force and enforced by a test; the
 directory move itself is not yet made.
 
 **Related:** ADR-098 (the core semantics this package encloses — commands,

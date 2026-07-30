@@ -69,6 +69,16 @@ export interface FoldStateCache<State> {
   delete(key: string, context: StoreContext): Promise<void>;
 }
 
+/** Every read is a miss. For a fold that has decided to pay a point read per
+ * delivery — a deliberate choice, spelled out, rather than an omission. */
+export function noFoldStateCache<State>(): FoldStateCache<State> {
+  return {
+    get: () => Promise.resolve(null),
+    set: () => Promise.resolve(),
+    delete: () => Promise.resolve(),
+  };
+}
+
 export interface ClickHouseReplacingArgs<State, Columns extends ColumnMap> {
   readonly client: ClickHouseClient;
   /** Must declare `merge: replacing({ version })` (ADR-099). */
@@ -99,8 +109,23 @@ export interface ClickHouseReplacingArgs<State, Columns extends ColumnMap> {
    */
   readonly state?: z.ZodType<State>;
   readonly row?: RowMapping<State, Columns>;
-  readonly cache?: FoldStateCache<State>;
+  /**
+   * Required, not optional. A fold reads its prior state back on every
+   * delivery, so an unfronted store is one ClickHouse point read per event —
+   * and forgetting the cache is silent, which is how the experiment-run fold
+   * ended up the only one paying it. Pass `noFoldStateCache()` to opt out
+   * deliberately.
+   */
+  readonly cache: FoldStateCache<State>;
   readonly retentionDays?: number;
+  /**
+   * Bounds the read on a sort-key column that leads the key columns, so a
+   * time-leading key is a seek rather than a tenant-range scan. A windowed miss
+   * always retries unwindowed before reporting `absent`, because reporting a row
+   * that exists outside the window as absent is the silent population-wide reset
+   * ADR-107 decision 9 exists to prevent.
+   */
+  readonly readWindow?: { readonly column: string; readonly lookbackMs: number };
   /** @default createRowCodec() */
   readonly codec?: WireCodec;
 }
@@ -133,16 +158,24 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
   requireColumn(table, stateVersionColumn, "stateVersionColumn");
   requireColumn(table, tenant, "tenant");
 
-  // The read binds the tenant and the key columns and nothing else, so they
-  // must be the front of the sort key. A column merely present further along
-  // still scans.
+  // The read binds the tenant, the key columns, and any declared window
+  // column, so exactly those must be the front of the sort key. A column
+  // merely present further along still scans.
+  const windowColumn = args.readWindow?.column;
+  if (windowColumn !== undefined) {
+    requireColumn(table, windowColumn, "readWindow.column");
+  }
   const bound = new Set<string>([tenant, ...keyColumns]);
-  const prefix = new Set(table.sortKey.slice(0, bound.size));
-  for (const column of bound) {
+  const boundWithWindow =
+    windowColumn === undefined ? bound : new Set([...bound, windowColumn]);
+  const prefix = new Set(table.sortKey.slice(0, boundWithWindow.size));
+  for (const column of boundWithWindow) {
     if (!prefix.has(column)) {
+      const needed = [...boundWithWindow].join(", ");
       throw new ReplaceStoreConfigurationError(
         `replace store for table "${table.name}": the sort key [${table.sortKey.join(", ")}] ` +
-          `must start with [${[...bound].join(", ")}] — a read bound on those alone would otherwise scan`,
+          `must start with [${needed}] — a read bound on those alone would otherwise scan. ` +
+          `A time-leading key is seekable only behind a declared readWindow on that column (ADR-109)`,
       );
     }
   }
@@ -177,11 +210,27 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
   const keyPredicate = keyColumns
     .map((column, index) => `AND ${names.of(column)} = {key${index}:String}`)
     .join(" ");
-  const readSql =
+  const selectFrom =
     `SELECT ${names.list(table.columnNames)} ` +
     `FROM ${names.of(table.name)} ` +
-    `WHERE ${names.of(tenant)} = {tenantId:String} ${keyPredicate} ` +
-    `ORDER BY ${names.of(table.merge.version)} DESC LIMIT 1`;
+    `WHERE ${names.of(tenant)} = {tenantId:String} ${keyPredicate} `;
+  const orderLimit = `ORDER BY ${names.of(table.merge.version)} DESC LIMIT 1`;
+  const readSql = selectFrom + orderLimit;
+
+  const windowChType =
+    windowColumn === undefined
+      ? undefined
+      : table.columns[windowColumn]?.chType;
+  const windowedReadSql =
+    windowColumn === undefined
+      ? undefined
+      : `${selectFrom}AND ${names.of(windowColumn)} >= {windowFrom:${windowChType}} ${orderLimit}`;
+  const windowFrom = (now: number): string | Date => {
+    const from = now - (args.readWindow?.lookbackMs ?? 0);
+    return windowChType === "UInt64" || windowChType === "Int64"
+      ? String(from)
+      : new Date(from);
+  };
 
   const keyParams = (foldKey: string): Record<string, string> => {
     const parts = splitKey(foldKey);
@@ -194,21 +243,32 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
     return Object.fromEntries(parts.map((part, index) => [`key${index}`, part]));
   };
 
-  const readFromTable = async (
-    foldKey: string,
-    context: StoreContext,
-  ): Promise<StateRead<State>> => {
-    const result = await client.query({
+  const queryRow = (foldKey: string, context: StoreContext, windowed: boolean) =>
+    client.query({
       tenantId: context.tenantId,
-      sql: readSql,
+      sql: windowed ? (windowedReadSql ?? readSql) : readSql,
       params: {
         ...names.params,
         tenantId: context.tenantId,
         ...keyParams(foldKey),
+        ...(windowed && windowedReadSql !== undefined
+          ? { windowFrom: windowFrom(Date.now()) }
+          : {}),
       },
       settings: READ_YOUR_WRITES_SETTINGS,
     });
 
+  const readFromTable = async (
+    foldKey: string,
+    context: StoreContext,
+  ): Promise<StateRead<State>> => {
+    // A windowed miss is not an answer: the row may simply be older than the
+    // window, and reporting that as absent would refold the aggregate from
+    // genesis and overwrite it.
+    let result = await queryRow(foldKey, context, windowedReadSql !== undefined);
+    if (!result.rows[0] && windowedReadSql !== undefined) {
+      result = await queryRow(foldKey, context, false);
+    }
     const row = result.rows[0];
     if (!row) return { kind: "absent" };
 
@@ -251,18 +311,25 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
       context: StoreContext,
     ): Promise<StateRead<State>> {
       if (cache) {
-        const cached = await cache.get(foldKey, context);
+        // An unreachable cache is a miss, never an error: the state is still in
+        // the durable store, so losing the tier costs latency and the
+        // read-your-writes window, not correctness (ADR-107 decision 10).
+        const cached = await cache
+          .get(foldKey, context)
+          .catch(() => null as StoredState<State> | null);
         if (cached?.version === version) {
           return { kind: "found", stored: cached };
         }
         // An entry under any other version is dropped rather than reported:
         // reporting it would make the fold unrecoverable, because nothing else
         // ever clears the key.
-        if (cached) await cache.delete(foldKey, context);
+        if (cached) await cache.delete(foldKey, context).catch(() => undefined);
       }
       const read = await readFromTable(foldKey, context);
       if (cache && read.kind === "found") {
-        await cache.set(foldKey, read.stored, context);
+        // Populating the tier is best-effort for the same reason: the row was
+        // already found, so a failure here must not fail the read.
+        await cache.set(foldKey, read.stored, context).catch(() => undefined);
       }
       return read;
     },

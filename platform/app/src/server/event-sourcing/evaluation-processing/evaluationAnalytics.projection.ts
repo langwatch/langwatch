@@ -1,3 +1,4 @@
+import { trimAttributesForAnalytics } from "../analyticsAttributeTrim";
 import type {
   EvaluationReportedData,
   EvaluationStartedData,
@@ -31,7 +32,11 @@ export function initEvaluationState(): EvaluationState {
   };
 }
 
-/** Scalar metadata values become attribute strings; anything else is dropped. */
+/**
+ * Scalar metadata values become attribute strings; anything else is dropped.
+ * Trimmed as it enters, not at write time: the state IS the stored row here, so
+ * bounding it on the way in is what keeps payload out of the slim table.
+ */
 function metadataAttributes(
   metadata: Record<string, unknown> | undefined,
 ): Record<string, string> {
@@ -46,7 +51,7 @@ function metadataAttributes(
       attributes[key] = String(value);
     }
   }
-  return attributes;
+  return trimAttributesForAnalytics(attributes);
 }
 
 /** `min` over every event, so refining "when did this begin" never depends on

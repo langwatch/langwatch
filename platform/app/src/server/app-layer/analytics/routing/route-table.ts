@@ -45,7 +45,7 @@ import type { AggregationTypes } from "~/server/analytics/types";
 import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
+} from "~/server/event-sourcing/analyticsAttributeTrim";
 import type { FilterField } from "~/server/filters/types";
 import {
   collectStringValues,

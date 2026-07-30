@@ -36,7 +36,7 @@ import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 import { SpendSpikeAnomalyEvaluator } from "../spendSpikeAnomalyEvaluator.service";
 

@@ -32,15 +32,15 @@ import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/re
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
 } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 
 let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;

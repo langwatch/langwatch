@@ -28,7 +28,6 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import {
   EVALUATION_REPORTED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_VERSION_LATEST,
@@ -43,7 +42,7 @@ import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import { mintFileUri } from "~/server/stored-objects/uri";
-import { getTestClickHouseClient } from "../../../event-sourcing.old/__tests__/integration/testContainers";
+import { getTestClickHouseClient } from "~/test-utils/integration/testContainers";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
   EVAL_INPUTS_INLINE_MAX_BYTES,
@@ -212,7 +211,7 @@ describe("evaluation inputs offload (integration)", () => {
       const event = EventUtils.createEvent<EvaluationReportedEvent>({
         aggregateType: "evaluation",
         aggregateId: evaluationId,
-        tenantId: createTenantId(tenantId),
+        tenantId: tenantId,
         type: EVALUATION_REPORTED_EVENT_TYPE,
         version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
         data: {
@@ -418,7 +417,7 @@ describe("evaluation inputs offload (integration)", () => {
       const event = EventUtils.createEvent<EvaluationReportedEvent>({
         aggregateType: "evaluation",
         aggregateId: evaluationId,
-        tenantId: createTenantId(tenantId),
+        tenantId: tenantId,
         type: EVALUATION_REPORTED_EVENT_TYPE,
         version: EVALUATION_REPORTED_EVENT_VERSION_LATEST,
         data: {

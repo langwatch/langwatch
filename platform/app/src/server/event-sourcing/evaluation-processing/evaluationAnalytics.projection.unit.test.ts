@@ -47,6 +47,25 @@ describe("evaluationAnalytics projection", () => {
     });
   });
 
+  describe("when an event carries payload-shaped metadata", () => {
+    it("keeps the slim table slim: drops a blocklisted key and caps a long value", () => {
+      const state = applyEvaluationReported(
+        initEvaluationState(),
+        reported({
+          metadata: {
+            "gen_ai.prompt": "the whole conversation",
+            "some.blob": "x".repeat(300),
+            "metadata.tier": "pro",
+          },
+        }),
+      );
+
+      expect(state.attributes["gen_ai.prompt"]).toBeUndefined();
+      expect(state.attributes["some.blob"]).toBeUndefined();
+      expect(state.attributes["metadata.tier"]).toBe("pro");
+    });
+  });
+
   describe("when a reported event is applied", () => {
     it("sets the terminal status and completedAt", () => {
       const state = applyEvaluationReported(

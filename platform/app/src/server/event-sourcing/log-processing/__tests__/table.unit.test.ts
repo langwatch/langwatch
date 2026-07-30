@@ -2,37 +2,37 @@ import { ch, defineTable, replacing } from "@langwatch/clickhouse";
 import { describe, expect, it } from "vitest";
 import { logRecordsTable, logUsageEstimatesTable } from "../table";
 
+/** Migration parity — engine, keys, anchors, column types — is asserted against
+ *  the migration SQL in `../../__tests__/tableMigrationParity.unit.test.ts`. */
 describe("logRecordsTable", () => {
-  it("declares the deployed ReplacingMergeTree(DedupVersion), so a redelivery is retry-safe", () => {
-    expect(logRecordsTable.merge).toEqual({
-      kind: "replacing",
-      version: "DedupVersion",
-    });
-  });
-
-  it("anchors its partition and TTL on AcceptedAt — frozen and platform-controlled", () => {
-    const description = logRecordsTable.describe();
-    expect(description.partition.column).toBe("AcceptedAt");
-    expect(description.ttl?.anchor).toBe("AcceptedAt");
-  });
-
   describe("given the deployed anchor, which is the customer-supplied TimeUnixMs", () => {
-    it("is refused by defineTable, which is why the declaration cannot mirror the deployment", () => {
-      expect(() =>
+    it("is refused unless the declaration names the debt, which is why this one does", () => {
+      const asDeployed = {
+        name: "log_records_as_deployed",
+        merge: replacing({ version: "WrittenAt" }),
+        sortKey: ["TenantId", "TimeUnixMs"],
+        partition: { by: "toYearWeek(TimeUnixMs)", column: "TimeUnixMs" },
+        tenant: ["TenantId"],
+        ttl: { anchor: "TimeUnixMs" },
+        columns: {
+          TenantId: ch.string(),
+          TimeUnixMs: ch.occurredAt(),
+          WrittenAt: ch.writtenAt(),
+        },
+      } as const;
+
+      expect(() => defineTable(asDeployed)).toThrow(
+        /partition column "TimeUnixMs" is not frozen/,
+      );
+      expect(
         defineTable({
-          name: "log_records_as_deployed",
-          merge: replacing({ version: "WrittenAt" }),
-          sortKey: ["TenantId", "TimeUnixMs"],
-          partition: { by: "toYearWeek(TimeUnixMs)", column: "TimeUnixMs" },
-          tenant: ["TenantId"],
-          ttl: { anchor: "TimeUnixMs" },
-          columns: {
-            TenantId: ch.string(),
-            TimeUnixMs: ch.occurredAt(),
-            WrittenAt: ch.writtenAt(),
-          },
-        }),
-      ).toThrow(/partition column "TimeUnixMs" is not frozen/);
+          ...asDeployed,
+          structuralDebt: [{ column: "TimeUnixMs", reason: "migration 00050" }],
+        }).partition.column,
+      ).toBe("TimeUnixMs");
+      expect(
+        logRecordsTable.structuralDebt?.map((debt) => debt.column),
+      ).toContain("TimeUnixMs");
     });
   });
 
@@ -78,20 +78,12 @@ describe("logRecordsTable", () => {
 });
 
 describe("logUsageEstimatesTable", () => {
-  it("declares the deployed ReplacingMergeTree(DedupVersion), like log_records", () => {
-    expect(logUsageEstimatesTable.merge).toEqual({
-      kind: "replacing",
-      version: "DedupVersion",
-    });
-  });
-
-  it("anchors its partition and TTL on AcceptedAt, matching the deployed migration exactly", () => {
-    const description = logUsageEstimatesTable.describe();
-    expect(description.partition).toEqual({
-      by: "toYYYYMM(AcceptedAt)",
-      column: "AcceptedAt",
-    });
-    expect(description.ttl).toEqual({ anchor: "AcceptedAt" });
+  it("needs no structural debt, being the one log table anchored on our own stamp", () => {
+    expect(logUsageEstimatesTable.structuralDebt).toBeUndefined();
+    expect(
+      logUsageEstimatesTable.columns[logUsageEstimatesTable.partition.column]
+        ?.timeRole,
+    ).toBe("acceptedAt");
   });
 
   it("keeps RecordId in its sort key", () => {

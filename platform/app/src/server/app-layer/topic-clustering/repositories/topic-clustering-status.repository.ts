@@ -1,7 +1,9 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
-import type { TopicClusteringRunHistoryEntry } from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
+import {
+  type RunHistoryViewEntry,
+  TOPIC_CLUSTERING_PROCESS_NAME,
+} from "~/server/event-sourcing/topic-clustering-processing";
 
 import { parseRunHistoryRuns } from "./topic-clustering-run-history-projection.prisma.repository";
 
@@ -20,7 +22,7 @@ export interface TopicClusteringStatusRepository {
   }): Promise<TopicClusteringStatusRecord>;
   findRunHistoryByProjectId(params: {
     projectId: string;
-  }): Promise<TopicClusteringRunHistoryEntry[]>;
+  }): Promise<RunHistoryViewEntry[]>;
 }
 
 /**
@@ -64,7 +66,7 @@ export class PrismaTopicClusteringStatusRepository
 
   async findRunHistoryByProjectId(params: {
     projectId: string;
-  }): Promise<TopicClusteringRunHistoryEntry[]> {
+  }): Promise<RunHistoryViewEntry[]> {
     const row =
       await this.prisma.topicClusteringRunHistoryProjection.findUnique({
         where: { projectId: params.projectId },

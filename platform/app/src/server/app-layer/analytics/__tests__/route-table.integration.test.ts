@@ -24,14 +24,14 @@ import { buildTimeseriesQuery } from "~/server/analytics/clickhouse/aggregation-
 import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   type TraceAnalyticsRow,
 } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
 import { buildSlimTimeseriesQuery } from "../query-builders/slim-timeseries-query";
 import type { AnalyticsTimeseriesBuilderInput } from "../types";

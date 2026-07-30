@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-30
 
-**Status:** Accepted — this is the shape a pipeline is declared in. There is no
+**Status:** Superseded by [ADR-107](./107-the-pipeline.md) (2026-07-30). Previously: Accepted — this is the shape a pipeline is declared in. There is no
 second one.
 
 **Builds on:** ADR-098 (the two projection kinds, ordering as best effort, and

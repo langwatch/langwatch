@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29
 
-**Status:** Accepted — the boundary is in force as a rule; the one crossing named
+**Status:** Superseded by [ADR-108](./108-the-dispatch-plane.md) (2026-07-30). Previously: Accepted — the boundary is in force as a rule; the one crossing named
 in Context is still in the code and is deleted by the migration this ADR arms.
 
 **Builds on:** ADR-098 (the third read outcome — present but undecodable —

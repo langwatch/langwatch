@@ -18,6 +18,11 @@ export const matchRecordedDataSchema = z.object({
   actionClass: triggerActionClassSchema,
   traceDebounceMs: z.number().int().nonnegative(),
   notificationCadence: z.enum(NOTIFICATION_CADENCES),
+  /** The match's own instant, stamped by the command. `triggerSettlement`'s
+   *  settle window — and so its persist intent's message key — derives from
+   *  this, and a key that read the runtime clock would be fresh on every
+   *  redelivery (ADR-107 decision 16). */
+  occurredAt: z.number().int(),
 });
 export type MatchRecordedData = z.infer<typeof matchRecordedDataSchema>;
 

@@ -129,6 +129,7 @@ export interface BillingReportingPipelineDeps {
     billingMonth: string;
   }) => Promise<string[]>;
   readonly pruneDispatchedIntentsBefore: (params: {
+    processName: string;
     before: number;
   }) => Promise<number>;
   readonly resolveOrganizationId?: (

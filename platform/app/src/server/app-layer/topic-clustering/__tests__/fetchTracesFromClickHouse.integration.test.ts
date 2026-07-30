@@ -26,7 +26,7 @@ import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClien
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { fetchTracesFromClickHouse } from "../clustering";
 
 const TENANT_ID = "topic-fetch-test";

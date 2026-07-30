@@ -23,6 +23,7 @@ describe("checkOrderInvariance", () => {
       { id: "d", value: 2 },
     ];
 
+    /** @scenario an event applied late reaches the same state as one applied in order */
     /** @scenario a fold whose fields keep a maximum or a set membership is unaffected by order */
     it("reports invariant across every permutation", () => {
       const report = checkOrderInvariance({
@@ -66,6 +67,7 @@ describe("checkOrderInvariance", () => {
       { id: "b", value: 4 },
     ];
 
+    /** @scenario a fold accumulating a counter by addition is rejected by the invariance check */
     /** @scenario a running total is caught, because a retried delivery would double it */
     it("finds a duplication counterexample even though every order agrees", () => {
       const report = checkOrderInvariance({

@@ -62,6 +62,16 @@ export function validateMount(mount: Mount): MountViolation[] {
     });
   }
 
+  if (mount.projection === "map" && mount.store === "replace") {
+    violations.push({
+      rule: "map-store-must-not-be-replace",
+      message:
+        `a "map" has no accumulator, so its executor takes an append or merge ` +
+        `store and nothing can run it against a "replace" one — the mount would ` +
+        `validate with no executor able to execute it (ADR-107 decision 14)`,
+    });
+  }
+
   if (mount.store === "merge") {
     violations.push({
       rule: "merge-closed-to-new-adopters",
@@ -108,7 +118,7 @@ export function validateMount(mount: Mount): MountViolation[] {
  * Declared `as const satisfies readonly MountShape[]` rather than typed
  * `readonly MountShape[]` outright: `satisfies` still checks every entry
  * against `MountShape`, but `as const` keeps each entry's literal type, so
- * `LegalMountShape` below is the actual union of the 24 legal combinations —
+ * `LegalMountShape` below is the actual union of the 13 legal combinations —
  * "the legal combinations" are a type as well as a runtime list, not just a
  * same-shaped array.
  */
@@ -117,36 +127,45 @@ export const LEGAL_MOUNT_SHAPES = [
   // writing to a store that reads back, never discarding to latest. `batch`
   // is legal for a fold (it may still gather several events for the same
   // aggregate); only `latest` is forbidden, by rule fold-collapse-must-not-be-latest.
-  { projection: "fold", store: "replace", scope: "aggregate", collapse: "none" },
-  { projection: "fold", store: "replace", scope: "aggregate", collapse: "batch" },
+  {
+    projection: "fold",
+    store: "replace",
+    scope: "aggregate",
+    collapse: "none",
+  },
+  {
+    projection: "fold",
+    store: "replace",
+    scope: "aggregate",
+    collapse: "batch",
+  },
 
-  // A map: any scope, any collapse, on `append` or `replace` — `merge` is
-  // closed (rule merge-closed-to-new-adopters) — except that an `event` scope
+  // A map: any scope, any collapse, on `append` only — `merge` is closed
+  // (merge-closed-to-new-adopters) and `replace` has no executor
+  // (map-store-must-not-be-replace) — except that an `event` scope
   // can never gather a `batch` (rule event-scope-cannot-batch), which removes
   // one cell per store kind.
   { projection: "map", store: "append", scope: "aggregate", collapse: "none" },
   { projection: "map", store: "append", scope: "aggregate", collapse: "batch" },
-  { projection: "map", store: "append", scope: "aggregate", collapse: "latest" },
+  {
+    projection: "map",
+    store: "append",
+    scope: "aggregate",
+    collapse: "latest",
+  },
   { projection: "map", store: "append", scope: "event", collapse: "none" },
   { projection: "map", store: "append", scope: "event", collapse: "latest" },
   { projection: "map", store: "append", scope: "partition", collapse: "none" },
   { projection: "map", store: "append", scope: "partition", collapse: "batch" },
-  { projection: "map", store: "append", scope: "partition", collapse: "latest" },
+  {
+    projection: "map",
+    store: "append",
+    scope: "partition",
+    collapse: "latest",
+  },
   { projection: "map", store: "append", scope: "global", collapse: "none" },
   { projection: "map", store: "append", scope: "global", collapse: "batch" },
   { projection: "map", store: "append", scope: "global", collapse: "latest" },
-
-  { projection: "map", store: "replace", scope: "aggregate", collapse: "none" },
-  { projection: "map", store: "replace", scope: "aggregate", collapse: "batch" },
-  { projection: "map", store: "replace", scope: "aggregate", collapse: "latest" },
-  { projection: "map", store: "replace", scope: "event", collapse: "none" },
-  { projection: "map", store: "replace", scope: "event", collapse: "latest" },
-  { projection: "map", store: "replace", scope: "partition", collapse: "none" },
-  { projection: "map", store: "replace", scope: "partition", collapse: "batch" },
-  { projection: "map", store: "replace", scope: "partition", collapse: "latest" },
-  { projection: "map", store: "replace", scope: "global", collapse: "none" },
-  { projection: "map", store: "replace", scope: "global", collapse: "batch" },
-  { projection: "map", store: "replace", scope: "global", collapse: "latest" },
 ] as const satisfies readonly MountShape[];
 
 /** The union of the 24 legal combinations, derived from {@link LEGAL_MOUNT_SHAPES}

@@ -67,10 +67,10 @@ const REPO_ROOT = resolve(__dirname, "../../..");
  * cannot see is the same "0/0, all bound ✓" trap a `.feature` file with no tags
  * falls into, one directory up.
  *
- * `python-sdk/specs` was missing for the same reason, discovered later: every
+ * `sdks/python/specs` was missing for the same reason, discovered later: every
  * scenario under it — fully tagged `@unit` / `@integration` in every file —
  * bound nothing and was invisible to this check, not because the behaviour
- * was untested but because nothing in `python-sdk` carried the `@scenario`
+ * was untested but because nothing in `sdks/python` carried the `@scenario`
  * annotation this checker looks for. Adding the root did not make those files
  * pass; it made the gap visible. See `LEGACY_UNBOUND` for the files that
  * surfaced already in that state.
@@ -203,23 +203,23 @@ const LEGACY_UNBOUND: string[] = [
   "specs/langy/langy-projection-independent-reactions.feature",
   "specs/langy/langy-turn-recovery.feature",
 
-  // Surfaced by adding `python-sdk/specs` to SPECS_ROOTS. Every scenario in
+  // Surfaced by adding `sdks/python/specs` to SPECS_ROOTS. Every scenario in
   // these three files carries a `@unit` / `@integration` tag, so they were
-  // never inert — they were invisible, the same trap `typescript-sdk/specs`
+  // never inert — they were invisible, the same trap `sdks/typescript/specs`
   // fell into above. Unlike that case, the behaviour these describe is not
-  // untested: `python-sdk/tests/experiment/test_with_target.py`,
+  // untested: `sdks/python/tests/experiment/test_with_target.py`,
   // `test_with_target_integration.py`, and the two
   // `test_server_run_results.py` files (experiment + workflow) have a test
   // method or class for nearly every scenario here — e.g.
   // `TestTargetBasics.test_target_creates_dataset_entry` for "target creates
   // dataset entry per target". What's missing is the `@scenario` annotation
   // this checker reads, not the test. Binding them means editing
-  // `python-sdk/tests/`, which is out of scope for the change that added
+  // `sdks/python/tests/`, which is out of scope for the change that added
   // this root — tracked here rather than claimed as `@unimplemented`, which
   // would be false.
-  "python-sdk/specs/evaluation/with_target.feature",
-  "python-sdk/specs/experiment/server_run_results.feature",
-  "python-sdk/specs/workflow/server_run_results.feature",
+  "sdks/python/specs/evaluation/with_target.feature",
+  "sdks/python/specs/experiment/server_run_results.feature",
+  "sdks/python/specs/workflow/server_run_results.feature",
 ];
 
 /**
@@ -472,13 +472,13 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/resource-limit-notifications.feature",
   "specs/licensing/subscription-page.feature",
   "specs/licensing/usage-page-navigation.feature",
-  "specs/mcp/typescript/analytics-tool.feature",
-  "specs/mcp/typescript/api-key-tools.feature",
-  "specs/mcp/typescript/experiment-results-tool.feature",
-  "specs/mcp/typescript/project-api-key-tools.feature",
-  "specs/mcp/typescript/project-tools.feature",
-  "specs/mcp/typescript/prompt-tools.feature",
-  "specs/mcp/typescript/scenario-tool-formatters.feature",
+  "specs/mcp-server/analytics-tool.feature",
+  "specs/mcp-server/api-key-tools.feature",
+  "specs/mcp-server/experiment-results-tool.feature",
+  "specs/mcp-server/project-api-key-tools.feature",
+  "specs/mcp-server/project-tools.feature",
+  "specs/mcp-server/prompt-tools.feature",
+  "specs/mcp-server/scenario-tool-formatters.feature",
   "specs/members/member-role-team-restrictions.feature",
   "specs/migration/vite-migration.feature",
   "specs/model-config/anthropic-empty-content.feature",
@@ -537,8 +537,8 @@ const LEGACY_INERT: string[] = [
   "specs/prompts/prompt-selection-drawer.feature",
   "specs/prompts/structured-outputs-streaming.feature",
   "specs/prompts/unified-defaults.feature",
-  "specs/sdks/python/async-experiment-parallelism.feature",
-  "specs/sdks/python/experiment-print-summary.feature",
+  "specs/python-sdk/async-experiment-parallelism.feature",
+  "specs/python-sdk/experiment-print-summary.feature",
   "specs/rbac/fetch-org-role-permission-resolution.feature",
   "specs/scenarios/ai-create-modal.feature",
   "specs/scenarios/event-driven-execution-prep.feature",
@@ -632,11 +632,11 @@ const LEGACY_INERT: string[] = [
   "specs/traces/trace-io-extraction.feature",
   "specs/traces/vertex-adk-canonicalisation.feature",
   "specs/triggers/event-sourced-graph-triggers.feature",
-  "specs/sdks/typescript/cli-docs.feature",
-  "specs/sdks/typescript/cli-error-handling.feature",
-  "specs/sdks/typescript/cli-experiment-results.feature",
-  "specs/sdks/typescript/cli-projects-api-keys.feature",
-  "specs/sdks/typescript/prompt-tags.feature",
+  "specs/typescript-sdk/cli-docs.feature",
+  "specs/typescript-sdk/cli-error-handling.feature",
+  "specs/typescript-sdk/cli-experiment-results.feature",
+  "specs/typescript-sdk/cli-projects-api-keys.feature",
+  "specs/typescript-sdk/prompt-tags.feature",
   "specs/variables-ui/prompt-editor-drawer-mappings.feature",
   "specs/workflows/studio-drawer-migration.feature",
   "specs/workflows/studio-evaluator-node-drawer.feature",

@@ -21,14 +21,13 @@ import { replayGooseMigrationUp } from "~/server/clickhouse/__tests__/migrationR
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
-import {
   createSpanReceivedEvent,
   msToUnixNano,
 } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "../budget.repository";
@@ -106,7 +105,7 @@ async function recordRequestFor({
   if (!record) throw new Error("gateway span derived no debit record");
   await projection.store.append(record, {
     aggregateId: event.aggregateId,
-    tenantId: createTenantId(projectId),
+    tenantId: projectId,
   });
 }
 

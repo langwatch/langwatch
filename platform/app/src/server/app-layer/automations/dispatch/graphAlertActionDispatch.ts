@@ -6,6 +6,7 @@ import {
 } from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import type { GraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
+import { DispatchError } from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
 import type { Project, Trigger } from "@prisma/client";
 import { createHash } from "crypto";
@@ -20,7 +21,6 @@ import {
   decryptWebhookHeaders,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
-import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 
 const logger = createLogger("langwatch:graph-alert-action-dispatch");

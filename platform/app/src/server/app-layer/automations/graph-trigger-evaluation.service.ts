@@ -28,6 +28,7 @@ import {
   slackDeliveryMethodOf,
 } from "@langwatch/automations/providers/slack";
 import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
+import { DispatchError } from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
@@ -48,7 +49,6 @@ import {
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
-import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,

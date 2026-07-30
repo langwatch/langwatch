@@ -3,9 +3,8 @@ import {
   LANGY_CONVERSATION_EVENT_VERSIONS,
 } from "@langwatch/langy";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing.old/pipelines/langy-conversation-processing/schemas/events";
-import type { EventSubscriberContext } from "~/server/event-sourcing.old/subscribers/eventSubscriber.types";
+import type { EventSubscriberContext } from "~/server/app-layer/langy/subscribers/eventSubscriber.types";
+import type { LangyConversationProcessingEvent } from "~/server/app-layer/langy/subscribers/langyConversationProcessingEvent";
 
 import { createLangyConversationUpdateBroadcastSubscriber } from "../langy-conversation-update-broadcast.subscriber";
 
@@ -99,7 +98,7 @@ describe("Langy conversation update broadcast subscriber", () => {
     const deps = makeDeps();
     const subscriber = createLangyConversationUpdateBroadcastSubscriber(deps);
     const event = makeEvent({
-      tenantId: createTenantId("project_2"),
+      tenantId: "project_2",
       aggregateId: "conv_2",
     });
 

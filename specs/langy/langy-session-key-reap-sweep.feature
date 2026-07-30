@@ -1,6 +1,6 @@
 # Implementation:
-#   langwatch/src/server/event-sourcing/langy-maintenance/index.ts
-#   langwatch/src/server/app-layer/langy/langyApiKey.ts (reapExpiredLangySessionApiKeys, unchanged)
+#   platform/app/src/server/event-sourcing/langy-maintenance/index.ts
+#   platform/app/src/server/app-layer/langy/langyApiKey.ts (reapExpiredLangySessionApiKeys, unchanged)
 #
 # Greenfield rewrite of event-sourcing.old/pipelines/langy-maintenance/
 # (read-only reference for this rewrite) onto @langwatch/event-sourcing

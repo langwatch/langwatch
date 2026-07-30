@@ -20,7 +20,7 @@ import type { TraceAnalyticsRow } from "~/server/event-sourcing.old/pipelines/tr
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { TraceAnalyticsClickHouseRepository } from "../trace-analytics.clickhouse.repository";
 
 let ch: ClickHouseClient;

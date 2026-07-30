@@ -19,7 +19,7 @@ import type { EvaluationAnalyticsRow } from "~/server/event-sourcing.old/pipelin
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { EvaluationAnalyticsClickHouseRepository } from "../evaluation-analytics.clickhouse.repository";
 
 let ch: ClickHouseClient;

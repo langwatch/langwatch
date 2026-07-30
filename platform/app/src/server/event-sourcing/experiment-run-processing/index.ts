@@ -3,6 +3,8 @@ import {
   clickhouseAppend,
   clickhouseReplacing,
   deriveRowMapping,
+  type FoldStateCache,
+  noFoldStateCache,
 } from "@langwatch/clickhouse";
 import {
   ConfigurationError,
@@ -178,6 +180,9 @@ export interface ExperimentRunBillingPoke {
 export interface ExperimentRunProcessingDeps {
   readonly client: ClickHouseClient;
   readonly metrics?: Metrics;
+  /** The `experimentRunState` fold's read-back cache tier. Absent means a
+   *  ClickHouse point read on every delivery — deliberate, not an omission. */
+  readonly cache?: FoldStateCache<ExperimentRunState>;
   /**
    * Required-but-nullable (ADR-102): every composition site has to say on
    * purpose whether stuck runs are watched, rather than silently getting no
@@ -214,6 +219,7 @@ export function createExperimentRunProcessingPipeline(
     stateVersionColumn: "Version",
     row: { toRow: runRowMapping.toRow, fromRow: runRowFromRow },
     retentionDays: DEFAULT_RETENTION_DAYS,
+    cache: deps.cache ?? noFoldStateCache(),
   });
   assertMountIsLegal("experimentRunState", {
     projection: "fold",

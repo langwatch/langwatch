@@ -129,7 +129,7 @@ function compareCatalogueToMigrations({
     }
 
     for (const tenantColumn of entry.tenantColumns) {
-      if (!shape.columns.includes(tenantColumn)) {
+      if (!shape.columnTypes.has(tenantColumn)) {
         findings.push({
           table,
           problem: `catalogue names ${tenantColumn} as a tenant column, but the table has no such column`,
@@ -138,7 +138,7 @@ function compareCatalogueToMigrations({
     }
 
     for (const heavyColumn of entry.heavyColumns) {
-      if (!shape.columns.includes(heavyColumn)) {
+      if (!shape.columnTypes.has(heavyColumn)) {
         findings.push({
           table,
           problem: `catalogue names ${heavyColumn} as a heavy column, but the table has no such column`,

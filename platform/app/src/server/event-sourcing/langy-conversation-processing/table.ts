@@ -10,20 +10,23 @@ import {
 } from "./maps";
 
 /**
- * `langy_analytics_events` (migration 00047), declared in the shape a store may
- * use rather than the shape deployed today: the deployed DDL partitions and
- * expires on `OccurredAt`, which the customer's process stamps, so neither role
- * may anchor on it (ADR-099). Both move onto `AcceptedAt`; one re-key migration
- * makes the deployed table match. `_size_bytes` stays undeclared — it is
- * MATERIALIZED, never inserted.
+ * `langy_analytics_events` as migration 00047 deployed it. `_size_bytes` stays
+ * undeclared — it is MATERIALIZED, never inserted.
  */
 export const langyAnalyticsEventsTable = defineTable({
   name: "langy_analytics_events",
   merge: replacing({ version: "ProjectedAt" }),
-  sortKey: ["TenantId", "AcceptedAt", "EventId"],
-  partition: { by: "toYearWeek(toDate(AcceptedAt))", column: "AcceptedAt" },
+  sortKey: ["TenantId", "OccurredAt", "EventId"],
+  partition: { by: "toYearWeek(toDate(OccurredAt))", column: "OccurredAt" },
   tenant: ["TenantId"],
-  ttl: { anchor: "AcceptedAt" },
+  ttl: { anchor: "OccurredAt" },
+  structuralDebt: [
+    {
+      column: "OccurredAt",
+      reason:
+        "migration 00047 partitions, expires and time-leads langy_analytics_events on OccurredAt — the domain event's own time, not the platform-set acceptedAt role. AcceptedAt is already on the row, so the re-key is a new table and a copy with no backfill of missing data, but neither ORDER BY nor PARTITION BY is alterable in place",
+    },
+  ],
   columns: {
     TenantId: ch.string(),
     EventId: ch.string(),

@@ -25,7 +25,7 @@ import {
   getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { GatewayUsageService } from "../usage.service";
 import {
   GatewayVirtualKeySpendRepository,

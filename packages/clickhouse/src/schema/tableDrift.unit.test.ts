@@ -71,6 +71,7 @@ describe("given a deployed engine whose version column disagrees", () => {
 });
 
 describe("given a deployed sort key that disagrees", () => {
+  /** @scenario a declared sort key that disagrees with the deployed order fails the parity check */
   /** @scenario a mismatched sort key is reported naming both */
   it("reports the table and both sort keys", () => {
     const deployed: DeployedTableInfo = {
@@ -85,6 +86,7 @@ describe("given a deployed sort key that disagrees", () => {
 });
 
 describe("given a deployed partition expression that disagrees", () => {
+  /** @scenario a declared partition expression that names an undeployed column fails the parity check */
   /** @scenario a mismatched partition expression is reported naming both */
   it("reports the table and both expressions", () => {
     const deployed: DeployedTableInfo = {
@@ -116,6 +118,7 @@ describe("given a declared TTL anchor missing from the deployed DDL", () => {
 });
 
 describe("given a declared column absent from the deployed table", () => {
+  /** @scenario a declared column that no migration deploys fails the parity check */
   /** @scenario a declared column absent from the deployed table is reported */
   it("reports the table and the missing column", () => {
     const deployed: DeployedTableInfo = {
@@ -132,6 +135,7 @@ describe("given a declared column absent from the deployed table", () => {
 });
 
 describe("given a declared column whose type disagrees with the deployed type", () => {
+  /** @scenario a declared type that disagrees with the deployed type fails the parity check */
   /** @scenario a declared column whose type disagrees with the deployed type is reported naming both */
   it("reports the table, the column and both types", () => {
     const deployed: DeployedTableInfo = {

@@ -47,6 +47,10 @@ export const runStatusStateSchema = z.object({
   /** Traces processed, keyed by the page that processed them. The total is a
    * query over this, never a running sum a redelivery could double. */
   currentRunPages: z.record(z.string(), z.number()),
+  /** The current run's first observed event, carried unchanged across its
+   * pages — lets a staleness cutoff use the run's own start rather than the
+   * last-applied event's time. */
+  currentRunStartedAt: z.number().nullable(),
   currentRunTerminal: terminalOutcomeSchema.nullable(),
 });
 export type RunStatusState = z.infer<typeof runStatusStateSchema>;
@@ -57,6 +61,7 @@ export function initRunStatusState(): RunStatusState {
     lastRequestTrigger: null,
     currentRunId: null,
     currentRunPages: {},
+    currentRunStartedAt: null,
     currentRunTerminal: null,
   };
 }
@@ -74,6 +79,7 @@ function tracesProcessed(pages: Record<string, number>): number {
 function withCurrentRun(
   state: RunStatusState,
   runId: string,
+  occurredAt: number,
   mutate: (state: RunStatusState) => RunStatusState,
 ): RunStatusState {
   if (state.currentRunId === null || runIsNewer(runId, state.currentRunId)) {
@@ -81,10 +87,22 @@ function withCurrentRun(
       ...state,
       currentRunId: runId,
       currentRunPages: {},
+      currentRunStartedAt: occurredAt,
       currentRunTerminal: null,
     });
   }
-  if (runId === state.currentRunId) return mutate(state);
+  if (runId === state.currentRunId) {
+    // The earliest occurredAt seen for this run, so a redelivered or
+    // out-of-order page cannot move the start depending on which arrived
+    // first (order-invariance, ADR-107 decision 8).
+    return mutate({
+      ...state,
+      currentRunStartedAt:
+        state.currentRunStartedAt === null
+          ? occurredAt
+          : Math.min(state.currentRunStartedAt, occurredAt),
+    });
+  }
   return state;
 }
 
@@ -111,14 +129,19 @@ export function handleRunStarted(
   state: RunStatusState,
   data: RunStartedData,
 ): RunStatusState {
-  return withCurrentRun(state, data.runId, (current) => current);
+  return withCurrentRun(
+    state,
+    data.runId,
+    data.occurredAt,
+    (current) => current,
+  );
 }
 
 export function handleRunCompleted(
   state: RunStatusState,
   data: RunCompletedData,
 ): RunStatusState {
-  return withCurrentRun(state, data.runId, (current) => {
+  return withCurrentRun(state, data.runId, data.occurredAt, (current) => {
     const currentRunPages = {
       ...current.currentRunPages,
       [data.page]: data.tracesProcessed,
@@ -150,7 +173,7 @@ export function handleRunFailed(
   state: RunStatusState,
   data: RunFailedData,
 ): RunStatusState {
-  return withCurrentRun(state, data.runId, (current) => ({
+  return withCurrentRun(state, data.runId, data.occurredAt, (current) => ({
     ...current,
     currentRunTerminal: current.currentRunTerminal ?? {
       kind: "failed",
@@ -171,6 +194,9 @@ export interface RunStatusView {
   readonly lastRequestTrigger: TopicClusteringTrigger | null;
   readonly isRunInProgress: boolean;
   readonly inProgressRunId: string | null;
+  /** The in-progress run's own start, for a staleness cutoff — null unless a
+   * run is in progress. */
+  readonly inProgressStartedAt: number | null;
   /** The current run's outcome, or null until it has one. An older,
    * superseded run's outcome is not "the last run". */
   readonly lastRun: {
@@ -198,6 +224,7 @@ export function deriveRunStatusView(state: RunStatusState): RunStatusView {
     lastRequestTrigger: state.lastRequestTrigger,
     isRunInProgress: state.currentRunId !== null && terminal === null,
     inProgressRunId: terminal === null ? state.currentRunId : null,
+    inProgressStartedAt: terminal === null ? state.currentRunStartedAt : null,
     lastRun:
       state.currentRunId === null || terminal === null
         ? null

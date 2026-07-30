@@ -149,8 +149,11 @@ export function handleMetadataUpdated(
   state: LangyConversationProcessState,
   data: { title?: string | null },
 ) {
-  // A manual rename is sticky and permanently suppresses auto titles.
-  if (data.title === undefined) return { state, intents: [], nextWakeAt: null };
+  // A manual rename is sticky and permanently suppresses auto titles. `null` is
+  // "not titled yet", not a rename, so it must not latch.
+  if (typeof data.title !== "string") {
+    return { state, intents: [], nextWakeAt: null };
+  }
   return {
     state: { ...state, titleSource: LANGY_TITLE_SOURCE.USER },
     intents: [],

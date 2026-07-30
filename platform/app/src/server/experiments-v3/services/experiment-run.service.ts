@@ -1,9 +1,16 @@
 import { TupleParam } from "@clickhouse/client";
+import type { ClickHouseClient as EventSourcingClickHouseClient } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { parseClickHouseDateTime } from "~/server/clickhouse/dateTime";
 import { prisma as defaultPrisma } from "~/server/db";
+import {
+  deriveExperimentRunTotals,
+  type ExperimentRunTotals,
+  experimentRunTotalsKey,
+} from "~/server/event-sourcing/experiment-run-processing/totals";
 import { ExperimentService } from "~/server/experiments/experiment.service";
 import {
   computeOccurredAtRangeForRuns,
@@ -18,6 +25,8 @@ import type {
   ClickHouseExperimentRunRow,
 } from "./mappers";
 import {
+  EXPERIMENT_RUN_ITEM_ROW_COLUMNS,
+  EXPERIMENT_RUN_ROW_COLUMNS,
   mapClickHouseItemsToRunWithItems,
   mapClickHouseRunToExperimentRun,
 } from "./mappers";
@@ -26,6 +35,9 @@ import type {
   ExperimentRunAggregate,
   ExperimentRunWithItems,
 } from "./types";
+
+const RUN_COLUMNS = EXPERIMENT_RUN_ROW_COLUMNS.join(", ");
+const RUN_ITEM_COLUMNS = EXPERIMENT_RUN_ITEM_ROW_COLUMNS.join(", ");
 
 interface ClickHouseExperimentRunAggregateRow {
   ExperimentId: string;
@@ -72,6 +84,58 @@ type ProjectClickHouseClient = NonNullable<
 >;
 
 /**
+ * `deriveExperimentRunTotals` speaks `@langwatch/clickhouse`'s client
+ * contract; this service holds the tenant-routed `@clickhouse/client`
+ * instance instead, because private per-org ClickHouse routing
+ * (`getClickHouseClientForProject`) lives only there. Adapts the one method
+ * totals.ts calls.
+ *
+ * Reads `JSONEachRow`, matching every other query in this file, and turns
+ * each row object into an array in the SELECT list's own order — the same
+ * order `Object.values` walks a JSON-parsed object's string keys in. No
+ * `header` is returned, so the codec's header/type cross-check (meant for the
+ * real `WithNamesAndTypes` wire format) simply does not run; column identity
+ * still comes from the SELECT list itself.
+ */
+function asTotalsClient(
+  raw: ProjectClickHouseClient,
+): EventSourcingClickHouseClient {
+  return {
+    async query({ sql, params }) {
+      const resultSet = await raw.query({
+        query: sql,
+        query_params: params,
+        format: "JSONEachRow",
+        clickhouse_settings: { output_format_json_quote_64bit_integers: 1 },
+      });
+      const objects = (await resultSet.json()) as Record<string, unknown>[];
+      return { rows: objects.map((row) => Object.values(row)) };
+    },
+    stream() {
+      throw new Error("not used by deriveExperimentRunTotals");
+    },
+    async insert() {
+      throw new Error("not used by deriveExperimentRunTotals");
+    },
+    async close() {
+      // Lifecycle belongs to getClickHouseClientForProject.
+    },
+  };
+}
+
+/** The buffered CH-string range `computeOccurredAtRangeForRuns` produces,
+ * as the `Date` bound `deriveExperimentRunTotals` takes. */
+function toTotalsOccurredAtRange(range: {
+  minOccurredAt: string;
+  maxOccurredAt: string;
+}): { from: Date; to: Date } {
+  return {
+    from: parseClickHouseDateTime(range.minOccurredAt),
+    to: parseClickHouseDateTime(range.maxOccurredAt),
+  };
+}
+
+/**
  * The one definition of what a trace's price is worth to a single target.
  *
  * A trace is produced per iteration, so several target executions can sit
@@ -93,11 +157,6 @@ function splitTraceCostAcrossTargets({
 
 function toCount(value: number | string | null | undefined): number {
   return value === null || value === undefined ? 0 : Number(value);
-}
-
-/** Composite key — a runId is not unique across experiments. */
-function experimentRunKey(experimentId: string, runId: string): string {
-  return `${experimentId}:${runId}`;
 }
 
 /**
@@ -229,7 +288,7 @@ export class ExperimentRunService {
           // Fetch run summaries
           const runsResult = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${RUN_COLUMNS}
               FROM experiment_runs AS t
               WHERE t.TenantId = {tenantId:String}
                 AND t.ExperimentId IN ({experimentIds:Array(String)})
@@ -415,7 +474,7 @@ export class ExperimentRunService {
 
           const runsResult = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${RUN_COLUMNS}
               FROM experiment_runs AS t
               WHERE t.TenantId = {tenantId:String}
                 AND t.ExperimentId = {experimentId:String}
@@ -538,7 +597,7 @@ export class ExperimentRunService {
           // reads (listRuns) and for experiment_run_items below.
           const runResult = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${RUN_COLUMNS}
               FROM experiment_runs
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
@@ -596,7 +655,7 @@ export class ExperimentRunService {
           // trace-dedup-oom-safety.unit.test.ts for the rationale.
           const itemsResult = await clickHouseClient.query({
             query: `
-              SELECT *
+              SELECT ${RUN_ITEM_COLUMNS}
               FROM experiment_run_items
               WHERE TenantId = {tenantId:String}
                 AND ExperimentId = {experimentId:String}
@@ -646,10 +705,19 @@ export class ExperimentRunService {
             occurredAtRange,
           );
 
+          const totals = await this.deriveTotalsForOneRun({
+            clickHouseClient,
+            projectId,
+            experimentId,
+            runId,
+            occurredAtRange,
+          });
+
           const result = mapClickHouseItemsToRunWithItems({
             runRecord,
             items: enrichedItems,
             projectId: runRecord.TenantId,
+            totals,
           });
 
           this.logger.debug(
@@ -676,6 +744,30 @@ export class ExperimentRunService {
         }
       },
     );
+  }
+
+  /** {@link deriveExperimentRunTotals} for exactly one run — `getRun`'s page of one. */
+  private async deriveTotalsForOneRun({
+    clickHouseClient,
+    projectId,
+    experimentId,
+    runId,
+    occurredAtRange,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    experimentId: string;
+    runId: string;
+    occurredAtRange: { minOccurredAt: string; maxOccurredAt: string };
+  }): Promise<ExperimentRunTotals | undefined> {
+    const runRef = { experimentId, runId };
+    const totals = await deriveExperimentRunTotals({
+      client: asTotalsClient(clickHouseClient),
+      tenantId: projectId,
+      runs: [runRef],
+      occurredAtRange: toTotalsOccurredAtRange(occurredAtRange),
+    });
+    return totals.get(experimentRunTotalsKey(runRef));
   }
 
   /**
@@ -719,6 +811,18 @@ export class ExperimentRunService {
       projectId,
       minMs: occurredAtRange.minMs,
       runCount: runRows.length,
+    });
+
+    // One query for the whole page's progress (ADR-103 decision 1) — never
+    // one per run.
+    const totalsByExperimentRun = await deriveExperimentRunTotals({
+      client: asTotalsClient(clickHouseClient),
+      tenantId: projectId,
+      runs: runRows.map((r) => ({
+        experimentId: r.ExperimentId,
+        runId: r.RunId,
+      })),
+      occurredAtRange: toTotalsOccurredAtRange(occurredAtRange),
     });
 
     // Fetch per-evaluator breakdown for all runs.
@@ -787,7 +891,10 @@ export class ExperimentRunService {
       ClickHouseEvaluatorBreakdownRow[]
     >();
     for (const row of breakdownRows) {
-      const key = `${row.ExperimentId}:${row.RunId}`;
+      const key = experimentRunTotalsKey({
+        experimentId: row.ExperimentId,
+        runId: row.RunId,
+      });
       const existing = breakdownByExperimentRun.get(key) ?? [];
       existing.push(row);
       breakdownByExperimentRun.set(key, existing);
@@ -858,7 +965,10 @@ export class ExperimentRunService {
     >();
     for (const row of costRows) {
       aggregateByExperimentRun.set(
-        experimentRunKey(row.ExperimentId, row.RunId),
+        experimentRunTotalsKey({
+          experimentId: row.ExperimentId,
+          runId: row.RunId,
+        }),
         row,
       );
     }
@@ -889,7 +999,10 @@ export class ExperimentRunService {
     });
 
     return runRows.map((row) => {
-      const compositeKey = experimentRunKey(row.ExperimentId, row.RunId);
+      const compositeKey = experimentRunTotalsKey({
+        experimentId: row.ExperimentId,
+        runId: row.RunId,
+      });
       const aggregate = aggregateByExperimentRun.get(compositeKey);
       return mapClickHouseRunToExperimentRun({
         record: row,
@@ -897,6 +1010,7 @@ export class ExperimentRunService {
           ? (versionsMap[row.WorkflowVersionId] ?? null)
           : null,
         evaluatorBreakdown: breakdownByExperimentRun.get(compositeKey),
+        totals: totalsByExperimentRun.get(compositeKey),
         costSummary: aggregate
           ? addTraceDerivedCost({
               aggregate,
@@ -1007,7 +1121,10 @@ export class ExperimentRunService {
         targetCount: toCount(row.targetCount),
       });
 
-      const key = experimentRunKey(row.ExperimentId, row.RunId);
+      const key = experimentRunTotalsKey({
+        experimentId: row.ExperimentId,
+        runId: row.RunId,
+      });
       const running = byExperimentRun.get(key) ?? {
         cost: 0,
         pricedItemCount: 0,

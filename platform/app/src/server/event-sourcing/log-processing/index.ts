@@ -8,8 +8,11 @@ import {
   validateMount,
 } from "@langwatch/event-sourcing";
 import {
-  DEFAULT_RETENTION_DAYS,
-  type StampedLogRecord,
+  createLogFactsBridge,
+  type LogFactsBridgeDeps,
+} from "../coding-agent-processing/bridge/dispatch";
+import {
+  stampLogRecords,
   toCanonicalLogRecord,
   toLogRecordRow,
   toLogUsageEstimateRow,
@@ -114,13 +117,7 @@ function createCanonicalLogStore(
   return {
     kind: "append",
     async writeBatch(batch, context) {
-      const writtenAt = new Date();
-      const stamped: StampedLogRecord[] = batch.map((record) => ({
-        ...record,
-        writtenAt,
-        dedupVersion: BigInt(writtenAt.getTime()),
-        retentionDays: context.retentionDays ?? DEFAULT_RETENTION_DAYS,
-      }));
+      const stamped = stampLogRecords(batch, context.retentionDays);
       await Promise.all([
         records.writeBatch(stamped, context),
         usage.writeBatch(stamped, context),
@@ -131,11 +128,15 @@ function createCanonicalLogStore(
 
 export function createLogProcessingPipeline(deps: {
   readonly client: ClickHouseClient;
+  /** Cross-pipeline dispatch (ADR-107 §13): lifts coding-agent facts off a
+   *  canonical log record into the session pipeline. Absent means a coding
+   *  agent's log-carried signals never reach a session. */
+  readonly codingAgentLogFacts?: Omit<LogFactsBridgeDeps, "eventTypes">;
 }) {
   const store = createCanonicalLogStore(deps.client);
   assertMountIsLegal(canonicalLogStorageMount(store));
 
-  return definePipeline(LOG_PIPELINE_NAME)
+  let chain = definePipeline(LOG_PIPELINE_NAME)
     .prefix(LOG_PIPELINE_PREFIX)
     .events(logProcessingEvents)
     .withCommand("recordCanonicalLog", {
@@ -145,6 +146,25 @@ export function createLogProcessingPipeline(deps: {
     .withMap("canonicalLogStorage", {
       on: { recordReceived: toCanonicalLogRecord },
       store,
-    })
-    .build();
+    });
+
+  if (deps.codingAgentLogFacts) {
+    const bridge = createLogFactsBridge({
+      ...deps.codingAgentLogFacts,
+      eventTypes: ["recordReceived"],
+    });
+    chain = chain.withSubscriber("codingAgentLogFactsDispatch", {
+      on: {
+        recordReceived: (data, ctx) =>
+          bridge.handle({
+            type: "recordReceived",
+            tenantId: ctx.tenantId,
+            occurredAt: ctx.now,
+            data,
+          }),
+      },
+    });
+  }
+
+  return chain.build();
 }

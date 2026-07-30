@@ -285,7 +285,12 @@ export function BatchRunsSidebar({
           !error &&
           sortedRuns.map((run) => {
             const isSelected = selectedRunId === run.runId;
-            const isFinished = isRunFinished(run.timestamps);
+            const isFinished = isRunFinished({
+              finishedAt: run.timestamps.finishedAt,
+              stoppedAt: run.timestamps.stoppedAt,
+              progress: run.progress,
+              total: run.total,
+            });
             const _runCost =
               (run.summary.datasetCost ?? 0) +
               (run.summary.evaluationsCost ?? 0);

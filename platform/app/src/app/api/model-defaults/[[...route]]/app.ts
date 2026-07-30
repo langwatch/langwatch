@@ -10,7 +10,7 @@ patchZodOpenapi();
  * going through the settings UI. Mirrors the tRPC surface
  * (saveDefaultModelsConfig, deleteDefaultModelsConfig,
  * getDefaultModelsForProject) — both call the same service layer in
- * langwatch/src/server/modelProviders/modelDefaults.{read,service}.ts so
+ * platform/app/src/server/modelProviders/modelDefaults.{read,service}.ts so
  * behaviour stays consistent across the two entrypoints.
  */
 const secured = createProjectApp({

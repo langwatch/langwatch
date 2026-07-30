@@ -1,5 +1,5 @@
 // Fixture run as a real child process by signal-shutdown.unit.test.ts. Mimics
-// how langwatch/src/instrumentation.node.ts + start.ts actually integrate:
+// how platform/app/src/instrumentation.node.ts + start.ts actually integrate:
 // the HOST owns its own SIGTERM handler and its own process.exit, doing its
 // own (slow) cleanup before calling the SDK's shutdown(). Proves that
 // pattern flushes exactly once and terminates with the host's own chosen

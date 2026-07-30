@@ -9,8 +9,10 @@ import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.s
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import type { EventSourcing } from "../event-sourcing.old/eventSourcing";
-import type { AppCommands } from "../event-sourcing.old/pipelineRegistry";
+import type {
+  AppCommands,
+  createEventSourcingRegistry,
+} from "../event-sourcing/registry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
@@ -167,7 +169,7 @@ export interface AppDependencies {
   newClickHouseClient: AppClickHouseClient;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
-  _eventSourcing?: EventSourcing;
+  _eventSourcing?: ReturnType<typeof createEventSourcingRegistry>;
 
   /** Internal — resources to gracefully close on shutdown. */
   _gracefulCloseables?: Array<{ name: string; close: () => Promise<void> }>;

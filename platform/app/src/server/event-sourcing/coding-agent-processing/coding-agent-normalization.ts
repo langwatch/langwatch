@@ -7,7 +7,7 @@
  * module is where that ends: raw wire strings in, one canonical fact out.
  * Nothing downstream of here should ever compare against a vendor's literal.
  *
- * WHO each agent is lives in `../agents/` — one pure definition per agent,
+ * WHO each agent is lives in `./agents/` — one pure definition per agent,
  * registered in an ordered registry (the trace-canonicalisation extractor
  * shape). This engine folds the registry into the shared detection,
  * prefix-stripping and alias tables; the per-vendor evidence lives with each
@@ -19,15 +19,15 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { scalarsFromCanonicalAttributes } from "../metric-processing/canonical/attributes";
+import { CODING_AGENT_REGISTRY } from "./agents";
 import type {
   CodingAgent,
   CodingAgentEvent,
   CodingAgentMetric,
   CodingAgentSignal,
   TokenType,
-} from "../agents/_types";
-import { scalarsFromCanonicalAttributes } from "../metric-processing/canonical/attributes";
-import { CODING_AGENT_REGISTRY } from "./agents";
+} from "./agents/_types";
 
 const logger = createLogger("langwatch:coding-agent:normalization");
 

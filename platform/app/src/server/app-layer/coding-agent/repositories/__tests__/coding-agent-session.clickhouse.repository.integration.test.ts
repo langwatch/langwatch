@@ -22,7 +22,7 @@ import { CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST } from "~/server/event-s
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session.clickhouse.repository";
 import { CodingAgentTraceSessionClickHouseRepository } from "../coding-agent-trace-session.repository";
 import { SessionMetricSeriesClickHouseRepository } from "../session-metric-series.repository";

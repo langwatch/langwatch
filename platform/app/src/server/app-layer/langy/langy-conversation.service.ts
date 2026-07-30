@@ -35,13 +35,7 @@ import {
   serializeLangyTurnError,
 } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
-import type { CommandEnvelope } from "~/server/event-sourcing.old/commands/commandEnvelope";
-import {
-  createTenantId,
-  type TenantId,
-} from "~/server/event-sourcing.old/domain/tenantId";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing.old/pipelines/langy-conversation-processing/schemas/events";
-import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing.old/stores/rehydrationWindow";
+import type { LangyConversationProcessingEvent } from "~/server/app-layer/langy/subscribers/langyConversationProcessingEvent";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationNotFoundError,
@@ -74,7 +68,7 @@ export type { LangyConversationRepository as LangyConversationReadRepository } f
 export interface LangyConversationEventsReader {
   getEventsOccurredSince(
     aggregateId: string,
-    context: { tenantId: TenantId },
+    context: { tenantId: string },
     aggregateType: "langy_conversation",
     occurredAtFromMs: number,
   ): Promise<readonly LangyConversationProcessingEvent[]>;
@@ -88,6 +82,16 @@ export interface LangyConversationEventsReader {
  * cap.
  */
 const CONVERSATION_EVENT_TAIL_LIMIT = 1_000;
+
+/**
+ * Lower-bound window subtracted from the anchor when bounding the tail
+ * read's `event_log` scan. Recovered from the deleted event-sourcing tree's
+ * `stores/rehydrationWindow` (the per-delivery refold machinery it also
+ * carried is gone with ADR-107 §7 — this is only the constant this read
+ * still needs). 45 days is deliberately conservative: larger than any
+ * conversation's lifetime, smaller than `event_log` retention.
+ */
+export const REHYDRATION_WINDOW_MS = 45 * 24 * 60 * 60 * 1000;
 
 /**
  * How long a read will wait out the dispatch window — the gap between a
@@ -157,6 +161,17 @@ export type ConversationDetail = ConversationListItem & {
 export interface ConversationListPage {
   items: ConversationListItem[];
   nextCursor: LangyConversationListCursor | null;
+}
+
+/**
+ * Envelope fields every command payload carries, stripped before being
+ * stored as event data. Recovered from the deleted event-sourcing tree's
+ * `commands/commandEnvelope`.
+ */
+export interface CommandEnvelope {
+  tenantId: string;
+  occurredAt: number;
+  idempotencyKey?: string;
 }
 
 /** Command dispatchers injected from the event-sourcing pipeline registry. */
@@ -381,7 +396,7 @@ export class LangyConversationService {
 
     const all = await this.events.getEventsOccurredSince(
       conversationId,
-      { tenantId: createTenantId(projectId) },
+      { tenantId: projectId },
       "langy_conversation",
       Math.max(0, after.acceptedAt - REHYDRATION_WINDOW_MS),
     );

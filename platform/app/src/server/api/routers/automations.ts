@@ -8,6 +8,7 @@ import {
 import { EMAIL_RX } from "@langwatch/automations/providers/email";
 import type { SlackActionParams } from "@langwatch/automations/providers/slack";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
+import { isDispatchError } from "@langwatch/event-sourcing";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import {
@@ -56,7 +57,6 @@ import {
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
-import { isDispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {

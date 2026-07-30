@@ -1,6 +1,6 @@
 Feature: Metric-processing pipeline (event-sourcing rewrite)
 
-  `langwatch/src/server/event-sourcing/metric-processing/` canonicalises OTLP
+  `platform/app/src/server/event-sourcing/metric-processing/` canonicalises OTLP
   metric data points into one immutable, content-addressed event per point,
   and mounts three `map` projections on it — never a `fold`, because a point
   has no lifetime to accumulate (ADR-098, ADR-105).

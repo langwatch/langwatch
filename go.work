@@ -10,3 +10,7 @@ use (
 	./infra/clickhouse-serverless
 	./sdks/go
 )
+
+// The onboarding codegen snippet is excluded by the root go.mod's `ignore`
+// block. `ignore` is a go.mod directive and is not valid here — declaring it in
+// go.work makes every go command fail to parse the workspace.

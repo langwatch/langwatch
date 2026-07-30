@@ -1,11 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import {
   incrementClickHouseQueryCount,
   incrementConventionViolation,
   observeClickHouseQueryDuration,
 } from "~/server/clickhouse/metrics";
-import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing.old/services/errorHandling";
 import {
   CONVENTION_GATE_THROWS,
   findConventionViolations,

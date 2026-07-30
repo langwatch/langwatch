@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  createClickHouseClient,
   type ClickHouseRawInsert,
   type ClickHouseRawQuery,
   type ClickHouseTransport,
+  createClickHouseClient,
 } from "./clickhouseClient";
 import type { WriteTarget } from "./retryPolicy";
 
@@ -24,11 +24,16 @@ interface FakeTransport extends ClickHouseTransport {
   readonly insertCalls: ClickHouseRawInsert[];
 }
 
-function createFakeTransport(overrides: {
-  query?: (request: ClickHouseRawQuery, callIndex: number) => Promise<{ rows: unknown[][] }>;
-  stream?: (request: ClickHouseRawQuery) => AsyncIterable<unknown[][]>;
-  insert?: (request: ClickHouseRawInsert, callIndex: number) => Promise<void>;
-} = {}): FakeTransport {
+function createFakeTransport(
+  overrides: {
+    query?: (
+      request: ClickHouseRawQuery,
+      callIndex: number,
+    ) => Promise<{ rows: unknown[][] }>;
+    stream?: (request: ClickHouseRawQuery) => AsyncIterable<unknown[][]>;
+    insert?: (request: ClickHouseRawInsert, callIndex: number) => Promise<void>;
+  } = {},
+): FakeTransport {
   const queryCalls: ClickHouseRawQuery[] = [];
   const insertCalls: ClickHouseRawInsert[] = [];
 
@@ -37,7 +42,8 @@ function createFakeTransport(overrides: {
     insertCalls,
     async query(request) {
       queryCalls.push(request);
-      if (overrides.query) return overrides.query(request, queryCalls.length - 1);
+      if (overrides.query)
+        return overrides.query(request, queryCalls.length - 1);
       return { rows: [] };
     },
     stream(request) {
@@ -47,19 +53,29 @@ function createFakeTransport(overrides: {
     },
     async insert(request) {
       insertCalls.push(request);
-      if (overrides.insert) return overrides.insert(request, insertCalls.length - 1);
+      if (overrides.insert)
+        return overrides.insert(request, insertCalls.length - 1);
     },
     async close() {},
   };
 }
 
 const REPLACING: WriteTarget = { kind: "replacing" };
-const APPEND_NO_IDENTITY: WriteTarget = { kind: "append", perRecordIdentity: false };
-const APPEND_WITH_IDENTITY: WriteTarget = { kind: "append", perRecordIdentity: true };
+const APPEND_NO_IDENTITY: WriteTarget = {
+  kind: "append",
+  perRecordIdentity: false,
+};
+const APPEND_WITH_IDENTITY: WriteTarget = {
+  kind: "append",
+  perRecordIdentity: true,
+};
 const AGGREGATING: WriteTarget = { kind: "aggregating" };
 
 /** Polls with real timers until `predicate` holds, so tests never guess a fixed microtask depth. */
-async function waitUntil(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+async function waitUntil(
+  predicate: () => boolean,
+  timeoutMs = 2000,
+): Promise<void> {
   const start = Date.now();
   while (!predicate()) {
     if (Date.now() - start > timeoutMs) {
@@ -103,7 +119,9 @@ describe("given createClickHouseClient()", () => {
       });
       const client = createClickHouseClient({ url: "http://ch", transport });
 
-      await expect(client.query({ tenantId: "t1", sql: "SELECT 1" })).rejects.toThrow();
+      await expect(
+        client.query({ tenantId: "t1", sql: "SELECT 1" }),
+      ).rejects.toThrow();
       expect(transport.queryCalls).toHaveLength(1);
     });
   });
@@ -209,7 +227,11 @@ describe("given createClickHouseClient()", () => {
           return { rows: [] };
         },
       });
-      const client = createClickHouseClient({ url: "http://ch", transport, maxOpenConnections: 20 });
+      const client = createClickHouseClient({
+        url: "http://ch",
+        transport,
+        maxOpenConnections: 20,
+      });
       const setTimeoutSpy = vi.spyOn(global, "setTimeout");
 
       const resultPromise = client.query({ tenantId: "t1", sql: "SELECT 1" });
@@ -302,9 +324,9 @@ describe("given createClickHouseClient()", () => {
       });
       const client = createClickHouseClient({ url: "http://ch", transport });
 
-      const iterator = client.stream({ tenantId: "t1", sql: "SELECT * FROM big_table" })[
-        Symbol.asyncIterator
-      ]();
+      const iterator = client
+        .stream({ tenantId: "t1", sql: "SELECT * FROM big_table" })
+        [Symbol.asyncIterator]();
 
       const first = await iterator.next();
       expect(first.value).toEqual([["row-1"]]);
@@ -320,6 +342,7 @@ describe("given createClickHouseClient()", () => {
   });
 
   describe("given an insert", () => {
+    /** @scenario a durable write resolves only once the block has landed */
     it("carries both async-insert settings so the write is never fire-and-forget", async () => {
       const transport = createFakeTransport();
       const client = createClickHouseClient({ url: "http://ch", transport });
@@ -336,6 +359,7 @@ describe("given createClickHouseClient()", () => {
       expect(transport.insertCalls[0]?.settings).toMatchObject({
         async_insert: 1,
         wait_for_async_insert: 1,
+        input_format_skip_unknown_fields: 0,
       });
     });
 

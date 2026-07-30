@@ -715,7 +715,7 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
 // §4.5 — `/budget/debit` is removed. Cost recording is now driven by the
 // gateway budget debits map projection on the trace-processing pipeline
 // (`createGatewayBudgetDebitsProjection` in
-// langwatch/ee/governance/projections/governanceProjections.composition.ts,
+// platform/app/ee/governance/projections/governanceProjections.composition.ts,
 // mounted by pipelineRegistry.ts), which folds OTel span usage attributes
 // into the ClickHouse `gateway_budget_ledger_events` table. Single source
 // of truth, no PG dual-write — see CLAUDE.md & the migration

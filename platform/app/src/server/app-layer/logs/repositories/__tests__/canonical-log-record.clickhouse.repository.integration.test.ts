@@ -29,7 +29,7 @@ import type { CanonicalLogRecord } from "~/server/event-sourcing.old/pipelines/l
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { CanonicalLogRecordClickHouseRepository } from "../canonical-log-record.clickhouse.repository";
 
 let ch: ClickHouseClient;

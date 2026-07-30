@@ -118,9 +118,6 @@ const nullIfEmpty = (value: string): string | null =>
  * Hand-written rather than `deriveRowMapping`: `Steps`/`StepStartedAt` are a
  * split representation of one state field and `MetricSeries` re-keys an
  * object into an array, neither of which the derived 1:1 mapper can express.
- * `CreatedAt` is stamped at write time on every write (not round-tripped
- * through state), so it tracks the latest write rather than the first —
- * see this pipeline's report.
  */
 export const codingAgentSessionRow: RowMapping<
   CodingAgentSessionState,
@@ -133,7 +130,10 @@ export const codingAgentSessionRow: RowMapping<
       SessionKeySource: state.sessionKeySource,
       Version: context.version,
       StartedAt: new Date(state.startedAtMs),
-      CreatedAt: context.writtenAt,
+      // Round-tripped through state, so it stays the first write's instant;
+      // `UpdatedAt` is the write stamp and the engine's merge version.
+      CreatedAt:
+        state.createdAt > 0 ? new Date(state.createdAt) : context.writtenAt,
       UpdatedAt: context.writtenAt,
 
       Agent: state.agent ?? "",
@@ -356,6 +356,7 @@ export const codingAgentSessionRow: RowMapping<
       truncated: row.Truncated,
 
       startedAtMs: row.StartedAt.getTime(),
+      createdAt: row.CreatedAt.getTime(),
       LastEventOccurredAt: row.LastEventOccurredAt.getTime(),
     };
   },

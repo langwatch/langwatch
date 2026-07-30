@@ -15,7 +15,7 @@ import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repos
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import type { GetAllTracesForProjectInput } from "../types";
 import { openProtections } from "./open-protections";

@@ -49,6 +49,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
+ignore (
+	./platform/app/src/features/onboarding/regions/observability/codegen/snippets/go
+)
+
 require (
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect

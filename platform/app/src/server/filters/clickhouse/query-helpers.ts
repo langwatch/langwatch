@@ -5,7 +5,7 @@ import type { ClickHouseFilterQueryParams, FilterOption } from "./types";
  * Attribute keys as stored in ClickHouse trace_summaries.Attributes map.
  *
  * These must match the canonical keys used by the event-sourcing fold projection.
- * See: src/server/event-sourcing.old/pipelines/trace-processing/projections/traceSummary.foldProjection.ts
+ * See: src/server/event-sourcing/trace-processing/traceSummary.projection.ts
  */
 export const ATTRIBUTE_KEYS = {
   thread_id: "Attributes['gen_ai.conversation.id']",

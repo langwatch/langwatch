@@ -50,9 +50,18 @@ const requested = (
   },
 });
 
-const runStarted = (runId: string, page = 1): Event => ({
+const runStarted = (
+  runId: string,
+  overrides: Partial<Pick<RunStartedData, "page" | "occurredAt">> = {},
+): Event => ({
   type: "runStarted",
-  data: { projectId: PROJECT_ID, runId, page, occurredAt: 1_700_000_000_000 },
+  data: {
+    projectId: PROJECT_ID,
+    runId,
+    page: 1,
+    occurredAt: 1_700_000_000_000,
+    ...overrides,
+  },
 });
 
 const runCompleted = (
@@ -121,6 +130,19 @@ describe("topicClusteringRunStatus fold", () => {
       expect(view.lastRun).toBeNull();
     });
 
+    /** @scenario A run in progress is visible while it is still working */
+    it("records the started run's own occurredAt as its start", () => {
+      const runId = mintManualRunId(1_700_000_000_000);
+      const state = apply(
+        initRunStatusState(),
+        runStarted(runId, { occurredAt: 1_700_000_050_000 }),
+      );
+      expect(state.currentRunStartedAt).toBe(1_700_000_050_000);
+      expect(deriveRunStatusView(state).inProgressStartedAt).toBe(
+        1_700_000_050_000,
+      );
+    });
+
     /** @scenario A large backlog is processed page by page through durable cursors */
     it("keeps the run in progress and records each page's traces under its own page", () => {
       const runId = mintManualRunId(1_700_000_000_000);
@@ -147,6 +169,36 @@ describe("topicClusteringRunStatus fold", () => {
       expect(state.currentRunPages).toEqual({ 1: 4, 2: 6 });
     });
 
+    it("keeps the run's original start across later pages of the same run", () => {
+      const runId = mintManualRunId(1_700_000_000_000);
+      let state = initRunStatusState();
+      state = apply(state, runStarted(runId, { occurredAt: 1_000 }));
+      state = apply(
+        state,
+        runCompleted(runId, {
+          page: 1,
+          tracesProcessed: 4,
+          nextSearchAfter: [1, "t1"],
+          occurredAt: 5_000,
+        }),
+      );
+      expect(state.currentRunStartedAt).toBe(1_000);
+    });
+
+    it("dates an unseen run from the first observed completion page, when run_started was lost", () => {
+      const runId = mintManualRunId(1_700_000_000_000);
+      const state = apply(
+        initRunStatusState(),
+        runCompleted(runId, {
+          page: 1,
+          tracesProcessed: 4,
+          nextSearchAfter: [1, "t1"],
+          occurredAt: 2_000,
+        }),
+      );
+      expect(state.currentRunStartedAt).toBe(2_000);
+    });
+
     it("settles as completed once the final page (no continuation cursor) lands", () => {
       const runId = mintManualRunId(1_700_000_000_000);
       let state = initRunStatusState();
@@ -162,6 +214,13 @@ describe("topicClusteringRunStatus fold", () => {
         topicsCount: 3,
         subtopicsCount: 5,
       });
+      expect(view.inProgressStartedAt).toBeNull();
+    });
+
+    it("reports no in-progress start before any run has started", () => {
+      expect(
+        deriveRunStatusView(initRunStatusState()).inProgressStartedAt,
+      ).toBeNull();
     });
 
     it("settles as skipped when the gate declined and no traces were processed", () => {
@@ -230,7 +289,10 @@ describe("topicClusteringRunStatus fold", () => {
       const newer = mintScheduledRunId(Date.UTC(2026, 6, 18, 9, 30, 0));
 
       let state = initRunStatusState();
-      state = apply(state, runStarted(older));
+      state = apply(
+        state,
+        runStarted(older, { occurredAt: Date.UTC(2026, 6, 17, 9, 30, 0) }),
+      );
       state = apply(
         state,
         runCompleted(older, {
@@ -241,7 +303,10 @@ describe("topicClusteringRunStatus fold", () => {
       );
       // The newer run starts before the older one's stale continuation page is
       // (re)delivered — legal under best-effort ordering.
-      state = apply(state, runStarted(newer));
+      state = apply(
+        state,
+        runStarted(newer, { occurredAt: Date.UTC(2026, 6, 18, 9, 30, 0) }),
+      );
       state = apply(
         state,
         runCompleted(older, {
@@ -253,6 +318,7 @@ describe("topicClusteringRunStatus fold", () => {
 
       expect(state.currentRunId).toBe(newer);
       expect(state.currentRunPages).toEqual({});
+      expect(state.currentRunStartedAt).toBe(Date.UTC(2026, 6, 18, 9, 30, 0));
     });
   });
 

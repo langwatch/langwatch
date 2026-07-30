@@ -15,7 +15,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { startTestContainers } from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+import { startTestContainers } from "~/test-utils/integration/testContainers";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
 
 const tenantId = `test-tsumm-resolve-${nanoid()}`;

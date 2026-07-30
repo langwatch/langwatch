@@ -28,7 +28,7 @@ import type { CanonicalMetricDataPoint } from "~/server/event-sourcing.old/pipel
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { MetricDataPointClickHouseRepository } from "../metric-data-point.clickhouse.repository";
 
 let ch: ClickHouseClient;

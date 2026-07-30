@@ -33,19 +33,17 @@ function reportedState(
   });
 }
 
+/** Migration parity — engine, keys, anchors, column types — is asserted against
+ *  the migration SQL in `../__tests__/tableMigrationParity.unit.test.ts`. */
 describe("evaluationAnalyticsTable", () => {
-  it("declares the engine key, partition and TTL migration 00041 deployed", () => {
-    expect(evaluationAnalyticsTable.name).toBe("evaluation_analytics");
-    expect(evaluationAnalyticsTable.sortKey).toEqual([
-      "TenantId",
-      "OccurredAt",
-      "EvaluationId",
-    ]);
-    expect(evaluationAnalyticsTable.partition).toEqual({
-      by: "toYearWeek(OccurredAt)",
-      column: "OccurredAt",
-    });
-    expect(evaluationAnalyticsTable.ttl?.anchor).toBe("OccurredAt");
+  it("names the debt its anchor carries rather than claiming a platform role", () => {
+    const anchor = evaluationAnalyticsTable.partition.column;
+    expect(evaluationAnalyticsTable.columns[anchor]?.timeRole).toBe(
+      "occurredAt",
+    );
+    expect(
+      evaluationAnalyticsTable.structuralDebt?.map((debt) => debt.column),
+    ).toEqual([anchor]);
   });
 
   it("declares no DeliverySeq column", () => {

@@ -524,3 +524,239 @@ describe("given the fold's dispatch lane", () => {
     );
   });
 });
+
+describe("given the members ADR-107's audit found dropped", () => {
+  const processCtx = { now: 10_000, tenantId: "tenant-1", processKey: "run-1" };
+
+  /** @scenario a queued run's target is dispatched from the outbox, and a
+   * post-dispatch fault is recorded as a terminal failure rather than retried */
+  it("scenarioExecution dispatches a queued run's target and records a fault as terminal", async () => {
+    const executeRun = vi.fn().mockRejectedValue(new Error("child crashed"));
+    const readRunStatus = vi.fn().mockResolvedValue("QUEUED");
+    const emitFailure = vi.fn().mockResolvedValue(undefined);
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient(),
+      scenarioExecution: { executeRun, readRunStatus, emitFailure },
+    });
+
+    const step = built.processManagers.scenarioExecution!.evolve(
+      built.processManagers.scenarioExecution!.init(),
+      {
+        type: "lw.simulation_run.queued",
+        data: {
+          ...QUEUED_INPUT,
+          target: { type: "prompt", referenceId: "p1" },
+        },
+      },
+      processCtx,
+    );
+    expect(step?.intents).toHaveLength(1);
+    expect(step?.nextWakeAt).not.toBeNull();
+
+    const payload = step!.intents[0]!.payload as Record<string, unknown>;
+    await built.processManagers.scenarioExecution!.intents.executeRun!.deliver(
+      payload,
+      ctx,
+    );
+
+    expect(executeRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarioRunId: "run-1",
+        target: { type: "prompt", referenceId: "p1" },
+      }),
+    );
+    expect(emitFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ scenarioRunId: "run-1", outcome: "error" }),
+    );
+  });
+
+  /** @scenario a run gone quiet past its deadline is written as STALLED */
+  it("scenarioExecution writes a stalled run as terminal on wake", () => {
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient(),
+      scenarioExecution: {
+        executeRun: vi.fn(),
+        readRunStatus: vi.fn(),
+        emitFailure: vi.fn(),
+      },
+    });
+
+    const armed = built.processManagers.scenarioExecution!.evolve(
+      built.processManagers.scenarioExecution!.init(),
+      {
+        type: "lw.simulation_run.queued",
+        data: {
+          ...QUEUED_INPUT,
+          target: { type: "prompt", referenceId: "p1" },
+        },
+      },
+      processCtx,
+    )!;
+    const wake = built.processManagers.scenarioExecution!.onWake!(
+      armed.state,
+      processCtx,
+    );
+    expect(wake.intents).toEqual([
+      {
+        type: "scenarioExecution/failRun",
+        payload: expect.objectContaining({
+          scenarioRunId: "run-1",
+          outcome: "stalled",
+        }),
+      },
+    ]);
+  });
+
+  /** @scenario a finished run's cost and latency are measured once it has settled */
+  it("runMetrics measures a finished run once, on the settle deadline", async () => {
+    const computeRunMetrics = vi.fn().mockResolvedValue(undefined);
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient(),
+      runMetrics: { computeRunMetrics },
+    });
+
+    const step = built.processManagers.runMetrics!.evolve(
+      built.processManagers.runMetrics!.init(),
+      {
+        type: "lw.simulation_run.finished",
+        data: { scenarioRunId: "run-1", occurredAt: 10_000 },
+      },
+      processCtx,
+    )!;
+    expect(step.nextWakeAt).not.toBeNull();
+
+    const wake = built.processManagers.runMetrics!.onWake!(
+      step.state,
+      processCtx,
+    );
+    const payload = wake.intents[0]!.payload as Record<string, unknown>;
+    await built.processManagers.runMetrics!.intents.computeRunMetrics!.deliver(
+      payload,
+      ctx,
+    );
+
+    expect(computeRunMetrics).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "tenant-1", scenarioRunId: "run-1" }),
+    );
+  });
+
+  /** @scenario a measurement recorded on the run ends the re-measure ladder */
+  it("runMetrics stops asking once the run's own metrics event lands", () => {
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient(),
+      runMetrics: { computeRunMetrics: vi.fn() },
+    });
+
+    const armed = built.processManagers.runMetrics!.evolve(
+      built.processManagers.runMetrics!.init(),
+      {
+        type: "lw.simulation_run.finished",
+        data: { scenarioRunId: "run-1", occurredAt: 10_000 },
+      },
+      processCtx,
+    )!;
+    const measured = built.processManagers.runMetrics!.evolve(
+      armed.state,
+      {
+        type: "lw.simulation_run.metrics_recorded",
+        data: {
+          scenarioRunId: "run-1",
+          traceIds: [],
+          totalCost: 1,
+          roleCosts: {},
+          roleLatencies: {},
+          occurredAt: 10_001,
+        },
+      },
+      processCtx,
+    )!;
+    expect(measured.nextWakeAt).toBeNull();
+
+    const wake = built.processManagers.runMetrics!.onWake!(
+      measured.state,
+      processCtx,
+    );
+    expect(wake.intents).toEqual([]);
+  });
+
+  /** @scenario the two billable simulation events poke the injected billing port */
+  it("billingMeterPoke forwards started and messageSnapshot to the injected port", async () => {
+    const handle = vi.fn().mockResolvedValue(undefined);
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient(),
+      billingPoke: { handle },
+    });
+
+    await built.subscribers.billingMeterPoke!.handle(
+      {
+        type: "lw.simulation_run.started",
+        data: {
+          scenarioRunId: "run-1",
+          scenarioId: "s",
+          batchRunId: "b",
+          scenarioSetId: "set",
+          occurredAt: 1,
+        },
+      },
+      ctx,
+    );
+    expect(handle).toHaveBeenCalledWith({ tenantId: "tenant-1" });
+  });
+
+  /** @scenario a run update broadcasts to SSE clients, but a streaming start does not */
+  it("snapshotUpdateBroadcast nudges on run updates, but stays quiet for textMessageStart", async () => {
+    const broadcastToTenant = vi.fn().mockResolvedValue(undefined);
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient(),
+      broadcast: { broadcastToTenant },
+    });
+
+    await built.subscribers.snapshotUpdateBroadcast!.handle(
+      {
+        type: "lw.simulation_run.finished",
+        data: { scenarioRunId: "run-1", occurredAt: 1 },
+      },
+      ctx,
+    );
+    expect(broadcastToTenant).toHaveBeenCalledWith(
+      "tenant-1",
+      JSON.stringify({ event: "simulation_updated", scenarioRunId: "run-1" }),
+      "simulation_updated",
+    );
+    expect(built.subscribers.snapshotUpdateBroadcast!.eventTypes).not.toContain(
+      "lw.simulation_run.text_message_start",
+    );
+  });
+
+  /** @scenario a cancellation publishes to every worker pod, and a failed publish is not swallowed */
+  it("cancellationBroadcast publishes the run id and rethrows on failure", async () => {
+    const publish = vi.fn().mockResolvedValue(1);
+    const built = createSimulationProcessingPipeline({
+      client: fakeClient(),
+      cancellationPublisher: { publish },
+    });
+
+    await built.subscribers.cancellationBroadcast!.handle(
+      {
+        type: "lw.simulation_run.cancel_requested",
+        data: { scenarioRunId: "run-1", occurredAt: 1 },
+      },
+      ctx,
+    );
+    expect(publish).toHaveBeenCalledWith(
+      "scenario:cancel",
+      JSON.stringify({ scenarioRunId: "run-1" }),
+    );
+
+    publish.mockRejectedValueOnce(new Error("redis down"));
+    await expect(
+      built.subscribers.cancellationBroadcast!.handle(
+        {
+          type: "lw.simulation_run.cancel_requested",
+          data: { scenarioRunId: "run-1", occurredAt: 1 },
+        },
+        ctx,
+      ),
+    ).rejects.toThrow("redis down");
+  });
+});

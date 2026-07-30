@@ -28,8 +28,14 @@ export const topicModelStateSchema = z.object({
 });
 export type TopicModelState = z.infer<typeof topicModelStateSchema>;
 
+/** `occurredAt` is epoch milliseconds, so 0 is below every real event. A
+ * non-finite sentinel would not survive the state's JSON column: `JSON.stringify`
+ * writes `-Infinity` as `null` and `z.number()` then refuses the row, which
+ * fails every later delivery for that project (ADR-107 decision 9). */
+const NO_WATERMARK = 0;
+
 export function initTopicModelState(): TopicModelState {
-  return { watermark: -Infinity, topics: {}, firstSeenAt: {} };
+  return { watermark: NO_WATERMARK, topics: {}, firstSeenAt: {} };
 }
 
 function withFirstSeenAt(
@@ -70,7 +76,11 @@ export function applyTopicsRecorded(
     topics[topic.id] = { ...content, asOf: data.occurredAt };
   }
 
-  if (data.mode !== "replace") return { ...state, topics, firstSeenAt };
+  // A merge carries the watermark forward rather than advancing it: only a
+  // `replace` decides a topic set, so only a `replace` may gate a later one.
+  if (data.mode !== "replace") {
+    return { watermark: state.watermark, topics, firstSeenAt };
+  }
 
   const incomingIds = new Set(data.topics.map((topic) => topic.id));
   for (const [id, topic] of Object.entries(topics)) {

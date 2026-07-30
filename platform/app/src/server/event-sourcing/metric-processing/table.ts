@@ -7,11 +7,11 @@ import {
 import { z } from "zod";
 
 /**
- * The three tables this pipeline's projections write (migration `00049`,
- * deployed). Every one of them partitions and expires on a customer-supplied
- * timestamp today — `TimeUnixMs`, `LastSeenAt`, `BucketStart` — which
- * `defineTable` refuses. Each is declared on a platform `AcceptedAt` instead:
- * the shape the pending re-key migration must produce.
+ * The three tables this pipeline's projections write, as migration `00049`
+ * deployed them. All three partition and expire on a customer-supplied
+ * timestamp — `TimeUnixMs`, `LastSeenAt`, `BucketStart` — and `PARTITION BY`
+ * is not alterable, so each names that column and its debt rather than
+ * claiming an anchor the deployed table does not have.
  */
 
 const lowCardinalityString = () => ch.lowCardinality(ch.string());
@@ -34,6 +34,24 @@ function int32(): ColumnDef<number> {
   };
 }
 
+/**
+ * `00049` stores the two content hashes as `FixedString(64)`, which pads a
+ * short value with NUL bytes instead of storing it as given, so the width is
+ * part of the contract rather than a storage hint.
+ */
+function fixedString(width: number): ColumnDef<string> {
+  const schema = z.string();
+  return {
+    chType: `FixedString(${width})`,
+    schema,
+    decode: (cell) => schema.parse(cell),
+    encode: (value) => value,
+    frozen: false,
+    platformControlled: false,
+    nullable: false,
+  };
+}
+
 /** The deployed engine version column: epoch millis in a `UInt64`. */
 const dedupVersion = (): ColumnDef<bigint> => ({
   ...ch.uint64(),
@@ -41,26 +59,24 @@ const dedupVersion = (): ColumnDef<bigint> => ({
   platformControlled: true,
 });
 
-/**
- * The engine elects the newest observation of a series, so the measurement time
- * is the version — a late old point cannot overwrite a newer row.
- */
-const lastSeenAtVersion = (): ColumnDef<Date> => ({
-  ...ch.lastAcceptedAt(),
-  timeRole: "writtenAt",
-});
-
 export const metricDataPointsTable = defineTable({
   name: "metric_data_points",
   merge: replacing({ version: "DedupVersion" }),
   sortKey: ["TenantId", "SeriesId", "TimeUnixMs", "TimeUnixNano", "PointId"],
-  partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
+  partition: { by: "toYearWeek(TimeUnixMs)", column: "TimeUnixMs" },
   tenant: ["TenantId"],
-  ttl: { anchor: "AcceptedAt" },
+  ttl: { anchor: "TimeUnixMs" },
+  structuralDebt: [
+    {
+      column: "TimeUnixMs",
+      reason:
+        "migration 00049 partitions and expires metric_data_points on TimeUnixMs, the point's own measurement time as the customer's process stamped it — so partition spread and retention are caller-controlled. TimeUnixMs is part of a point's identity, so moving the anchor to AcceptedAt needs a new table and a copy, not an ALTER",
+    },
+  ],
   columns: {
     TenantId: ch.string(),
-    PointId: ch.string(),
-    SeriesId: ch.string(),
+    PointId: fixedString(64),
+    SeriesId: fixedString(64),
     ResourceSchemaUrl: ch.string(),
     ResourceAttributesJson: ch.string(),
     ResourceAttributeKeys: ch.array(ch.string()),
@@ -113,12 +129,19 @@ export const metricSeriesTable = defineTable({
   name: "metric_series",
   merge: replacing({ version: "LastSeenAt" }),
   sortKey: ["TenantId", "SeriesId"],
-  partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
+  partition: { by: "toYearWeek(LastSeenAt)", column: "LastSeenAt" },
   tenant: ["TenantId"],
-  ttl: { anchor: "AcceptedAt" },
+  ttl: { anchor: "LastSeenAt" },
+  structuralDebt: [
+    {
+      column: "LastSeenAt",
+      reason:
+        "migration 00049 makes LastSeenAt the engine version, the partition key and the TTL anchor of metric_series at once, and it holds the newest point's measurement time — customer-supplied and moving. It is not in the dedup key, so a series seen in two weeks keeps one row per week permanently; both are frozen until a new-table-and-copy re-key onto AcceptedAt",
+    },
+  ],
   columns: {
     TenantId: ch.string(),
-    SeriesId: ch.string(),
+    SeriesId: fixedString(64),
     ResourceSchemaUrl: ch.string(),
     ResourceAttributesJson: ch.string(),
     ResourceAttributeKeys: ch.array(ch.string()),
@@ -135,8 +158,7 @@ export const metricSeriesTable = defineTable({
     IsMonotonic: ch.nullable(ch.boolean()),
     PointAttributesJson: ch.string(),
     PointAttributeKeys: ch.array(ch.string()),
-    LastSeenAt: lastSeenAtVersion(),
-    AcceptedAt: ch.acceptedAt(),
+    LastSeenAt: ch.occurredAt(),
     _retention_days: ch.uint16(),
     _size_bytes: ch.uint32(),
   },
@@ -150,12 +172,19 @@ export const metricTimeRollupsTable = defineTable({
   name: "metric_time_rollups",
   merge: replacing({ version: "UpdatedAt" }),
   sortKey: ["TenantId", "SeriesId", "BucketStart"],
-  partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
+  partition: { by: "toYearWeek(BucketStart)", column: "BucketStart" },
   tenant: ["TenantId"],
-  ttl: { anchor: "AcceptedAt" },
+  ttl: { anchor: "BucketStart" },
+  structuralDebt: [
+    {
+      column: "BucketStart",
+      reason:
+        "migration 00049 partitions and expires metric_time_rollups on BucketStart, which is derived from the point's own measurement time, so a backdated or future-stamped point chooses the partition and the retention deadline. BucketStart is the sort key's leaf, so re-anchoring needs a new table and a copy",
+    },
+  ],
   columns: {
     TenantId: ch.string(),
-    SeriesId: ch.string(),
+    SeriesId: fixedString(64),
     MetricName: ch.string(),
     MetricUnit: ch.string(),
     MetricKind: lowCardinalityString(),
@@ -180,11 +209,11 @@ export const metricTimeRollupsTable = defineTable({
     ResetCount: ch.uint32(),
     GapCount: ch.uint32(),
     SourcePointCount: ch.uint32(),
-    /** Frozen per bucket: receipt time only moves forward, so a later
-     * recompute over a grown point set derives the same earliest acceptance. */
-    AcceptedAt: ch.acceptedAt(),
     UpdatedAt: ch.writtenAt(),
     _retention_days: ch.uint16(),
     _size_bytes: ch.uint32(),
+    /** Earliest acceptance of the points that built the bucket (migration
+     * 00067); bookkeeping only, since 00049 anchors structure on BucketStart. */
+    AcceptedAt: ch.acceptedAt(),
   },
 });

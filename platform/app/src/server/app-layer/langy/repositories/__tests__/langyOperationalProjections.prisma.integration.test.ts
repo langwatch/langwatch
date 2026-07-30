@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { LangyConversationNotFoundError } from "~/server/app-layer/langy/errors";
 import { LangyMessageService } from "~/server/app-layer/langy/langy-message.service";
 import { prisma } from "~/server/db";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import type { Event } from "~/server/event-sourcing.old/domain/types";
 import {
   LangyAgentRespondedEventSchema,
@@ -73,7 +72,7 @@ const messageProjection = new LangyMessageOperationalMapProjection({
 function context(projectId: string, key?: string): ProjectionStoreContext {
   return {
     aggregateId: conversationId,
-    tenantId: createTenantId(projectId),
+    tenantId: projectId,
     ...(key ? { key } : {}),
   };
 }
@@ -93,7 +92,7 @@ function eventBase({
     id: `${namespace}-${id}`,
     aggregateId: conversationId,
     aggregateType: "langy_conversation" as const,
-    tenantId: createTenantId(projectId),
+    tenantId: projectId,
     createdAt: acceptedAt,
     occurredAt,
   };

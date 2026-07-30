@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-109](./109-storage.md) (2026-07-30). Previously: Accepted
 
 **Related:** ADR-098 (the two projection kinds this storage layer serves, and the
 write ordering it must honour), ADR-100 (the dispatch plane that decides what a

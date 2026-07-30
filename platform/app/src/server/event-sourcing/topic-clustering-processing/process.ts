@@ -50,20 +50,23 @@ export type TopicClusteringIntents = {
 
 type Step = EvolveStep<TopicClusteringScheduleState, TopicClusteringIntents>;
 
-export interface TopicClusteringScheduleState {
+export const topicClusteringScheduleStateSchema = z.object({
+  /** False until the project's first clustering event bootstraps it. A wake for
+   * an unbootstrapped project decides nothing and must clear its own deadline,
+   * or the wake worker re-finds it and starts a run every day for a project
+   * that never asked for one. */
+  enabled: z.boolean(),
   /** The run this process believes owns the project, or `null` when idle.
    * Cleared by the run's final `runCompleted` or by a `runFailed`, and treated
    * as abandoned once {@link TOPIC_CLUSTERING_STALE_RUN_MS} has passed. */
-  readonly currentRun: { readonly runId: string; readonly page: number } | null;
-}
-
-export const topicClusteringScheduleStateSchema: z.ZodType<TopicClusteringScheduleState> =
-  z.object({
-    currentRun: z.object({ runId: z.string(), page: z.number() }).nullable(),
-  });
+  currentRun: z.object({ runId: z.string(), page: z.number() }).nullable(),
+});
+export type TopicClusteringScheduleState = z.infer<
+  typeof topicClusteringScheduleStateSchema
+>;
 
 export function initTopicClusteringScheduleState(): TopicClusteringScheduleState {
-  return { currentRun: null };
+  return { enabled: false, currentRun: null };
 }
 
 /** The project's stable minute of the UTC day, from a sha256 of its id.
@@ -109,19 +112,31 @@ function schedulingRef(occurredAt: number, ctx: ProcessContext): number {
   return Math.max(occurredAt, ctx.now);
 }
 
-/** Every step reschedules the daily slot; the wake-time in-flight guard, not
- * wake suppression, is what prevents run pile-ups. */
+/** Every step of a bootstrapped project reschedules the daily slot; the
+ * wake-time in-flight guard, not wake suppression, is what prevents run
+ * pile-ups. A project that is not enabled arms nothing. */
 function settle(
   state: TopicClusteringScheduleState,
   ctx: ProcessContext,
   refMs: number,
   intents: Step["intents"] = [],
 ): Step {
-  return { state, intents, nextWakeAt: nextDailySlot(ctx.tenantId, refMs) };
+  return {
+    state,
+    intents,
+    nextWakeAt: state.enabled ? nextDailySlot(ctx.tenantId, refMs) : null,
+  };
+}
+
+/** Any of this project's clustering events bootstraps the schedule. */
+function enabled(
+  state: TopicClusteringScheduleState,
+): TopicClusteringScheduleState {
+  return state.enabled ? state : { ...state, enabled: true };
 }
 
 function startRun(runId: string, ctx: ProcessContext, refMs: number): Step {
-  return settle({ currentRun: { runId, page: 1 } }, ctx, refMs, [
+  return settle({ enabled: true, currentRun: { runId, page: 1 } }, ctx, refMs, [
     { type: "run", payload: { runId, page: 1, searchAfter: null } },
   ]);
 }
@@ -136,6 +151,7 @@ export function onTopicClusteringWake(
   state: TopicClusteringScheduleState,
   ctx: ProcessContext,
 ): Step {
+  if (!state.enabled) return { state, intents: [], nextWakeAt: null };
   if (isRunInFlight(state.currentRun, ctx.now))
     return settle(state, ctx, ctx.now);
   return startRun(mintScheduledRunId(ctx.now), ctx, ctx.now);
@@ -151,40 +167,49 @@ export function onClusteringRequested(
   ctx: ProcessContext,
 ): Step {
   const refMs = schedulingRef(data.occurredAt, ctx);
-  if (data.trigger !== "manual") return settle(state, ctx, refMs);
-  if (isRunInFlight(state.currentRun, refMs)) return settle(state, ctx, refMs);
+  const base = enabled(state);
+  if (data.trigger !== "manual") return settle(base, ctx, refMs);
+  if (isRunInFlight(base.currentRun, refMs)) return settle(base, ctx, refMs);
   return startRun(mintManualRunId(data.occurredAt), ctx, refMs);
 }
 
 /** Continues the walk if a cursor came back, otherwise clears the run. A
- * completion for a run a newer one has superseded is a late straggler. */
+ * completion arriving when no run is current — or for a run a newer one has
+ * superseded — is a late straggler: acting on it would resurrect a finished run
+ * and page the project again, skipping the day's scheduled slot. */
 export function onClusteringRunCompleted(
   state: TopicClusteringScheduleState,
   data: RunCompletedData,
   ctx: ProcessContext,
 ): Step {
   const refMs = schedulingRef(data.occurredAt, ctx);
+  const base = enabled(state);
+  if (base.currentRun === null) return settle(base, ctx, refMs);
   if (
-    state.currentRun !== null &&
-    state.currentRun.runId !== data.runId &&
-    !runIsNewer(data.runId, state.currentRun.runId)
+    base.currentRun.runId !== data.runId &&
+    !runIsNewer(data.runId, base.currentRun.runId)
   ) {
-    return settle(state, ctx, refMs);
+    return settle(base, ctx, refMs);
   }
   if (data.nextSearchAfter === undefined) {
-    return settle({ currentRun: null }, ctx, refMs);
+    return settle({ ...base, currentRun: null }, ctx, refMs);
   }
   const page = data.page + 1;
-  return settle({ currentRun: { runId: data.runId, page } }, ctx, refMs, [
-    {
-      type: "run",
-      payload: {
-        runId: data.runId,
-        page,
-        searchAfter: [data.nextSearchAfter[0], data.nextSearchAfter[1]],
+  return settle(
+    { ...base, currentRun: { runId: data.runId, page } },
+    ctx,
+    refMs,
+    [
+      {
+        type: "run",
+        payload: {
+          runId: data.runId,
+          page,
+          searchAfter: [data.nextSearchAfter[0], data.nextSearchAfter[1]],
+        },
       },
-    },
-  ]);
+    ],
+  );
 }
 
 /** Mirror of the completion guard, so a late failure from a superseded run
@@ -195,10 +220,11 @@ export function onClusteringRunFailed(
   ctx: ProcessContext,
 ): Step {
   const refMs = schedulingRef(data.occurredAt, ctx);
-  if (state.currentRun !== null && state.currentRun.runId !== data.runId) {
-    return settle(state, ctx, refMs);
+  const base = enabled(state);
+  if (base.currentRun !== null && base.currentRun.runId !== data.runId) {
+    return settle(base, ctx, refMs);
   }
-  return settle({ currentRun: null }, ctx, refMs);
+  return settle({ ...base, currentRun: null }, ctx, refMs);
 }
 
 /**
@@ -220,27 +246,10 @@ export interface TopicClusteringDispatchPorts {
   ): Promise<void>;
 }
 
-/** The mount record, with the one effect bound to the port that runs it. */
-export function topicClusteringProcess(ports: TopicClusteringDispatchPorts) {
-  return {
-    state: topicClusteringScheduleStateSchema,
-    init: initTopicClusteringScheduleState,
-    intents: {
-      run: {
-        payload: topicClusteringRunIntentPayloadSchema,
-        messageKey: (payload: TopicClusteringRunIntentPayload) =>
-          `run:${payload.runId}:page-${payload.page}`,
-        deliver: (
-          payload: TopicClusteringRunIntentPayload,
-          ctx: HandlerContext,
-        ) => ports.runClusteringPage(payload, ctx),
-      },
-    },
-    on: {
-      requested: onClusteringRequested,
-      runCompleted: onClusteringRunCompleted,
-      runFailed: onClusteringRunFailed,
-    },
-    onWake: onTopicClusteringWake,
-  };
+/** One page's identity: the run and its page, never the clock, so a redelivered
+ * step mints the key the outbox already holds. */
+export function topicClusteringRunMessageKey(
+  payload: TopicClusteringRunIntentPayload,
+): string {
+  return `run:${payload.runId}:page-${payload.page}`;
 }

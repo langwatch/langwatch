@@ -1,17 +1,24 @@
 import type { StoreContext, StoredState } from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import type { ClickHouseClient, QueryOptions } from "../client/clickhouseClient";
-import { createRowCodec, type AnyWireColumn, type WireCodec } from "../codec/rowCodec";
-import { ch, type ColumnMap } from "../schema/columns";
-import { append, defineTable, replacing } from "../schema/defineTable";
-import { RowMappingError } from "./rowMapping";
+import type {
+  ClickHouseClient,
+  QueryOptions,
+} from "../client/clickhouseClient";
 import {
-  clickhouseReplacing,
-  ReplaceStoreConfigurationError,
+  type AnyWireColumn,
+  createRowCodec,
+  type WireCodec,
+} from "../codec/rowCodec";
+import { type ColumnMap, ch } from "../schema/columns";
+import { append, defineTable, replacing } from "../schema/defineTable";
+import {
   type ClickHouseReplacingArgs,
+  clickhouseReplacing,
   type FoldStateCache,
+  ReplaceStoreConfigurationError,
 } from "./replaceStore";
+import { RowMappingError } from "./rowMapping";
 
 const FOLD_STATE = z.object({
   count: z.number(),
@@ -113,7 +120,11 @@ interface FakeCache extends FoldStateCache<FoldState> {
 }
 
 function createFakeCache(
-  overrides: { onSet?: () => void; failSet?: boolean; failDelete?: boolean } = {},
+  overrides: {
+    onSet?: () => void;
+    failSet?: boolean;
+    failDelete?: boolean;
+  } = {},
 ): FakeCache {
   const entries = new Map<string, StoredState<FoldState>>();
   const setCalls: FakeCache["setCalls"] = [];
@@ -142,7 +153,9 @@ function createFakeCache(
 
 function buildStore(
   client: ClickHouseClient,
-  overrides: Partial<ClickHouseReplacingArgs<FoldState, typeof foldTable.columns>> = {},
+  overrides: Partial<
+    ClickHouseReplacingArgs<FoldState, typeof foldTable.columns>
+  > = {},
 ) {
   return clickhouseReplacing<FoldState, typeof foldTable.columns>({
     client,
@@ -271,6 +284,7 @@ describe("given clickhouseReplacing()", () => {
   });
 
   describe("when the sort key does not start with the tenant and key columns", () => {
+    /** @scenario a filtered column that is not in the sort key is refused */
     it("refuses at construction, a read bound on those two alone being a scan", () => {
       const lateKeyTable = defineTable({
         name: "fold_state_late_key",
@@ -316,7 +330,10 @@ describe("given clickhouseReplacing()", () => {
 
     it("refuses at construction rather than picking one of them", () => {
       expect(() =>
-        clickhouseReplacing<z.infer<typeof TWO_TENANT_STATE>, typeof twoTenantTable.columns>({
+        clickhouseReplacing<
+          z.infer<typeof TWO_TENANT_STATE>,
+          typeof twoTenantTable.columns
+        >({
           client: createFakeClient(),
           table: twoTenantTable,
           version: EXPECTED_VERSION,
@@ -329,7 +346,10 @@ describe("given clickhouseReplacing()", () => {
 
     it("accepts the table once the caller names which one scopes the read", () => {
       expect(() =>
-        clickhouseReplacing<z.infer<typeof TWO_TENANT_STATE>, typeof twoTenantTable.columns>({
+        clickhouseReplacing<
+          z.infer<typeof TWO_TENANT_STATE>,
+          typeof twoTenantTable.columns
+        >({
           client: createFakeClient(),
           table: twoTenantTable,
           version: EXPECTED_VERSION,
@@ -411,17 +431,27 @@ describe("given clickhouseReplacing()", () => {
       const read = await store.read(KEY, CONTEXT);
       expect(read).toEqual({
         kind: "found",
-        stored: { state: { ...STORED_STATE, label: "unmapped:steady" }, version: EXPECTED_VERSION },
+        stored: {
+          state: { ...STORED_STATE, label: "unmapped:steady" },
+          version: EXPECTED_VERSION,
+        },
       });
 
-      await store.write(KEY, { state: foldState(), version: EXPECTED_VERSION }, CONTEXT);
+      await store.write(
+        KEY,
+        { state: foldState(), version: EXPECTED_VERSION },
+        CONTEXT,
+      );
       expect(cellOf(client.insertCalls[0]!, "Label")).toBe("mapped:rising");
     });
   });
 
   describe("when reading a key with no stored row", () => {
+    /** @scenario an aggregate with no record at all is reported absent */
     it("reports absent", async () => {
-      const store = buildStore(createFakeClient({ query: async () => ({ rows: [] }) }));
+      const store = buildStore(
+        createFakeClient({ query: async () => ({ rows: [] }) }),
+      );
 
       expect(await store.read(KEY, CONTEXT)).toEqual({ kind: "absent" });
     });
@@ -468,6 +498,7 @@ describe("given clickhouseReplacing()", () => {
       }
     });
 
+    /** @scenario every read filters on the tenant first */
     it("selects every column of one row, scoped to the tenant and key, newest by merge version", async () => {
       const client = createFakeClient();
       const store = buildStore(client);
@@ -476,7 +507,9 @@ describe("given clickhouseReplacing()", () => {
 
       const call = client.queryCalls[0]!;
       const sql = resolveIdentifiers(call);
-      expect(sql).toContain(`SELECT ${foldTable.columnNames.join(", ")} FROM fold_state`);
+      expect(sql).toContain(
+        `SELECT ${foldTable.columnNames.join(", ")} FROM fold_state`,
+      );
       expect(sql).toContain(
         "WHERE TenantId = {tenantId:String} AND AggregateId = {key0:String}",
       );
@@ -486,6 +519,8 @@ describe("given clickhouseReplacing()", () => {
   });
 
   describe("when reading a key whose stored row was written under an older state version", () => {
+    /** @scenario a record in a shape this build cannot read is reported as found and refused */
+    /** @scenario a fold with production rows and no pin fails its version gate on every row */
     it("reports undecodable with the stored version, never absent", async () => {
       const client = createFakeClient({
         query: async () => storedRow({ stateVersion: "v0-legacy" }),
@@ -535,7 +570,9 @@ describe("given clickhouseReplacing()", () => {
       const result = await store.read(KEY, CONTEXT);
 
       expect(result.kind).toBe("undecodable");
-      expect((result as { storedVersion?: string }).storedVersion).toBeUndefined();
+      expect(
+        (result as { storedVersion?: string }).storedVersion,
+      ).toBeUndefined();
       expect((result as { cause?: unknown }).cause).toBeDefined();
     });
   });
@@ -550,7 +587,9 @@ describe("given clickhouseReplacing()", () => {
       const result = await store.read(KEY, CONTEXT);
 
       expect(result.kind).toBe("undecodable");
-      expect((result as { storedVersion?: string }).storedVersion).toBe(EXPECTED_VERSION);
+      expect((result as { storedVersion?: string }).storedVersion).toBe(
+        EXPECTED_VERSION,
+      );
       expect((result as { cause?: unknown }).cause).toBeDefined();
     });
   });
@@ -562,7 +601,10 @@ describe("given clickhouseReplacing()", () => {
 
       await store.write(
         KEY,
-        { state: foldState({ count: 5, label: "rising" }), version: EXPECTED_VERSION },
+        {
+          state: foldState({ count: 5, label: "rising" }),
+          version: EXPECTED_VERSION,
+        },
         CONTEXT,
       );
 
@@ -602,6 +644,7 @@ describe("given clickhouseReplacing()", () => {
       expect(stampedAt(client.insertCalls[1]!)).toEqual(second);
     });
 
+    /** @scenario a partition anchor is not re-stamped on every write */
     it("leaves the frozen partition anchor where the state put it, write after write", async () => {
       const client = createFakeClient();
       const store = buildStore(client);
@@ -623,6 +666,8 @@ describe("given clickhouseReplacing()", () => {
       expect(anchorOf(client.insertCalls[1]!)).toEqual(new Date(ACCEPTED_AT));
     });
 
+    /** @scenario retention is stamped from the kind of data a record holds */
+    /** @scenario a fold with no retention answer still keeps records for a bounded time */
     it("stamps the retention the caller asked for, falling back to the store's own", async () => {
       const client = createFakeClient();
       const store = buildStore(client, { retentionDays: 90 });
@@ -645,7 +690,9 @@ describe("given clickhouseReplacing()", () => {
       });
       const store = buildStore(client);
 
-      await expect(store.read(KEY, CONTEXT)).rejects.toThrow("connection refused");
+      await expect(store.read(KEY, CONTEXT)).rejects.toThrow(
+        "connection refused",
+      );
     });
   });
 
@@ -656,7 +703,11 @@ describe("given clickhouseReplacing()", () => {
       const storeA = buildStore(clientA);
       buildStore(clientB);
 
-      await storeA.write(KEY, { state: foldState(), version: EXPECTED_VERSION }, CONTEXT);
+      await storeA.write(
+        KEY,
+        { state: foldState(), version: EXPECTED_VERSION },
+        CONTEXT,
+      );
 
       expect(clientA.insertCalls).toHaveLength(1);
       expect(clientB.insertCalls).toHaveLength(0);
@@ -693,12 +744,20 @@ describe("given clickhouseReplacing()", () => {
       expect(await store.read(KEY, CONTEXT)).toEqual({
         kind: "found",
         stored: {
-          state: { count: 4, label: "decoded-by-fake-codec", acceptedAt: ACCEPTED_AT },
+          state: {
+            count: 4,
+            label: "decoded-by-fake-codec",
+            acceptedAt: ACCEPTED_AT,
+          },
           version: EXPECTED_VERSION,
         },
       });
 
-      await store.write(KEY, { state: foldState(), version: EXPECTED_VERSION }, CONTEXT);
+      await store.write(
+        KEY,
+        { state: foldState(), version: EXPECTED_VERSION },
+        CONTEXT,
+      );
       expect(encodeRows).toHaveBeenCalledOnce();
       expect(client.insertCalls[0]?.rows).toEqual([["encoded-by-fake-codec"]]);
     });
@@ -707,19 +766,27 @@ describe("given clickhouseReplacing()", () => {
 
 describe("given clickhouseReplacing() with a cache in front of the table", () => {
   describe("when the cached entry was written under the expected version", () => {
+    /** @scenario a cached entry is served without reading the durable store */
     it("serves it without querying the table at all", async () => {
       const client = createFakeClient({ query: async () => storedRow() });
       const cache = createFakeCache();
-      const cached = { state: foldState({ count: 3, label: "cached" }), version: EXPECTED_VERSION };
+      const cached = {
+        state: foldState({ count: 3, label: "cached" }),
+        version: EXPECTED_VERSION,
+      };
       cache.entries.set(KEY, cached);
       const store = buildStore(client, { cache });
 
-      expect(await store.read(KEY, CONTEXT)).toEqual({ kind: "found", stored: cached });
+      expect(await store.read(KEY, CONTEXT)).toEqual({
+        kind: "found",
+        stored: cached,
+      });
       expect(client.queryCalls).toHaveLength(0);
     });
   });
 
   describe("when the cached entry's version disagrees with this build's", () => {
+    /** @scenario a cache entry written under an older state shape is passed over while still warm */
     it("drops the entry and rereads the table, so the key is not stuck on a shape it cannot use", async () => {
       const client = createFakeClient({ query: async () => storedRow() });
       const cache = createFakeCache();
@@ -745,14 +812,23 @@ describe("given clickhouseReplacing() with a cache in front of the table", () =>
   });
 
   describe("when the cache has no entry for the key", () => {
+    /** @scenario a cache miss falls through to the durable store */
+    /** @scenario a cold cache recovers from the fold's own row, never from the event log */
     it("falls through to the table and caches what it found", async () => {
-      const client = createFakeClient({ query: async () => storedRow({ count: 9n }) });
+      const client = createFakeClient({
+        query: async () => storedRow({ count: 9n }),
+      });
       const cache = createFakeCache();
       const store = buildStore(client, { cache });
 
       await store.read(KEY, CONTEXT);
 
       expect(client.queryCalls).toHaveLength(1);
+      // The only query issued targets the fold's own table — recovery never
+      // reaches for the event log, which this store has no reference to at all.
+      expect(resolveIdentifiers(client.queryCalls[0]!)).toContain(
+        `FROM ${foldTable.name}`,
+      );
       expect(cache.entries.get(KEY)).toEqual({
         state: STORED_STATE,
         version: EXPECTED_VERSION,
@@ -771,6 +847,8 @@ describe("given clickhouseReplacing() with a cache in front of the table", () =>
   });
 
   describe("when a write succeeds", () => {
+    /** @scenario the durable store is written before the cache, always */
+    /** @scenario a durable write resolves only once the block has landed */
     it("populates the cache, after the row is durable and never before", async () => {
       const order: string[] = [];
       const client = createFakeClient({ onInsert: () => order.push("insert") });
@@ -786,6 +864,7 @@ describe("given clickhouseReplacing() with a cache in front of the table", () =>
   });
 
   describe("when the cache write fails after a durable insert", () => {
+    /** @scenario a failed cache write deletes the key rather than leaving what is there */
     it("deletes the key rather than leaving a stale entry the next read would serve", async () => {
       const client = createFakeClient();
       const cache = createFakeCache({ failSet: true });
@@ -795,7 +874,11 @@ describe("given clickhouseReplacing() with a cache in front of the table", () =>
       });
       const store = buildStore(client, { cache });
 
-      await store.write(KEY, { state: foldState(), version: EXPECTED_VERSION }, CONTEXT);
+      await store.write(
+        KEY,
+        { state: foldState(), version: EXPECTED_VERSION },
+        CONTEXT,
+      );
 
       expect(client.insertCalls).toHaveLength(1);
       expect(cache.deleteCalls).toEqual([KEY]);
@@ -808,9 +891,81 @@ describe("given clickhouseReplacing() with a cache in front of the table", () =>
       const store = buildStore(client, { cache });
 
       await expect(
-        store.write(KEY, { state: foldState(), version: EXPECTED_VERSION }, CONTEXT),
+        store.write(
+          KEY,
+          { state: foldState(), version: EXPECTED_VERSION },
+          CONTEXT,
+        ),
       ).resolves.toBeUndefined();
       expect(client.insertCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when the cache resolves no entry because its own stored bytes could not be read back", () => {
+    /** @scenario an unreadable cache entry is a miss, not a failure */
+    it("is indistinguishable from a plain miss, and falls through to the table without failing", async () => {
+      const client = createFakeClient({
+        query: async () => storedRow({ count: 9n }),
+      });
+      // `FoldStateCache.get()` returns `null` for both "no entry" and "entry
+      // present but this cache implementation could not decode it" — the
+      // distinction, if any, is the cache's own concern, never the store's.
+      const cache = createFakeCache();
+      const store = buildStore(client, { cache });
+
+      const result = await store.read(KEY, CONTEXT);
+
+      expect(result).toEqual({
+        kind: "found",
+        stored: { state: STORED_STATE, version: EXPECTED_VERSION },
+      });
+      expect(client.queryCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when the cache cannot be reached at all", () => {
+    /** @scenario an unreachable cache does not fail a delivery */
+    it("falls through to the durable store and the read still succeeds", async () => {
+      const client = createFakeClient({
+        query: async () => storedRow({ count: 9n }),
+      });
+      const cache = createFakeCache();
+      cache.get = () => Promise.reject(new Error("cache unreachable"));
+      const store = buildStore(client, { cache });
+
+      const result = await store.read(KEY, CONTEXT);
+
+      expect(result).toEqual({
+        kind: "found",
+        stored: { state: STORED_STATE, version: EXPECTED_VERSION },
+      });
+      expect(client.queryCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when the lane serving this aggregate moves to a different consumer", () => {
+    /** @scenario a lane that moves to another consumer does not serve the first one's cached state */
+    it("does not serve the first consumer's cached entry once another has advanced the aggregate", async () => {
+      const client = createFakeClient({
+        query: async () => storedRow({ count: 9n }),
+      });
+      // The cache is shared infrastructure (Redis, not a per-process map), so
+      // two consumers of the same lane read and write through the one entry.
+      const sharedCache = createFakeCache();
+      const firstConsumer = buildStore(client, { cache: sharedCache });
+      const secondConsumer = buildStore(client, { cache: sharedCache });
+
+      await firstConsumer.read(KEY, CONTEXT);
+      const advanced = {
+        state: foldState({ count: 41, label: "advanced" }),
+        version: EXPECTED_VERSION,
+      };
+      await secondConsumer.write(KEY, advanced, CONTEXT);
+
+      expect(await firstConsumer.read(KEY, CONTEXT)).toEqual({
+        kind: "found",
+        stored: advanced,
+      });
     });
   });
 });
@@ -854,7 +1009,7 @@ describe("given a table whose engine key is composite", () => {
     });
   }
 
-  /** @scenario a composite engine key is bound column by column, never collapsed to one */
+  /** @scenario a composite engine key is bound column by column */
   it("binds every key column, so two rows sharing one part stay distinct", async () => {
     const client = createFakeClient();
     const store = buildCompositeStore(client);
@@ -891,5 +1046,83 @@ describe("given a table whose engine key is composite", () => {
         stateVersionColumn: "Version",
       }),
     ).toThrow(ReplaceStoreConfigurationError);
+  });
+});
+
+describe("given clickhouseReplacing() with a declared read window", () => {
+  // A time-leading sort key is only seekable behind a declared window
+  // (ADR-109 decision 5): `AcceptedAt` fronts the key, ahead of the fold's
+  // own `AggregateId`.
+  const windowedTable = defineTable({
+    name: "fold_state_windowed",
+    merge: replacing({ version: "WrittenAt" }),
+    sortKey: ["TenantId", "AcceptedAt", "AggregateId"],
+    partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
+    tenant: ["TenantId"],
+    columns: foldTable.columns,
+  });
+
+  function buildWindowedStore(client: ClickHouseClient) {
+    return clickhouseReplacing<FoldState, typeof windowedTable.columns>({
+      client,
+      table: windowedTable,
+      version: EXPECTED_VERSION,
+      key: "AggregateId",
+      stateVersionColumn: "StateVersion",
+      state: FOLD_STATE,
+      readWindow: {
+        column: "AcceptedAt",
+        lookbackMs: 30 * 24 * 60 * 60 * 1000,
+      },
+    });
+  }
+
+  /** @scenario a declared read window bounds the store read */
+  it("bounds the read on the window column when the row is found within it", async () => {
+    const client = createFakeClient({ query: async () => storedRow() });
+    const store = buildWindowedStore(client);
+
+    await store.read(KEY, CONTEXT);
+
+    expect(client.queryCalls).toHaveLength(1);
+    const sql = resolveIdentifiers(client.queryCalls[0]!);
+    expect(sql).toContain("AND AcceptedAt >= {windowFrom:DateTime64(3)}");
+  });
+
+  /** @scenario a windowed miss retries unwindowed before treating the aggregate as new */
+  it("retries unwindowed before reporting the aggregate absent", async () => {
+    let calls = 0;
+    const client = createFakeClient({
+      query: async () => {
+        calls++;
+        return calls === 1 ? { rows: [] } : storedRow();
+      },
+    });
+    const store = buildWindowedStore(client);
+
+    const result = await store.read(KEY, CONTEXT);
+
+    expect(client.queryCalls).toHaveLength(2);
+    expect(resolveIdentifiers(client.queryCalls[0]!)).toContain("windowFrom");
+    expect(resolveIdentifiers(client.queryCalls[1]!)).not.toContain(
+      "windowFrom",
+    );
+    expect(result).toEqual({
+      kind: "found",
+      stored: { state: STORED_STATE, version: EXPECTED_VERSION },
+    });
+  });
+
+  /** @scenario a row the store found but refused is not read again unwindowed */
+  it("does not retry unwindowed once the windowed query found an undecodable row", async () => {
+    const client = createFakeClient({
+      query: async () => storedRow({ stateVersion: "v0-legacy" }),
+    });
+    const store = buildWindowedStore(client);
+
+    const result = await store.read(KEY, CONTEXT);
+
+    expect(client.queryCalls).toHaveLength(1);
+    expect(result).toEqual({ kind: "undecodable", storedVersion: "v0-legacy" });
   });
 });

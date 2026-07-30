@@ -11,12 +11,13 @@
  *
  * It is a text reader, not a SQL parser, and it only understands the small
  * dialect our migrations are actually written in: one `CREATE TABLE` per
- * `-- +goose StatementBegin` block, `PARTITION BY` / `ORDER BY` on their own
- * lines after the closing paren, `DROP TABLE`, `EXCHANGE TABLES`, and
- * `ALTER TABLE … MODIFY ORDER BY`. That is enough to be exact about the four
- * facts the catalogue claims, and anything it cannot read it reports rather
- * than skipping — a reader that silently understands less over time is the
- * exact failure this file was written to end.
+ * `-- +goose StatementBegin` block, `PARTITION BY` / `ORDER BY` / `TTL` on
+ * their own lines after the closing paren, `DROP TABLE`, `EXCHANGE TABLES`,
+ * and the `ALTER TABLE` forms our migrations use — `MODIFY ORDER BY`,
+ * `MODIFY TTL`, and `ADD`/`MODIFY`/`RENAME`/`DROP COLUMN`. That is enough to
+ * be exact about the facts a declaration claims, and anything it cannot read
+ * it reports rather than skipping — a reader that silently understands less
+ * over time is the exact failure this file was written to end.
  *
  * Commented lines are inert, and everything after `-- +goose Down` is ignored:
  * a Down block is not what the database is running. Migrations are applied in
@@ -53,8 +54,22 @@ export interface MigrationTableShape {
    * have none (AggregatingMergeTree, plain MergeTree).
    */
   readonly versionColumn: string | null;
-  /** Column names declared in the CREATE TABLE body. */
-  readonly columns: readonly string[];
+  /**
+   * Declared type per column, in physical order, after every `ALTER`.
+   *
+   * Types matter because a declaration naming the wrong one decodes wrong or
+   * throws rather than failing loudly at the boundary — `Nullable(UInt32)` read
+   * as a `UInt64` expects a quoted string and gets a bare number. The `ALTER`
+   * fold matters because most columns on the oldest tables arrived that way,
+   * and a reader that only saw `CREATE TABLE` bodies reported them as absent.
+   */
+  readonly columnTypes: ReadonlyMap<string, string>;
+  /**
+   * The `TTL` clause verbatim, whitespace-normalised, or null when the DDL has
+   * none. Null does not mean "never expires": `ttlReconciler.ts` sets the TTL
+   * on the retention-managed tables at runtime, and their DDL carries none.
+   */
+  readonly ttlExpression: string | null;
   /** The migration file that last defined this table's shape. */
   readonly definedIn: string;
 }
@@ -177,29 +192,186 @@ function parseVersionColumn(engine: string): string | null {
 }
 
 /**
- * Column names out of a CREATE TABLE body.
+ * The column name out of one declaration.
  *
- * Index and constraint declarations are skipped; a backtick-quoted name
- * (`` `_retention_days` ``) is unquoted. Types are not read — nothing the
- * catalogue claims depends on them.
+ * A backtick-quoted name may contain dots (`` `Events.Timestamp` ``), and it
+ * must keep them: stopping at the dot collapsed `stored_spans`' three
+ * `Events.*` columns onto one name called `Events`.
  */
-function parseColumns(body: string): string[] {
-  const columns: string[] = [];
+function parseColumnName(declaration: string): string | null {
+  return /^`?([\w$.]+)`?/.exec(declaration.trim())?.[1] ?? null;
+}
+
+/** Everything after the type is storage or derivation detail, not the type. */
+const COLUMN_TAIL =
+  /^(?:CODEC|DEFAULT|MATERIALIZED|ALIAS|EPHEMERAL|TTL|COMMENT|SETTINGS|AFTER|FIRST)\b/i;
+
+/**
+ * The type expression out of one declaration, or null when it carries none.
+ *
+ * A type nests (`Map(LowCardinality(String), UInt32)`,
+ * `Array(Tuple(String, UInt32, Bool))`), so the cut is the first depth-zero
+ * space followed by a tail keyword rather than the first space.
+ */
+function parseColumnType(declaration: string): string | null {
+  const rest = /^`?[\w$.]+`?\s+([\s\S]+)$/.exec(declaration.trim())?.[1];
+  if (rest === undefined || COLUMN_TAIL.test(rest)) return null;
+
+  let depth = 0;
+  let end = rest.length;
+  for (let index = 0; index < rest.length; index++) {
+    const char = rest[index]!;
+    if (char === "(") depth++;
+    if (char === ")") depth--;
+    if (
+      depth === 0 &&
+      /\s/.test(char) &&
+      COLUMN_TAIL.test(rest.slice(index + 1))
+    ) {
+      end = index;
+      break;
+    }
+  }
+  return rest.slice(0, end).trim().replace(/\s+/g, " ").replace(/,\s*/g, ", ");
+}
+
+/**
+ * Columns and their types out of a CREATE TABLE body, in declaration order.
+ * Index and constraint declarations are skipped.
+ */
+function parseColumns(body: string): Map<string, string> {
+  const columns = new Map<string, string>();
 
   for (const part of splitTopLevel(body)) {
     const declaration = part.trim();
     if (/^(?:INDEX|CONSTRAINT|PRIMARY\s+KEY|PROJECTION)\b/i.test(declaration)) {
       continue;
     }
-    const name = /^`?([\w$]+)`?\b/.exec(declaration)?.[1];
-    if (name) columns.push(name);
+    const name = parseColumnName(declaration);
+    if (name) columns.set(name, parseColumnType(declaration) ?? "");
   }
 
   return columns;
 }
 
+/** The four `ALTER` actions that change a table's column set. */
+const COLUMN_ACTION = /^(?:ADD|MODIFY|RENAME|DROP)\s+COLUMN\b/i;
+
+/** Applies one {@link COLUMN_ACTION} to a table's accumulated columns. */
+function applyColumnAction(action: string, columns: Map<string, string>): void {
+  const added = /^ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([\s\S]+)$/i.exec(
+    action,
+  );
+  if (added) {
+    const name = parseColumnName(added[1]!);
+    if (name) columns.set(name, parseColumnType(added[1]!) ?? "");
+    return;
+  }
+
+  const modified = /^MODIFY\s+COLUMN\s+(?:IF\s+EXISTS\s+)?([\s\S]+)$/i.exec(
+    action,
+  );
+  if (modified) {
+    const name = parseColumnName(modified[1]!);
+    if (name && columns.has(name)) {
+      columns.set(name, parseColumnType(modified[1]!) ?? "");
+    }
+    return;
+  }
+
+  const renamed =
+    /^RENAME\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?([\w$.]+)`?\s+TO\s+`?([\w$.]+)`?/i.exec(
+      action,
+    );
+  if (renamed) {
+    const type = columns.get(renamed[1]!);
+    if (type !== undefined) {
+      columns.delete(renamed[1]!);
+      columns.set(renamed[2]!, type);
+    }
+    return;
+  }
+
+  const dropped = /^DROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?([\w$.]+)`?/i.exec(
+    action,
+  );
+  if (dropped) columns.delete(dropped[1]!);
+}
+
 const CREATE_TABLE =
   /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)\s*\(/gi;
+
+/** The index just past the paren closing a `CREATE TABLE`'s column list. The
+ *  body nests (types, codecs, index expressions), so depth is the only guide. */
+function endOfColumnList(sql: string, from: number): number {
+  let depth = 1;
+  let cursor = from;
+  while (cursor < sql.length && depth > 0) {
+    if (sql[cursor] === "(") depth++;
+    if (sql[cursor] === ")") depth--;
+    cursor++;
+  }
+  return cursor;
+}
+
+/**
+ * Everything from a `CREATE TABLE`'s closing paren to its `;` — the clause the
+ * engine, partition key, sort key and TTL live in.
+ */
+function parseTableTail(
+  tail: string,
+): Omit<MigrationTableShape, "table" | "columnTypes" | "definedIn"> {
+  const partition = /PARTITION\s+BY\s+([^\n]+)/i.exec(tail)?.[1]?.trim();
+  // The clause runs to the next top-level keyword. `PARTITION BY` is one of
+  // them because 00036 writes `ORDER BY` first — a lookahead that omitted it
+  // swallowed the partition clause into the sort key and reported a sort key
+  // no engine has.
+  const order =
+    /ORDER\s+BY\s+([\s\S]*?)(?=\n\s*(?:TTL|SETTINGS|PRIMARY\s+KEY|SAMPLE\s+BY|PARTITION\s+BY|ENGINE)\b|$)/i.exec(
+      tail,
+    )?.[1];
+  const engine = /ENGINE\s*=\s*([^\n]+)/i.exec(tail)?.[1] ?? "";
+  // Our TTL clauses wrap the anchor in `IF(_retention_days > 0, …)` and span
+  // several lines, so this runs to `SETTINGS` rather than to a newline.
+  const ttl = /\bTTL\s+([\s\S]*?)(?=\s+SETTINGS\b|$)/i.exec(tail)?.[1]?.trim();
+
+  return {
+    partitionExpression: partition ? partition.replace(/\s+/g, " ") : null,
+    sortKey: order ? parseSortKey(order) : [],
+    versionColumn: parseVersionColumn(engine),
+    ttlExpression: ttl ? ttl.replace(/\s+/g, " ") : null,
+  };
+}
+
+/** Every `CREATE TABLE` in one migration, replacing whatever shape it had. */
+function applyCreateTables(
+  sql: string,
+  entry: string,
+  shapes: Map<string, MigrationTableShape>,
+): void {
+  CREATE_TABLE.lastIndex = 0;
+  let created: RegExpExecArray | null = CREATE_TABLE.exec(sql);
+  while (created !== null) {
+    const table = unqualify(created[1]!);
+    const bodyStart = created.index + created[0].length;
+    const cursor = endOfColumnList(sql, bodyStart);
+    const tailEnd = sql.indexOf(";", cursor);
+
+    // A MATERIALIZED VIEW's target table is the one that stores rows; the view
+    // itself has no partition key of its own to catalogue.
+    shapes.set(table, {
+      table,
+      ...parseTableTail(
+        sql.slice(cursor, tailEnd === -1 ? sql.length : tailEnd),
+      ),
+      columnTypes: parseColumns(sql.slice(bodyStart, cursor - 1)),
+      definedIn: entry,
+    });
+
+    CREATE_TABLE.lastIndex = tailEnd === -1 ? sql.length : tailEnd;
+    created = CREATE_TABLE.exec(sql);
+  }
+}
 
 /**
  * Reads one migration file's effect onto the accumulating schema.
@@ -218,53 +390,7 @@ function applyMigration({
   sql: string;
   shapes: Map<string, MigrationTableShape>;
 }): void {
-  CREATE_TABLE.lastIndex = 0;
-  let created: RegExpExecArray | null = CREATE_TABLE.exec(sql);
-  while (created !== null) {
-    const table = unqualify(created[1]!);
-    const bodyStart = created.index + created[0].length;
-
-    // Walk to the paren that closes the column list. The body nests (types,
-    // codecs, index expressions), so counting depth is the only correct way.
-    let depth = 1;
-    let cursor = bodyStart;
-    while (cursor < sql.length && depth > 0) {
-      if (sql[cursor] === "(") depth++;
-      if (sql[cursor] === ")") depth--;
-      cursor++;
-    }
-    const body = sql.slice(bodyStart, cursor - 1);
-
-    // Everything from the closing paren to the statement's `;` carries ENGINE,
-    // PARTITION BY, ORDER BY, TTL and SETTINGS.
-    const tailEnd = sql.indexOf(";", cursor);
-    const tail = sql.slice(cursor, tailEnd === -1 ? sql.length : tailEnd);
-
-    const partition = /PARTITION\s+BY\s+([^\n]+)/i.exec(tail)?.[1]?.trim();
-    // The clause runs to the next top-level keyword. `PARTITION BY` is one of
-    // them because 00036 writes `ORDER BY` first — a lookahead that omitted it
-    // swallowed the partition clause into the sort key and reported a sort key
-    // no engine has.
-    const order =
-      /ORDER\s+BY\s+([\s\S]*?)(?=\n\s*(?:TTL|SETTINGS|PRIMARY\s+KEY|SAMPLE\s+BY|PARTITION\s+BY|ENGINE)\b|$)/i.exec(
-        tail,
-      )?.[1];
-    const engine = /ENGINE\s*=\s*([^\n]+)/i.exec(tail)?.[1] ?? "";
-
-    // A MATERIALIZED VIEW's target table is the one that stores rows; the view
-    // itself has no partition key of its own to catalogue.
-    shapes.set(table, {
-      table,
-      partitionExpression: partition ? partition.replace(/\s+/g, " ") : null,
-      sortKey: order ? parseSortKey(order) : [],
-      versionColumn: parseVersionColumn(engine),
-      columns: parseColumns(body),
-      definedIn: entry,
-    });
-
-    CREATE_TABLE.lastIndex = tailEnd === -1 ? sql.length : tailEnd;
-    created = CREATE_TABLE.exec(sql);
-  }
+  applyCreateTables(sql, entry, shapes);
 
   // DROP, EXCHANGE and MODIFY ORDER BY are applied in the order they appear in
   // the file, not grouped by kind. 00058 creates a scratch rollup, EXCHANGEs it
@@ -305,18 +431,52 @@ function applyMigration({
   // directly after the table name read straight past it and reported the
   // original four-column key.
   for (const altered of sql.matchAll(/ALTER\s+TABLE\s+(\S+)([^;]*);/gi)) {
-    const modify = /MODIFY\s+ORDER\s+BY\s+([\s\S]*)$/i.exec(altered[2]!);
-    if (!modify) continue;
-
     const table = unqualify(altered[1]!);
-    const sortKey = parseSortKey(modify[1]!);
-    rewrites.push({
-      at: altered.index,
-      apply: () => {
-        const existing = shapes.get(table);
-        if (existing) shapes.set(table, { ...existing, sortKey });
-      },
-    });
+    const at = altered.index;
+
+    const modify = /MODIFY\s+ORDER\s+BY\s+([\s\S]*)$/i.exec(altered[2]!);
+    if (modify) {
+      const sortKey = parseSortKey(modify[1]!);
+      rewrites.push({
+        at,
+        apply: () => {
+          const existing = shapes.get(table);
+          if (existing) shapes.set(table, { ...existing, sortKey });
+        },
+      });
+    }
+
+    // The actions are split at depth-zero commas, because a column type carries
+    // commas of its own: splitting on every comma truncates
+    // `Array(Tuple(String, UInt32, Bool))` to `Array(Tuple(String`.
+    for (const action of splitTopLevel(altered[2]!).map((part) =>
+      part.trim(),
+    )) {
+      if (COLUMN_ACTION.test(action)) {
+        rewrites.push({
+          at,
+          apply: () => {
+            const existing = shapes.get(table);
+            if (!existing) return;
+            const columnTypes = new Map(existing.columnTypes);
+            applyColumnAction(action, columnTypes);
+            shapes.set(table, { ...existing, columnTypes });
+          },
+        });
+        continue;
+      }
+
+      const ttl = /^MODIFY\s+TTL\s+([\s\S]+)$/i.exec(action);
+      if (!ttl) continue;
+      const ttlExpression = ttl[1]!.trim().replace(/\s+/g, " ");
+      rewrites.push({
+        at,
+        apply: () => {
+          const existing = shapes.get(table);
+          if (existing) shapes.set(table, { ...existing, ttlExpression });
+        },
+      });
+    }
   }
 
   rewrites.sort((left, right) => left.at - right.at);

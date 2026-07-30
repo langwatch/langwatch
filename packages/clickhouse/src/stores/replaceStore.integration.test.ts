@@ -1,16 +1,22 @@
-import { createClient, type ClickHouseClient as DriverClient } from "@clickhouse/client";
+import {
+  createClient,
+  type ClickHouseClient as DriverClient,
+} from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  FOLD_STATE_SCHEMA,
+  type FoldState,
+  foldStateTable,
+} from "../__tests__/integration/fixtures";
 import {
   readTestClickHouseInfo,
   uniqueId,
   uniqueTenant,
 } from "../__tests__/integration/testClickHouse";
 import {
-  FOLD_STATE_SCHEMA,
-  foldStateTable,
-  type FoldState,
-} from "../__tests__/integration/fixtures";
-import { createClickHouseClient, type ClickHouseClient } from "../client/clickhouseClient";
+  type ClickHouseClient,
+  createClickHouseClient,
+} from "../client/clickhouseClient";
 import { createRowCodec } from "../codec/rowCodec";
 import { bindIdentifiers } from "../query/identifiers";
 import type { ColumnMap } from "../schema/columns";
@@ -64,11 +70,16 @@ describe("given clickhouseReplacing against a live ClickHouse", () => {
     });
   }
 
+  /** @scenario a record written under the current shape is recovered as written */
   it("finds the exact state immediately after a write — read-your-writes", async () => {
     const store = buildStore();
     const tenantId = uniqueTenant();
     const key = uniqueId("key");
-    const state: FoldState = { value: "first", count: 1, acceptedAt: Date.now() };
+    const state: FoldState = {
+      value: "first",
+      count: 1,
+      acceptedAt: Date.now(),
+    };
 
     await store.write(key, { state, version: EXPECTED_VERSION }, { tenantId });
     const result = await store.read(key, { tenantId });
@@ -107,9 +118,14 @@ describe("given clickhouseReplacing against a live ClickHouse", () => {
       const key = uniqueId("key");
       const store = buildStore();
       const codec = createRowCodec();
-      const columns = foldStateTable.columnNames.map((name) => foldStateColumns[name]!);
+      const columns = foldStateTable.columnNames.map(
+        (name) => foldStateColumns[name]!,
+      );
 
-      async function insertVersion(state: FoldState, writtenAt: Date): Promise<void> {
+      async function insertVersion(
+        state: FoldState,
+        writtenAt: Date,
+      ): Promise<void> {
         const row = {
           TenantId: tenantId,
           Key: key,

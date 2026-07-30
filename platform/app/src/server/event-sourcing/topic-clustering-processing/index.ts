@@ -1,11 +1,13 @@
 import {
   type ClickHouseClient,
   clickhouseReplacing,
+  noFoldStateCache,
 } from "@langwatch/clickhouse";
 import {
   ConfigurationError,
   definePipeline,
   type GroupKey,
+  type HandlerContext,
   type Metrics,
   type Mount,
   validateMount,
@@ -16,8 +18,16 @@ import {
   topicClusteringEvents,
 } from "./events";
 import {
+  initTopicClusteringScheduleState,
+  onClusteringRequested,
+  onClusteringRunCompleted,
+  onClusteringRunFailed,
+  onTopicClusteringWake,
+  TOPIC_CLUSTERING_PROCESS_NAME,
   type TopicClusteringDispatchPorts,
-  topicClusteringProcess,
+  topicClusteringRunIntentPayloadSchema,
+  topicClusteringRunMessageKey,
+  topicClusteringScheduleStateSchema,
 } from "./process";
 import {
   handleRunCompleted as applyRunHistoryRunCompleted,
@@ -158,6 +168,9 @@ export function createTopicClusteringProcessingPipeline(
     key: "ProjectId",
     stateVersionColumn: "StateVersion",
     row: foldStateRow<ReturnType<typeof initRunStatusState>>(),
+    // No cache tier exists for this fold yet — a deliberate point read per
+    // delivery, not an oversight.
+    cache: noFoldStateCache(),
   });
   assertMountIsLegal("topicClusteringRunStatus", {
     projection: "fold",
@@ -173,6 +186,7 @@ export function createTopicClusteringProcessingPipeline(
     key: "ProjectId",
     stateVersionColumn: "StateVersion",
     row: foldStateRow<ReturnType<typeof initRunHistoryState>>(),
+    cache: noFoldStateCache(),
   });
   assertMountIsLegal("topicClusteringRunHistory", {
     projection: "fold",
@@ -188,6 +202,7 @@ export function createTopicClusteringProcessingPipeline(
     key: "ProjectId",
     stateVersionColumn: "StateVersion",
     row: foldStateRow<ReturnType<typeof initTopicModelState>>(),
+    cache: noFoldStateCache(),
   });
   assertMountIsLegal("topicModel", {
     projection: "fold",
@@ -258,7 +273,24 @@ export function createTopicClusteringProcessingPipeline(
       on: { topicsRecorded: applyTopicsRecorded },
       store: topicModelStore,
     })
-    .withProcessManager("topicClustering", topicClusteringProcess(deps.ports))
+    .withProcessManager(TOPIC_CLUSTERING_PROCESS_NAME, {
+      state: topicClusteringScheduleStateSchema,
+      init: initTopicClusteringScheduleState,
+      intents: {
+        run: {
+          payload: topicClusteringRunIntentPayloadSchema,
+          messageKey: topicClusteringRunMessageKey,
+          deliver: (payload, ctx: HandlerContext) =>
+            deps.ports.runClusteringPage(payload, ctx),
+        },
+      },
+      on: {
+        requested: onClusteringRequested,
+        runCompleted: onClusteringRunCompleted,
+        runFailed: onClusteringRunFailed,
+      },
+      onWake: onTopicClusteringWake,
+    })
     .build({ metrics: deps.metrics });
 }
 

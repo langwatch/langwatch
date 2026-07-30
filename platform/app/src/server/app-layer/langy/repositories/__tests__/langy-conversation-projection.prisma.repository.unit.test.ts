@@ -1,14 +1,9 @@
-import type { LangyConversationStateData } from "@langwatch/langy";
 import {
   type LangyConversationProjection,
   LangyProjectionTitleSource,
 } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
-import type { Event } from "~/server/event-sourcing.old/domain/types";
-import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
-import type { StateProjectionDefinition } from "~/server/event-sourcing.old/projections/stateProjection.types";
-import { StateProjectionExecutor } from "~/server/event-sourcing.old/projections/stateProjectionExecutor";
+import type { LegacyProjectionStoreContext } from "~/server/app-layer/_shared/legacyProjectionStore.types";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 
 type Row = LangyConversationProjection;
@@ -63,10 +58,10 @@ function setup(find: FindUnique = vi.fn<FindUnique>()) {
   };
 }
 
-function context(projectId: string): ProjectionStoreContext {
+function context(projectId: string): LegacyProjectionStoreContext {
   return {
     aggregateId: conversationId,
-    tenantId: createTenantId(projectId),
+    tenantId: projectId,
   };
 }
 
@@ -157,53 +152,4 @@ describe("PrismaLangyConversationProjectionRepository", () => {
       }),
     });
   });
-
-  it("leaves duplicate and stale-event rejection to the executor and performs no write", async () => {
-    const { repository, upsert } = setup(async () => row());
-    const apply = vi.fn((state: LangyConversationStateData) => state);
-    const projection: StateProjectionDefinition<LangyConversationStateData> = {
-      name: "langyConversationState",
-      version: "v1",
-      eventTypes: ["test.integration.event"],
-      init: () => rowToState(row()),
-      apply,
-      store: repository,
-    };
-    const event = (
-      id: string,
-      acceptedAt: number,
-    ): Event<Record<string, never>> => ({
-      id,
-      aggregateId: conversationId,
-      aggregateType: "langy_conversation",
-      tenantId: createTenantId("project-1"),
-      createdAt: acceptedAt,
-      occurredAt: 140,
-      type: "test.integration.event",
-      version: "v1",
-      data: {},
-    });
-
-    await new StateProjectionExecutor().execute({
-      projection,
-      events: [event("event-b", 200), event("event-z", 199)],
-      context: context("project-1"),
-    });
-
-    expect(apply).not.toHaveBeenCalled();
-    expect(upsert).not.toHaveBeenCalled();
-  });
 });
-
-function rowToState(source: Row): LangyConversationStateData {
-  const {
-    id: _id,
-    projectId: _projectId,
-    OccurredAt,
-    AcceptedAt: _acceptedAt,
-    LastEventId: _lastEventId,
-    ProjectionVersion: _projectionVersion,
-    ...state
-  } = source;
-  return { ...state, LastEventOccurredAt: OccurredAt };
-}

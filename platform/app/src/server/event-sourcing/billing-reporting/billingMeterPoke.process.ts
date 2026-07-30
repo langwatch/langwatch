@@ -48,7 +48,12 @@ export function billingMeterPokeIntents(ports: ReportUsagePorts) {
       payload: reportUsagePayloadSchema,
       messageKey: (payload: ReportUsagePayload) =>
         `${payload.organizationId}:${payload.billingMonth}`,
-      deliver: (payload: ReportUsagePayload) => reportUsage(ports, payload),
+      // Raises on failure rather than swallowing it, so the outbox retries
+      // this job instead of marking a failed report as delivered.
+      async deliver(payload: ReportUsagePayload) {
+        const outcome = await reportUsage(ports, payload);
+        if (!outcome.ok) throw outcome.error;
+      },
     } satisfies IntentDef<typeof reportUsagePayloadSchema>,
   };
 }

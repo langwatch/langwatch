@@ -178,7 +178,7 @@ describe("the traceAnalytics fold", () => {
   });
 
   describe("given a slimmed analytics row this build wrote", () => {
-    /** @scenario "a fold whose stored row is a slimmed analytics summary still recovers its working state" */
+    /** @scenario "a fold whose row is a slimmed summary still recovers its working state" */
     it("recovers a working state from the row's own columns", () => {
       const state = fold([
         SPAN_WITH_DIMENSIONS,
@@ -205,6 +205,35 @@ describe("the traceAnalytics fold", () => {
       expect(view.labels).toEqual(["prod"]);
       expect(view.userId).toBe("u-1");
       expect(recovered.earliestSpanStartMs).toBe(state.earliestSpanStartMs);
+    });
+  });
+
+  describe("given the summary fold's attributes carry payload", () => {
+    it("keeps payload out of the slim row and out of the state it reads back", () => {
+      const state = handleSpanReceived(initTraceAnalyticsState(), {
+        ...canonicalSpan(),
+        attributes: {
+          "gen_ai.prompt": "the whole conversation",
+          "gen_ai.completion.0.content": "and the whole reply",
+          "some.blob": "x".repeat(300),
+          "metadata.tier": "pro",
+          "gen_ai.request.model": "gpt-5-mini",
+        },
+      });
+
+      const stored: Record<string, string> = JSON.parse(
+        traceAnalyticsRowMapping.toRow(state, ROW_CONTEXT).AttributesJson,
+      );
+
+      expect(Object.keys(stored).sort()).toEqual([
+        "gen_ai.request.model",
+        "metadata.tier",
+      ]);
+      expect(
+        traceAnalyticsRowMapping
+          .fromRow(traceAnalyticsRowMapping.toRow(state, ROW_CONTEXT))
+          .attributes.has("gen_ai.prompt"),
+      ).toBe(false);
     });
   });
 });

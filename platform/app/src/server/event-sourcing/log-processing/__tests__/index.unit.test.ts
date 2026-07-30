@@ -45,6 +45,33 @@ function createFakeClient(): FakeClient {
   };
 }
 
+/** Same content on every call — so the RecordId matches — with only `acceptedAt` varying. */
+async function fixtureRecordAcceptedAt(
+  acceptedAt: number,
+): Promise<CanonicalLogRecord> {
+  const result = await canonicalizeLogRequest({
+    tenantId: "tenant-a",
+    organizationId: "org-a",
+    piiRedactionLevel: "DISABLED",
+    redactionService: { redactLog: async () => undefined },
+    acceptedAt,
+    request: {
+      resourceLogs: [
+        {
+          resource: { attributes: [] },
+          scopeLogs: [
+            {
+              scope: { name: "test.scope" },
+              logRecords: [{ body: { stringValue: "one" } }],
+            },
+          ],
+        },
+      ],
+    } as any,
+  });
+  return result.accepted[0]!.record;
+}
+
 async function fixtureRecords(count: 1 | 2): Promise<CanonicalLogRecord[]> {
   const bodies = ["one", "two"].slice(0, count);
   const result = await canonicalizeLogRequest({
@@ -326,6 +353,35 @@ describe("the canonicalLogStorage map", () => {
     });
   });
 
+  describe("given the same record accepted once, then again by a replay", () => {
+    /** @scenario A replay must not move a billing ledger row into its own hour */
+    it("stamps the earlier acceptance with the higher DedupVersion in both tables", async () => {
+      const client = createFakeClient();
+      const built = createLogProcessingPipeline({ client });
+      const first = await fixtureRecordAcceptedAt(1_700_000_000_000);
+      const replay = await fixtureRecordAcceptedAt(1_800_000_000_000);
+
+      await built.maps.canonicalLogStorage!.apply({
+        tenantId: "tenant-a",
+        events: [recordReceivedEvent(first)],
+      });
+      await built.maps.canonicalLogStorage!.apply({
+        tenantId: "tenant-a",
+        events: [recordReceivedEvent(replay)],
+      });
+
+      for (const table of ["log_records", "log_usage_estimates"] as const) {
+        const calls = client.insertCalls.filter((c) => c.table === table);
+        const versionIndex = calls[0]!.columns.indexOf("DedupVersion");
+        const firstVersion = BigInt(calls[0]!.rows[0]![versionIndex] as string);
+        const replayVersion = BigInt(
+          calls[1]!.rows[0]![versionIndex] as string,
+        );
+        expect(firstVersion).toBeGreaterThan(replayVersion);
+      }
+    });
+  });
+
   describe("given an event of a type this pipeline never declared", () => {
     it("maps it to nothing and writes nothing", async () => {
       const client = createFakeClient();
@@ -358,6 +414,56 @@ describe("the canonicalLogStorage map", () => {
         }),
       ).rejects.toThrow("log_records insert failed");
       failingInsert.mockRestore();
+    });
+  });
+});
+
+describe("given the coding-agent dispatch ADR-107's audit found dropped", () => {
+  /** @scenario a canonical log record from a recognised coding agent dispatches its lifted facts */
+  it("codingAgentLogFactsDispatch contributes facts for a recognised agent record", async () => {
+    const contributeLogFacts = vi.fn().mockResolvedValue(undefined);
+    const built = createLogProcessingPipeline({
+      client: createFakeClient(),
+      codingAgentLogFacts: {
+        contributeLogFacts,
+        parseFlatAttributes: (json) =>
+          JSON.parse(json) as Record<string, unknown>,
+        detection: {
+          resolveConversationKey: () => "session-key",
+          detectAgent: () => "claude_code",
+          isCodingAgentSpanName: () => false,
+          liftSpanFacts: () => ({}),
+          liftLogFacts: () => ({ lifted: true }),
+          isCodingAgentMetricName: () => false,
+          liftMetricAttributes: () => ({}),
+        },
+      },
+    });
+
+    const record = {
+      recordId: "r1",
+      scopeName: "claude-code",
+      eventName: "tool_use",
+      attributesFlatJson: "{}",
+      resourceAttributesFlatJson: "{}",
+      correlationSource: "none",
+      correlationTraceId: "",
+      correlationSpanId: "",
+      providerSessionId: "",
+      providerKind: "claude_code",
+      severityNumber: null,
+      timeUnixMs: 1_000,
+      acceptedAt: 1_500,
+    };
+
+    await built.subscribers.codingAgentLogFactsDispatch!.handle(
+      { type: "lw.obs.log.record_received", data: record },
+      { now: Date.now(), tenantId: "tenant-a" },
+    );
+    expect(contributeLogFacts).toHaveBeenCalledTimes(1);
+    expect(contributeLogFacts.mock.calls[0]![0]).toMatchObject({
+      recordId: "r1",
+      agent: "claude_code",
     });
   });
 });

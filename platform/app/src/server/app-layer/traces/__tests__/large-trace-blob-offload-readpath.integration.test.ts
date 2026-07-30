@@ -65,12 +65,6 @@ import { SpanStorageService } from "~/server/app-layer/traces/span-storage.servi
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { Event } from "~/server/event-sourcing.old";
 import {
-  getTestClickHouseClient,
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import { generateTestTenantId } from "~/server/event-sourcing.old/__tests__/integration/testHelpers";
-import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -85,6 +79,12 @@ import {
   resolveOffloadedTraces,
   type WarnLogger,
 } from "~/server/traces/resolve-offloaded-traces";
+import { generateTestTenantId } from "~/test-utils/integration/tenants";
+import {
+  getTestClickHouseClient,
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 
 // Gate identically to the canonical event_log integration test: skip when no
 // real ClickHouse is reachable, run against the testcontainer otherwise.

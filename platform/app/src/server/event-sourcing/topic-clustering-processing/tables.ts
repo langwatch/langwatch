@@ -12,12 +12,14 @@ import { topicModelStateSchema } from "./projections/topicModel";
 /**
  * The three fold tables, one row per project each.
  *
- * These are proposals, not transcriptions of deployed DDL: the old pipeline
- * kept all three read models in Postgres, and the topic-model one is the
- * write-through store behind the Postgres `Topic` table that the settings UI
- * and every Prisma join still read. Wiring these folds to ClickHouse without
- * migrating those readers would silently stop them seeing new data, so the
- * choice — and the migration it needs — is left open.
+ * NONE OF THE THREE IS DEPLOYED — no migration creates any of them, so every
+ * write through these stores fails. All three read models live in Postgres
+ * today (`topic.prisma.repository.ts`, `routers/topics.ts`), and the topic
+ * model is the write-through store behind the `Topic` table the settings UI and
+ * every Prisma join read, so moving them to ClickHouse is a reader migration
+ * before it is a table migration. Declared here as the shape those tables would
+ * take, and mounted by `index.ts` — which is what makes this a defect rather
+ * than a sketch.
  */
 
 /** The whole fold state lands in one JSON column, so the state is not a

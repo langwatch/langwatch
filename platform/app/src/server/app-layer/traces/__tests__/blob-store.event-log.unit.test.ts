@@ -22,7 +22,6 @@ import {
   IO_PREVIEW_BYTES,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
@@ -511,7 +510,7 @@ describe("given a SpanReceivedEvent written through eventToRecord (real write pa
       const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
         aggregateType: "trace",
         aggregateId: AGGREGATE_ID,
-        tenantId: createTenantId(TENANT_A),
+        tenantId: TENANT_A,
         type: SPAN_RECEIVED_EVENT_TYPE,
         version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
         data: {
@@ -651,7 +650,7 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
     return EventUtils.createEvent<SpanReceivedEvent>({
       aggregateType: "trace",
       aggregateId: AGGREGATE_ID,
-      tenantId: createTenantId(TENANT_A),
+      tenantId: TENANT_A,
       type: SPAN_RECEIVED_EVENT_TYPE,
       version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
       data: {
@@ -776,7 +775,7 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
       const fullEvent = EventUtils.createEvent<SpanReceivedEvent>({
         aggregateType: "trace",
         aggregateId: AGGREGATE_ID,
-        tenantId: createTenantId(TENANT_A),
+        tenantId: TENANT_A,
         type: SPAN_RECEIVED_EVENT_TYPE,
         version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
         data: {

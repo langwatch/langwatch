@@ -4,7 +4,7 @@ Feature: Resolving a runnable model handle for a project
   So that a feature either runs against a real provider or fails with a message that names the fix
 
   # Scope: the server-side ladder in
-  # `langwatch/src/server/modelProviders/utils.ts` that turns
+  # `platform/app/src/server/modelProviders/utils.ts` that turns
   # (projectId, featureKey, optional explicit model) into a Vercel AI SDK
   # handle. Siblings own the neighbouring concerns:
   #

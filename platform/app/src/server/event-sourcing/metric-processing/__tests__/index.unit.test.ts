@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createMetricProcessingPipeline } from "../index";
 import { createFakeClient, insertedCell } from "./fakeClient";
 import { point } from "./fixtures";
@@ -152,5 +152,46 @@ describe("every projection on this pipeline", () => {
 
     expect(outcome).toEqual({ written: 0 });
     expect(client.insertCalls).toHaveLength(0);
+  });
+});
+
+describe("given the coding-agent dispatch ADR-107's audit found dropped", () => {
+  /** @scenario a coding-agent metric point dispatches its lifted facts */
+  it("codingAgentMetricFactsDispatch contributes facts for a recognised agent metric", async () => {
+    const contributeMetricFacts = vi.fn().mockResolvedValue(undefined);
+    const built = createMetricProcessingPipeline({
+      client: createFakeClient(),
+      codingAgentMetricFacts: {
+        contributeMetricFacts,
+        parseKeyValueAttributes: () => ({}),
+        detection: {
+          resolveConversationKey: () => "session-key",
+          detectAgent: () => "claude_code",
+          isCodingAgentSpanName: () => false,
+          liftSpanFacts: () => ({}),
+          liftLogFacts: () => null,
+          isCodingAgentMetricName: () => true,
+          liftMetricAttributes: () => ({}),
+        },
+      },
+    });
+
+    const canonical = point({
+      timeUnixMs: 1_000,
+      metricName: "claude_code.tokens",
+      valueType: "double",
+      valueDouble: 42,
+    });
+
+    await built.subscribers.codingAgentMetricFactsDispatch!.handle(
+      { type: "lw.obs.metric.data_point_received", data: canonical },
+      { now: Date.now(), tenantId: "project-1" },
+    );
+    expect(contributeMetricFacts).toHaveBeenCalledTimes(1);
+    expect(contributeMetricFacts.mock.calls[0]![0]).toMatchObject({
+      agent: "claude_code",
+      metricName: "claude_code.tokens",
+      value: 42,
+    });
   });
 });

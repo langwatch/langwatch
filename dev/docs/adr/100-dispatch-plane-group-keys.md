@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29
 
-**Status:** Accepted — the descriptor is the only way to name a lane; the
+**Status:** Superseded by [ADR-108](./108-the-dispatch-plane.md) (2026-07-30). Previously: Accepted — the descriptor is the only way to name a lane; the
 mispaired scopes named below are corrected as part of adopting it.
 
 **Builds on:** ADR-098 (the projection kinds and post-event work this plane

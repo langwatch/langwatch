@@ -1,6 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import type { EventSourcing } from "../event-sourcing.old/eventSourcing";
-import type { AppCommands } from "../event-sourcing.old/pipelineRegistry";
+import type {
+  AppCommands,
+  createEventSourcingRegistry,
+} from "../event-sourcing/registry";
 import type { AppConfig } from "./config";
 import type {
   AppDependencies,
@@ -54,9 +56,13 @@ export class App {
   readonly newClickHouseClient: AppDependencies["newClickHouseClient"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
-  private readonly _eventSourcing?: EventSourcing;
+  private readonly _eventSourcing?: ReturnType<
+    typeof createEventSourcingRegistry
+  >;
 
-  get eventSourcing(): EventSourcing | undefined {
+  get eventSourcing():
+    | ReturnType<typeof createEventSourcingRegistry>
+    | undefined {
     return this._eventSourcing;
   }
 
@@ -120,7 +126,7 @@ export class App {
       (async () => {
         if (this._eventSourcing) {
           try {
-            await this._eventSourcing.close();
+            await this._eventSourcing.stop();
           } catch (error) {
             logger.error({ error }, "Failed to close EventSourcing");
           }

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { computeEngineCpuPercent } from "../../redis-engine-cpu";
 
 // Reproduces the body of OpsMetricsCollector.getRedisInfo() against the same

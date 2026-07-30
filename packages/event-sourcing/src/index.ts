@@ -51,16 +51,6 @@ export {
 export type { LegalMountShape } from "./mount/validateMount";
 export { LEGAL_MOUNT_SHAPES, validateMount } from "./mount/validateMount";
 export type {
-  CounterHandle,
-  HistogramHandle,
-  HistogramSpec,
-  MetricLabels,
-  MetricSpec,
-  Metrics,
-} from "./ports/metrics";
-export { noopMetrics } from "./ports/metrics";
-export { EVENT_SOURCING_TRACER, tracer, withSpan } from "./ports/tracing";
-export type {
   CommandBuilt,
   FoldWithStore,
   MapWithStore,
@@ -93,16 +83,37 @@ export type {
   IntentDef,
   IntentMap,
   IntentTypeStrings,
-  MappedRow,
   MapHandlerMap,
+  MappedRow,
   ProcessContext,
   ProcessManagerHandlerMap,
   SubscriberHandlerMap,
   WireEvent,
 } from "./pipeline/pipeline.types";
-export type { RatchetViolation, TypeStringSnapshot } from "./pipeline/ratchet";
-export { checkTypeStringRatchet, mergeSnapshot } from "./pipeline/ratchet";
+export type {
+  RatchetViolation,
+  StateVersionDrift,
+  StateVersionSnapshot,
+  TypeStringSnapshot,
+} from "./pipeline/ratchet";
+export {
+  checkStateVersionDrift,
+  checkTypeStringRatchet,
+  mergeSnapshot,
+  snapshotFromRegistry,
+  stateVersionsFromRegistry,
+} from "./pipeline/ratchet";
 export type { EventTypeString, IntentTypeString } from "./pipeline/typeStrings";
+export type {
+  CounterHandle,
+  HistogramHandle,
+  HistogramSpec,
+  MetricLabels,
+  MetricSpec,
+  Metrics,
+} from "./ports/metrics";
+export { noopMetrics } from "./ports/metrics";
+export { EVENT_SOURCING_TRACER, tracer, withSpan } from "./ports/tracing";
 export type { OrderInvarianceReport } from "./projections/orderInvariance";
 export { checkOrderInvariance } from "./projections/orderInvariance";
 export type {
@@ -117,6 +128,76 @@ export type {
   StoredState,
   TenantId,
 } from "./projections/store.types";
+export type {
+  ConsumerDeps,
+  LaneExecution,
+  LaneExecutors,
+} from "./runtime/consumer";
+export { createLaneConsumer } from "./runtime/consumer";
+export type {
+  BlobSpool,
+  ClaimedBatch,
+  ClaimRequest,
+  Clock,
+  CommandClient,
+  CommittedEvent,
+  ConsumerBudget,
+  DispatchResult,
+  DueProcessInstance,
+  EnginePorts,
+  EventLog,
+  EventLogScan,
+  EventProducer,
+  EventSourcingService,
+  Job,
+  JobHeader,
+  LaneConsumer,
+  LaneKind,
+  LaneQueue,
+  Lease,
+  Outbox,
+  OutboxRow,
+  ProcessInstanceKey,
+  ProcessStore,
+  RegisteredPipeline,
+  Registry,
+  ReplayReport,
+  ReplayRequest,
+  StagedJob,
+  StoredProcessState,
+} from "./runtime/contracts";
+export {
+  DispatchError,
+  extractHttpStatus,
+  isDispatchError,
+  isRetryableHttpStatus,
+  parseRetryAfterMs,
+  toDispatchError,
+} from "./runtime/dispatchError";
+export type { MemoryOutbox, MemoryQueue } from "./runtime/memory";
+export {
+  memoryClock,
+  memoryEventLog,
+  memoryOutbox,
+  memoryProcessStore,
+  memoryQueue,
+  memorySpool,
+} from "./runtime/memory";
+export type {
+  ProcessDeliveryArgs,
+  ProcessRuntime,
+  ProcessRuntimeDeps,
+  ProcessWakeArgs,
+} from "./runtime/processRuntime";
+export { createProcessRuntime } from "./runtime/processRuntime";
+export type { EventProducerDeps } from "./runtime/producer";
+export { createEventProducer } from "./runtime/producer";
+export type { PipelineRegistry } from "./runtime/registry";
+export { createRegistry } from "./runtime/registry";
+export type { ReplayDeps } from "./runtime/replay";
+export { createReplay } from "./runtime/replay";
+export type { EventSourcingServiceDeps } from "./runtime/service";
+export { createEventSourcingService } from "./runtime/service";
 export type {
   CompiledSchema,
   CompiledSchemaCache,

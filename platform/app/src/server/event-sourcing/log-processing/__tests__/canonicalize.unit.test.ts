@@ -332,11 +332,10 @@ describe("canonicalizeLogRequest", () => {
     });
 
     /** @scenario The same batch sent twice is stored once */
-    it("derives the same TimeUnixMs on a redelivery of a record carrying no timestamp", async () => {
-      // TimeUnixMs is in the deployed sort key, so a redelivery deriving a
-      // different one writes a second row for the same RecordId and bills the
-      // tenant twice. Every input to it has to be inside the hashed payload —
-      // and the record's own arrival time is not.
+    it("derives the same content id for a record carrying no timestamp, so usage still collapses", async () => {
+      // RecordId is what `log_usage_estimates` sorts on, and the acceptance
+      // fallback is deliberately outside the hashed payload, so two acceptances
+      // of a timestamp-less record are billed once.
       const log = { body: { stringValue: "no timestamps at all" } };
       const first = await canonicalizeLogRequest({
         tenantId: "project_test",
@@ -358,12 +357,37 @@ describe("canonicalizeLogRequest", () => {
       expect(first.accepted[0]!.record.recordId).toBe(
         second.accepted[0]!.record.recordId,
       );
-      expect(first.accepted[0]!.record.timeUnixMs).toBe(
-        second.accepted[0]!.record.timeUnixMs,
-      );
-      expect(first.accepted[0]!.record.occurredAt).toBe(
-        second.accepted[0]!.record.occurredAt,
-      );
+    });
+  });
+
+  describe("given a log record carrying neither timestamp", () => {
+    it("times it at its acceptance rather than at the epoch", async () => {
+      const prepared = await prepare([
+        { body: { stringValue: "no timestamps at all" } },
+      ]);
+
+      expect(prepared.accepted[0]!.record.timeUnixMs).toBe(1_700_000_000_000);
+      expect(prepared.accepted[0]!.record.occurredAt).toBe(1_700_000_000_000);
+    });
+
+    it("keeps the wire timestamps as the zero the sender actually sent", async () => {
+      const prepared = await prepare([
+        { body: { stringValue: "no timestamps at all" } },
+      ]);
+
+      expect(prepared.accepted[0]!.record.timeUnixNano).toBe("0");
+      expect(prepared.accepted[0]!.record.observedTimeUnixNano).toBe("0");
+    });
+
+    it("prefers the observed timestamp over its acceptance when the sender sent one", async () => {
+      const prepared = await prepare([
+        {
+          observedTimeUnixNano: "1600000000123456789",
+          body: { stringValue: "observed only" } as unknown,
+        },
+      ]);
+
+      expect(prepared.accepted[0]!.record.timeUnixMs).toBe(1_600_000_000_123);
     });
   });
 });

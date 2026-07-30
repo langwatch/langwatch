@@ -18,14 +18,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { EvaluationAnalyticsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics.clickhouse.repository";
 import { EvaluationAnalyticsRollupClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsRow,
 } from "~/server/event-sourcing.old/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import type { EvaluationAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.mapProjection";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 
 const tenantId = `test-eval-${nanoid()}`;
 

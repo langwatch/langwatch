@@ -57,10 +57,10 @@ export function initTriggerSettlementState(): TriggerSettlementState {
 }
 
 /**
- * The identity of one round of trace activity (ADR-098 decision 4). Derived
- * from the event's own instant, never from wall-clock at handling time, so a
- * redelivery names the same round and its persist intent collapses on the
- * outbox instead of writing the customer's match twice.
+ * The identity of one round of trace activity. Derived from the event's own
+ * `occurredAt`, never from wall-clock at handling time, so a redelivery names
+ * the same round and its persist intent collapses on the outbox instead of
+ * writing the customer's match twice (ADR-107 decision 16).
  */
 function settleWindowBucket({
   occurredAt,
@@ -102,8 +102,8 @@ export function digestBatchKey(traceIds: readonly string[]): string {
 /**
  * Records one match, re-arming (not appending to) the trace's settle window: a
  * second match for a pending trace moves its due times later, because it is
- * the same round continuing. Every field derives from `occurredAt` and the
- * match's own config, so re-applying one event is a no-op.
+ * the same round continuing. Every field derives from the event's own
+ * `occurredAt` and config, so re-applying one event is a no-op.
  *
  * Past `MAX_PENDING_MATCHES` the oldest matches are evicted and returned as
  * `flushed` for the caller to dispatch immediately — degraded batching under a
@@ -112,11 +112,11 @@ export function digestBatchKey(traceIds: readonly string[]): string {
 export function addPending(
   previousState: TriggerSettlementState,
   data: MatchRecordedData,
-  occurredAt: number,
 ): {
   state: TriggerSettlementState;
   flushed: Array<{ traceId: string; match: PendingMatch }>;
 } {
+  const occurredAt = data.occurredAt;
   const settleDueAt = occurredAt + data.traceDebounceMs;
   const dispatchDueAt = computeScheduledFor({
     action: data.action,
@@ -544,9 +544,9 @@ export function triggerSettlementIntents(ports: TriggerDispatchPorts) {
 type TriggerSettlementIntents = ReturnType<typeof triggerSettlementIntents>;
 
 /**
- * The one `matchRecorded` handler. Pure — every field derives from the event
- * and the process's own state, never from a collaborator, so redelivery is
- * safe by construction (ADR-098 decision 5).
+ * The one `matchRecorded` handler. Every durable field derives from the event
+ * and the process's own state; only the wake clamps to `ctx.now`, which no
+ * intent key reads.
  */
 export const triggerSettlementOn: ProcessManagerHandlerMap<
   typeof automationsEvents,
@@ -558,7 +558,7 @@ export const triggerSettlementOn: ProcessManagerHandlerMap<
     data,
     ctx: ProcessContext,
   ): EvolveStep<TriggerSettlementState, TriggerSettlementIntents> {
-    const { state: nextState, flushed } = addPending(state, data, ctx.now);
+    const { state: nextState, flushed } = addPending(state, data);
     if (flushed.length === 0) {
       return {
         state: nextState,

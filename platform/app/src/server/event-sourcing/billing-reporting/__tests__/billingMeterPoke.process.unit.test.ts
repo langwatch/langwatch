@@ -1,10 +1,12 @@
 import type { ProcessContext } from "@langwatch/event-sourcing";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  billingMeterPokeIntents,
   billingMeterPokeOn,
   initBillingMeterPokeState,
 } from "../billingMeterPoke.process";
 import type { BillableEventRecorded } from "../events";
+import type { ReportUsagePorts } from "../reportUsage";
 
 const event = (
   overrides: Partial<BillableEventRecorded> = {},
@@ -105,6 +107,39 @@ describe("billing meter poke process", () => {
       });
 
       expect(second).toBe(first);
+    });
+  });
+
+  describe("given the usage report dispatch fails", () => {
+    /** @scenario A dispatch that fails is raised, not swallowed */
+    it("raises rather than logging and discarding the failure", async () => {
+      const ports: ReportUsagePorts = {
+        organizations: {
+          getOrganizationForBilling: vi
+            .fn()
+            .mockRejectedValue(new Error("db down")),
+        },
+        organizationCache: {
+          get: async () => undefined,
+          set: async () => undefined,
+        },
+        billingCheckpoints: {} as never,
+        getUsageReportingService: () => undefined,
+        queryBillableEventsTotal: async () => null,
+      };
+      const intents = billingMeterPokeIntents(ports);
+
+      await expect(
+        intents.reportUsage.deliver(
+          {
+            organizationId: "org-1",
+            billingMonth: "2026-07",
+            tenantId: "project-1",
+            occurredAt: 1,
+          },
+          { now: 1, tenantId: "project-1" },
+        ),
+      ).rejects.toThrow("db down");
     });
   });
 });

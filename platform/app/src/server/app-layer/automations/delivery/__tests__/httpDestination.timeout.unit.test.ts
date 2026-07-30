@@ -1,7 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import { DispatchError } from "@langwatch/event-sourcing";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import { sendHttpDestination } from "../httpDestination";
 
 /**

@@ -1,10 +1,11 @@
-import type {
-  AppendStore,
-  BatchContext,
-  ReplaceStore,
-  StateRead,
-  StoreContext,
-  StoredState,
+import {
+  type AppendStore,
+  type BatchContext,
+  ConfigurationError,
+  type ReplaceStore,
+  type StateRead,
+  type StoreContext,
+  type StoredState,
 } from "@langwatch/event-sourcing";
 import {
   LANGY_CONVERSATION_STATUS,
@@ -22,6 +23,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import {
   LANGY_CONVERSATION_SPINE_VERSION,
+  LANGY_CONVERSATION_TURN_PROJECTION,
   LANGY_CONVERSATION_TURN_VERSION,
   type LangyConversationSpineState,
   type LangyConversationTurnState,
@@ -211,6 +213,28 @@ type TurnPrismaClient = {
   };
 };
 
+/**
+ * The turn document's row key is `makeConversationTurnKey`'s
+ * `${conversationId}:${turnId}` — the turn is the aggregate, not the
+ * conversation. A key carrying no turn component would key every turn of a
+ * conversation onto `TurnId: ""`, each write overwriting the last, so it is
+ * refused here rather than defaulted (`parseConversationTurnKey` is total by
+ * design and cannot refuse it).
+ */
+function turnRowKey(key: string): {
+  conversationId: string;
+  turnId: string;
+} {
+  const parsed = parseConversationTurnKey(key);
+  if (!parsed.conversationId || !parsed.turnId) {
+    throw new ConfigurationError(
+      `${LANGY_CONVERSATION_TURN_PROJECTION}'s row key must be "<conversationId>:<turnId>"`,
+      { projection: LANGY_CONVERSATION_TURN_PROJECTION, key },
+    );
+  }
+  return parsed;
+}
+
 function decodeTurnRow(row: TurnRow): LangyConversationTurnState {
   return {
     ConversationId: row.ConversationId,
@@ -234,7 +258,7 @@ export function createLangyConversationTurnStore(deps: {
 
     async read(key, context: StoreContext) {
       const projectId = context.tenantId;
-      const { conversationId, turnId } = parseConversationTurnKey(key);
+      const { conversationId, turnId } = turnRowKey(key);
       const row = await deps.prisma.langyConversationTurnProjection.findUnique({
         where: {
           projectId,
@@ -258,7 +282,7 @@ export function createLangyConversationTurnStore(deps: {
       context: StoreContext,
     ) {
       const projectId = context.tenantId;
-      const { conversationId, turnId } = parseConversationTurnKey(key);
+      const { conversationId, turnId } = turnRowKey(key);
       const now = Date.now();
       const { Plan, ...state } = stored.state;
       const data = {

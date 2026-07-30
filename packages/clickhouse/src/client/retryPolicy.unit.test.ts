@@ -12,7 +12,9 @@ function connectionResetError(): Error {
 }
 
 function gatewayError(status: number): Error {
-  const error = new Error(`upstream error ${status}`) as Error & { statusCode: number };
+  const error = new Error(`upstream error ${status}`) as Error & {
+    statusCode: number;
+  };
   error.statusCode = status;
   return error;
 }
@@ -109,6 +111,7 @@ describe("given decideRetry()", () => {
   });
 
   describe("when an insert into a replacing table hits a transient failure", () => {
+    /** @scenario a replace write is retryable because the version column resolves a duplicate */
     it("retries, because a duplicate collapses at merge", () => {
       const decision = decideRetry({
         operation: INSERT_REPLACING,
@@ -120,6 +123,7 @@ describe("given decideRetry()", () => {
   });
 
   describe("when an insert into an append table without per-record identity hits a transient failure", () => {
+    /** @scenario an append write is retryable only when its sort key carries per-record identity */
     it("does not retry, because a duplicate would land as a second row", () => {
       const decision = decideRetry({
         operation: INSERT_APPEND_NO_IDENTITY,
@@ -131,6 +135,7 @@ describe("given decideRetry()", () => {
   });
 
   describe("when an insert into an append table with per-record identity hits a transient failure", () => {
+    /** @scenario an append write is retryable only when its sort key carries per-record identity */
     it("retries, because a duplicate lands on the same key and collapses", () => {
       const decision = decideRetry({
         operation: INSERT_APPEND_WITH_IDENTITY,
@@ -142,6 +147,7 @@ describe("given decideRetry()", () => {
   });
 
   describe("when an insert into an aggregating table hits a transient failure", () => {
+    /** @scenario an aggregating write is never retried */
     it("never retries, because the engine adds and a duplicate corrupts the aggregate", () => {
       const decision = decideRetry({
         operation: INSERT_AGGREGATING,
@@ -179,8 +185,16 @@ describe("given decideRetry()", () => {
     it("grows the delay ceiling with the attempt number", () => {
       const randomSpy = vi.spyOn(Math, "random").mockReturnValue(1);
       try {
-        const early = decideRetry({ operation: SELECT, error: connectionResetError(), attempt: 1 });
-        const later = decideRetry({ operation: SELECT, error: connectionResetError(), attempt: 3 });
+        const early = decideRetry({
+          operation: SELECT,
+          error: connectionResetError(),
+          attempt: 1,
+        });
+        const later = decideRetry({
+          operation: SELECT,
+          error: connectionResetError(),
+          attempt: 3,
+        });
         if (!early.retry || !later.retry) {
           throw new Error("expected both decisions to retry");
         }

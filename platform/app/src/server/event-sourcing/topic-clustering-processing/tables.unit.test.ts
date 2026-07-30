@@ -7,29 +7,30 @@ import {
   topicModelTable,
 } from "./tables";
 
+/**
+ * None of these three tables is deployed — that is asserted against the
+ * migration SQL in `../__tests__/tableMigrationParity.unit.test.ts`, which is
+ * also where engine, key, anchor and column-type parity will be checked once
+ * one is. What is worth pinning here is that the three share one shape,
+ * because they come from one factory.
+ */
 describe("topic-clustering-processing ClickHouse table declarations", () => {
-  for (const [name, table] of [
-    ["topicClusteringRunStatusTable", topicClusteringRunStatusTable],
-    ["topicClusteringRunHistoryTable", topicClusteringRunHistoryTable],
-    ["topicModelTable", topicModelTable],
-  ] as const) {
-    it(`${name} declares a replacing table keyed on (TenantId, ProjectId)`, () => {
-      const description = table.describe();
-      expect(description.merge).toEqual({
-        kind: "replacing",
-        version: "UpdatedAt",
-      });
-      expect(description.sortKey).toEqual(["TenantId", "ProjectId"]);
-      expect(description.tenant).toEqual(["TenantId"]);
-    });
+  const tables = [
+    topicClusteringRunStatusTable,
+    topicClusteringRunHistoryTable,
+    topicModelTable,
+  ] as const;
 
-    it(`${name} partitions and expires on the frozen, platform-controlled AcceptedAt column`, () => {
-      const description = table.describe();
-      expect(description.partition.column).toBe("AcceptedAt");
-      expect(description.ttl?.anchor).toBe("AcceptedAt");
-    });
+  it("gives all three the same shape, differing only in name", () => {
+    const shapes = tables.map((table) =>
+      JSON.stringify({ ...table.describe(), name: "" }),
+    );
+    expect(new Set(shapes).size).toBe(1);
+    expect(new Set(tables.map((table) => table.name)).size).toBe(tables.length);
+  });
 
-    it(`${name} declares no DeliverySeq column`, () => {
+  for (const table of tables) {
+    it(`${table.name} declares no DeliverySeq column`, () => {
       expect(table.columnNames).not.toContain("DeliverySeq");
     });
   }

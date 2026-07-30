@@ -72,6 +72,7 @@ describe("resolveStateVersion", () => {
   });
 
   describe("given an explicit pin", () => {
+    /** @scenario a pin records both the pinned stamp and the computed hash */
     it("stamps the pin as the version while still reporting the hash", () => {
       const schema = z.object({ total: z.number() });
       const { version, schemaHash } = resolveStateVersion({

@@ -82,12 +82,18 @@ function buildRecord(args: {
     log.observedTimeUnixNano,
     "observedTimeUnixNano",
   );
-  // Every input to this choice is inside `canonicalPayload`, so a redelivery
-  // derives the same `TimeUnixMs` as the first delivery. Falling back to
-  // `acceptedAt` would not: it moves per delivery, and `TimeUnixMs` is in the
-  // deployed sort key, so the two rows would never collapse.
+  // A record carrying neither timestamp falls back to its acceptance instant:
+  // `TimeUnixMs` is in the deployed sort key, so 0 files the row at the epoch
+  // where it is past every retention window and unreachable once merged. The
+  // fallback is not part of `canonicalPayload`, so `RecordId` is unchanged by
+  // it; what two acceptances of one timestamp-less record cost is a sort key
+  // that never collapses, and a duplicate row beats a deleted one.
   const effectiveTimestamp =
-    timeUnixNano !== "0" ? timeUnixNano : observedTimeUnixNano;
+    timeUnixNano !== "0"
+      ? timeUnixNano
+      : observedTimeUnixNano !== "0"
+        ? observedTimeUnixNano
+        : String(BigInt(args.acceptedAt) * 1_000_000n);
 
   const flags = uint32Number(log.flags, "flags");
   const severityNumber = Number(

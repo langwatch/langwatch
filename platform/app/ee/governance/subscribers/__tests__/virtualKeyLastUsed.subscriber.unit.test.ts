@@ -1,24 +1,14 @@
 /**
  * Unit tests for the ADR-075 Class C (retired; ground now ADR-098) split:
  * the half of `gatewayBudgetSync` that is a best-effort Prisma side effect
- * rather than derived state.
- *
- * Two things are load-bearing. The enqueue filter has to be TOTAL — ADR-069
- * (retired; ground now ADR-098) gives it no retry, so a throw there
- * permanently loses the job rather than
- * reading as "not relevant". And the handler has to stay silent on failure:
- * this lane carries nothing worth wedging a queue over.
+ * rather than derived state. Now a pre-built `BuiltSubscriber` (ADR-107
+ * decision 17), mounted behind `deps.ee` on trace-processing.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createSpanReceivedEvent,
-  type TestSpanReceivedEventOptions,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
-import type { TraceProcessingEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import { canonicalSpan } from "~/server/event-sourcing/trace-processing/__tests__/fixtures";
 import {
   createVirtualKeyLastUsedSubscriber,
-  spanCarriesVirtualKeyMarker,
   VIRTUAL_KEY_LAST_USED_THROTTLE_MS,
 } from "../virtualKeyLastUsed.subscriber";
 
@@ -36,21 +26,17 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
-const CONTEXT = { tenantId: "project-1", aggregateId: "trace-1" };
-
-function gatewayEvent(
-  options: TestSpanReceivedEventOptions = {},
-): TraceProcessingEvent {
-  return createSpanReceivedEvent({
-    ...options,
-    attributes: {
-      "langwatch.virtual_key_id": "vk-1",
-      ...(options.attributes ?? {}),
-    },
-  }) as unknown as TraceProcessingEvent;
-}
-
+const CTX = { now: Date.now(), tenantId: "project-1" };
 const TENANT_ORG = "org-1";
+
+function gatewayEvent(attributes: Record<string, unknown> = {}) {
+  return {
+    type: "lw.obs.trace.span_received",
+    data: canonicalSpan({
+      attributes: { "langwatch.virtual_key_id": "vk-1", ...attributes },
+    }),
+  };
+}
 
 function buildSubscriber(
   vk: { id: string; lastUsedAt: Date | null; organizationId?: string } | null,
@@ -83,62 +69,13 @@ function buildSubscriber(
   };
 }
 
-describe("spanCarriesVirtualKeyMarker", () => {
-  describe("given a gateway span", () => {
-    it("accepts it", () => {
-      expect(spanCarriesVirtualKeyMarker(gatewayEvent())).toBe(true);
-    });
-  });
-
-  describe("given an ordinary application span", () => {
-    it("declines it, so the vast majority of the span stream mints no job", () => {
-      const event = createSpanReceivedEvent({
-        attributes: { "gen_ai.request.model": "gpt-5-mini" },
-      }) as unknown as TraceProcessingEvent;
-      expect(spanCarriesVirtualKeyMarker(event)).toBe(false);
-    });
-  });
-
-  describe("given an event of another type", () => {
-    it("declines it", () => {
-      expect(
-        spanCarriesVirtualKeyMarker({
-          type: "lw.obs.trace.origin_resolved",
-        } as TraceProcessingEvent),
-      ).toBe(false);
-    });
-  });
-
-  describe("given a malformed payload", () => {
-    it("returns false instead of throwing, because a throw would lose the job", () => {
-      const malformed = [
-        { type: "lw.obs.trace.span_received" },
-        { type: "lw.obs.trace.span_received", data: {} },
-        { type: "lw.obs.trace.span_received", data: { span: {} } },
-        {
-          type: "lw.obs.trace.span_received",
-          data: { span: { attributes: null } },
-        },
-        {
-          type: "lw.obs.trace.span_received",
-          data: { span: { attributes: "not-an-array" } },
-        },
-        {
-          type: "lw.obs.trace.span_received",
-          data: { span: { attributes: [null, undefined, {}] } },
-        },
-      ] as unknown as TraceProcessingEvent[];
-
-      for (const event of malformed) {
-        expect(() => spanCarriesVirtualKeyMarker(event)).not.toThrow();
-        expect(spanCarriesVirtualKeyMarker(event)).toBe(false);
-      }
-    });
-  });
-});
-
 describe("virtualKeyLastUsed subscriber", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("listens only to span_received", () => {
+    const { subscriber } = buildSubscriber(null);
+    expect(subscriber.eventTypes).toEqual(["lw.obs.trace.span_received"]);
+  });
 
   describe("given a key that has never been used", () => {
     it("stamps it as used now", async () => {
@@ -147,7 +84,7 @@ describe("virtualKeyLastUsed subscriber", () => {
         lastUsedAt: null,
       });
 
-      await subscriber.handle(gatewayEvent(), CONTEXT);
+      await subscriber.handle(gatewayEvent(), CTX);
 
       expect(update).toHaveBeenCalledTimes(1);
       expect(update.mock.calls[0]![0]).toMatchObject({ where: { id: "vk-1" } });
@@ -163,7 +100,7 @@ describe("virtualKeyLastUsed subscriber", () => {
         ),
       });
 
-      await subscriber.handle(gatewayEvent(), CONTEXT);
+      await subscriber.handle(gatewayEvent(), CTX);
 
       expect(update).toHaveBeenCalledTimes(1);
     });
@@ -171,16 +108,12 @@ describe("virtualKeyLastUsed subscriber", () => {
 
   describe("given a span naming a virtual key from another organization", () => {
     it("refuses the write rather than trusting the span's key id", async () => {
-      // `langwatch.virtual_key_id` is customer-writable and is not in the
-      // reserved namespace the receiver strips, so any tenant can name any VK
-      // id. The multitenancy middleware does not catch it either — VirtualKey's
-      // validateWhere accepts a bare row id as tenancy proof.
       const { subscriber, update } = buildSubscriber(
         { id: "vk-1", lastUsedAt: null, organizationId: "org-victim" },
         { projectOrganizationId: "org-attacker" },
       );
 
-      await subscriber.handle(gatewayEvent(), CONTEXT);
+      await subscriber.handle(gatewayEvent(), CTX);
 
       expect(update).not.toHaveBeenCalled();
     });
@@ -191,7 +124,7 @@ describe("virtualKeyLastUsed subscriber", () => {
         { projectOrganizationId: null },
       );
 
-      await subscriber.handle(gatewayEvent(), CONTEXT);
+      await subscriber.handle(gatewayEvent(), CTX);
 
       expect(update).not.toHaveBeenCalled();
     });
@@ -204,7 +137,7 @@ describe("virtualKeyLastUsed subscriber", () => {
         lastUsedAt: new Date(),
       });
 
-      await subscriber.handle(gatewayEvent(), CONTEXT);
+      await subscriber.handle(gatewayEvent(), CTX);
 
       expect(update).not.toHaveBeenCalled();
     });
@@ -216,11 +149,14 @@ describe("virtualKeyLastUsed subscriber", () => {
         id: "vk-1",
         lastUsedAt: null,
       });
-      const event = createSpanReceivedEvent({
-        attributes: { "gen_ai.request.model": "gpt-5-mini" },
-      }) as unknown as TraceProcessingEvent;
 
-      await subscriber.handle(event, CONTEXT);
+      await subscriber.handle(
+        {
+          type: "lw.obs.trace.span_received",
+          data: canonicalSpan({ attributes: {} }),
+        },
+        CTX,
+      );
 
       expect(prisma.virtualKey.findUnique).not.toHaveBeenCalled();
     });
@@ -230,7 +166,7 @@ describe("virtualKeyLastUsed subscriber", () => {
     it("does nothing", async () => {
       const { subscriber, update } = buildSubscriber(null);
 
-      await subscriber.handle(gatewayEvent(), CONTEXT);
+      await subscriber.handle(gatewayEvent(), CTX);
 
       expect(update).not.toHaveBeenCalled();
     });
@@ -245,22 +181,8 @@ describe("virtualKeyLastUsed subscriber", () => {
       update.mockRejectedValue(new Error("PG down"));
 
       await expect(
-        subscriber.handle(gatewayEvent(), CONTEXT),
+        subscriber.handle(gatewayEvent(), CTX),
       ).resolves.toBeUndefined();
-    });
-  });
-
-  describe("given the subscriber is registered", () => {
-    it("declines irrelevant events at the enqueue seam", () => {
-      const { subscriber } = buildSubscriber(null);
-      expect(subscriber.options?.enqueue?.filter).toBe(
-        spanCarriesVirtualKeyMarker,
-      );
-    });
-
-    it("listens only to span_received", () => {
-      const { subscriber } = buildSubscriber(null);
-      expect(subscriber.eventTypes).toEqual(["lw.obs.trace.span_received"]);
     });
   });
 });

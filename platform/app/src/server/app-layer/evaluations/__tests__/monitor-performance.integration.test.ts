@@ -16,7 +16,7 @@ import {
   cleanupTestData,
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import {
   MonitorPerformanceService,
   summarizeMonitorPerformance,

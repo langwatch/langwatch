@@ -24,11 +24,11 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { connection as redisConnection } from "~/server/redis";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
+} from "~/test-utils/integration/testContainers";
 
 import { app } from "../auth-cli";
 

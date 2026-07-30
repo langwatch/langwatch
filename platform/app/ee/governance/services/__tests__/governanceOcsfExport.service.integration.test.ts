@@ -27,7 +27,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { getTestClickHouseClient } from "~/server/event-sourcing.old/__tests__/integration/testContainers";
+import { getTestClickHouseClient } from "~/test-utils/integration/testContainers";
 
 import {
   GovernanceOcsfEventsClickHouseRepository,

@@ -1,12 +1,12 @@
 import { generate } from "@langwatch/ksuid";
 import type { Prisma } from "@prisma/client";
-import type { TopicClusteringRunStatusData } from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing.old/projections/stateProjection.types";
+  LegacyProjectionStoreContext,
+  LegacyStateProjectionStore,
+  LegacyStoredProjection,
+} from "~/server/app-layer/_shared/legacyProjectionStore.types";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import type { TopicClusteringRunStatusData } from "./topicClusteringRunStatus.types";
 
 type Row = Prisma.TopicClusteringRunProjectionGetPayload<object>;
 
@@ -19,7 +19,9 @@ type RunProjectionPrismaClient = {
   };
 };
 
-function fromRow(row: Row): StoredProjection<TopicClusteringRunStatusData> {
+function fromRow(
+  row: Row,
+): LegacyStoredProjection<TopicClusteringRunStatusData> {
   const {
     id: _id,
     projectId,
@@ -41,14 +43,14 @@ function fromRow(row: Row): StoredProjection<TopicClusteringRunStatusData> {
 
 /** Postgres row I/O for the topic clustering run-status projection. */
 export class PrismaTopicClusteringRunProjectionRepository
-  implements StateProjectionStore<TopicClusteringRunStatusData>
+  implements LegacyStateProjectionStore<TopicClusteringRunStatusData>
 {
   constructor(private readonly prisma: RunProjectionPrismaClient) {}
 
   async load(
     _projectionKey: string,
-    context: ProjectionStoreContext,
-  ): Promise<StoredProjection<TopicClusteringRunStatusData> | null> {
+    context: LegacyProjectionStoreContext,
+  ): Promise<LegacyStoredProjection<TopicClusteringRunStatusData> | null> {
     const projectId = String(context.tenantId);
     const row = await this.prisma.topicClusteringRunProjection.findUnique({
       where: { projectId },
@@ -57,8 +59,8 @@ export class PrismaTopicClusteringRunProjectionRepository
   }
 
   async store(
-    projection: StoredProjection<TopicClusteringRunStatusData>,
-    context: ProjectionStoreContext,
+    projection: LegacyStoredProjection<TopicClusteringRunStatusData>,
+    context: LegacyProjectionStoreContext,
   ): Promise<void> {
     const projectId = String(context.tenantId);
     // `state` legitimately carries CreatedAt/UpdatedAt (the fold base class

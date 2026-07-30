@@ -22,7 +22,10 @@ import { extractTableStatements } from "./migrationReplay";
  * docblock for why this package restates rather than imports its reader).
  */
 const DEPLOYED_MIGRATIONS_DIR = fileURLToPath(
-  new URL("../../../../../src/server/clickhouse/migrations", import.meta.url),
+  new URL(
+    "../../../../../platform/app/src/server/clickhouse/migrations",
+    import.meta.url,
+  ),
 );
 
 /** One column per field: the wide row shape `clickhouseReplacing` serves. */

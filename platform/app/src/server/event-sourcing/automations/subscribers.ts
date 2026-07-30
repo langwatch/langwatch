@@ -5,7 +5,7 @@ import {
 } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { MatchRecordedData } from "./aggregate";
+import type { MatchRecordedData } from "./events";
 
 const logger = createLogger("langwatch:automations:subscribers");
 
@@ -90,9 +90,7 @@ export interface EvaluationTriggerMatchPorts {
     occurredAtMs?: number;
   }): Promise<TraceSummaryData | null>;
   recordMatch: {
-    send(
-      data: MatchRecordedData & { tenantId: string; occurredAt: number },
-    ): Promise<void>;
+    send(data: MatchRecordedData & { tenantId: string }): Promise<void>;
   };
 }
 

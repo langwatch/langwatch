@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ch, type ColumnMap } from "./columns.js";
+import { type ColumnMap, ch } from "./columns.js";
 import {
   aggregating,
   append,
@@ -159,7 +159,9 @@ describe("given a partition column that is not frozen and platform-controlled", 
         ...validTableArgs(),
         partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
       }),
-    ).toThrow(/partition column "OccurredAt" is not frozen and platform-controlled/);
+    ).toThrow(
+      /partition column "OccurredAt" is not frozen and platform-controlled/,
+    );
   });
 });
 
@@ -234,6 +236,7 @@ describe("given an empty tenant list", () => {
  * table, or a column, that does not name itself here.
  */
 describe("given a table that names known structural debt for its partition column", () => {
+  /** @scenario a known-wrong column is declared as debt rather than left silent */
   /** @scenario a partition column exempted as structural debt compiles and keeps its true role */
   it("builds successfully and the column still reports its true, non-structural role", () => {
     const table = defineTable({
@@ -242,7 +245,8 @@ describe("given a table that names known structural debt for its partition colum
       structuralDebt: [
         {
           column: "OccurredAt",
-          reason: "customer-supplied event time anchors the partition; re-key pending",
+          reason:
+            "customer-supplied event time anchors the partition; re-key pending",
         },
       ],
     });
@@ -250,6 +254,15 @@ describe("given a table that names known structural debt for its partition colum
     expect(table.columns.OccurredAt!.timeRole).toBe("occurredAt");
     expect(table.columns.OccurredAt!.frozen).toBe(false);
     expect(table.columns.OccurredAt!.platformControlled).toBe(false);
+    // The debt is not just tolerated — it stays visible on the definition a
+    // reader consults, rather than being absorbed and forgotten.
+    expect(table.structuralDebt).toEqual([
+      {
+        column: "OccurredAt",
+        reason:
+          "customer-supplied event time anchors the partition; re-key pending",
+      },
+    ]);
   });
 });
 
@@ -328,9 +341,13 @@ describe("given a structuralDebt entry for a column that anchors nothing", () =>
     expect(() =>
       defineTable({
         ...validTableArgs(),
-        structuralDebt: [{ column: "TraceId", reason: "not actually structural" }],
+        structuralDebt: [
+          { column: "TraceId", reason: "not actually structural" },
+        ],
       }),
-    ).toThrow(/is not this table's partition column, TTL anchor or replacing version/);
+    ).toThrow(
+      /is not this table's partition column, TTL anchor or replacing version/,
+    );
   });
 });
 
@@ -344,11 +361,14 @@ describe("given a structuralDebt entry that exempts a different column than the 
         structuralDebt: [
           {
             column: "UpdatedAt",
-            reason: "placeholder — UpdatedAt already passes on its own, so this excuses nothing",
+            reason:
+              "placeholder — UpdatedAt already passes on its own, so this excuses nothing",
           },
         ],
       }),
-    ).toThrow(/partition column "OccurredAt" is not frozen and platform-controlled/);
+    ).toThrow(
+      /partition column "OccurredAt" is not frozen and platform-controlled/,
+    );
   });
 });
 

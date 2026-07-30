@@ -27,11 +27,11 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { connection as redisConnection } from "~/server/redis";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
+} from "~/test-utils/integration/testContainers";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { app } from "../auth-cli";

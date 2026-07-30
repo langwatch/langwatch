@@ -98,12 +98,12 @@ browser-tests/
 # those rules, or `git add -f` it.
 
 # Playwright E2E tests
-tests/agentic-e2e/test-results/
-tests/agentic-e2e/playwright-report/
-tests/agentic-e2e/.auth/
-tests/agentic-e2e/debug-*.png
-tests/agentic-e2e/tests/seed.spec.ts
-tests/agentic-e2e/node_modules/
+dev/tests/agentic-e2e/test-results/
+dev/tests/agentic-e2e/playwright-report/
+dev/tests/agentic-e2e/.auth/
+dev/tests/agentic-e2e/debug-*.png
+dev/tests/agentic-e2e/tests/seed.spec.ts
+dev/tests/agentic-e2e/node_modules/
 seed.spec.ts
 .playwright-mcp/
 .mcp.local.json

@@ -34,6 +34,10 @@ interface StubTables {
   items: Record<string, unknown>[];
   traceGroups: Record<string, unknown>[];
   traceCosts: Record<string, unknown>[];
+  /** `deriveExperimentRunTotals`'s summary row (`totals.ts`) — empty means no
+   * item has landed for any run on the page, which is the default every test
+   * here that does not care about progress gets. */
+  totals: Record<string, unknown>[];
 }
 
 /**
@@ -49,6 +53,7 @@ function routeQuery(
   if (sql.includes("AS costlessCount")) return tables.traceGroups;
   if (sql.includes("AS datasetCost")) return tables.costs;
   if (sql.includes("AS avgScore")) return tables.breakdown;
+  if (sql.includes("AS completedCount")) return tables.totals;
   if (sql.includes("FROM experiment_run_items")) return tables.items;
   if (sql.includes("FROM experiment_runs")) return tables.runs;
   throw new Error(`stub ClickHouse client got an unrouted query:\n${sql}`);
@@ -73,12 +78,6 @@ function runRow(overrides: Record<string, unknown> = {}) {
     WorkflowVersionId: null,
     Version: "2025-02-01",
     Total: 2,
-    Progress: 2,
-    CompletedCount: 2,
-    FailedCount: 0,
-    TotalDurationMs: null,
-    AvgScoreBps: null,
-    PassRateBps: null,
     Targets: "[]",
     CreatedAt: "2024-01-15 10:30:00.000",
     UpdatedAt: "2024-01-15 10:35:00.000",
@@ -158,6 +157,7 @@ function emptyTables(): StubTables {
     items: [],
     traceGroups: [],
     traceCosts: [],
+    totals: [],
   };
 }
 

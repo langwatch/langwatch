@@ -291,6 +291,46 @@ describe("the turn store", () => {
     });
   });
 
+  describe("when the fold key carries no turn component", () => {
+    it("refuses the read rather than keying every turn onto one row", async () => {
+      const prisma = turnPrisma();
+      await expect(
+        createLangyConversationTurnStore({ prisma }).read("conv-1", context),
+      ).rejects.toThrow(/conversationId.*turnId/);
+      expect(
+        prisma.langyConversationTurnProjection.findUnique,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("refuses the write for the same reason", async () => {
+      const prisma = turnPrisma();
+      await expect(
+        createLangyConversationTurnStore({ prisma }).write(
+          "conv-1",
+          {
+            version: LANGY_CONVERSATION_TURN_VERSION,
+            state: {
+              ConversationId: "conv-1",
+              TurnId: "turn-1",
+              Status: "running",
+              QuestionParts: [],
+              AnswerParts: [],
+              ToolCalls: [],
+              Plan: null,
+              Error: null,
+              StartedAt: 1_000,
+              EndedAt: null,
+            },
+          },
+          context,
+        ),
+      ).rejects.toThrow(/conversationId.*turnId/);
+      expect(
+        prisma.langyConversationTurnProjection.upsert,
+      ).not.toHaveBeenCalled();
+    });
+  });
+
   it("writes a missing plan as a JSON null rather than dropping the column", async () => {
     const prisma = turnPrisma();
     await createLangyConversationTurnStore({ prisma }).write(

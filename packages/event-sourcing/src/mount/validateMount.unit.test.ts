@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { Mount, MountShape } from "./mount.types";
 import {
   COLLAPSE_KINDS,
   PROJECTION_KINDS,
   SCOPE_KINDS,
   STORE_KINDS,
 } from "./mount.types";
-import type { Mount, MountShape } from "./mount.types";
 import { LEGAL_MOUNT_SHAPES, validateMount } from "./validateMount";
 
 /**
@@ -27,7 +27,13 @@ import { LEGAL_MOUNT_SHAPES, validateMount } from "./validateMount";
 function toMount(shape: MountShape): Mount {
   const { projection, scope, collapse, store } = shape;
   if (store === "merge") {
-    return { projection, scope, collapse, store, idempotency: "upstream-exactly-once" };
+    return {
+      projection,
+      scope,
+      collapse,
+      store,
+      idempotency: "upstream-exactly-once",
+    };
   }
   return { projection, scope, collapse, store, idempotency: undefined };
 }
@@ -147,6 +153,7 @@ describe("validateMount", () => {
   });
 
   describe("given a fold mounted on a store that never reads back", () => {
+    /** @scenario a fold mounts only on a store that reads back */
     /** @scenario a projection that reads its prior state is mounted on a store that never reads back */
     it("refuses the mount and names that the fold has nowhere to read from", () => {
       const violations = validateMount({ ...legalFold, store: "append" });
@@ -159,7 +166,28 @@ describe("validateMount", () => {
     });
   });
 
+  describe("given a map mounted on a store that reads prior state back", () => {
+    /** @scenario a map mounts on append or merge, never on replace */
+    it("refuses the mount, because no executor accepts that pairing", () => {
+      const violations = validateMount({ ...legalMap, store: "replace" });
+
+      const violation = violations.find(
+        (v) => v.rule === "map-store-must-not-be-replace",
+      );
+      expect(violation).toBeDefined();
+      expect(violation!.message).toMatch(/no executor|nothing can run/i);
+    });
+
+    it("does not refuse a map on an append or merge store", () => {
+      const violations = validateMount({ ...legalMap, store: "append" });
+      expect(violations.map((v) => v.rule)).not.toContain(
+        "map-store-must-not-be-replace",
+      );
+    });
+  });
+
   describe("given a mount choosing a store that combines rows by their key", () => {
+    /** @scenario a merge store is refused outright */
     /** @scenario a projection is mounted on a store that combines rows by their key */
     it("refuses the mount and names that the kind is closed to new adopters", () => {
       const violations = validateMount({
@@ -243,7 +271,12 @@ describe("validateMount", () => {
     const allShapes: MountShape[] = PROJECTION_KINDS.flatMap((projection) =>
       STORE_KINDS.flatMap((store) =>
         SCOPE_KINDS.flatMap((scope) =>
-          COLLAPSE_KINDS.map((collapse) => ({ projection, store, scope, collapse })),
+          COLLAPSE_KINDS.map((collapse) => ({
+            projection,
+            store,
+            scope,
+            collapse,
+          })),
         ),
       ),
     );

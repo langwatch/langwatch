@@ -1,8 +1,7 @@
 import type { LangyMessageProjectionRecord } from "@langwatch/langy";
 import type { LangyMessageProjection } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
-import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
+import type { LegacyProjectionStoreContext } from "~/server/app-layer/_shared/legacyProjectionStore.types";
 import { PrismaLangyMessageProjectionRepository } from "../langy-message-projection.prisma.repository";
 
 type Row = LangyMessageProjection;
@@ -29,10 +28,10 @@ const record: LangyMessageProjectionRecord = {
   UpdatedAt: 100,
 };
 
-function context(projectId: string): ProjectionStoreContext {
+function context(projectId: string): LegacyProjectionStoreContext {
   return {
     aggregateId: record.ConversationId,
-    tenantId: createTenantId(projectId),
+    tenantId: projectId,
   };
 }
 

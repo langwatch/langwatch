@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { EmittedEvent } from "@langwatch/event-sourcing";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -79,6 +80,21 @@ export type ExecuteEvaluationInput = z.infer<
  */
 function isCustomerFixable(error: unknown): error is HandledError {
   return HandledError.isHandled(error) && error.fault === "customer";
+}
+
+/**
+ * Deterministic in `evaluationId`, so a retried command samples identically
+ * to its first attempt (ADR-107 decision 15) — `Math.random()` would emit a
+ * different decision on retry and double-count the evaluation.
+ */
+export function isEvaluationSampledIn(args: {
+  evaluationId: string;
+  sampleRate: number;
+}): boolean {
+  const bucket =
+    createHash("sha256").update(args.evaluationId).digest().readUInt32BE(0) /
+    0x100000000;
+  return bucket <= args.sampleRate;
 }
 
 export interface ExecuteEvaluationDeps {
@@ -209,7 +225,12 @@ export async function executeEvaluation(
     }
   }
 
-  if (Math.random() > monitor.sample) {
+  if (
+    !isEvaluationSampledIn({
+      evaluationId: input.evaluationId,
+      sampleRate: monitor.sample,
+    })
+  ) {
     logger.debug(
       { tenantId, evaluatorId: input.evaluatorId, sample: monitor.sample },
       "Evaluation excluded by sampling",

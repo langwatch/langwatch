@@ -5,14 +5,18 @@ import {
   deriveAppendMapping,
   deriveRowMapping,
   type FoldStateCache,
+  noFoldStateCache,
   type RowMapping,
 } from "@langwatch/clickhouse";
 import {
   definePipeline,
   type GroupKey,
   type Metrics,
+  type PipelineChainWithId,
   renderGroupKey,
 } from "@langwatch/event-sourcing";
+import type { CancellationPublisher } from "~/server/scenarios/cancellation-channel";
+import { publishCancellation } from "~/server/scenarios/cancellation-channel";
 import { cancelRun } from "./cancelRun.command";
 import { deleteRun } from "./deleteRun.command";
 import { endTextMessage } from "./endTextMessage.command";
@@ -30,6 +34,24 @@ import {
 } from "./messages";
 import { queueRun } from "./queueRun.command";
 import { recordMetrics } from "./recordMetrics.command";
+import {
+  computeRunMetricsIntents,
+  initRunMetricsState,
+  RUN_METRICS_PROCESS_NAME,
+  type RunMetricsDispatchDeps,
+  runMetricsOn,
+  runMetricsOnWake,
+  runMetricsStateSchema,
+} from "./runMetrics.process";
+import {
+  initScenarioExecutionState,
+  SCENARIO_EXECUTION_PROCESS_NAME,
+  type ScenarioExecutionDispatchDeps,
+  scenarioExecutionIntents,
+  scenarioExecutionOn,
+  scenarioExecutionOnWake,
+  scenarioExecutionStateSchema,
+} from "./scenarioExecution.process";
 import {
   initSimulationRunState,
   type SimulationRunState,
@@ -136,17 +158,131 @@ const messageRowMapping = deriveAppendMapping<
   },
 });
 
+export interface SimulationBroadcastPorts {
+  broadcastToTenant(
+    tenantId: string,
+    payload: string,
+    eventType: string,
+  ): Promise<void>;
+}
+
+export interface SimulationProcessingPipelineDeps {
+  readonly client: ClickHouseClient;
+  readonly cache?: FoldStateCache<SimulationRunState>;
+  readonly metrics?: Metrics;
+  /** Absent means a queued run is never dispatched, and a dead run never
+   * reaches a terminal STALLED state. */
+  readonly scenarioExecution?: ScenarioExecutionDispatchDeps;
+  /** Absent means a finished run's cost and latency are never measured. */
+  readonly runMetrics?: RunMetricsDispatchDeps;
+  readonly billingPoke?: { handle(event: { tenantId: string }): Promise<void> };
+  readonly broadcast?: SimulationBroadcastPorts;
+  readonly cancellationPublisher?: CancellationPublisher;
+}
+
+type SimulationChain = PipelineChainWithId<
+  typeof SIMULATION_RUN_PIPELINE_NAME,
+  typeof SIMULATION_RUN_PIPELINE_PREFIX,
+  typeof simulationRunEvents
+>;
+
+function mountProcessManagers(
+  chain: SimulationChain,
+  deps: SimulationProcessingPipelineDeps,
+): SimulationChain {
+  let next = chain;
+  if (deps.scenarioExecution) {
+    next = next.withProcessManager(SCENARIO_EXECUTION_PROCESS_NAME, {
+      state: scenarioExecutionStateSchema,
+      init: initScenarioExecutionState,
+      intents: scenarioExecutionIntents(deps.scenarioExecution),
+      on: scenarioExecutionOn,
+      onWake: scenarioExecutionOnWake,
+    });
+  }
+  if (deps.runMetrics) {
+    next = next.withProcessManager(RUN_METRICS_PROCESS_NAME, {
+      state: runMetricsStateSchema,
+      init: initRunMetricsState,
+      intents: computeRunMetricsIntents(deps.runMetrics),
+      on: runMetricsOn,
+      onWake: runMetricsOnWake,
+    });
+  }
+  return next;
+}
+
+/** `snapshotUpdateBroadcast` fires on everything but `textMessageStart`
+ * (the API route streams those frames itself); `cancellationBroadcast` fires
+ * only on `cancelRequested`, rethrowing so a failed publish is retried rather
+ * than leaving a child process running unattended. */
+function mountBroadcastSubscribers(
+  chain: SimulationChain,
+  deps: SimulationProcessingPipelineDeps,
+): SimulationChain {
+  let next = chain;
+  if (deps.broadcast) {
+    const broadcast = deps.broadcast;
+    const nudge = (
+      tenantId: string,
+      data: { batchRunId?: string; scenarioSetId?: string },
+      scenarioRunId: string,
+    ) =>
+      broadcast.broadcastToTenant(
+        tenantId,
+        JSON.stringify({
+          event: "simulation_updated",
+          scenarioRunId,
+          batchRunId: data.batchRunId,
+          scenarioSetId: data.scenarioSetId,
+        }),
+        "simulation_updated",
+      );
+    next = next.withSubscriber("snapshotUpdateBroadcast", {
+      on: {
+        queued: (data, ctx) => nudge(ctx.tenantId, data, data.scenarioRunId),
+        started: (data, ctx) => nudge(ctx.tenantId, data, data.scenarioRunId),
+        messageSnapshot: (data, ctx) =>
+          nudge(ctx.tenantId, {}, data.scenarioRunId),
+        // textMessageStart deliberately absent — the API route streams those
+        // frames itself, and a refetch nudge on the same instant empties the
+        // accumulated content before the fold has caught up.
+        textMessageEnd: (data, ctx) =>
+          nudge(ctx.tenantId, {}, data.scenarioRunId),
+        finished: (data, ctx) => nudge(ctx.tenantId, {}, data.scenarioRunId),
+        metricsRecorded: (data, ctx) =>
+          nudge(ctx.tenantId, {}, data.scenarioRunId),
+        cancelRequested: (data, ctx) =>
+          nudge(ctx.tenantId, {}, data.scenarioRunId),
+        deleted: (data, ctx) => nudge(ctx.tenantId, {}, data.scenarioRunId),
+      },
+    });
+  }
+  if (deps.cancellationPublisher) {
+    const publisher = deps.cancellationPublisher;
+    next = next.withSubscriber("cancellationBroadcast", {
+      on: {
+        // Rethrows on a failed publish (unlike the SSE nudges above): losing
+        // this one leaves a child process running against a run the user
+        // asked to stop.
+        cancelRequested: (data) =>
+          publishCancellation({
+            publisher,
+            message: { scenarioRunId: data.scenarioRunId },
+          }),
+      },
+    });
+  }
+  return next;
+}
+
 /**
  * Mounts the run's fold and its item-row map, each beside the store it writes
  * to. The run's messages are item rows and its batch totals a query
  * (`batchAggregates.ts`), so nothing in the fold grows with the work
  * (ADR-103).
  */
-export function createSimulationProcessingPipeline(deps: {
-  readonly client: ClickHouseClient;
-  readonly cache?: FoldStateCache<SimulationRunState>;
-  readonly metrics?: Metrics;
-}) {
+function buildStores(deps: SimulationProcessingPipelineDeps) {
   const runStore = clickhouseReplacing({
     client: deps.client,
     table: simulationRunsTable,
@@ -154,7 +290,7 @@ export function createSimulationProcessingPipeline(deps: {
     key: "ScenarioRunId",
     stateVersionColumn: "Version",
     row: runRowMapping,
-    cache: deps.cache,
+    cache: deps.cache ?? noFoldStateCache(),
   });
 
   const messagesStore = clickhouseAppend<
@@ -166,7 +302,15 @@ export function createSimulationProcessingPipeline(deps: {
     toRow: messageRowMapping,
   });
 
-  return definePipeline(SIMULATION_RUN_PIPELINE_NAME)
+  return { runStore, messagesStore };
+}
+
+export function createSimulationProcessingPipeline(
+  deps: SimulationProcessingPipelineDeps,
+) {
+  const { runStore, messagesStore } = buildStores(deps);
+
+  let chain = definePipeline(SIMULATION_RUN_PIPELINE_NAME)
     .prefix(SIMULATION_RUN_PIPELINE_PREFIX)
     .events(simulationRunEvents)
     .id({
@@ -239,6 +383,21 @@ export function createSimulationProcessingPipeline(deps: {
         textMessageEnd: mapTextMessageEnd,
       },
       store: messagesStore,
-    })
-    .build({ metrics: deps.metrics });
+    });
+
+  chain = mountProcessManagers(chain, deps);
+  chain = mountBroadcastSubscribers(chain, deps);
+
+  if (deps.billingPoke) {
+    const billingPoke = deps.billingPoke;
+    chain = chain.withSubscriber("billingMeterPoke", {
+      on: {
+        started: (_data, ctx) => billingPoke.handle({ tenantId: ctx.tenantId }),
+        messageSnapshot: (_data, ctx) =>
+          billingPoke.handle({ tenantId: ctx.tenantId }),
+      },
+    });
+  }
+
+  return chain.build({ metrics: deps.metrics });
 }

@@ -1,0 +1,35 @@
+{
+  "name": "@langwatch/groupqueue",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Redis dispatch substrate: LaneQueue and BlobSpool, implementing the event-sourcing runtime's ports (ADR-108, ADR-110).",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@langwatch/event-sourcing": "workspace:*",
+    "ioredis": "5.10.1"
+  },
+  "devDependencies": {
+    "@testcontainers/redis": "^12.0.4",
+    "dotenv": "^17.4.2",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.9"
+  }
+}

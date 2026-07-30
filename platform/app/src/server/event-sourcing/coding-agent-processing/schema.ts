@@ -197,6 +197,9 @@ export const codingAgentSessionStateSchema = z.object({
 
   /** Earliest span/log/metric start time seen. 0 is the "no spans yet" sentinel. */
   startedAtMs: z.number(),
+  /** When the row was first written, round-tripped so it stays the FIRST write
+   * rather than the latest. 0 means this state has never been stored. */
+  createdAt: z.number(),
   /** Out-of-order checkpoint: max(prev, event.occurredAt) on every apply. Not projected as its own column beyond the row's own bookkeeping. */
   LastEventOccurredAt: z.number(),
 });

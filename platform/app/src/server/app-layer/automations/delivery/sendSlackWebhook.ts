@@ -1,11 +1,11 @@
 import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
+import { toDispatchError } from "@langwatch/event-sourcing";
 import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
 import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
 import { env } from "~/env.mjs";
-import { toDispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 import { assertSlackWebhookUrl } from "./slackWebhookGuard";
 

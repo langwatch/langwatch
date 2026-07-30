@@ -17,36 +17,6 @@
  * this layer in its own package rather than inside the event-sourcing core.
  */
 
-export {
-  ch,
-  ColumnDecodeError,
-} from "./schema/columns";
-export type { AnyColumnDef, ColumnDef, ColumnMap, TimeRole } from "./schema/columns";
-
-export {
-  aggregating,
-  append,
-  defineTable,
-  replacing,
-  TableDefinitionError,
-} from "./schema/defineTable";
-export type {
-  MergeIdempotency,
-  MergeStrategy,
-  StructuralDebt,
-  TableDefinition,
-  TableDefinitionArgs,
-  TableDescription,
-  TableRow,
-} from "./schema/defineTable";
-
-export { createRowCodec, WireShapeMismatchError } from "./codec/rowCodec";
-export type { WireCodec, WireColumn } from "./codec/rowCodec";
-
-export {
-  createClickHouseClient,
-  ClickHouseOperationError,
-} from "./client/clickhouseClient";
 export type {
   ClickHouseClient,
   ClickHouseClientConfig,
@@ -61,45 +31,77 @@ export type {
   QueryOptions,
   WriteTarget,
 } from "./client/clickhouseClient";
-
-export { decideRetry, isTransientTransportError } from "./client/retryPolicy";
-export type { Operation, RetryDecision } from "./client/retryPolicy";
-
 export {
-  createPoolRegistry,
-  mappedTenantRouter,
-  sharedDatabaseRouter,
-} from "./client/tenantRouting";
+  ClickHouseOperationError,
+  createClickHouseClient,
+} from "./client/clickhouseClient";
+export type { Operation, RetryDecision } from "./client/retryPolicy";
+export { decideRetry, isTransientTransportError } from "./client/retryPolicy";
 export type {
   PoolRegistry,
   TenantRouter,
   TenantTarget,
 } from "./client/tenantRouting";
-
+export {
+  createPoolRegistry,
+  mappedTenantRouter,
+  sharedDatabaseRouter,
+} from "./client/tenantRouting";
+export {
+  CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+  isTransientClickHouseMessage,
+} from "./client/transientErrors";
+export type { WireCodec, WireColumn } from "./codec/rowCodec";
+export { createRowCodec, WireShapeMismatchError } from "./codec/rowCodec";
+export type { BoundIdentifiers } from "./query/identifiers";
+export { bindIdentifiers } from "./query/identifiers";
+export type {
+  AnyColumnDef,
+  ColumnDef,
+  ColumnMap,
+  TimeRole,
+} from "./schema/columns";
+export {
+  ColumnDecodeError,
+  ch,
+} from "./schema/columns";
+export type {
+  MergeIdempotency,
+  MergeStrategy,
+  StructuralDebt,
+  TableDefinition,
+  TableDefinitionArgs,
+  TableDescription,
+  TableRow,
+} from "./schema/defineTable";
+export {
+  aggregating,
+  append,
+  defineTable,
+  replacing,
+  TableDefinitionError,
+} from "./schema/defineTable";
+export type { ClickHouseAppendArgs } from "./stores/appendStore";
 export {
   AppendStoreConfigurationError,
   clickhouseAppend,
 } from "./stores/appendStore";
-export type { ClickHouseAppendArgs } from "./stores/appendStore";
-
-export {
-  clickhouseReplacing,
-  ReplaceStoreConfigurationError,
-} from "./stores/replaceStore";
+export { clickhouseEventLog } from "./stores/eventLogStore";
 export type {
   ClickHouseReplacingArgs,
   FoldStateCache,
 } from "./stores/replaceStore";
-
-export { bindIdentifiers } from "./query/identifiers";
-export type { BoundIdentifiers } from "./query/identifiers";
-
+export {
+  clickhouseReplacing,
+  noFoldStateCache,
+  ReplaceStoreConfigurationError,
+} from "./stores/replaceStore";
+export type { RowContext, RowMapping } from "./stores/rowMapping";
 export {
   deriveAppendMapping,
   deriveRowMapping,
   RowMappingError,
 } from "./stores/rowMapping";
-export type { RowContext, RowMapping } from "./stores/rowMapping";
-
-export { eventLogTable } from "./tables/eventLog";
 export type { EventLogRow } from "./tables/eventLog";
+export { eventLogTable } from "./tables/eventLog";
+export { SecurityError, validateTenantId } from "./tenancy";

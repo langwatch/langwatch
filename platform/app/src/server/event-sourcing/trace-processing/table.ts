@@ -6,16 +6,17 @@ import {
 } from "@langwatch/clickhouse";
 
 /**
- * `AcceptedAt` is every table's ADR-099 storage anchor: partition key and TTL
- * anchor. `OccurredAt` is customer-stamped and moves backwards, so it anchors
- * nothing.
- */
-
-/**
  * One row per canonicalized span, and the item table every trace-level total is
  * a query over (ADR-103). The engine key is the span's own identity, so a
  * redelivered span collapses to one row and a `sum()` over the rows is
  * idempotent by construction.
+ *
+ * NOT DEPLOYED. No migration creates this table: the `stored_spans` that exists
+ * is the legacy span row of `00002_create_schema.sql` — `SpanName`, `SpanKind`,
+ * `SpanAttributes` as a Map, `StartTime`/`EndTime`, keyed and partitioned on
+ * `StartTime` — which `span-storage.clickhouse.repository.ts` still reads under
+ * those names. This declaration is the canonical row that replaces it, so it
+ * needs a new table and a cutover, not an `ALTER`.
  */
 export const storedSpansTable = defineTable({
   name: "stored_spans",
@@ -68,21 +69,28 @@ export const traceSummariesTable = defineTable({
   name: "trace_summaries",
   merge: replacing({ version: "UpdatedAt" }),
   sortKey: ["TenantId", "TraceId"],
-  partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
+  partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
   tenant: ["TenantId"],
-  ttl: { anchor: "AcceptedAt" },
+  ttl: { anchor: "OccurredAt" },
+  structuralDebt: [
+    {
+      column: "OccurredAt",
+      reason:
+        "migration 00002 partitions trace_summaries on OccurredAt and the TTL reconciler expires it on the same column, and it moves backwards as earlier spans arrive — epoch sentinel rows exist. trace_analytics got the storage-anchor split in 00061; this table did not, and PARTITION BY is not alterable in place",
+    },
+  ],
   columns: {
     TenantId: ch.string(),
     TraceId: ch.string(),
     /** The fold's own state-shape gate (ADR-098 decision 6). */
-    Version: ch.string(),
+    Version: ch.lowCardinality(ch.string()),
 
-    TotalDurationMs: ch.uint64(),
+    TotalDurationMs: ch.int64(),
 
     ComputedInput: ch.nullable(ch.string()),
     ComputedOutput: ch.nullable(ch.string()),
-    TimeToFirstTokenMs: ch.nullable(ch.uint64()),
-    TimeToLastTokenMs: ch.nullable(ch.uint64()),
+    TimeToFirstTokenMs: ch.nullable(ch.uint32()),
+    TimeToLastTokenMs: ch.nullable(ch.uint32()),
 
     ContainsErrorStatus: ch.boolean(),
     ContainsOKStatus: ch.boolean(),
@@ -99,7 +107,7 @@ export const traceSummariesTable = defineTable({
     LastUsedPromptVersionId: ch.nullable(ch.string()),
 
     TraceName: ch.string(),
-    RootSpanType: ch.nullable(ch.string()),
+    RootSpanType: ch.lowCardinality(ch.nullable(ch.string())),
     RootSpanStartTimeMs: ch.nullable(ch.uint64()),
     TraceNameFromFallback: ch.boolean(),
 
@@ -127,18 +135,25 @@ export type TraceSummariesRow = TableRow<typeof traceSummariesTable.columns>;
 export const traceAnalyticsTable = defineTable({
   name: "trace_analytics",
   merge: replacing({ version: "UpdatedAt" }),
-  sortKey: ["TenantId", "TraceId"],
-  partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
+  sortKey: ["TenantId", "OccurredAt", "TraceId"],
+  partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
   tenant: ["TenantId"],
-  ttl: { anchor: "AcceptedAt" },
+  ttl: { anchor: "OccurredAt" },
+  structuralDebt: [
+    {
+      column: "OccurredAt",
+      reason:
+        "migration 00061 froze what trace_analytics writes into OccurredAt — the first business time any contribution reported, written once — but the column is still the customer's clock rather than a platform stamp, and 00039 also made it the partition key and the sort key's time leaf. Time-leading the key costs this fold's point read on (TenantId, TraceId) its primary-index seek; neither ORDER BY nor PARTITION BY is alterable in place",
+    },
+  ],
   columns: {
     TenantId: ch.string(),
     TraceId: ch.string(),
-    Version: ch.string(),
+    Version: ch.lowCardinality(ch.string()),
 
     EarliestSpanStartMs: ch.uint64(),
-    TotalDurationMs: ch.uint64(),
-    TimeToFirstTokenMs: ch.nullable(ch.uint64()),
+    TotalDurationMs: ch.int64(),
+    TimeToFirstTokenMs: ch.nullable(ch.uint32()),
 
     TraceName: ch.string(),
     TopicId: ch.nullable(ch.string()),
@@ -148,17 +163,17 @@ export const traceAnalyticsTable = defineTable({
     UserId: ch.nullable(ch.string()),
     ConversationId: ch.nullable(ch.string()),
     CustomerId: ch.nullable(ch.string()),
-    Origin: ch.nullable(ch.string()),
+    Origin: ch.string(),
     Models: ch.array(ch.string()),
     Labels: ch.array(ch.string()),
 
     HasError: ch.boolean(),
-    HasAnnotation: ch.boolean(),
+    HasAnnotation: ch.nullable(ch.boolean()),
     AnnotationIds: ch.array(ch.string()),
 
     AttributesJson: ch.string(),
 
-    RootSpanStartTimeMs: ch.nullable(ch.uint64()),
+    RootSpanStartTimeMs: ch.uint64(),
     TraceNameFromFallback: ch.boolean(),
 
     OccurredAt: ch.occurredAt(),

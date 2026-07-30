@@ -1,7 +1,4 @@
-import {
-  DispatchError,
-  parseRetryAfterMs,
-} from "~/server/event-sourcing.old/queues/dispatchError";
+import { DispatchError, parseRetryAfterMs } from "@langwatch/event-sourcing";
 import {
   fetchWithResolvedIp,
   type SSRFValidationResult,

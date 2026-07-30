@@ -6,8 +6,8 @@ import type {
   MetricLabels,
   Metrics,
 } from "../ports/metrics";
-import { createFoldExecutor } from "./foldExecutor";
 import type { FoldDelivery } from "./foldExecutor";
+import { createFoldExecutor } from "./foldExecutor";
 import type {
   ReplaceStore,
   StateRead,
@@ -104,7 +104,7 @@ function delivery(
 
 describe("fold executor", () => {
   describe("given no stored state", () => {
-    /** @scenario the first delivery for a key starts from the fold's genesis state */
+    /** @scenario the first delivery for an aggregate starts from genesis */
     it("starts from init() and applies every event", async () => {
       const store = fakeStore();
       const executor = createFoldExecutor({
@@ -125,7 +125,7 @@ describe("fold executor", () => {
   });
 
   describe("given prior stored state", () => {
-    /** @scenario a later delivery folds onto the existing state, not a fresh one */
+    /** @scenario a later delivery folds onto the stored state */
     it("applies the batch on top of the stored state", async () => {
       const store = fakeStore({
         state: { highest: 10, seen: [10] },
@@ -147,7 +147,7 @@ describe("fold executor", () => {
       ]);
     });
 
-    /** @scenario a redelivered job is applied again and reaches the same state */
+    /** @scenario a redelivered delivery is applied again and reaches the same state */
     it("re-applies a redelivered batch rather than skipping it", async () => {
       const store = fakeStore();
       const executor = createFoldExecutor({
@@ -165,10 +165,78 @@ describe("fold executor", () => {
       expect(store.writes).toHaveLength(2);
       expect(store.writes[0]).toEqual(store.writes[1]);
     });
+
+    /** @scenario reading a row back and re-projecting it is a fixed point */
+    it("reaches the same state again when re-projected with no new events", async () => {
+      const stored = { state: { highest: 10, seen: [3, 10] }, version: "v1" };
+      const store = fakeStore(stored);
+      const executor = createFoldExecutor({
+        store,
+        init,
+        apply,
+        stateVersion: "v1",
+        projectionName: "totals",
+      });
+
+      await executor.apply(delivery({ events: [] }));
+
+      expect(store.writes).toEqual([stored]);
+    });
+  });
+
+  describe("given one aggregate with no stored row and one with an undecodable one", () => {
+    /** @scenario a genuinely missing row is genesis, and an undecodable one is not */
+    it("starts the missing aggregate from genesis and fails the undecodable one instead of resetting it", async () => {
+      const genesisStore = fakeStore();
+      const genesisExecutor = createFoldExecutor({
+        store: genesisStore,
+        init,
+        apply,
+        stateVersion: "v1",
+        projectionName: "totals",
+      });
+
+      const undecodableStore: ReplaceStore<TestState> & {
+        writes: StoredState<TestState>[];
+      } = {
+        kind: "replace",
+        writes: [],
+        async read(): Promise<StateRead<TestState>> {
+          return {
+            kind: "undecodable",
+            storedVersion: "v0",
+            cause: new Error("bad shape"),
+          };
+        },
+        async write(_key, stored): Promise<void> {
+          undecodableStore.writes.push(stored);
+        },
+      };
+      const undecodableExecutor = createFoldExecutor({
+        store: undecodableStore,
+        init,
+        apply,
+        stateVersion: "v1",
+        projectionName: "totals",
+      });
+
+      const genesisOutcome = await genesisExecutor.apply(
+        delivery({ key: "trace-genesis" }),
+      );
+      expect(genesisOutcome).toEqual({ events: 3 });
+      expect(genesisStore.writes).toEqual([
+        { state: { highest: 3, seen: [1, 2, 3] }, version: "v1" },
+      ]);
+
+      await expect(
+        undecodableExecutor.apply(delivery({ key: "trace-undecodable" })),
+      ).rejects.toThrow(UndecodableStateError);
+      expect(undecodableStore.writes).toEqual([]);
+    });
   });
 
   describe("given an undecodable stored row", () => {
-    /** @scenario a shape change never overwrites unreadable state with a fresh accumulator */
+    /** @scenario an unreadable row is never treated as an aggregate that has never been seen */
     it("throws UndecodableStateError instead of treating the row as genesis", async () => {
       const store: ReplaceStore<TestState> & {
         writes: StoredState<TestState>[];
@@ -210,7 +278,7 @@ describe("fold executor", () => {
   });
 
   describe("given a store write failure", () => {
-    /** @scenario a failed write is never swallowed into a false "applied" outcome */
+    /** @scenario a failed write is never reported as applied */
     it("propagates the error rather than reporting success", async () => {
       const store: ReplaceStore<TestState> = {
         kind: "replace",
@@ -288,7 +356,7 @@ describe("fold executor", () => {
       ]);
     });
 
-    /** @scenario every failure lands on the same counter as a success, so the denominator is every attempt */
+    /** @scenario every failure lands on the same measure as a success */
     it("counts a failed store read", async () => {
       const store: ReplaceStore<TestState> = {
         kind: "replace",
@@ -343,7 +411,7 @@ describe("fold executor", () => {
       ]);
     });
 
-    /** @scenario a fold that throws in its own apply is not the one failure nothing counts */
+    /** @scenario a fold that throws in its own apply is counted, not swallowed */
     it("counts a throwing apply rather than leaving the delivery uncounted", async () => {
       const store = fakeStore();
       const metrics = fakeMetrics();

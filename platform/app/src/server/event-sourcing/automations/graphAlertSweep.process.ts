@@ -23,8 +23,12 @@ export const graphAlertSweepStateSchema = z.object({
    *  arms the very first wake, but every wake after that re-arms itself, and
    *  a `matchRecorded` event this process does not otherwise act on must
    *  leave whatever is currently armed untouched — the only way to state that
-   *  truthfully is to carry the deadline in state and hand it straight back. */
-  nextWakeAt: z.number().nullable(),
+   *  truthfully is to carry the deadline in state and hand it straight back.
+   *
+   *  Defaulted because it is new: a deployed row predates the field, carries no
+   *  state version to gate on, and a required key would fail its decode
+   *  instead of reading as "nothing armed yet". */
+  nextWakeAt: z.number().nullable().default(null),
 });
 export type GraphAlertSweepState = z.infer<typeof graphAlertSweepStateSchema>;
 
@@ -54,18 +58,24 @@ export interface GraphAlertSweepPorts {
     now: Date;
   }): Promise<readonly GraphAlertSweepCandidate[]>;
   evaluateGraphTrigger(candidate: GraphAlertSweepCandidate): Promise<void>;
-  /** Deletes this process's own dispatched outbox rows older than `before`. */
-  pruneDispatchedIntentsBefore(params: { before: number }): Promise<number>;
+  /** Deletes dispatched outbox rows older than `before` for one process. The
+   *  name is not optional: the outbox is shared, and other processes keep their
+   *  own history for longer than this sweep's day. */
+  pruneDispatchedIntentsBefore(params: {
+    processName: string;
+    before: number;
+  }): Promise<number>;
 }
 
 /**
  * A singleton, schedule-only process manager backstopping the real-time
  * graph-trigger subscriber: a "no data" alert fires on the ABSENCE of traces,
- * and a lost real-time job has nothing else to recover it. Every wake emits
- * one intent keyed on the wake instant, so a redelivered wake collapses
- * instead of re-sweeping. Sweeps every due candidate, isolating one
- * candidate's failure so a single tenant's evaluation error never stalls the
- * whole sweep, and self-prunes its own outbox history.
+ * and a lost real-time job has nothing else to recover it.
+ *
+ * The key carries the wake instant, so a redelivered WAKE mints a fresh key and
+ * sweeps again. That is bounded and harmless — the candidate query and the
+ * evaluator are both level reads — but it is a second sweep, not a collapse.
+ * One candidate's failure is isolated so a single tenant never stalls the rest.
  */
 function createEvaluateGraphIntent(
   ports: GraphAlertSweepPorts,
@@ -103,6 +113,7 @@ function createEvaluateGraphIntent(
 
       try {
         await ports.pruneDispatchedIntentsBefore({
+          processName: GRAPH_ALERT_SWEEP_PROCESS_NAME,
           before: payload.scheduledFor - SWEEP_OUTBOX_RETENTION_MS,
         });
       } catch (error) {

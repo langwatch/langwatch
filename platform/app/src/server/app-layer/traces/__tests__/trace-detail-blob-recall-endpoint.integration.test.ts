@@ -40,11 +40,6 @@ import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import type { Event } from "~/server/event-sourcing.old";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import { generateTestTenantId } from "~/server/event-sourcing.old/__tests__/integration/testHelpers";
-import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
@@ -52,6 +47,11 @@ import type { Span, Trace } from "~/server/tracer/types";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import { generateTestTenantId } from "~/test-utils/integration/tenants";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 
 // Gate identically to the canonical event_log integration tests: skip unless a
 // real ClickHouse is reachable, run against the testcontainer otherwise.

@@ -23,11 +23,11 @@ import {
 import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
-import { pMapLimited } from "../../event-sourcing.old/replay/pMapLimited";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
+import { pMapLimited } from "../../utils/pMapLimited";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";

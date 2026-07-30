@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-30
 
-**Status:** Accepted — the checker is the single home for a rule that was
+**Status:** Superseded by [ADR-107](./107-the-pipeline.md) (2026-07-30). Previously: Accepted — the checker is the single home for a rule that was
 previously written three times in three places.
 
 **Builds on:** ADR-098 (the two projection kinds, and order-invariance), ADR-099

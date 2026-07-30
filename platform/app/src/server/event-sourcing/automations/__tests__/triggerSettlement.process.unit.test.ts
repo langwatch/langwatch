@@ -8,7 +8,6 @@ import type { MatchRecordedData } from "../events";
 import { TerminalDispatchError } from "../intentDispatch";
 import {
   addPending,
-  digestBatchKey,
   drainDue,
   initTriggerSettlementState,
   MAX_PENDING_MATCHES,
@@ -38,6 +37,7 @@ const match = (
   actionClass: "notify",
   traceDebounceMs: 30_000,
   notificationCadence: "immediate",
+  occurredAt: 1_000,
   ...overrides,
 });
 
@@ -61,8 +61,11 @@ describe("trigger settlement process", () => {
   describe("given a trace is already pending", () => {
     describe("when the trace matches again", () => {
       it("moves the durable settle wake later", () => {
-        const first = addPending(initTriggerSettlementState(), match(), 1_000);
-        const second = addPending(first.state, match(), 10_000);
+        const first = addPending(
+          initTriggerSettlementState(),
+          match({ occurredAt: 1_000 }),
+        );
+        const second = addPending(first.state, match({ occurredAt: 10_000 }));
 
         expect(settleBoundary(second.state)).toBe(40_000);
       });
@@ -147,21 +150,24 @@ describe("trigger settlement process", () => {
   describe("given a persist match completed its settle round", () => {
     describe("when later activity arrives in a new settle window", () => {
       it("creates a fresh persist intent for the later round", () => {
-        const persistMatch = () =>
+        // The round is named by the event's own instant, so a later round is a
+        // later `occurredAt` — not merely a later handling clock.
+        const persistMatch = (occurredAt: number) =>
           match({
             action: TriggerAction.ADD_TO_DATASET,
             actionClass: "persist",
+            occurredAt,
           });
 
         const firstRound = recordMatch(
           initTriggerSettlementState(),
-          persistMatch(),
+          persistMatch(1_000),
           ctx({ now: 1_000 }),
         );
         const firstWake = wake(firstRound.state, ctx({ now: 31_000 }));
         const secondRound = recordMatch(
           firstWake.state,
-          persistMatch(),
+          persistMatch(31_001),
           ctx({ now: 31_001 }),
         );
         const secondWake = wake(secondRound.state, ctx({ now: 61_001 }));
@@ -212,29 +218,34 @@ describe("trigger settlement process", () => {
   });
 
   describe("given several matches arrive in any order, with any of them redelivered", () => {
-    /**
-     * `ProcessContext` carries only `now` (the instant this delivery is being
-     * handled), not a separate "instant the event occurred" the way the old
-     * process runtime's `ctx.at` did — so unlike the old pipeline, this state
-     * is invariant to *ordering* at one wall-clock instant, not to *when*
-     * each redelivery happens to be processed. That narrower guarantee is
-     * what this asserts; the lost one is reported alongside this conversion.
-     */
-    it("reaches the same durable state for any order, at one wall-clock instant", () => {
+    it("reaches the same durable state whenever each delivery is handled", () => {
+      // The clock advances between deliveries, so a durable field derived from
+      // `ctx.now` rather than the event's own `occurredAt` would make the state
+      // depend on arrival order.
+      let handledAt = 1_000;
       const report = checkOrderInvariance({
         init: () => initTriggerSettlementState(),
-        apply: (state: TriggerSettlementState, data: MatchRecordedData) =>
-          recordMatch(state, data, ctx({ now: 1_000 })).state,
+        apply: (state: TriggerSettlementState, data: MatchRecordedData) => {
+          handledAt += 45_000;
+          return recordMatch(state, data, ctx({ now: handledAt })).state;
+        },
         events: [
-          match({ traceId: "trace-a" }),
-          match({ traceId: "trace-b", actionClass: "persist" }),
-          match({ traceId: "trace-c", traceDebounceMs: 0 }),
-          match({ traceId: "trace-a", notificationCadence: "immediate" }),
+          match({ traceId: "trace-a", occurredAt: 1_000 }),
+          match({
+            traceId: "trace-b",
+            actionClass: "persist",
+            occurredAt: 900,
+          }),
+          match({ traceId: "trace-c", traceDebounceMs: 0, occurredAt: 2_500 }),
+          match({
+            traceId: "trace-a",
+            notificationCadence: "immediate",
+            occurredAt: 1_000,
+          }),
         ],
       });
 
-      expect(report.invariant).toBe(true);
-      expect(report.duplicatesChecked).toBe(4);
+      expect(report).toMatchObject({ invariant: true });
     });
   });
 
@@ -255,8 +266,7 @@ describe("trigger settlement process", () => {
 
         const next = addPending(
           { pendingMatches, overflowFlushed: 0 },
-          match({ traceId: "newest" }),
-          MAX_PENDING_MATCHES + 1,
+          match({ traceId: "newest", occurredAt: MAX_PENDING_MATCHES + 1 }),
         );
 
         expect(Object.keys(next.state.pendingMatches)).toHaveLength(
@@ -320,12 +330,13 @@ describe("trigger settlement process", () => {
   });
 
   describe("given a match delivered late, well after its own occurredAt", () => {
-    describe("when the same match is redelivered later still", () => {
+    describe("when the same match is redelivered a bucket-width later still", () => {
       it("mints the identical persist intent, so the customer's match is written once", () => {
         const persist = () =>
           match({
             action: TriggerAction.ADD_TO_DATASET,
             actionClass: "persist",
+            occurredAt: 1_000,
           });
 
         const first = recordMatch(
@@ -333,13 +344,15 @@ describe("trigger settlement process", () => {
           persist(),
           ctx({ now: 1_000 }),
         );
+        // A whole debounce width later, so a bucket derived from the handling
+        // clock instead of the event's own instant would land in "30000-2".
         const redelivered = recordMatch(
           initTriggerSettlementState(),
           persist(),
-          ctx({ now: 1_000 }),
+          ctx({ now: 61_000 }),
         );
 
-        expect(wake(redelivered.state, ctx({ now: 31_000 })).intents).toEqual(
+        expect(wake(redelivered.state, ctx({ now: 91_000 })).intents).toEqual(
           wake(first.state, ctx({ now: 31_000 })).intents,
         );
       });
@@ -348,8 +361,10 @@ describe("trigger settlement process", () => {
 
   describe("given activity for one trace under one debounce configuration", () => {
     const bucketOf = (at: number, traceDebounceMs: number) =>
-      addPending(initTriggerSettlementState(), match({ traceDebounceMs }), at)
-        .state.pendingMatches["trace-1"]!.settleWindowBucket;
+      addPending(
+        initTriggerSettlementState(),
+        match({ traceDebounceMs, occurredAt: at }),
+      ).state.pendingMatches["trace-1"]!.settleWindowBucket;
 
     it("names one round while activity stays inside the window, a new one after it", () => {
       expect(bucketOf(1_000, 30_000)).toBe("30000-0");
@@ -389,16 +404,14 @@ describe("trigger settlement process", () => {
             pendingMatches: { ...filler, "tie-a": tied, "tie-b": tied },
             overflowFlushed: 0,
           },
-          match({ traceId: "newest" }),
-          MAX_PENDING_MATCHES + 1,
+          match({ traceId: "newest", occurredAt: MAX_PENDING_MATCHES + 1 }),
         );
         const backwards = addPending(
           {
             pendingMatches: { "tie-b": tied, "tie-a": tied, ...filler },
             overflowFlushed: 0,
           },
-          match({ traceId: "newest" }),
-          MAX_PENDING_MATCHES + 1,
+          match({ traceId: "newest", occurredAt: MAX_PENDING_MATCHES + 1 }),
         );
 
         expect(forwards.flushed.map(({ traceId }) => traceId)).toEqual([

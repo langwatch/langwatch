@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29
 
-**Status:** Accepted — the rule is in force; the consolidation onto a single
+**Status:** Superseded by [ADR-109](./109-storage.md) (2026-07-30). Previously: Accepted — the rule is in force; the consolidation onto a single
 client is a mechanical migration carried out alongside the package extraction.
 
 **Related:** ADR-099 (`defineTable`, whose declared merge strategy this client

@@ -27,6 +27,12 @@ export const reportUsagePayloadSchema = z.object({
 });
 export type ReportUsagePayload = z.infer<typeof reportUsagePayloadSchema>;
 
+/** What one report attempt did, so a caller dispatching many (the sweep) or
+ *  one (the poke) can decide whether to raise for a retry. */
+export type ReportUsageOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly error: Error };
+
 /** The billing organization read, cached: this sits behind the busiest
  *  dispatch loop in the pipeline and would otherwise run once per report
  *  attempt. */
@@ -83,7 +89,7 @@ async function reportForBillingMonth(
     billingMonth: string;
     stripeCustomerId: string;
   },
-): Promise<void> {
+): Promise<ReportUsageOutcome> {
   const { organizationId, billingMonth, stripeCustomerId } = params;
 
   const checkpoint = await ports.billingCheckpoints.getCheckpoint({
@@ -114,13 +120,13 @@ async function reportForBillingMonth(
       organizationId,
       billingMonth,
     });
-    if (currentTotal === null) return; // ClickHouse not available
+    if (currentTotal === null) return { ok: true }; // ClickHouse not available
     if (currentTotal <= lastReportedTotal) {
       logger.debug(
         { organizationId, billingMonth, currentTotal, lastReportedTotal },
         "no new billable events, skipping",
       );
-      return;
+      return { ok: true };
     }
     targetTotal = currentTotal;
     await ports.billingCheckpoints.writeIntent({
@@ -137,7 +143,7 @@ async function reportForBillingMonth(
       { organizationId, billingMonth, targetTotal, lastReportedTotal },
       "non-positive delta, skipping Stripe report",
     );
-    return;
+    return { ok: true };
   }
 
   const identifier = buildIdentifier({
@@ -152,7 +158,7 @@ async function reportForBillingMonth(
       { organizationId, billingMonth },
       "usageReportingService not available -- billing requires isSaas, this is a configuration error",
     );
-    return;
+    return { ok: true };
   }
 
   try {
@@ -170,7 +176,7 @@ async function reportForBillingMonth(
     });
 
     const result = results[0];
-    if (!result || !result.reported) {
+    if (!result?.reported) {
       logger.error(
         {
           organizationId,
@@ -200,7 +206,10 @@ async function reportForBillingMonth(
         billingMonth,
         consecutiveFailures: consecutiveFailures + 1,
       });
-      return;
+      // A permanent rejection re-fails identically on an immediate retry, so
+      // this is not escalated — it converges via the checkpoint on the next
+      // independently-scheduled poke or sweep, same as before.
+      return { ok: true };
     }
 
     await ports.billingCheckpoints.confirm({
@@ -212,6 +221,7 @@ async function reportForBillingMonth(
       { organizationId, billingMonth, identifier, delta, targetTotal },
       "usage reported and checkpoint updated successfully",
     );
+    return { ok: true };
   } catch (error) {
     logger.warn(
       { organizationId, billingMonth, error },
@@ -224,14 +234,25 @@ async function reportForBillingMonth(
       pendingReportedTotal: targetTotal,
       consecutiveFailures: consecutiveFailures + 1,
     });
+    // Mirrors the retired command's `return !circuitTripped`: a tripped
+    // circuit no longer demands an immediate retry of the whole tick — the
+    // next independently-scheduled poke or sweep attempts Stripe again
+    // regardless.
+    return circuitTripped ? { ok: true } : { ok: false, error: toError(error) };
   }
 }
 
-/** Resolves the organization, applies its skip conditions, then reports. */
+/**
+ * Resolves the organization, applies its skip conditions, then reports.
+ *
+ * Never throws — the caller (the poke, one organization at a time; the
+ * sweep, many) decides whether the returned outcome is worth raising for a
+ * retry, per its own dispatch shape.
+ */
 export async function reportUsage(
   ports: ReportUsagePorts,
   payload: ReportUsagePayload,
-): Promise<void> {
+): Promise<ReportUsageOutcome> {
   const { organizationId, billingMonth } = payload;
   try {
     let org = (await ports.organizationCache.get(organizationId)) ?? null;
@@ -244,24 +265,24 @@ export async function reportUsage(
         { organizationId },
         "organization not found or not SEAT_EVENT, skipping",
       );
-      return;
+      return { ok: true };
     }
     if (!org.stripeCustomerId) {
       logger.debug(
         { organizationId },
         "no Stripe customer ID, skipping usage reporting",
       );
-      return;
+      return { ok: true };
     }
     if (org.subscriptions.length === 0) {
       logger.debug(
         { organizationId },
         "no active subscription, skipping usage reporting",
       );
-      return;
+      return { ok: true };
     }
 
-    await reportForBillingMonth(ports, {
+    return await reportForBillingMonth(ports, {
       organizationId,
       billingMonth,
       stripeCustomerId: org.stripeCustomerId,
@@ -277,5 +298,6 @@ export async function reportUsage(
       scope.setExtra?.("billingMonth", billingMonth);
       captureException(toError(error));
     });
+    return { ok: false, error: toError(error) };
   }
 }

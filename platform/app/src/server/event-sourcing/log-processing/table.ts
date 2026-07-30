@@ -4,6 +4,7 @@ import {
   defineTable,
   replacing,
 } from "@langwatch/clickhouse";
+import { z } from "zod";
 
 /**
  * The two tables `canonicalLogStorage` writes into (migration `00050`,
@@ -25,22 +26,40 @@ const dedupVersion = (): ColumnDef<bigint> => ({
 });
 
 /**
- * The deployed DDL partitions and expires on `toYearWeek(TimeUnixMs)`, a
- * customer-supplied timestamp. `defineTable` refuses that anchor and is right
- * to: a client can fan one insert across arbitrary partitions and hold rows
- * past their retention. Declared on `AcceptedAt` — the shape the pending re-key
- * migration must produce.
+ * `00050` stores `RecordId` as `FixedString(64)`, which pads a short value with
+ * NUL bytes rather than storing it as given, so the width is part of the
+ * contract and not a storage hint.
  */
+function fixedString(width: number): ColumnDef<string> {
+  const schema = z.string();
+  return {
+    chType: `FixedString(${width})`,
+    schema,
+    decode: (cell) => schema.parse(cell),
+    encode: (value) => value,
+    frozen: false,
+    platformControlled: false,
+    nullable: false,
+  };
+}
+
 export const logRecordsTable = defineTable({
   name: "log_records",
   merge: replacing({ version: "DedupVersion" }),
   sortKey: ["TenantId", "CorrelationTraceId", "TimeUnixMs", "RecordId"],
-  partition: { by: "toYearWeek(AcceptedAt)", column: "AcceptedAt" },
+  partition: { by: "toYearWeek(TimeUnixMs)", column: "TimeUnixMs" },
   tenant: ["TenantId"],
-  ttl: { anchor: "AcceptedAt" },
+  ttl: { anchor: "TimeUnixMs" },
+  structuralDebt: [
+    {
+      column: "TimeUnixMs",
+      reason:
+        "migration 00050 partitions and expires log_records on TimeUnixMs, the record's own timestamp as the emitting process stamped it, so a skewed or backfilling client controls partition spread and retention. TimeUnixMs is in the dedup key, so re-anchoring on AcceptedAt needs a new table and a copy rather than an ALTER",
+    },
+  ],
   columns: {
     TenantId: ch.string(),
-    RecordId: ch.string(),
+    RecordId: fixedString(64),
     ResourceSchemaUrl: ch.string(),
     ResourceAttributesJson: ch.string(),
     ResourceAttributesFlatJson: ch.string(),
@@ -98,12 +117,10 @@ export const logUsageEstimatesTable = defineTable({
   columns: {
     OrganizationId: ch.string(),
     TenantId: ch.string(),
-    RecordId: ch.string(),
+    RecordId: fixedString(64),
     ProviderKind: lowCardinalityString(),
     AcceptedAt: ch.acceptedAt(),
-    // The deployed column is plain `DateTime`; `ch.dateTime64(0)` reads and
-    // writes the same bytes, only the reported `chType` differs.
-    AcceptedHour: ch.dateTime64(0),
+    AcceptedHour: ch.dateTime(),
     CanonicalSourceBytes: ch.uint32(),
     WrittenAt: ch.writtenAt(),
     DedupVersion: dedupVersion(),

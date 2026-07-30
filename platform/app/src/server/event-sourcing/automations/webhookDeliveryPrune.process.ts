@@ -23,8 +23,9 @@ export const webhookDeliveryPruneStateSchema = z.object({
   lastPruneAt: z.number().nullable(),
   /** See `graphAlertSweepStateSchema.nextWakeAt` — same reasoning: the only
    *  way an `.on()` handler this process needs just to exist can leave the
-   *  armed deadline untouched is by reading it back from state. */
-  nextWakeAt: z.number().nullable(),
+   *  armed deadline untouched is by reading it back from state. Defaulted for
+   *  the same reason too: a deployed row predates the field. */
+  nextWakeAt: z.number().nullable().default(null),
 });
 export type WebhookDeliveryPruneState = z.infer<
   typeof webhookDeliveryPruneStateSchema

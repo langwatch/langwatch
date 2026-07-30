@@ -117,9 +117,29 @@ export interface PipelineChain<
     record: MapWithStore<Events, Handle>,
   ): PipelineChain<Name, Prefix, Events>;
 
+  /**
+   * A map that arrives already built (ADR-107 decision 17): an enterprise
+   * member, which cannot be imported unconditionally into an OSS pipeline
+   * file and so crosses as a value the composition root builds and injects
+   * behind an `if`; or a member whose source vocabulary belongs to another
+   * pipeline entirely, which the declared form cannot express because its
+   * `on` can only key on *this* chain's own `.events()`. `map.eventTypes` are
+   * already-persisted type strings, supplied by the caller. `mount` is
+   * supplied alongside it, rather than derived from a typed `store`, because
+   * a pre-built map's store is already erased into `apply` — mount legality
+   * (decision 14) is still checked, over the shape the caller states.
+   */
+  withMap(name: string, map: BuiltMap, mount: Mount): PipelineChain<Name, Prefix, Events>;
+
   withSubscriber(
     name: string,
     record: SubscriberOn<Events>,
+  ): PipelineChain<Name, Prefix, Events>;
+
+  /** The `.withSubscriber` counterpart to the pre-built `.withMap` above. */
+  withSubscriber(
+    name: string,
+    subscriber: BuiltSubscriber,
   ): PipelineChain<Name, Prefix, Events>;
 
   build(ports?: PipelinePorts): BuiltPipeline<Name, Prefix>;
@@ -145,6 +165,8 @@ export interface PipelineChainWithId<
     record: MapWithStore<Events, Handle>,
   ): PipelineChainWithId<Name, Prefix, Events>;
 
+  withMap(name: string, map: BuiltMap, mount: Mount): PipelineChainWithId<Name, Prefix, Events>;
+
   withProcessManager<StateSchema extends z.ZodTypeAny, Intents extends IntentMap>(
     name: string,
     record: ProcessManagerOn<Events, StateSchema, Intents>,
@@ -153,6 +175,11 @@ export interface PipelineChainWithId<
   withSubscriber(
     name: string,
     record: SubscriberOn<Events>,
+  ): PipelineChainWithId<Name, Prefix, Events>;
+
+  withSubscriber(
+    name: string,
+    subscriber: BuiltSubscriber,
   ): PipelineChainWithId<Name, Prefix, Events>;
 }
 
@@ -369,8 +396,12 @@ function chainStage<
       mountCommand(state, name, record);
       return chainStage<Name, Prefix, Events>(state);
     },
-    withMap(name, record) {
-      mountMap(state, name, record);
+    withMap(
+      name: string,
+      record: MapWithStore<Events, MapHandlerMap<Events, unknown>> | BuiltMap,
+      mount?: Mount,
+    ) {
+      mountMap(state, name, record, mount);
       return chainStage<Name, Prefix, Events>(state);
     },
     withSubscriber(name, record) {
@@ -421,8 +452,12 @@ function chainWithIdStage<
       mountFold(state, name, record);
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
-    withMap(name, record) {
-      mountMap(state, name, record);
+    withMap(
+      name: string,
+      record: MapWithStore<Events, MapHandlerMap<Events, unknown>> | BuiltMap,
+      mount?: Mount,
+    ) {
+      mountMap(state, name, record, mount);
       return chainWithIdStage<Name, Prefix, Events>(state);
     },
     withProcessManager(name, record) {
@@ -512,11 +547,21 @@ function mountFold<Events extends EventSchemaMap, StateSchema extends z.ZodTypeA
 function mountMap<Events extends EventSchemaMap, Handle extends MapHandlerMap<Events, unknown>>(
   state: ChainState,
   name: string,
-  record: MapWithStore<Events, Handle>,
+  record: MapWithStore<Events, Handle> | BuiltMap,
+  mount?: Mount,
 ): void {
   assertNameNotTaken(state, name);
+  // A pre-built map (ADR-107 decision 17) arrives with its own `Mount`
+  // already stated by the caller, since its store is erased into `apply`.
+  if (mount !== undefined) {
+    const built = record as BuiltMap;
+    state.mounts.push({ member: name, mount });
+    state.maps.set(name, () => built);
+    return;
+  }
+  const declared = record as MapWithStore<Events, Handle>;
   const dispatch = resolveDispatch({
-    handlers: record.on,
+    handlers: declared.on,
     typeOf: typeOfEventIn(state),
     what: "map",
     owner: name,
@@ -524,17 +569,17 @@ function mountMap<Events extends EventSchemaMap, Handle extends MapHandlerMap<Ev
   state.mounts.push({
     member: name,
     mount:
-      record.store.kind === "merge"
+      declared.store.kind === "merge"
         ? {
             projection: "map",
             store: "merge",
             scope: UNDECLARED_SCOPE,
             collapse: UNDECLARED_COLLAPSE,
-            idempotency: record.store.idempotency,
+            idempotency: declared.store.idempotency,
           }
         : {
             projection: "map",
-            store: record.store.kind,
+            store: declared.store.kind,
             scope: UNDECLARED_SCOPE,
             collapse: UNDECLARED_COLLAPSE,
             idempotency: undefined,
@@ -542,7 +587,7 @@ function mountMap<Events extends EventSchemaMap, Handle extends MapHandlerMap<Ev
   });
   state.maps.set(name, (metrics) => {
     const executor = createMapExecutor<WireEvent, MappedRow<Handle>>({
-      store: record.store,
+      store: declared.store,
       map(event) {
         const handler = wireHandler<
           [unknown],
@@ -641,9 +686,16 @@ function mountProcessManager<
 function mountSubscriber<Events extends EventSchemaMap>(
   state: ChainState,
   name: string,
-  record: SubscriberOn<Events>,
+  record: SubscriberOn<Events> | BuiltSubscriber,
 ): void {
   assertNameNotTaken(state, name);
+  // A pre-built subscriber (ADR-107 decision 17) has no `on` at all — it
+  // arrives as a plain `BuiltSubscriber`, dispatch already resolved by
+  // whoever constructed it.
+  if (!("on" in record)) {
+    state.subscribers.set(name, record);
+    return;
+  }
   const dispatch = resolveDispatch({
     handlers: record.on,
     typeOf: typeOfEventIn(state),
@@ -663,12 +715,25 @@ function mountSubscriber<Events extends EventSchemaMap>(
   });
 }
 
+/** Binds each declared `.id()` extractor to its own event's persisted type
+ * string, once, so `aggregateIdFor` is a map lookup rather than a re-walk of
+ * the id map per call (ADR-107 decision 4). */
+function buildIdExtractors(state: ChainState): Map<string, (data: unknown) => string> {
+  const typeOf = typeOfEventIn(state);
+  const extractors = new Map<string, (data: unknown) => string>();
+  for (const [key, extractor] of Object.entries(state.id ?? {})) {
+    extractors.set(typeOf(key), extractor as unknown as (data: unknown) => string);
+  }
+  return extractors;
+}
+
 function assemble<Name extends string, Prefix extends string | undefined>(
   state: ChainState,
   ports: PipelinePorts | undefined,
 ): BuiltPipeline<Name, Prefix> {
   assertMountsAreLegal(state);
   const metrics = ports?.metrics;
+  const idExtractors = buildIdExtractors(state);
   return {
     name: state.name as Name,
     prefix: state.prefix as Prefix,
@@ -682,5 +747,15 @@ function assemble<Name extends string, Prefix extends string | undefined>(
     ),
     processManagers: Object.fromEntries(state.processManagers),
     subscribers: Object.fromEntries(state.subscribers),
+    aggregateIdFor(eventType, payload) {
+      const extractor = idExtractors.get(eventType);
+      if (!extractor) {
+        throw new ConfigurationError(
+          `pipeline "${state.name}" has no id extractor for event type "${eventType}"`,
+          { pipeline: state.name, eventType },
+        );
+      }
+      return extractor(payload);
+    },
   };
 }

@@ -4,7 +4,7 @@ import {
   getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { createTenantId } from "../../../../event-sourcing.old/domain/tenantId";
 import { LEGACY_HOLDER_LEASE_GUARD } from "../../../../event-sourcing.old/queues/groupQueue/blobConstants";
 import {

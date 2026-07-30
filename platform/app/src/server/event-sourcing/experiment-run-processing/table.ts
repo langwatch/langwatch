@@ -46,8 +46,9 @@ export type ExperimentRunsRow = TableRow<typeof experimentRunsTable.columns>;
  * redelivered result collapses to one row at merge — which is what makes
  * `count()` a count of items rather than of deliveries.
  *
- * `OccurredAt` is stamped by our own orchestrator at dispatch, not by a customer
- * SDK, so it is the deployed engine's version column and its partition key.
+ * The deployed key omits `ExperimentId` (ADR-103 decision 2). Two experiments
+ * sharing a `runId` therefore mint identical sort keys, and a background merge
+ * deletes the older experiment's item — data loss, not a wrong number.
  */
 export const experimentRunItemsTable = defineTable({
   name: "experiment_run_items",
@@ -55,6 +56,13 @@ export const experimentRunItemsTable = defineTable({
   sortKey: ["TenantId", "RunId", "ProjectionId"],
   partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
   tenant: ["TenantId"],
+  structuralDebt: [
+    {
+      column: "OccurredAt",
+      reason:
+        "migration 00002 makes OccurredAt both the partition key and the ReplacingMergeTree version of experiment_run_items — one moving column doing two jobs ADR-099 requires a frozen, platform-set column for. The same re-key must add ExperimentId to the sort key, which the deployed key omits, so two experiments sharing a runId stop colliding; one new table and one copy fixes both, and neither ORDER BY nor PARTITION BY is alterable in place",
+    },
+  ],
   columns: {
     ProjectionId: ch.string(),
     TenantId: ch.string(),
@@ -82,7 +90,7 @@ export const experimentRunItemsTable = defineTable({
     EvaluationInputs: ch.nullable(ch.string()),
     EvaluationDurationMs: ch.nullable(ch.uint32()),
     CreatedAt: ch.dateTime64(3),
-    OccurredAt: ch.acceptedAt(),
+    OccurredAt: ch.occurredAt(),
     _retention_days: ch.uint16(),
   },
 });

@@ -2,17 +2,17 @@ import { generate } from "@langwatch/ksuid";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+import type {
+  LegacyProjectionStoreContext,
+  LegacyStateProjectionStore,
+  LegacyStoredProjection,
+} from "~/server/app-layer/_shared/legacyProjectionStore.types";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   type TopicClusteringRunHistoryData,
   type TopicClusteringRunHistoryEntry,
   topicClusteringRunHistoryEntrySchema,
-} from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing.old/projections/stateProjection.types";
-import { KSUID_RESOURCES } from "~/utils/constants";
+} from "./topicClusteringRunHistory.schema";
 
 type Row = Prisma.TopicClusteringRunHistoryProjectionGetPayload<object>;
 
@@ -40,7 +40,9 @@ export function parseRunHistoryRuns(
   return parsed.success ? parsed.data : [];
 }
 
-function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
+function fromRow(
+  row: Row,
+): LegacyStoredProjection<TopicClusteringRunHistoryData> {
   return {
     state: {
       ProjectId: row.projectId,
@@ -57,16 +59,25 @@ function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
   };
 }
 
-/** Postgres row I/O for the topic clustering run-history projection. */
+/**
+ * Postgres row I/O for the topic clustering run-history projection.
+ *
+ * The pipeline's own `topicClusteringRunHistory` fold now writes to
+ * ClickHouse (`clickhouseReplacing`, see
+ * `event-sourcing/topic-clustering-processing`), so this class is no longer
+ * that fold's store and does not implement any engine contract — it keeps
+ * its own local load/store shape unchanged, serving whatever app-layer read
+ * still goes through it.
+ */
 export class PrismaTopicClusteringRunHistoryProjectionRepository
-  implements StateProjectionStore<TopicClusteringRunHistoryData>
+  implements LegacyStateProjectionStore<TopicClusteringRunHistoryData>
 {
   constructor(private readonly prisma: RunHistoryPrismaClient) {}
 
   async load(
     _projectionKey: string,
-    context: ProjectionStoreContext,
-  ): Promise<StoredProjection<TopicClusteringRunHistoryData> | null> {
+    context: LegacyProjectionStoreContext,
+  ): Promise<LegacyStoredProjection<TopicClusteringRunHistoryData> | null> {
     const projectId = String(context.tenantId);
     const row =
       await this.prisma.topicClusteringRunHistoryProjection.findUnique({
@@ -76,8 +87,8 @@ export class PrismaTopicClusteringRunHistoryProjectionRepository
   }
 
   async store(
-    projection: StoredProjection<TopicClusteringRunHistoryData>,
-    context: ProjectionStoreContext,
+    projection: LegacyStoredProjection<TopicClusteringRunHistoryData>,
+    context: LegacyProjectionStoreContext,
   ): Promise<void> {
     const projectId = String(context.tenantId);
     const data = {

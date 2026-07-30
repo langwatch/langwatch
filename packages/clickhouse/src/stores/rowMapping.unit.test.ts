@@ -5,8 +5,8 @@ import { append, defineTable, replacing } from "../schema/defineTable";
 import {
   deriveAppendMapping,
   deriveRowMapping,
-  RowMappingError,
   type RowContext,
+  RowMappingError,
 } from "./rowMapping";
 
 const RUN_STATE = z.object({
@@ -101,7 +101,9 @@ describe("given deriveRowMapping()", () => {
 
       const restored = mapping.fromRow(mapping.toRow(BASE_STATE, CONTEXT));
 
-      expect(Object.keys(restored).sort()).toEqual(Object.keys(BASE_STATE).sort());
+      expect(Object.keys(restored).sort()).toEqual(
+        Object.keys(BASE_STATE).sort(),
+      );
     });
   });
 
@@ -109,7 +111,10 @@ describe("given deriveRowMapping()", () => {
     it("widens a number onto a 64-bit integer column and narrows it back", () => {
       const mapping = buildMapping();
 
-      const row = mapping.toRow(stateWith({ eventCount: 42, drift: -7 }), CONTEXT);
+      const row = mapping.toRow(
+        stateWith({ eventCount: 42, drift: -7 }),
+        CONTEXT,
+      );
 
       expect(row.EventCount).toEqual(42n);
       expect(row.Drift).toEqual(-7n);
@@ -128,7 +133,10 @@ describe("given deriveRowMapping()", () => {
       const mapping = buildMapping();
       const beyondDoublePrecision = 9_007_199_254_740_993n;
 
-      const row = mapping.toRow(stateWith({ ledgerId: beyondDoublePrecision }), CONTEXT);
+      const row = mapping.toRow(
+        stateWith({ ledgerId: beyondDoublePrecision }),
+        CONTEXT,
+      );
 
       expect(row.LedgerId).toEqual(beyondDoublePrecision);
       expect(mapping.fromRow(row).ledgerId).toEqual(beyondDoublePrecision);
@@ -174,7 +182,10 @@ describe("given deriveRowMapping()", () => {
   describe("when a field is absent at write time", () => {
     it("writes NULL if the column is nullable", () => {
       const optionalScore = RUN_STATE.extend({ score: z.number().optional() });
-      const mapping = deriveRowMapping<z.infer<typeof optionalScore>, typeof runTable.columns>({
+      const mapping = deriveRowMapping<
+        z.infer<typeof optionalScore>,
+        typeof runTable.columns
+      >({
         table: runTable,
         state: optionalScore,
         key: "RunId",
@@ -189,7 +200,10 @@ describe("given deriveRowMapping()", () => {
 
     it("refuses the write if the column is not nullable, naming the field", () => {
       const optionalLabel = RUN_STATE.extend({ label: z.string().optional() });
-      const mapping = deriveRowMapping<z.infer<typeof optionalLabel>, typeof runTable.columns>({
+      const mapping = deriveRowMapping<
+        z.infer<typeof optionalLabel>,
+        typeof runTable.columns
+      >({
         table: runTable,
         state: optionalLabel,
         key: "RunId",
@@ -197,12 +211,12 @@ describe("given deriveRowMapping()", () => {
         stateVersionColumn: "StateVersion",
       });
 
-      expect(() => mapping.toRow({ ...BASE_STATE, label: undefined }, CONTEXT)).toThrow(
-        RowMappingError,
-      );
-      expect(() => mapping.toRow({ ...BASE_STATE, label: undefined }, CONTEXT)).toThrow(
-        /label/,
-      );
+      expect(() =>
+        mapping.toRow({ ...BASE_STATE, label: undefined }, CONTEXT),
+      ).toThrow(RowMappingError);
+      expect(() =>
+        mapping.toRow({ ...BASE_STATE, label: undefined }, CONTEXT),
+      ).toThrow(/label/);
     });
   });
 
@@ -237,7 +251,10 @@ describe("given deriveRowMapping()", () => {
 
     it("yields the column to a state field of the same name, so a state carrying its own key keeps it", () => {
       const keyInState = RUN_STATE.extend({ runId: z.string() });
-      const mapping = deriveRowMapping<z.infer<typeof keyInState>, typeof runTable.columns>({
+      const mapping = deriveRowMapping<
+        z.infer<typeof keyInState>,
+        typeof runTable.columns
+      >({
         table: runTable,
         state: keyInState,
         key: "RunId",
@@ -245,7 +262,10 @@ describe("given deriveRowMapping()", () => {
         stateVersionColumn: "StateVersion",
       });
 
-      const row = mapping.toRow({ ...BASE_STATE, runId: "from-state" }, CONTEXT);
+      const row = mapping.toRow(
+        { ...BASE_STATE, runId: "from-state" },
+        CONTEXT,
+      );
 
       expect(row.RunId).toBe("from-state");
       expect(mapping.fromRow(row).runId).toBe("from-state");
@@ -275,7 +295,10 @@ describe("given deriveRowMapping()", () => {
 
     it("refuses at construction without one, naming the column it cannot fill", () => {
       expect(() =>
-        deriveRowMapping<z.infer<typeof NOTES_STATE>, typeof notesTable.columns>({
+        deriveRowMapping<
+          z.infer<typeof NOTES_STATE>,
+          typeof notesTable.columns
+        >({
           table: notesTable,
           state: NOTES_STATE,
           key: "RunId",
@@ -286,7 +309,10 @@ describe("given deriveRowMapping()", () => {
     });
 
     it("produces the column's value from state once the fill is given", () => {
-      const mapping = deriveRowMapping<z.infer<typeof NOTES_STATE>, typeof notesTable.columns>({
+      const mapping = deriveRowMapping<
+        z.infer<typeof NOTES_STATE>,
+        typeof notesTable.columns
+      >({
         table: notesTable,
         state: NOTES_STATE,
         key: "RunId",
@@ -299,7 +325,10 @@ describe("given deriveRowMapping()", () => {
     });
 
     it("does not read a filled column back as state, the fill being its only source", () => {
-      const mapping = deriveRowMapping<z.infer<typeof NOTES_STATE>, typeof notesTable.columns>({
+      const mapping = deriveRowMapping<
+        z.infer<typeof NOTES_STATE>,
+        typeof notesTable.columns
+      >({
         table: notesTable,
         state: NOTES_STATE,
         key: "RunId",
@@ -308,7 +337,9 @@ describe("given deriveRowMapping()", () => {
         fill: { Notes: () => "unset" },
       });
 
-      expect(mapping.fromRow(mapping.toRow(notesState, CONTEXT))).not.toHaveProperty("notes");
+      expect(
+        mapping.fromRow(mapping.toRow(notesState, CONTEXT)),
+      ).not.toHaveProperty("notes");
     });
   });
 
@@ -437,7 +468,7 @@ describe("given a fill for a frozen, platform-controlled column", () => {
     },
   });
 
-  /** @scenario a partition anchor cannot be re-stamped on every write */
+  /** @scenario a partition anchor is not re-stamped on every write */
   it("refuses at construction, because re-stamping it would migrate the row's partition", () => {
     expect(() =>
       deriveRowMapping({

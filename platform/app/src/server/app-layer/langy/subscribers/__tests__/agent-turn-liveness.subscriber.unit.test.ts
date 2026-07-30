@@ -1,3 +1,4 @@
+import { DispatchError } from "@langwatch/event-sourcing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -7,10 +8,8 @@ import { describe, expect, it, vi } from "vitest";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTurnHandoff } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing.old/pipelines/langy-conversation-processing/schemas/events";
-import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
-import type { EventSubscriberContext } from "~/server/event-sourcing.old/subscribers/eventSubscriber.types";
+import type { EventSubscriberContext } from "~/server/app-layer/langy/subscribers/eventSubscriber.types";
+import type { LangyConversationProcessingEvent } from "~/server/app-layer/langy/subscribers/langyConversationProcessingEvent";
 
 import {
   createAgentTurnLivenessSubscriber,
@@ -108,7 +107,7 @@ describe("agent turn liveness subscriber", () => {
   it("configures one delayed, tenant-scoped timer per conversation turn", () => {
     const subscriber = createAgentTurnLivenessSubscriber(makeDeps());
     const event = makeEvent({
-      tenantId: createTenantId("project_2"),
+      tenantId: "project_2",
       aggregateId: "conv_2",
     });
 
@@ -129,7 +128,7 @@ describe("agent turn liveness subscriber", () => {
     });
     const subscriber = createAgentTurnLivenessSubscriber(deps);
     const event = makeEvent({
-      tenantId: createTenantId("project_2"),
+      tenantId: "project_2",
       aggregateId: "conv_2",
     });
 

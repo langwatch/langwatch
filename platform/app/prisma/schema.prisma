@@ -3233,6 +3233,11 @@ model ProcessManagerInstance {
   userId      String?
   state       Json
   revision    Int
+  /// The fold's state-schema hash a row was last written under (ADR-107 §11).
+  /// Nullable because no previous implementation ever stamped one: NULL means
+  /// a legacy row, which the store accepts as a normal read (not a version
+  /// mismatch) and stamps for real on its next write.
+  stateVersion String?
   nextWakeAt  DateTime? @db.Timestamptz(3)
   updatedAt   DateTime  @db.Timestamptz(3)
 

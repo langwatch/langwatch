@@ -4,15 +4,9 @@ import { simulationRunMessagesTable, simulationRunsTable } from "../table";
 /**
  * @see specs/event-sourcing/simulation-run-aggregate.feature
  */
+/** Migration parity — engine, keys, anchors, column types — is asserted against
+ *  the migration SQL in `../../__tests__/tableMigrationParity.unit.test.ts`. */
 describe("simulationRunsTable", () => {
-  it("declares the deployed engine key and replacing version", () => {
-    expect(simulationRunsTable.sortKey).toEqual(["TenantId", "ScenarioRunId"]);
-    expect(simulationRunsTable.merge).toEqual({
-      kind: "replacing",
-      version: "UpdatedAt",
-    });
-  });
-
   it("declares no delivery-sequence column", () => {
     expect(simulationRunsTable.columnNames).not.toContain("DeliverySeq");
   });
@@ -31,23 +25,18 @@ describe("simulationRunsTable", () => {
   });
 });
 
+/** No migration creates this table yet, which the parity test asserts. */
 describe("simulationRunMessagesTable", () => {
   it("keys a row by the logical message, so a redelivery collapses at merge", () => {
-    expect(simulationRunMessagesTable.sortKey).toEqual([
-      "TenantId",
-      "ScenarioRunId",
-      "MessageId",
-    ]);
-    expect(simulationRunMessagesTable.merge).toEqual({
-      kind: "replacing",
-      version: "UpdatedAt",
-    });
+    expect(simulationRunMessagesTable.sortKey.at(-1)).toBe("MessageId");
   });
 
-  it("partitions on a platform-stamped anchor, never on the message's own time", () => {
-    expect(simulationRunMessagesTable.partition).toEqual({
-      by: "toYearWeek(AcceptedAt)",
-      column: "AcceptedAt",
-    });
+  it("anchors on a platform stamp, so a new table starts free of ADR-099 debt", () => {
+    expect(
+      simulationRunMessagesTable.columns[
+        simulationRunMessagesTable.partition.column
+      ]?.timeRole,
+    ).toBe("acceptedAt");
+    expect(simulationRunMessagesTable.structuralDebt).toBeUndefined();
   });
 });

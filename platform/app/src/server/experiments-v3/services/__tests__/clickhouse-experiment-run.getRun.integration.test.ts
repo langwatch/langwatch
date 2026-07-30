@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 
 // getRun resolves its ClickHouse client through getClickHouseClientForProject;
 // point that at the testcontainer client so the real query path runs.
@@ -29,7 +29,6 @@ interface RunVersion {
   tenant?: string;
   experimentId: string;
   runId: string;
-  progress: number;
   total?: number;
   targets?: string;
   /** Seconds subtracted from now64(3) for UpdatedAt; lower = newer. */
@@ -46,9 +45,9 @@ async function insertVersion(ch: ClickHouseClient, v: RunVersion) {
   await ch.command({
     query: `
       INSERT INTO experiment_runs
-        (ProjectionId, TenantId, RunId, ExperimentId, Version, Total, Progress, Targets, CreatedAt, UpdatedAt, StartedAt)
+        (ProjectionId, TenantId, RunId, ExperimentId, Version, Total, Targets, CreatedAt, UpdatedAt, StartedAt)
       VALUES
-        ({pid:String}, {tenant:String}, {runId:String}, {experimentId:String}, 'v1', {total:UInt32}, {progress:UInt32}, {targets:String}, now64(3), now64(3) - {agoSec:UInt32}, now64(3))
+        ({pid:String}, {tenant:String}, {runId:String}, {experimentId:String}, 'v1', {total:UInt32}, {targets:String}, now64(3), now64(3) - {agoSec:UInt32}, now64(3))
     `,
     query_params: {
       pid: nanoid(),
@@ -56,9 +55,40 @@ async function insertVersion(ch: ClickHouseClient, v: RunVersion) {
       runId: v.runId,
       experimentId: v.experimentId,
       total: v.total ?? 10,
-      progress: v.progress,
       targets: v.targets ?? "[]",
       agoSec: v.agoSec,
+    },
+  });
+}
+
+/**
+ * Inserts one `experiment_run_items` target row — completed when `error` is
+ * omitted, failed otherwise — so `getRun`'s derived `progress` has real rows
+ * to count.
+ */
+async function insertResultItem(
+  ch: ClickHouseClient,
+  v: {
+    experimentId: string;
+    runId: string;
+    rowIndex: number;
+    error?: string;
+  },
+) {
+  await ch.command({
+    query: `
+      INSERT INTO experiment_run_items
+        (ProjectionId, TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, DatasetEntry, TargetError, OccurredAt, CreatedAt)
+      VALUES
+        ({pid:String}, {tenant:String}, {experimentId:String}, {runId:String}, {rowIndex:UInt32}, 'default', 'target', '{}', {error:Nullable(String)}, now64(3), now64(3))
+    `,
+    query_params: {
+      pid: nanoid(),
+      tenant: tenantId,
+      experimentId: v.experimentId,
+      runId: v.runId,
+      rowIndex: v.rowIndex,
+      error: v.error ?? null,
     },
   });
 }
@@ -150,21 +180,18 @@ describe("ExperimentRunService.getRun (integration)", () => {
       await insertVersion(ch, {
         experimentId,
         runId,
-        progress: 1,
         targets: '[{"id":"stale-1"}]',
         agoSec: 3,
       });
       await insertVersion(ch, {
         experimentId,
         runId,
-        progress: 2,
         targets: '[{"id":"stale-2"}]',
         agoSec: 1,
       });
       await insertVersion(ch, {
         experimentId,
         runId,
-        progress: 9,
         targets: '[{"id":"final"}]',
         agoSec: 0,
       });
@@ -176,8 +203,53 @@ describe("ExperimentRunService.getRun (integration)", () => {
       });
 
       expect(result).not.toBeNull();
-      expect(result!.progress).toBe(9);
       expect(result!.targets).toEqual([{ id: "final" }]);
+    });
+  });
+
+  describe("given a run whose items have landed", () => {
+    /** @scenario Progress and outcomes reflect the run's items */
+    it("derives progress from the item rows, not a counter on the run row", async () => {
+      const experimentId = `exp-progress-${nanoid()}`;
+      const runId = `run-progress-${nanoid()}`;
+      await insertVersion(ch, { experimentId, runId, total: 3, agoSec: 0 });
+      await insertResultItem(ch, { experimentId, runId, rowIndex: 0 });
+      await insertResultItem(ch, { experimentId, runId, rowIndex: 1 });
+      await insertResultItem(ch, {
+        experimentId,
+        runId,
+        rowIndex: 2,
+        error: "boom",
+      });
+
+      const result = await service.getRun({
+        projectId: tenantId,
+        experimentId,
+        runId,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.progress).toBe(3);
+      expect(result!.total).toBe(3);
+    });
+  });
+
+  describe("given a run with no items yet", () => {
+    /** @scenario Progress and outcomes reflect the run's items */
+    it("reports null progress, distinguishable from a run with zero progress", async () => {
+      const experimentId = `exp-no-items-${nanoid()}`;
+      const runId = `run-no-items-${nanoid()}`;
+      await insertVersion(ch, { experimentId, runId, total: 5, agoSec: 0 });
+
+      const result = await service.getRun({
+        projectId: tenantId,
+        experimentId,
+        runId,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result!.progress).toBeNull();
+      expect(result!.total).toBe(5);
     });
   });
 
@@ -190,7 +262,6 @@ describe("ExperimentRunService.getRun (integration)", () => {
       await insertVersion(ch, {
         experimentId,
         runId,
-        progress: 1,
         targets: '[{"id":"default"}]',
         agoSec: 0,
       });
@@ -230,7 +301,6 @@ describe("ExperimentRunService.getRun (integration)", () => {
         tenant: otherTenant,
         experimentId,
         runId,
-        progress: 5,
         agoSec: 0,
       });
 

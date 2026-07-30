@@ -29,8 +29,11 @@ export const billingMeterSweepStateSchema = z.object({
   /** The scheduler is external to this state (ADR-105 §12): nothing here
    *  arms the very first wake, but every wake after that re-arms itself, and
    *  a `billableEventRecorded` event this global singleton does not act on
-   *  must leave whatever is currently armed untouched. */
-  nextWakeAt: z.number().nullable(),
+   *  must leave whatever is currently armed untouched.
+   *
+   *  Defaulted because it is new: a deployed row predates the field and carries
+   *  no state version to gate on, so a required key would fail its decode. */
+  nextWakeAt: z.number().nullable().default(null),
 });
 export type BillingMeterSweepState = z.infer<
   typeof billingMeterSweepStateSchema
@@ -54,8 +57,11 @@ export interface BillingMeterSweepPorts extends ReportUsagePorts {
   readonly listOrganizationsToReport: (params: {
     billingMonth: string;
   }) => Promise<string[]>;
-  /** Deletes this process's own dispatched outbox rows older than `before`. */
+  /** Deletes dispatched outbox rows older than `before` for one process. The
+   *  name is not optional: the outbox is shared, and other processes keep their
+   *  own history for longer than this sweep's week. */
   readonly pruneDispatchedIntentsBefore: (params: {
+    processName: string;
     before: number;
   }) => Promise<number>;
 }
@@ -72,14 +78,17 @@ export function billingMonthsForSweep(now: Date): string[] {
 }
 
 /**
- * The scheduled sweep (ADR-098): the durability guarantee behind the poke. It
- * wakes hourly, reads the months it owes, and dispatches a report for every
- * candidate organization regardless of whether any billable event has
- * occurred since the last run. Each month is attempted independently, so a
- * listing failure for one does not skip the other; any dispatch failure is
- * raised after every organization has been attempted, so the outbox retries
- * the whole tick — re-dispatching an organization that already succeeded is
- * free, because the report reads the month total as a level.
+ * The scheduled sweep: the durability guarantee behind the poke. It wakes
+ * hourly, reads the months it owes, and reports every candidate organization
+ * regardless of whether a billable event has occurred since the last run.
+ *
+ * Each month is listed independently, so a listing failure for one does not
+ * skip the other, and a listing failure is raised so the outbox retries the
+ * whole tick — repeating an organization that already succeeded is free,
+ * because the report reads the month total as a level. A per-organization
+ * reporting failure is NOT raised, because `reportUsage` handles its own: it
+ * records the failure on that organization's billing checkpoint and returns,
+ * so the delta converges on the next poke or the next tick.
  */
 function createSweepIntent(
   ports: BillingMeterSweepPorts,
@@ -91,9 +100,7 @@ function createSweepIntent(
       const startedAt = payload.scheduledFor;
       const months = billingMonthsForSweep(new Date(startedAt));
 
-      let dispatched = 0;
-      const failures: Array<{ organizationId: string; billingMonth: string }> =
-        [];
+      let reported = 0;
       const raise: Error[] = [];
 
       for (const billingMonth of months) {
@@ -114,30 +121,21 @@ function createSweepIntent(
         }
 
         for (const organizationId of organizationIds) {
-          try {
-            await reportUsage(ports, {
-              organizationId,
-              billingMonth,
-              tenantId: organizationId,
-              occurredAt: startedAt,
-            });
-            dispatched++;
-          } catch (error) {
-            failures.push({ organizationId, billingMonth });
-            logger.error(
-              {
-                organizationId,
-                billingMonth,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "billing meter sweep could not report usage; this organization's usage stays unreported until a later attempt succeeds",
-            );
-          }
+          await reportUsage(ports, {
+            organizationId,
+            billingMonth,
+            tenantId: organizationId,
+            occurredAt: startedAt,
+          });
+          reported++;
         }
       }
 
+      // Before the raise: these rows are bookkeeping either way, and a run of
+      // failing ticks must not let them accumulate.
       try {
         await ports.pruneDispatchedIntentsBefore({
+          processName: BILLING_METER_SWEEP_PROCESS_NAME,
           before: startedAt - SWEEP_OUTBOX_RETENTION_MS,
         });
       } catch (error) {
@@ -147,19 +145,12 @@ function createSweepIntent(
         );
       }
 
-      if (failures.length > 0) {
-        raise.push(
-          new Error(
-            `billing meter sweep failed to report ${failures.length} of ${dispatched + failures.length} usage reports`,
-          ),
-        );
-      }
       const [firstFailure] = raise;
       if (firstFailure) throw firstFailure;
 
       logger.debug(
-        { months, dispatched },
-        "billing meter sweep dispatched usage reports",
+        { months, reported },
+        "billing meter sweep reported usage for every candidate organization",
       );
     },
   };

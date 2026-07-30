@@ -1,8 +1,8 @@
 # Implementation:
-#   langwatch/src/server/event-sourcing/pipelines/billing-reporting/subscribers/billingMeterPoke.subscriber.ts
-#   langwatch/src/server/event-sourcing/pipelines/billing-reporting/process-manager/billingMeterSweep.process.ts
-#   langwatch/src/server/app-layer/billing/billingReportingCandidates.service.ts
-#   langwatch/src/server/event-sourcing/pipelineRegistry.ts (registerBillingReportingPipeline)
+#   platform/app/src/server/event-sourcing/pipelines/billing-reporting/subscribers/billingMeterPoke.subscriber.ts
+#   platform/app/src/server/event-sourcing/pipelines/billing-reporting/process-manager/billingMeterSweep.process.ts
+#   platform/app/src/server/app-layer/billing/billingReportingCandidates.service.ts
+#   platform/app/src/server/event-sourcing/pipelineRegistry.ts (registerBillingReportingPipeline)
 #
 # The poke is mounted on every pipeline that produces a billable event (trace,
 # evaluation, experiment-run, simulation processing). The sweep is mounted

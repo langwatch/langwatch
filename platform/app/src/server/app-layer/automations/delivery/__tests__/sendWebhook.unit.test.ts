@@ -1,5 +1,5 @@
+import { DispatchError } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
-import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import { assertWebhookDelivered, sendWebhook } from "../sendWebhook";
 
 async function captureDispatchError(

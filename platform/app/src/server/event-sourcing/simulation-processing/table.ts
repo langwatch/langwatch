@@ -63,7 +63,8 @@ export const simulationRunsTable = defineTable({
     TotalCost: ch.nullable(ch.float64()),
     RoleCosts: ch.map(ch.string(), ch.array(ch.float64())),
     RoleLatencies: ch.map(ch.string(), ch.array(ch.float64())),
-    /** The stamp the stored measurement carried. */
+    /** The stamp the stored measurement carried, so a late old measurement
+     *  cannot overwrite a newer one on read-back (migration 00067). */
     MetricsAsOf: ch.nullable(ch.dateTime64(3)),
     StartedAt: ch.acceptedAt(),
     QueuedAt: ch.nullable(ch.dateTime64(3)),
@@ -84,6 +85,11 @@ export type SimulationRunsRow = TableRow<typeof simulationRunsTable.columns>;
  * The item table a run's messages live in, one row per message. The sort key is
  * the logical message, so a redelivered message collapses to a single row at
  * merge instead of accumulating (ADR-103 decision 2).
+ *
+ * NOT DEPLOYED. No migration creates this table. A run's messages live today in
+ * the `Messages.*` nested arrays on `simulation_runs`, which
+ * `simulation.clickhouse.repository.ts` reads, so creating this table is only
+ * half the change — the readers move with it or they stop seeing new messages.
  */
 export const simulationRunMessagesTable = defineTable({
   name: "simulation_run_messages",

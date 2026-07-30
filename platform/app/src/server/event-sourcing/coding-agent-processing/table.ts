@@ -1,4 +1,5 @@
 import {
+  type ColumnDef,
   ch,
   defineTable,
   replacing,
@@ -8,46 +9,69 @@ import { z } from "zod";
 
 const lowCardinalityString = () => ch.lowCardinality(ch.string());
 
-/**
- * `@langwatch/clickhouse` has no `Array(Tuple(...))` builder yet (out of this
- * pipeline's two directories to add). Deployed `Steps`/`MetricSeries` are
- * native tuple arrays; declared here as JSON-encoded strings instead — a real
- * `chType` deviation from the deployed DDL for these two columns only. See
- * this pipeline's conversion report.
- */
-const stepTupleSchema = z.tuple([z.string(), z.number(), z.boolean()]);
-const metricSeriesTupleSchema = z.tuple([
-  z.string(),
-  z.string(),
-  z.string(),
-  z.string(),
-  z.string(),
-  z.number(),
-]);
+/** One batched step of the session, failures marked in place (migration 00051). */
+export type Step = [name: string, count: number, failed: boolean];
+
+/** One converged metric unit of the session (migration 00053). */
+export type MetricSeriesUnit = [
+  seriesId: string,
+  metricName: string,
+  type: string,
+  decision: string,
+  language: string,
+  value: number,
+];
 
 /**
- * One row per session, matching the deployed shape exactly (migrations
- * 00051, 00053, 00054) — every column those three migrations declared.
- *
- * DEVIATES FROM DEPLOYED in one respect only: the sort key. Migration 00051's
- * is time-leading `(TenantId, StartedAt, SessionId)`, built for the read this
- * row used to serve — "what did this project's agents do this week", a
- * time-bounded scan. `clickhouseReplacing`'s read is a POINT lookup on
- * `(tenant, key)` alone and requires the sort key to start with exactly
- * those columns (`replaceStore.ts`'s own construction-time check — there is
- * no `structuralDebt` exemption for a sort-key prefix), so the deployed key
- * fails it unconditionally and this fold could not read its own state back
- * through it at all. Re-keyed here to `(TenantId, SessionId)`; `StartedAt`
- * keeps anchoring the partition and TTL via `structuralDebt`, matching
- * deployed. `ORDER BY`/`PARTITION BY` are not `ALTER`-able in ClickHouse, so
- * closing this gap needs a new-table-and-copy migration (ADR-099's
- * `experiment_run_items` precedent) — deliberately not attempted here; see
- * this pipeline's conversion report.
+ * An unnamed ClickHouse `Tuple` crosses the JSON wire as an array, and every
+ * element type here (`String`, `UInt32`, `Bool`, `Float64`) crosses as itself,
+ * so the zod schema is the whole decode and encode is the identity.
+ */
+const stepsColumn = (): ColumnDef<Step[]> => {
+  const schema = z.array(
+    z.tuple([z.string(), z.number().int().nonnegative(), z.boolean()]),
+  );
+  return {
+    chType: "Array(Tuple(String, UInt32, Bool))",
+    schema,
+    decode: (cell) => schema.parse(cell),
+    encode: (value) => value,
+    frozen: false,
+    platformControlled: false,
+    nullable: false,
+  };
+};
+
+const metricSeriesColumn = (): ColumnDef<MetricSeriesUnit[]> => {
+  const schema = z.array(
+    z.tuple([
+      z.string(),
+      z.string(),
+      z.string(),
+      z.string(),
+      z.string(),
+      z.number(),
+    ]),
+  );
+  return {
+    chType: "Array(Tuple(String, String, String, String, String, Float64))",
+    schema,
+    decode: (cell) => schema.parse(cell),
+    encode: (value) => value,
+    frozen: false,
+    platformControlled: false,
+    nullable: false,
+  };
+};
+
+/**
+ * One row per session, as migrations 00051, 00053 and 00054 deployed it —
+ * every column, the time-leading sort key and the `StartedAt` anchor included.
  */
 export const codingAgentSessionsTable = defineTable({
   name: "coding_agent_sessions",
   merge: replacing({ version: "UpdatedAt" }),
-  sortKey: ["TenantId", "SessionId"],
+  sortKey: ["TenantId", "StartedAt", "SessionId"],
   partition: { by: "toYearWeek(StartedAt)", column: "StartedAt" },
   tenant: ["TenantId"],
   ttl: { anchor: "StartedAt" },
@@ -55,7 +79,7 @@ export const codingAgentSessionsTable = defineTable({
     {
       column: "StartedAt",
       reason:
-        "migration 00051 partitions and expires coding_agent_sessions on StartedAt, a business time that moves backwards as an earlier signal arrives late — not the platform-set acceptedAt role, and immutable without the re-key migration this table separately needs",
+        "migration 00051 partitions, expires and time-leads coding_agent_sessions on StartedAt, a business time that moves backwards as an earlier signal arrives late — not the platform-set acceptedAt role. It also costs the read path: with StartedAt ahead of SessionId in ORDER BY, this fold's point read on (TenantId, SessionId) is not a primary-index seek but a scan of the tenant's range. Both need one new-table-and-copy re-key; neither ORDER BY nor PARTITION BY is alterable",
     },
   ],
   columns: {
@@ -82,8 +106,7 @@ export const codingAgentSessionsTable = defineTable({
     Prompts: ch.uint32(),
     PromptChars: ch.uint64(),
     ResponseChars: ch.uint64(),
-    /** `(name, count, failed)`, in the order they happened — one JSON string, not a native tuple array (see the module note above). */
-    Steps: ch.json(z.array(stepTupleSchema)),
+    Steps: stepsColumn(),
 
     ToolCounts: ch.map(lowCardinalityString(), ch.uint32()),
     ToolDurationMs: ch.map(lowCardinalityString(), ch.uint64()),
@@ -154,8 +177,7 @@ export const codingAgentSessionsTable = defineTable({
     SubAgentIds: ch.array(ch.string()),
     PreviousCallContextTokens: ch.uint64(),
     StepStartedAt: ch.array(ch.uint64()),
-    /** `(SeriesId, MetricName, Type, Decision, Language, Value)` tuples, one JSON string (see the module note above). */
-    MetricSeries: ch.json(z.array(metricSeriesTupleSchema)),
+    MetricSeries: metricSeriesColumn(),
     LastEventOccurredAt: ch.occurredAt(),
 
     // Migration 00054 — durable redelivery watermark. Carried on the row but

@@ -18,7 +18,7 @@ import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { ActivityMonitorService } from "../activity-monitor/activityMonitor.service";
 
 const USER_KEY = "langwatch.user_id";

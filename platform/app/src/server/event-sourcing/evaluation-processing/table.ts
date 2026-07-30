@@ -8,11 +8,11 @@ import { type EvaluationState, evaluationStateSchema } from "./schema";
 
 /**
  * `evaluation_analytics` as deployed (migrations 00041 and 00056): `OccurredAt`
- * partitions, expires and leads the sort key, so it is declared with the role
- * those three demand. The fold makes it monotone and never re-stamps it from a
- * clock, but only the re-key migration makes that structural claim true — and
- * until it lands the fold's point lookup on `(TenantId, EvaluationId)` is not
- * this sort key's prefix, so the replace store refuses the mount.
+ * partitions, expires and leads the sort key. The fold keeps it monotone and
+ * never re-stamps it from a clock, which is why the row converges, but it is
+ * still the evaluated work's own time rather than a platform stamp — and while
+ * it leads the sort key the fold's point lookup on `(TenantId, EvaluationId)`
+ * is not this key's prefix, so the replace store refuses the mount.
  */
 
 const lowCardinalityString = () => ch.lowCardinality(ch.string());
@@ -24,11 +24,18 @@ export const evaluationAnalyticsTable = defineTable({
   partition: { by: "toYearWeek(OccurredAt)", column: "OccurredAt" },
   tenant: ["TenantId"],
   ttl: { anchor: "OccurredAt" },
+  structuralDebt: [
+    {
+      column: "OccurredAt",
+      reason:
+        "migration 00041 partitions, expires and time-leads evaluation_analytics on OccurredAt, the evaluated work's own time rather than the platform-set acceptedAt role — the table never received the storage-anchor split trace_analytics got in 00061, and neither ORDER BY nor PARTITION BY is alterable in place",
+    },
+  ],
   columns: {
     TenantId: ch.string(),
     EvaluationId: ch.string(),
     Version: lowCardinalityString(),
-    OccurredAt: ch.acceptedAt(),
+    OccurredAt: ch.occurredAt(),
     CreatedAt: ch.dateTime64(3),
     UpdatedAt: ch.writtenAt(),
     EvaluatorType: lowCardinalityString(),

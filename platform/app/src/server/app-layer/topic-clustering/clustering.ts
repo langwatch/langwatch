@@ -2,7 +2,6 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import { env } from "../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";
 import {
@@ -57,6 +56,20 @@ const CLUSTERING_MODE_WINDOW_DAYS = 365;
  * unaffected.
  */
 const CLUSTERING_FETCH_WINDOW_DAYS = 49;
+
+/**
+ * The lease must OUTLIVE the slowest healthy clustering page, or a second
+ * dispatcher re-leases the row mid-flight and re-runs the same page
+ * concurrently. A page is up to 2000 traces through langevals batch
+ * clustering (embeddings + LLM naming) — minutes, not seconds — so a
+ * generic 30s default is unsafe here. Mirrors the outbox lease the topic
+ * clustering process manager claims with; the two must not drift apart.
+ *
+ * Belongs on `event-sourcing/topic-clustering-processing` next to
+ * `TOPIC_CLUSTERING_STALE_RUN_MS`, not here — parked in app-layer only
+ * because that pipeline directory is out of scope for this repoint.
+ */
+export const TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS = 20 * 60 * 1000;
 
 /**
  * Hard deadline on a single langevals clustering call, DERIVED from the outbox

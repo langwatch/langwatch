@@ -96,6 +96,7 @@
     "@langwatch/automations": "workspace:*",
     "@langwatch/clickhouse": "workspace:*",
     "@langwatch/event-sourcing": "workspace:*",
+    "@langwatch/groupqueue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",

@@ -27,7 +27,7 @@ import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClien
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../../event-sourcing.old/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
 import { buildTimeseriesQuery } from "../aggregation-builder";

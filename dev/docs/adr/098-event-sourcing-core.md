@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-29
 
-**Status:** Accepted — the taxonomy and the read-outcome rule are in force.
+**Status:** Superseded by [ADR-107](./107-the-pipeline.md) (2026-07-30). Previously: Accepted — the taxonomy and the read-outcome rule are in force.
 Two moves are sequenced behind conditions that take a release cycle to clear —
 one behind data ageing, one behind per-adopter redesign — and are named under
 "Migration order".

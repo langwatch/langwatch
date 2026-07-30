@@ -1,5 +1,6 @@
 import type { RowMapping } from "@langwatch/clickhouse";
 import { z } from "zod";
+import { trimAttributesForAnalytics } from "../analyticsAttributeTrim";
 import {
   applyOriginSpan,
   extractOriginSignals,
@@ -374,17 +375,22 @@ export const traceAnalyticsRowMapping: RowMapping<
       UserId: view.userId,
       ConversationId: view.conversationId,
       CustomerId: view.customerId,
-      Origin: view.origin,
+      // Deployed non-nullable (00039), so an unresolved origin is the empty
+      // string rather than NULL — the slim table's readers group on it.
+      Origin: view.origin ?? "",
       Models: [...view.models],
       Labels: [...view.labels],
       HasError: view.hasError,
       HasAnnotation: view.hasAnnotation,
       AnnotationIds: [...view.annotationIds],
-      AttributesJson: JSON.stringify(view.attributes),
-      RootSpanStartTimeMs:
-        view.rootSpanStartTimeMs === null
-          ? null
-          : BigInt(Math.max(0, view.rootSpanStartTimeMs)),
+      // Slim has to be genuinely slim: the summary fold's map is roughly half
+      // payload, and this is the fold's own read-back, so the trim bounds the
+      // state as well as the row.
+      AttributesJson: JSON.stringify(
+        trimAttributesForAnalytics(view.attributes),
+      ),
+      // Deployed non-nullable (00056), so "no root span seen yet" is 0.
+      RootSpanStartTimeMs: BigInt(Math.max(0, view.rootSpanStartTimeMs ?? 0)),
       TraceNameFromFallback: view.traceNameFromFallback,
       OccurredAt: anchor,
       AcceptedAt: anchor,

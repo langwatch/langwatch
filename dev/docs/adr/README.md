@@ -65,14 +65,19 @@ The file name is `NNN-short-title.md` and the `# ADR-NNN:` heading inside must m
 | [093](./093-trace-facet-sidebar-presentation-and-perspectives.md) | Trace facet sidebar — numeric presentation modes and facet perspectives | Proposed |
 | [094](./094-trace-table-per-evaluator-columns.md) | Trace table per-evaluator eval columns | Proposed |
 | [097](./097-depth-aware-overlay-z-index.md) | Depth-aware z-index for portalled overlay components | Accepted |
-| [098](./098-event-sourcing-core.md) | The event-sourcing core — commands, events, and the two kinds of projection | Accepted |
-| [099](./099-projection-storage-and-table-definition.md) | Projection storage — three store kinds and one table definition | Accepted |
-| [100](./100-dispatch-plane-group-keys.md) | The dispatch plane — a group key is a declared contract, not a string | Accepted |
-| [101](./101-replay-offline-version-gated.md) | Replay is offline, version-gated, and the only bulk reader of `event_log` | Accepted |
-| [102](./102-package-topology-and-composition.md) | The core is a package, the pipelines are the application | Accepted |
+| [098](./098-event-sourcing-core.md) | The event-sourcing core — commands, events, and the two kinds of projection | Superseded by 107 |
+| [099](./099-projection-storage-and-table-definition.md) | Projection storage — three store kinds and one table definition | Superseded by 109 |
+| [100](./100-dispatch-plane-group-keys.md) | The dispatch plane — a group key is a declared contract, not a string | Superseded by 108 |
+| [101](./101-replay-offline-version-gated.md) | Replay is offline, version-gated, and the only bulk reader of `event_log` | Superseded by 108 |
+| [102](./102-package-topology-and-composition.md) | The core is a package, the pipelines are the application | Superseded by 110 |
 | [103](./103-runs-aggregates-are-queries.md) | A run's totals are a query; a run's liveness is a process manager | Accepted |
-| [104](./104-clickhouse-client.md) | One ClickHouse client, and the schema decides whether a write may be retried | Accepted |
-| [105](./105-defining-a-pipeline.md) | A pipeline is one declaration — events, commands, projections and types derive from it | Accepted |
+| [104](./104-clickhouse-client.md) | One ClickHouse client, and the schema decides whether a write may be retried | Superseded by 109 |
+| [105](./105-defining-a-pipeline.md) | A pipeline is one declaration — events, commands, projections and types derive from it | Superseded by 107 |
+| [106](./106-the-mount-contract.md) | A projection declares what it is, and the mount refuses illegal combinations | Superseded by 107 |
+| [107](./107-the-pipeline.md) | A pipeline is one declaration, and the engine reads every part of it | Accepted |
+| [108](./108-the-dispatch-plane.md) | The dispatch plane — a client, a producer, a consumer, and one lane | Accepted |
+| [109](./109-storage.md) | Storage — one table definition, three store kinds, one client | Accepted |
+| [110](./110-topology.md) | The engine is a package, the pipelines and the wiring are the application | Accepted |
 
 39 numbers (002, 006, 007, 014, 015, 022, 023, 024, 026, 029, 030, 034, 035,
 039, 046, 048, 049, 051, 052, 056, 059, 066, 068, 069, 071–075, 080–085, 088,

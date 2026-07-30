@@ -2,6 +2,7 @@ import type { ProcessContext } from "@langwatch/event-sourcing";
 import { describe, expect, it, vi } from "vitest";
 import {
   BILLING_METER_SWEEP_INTERVAL_MS,
+  BILLING_METER_SWEEP_PROCESS_NAME,
   type BillingMeterSweepPorts,
   billingMeterSweepIntents,
   billingMeterSweepOn,
@@ -119,8 +120,7 @@ describe("billing meter sweep process", () => {
   });
 
   describe("given one organization's report fails", () => {
-    /** @scenario A sweep that cannot dispatch every report is retried */
-    it("still reports every other organization, then raises so the tick retries", async () => {
+    it("still attempts every other organization", async () => {
       const organizations = {
         getOrganizationForBilling: vi
           .fn()
@@ -138,12 +138,13 @@ describe("billing meter sweep process", () => {
           { now: ctx.now, tenantId: "__global__" },
         ),
       ).resolves.toBeUndefined();
-      // reportUsage swallows organization-lookup failures internally (never
-      // throws to its caller), so every candidate is still attempted and the
-      // sweep does not raise for this class of failure.
+      // `reportUsage` records a failure on the organization's own billing
+      // checkpoint and returns, so the tick does not raise for this class and
+      // the delta converges on the next poke or tick.
       expect(organizations.getOrganizationForBilling).toHaveBeenCalledTimes(2);
     });
 
+    /** @scenario A sweep that cannot dispatch every report is retried */
     it("raises when it cannot even list which organizations to report", async () => {
       const listOrganizationsToReport = vi
         .fn()
@@ -179,7 +180,7 @@ describe("billing meter sweep process", () => {
   });
 
   describe("given the sweep's own dispatched outbox rows have accumulated", () => {
-    it("prunes rows older than a week", async () => {
+    it("prunes only its own rows older than a week", async () => {
       const pruneDispatchedIntentsBefore = vi.fn().mockResolvedValue(0);
       const ports = makePorts({ pruneDispatchedIntentsBefore });
 
@@ -189,6 +190,7 @@ describe("billing meter sweep process", () => {
       );
 
       expect(pruneDispatchedIntentsBefore).toHaveBeenCalledWith({
+        processName: BILLING_METER_SWEEP_PROCESS_NAME,
         before: 10_000_000 - 7 * 24 * 60 * 60 * 1000,
       });
     });

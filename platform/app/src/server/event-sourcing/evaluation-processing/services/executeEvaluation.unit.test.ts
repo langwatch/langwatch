@@ -7,6 +7,7 @@ import {
   type ExecuteEvaluationDeps,
   type ExecuteEvaluationInput,
   executeEvaluation,
+  isEvaluationSampledIn,
 } from "./executeEvaluation";
 
 /** A minimal concrete `HandledError` — the class is abstract, so every test
@@ -95,6 +96,60 @@ describe("executeEvaluation", () => {
       const events = await executeEvaluation(deps, baseInput());
 
       expect(events).toEqual([]);
+    });
+  });
+
+  describe("given the same evaluation is retried", () => {
+    /** @scenario A retried command samples identically to its first attempt */
+    it("reaches the same sampling decision on every attempt, regardless of Math.random", async () => {
+      const input = baseInput({ evaluationId: "eval-retry-1" });
+      const sample = isEvaluationSampledIn({
+        evaluationId: input.evaluationId,
+        sampleRate: 0.5,
+      })
+        ? 0.5
+        : 0.999999; // whichever rate this id samples in at
+      const deps = baseDeps({
+        monitors: {
+          getMonitorById: vi.fn().mockResolvedValue(baseMonitor({ sample })),
+        } as unknown as MonitorService,
+      });
+
+      const randomSpy = vi
+        .spyOn(Math, "random")
+        .mockReturnValueOnce(0.01)
+        .mockReturnValueOnce(0.99);
+
+      const first = await executeEvaluation(deps, input);
+      const second = await executeEvaluation(deps, input);
+
+      randomSpy.mockRestore();
+      expect(second.length > 0).toBe(first.length > 0);
+    });
+  });
+
+  describe("isEvaluationSampledIn", () => {
+    it("returns the same decision for the same evaluationId every time", () => {
+      const args = { evaluationId: "eval-stable", sampleRate: 0.4 };
+      const first = isEvaluationSampledIn(args);
+      for (let i = 0; i < 10; i++) {
+        expect(isEvaluationSampledIn(args)).toBe(first);
+      }
+    });
+
+    /** @scenario Sampling applies correctly */
+    it("preserves the sample rate across many distinct evaluations", () => {
+      const sampleRate = 0.3;
+      const total = 4_000;
+      let sampledIn = 0;
+      for (let i = 0; i < total; i++) {
+        if (isEvaluationSampledIn({ evaluationId: `eval-${i}`, sampleRate })) {
+          sampledIn++;
+        }
+      }
+      const rate = sampledIn / total;
+      expect(rate).toBeGreaterThan(0.25);
+      expect(rate).toBeLessThan(0.35);
     });
   });
 

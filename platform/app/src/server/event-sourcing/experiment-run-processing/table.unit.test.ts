@@ -7,23 +7,9 @@ import {
   experimentRunsTable,
 } from "./table";
 
+/** Migration parity — engine, keys, anchors, column types — is asserted against
+ *  the migration SQL in `../__tests__/tableMigrationParity.unit.test.ts`. */
 describe("experimentRunsTable", () => {
-  it("declares the deployed engine key, version and partition", () => {
-    expect(experimentRunsTable.merge).toEqual({
-      kind: "replacing",
-      version: "UpdatedAt",
-    });
-    expect(experimentRunsTable.sortKey).toEqual([
-      "TenantId",
-      "RunId",
-      "ExperimentId",
-    ]);
-    expect(experimentRunsTable.partition).toEqual({
-      by: "toYearWeek(StartedAt)",
-      column: "StartedAt",
-    });
-  });
-
   it("declares no delivery-sequence column", () => {
     expect(experimentRunsTable.columnNames).not.toContain("DeliverySeq");
   });
@@ -48,12 +34,19 @@ describe("experimentRunsTable", () => {
 });
 
 describe("experimentRunItemsTable", () => {
-  it("ends its sort key on the item's deterministic identity", () => {
-    expect(experimentRunItemsTable.sortKey).toEqual([
-      "TenantId",
-      "RunId",
-      "ProjectionId",
-    ]);
+  /**
+   * ADR-103 decision 2: `ProjectionId` is a hash of the logical item, so the
+   * key it ends on is what makes `count()` a count of items. `ExperimentId`
+   * missing from that key is the live data-loss defect, recorded as debt.
+   */
+  it("ends its sort key on the item's deterministic identity, without the experiment", () => {
+    expect(experimentRunItemsTable.sortKey.at(-1)).toBe("ProjectionId");
+    expect(experimentRunItemsTable.sortKey).not.toContain("ExperimentId");
+    expect(
+      experimentRunItemsTable.structuralDebt?.some((debt) =>
+        debt.reason.includes("ExperimentId"),
+      ),
+    ).toBe(true);
   });
 
   it("round-trips a mapped item row through the shared wire codec", () => {

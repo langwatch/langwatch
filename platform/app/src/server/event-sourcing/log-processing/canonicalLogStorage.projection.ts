@@ -1,5 +1,6 @@
 import { deriveAppendMapping } from "@langwatch/clickhouse";
 import { z } from "zod";
+import { firstAcceptanceWins } from "../firstAcceptanceWins";
 import { type CanonicalLogRecord, canonicalLogRecordSchema } from "./schema";
 import { logRecordsTable, logUsageEstimatesTable } from "./table";
 
@@ -24,6 +25,25 @@ const stampedLogRecordSchema = canonicalLogRecordSchema.extend({
 });
 
 export type StampedLogRecord = z.infer<typeof stampedLogRecordSchema>;
+
+/**
+ * Stamps a batch once per delivery so every row of it reports the same write
+ * instant, and elects the earliest acceptance of a `RecordId` as the surviving
+ * row — `log_usage_estimates` is a billing ledger, so a replay must not move a
+ * record into the replay's `AcceptedHour`.
+ */
+export function stampLogRecords(
+  batch: readonly CanonicalLogRecord[],
+  retentionDays: number | undefined,
+): StampedLogRecord[] {
+  const writtenAt = new Date();
+  return batch.map((record) => ({
+    ...record,
+    writtenAt,
+    dedupVersion: firstAcceptanceWins(record.acceptedAt),
+    retentionDays: retentionDays ?? DEFAULT_RETENTION_DAYS,
+  }));
+}
 
 /**
  * `fill` names the columns the derivation cannot produce: the 64-bit stamps a

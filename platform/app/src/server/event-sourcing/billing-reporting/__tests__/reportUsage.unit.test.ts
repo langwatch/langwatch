@@ -126,13 +126,108 @@ describe("reportUsage", () => {
     expect(reportUsageDelta).not.toHaveBeenCalled();
   });
 
-  it("never throws to its caller, even on an unexpected failure", async () => {
+  /** @scenario A sweep that cannot dispatch every report is retried */
+  it("never throws to its caller, but reports an unexpected failure as an outcome the caller can raise on", async () => {
     const ports = makePorts({
       queryBillableEventsTotal: vi
         .fn()
         .mockRejectedValue(new Error("clickhouse down")),
     });
 
-    await expect(reportUsage(ports, payload)).resolves.toBeUndefined();
+    const outcome = await reportUsage(ports, payload);
+
+    expect(outcome).toEqual({ ok: false, error: expect.any(Error) });
+  });
+
+  it("reports success once the delta is confirmed", async () => {
+    const ports = makePorts();
+    await expect(reportUsage(ports, payload)).resolves.toEqual({ ok: true });
+  });
+
+  it("reports success when there is nothing new to report", async () => {
+    const ports = makePorts({
+      billingCheckpoints: {
+        getCheckpoint: vi
+          .fn()
+          .mockResolvedValue({ lastReportedTotal: 10, consecutiveFailures: 0 }),
+        writeIntent: vi.fn(),
+        confirm: vi.fn(),
+        incrementFailures: vi.fn(),
+        clearPendingAndIncrementFailures: vi.fn(),
+      } as never,
+    });
+    await expect(reportUsage(ports, payload)).resolves.toEqual({ ok: true });
+  });
+
+  describe("given Stripe permanently rejects the meter event", () => {
+    it("reports success — the rejection is recorded on the checkpoint, not escalated", async () => {
+      const ports = makePorts({
+        getUsageReportingService: () =>
+          ({
+            reportUsageDelta: vi
+              .fn()
+              .mockResolvedValue([{ reported: false, error: "bad request" }]),
+          }) as never,
+      });
+
+      await expect(reportUsage(ports, payload)).resolves.toEqual({
+        ok: true,
+      });
+    });
+  });
+
+  describe("given a transient error reporting to Stripe", () => {
+    /** @scenario A sweep that cannot dispatch every report is retried */
+    it("reports failure while the circuit breaker has not tripped", async () => {
+      const ports = makePorts({
+        billingCheckpoints: {
+          getCheckpoint: vi.fn().mockResolvedValue({
+            lastReportedTotal: 0,
+            consecutiveFailures: 0,
+          }),
+          writeIntent: vi.fn(),
+          confirm: vi.fn(),
+          incrementFailures: vi.fn(),
+          clearPendingAndIncrementFailures: vi.fn(),
+        } as never,
+        getUsageReportingService: () =>
+          ({
+            reportUsageDelta: vi.fn().mockRejectedValue(new Error("ETIMEDOUT")),
+          }) as never,
+      });
+
+      const outcome = await reportUsage(ports, payload);
+
+      expect(outcome).toEqual({ ok: false, error: expect.any(Error) });
+    });
+
+    /**
+     * Mirrors the retired command's `return !circuitTripped`: once the
+     * breaker has tripped, a further transient failure no longer demands an
+     * immediate retry of the whole tick — the next independently-scheduled
+     * poke or sweep attempts Stripe again regardless.
+     */
+    it("reports success once the circuit breaker has tripped, so the caller does not keep re-raising", async () => {
+      const ports = makePorts({
+        billingCheckpoints: {
+          getCheckpoint: vi.fn().mockResolvedValue({
+            lastReportedTotal: 0,
+            consecutiveFailures: 5,
+          }),
+          writeIntent: vi.fn(),
+          confirm: vi.fn(),
+          incrementFailures: vi.fn(),
+          clearPendingAndIncrementFailures: vi.fn(),
+        } as never,
+        getUsageReportingService: () =>
+          ({
+            reportUsageDelta: vi.fn().mockRejectedValue(new Error("ETIMEDOUT")),
+          }) as never,
+      });
+
+      await expect(reportUsage(ports, payload)).resolves.toEqual({
+        ok: true,
+      });
+    });
   });
 });

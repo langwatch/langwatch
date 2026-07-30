@@ -47,14 +47,14 @@ import {
   IO_PREVIEW_BYTES,
 } from "~/server/app-layer/traces/lean-for-projection";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
-import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
+import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/test-utils/integration/testContainers";
 import { ExportService } from "../export.service";
 import type { ExportRequest } from "../types";
 

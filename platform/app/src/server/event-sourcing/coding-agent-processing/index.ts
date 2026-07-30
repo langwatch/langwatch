@@ -121,6 +121,8 @@ function assertMountIsLegal(projection: string, mount: Mount): Mount {
   return mount;
 }
 
+const SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 export function createCodingAgentProcessingPipeline(deps: {
   readonly client: ClickHouseClient;
   readonly cache?: FoldStateCache<CodingAgentSessionState>;
@@ -134,6 +136,10 @@ export function createCodingAgentProcessingPipeline(deps: {
     stateVersionColumn: "Version",
     row: codingAgentSessionRow,
     cache: deps.cache,
+    // Deployed `ORDER BY (TenantId, StartedAt, SessionId)` is time-leading, so
+    // the read is a seek only behind this bound; a session older than the window
+    // still reads back, because a windowed miss retries unwindowed.
+    readWindow: { column: "StartedAt", lookbackMs: SESSION_READ_WINDOW_MS },
   });
   const traceSessionsStore = clickhouseAppend({
     client: deps.client,
