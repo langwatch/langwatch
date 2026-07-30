@@ -398,8 +398,7 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 		// Memory threshold: files up to 10 MB stay in memory, larger ones
 		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) || errors.Is(err, errDecodedBodyTooLarge) {
+			if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
 				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
 					"message": "audio upload exceeds the 25 MB transcription limit",
 				}))
@@ -679,7 +678,7 @@ func readFullBody(logger *zap.Logger, w http.ResponseWriter, r *http.Request, ma
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeError(logger, w, ctx, herr.New(ctx, bodyReadErrorCode(err), nil))
+		writeError(logger, w, ctx, herr.New(ctx, bodyReadErrorCode(err), herr.M{"message": err.Error()}))
 		return nil, false
 	}
 	return body, true
@@ -699,11 +698,20 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 		return nil, nil, func() {}, false
 	}
 
-	buf := bodyPool.Get().(*bytes.Buffer)
 	peeked := make([]byte, peekSize)
-	n, _ := io.ReadFull(r.Body, peeked)
+	n, err := io.ReadFull(r.Body, peeked)
+	// A body shorter than the peek window is the normal case and reports EOF.
+	// Any other failure comes from the decoder or one of the size ceilings, and
+	// swallowing it would peek at a truncated payload and then surface the real
+	// cause as a downstream application error instead of a 400 / 413.
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		writeError(clog.Get(r.Context()), w, r.Context(),
+			herr.New(r.Context(), bodyReadErrorCode(err), herr.M{"message": err.Error()}))
+		return nil, nil, func() {}, false
+	}
 	peeked = peeked[:n]
 
+	buf := bodyPool.Get().(*bytes.Buffer)
 	body := io.MultiReader(bytes.NewReader(peeked), r.Body)
 
 	// Since we need to materialize for bifrost anyway, we still use the pool

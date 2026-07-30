@@ -40,16 +40,22 @@ func prepareRequestBody(w http.ResponseWriter, r *http.Request, maxBytes int64) 
 
 	// Content-Encoding lists the transforms in the order they were applied,
 	// so undo them from the outside in.
-	var reader io.Reader = r.Body
-	closers := []io.Closer{r.Body}
+	raw := r.Body
+	var reader io.Reader = raw
+	var decoders []io.Closer
 	for i := len(encodings) - 1; i >= 0; i-- {
 		decoded, closer, err := decodeStream(encodings[i], reader, maxBytes)
 		if err != nil {
+			// The decoders already built for the outer layers hold buffers and,
+			// for zstd, a decode goroutine. Nothing installs decodedRequestBody
+			// on this path, so they have to be released here or a stream of
+			// malformed chained requests leaks them.
+			_ = closeAll(decoders)
 			return herr.New(r.Context(), domain.ErrBadRequest, herr.M{"message": err.Error()})
 		}
 		reader = decoded
 		if closer != nil {
-			closers = append(closers, closer)
+			decoders = append(decoders, closer)
 		}
 	}
 
@@ -60,7 +66,7 @@ func prepareRequestBody(w http.ResponseWriter, r *http.Request, maxBytes int64) 
 	r.ContentLength = -1
 	r.Body = &decodedRequestBody{
 		Reader:  &boundedReader{r: reader, remaining: maxBytes},
-		closers: closers,
+		closers: append([]io.Closer{raw}, decoders...),
 	}
 	return nil
 }
@@ -127,9 +133,15 @@ type decodedRequestBody struct {
 }
 
 func (d *decodedRequestBody) Close() error {
+	return closeAll(d.closers)
+}
+
+// closeAll releases closers in reverse of the order they were built, so an
+// inner decoder is done with its source before that source is closed.
+func closeAll(closers []io.Closer) error {
 	var firstErr error
-	for i := len(d.closers) - 1; i >= 0; i-- {
-		if err := d.closers[i].Close(); err != nil && firstErr == nil {
+	for i := len(closers) - 1; i >= 0; i-- {
+		if err := closers[i].Close(); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"compress/zlib"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -159,6 +160,35 @@ func TestRouter_EncodedBodies_DecodedOnEveryLane(t *testing.T) {
 	}
 }
 
+// encodingRouterWithLimit builds the router with an explicit body ceiling so a
+// compression bomb stays small enough on the wire to clear the raw cap and only
+// trip the decoded one.
+func encodingRouterWithLimit(t *testing.T, maxBytes int64) http.Handler {
+	t.Helper()
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			return successResponse(), nil
+		},
+	}
+	reg := health.New("test")
+	reg.MarkStarted()
+	return NewRouter(RouterDeps{
+		App: app.New(
+			app.WithAuth(auth),
+			app.WithProviders(provider),
+			app.WithLogger(zap.NewNop()),
+		),
+		Logger:              zap.NewNop(),
+		Health:              reg,
+		MaxRequestBodyBytes: maxBytes,
+	})
+}
+
 // A body layered gzip-then-zstd unwinds outside-in, the order the header lists.
 func TestRouter_ChainedContentEncodings(t *testing.T) {
 	var got domain.Request
@@ -176,6 +206,55 @@ func TestRouter_ChainedContentEncodings(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.JSONEq(t, string(payload), string(dispatchedBody(t, &got)))
 }
+
+// The outer layer of a chain can decode while the inner one does not: the zstd
+// frame is well formed, what it wraps is not gzip. The chain has to unwind the
+// decoder it already built before answering, and the answer names the layer that
+// actually failed.
+func TestRouter_ChainedContentEncodings_InnerLayerFailureIsBadRequest(t *testing.T) {
+	var got domain.Request
+	router := encodingRouter(t, &got)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions",
+		bytes.NewReader(zstdBytes(t, []byte("this is not a gzip stream"))))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip, zstd")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	var errResp herr.ErrorResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&errResp))
+	assert.Equal(t, string(domain.ErrBadRequest), errResp.Error.Type)
+	assert.Contains(t, errResp.Error.Message, "malformed gzip request body")
+}
+
+// Close order is inner decoder first, source last, and every closer runs even
+// after one fails. The reported error is the first one hit along that order.
+func TestCloseAll(t *testing.T) {
+	var order []string
+	spy := func(name string, err error) io.Closer {
+		return closerFunc(func() error {
+			order = append(order, name)
+			return err
+		})
+	}
+	boom := errors.New("boom")
+
+	err := closeAll([]io.Closer{
+		spy("source", errors.New("masked")),
+		spy("outer", boom),
+		spy("inner", nil),
+	})
+
+	assert.Equal(t, boom, err)
+	assert.Equal(t, []string{"inner", "outer", "source"}, order)
+}
+
+type closerFunc func() error
+
+func (f closerFunc) Close() error { return f() }
 
 func TestRouter_IdentityContentEncodingLeavesBodyAlone(t *testing.T) {
 	var got domain.Request
@@ -234,28 +313,7 @@ func TestRouter_MalformedEncodedBodyIsBadRequest(t *testing.T) {
 // stream carries the same limit and answers 413 rather than buffering it all.
 /** @scenario "a compression bomb is capped at the same ceiling as a raw body" */
 func TestRouter_CompressionBombIsPayloadTooLarge(t *testing.T) {
-	auth := &mockAuth{
-		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
-			return testBundle(), nil
-		},
-	}
-	provider := &mockProvider{
-		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
-			return successResponse(), nil
-		},
-	}
-	reg := health.New("test")
-	reg.MarkStarted()
-	router := NewRouter(RouterDeps{
-		App: app.New(
-			app.WithAuth(auth),
-			app.WithProviders(provider),
-			app.WithLogger(zap.NewNop()),
-		),
-		Logger:              zap.NewNop(),
-		Health:              reg,
-		MaxRequestBodyBytes: 64 * 1024,
-	})
+	router := encodingRouterWithLimit(t, 64*1024)
 
 	bomb := zstdBytes(t, bytes.Repeat([]byte("a"), 4*1024*1024))
 	require.Less(t, len(bomb), 64*1024, "the compressed body must fit under the raw ceiling")
@@ -268,6 +326,33 @@ func TestRouter_CompressionBombIsPayloadTooLarge(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+	var errResp herr.ErrorResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&errResp))
+	assert.Equal(t, string(domain.ErrPayloadTooLarge), errResp.Error.Type)
+}
+
+// /v1/embeddings takes the prefix-peek lane, where the decode failure lands on
+// the peek read rather than on a full-body read. Discarding it there would hand
+// the model peek a truncated payload and answer with whatever the peek made of
+// it instead of the ceiling that was actually hit.
+/** @scenario "a compression bomb on the peek lane is capped too" */
+func TestRouter_PeekLane_CompressionBombIsPayloadTooLarge(t *testing.T) {
+	const maxBytes = 8 * 1024
+	router := encodingRouterWithLimit(t, maxBytes)
+
+	// Bigger than the peek window (32 KiB) so the ceiling is crossed while the
+	// peek is still filling, not on a later read.
+	bomb := zstdBytes(t, bytes.Repeat([]byte("a"), 1024*1024))
+	require.Less(t, len(bomb), maxBytes, "the compressed body must fit under the raw ceiling")
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/embeddings", bytes.NewReader(bomb))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "zstd")
+	req.Header.Set("Authorization", "Bearer vk-lw-test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
 	var errResp herr.ErrorResponse
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&errResp))
 	assert.Equal(t, string(domain.ErrPayloadTooLarge), errResp.Error.Type)

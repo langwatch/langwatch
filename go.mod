@@ -16,7 +16,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/klauspost/compress v1.18.5
+	github.com/klauspost/compress v1.18.7
 	github.com/langwatch/langwatch/sdk-go v0.2.0
 	github.com/maximhq/bifrost/core v1.4.22
 	github.com/oklog/ulid/v2 v2.1.1
