@@ -1711,6 +1711,12 @@ export class ClickHouseTraceService {
           return { traces: [], totalHits: 0, lastTrace: null };
         }
 
+        // Trace and span names are operation names rather than captured
+        // content, and a tool or agent identifier is often only there, so free
+        // text has to reach them too. They ride alongside the I/O columns
+        // instead of replacing them, and `searchQuery` is already lowercased
+        // and LIKE-escaped, so `lower(...)` on each side is the whole contract.
+        // Whether captured I/O may be searched at all is still decided above.
         const searchableColumns = [
           ...(protections.canSeeCapturedInput !== false
             ? ["lower(ifNull(ts.ComputedInput, ''))"]
@@ -1718,10 +1724,29 @@ export class ClickHouseTraceService {
           ...(protections.canSeeCapturedOutput !== false
             ? ["lower(ifNull(ts.ComputedOutput, ''))"]
             : []),
+          "lower(ifNull(ts.TraceName, ''))",
         ];
 
+        // Non-root span names live in `stored_spans`, probed with the same
+        // correlated EXISTS shape the span filters in `filter-conditions.ts`
+        // use. The StartTime bound keeps it partition-pruned instead of
+        // cold-scanning every weekly partition, matching `buildSpanTimeBound`.
+        const spanNameSearch = `EXISTS (
+                    SELECT 1 FROM stored_spans sp
+                    WHERE sp.TenantId = ts.TenantId
+                      AND sp.TraceId = ts.TraceId
+                      AND sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
+                      AND sp.StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
+                      AND lower(sp.SpanName) LIKE {searchQuery:String}
+                  )`;
+
         const searchFilter = effectiveQuery
-          ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
+          ? ` AND (${[
+              ...searchableColumns.map(
+                (col) => `${col} LIKE {searchQuery:String}`,
+              ),
+              spanNameSearch,
+            ].join(" OR ")})`
           : "";
 
         // Date axis.

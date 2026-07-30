@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { SuitesApiService } from "@/client-sdk/services/suites";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
@@ -11,7 +11,7 @@ import type { CommandResult } from "../../utils/output";
  * whatever format the caller asked for (utils/output.ts).
  */
 export const listSuitesCommand = async (): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new SuitesApiService();
   const spinner = createSpinner("Fetching suites...").start();

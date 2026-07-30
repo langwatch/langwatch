@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import type * as NodeFs from "node:fs";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope, parseScopeArg } from "./_shared";
 import type { CommandResult } from "../../utils/output";
@@ -50,7 +50,7 @@ export const updateVirtualKeyCommand = async (
   id: string,
   options: UpdateVirtualKeyOptions,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   let config: Record<string, unknown> | undefined;
   try {
