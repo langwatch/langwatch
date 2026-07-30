@@ -7,6 +7,7 @@ import {
   memoryClock,
   memoryOutbox,
   memoryProcessStore,
+  UndecodableStateError,
 } from "@langwatch/event-sourcing";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -193,7 +194,11 @@ describe("createGenericLaneExecutors", () => {
               if (next === null) return null;
               return {
                 state: next,
-                intents: [{ type: "notify", payload: { n: next.count } }],
+                // Qualified, the way `definePipeline` emits it -- a bare key
+                // here would pass against a shape no real pipeline produces.
+                intents: [
+                  { type: "digest/notify", payload: { n: next.count } },
+                ],
                 nextWakeAt: null,
               };
             },
@@ -294,9 +299,11 @@ describe("createGenericLaneExecutors", () => {
         lastEvent: "x",
       }));
 
+      // The stored version is a real, non-empty stamp that does not match, so
+      // it is undecodable rather than legacy -- refused, never reset to init().
       await expect(
         executors.processManager(execution({ pipeline, name: "digest" })),
-      ).rejects.toThrow(/cannot resume instance/);
+      ).rejects.toBeInstanceOf(UndecodableStateError);
     });
   });
 });

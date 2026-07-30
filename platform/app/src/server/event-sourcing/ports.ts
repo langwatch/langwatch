@@ -17,8 +17,7 @@ import {
   memorySpool,
   type Outbox,
   type OutboxRow,
-  type ProcessContext,
-  type ProcessInstanceKey,
+  type ProcessRuntime,
   type ProcessStore,
   type Registry,
   type StoreContext,
@@ -142,47 +141,14 @@ function findProcessManager(
   return undefined;
 }
 
-async function stageIntents(args: {
-  readonly outbox: Outbox;
-  readonly pm: BuiltProcessManager;
-  readonly tenantId: string;
-  readonly intents: readonly {
-    readonly type: string;
-    readonly payload: unknown;
-  }[];
-}): Promise<void> {
-  if (args.intents.length === 0) return;
-  const rows = args.intents.map((intent) => {
-    const def = args.pm.intents[intent.type];
-    if (!def) {
-      throw new EventSourcingError(
-        `process manager "${args.pm.name}" evolved an intent "${intent.type}" it never declared`,
-        { processManager: args.pm.name, intent: intent.type },
-      );
-    }
-    return {
-      intentType: `${args.pm.name}/${intent.type}`,
-      messageKey: def.messageKey(intent.payload),
-      tenantId: args.tenantId,
-      payload: JSON.stringify(intent.payload),
-    };
-  });
-  await args.outbox.stage(rows);
-}
-
-/**
- * Runs one process manager's batch as a single left-fold (ADR-108 §8: one
- * emission, not N). An event whose type has no declared handler contributes
- * nothing — state, intents and the armed wake stay exactly as the last event
- * that did run left them.
- */
+/** The delivery half of a process manager's cycle. The cycle itself belongs to
+ *  the process runtime (ADR-108 §11) — a copy here drifted twice over: it
+ *  rejected a row written before process managers carried a version at all, and
+ *  it indexed intents by their bare key when `definePipeline` emits them
+ *  qualified, so every intent this path staged threw instead. */
 async function runProcessManager(
   execution: LaneExecution,
-  deps: {
-    readonly processStore: ProcessStore;
-    readonly outbox: Outbox;
-    readonly clock: Clock;
-  },
+  runtime: ProcessRuntime,
 ): Promise<void> {
   const pm = memberFor(execution).processManager;
   if (!pm) {
@@ -192,59 +158,14 @@ async function runProcessManager(
     );
   }
 
-  const key: ProcessInstanceKey = {
-    processName: pm.name,
-    projectId: execution.tenantId,
-    processKey: execution.aggregateId,
-  };
-  const stored = await deps.processStore.load(key);
-  if (stored !== null && stored.stateVersion !== pm.stateVersion) {
-    // Never silently overwritten (same rule as a fold's undecodable row) — an
-    // incompatible row fails the delivery so an operator sees it, rather than
-    // resetting an in-flight process instance to `init()`.
-    throw new EventSourcingError(
-      `process manager "${pm.name}" cannot resume instance "${execution.aggregateId}": stored state version "${stored.stateVersion}" does not match "${pm.stateVersion}"`,
-      { processManager: pm.name, processKey: execution.aggregateId },
-    );
-  }
-  const state =
-    stored === null ? pm.init() : pm.stateSchema.parse(stored.state);
-  const expectedRevision = stored?.revision ?? 0;
-
-  let current = state;
-  let ranAtLeastOnce = false;
-  let nextWakeAt: number | null = null;
-  const intents: { readonly type: string; readonly payload: unknown }[] = [];
-
-  for (const event of execution.events) {
-    const ctx: ProcessContext = {
-      now: deps.clock.now(),
-      tenantId: execution.tenantId,
+  await runtime.deliver(pm, {
+    key: {
+      processName: pm.name,
+      projectId: execution.tenantId,
       processKey: execution.aggregateId,
-    };
-    const step = pm.evolve(current, event, ctx);
-    if (step === null) continue;
-    current = step.state;
-    nextWakeAt = step.nextWakeAt;
-    intents.push(...step.intents);
-    ranAtLeastOnce = true;
-  }
-
-  if (!ranAtLeastOnce) return;
-
-  await deps.processStore.save({
-    key,
+    },
     tenantId: execution.tenantId,
-    state: current,
-    stateVersion: pm.stateVersion,
-    expectedRevision,
-    nextWakeAt,
-  });
-  await stageIntents({
-    outbox: deps.outbox,
-    pm,
-    tenantId: execution.tenantId,
-    intents,
+    events: execution.events,
   });
 }
 
@@ -258,6 +179,11 @@ export function createGenericLaneExecutors(deps: {
   readonly outbox: Outbox;
   readonly clock: Clock;
 }): LaneExecutors {
+  const runtime = createProcessRuntime({
+    processStore: deps.processStore,
+    outbox: deps.outbox,
+    clock: deps.clock,
+  });
   return {
     async fold(execution) {
       const fold = memberFor(execution).fold;
@@ -313,7 +239,7 @@ export function createGenericLaneExecutors(deps: {
       }
     },
 
-    processManager: (execution) => runProcessManager(execution, deps),
+    processManager: (execution) => runProcessManager(execution, runtime),
   };
 }
 
