@@ -11,7 +11,7 @@ import { prisma } from "../../../../../src/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../../src/server/event-sourcing/__tests__/integration/testContainers";
+} from "../../../../../src/server/event-sourcing.old/__tests__/integration/testContainers";
 import {
   DepartmentAssignmentTargetNotFoundError,
   DepartmentService,

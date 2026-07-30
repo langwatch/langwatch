@@ -7,9 +7,9 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type {
   CodingAgentSessionMetricSeriesRow,
   CodingAgentSessionRow,
-} from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+} from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import {
   type CodingAgentSessionListReadOutcome,
   observeCodingAgentSessionListReadDuration,

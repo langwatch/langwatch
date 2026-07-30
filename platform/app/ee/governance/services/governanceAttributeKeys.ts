@@ -14,7 +14,7 @@
  * fixed in eb221e348). Anchor them once.
  *
  * NOTE: the trace-pipeline projection at
- * src/server/event-sourcing/pipelines/trace-processing/projections/
+ * src/server/event-sourcing.old/pipelines/trace-processing/projections/
  *   services/trace-attribute-accumulation.service.ts also references
  * these keys verbatim. Keep that list in sync if you add an attribute
  * here that needs to be hoisted from spans into trace_summaries.

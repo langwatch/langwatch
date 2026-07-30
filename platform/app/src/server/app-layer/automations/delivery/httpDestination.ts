@@ -1,7 +1,7 @@
 import {
   DispatchError,
   parseRetryAfterMs,
-} from "~/server/event-sourcing/queues/dispatchError";
+} from "~/server/event-sourcing.old/queues/dispatchError";
 import {
   fetchWithResolvedIp,
   type SSRFValidationResult,

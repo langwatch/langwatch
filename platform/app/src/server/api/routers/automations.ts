@@ -56,7 +56,7 @@ import {
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
-import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { isDispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import { featureFlagService } from "~/server/featureFlag";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {

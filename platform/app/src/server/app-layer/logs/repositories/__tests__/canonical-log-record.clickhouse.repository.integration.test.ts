@@ -24,12 +24,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   type LogRedactionService,
   prepareCanonicalLogRecords,
-} from "~/server/event-sourcing/pipelines/log-processing/canonicalLog";
-import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
+} from "~/server/event-sourcing.old/pipelines/log-processing/canonicalLog";
+import type { CanonicalLogRecord } from "~/server/event-sourcing.old/pipelines/log-processing/schemas/logRecord";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
 import { CanonicalLogRecordClickHouseRepository } from "../canonical-log-record.clickhouse.repository";
 
 let ch: ClickHouseClient;

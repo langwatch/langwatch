@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GROUP_QUEUE_REGISTRY_KEY,
   GroupStagingScripts,
-} from "~/server/event-sourcing/queues/groupQueue/scripts";
+} from "~/server/event-sourcing.old/queues/groupQueue/scripts";
 import { QueueRedisRepository } from "../repositories/queue.redis.repository";
 
 type ScanPage = [cursor: string, keys: string[]];

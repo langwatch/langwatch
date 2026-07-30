@@ -35,7 +35,7 @@
  * never hardcodes which attribute keys the caller reads. It is idempotent and a
  * no-op (empty map) when there are no claude content logs.
  */
-import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
+import { capPayloadString } from "~/server/event-sourcing.old/pipelines/trace-processing/utils/capOversizedLogRecord";
 import type { ChatMessage, SpanInputOutput } from "~/server/tracer/types";
 
 import {

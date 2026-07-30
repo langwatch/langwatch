@@ -20,7 +20,7 @@ import {
   decryptWebhookHeaders,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 
 const logger = createLogger("langwatch:graph-alert-action-dispatch");

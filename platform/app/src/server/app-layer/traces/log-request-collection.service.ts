@@ -6,18 +6,18 @@ import type { DeepPartial } from "~/utils/types";
 import {
   type LogRedactionService,
   prepareCanonicalLogRecords,
-} from "../../event-sourcing/pipelines/log-processing/canonicalLog";
+} from "../../event-sourcing.old/pipelines/log-processing/canonicalLog";
 import type {
   CanonicalLogRecord,
   LogTraceContribution,
-} from "../../event-sourcing/pipelines/log-processing/schemas/logRecord";
+} from "../../event-sourcing.old/pipelines/log-processing/schemas/logRecord";
 import {
   extractIOFromLogRecord,
   liftCanonicalAttributesFromLogRecord,
   NON_BILLABLE_ATTR,
-} from "../../event-sourcing/pipelines/trace-processing/projections/services";
-import { piiRedactionLevelSchema } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { LogRecordReceivedEventData } from "../../event-sourcing/pipelines/trace-processing/schemas/events";
+} from "../../event-sourcing.old/pipelines/trace-processing/projections/services";
+import { piiRedactionLevelSchema } from "../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
+import type { LogRecordReceivedEventData } from "../../event-sourcing.old/pipelines/trace-processing/schemas/events";
 import { IO_PREVIEW_BYTES, utf8Preview } from "./lean-for-projection";
 import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 

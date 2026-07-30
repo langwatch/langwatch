@@ -4,7 +4,7 @@ import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/
 import { createHash } from "crypto";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/commands";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";

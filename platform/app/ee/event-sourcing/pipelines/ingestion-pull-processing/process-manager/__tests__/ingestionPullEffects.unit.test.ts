@@ -1,7 +1,7 @@
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type { IntentContext } from "~/server/event-sourcing.old/pipeline/processManagerDefinition";
 
 import {
   createIngestionPullRunHandler,

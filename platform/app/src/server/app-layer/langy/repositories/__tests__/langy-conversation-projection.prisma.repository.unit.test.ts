@@ -4,11 +4,11 @@ import {
   LangyProjectionTitleSource,
 } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { Event } from "~/server/event-sourcing/domain/types";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type { StateProjectionDefinition } from "~/server/event-sourcing/projections/stateProjection.types";
-import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
+import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
+import type { Event } from "~/server/event-sourcing.old/domain/types";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
+import type { StateProjectionDefinition } from "~/server/event-sourcing.old/projections/stateProjection.types";
+import { StateProjectionExecutor } from "~/server/event-sourcing.old/projections/stateProjectionExecutor";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 
 type Row = LangyConversationProjection;

@@ -2,9 +2,9 @@ import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { IdUtils } from "~/server/event-sourcing/pipelines/trace-processing/utils/id.utils";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
+import { IdUtils } from "~/server/event-sourcing.old/pipelines/trace-processing/utils/id.utils";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import {
   DEFAULT_PARTITION_WINDOW_MS,

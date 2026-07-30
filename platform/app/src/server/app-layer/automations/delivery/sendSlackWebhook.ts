@@ -5,7 +5,7 @@ import {
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
 import { env } from "~/env.mjs";
-import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { toDispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 import { assertSlackWebhookUrl } from "./slackWebhookGuard";
 

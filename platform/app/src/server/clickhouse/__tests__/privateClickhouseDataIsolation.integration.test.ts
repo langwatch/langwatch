@@ -14,7 +14,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
 import { prisma } from "~/server/db";
-import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types";
+import type { EventRecord } from "~/server/event-sourcing.old/stores/repositories/eventRepository.types";
 import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
 import type { ClickHouseClientResolver } from "../clickhouseClient";
 
@@ -346,7 +346,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
       /** @scenario Events for a private-CH org are stored in the private instance */
       it("stores events in the private instance only", async () => {
         const { EventRepositoryClickHouse } = await import(
-          "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse"
+          "~/server/event-sourcing.old/stores/repositories/eventRepositoryClickHouse"
         );
         const resolver = await buildResolver();
         const repo = new EventRepositoryClickHouse(resolver);
@@ -369,7 +369,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     describe("when inserting events for a shared-CH org", () => {
       it("stores events in the shared instance only", async () => {
         const { EventRepositoryClickHouse } = await import(
-          "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse"
+          "~/server/event-sourcing.old/stores/repositories/eventRepositoryClickHouse"
         );
         const resolver = await buildResolver();
         const repo = new EventRepositoryClickHouse(resolver);

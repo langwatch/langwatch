@@ -1,4 +1,4 @@
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { DerivedTraceEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { api } from "~/utils/api";
 import { useSharedTrace } from "../context/SharedTraceContext";
 import { useTraceQueryArgs } from "./useTraceQueryArgs";

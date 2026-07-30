@@ -8,8 +8,8 @@ import { createLogger } from "@langwatch/observability";
 import type {
   AppendStore,
   BulkAppendContext,
-} from "~/server/event-sourcing/projections/mapProjection.types";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+} from "~/server/event-sourcing.old/projections/mapProjection.types";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import type { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { assertRecordsTenant, assertRecordTenant } from "./assertRecordTenant";

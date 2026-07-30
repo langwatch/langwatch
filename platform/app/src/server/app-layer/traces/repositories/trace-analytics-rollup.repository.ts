@@ -1,4 +1,4 @@
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
 
 /**
  * Per-span insert into `trace_analytics_rollup` (ADR-034 Phase 1).

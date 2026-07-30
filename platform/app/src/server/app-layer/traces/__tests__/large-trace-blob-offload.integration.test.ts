@@ -33,14 +33,14 @@ import {
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { Event } from "~/server/event-sourcing";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type { Event } from "~/server/event-sourcing.old";
+import type { RecordSpanCommandData } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/commands";
+import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
 import {
   resolveOffloadedTraces,
   type WarnLogger,

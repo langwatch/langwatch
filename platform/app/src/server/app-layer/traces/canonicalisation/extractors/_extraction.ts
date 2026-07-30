@@ -1,4 +1,4 @@
-import type { NormalizedEvent } from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedEvent } from "../../../../event-sourcing.old/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS, SPAN_TYPE_TO_GEN_AI_OP } from "./_constants";
 import { asNumber, isNonEmptyString, isRecord } from "./_guards";
 import {

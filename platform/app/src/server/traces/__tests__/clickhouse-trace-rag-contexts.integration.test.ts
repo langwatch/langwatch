@@ -21,7 +21,7 @@ import type { Protections } from "~/server/traces/protections";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "../../event-sourcing.old/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 

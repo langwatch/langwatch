@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
+import type { QueueRunCommandData } from "~/server/event-sourcing.old/pipelines/simulation-processing/schemas/commands";
 import {
   deriveBatchRunId,
   deriveScenarioRunId,

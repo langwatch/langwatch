@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "../../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import { CanonicalizeSpanAttributesService } from "../canonicalisation/canonicalizeSpanAttributesService";
 import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
 import { SpanNormalizationPipelineService } from "../span-normalization.service";

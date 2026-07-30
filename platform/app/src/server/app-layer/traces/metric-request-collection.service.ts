@@ -6,12 +6,12 @@ import type { DeepPartial } from "~/utils/types";
 import {
   type MetricPreparationResult,
   prepareMetricDataPoints,
-} from "../../event-sourcing/pipelines/metric-processing/canonicalMetric";
-import type { CanonicalMetricDataPoint } from "../../event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
+} from "../../event-sourcing.old/pipelines/metric-processing/canonicalMetric";
+import type { CanonicalMetricDataPoint } from "../../event-sourcing.old/pipelines/metric-processing/schemas/metricDataPoint";
 import {
   piiRedactionLevelSchema,
   type RecordMetricCorrelationCommandData,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+} from "../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
 import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface MetricRequestCollectionDeps {

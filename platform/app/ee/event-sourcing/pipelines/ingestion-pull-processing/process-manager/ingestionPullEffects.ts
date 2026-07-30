@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   IntentContext,
   IntentExecutor,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+} from "~/server/event-sourcing.old/pipeline/processManagerDefinition";
 import {
   incrementIngestionPullTotal,
   observeIngestionPullDuration,

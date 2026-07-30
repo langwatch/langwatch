@@ -77,13 +77,13 @@ import { spanCostService } from "@ee/governance/services/spanDerivation.composit
 import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import type { NormalizedSpan } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
-} from "~/server/event-sourcing/projections/abstractMapProjection";
-import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
+} from "~/server/event-sourcing.old/projections/abstractMapProjection";
+import type { AppendStore } from "~/server/event-sourcing.old/projections/mapProjection.types";
 import {
   normalizeGovernanceSpanOrNull,
   readGovernanceSpanFacts,

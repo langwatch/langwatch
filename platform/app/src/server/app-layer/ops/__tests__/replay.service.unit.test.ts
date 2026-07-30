@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
-import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
+import { createReplayRuntime } from "~/server/event-sourcing.old/replay/replayPreset";
+import type { ReplayProgress } from "~/server/event-sourcing.old/replay/types";
 import { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "../replay.service";
 import {
   IDLE_STATUS,
@@ -13,7 +13,7 @@ vi.mock("~/env.mjs", () => ({
   env: { REDIS_URL: "redis://unit-test" },
 }));
 
-vi.mock("~/server/event-sourcing/replay/replayPreset", () => ({
+vi.mock("~/server/event-sourcing.old/replay/replayPreset", () => ({
   createReplayRuntime: vi.fn(),
 }));
 

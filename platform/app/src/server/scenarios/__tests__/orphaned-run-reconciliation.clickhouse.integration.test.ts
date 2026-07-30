@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "../../event-sourcing.old/__tests__/integration/testContainers";
 import { ClickHouseOrphanedRunFinder } from "../orphaned-run-reconciliation.clickhouse";
 import { STALL_THRESHOLD_MS } from "../stall-detection";
 

@@ -4,9 +4,9 @@ import {
   getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { GroupQueueProcessor } from "../../../../event-sourcing/queues/groupQueue/groupQueue";
-import type { EventSourcedQueueDefinition } from "../../../../event-sourcing/queues/queue.types";
+} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+import { GroupQueueProcessor } from "../../../../event-sourcing.old/queues/groupQueue/groupQueue";
+import type { EventSourcedQueueDefinition } from "../../../../event-sourcing.old/queues/queue.types";
 import { OpsMetricsCollector } from "../../metrics-collector";
 import {
   NullQueueRepository,

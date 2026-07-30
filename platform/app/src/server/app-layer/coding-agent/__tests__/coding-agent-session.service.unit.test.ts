@@ -5,11 +5,11 @@
  * @see specs/coding-agent/personal-usage.feature
  */
 import { describe, expect, it } from "vitest";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import type { CodingAgentSessionRow } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   projectCodingAgentSessionToRow,
-} from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+} from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionService } from "../coding-agent-session.service";
 import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";

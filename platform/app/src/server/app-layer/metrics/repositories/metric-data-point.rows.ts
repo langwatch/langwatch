@@ -3,9 +3,9 @@ import type {
   CanonicalMetricDataPoint,
   MetricKind,
   MetricRollupRow,
-} from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+} from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/metricDataPoint";
+import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 
 /**
  * ReplacingMergeTree keeps the largest version, so inverting the acceptance

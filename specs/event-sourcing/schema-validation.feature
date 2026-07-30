@@ -75,14 +75,24 @@ Feature: Validation is compiled where it can be, and honest where it cannot
     Then the fallback is recorded only on the first compile
     And later compiles of the same schema do not record it again
 
-  Scenario: the helper runs both callbacks and returns non-negative durations
-    Given a compiled path and an interpreted path for the same schema
-    When the two are timed over the same number of iterations
-    Then each path is run the declared number of times
-    And each duration reported is zero or greater
+  Scenario: the compiled path and interpreted zod accept and reject the same values
+    Given a schema and a value
+    When the compiled path and plain interpreted validation are both asked about it
+    Then they agree on whether it is valid
+    And they agree for values that are invalid as well as valid
 
-  Scenario: the compiled path is not slower than the interpreted path
-    Given a schema representative of a stored projection state
-    When both paths validate the same value many times over
-    Then the compiled path takes no longer than the interpreted one
-    But no particular speed-up is required of it
+  Scenario: the helper runs each callback once per warm-up and once per measured iteration
+    Given a compiled path and an interpreted path for the same schema
+    When the two are timed over a declared number of iterations
+    Then each path is exercised once to warm it and once for every measured run
+    And the measurement excludes the warm-up
+
+  Scenario: the warm-up is bounded so a large benchmark does not double its own cost
+    Given a benchmark asking for far more iterations than the warm-up needs
+    When the two paths are timed
+    Then the warm-up stops at its own ceiling rather than matching the request
+
+  Scenario: a supported schema never records a fallback
+    Given a schema the compiler can handle
+    When it is compiled
+    Then no fallback is recorded for it

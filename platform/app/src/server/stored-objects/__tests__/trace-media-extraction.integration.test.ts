@@ -41,9 +41,9 @@ import { COMMAND_INLINE_THRESHOLD } from "../../app-layer/traces/lean-for-projec
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
-import type { RecordSpanCommandData } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "../../event-sourcing.old/__tests__/integration/testContainers";
+import type { RecordSpanCommandData } from "../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
+import type { OtlpSpan } from "../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import { extractInlineMediaFromEvent } from "../content-extractor";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";

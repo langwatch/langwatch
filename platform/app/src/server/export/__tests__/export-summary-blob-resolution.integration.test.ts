@@ -49,11 +49,11 @@ import {
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import { ExportService } from "../export.service";
 import type { ExportRequest } from "../types";

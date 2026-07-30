@@ -21,7 +21,7 @@ import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
 import type { SingleEvaluationResult } from "../../evaluations/evaluators.generated";
 import {
   evaluationDataFor,

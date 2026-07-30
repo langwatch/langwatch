@@ -1,0 +1,882 @@
+import { createLogger } from "@langwatch/observability";
+import {
+  incrementEsFoldDuplicateEventsSkipped,
+  incrementEsFoldReadWindowFallbackTotal,
+  incrementEsFoldRefoldOnMissTotal,
+  incrementEsFoldRefoldTotal,
+  observeEsFoldBlindReapplyEvents,
+} from "~/server/metrics";
+import type { Event } from "../domain/types";
+import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionStore,
+} from "./foldProjection.types";
+import {
+  type ProjectionStoreContext,
+  readWindowAround,
+} from "./projectionStoreContext";
+
+const logger = createLogger("langwatch:event-sourcing:fold-executor");
+
+/**
+ * Event ids carried in a blind-reapply log line. A coalesced batch can hold up
+ * to COALESCE_MAX_BATCH events; the ids are for identifying which aggregates to
+ * reconcile afterwards, and a handful is enough to find the trace.
+ */
+const MAX_LOGGED_EVENT_IDS = 10;
+
+/**
+ * Projections that already warned about a read-window recovery this process.
+ * Bounded by the number of registered projections; see the warn site.
+ */
+const readWindowRecoveryWarned = new Set<string>();
+
+function compareFoldEvents<State, E extends Event>(
+  projection: FoldProjectionDefinition<State, E>,
+  a: E,
+  b: E,
+): number {
+  if (projection.options?.eventOrdering === "acceptedAt") {
+    if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  }
+
+  return a.occurredAt - b.occurredAt;
+}
+
+/**
+ * Whether an out-of-order event should replay the aggregate's history rather
+ * than being applied on top of the state already loaded.
+ *
+ * See `FoldProjectionOptions.refoldOnOutOfOrder` for why an order-insensitive
+ * business-time fold may opt out. Accepted-order folds never enter this path.
+ */
+function canRefold<State, E extends Event>(
+  projection: FoldProjectionDefinition<State, E>,
+  context: ProjectionStoreContext,
+): boolean {
+  if (projection.options?.refoldOnOutOfOrder === false) {
+    incrementEsFoldRefoldTotal(projection.name, "declined");
+    return false;
+  }
+  if (!projection.eventLoader) {
+    incrementEsFoldRefoldTotal(projection.name, "unavailable");
+    logger.warn(
+      { projection: projection.name, aggregateId: context.aggregateId },
+      "Out-of-order event detected but no eventLoader available — cannot re-fold",
+    );
+    return false;
+  }
+  incrementEsFoldRefoldTotal(projection.name, "performed");
+  return true;
+}
+
+/**
+ * Returns a context carrying the event's occurredAt — and, when the fold
+ * DECLARED a read window (`options.readWindow`), the computed
+ * `occurredAt ± widthMs` bound for the store's backing read. The original
+ * context is returned unchanged when the event has no usable occurredAt: an
+ * unusable business time cannot anchor a window, so the read stays unbounded.
+ */
+function withReadHints<State, E extends Event>({
+  context,
+  event,
+  projection,
+}: {
+  context: ProjectionStoreContext;
+  event: Event;
+  projection: FoldProjectionDefinition<State, E>;
+}): ProjectionStoreContext {
+  const occurredAt = (event as Record<string, unknown>).occurredAt;
+  if (typeof occurredAt !== "number" || occurredAt <= 0) return context;
+  const widthMs = projection.options?.readWindow?.widthMs;
+  return {
+    ...context,
+    occurredAtMs: occurredAt,
+    ...(widthMs !== undefined
+      ? { readWindow: readWindowAround({ anchorMs: occurredAt, widthMs }) }
+      : {}),
+  };
+}
+
+/**
+ * Returns a context recording which events this fold step applied, so a caching
+ * store can recognise them if the queue redelivers the same batch.
+ */
+function withAppliedEventIds(
+  context: ProjectionStoreContext,
+  appliedEventIds: readonly string[],
+): ProjectionStoreContext {
+  return { ...context, appliedEventIds };
+}
+
+/**
+ * Executes a fold projection incrementally by applying a single event to existing state.
+ *
+ * Flow:
+ * 1. Load existing state via `store.get()` (or `init()` if none)
+ * 2. If the store missed and `options.refoldOnStoreMiss` is set → re-fold
+ *    from the event log up to the delivered event (see below)
+ * 3. `state = projection.apply(state, event)`
+ * 4. If out-of-order detected and the projection admits a re-fold → re-fold from scratch
+ * 5. `projection.store.store(state, context)`
+ *
+ * For business-time folds, out-of-order detection compares event.occurredAt
+ * against the state's LastEventOccurredAt (tracked by
+ * AbstractFoldProjection). If the event occurred earlier than what we've
+ * already seen, all events are re-loaded in occurredAt order and replayed
+ * from init() — unless the projection set `options.refoldOnOutOfOrder` to
+ * false (see {@link canRefold}). Accepted-order folds rely on their serialized
+ * queue lane and do not business-time re-fold a backdated event.
+ *
+ * Store-miss re-fold (`options.refoldOnStoreMiss`): a fold whose persisted
+ * row cannot be read back into fold state (lossy analytics rows) returns
+ * null from `store.get()` whenever its cache is cold. Starting from `init()`
+ * there would fold only the delivered events — a partial state that
+ * overwrites the complete row. Instead, the aggregate's history is loaded
+ * up to AND INCLUDING the delivered event in log order (`eventLoaderUpTo`)
+ * and folded from scratch. The log-order bound guarantees an event that is
+ * persisted but still queued for this projection is NOT pre-applied (its own
+ * delivery is next). If the delivered event is missing from the loaded
+ * history (event-log read lag), it is applied on top.
+ */
+export class FoldProjectionExecutor {
+  /**
+   * @param refoldPageSize events per page for the streaming store-miss re-fold
+   *   (`streamRefoldUpToDelivered`). Bounds the working set; 1000 keeps the
+   *   per-page memory small while amortising the per-query round-trip. Injected
+   *   only so tests can force multi-page runs.
+   */
+  constructor(private readonly refoldPageSize = 1000) {}
+
+  /**
+   * Loads state along with the ids of the events already folded into it.
+   *
+   * A store that keeps an applied-event-id set — the Redis cache wrapper, or a
+   * store that persists the set durably next to its row — answers with it via
+   * `getWithApplied`. A store that keeps none has no `getWithApplied`; its read
+   * carries an empty set and the executor treats every delivery as fresh.
+   *
+   * When the fold declared a read window and the windowed read misses, the
+   * read is retried ONCE without the window: the row may sit outside the
+   * window (long-lived aggregate, clock skew, backfill), and concluding "new
+   * aggregate" from a windowed miss is how a partial batch folded onto
+   * `init()` permanently overwrites the complete row. The retry is the
+   * declared-window contract's correctness net; the windowed read is only the
+   * partition-pruning fast path.
+   */
+  private async loadWithApplied<State>({
+    projectionName,
+    store,
+    key,
+    context,
+  }: {
+    projectionName: string;
+    store: FoldProjectionStore<State>;
+    key: string;
+    context: ProjectionStoreContext;
+  }): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
+  }> {
+    const read = async (
+      readContext: ProjectionStoreContext,
+    ): Promise<{
+      state: State | null;
+      appliedEventIds: string[];
+      miss?: "absent" | "undecodable";
+    }> => {
+      if (store.getWithApplied) {
+        return await store.getWithApplied(key, readContext);
+      }
+      return {
+        state: await store.get(key, readContext),
+        appliedEventIds: [],
+      };
+    };
+
+    const windowed = await read(context);
+    if (windowed.state !== null || context.readWindow === undefined) {
+      return windowed;
+    }
+    // An undecodable row was FOUND and refused, so widening the scope re-reads
+    // the same row to refuse it again. Skipping the retry saves an unpruned
+    // scan per event per stale aggregate, and keeps the fallback counter
+    // meaning "the window missed a live aggregate" rather than absorbing a
+    // schema condition that has nothing to do with the window.
+    if (windowed.miss === "undecodable") {
+      return windowed;
+    }
+
+    // The retry drops the window and bypasses the read cache: the windowed
+    // attempt consulted the cache moments ago, so a second cache read is a
+    // guaranteed miss that would only skew the cache metrics.
+    const { readWindow: _readWindow, ...rest } = context;
+    const unwindowed = await read({ ...rest, bypassReadCache: true });
+    incrementEsFoldReadWindowFallbackTotal(
+      projectionName,
+      unwindowed.state !== null ? "recovered" : "absent",
+    );
+    if (unwindowed.state !== null) {
+      // A chronically-wrong width would otherwise warn per event; the metric's
+      // `recovered` counter is the ongoing signal, so warn once per projection
+      // per process and drop to debug after that.
+      const level = readWindowRecoveryWarned.has(projectionName)
+        ? ("debug" as const)
+        : ("warn" as const);
+      readWindowRecoveryWarned.add(projectionName);
+      logger[level](
+        {
+          projection: projectionName,
+          tenantId: String(context.tenantId),
+          aggregateId: context.aggregateId,
+          readWindow: context.readWindow,
+        },
+        "Fold state found outside the declared read window — the window missed a live aggregate; widen readWindow.widthMs if this recurs",
+      );
+    }
+    return unwindowed;
+  }
+
+  /**
+   * The applied-event-id set to record at commit.
+   *
+   * On a fresh delivery the previous batch for this group already acked (the
+   * queue holds one active batch per group), so its ids can never be
+   * redelivered — the set resets to this batch's fresh ids, staying bounded to
+   * one batch. On a RETRY it must instead be the UNION of the set loaded at read
+   * time and the fresh ids: a retry chain that keeps losing its cache would
+   * otherwise record only each attempt's fresh ids, and a later attempt
+   * redelivering the whole batch would re-apply the events an earlier attempt
+   * already folded into the durable row (silent double-count). Merging keeps
+   * every id the durable row still needs to recognise, capped and deduped.
+   */
+  private appliedIdsForCommit({
+    context,
+    loadedAppliedIds,
+    freshIds,
+  }: {
+    context: ProjectionStoreContext;
+    loadedAppliedIds: readonly string[];
+    freshIds: readonly string[];
+  }): string[] {
+    return (context.deliveryAttempt ?? 1) > 1
+      ? mergeAppliedEventIds({ previous: loadedAppliedIds, applied: freshIds })
+      : [...freshIds];
+  }
+
+  /**
+   * Drops events already folded into the loaded state.
+   *
+   * Queue delivery is at-least-once: a fold job that fails after its state was
+   * stored is re-dispatched with the same events. Most handlers accumulate
+   * (counters, sums, appends) rather than being idempotent, so re-applying
+   * would double-count silently.
+   */
+  private dropAlreadyApplied<E extends Event>({
+    projectionName,
+    events,
+    appliedEventIds,
+    context,
+  }: {
+    projectionName: string;
+    events: E[];
+    appliedEventIds: readonly string[];
+    context: ProjectionStoreContext;
+  }): E[] {
+    if (events.length === 0) return events;
+
+    if (appliedEventIds.length === 0) {
+      // A retry with no record of what an earlier attempt applied cannot tell a
+      // redelivery from a fresh event, so everything here is about to be folded
+      // on top of state that may already contain it. `dedup_unavailable` counts
+      // that this happened; this records how much it is about to re-apply.
+      if ((context.deliveryAttempt ?? 1) > 1) {
+        observeEsFoldBlindReapplyEvents(projectionName, events.length);
+        logger.warn(
+          {
+            projection: projectionName,
+            tenantId: context.tenantId,
+            aggregateId: context.aggregateId,
+            deliveryAttempt: context.deliveryAttempt,
+            reapplying: events.length,
+            eventIds: events.slice(0, MAX_LOGGED_EVENT_IDS).map((e) => e.id),
+          },
+          "Retry has no applied-event-id set — re-folding events that may already be in the stored state (accumulating folds will double-count)",
+        );
+      }
+      return events;
+    }
+
+    const applied = new Set(appliedEventIds);
+    const fresh = events.filter((event) => !applied.has(event.id));
+    const skipped = events.length - fresh.length;
+
+    if (skipped > 0) {
+      incrementEsFoldDuplicateEventsSkipped(projectionName, skipped);
+      logger.info(
+        { projection: projectionName, skipped, delivered: events.length },
+        "Skipped redelivered events already folded into the cached state",
+      );
+    }
+    return fresh;
+  }
+
+  async execute<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    event: E,
+    context: ProjectionStoreContext,
+  ): Promise<State> {
+    if (!this.matchesEventTypes(projection, event)) {
+      return projection.init();
+    }
+
+    const key = context.key ?? context.aggregateId;
+    // Anchor the store read to the event's business time. A fold that declared
+    // a read window gets its backing read bounded to occurredAt ± widthMs, with
+    // the executor retrying unwindowed on a miss (see loadWithApplied).
+    const loadContext = withReadHints({ context, event, projection });
+    const {
+      state: loaded,
+      appliedEventIds,
+      miss,
+    } = await this.loadWithApplied({
+      projectionName: projection.name,
+      store: projection.store,
+      key,
+      context: loadContext,
+    });
+    if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
+
+    if (loaded === null && this.shouldRefoldOnMiss(projection)) {
+      const refolded = await this.refoldUpToDelivered(
+        projection,
+        [event],
+        context,
+      );
+      // The ADR-099 transitional net, made observable: its deletion condition is
+      // "it stopped firing", which is otherwise indistinguishable from a
+      // regression to the pre-ADR-099 steady state of refolding on every miss.
+      incrementEsFoldRefoldOnMissTotal(
+        projection.name,
+        refolded === null ? "absent" : "performed",
+      );
+      if (refolded !== null) {
+        await projection.store.store(
+          refolded,
+          withAppliedEventIds(
+            context,
+            this.appliedIdsForCommit({
+              context,
+              loadedAppliedIds: appliedEventIds,
+              freshIds: [event.id],
+            }),
+          ),
+        );
+        return refolded;
+      }
+      this.assertUndecodableWasRebuilt(projection, miss);
+    }
+
+    // A redelivery of an event already folded into the loaded state: the state
+    // is already correct, so there is nothing to apply and nothing to write.
+    if (
+      this.dropAlreadyApplied({
+        projectionName: projection.name,
+        events: [event],
+        appliedEventIds,
+        context,
+      }).length === 0
+    ) {
+      return loaded ?? projection.init();
+    }
+
+    const loadedState = loaded ?? projection.init();
+
+    // Capture the highest occurredAt before applying the new event.
+    const prevLastOccurred =
+      (loadedState as Record<string, unknown>)[
+        projection.LastEventOccurredAtKey
+      ] ?? 0;
+
+    let state = projection.apply(loadedState, event);
+
+    // Detect out-of-order: event's occurredAt is STRICTLY LESS than what we've already seen.
+    // Same occurredAt (==) does NOT trigger re-fold — arrival order is the correct
+    // tiebreaker for events at the same logical instant (e.g., SDK sends snapshot and
+    // finished with identical occurredAt). The +1 on UpdatedAt in apply() guarantees
+    // distinct ClickHouse rows regardless.
+    const eventOccurredAt = (event as Record<string, unknown>).occurredAt;
+    if (
+      projection.options?.eventOrdering !== "acceptedAt" &&
+      typeof eventOccurredAt === "number" &&
+      eventOccurredAt > 0 &&
+      typeof prevLastOccurred === "number" &&
+      eventOccurredAt < prevLastOccurred &&
+      canRefold(projection, context)
+    ) {
+      // CanRefold returns false without an eventLoader.
+      const allEvents = await projection.eventLoader!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        occurredAtMs: eventOccurredAt,
+      });
+
+      logger.info(
+        {
+          projection: projection.name,
+          aggregateId: context.aggregateId,
+          tenantId: context.tenantId,
+          eventType: event.type,
+          eventOccurredAt,
+          prevLastOccurred,
+          refoldEventCount: allEvents.length,
+        },
+        "Out-of-order event detected, re-folding from scratch",
+      );
+
+      state = projection.init();
+      for (const e of allEvents) {
+        state = projection.apply(state, e as E);
+      }
+    }
+
+    await projection.store.store(
+      state,
+      withAppliedEventIds(
+        context,
+        this.appliedIdsForCommit({
+          context,
+          loadedAppliedIds: appliedEventIds,
+          freshIds: [event.id],
+        }),
+      ),
+    );
+    return state;
+  }
+
+  /**
+   * Applies a batch of events for the same aggregate in a single load/store cycle.
+   *
+   * Equivalent to calling `execute()` once per event, but reads the existing
+   * state once, folds every event in the projection's declared order, and
+   * writes the result once. This turns a backed-up group of N events from N
+   * load+store round-trips (O(n²) on growing fold state) into a single one
+   * (O(n)).
+   *
+   * Business-time out-of-order handling matches `execute()`: if the earliest
+   * event in the batch occurred before the persisted checkpoint, the aggregate
+   * is re-folded from scratch via `eventLoader` — when one exists and the
+   * projection has not opted out via `options.refoldOnOutOfOrder` (see
+   * {@link canRefold}).
+   */
+  async executeBatch<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    events: E[],
+    context: ProjectionStoreContext,
+  ): Promise<State> {
+    const matching = events.filter((event) =>
+      this.matchesEventTypes(projection, event),
+    );
+    if (matching.length === 0) {
+      return projection.init();
+    }
+    if (matching.length === 1) {
+      return this.execute(projection, matching[0]!, context);
+    }
+
+    // Most folds follow business time. Lifecycle folds may instead select the
+    // canonical accepted cursor so a backdated transition cannot jump ahead of
+    // an event the log accepted first.
+    const ordered = [...matching].sort((a, b) =>
+      compareFoldEvents(projection, a, b),
+    );
+
+    const key = context.key ?? context.aggregateId;
+    // Anchor the read to the batch's earliest event (any event in the batch is
+    // for the same aggregate, so it anchors the same partition window; the
+    // unwindowed retry covers a batch that somehow spans wider than widthMs).
+    // The empty/single-event batches returned above, so ordered has at least two events.
+    const loadContext = withReadHints({
+      context,
+      event: ordered[0]!,
+      projection,
+    });
+    const {
+      state: loaded,
+      appliedEventIds,
+      miss,
+    } = await this.loadWithApplied({
+      projectionName: projection.name,
+      store: projection.store,
+      key,
+      context: loadContext,
+    });
+    if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
+
+    if (loaded === null && this.shouldRefoldOnMiss(projection)) {
+      const refolded = await this.refoldUpToDelivered(
+        projection,
+        ordered,
+        context,
+      );
+      // Counted as on the single-event path above.
+      incrementEsFoldRefoldOnMissTotal(
+        projection.name,
+        refolded === null ? "absent" : "performed",
+      );
+      if (refolded !== null) {
+        await projection.store.store(
+          refolded,
+          withAppliedEventIds(
+            context,
+            this.appliedIdsForCommit({
+              context,
+              loadedAppliedIds: appliedEventIds,
+              freshIds: ordered.map((event) => event.id),
+            }),
+          ),
+        );
+        return refolded;
+      }
+      this.assertUndecodableWasRebuilt(projection, miss);
+    }
+
+    const fresh = this.dropAlreadyApplied({
+      projectionName: projection.name,
+      events: ordered,
+      appliedEventIds,
+      context,
+    });
+    // Every event in the batch was a redelivery — the loaded state already
+    // reflects them all, so re-storing it would only churn the durable row.
+    if (fresh.length === 0) {
+      return loaded ?? projection.init();
+    }
+
+    const loadedState = loaded ?? projection.init();
+
+    const prevLastOccurred =
+      (loadedState as Record<string, unknown>)[
+        projection.LastEventOccurredAtKey
+      ] ?? 0;
+    const earliestOccurredAt = (fresh[0] as Record<string, unknown>).occurredAt;
+
+    // Out-of-order vs the persisted checkpoint: the batch starts earlier than
+    // what we've already folded. Re-fold from scratch when we can load the full
+    // history AND the projection still gains something by replaying it;
+    // otherwise apply the batch on top (matches the single-event executor's
+    // degraded behavior when no eventLoader exists).
+    const isOutOfOrder =
+      projection.options?.eventOrdering !== "acceptedAt" &&
+      typeof earliestOccurredAt === "number" &&
+      earliestOccurredAt > 0 &&
+      typeof prevLastOccurred === "number" &&
+      earliestOccurredAt < prevLastOccurred;
+
+    let state = loadedState;
+    if (isOutOfOrder && canRefold(projection, context)) {
+      // CanRefold returns false without an eventLoader.
+      const allEvents = await projection.eventLoader!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        occurredAtMs: earliestOccurredAt,
+      });
+      logger.info(
+        {
+          projection: projection.name,
+          aggregateId: context.aggregateId,
+          tenantId: context.tenantId,
+          batchSize: ordered.length,
+          earliestOccurredAt,
+          prevLastOccurred,
+          refoldEventCount: allEvents.length,
+        },
+        "Out-of-order batch detected, re-folding from scratch",
+      );
+      state = projection.init();
+      for (const e of allEvents) {
+        state = projection.apply(state, e as E);
+      }
+    } else {
+      for (const event of fresh) {
+        state = projection.apply(state, event);
+      }
+    }
+
+    await projection.store.store(
+      state,
+      withAppliedEventIds(
+        context,
+        this.appliedIdsForCommit({
+          context,
+          loadedAppliedIds: appliedEventIds,
+          freshIds: fresh.map((event) => event.id),
+        }),
+      ),
+    );
+    return state;
+  }
+
+  /**
+   * Whether the projection cares about this event. An empty `eventTypes` list
+   * means the projection subscribes to every event type.
+   */
+  private matchesEventTypes<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    event: E,
+  ): boolean {
+    return (
+      projection.eventTypes.length === 0 ||
+      projection.eventTypes.includes(event.type)
+    );
+  }
+
+  /**
+   * Whether a store miss rebuilds from the event log.
+   *
+   * The store's own declaration wins where it makes one: a store that can
+   * refuse a committed row arms the rebuild that makes refusing safe, in the
+   * same declaration as the gate, so the pair cannot be broken from a distance.
+   * `options.refoldOnStoreMiss` remains for the stores that still hand-roll
+   * their gate.
+   */
+  private shouldRefoldOnMiss<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+  ): boolean {
+    const armed =
+      projection.store.refoldsOnMiss ??
+      projection.options?.refoldOnStoreMiss === true;
+    return armed && projection.eventLoaderUpTo !== undefined;
+  }
+
+  /**
+   * Refuse to fold onto `init()` when the store FOUND a row and rejected it.
+   *
+   * `absent` and `undecodable` are both "no state", but they must not be
+   * handled alike. An absent row means this batch is the aggregate's first, so
+   * folding from `init()` is exactly right. An undecodable row means a complete
+   * state exists and this build cannot read it — folding from `init()` would
+   * write a PARTIAL state stamped at the CURRENT version, which the gate that
+   * just rejected the row would then accept forever. The corruption launders
+   * itself and the original is gone.
+   *
+   * Refolding from `event_log` is what makes a rejection safe, so without it
+   * the only correct move is to stop. Throwing puts the job on its retry
+   * budget and surfaces to an operator; the alternative is silent, permanent,
+   * and undetectable after the fact.
+   *
+   * This pairing is easy to break from a distance: `refoldOnStoreMiss` is
+   * documented for deletion once its population ages out, and `eventLoaderUpTo`
+   * is auto-wired only when the service has an event store.
+   *
+   * This proves only that a rebuild is POSSIBLE, not that it happened — the
+   * refold can still come back empty. {@link assertUndecodableWasRebuilt}
+   * closes that half, and both are needed.
+   */
+  private assertUndecodableIsRecoverable<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    miss: "absent" | "undecodable" | undefined,
+  ): void {
+    if (miss !== "undecodable" || this.shouldRefoldOnMiss(projection)) return;
+    throw new Error(
+      `Fold projection "${projection.name}" read back a row it cannot decode and has no re-fold path ` +
+        `(refoldOnStoreMiss=${String(projection.options?.refoldOnStoreMiss)}, ` +
+        `eventLoaderUpTo=${projection.eventLoaderUpTo === undefined ? "unwired" : "wired"}). ` +
+        `Refusing to fold onto an empty state, which would overwrite the committed row with a partial ` +
+        `one stamped at the current version.`,
+    );
+  }
+
+  /**
+   * The second half of the undecodable guard: the rebuild must have PRODUCED
+   * something.
+   *
+   * `refoldUpToDelivered` returns null when the aggregate's history reads back
+   * empty — a truncated log, a retention sweep, an event store that answered
+   * nothing. For an `absent` miss that is ordinary and folding from `init()` is
+   * right. For an `undecodable` one it is the corruption case again by another
+   * route: a complete row exists, this build cannot read it, and the rebuild
+   * that was supposed to make refusing it safe came back with nothing. Falling
+   * through would commit a partial state at the current version and launder it
+   * past the gate exactly as if no refold had been configured at all.
+   */
+  private assertUndecodableWasRebuilt<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    miss: "absent" | "undecodable" | undefined,
+  ): void {
+    if (miss !== "undecodable") return;
+    throw new Error(
+      `Fold projection "${projection.name}" read back a row it cannot decode, and re-folding it from the event log ` +
+        `produced no state (empty or unavailable history). Refusing to fold onto an empty state, which would ` +
+        `overwrite the committed row with a partial one stamped at the current version.`,
+    );
+  }
+
+  /**
+   * Store-miss re-fold: rebuild state from the aggregate's event history up
+   * to AND INCLUDING the log-latest delivered event, then apply any delivered
+   * event the history read did not return (event-log read lag on the
+   * just-persisted event).
+   *
+   * Returns null when the history read comes back empty — the caller falls
+   * through to the plain init+apply path, which is equivalent for a genuinely
+   * new aggregate. A failed history read propagates: correctness over
+   * availability, the queue's retry machinery re-delivers.
+   */
+  private async refoldUpToDelivered<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    delivered: E[],
+    context: ProjectionStoreContext,
+  ): Promise<State | null> {
+    const upToEvent = delivered.reduce((latest, e) => {
+      if (e.createdAt !== latest.createdAt) {
+        return e.createdAt > latest.createdAt ? e : latest;
+      }
+      return e.id > latest.id ? e : latest;
+    });
+
+    // Stream the re-fold page-by-page when the fold is order-insensitive and a
+    // paginated loader is wired. Bounds memory for a huge aggregate (a hot
+    // trace's 100k+ events never land in memory whole). Gated on
+    // refoldOnOutOfOrder: false because pages arrive in (timestamp, eventId)
+    // order, not occurredAt order — equivalent only for an order-insensitive
+    // fold.
+    if (
+      projection.eventLoaderUpToPaged &&
+      projection.options?.refoldOnOutOfOrder === false
+    ) {
+      return this.streamRefoldUpToDelivered(
+        projection,
+        delivered,
+        context,
+        upToEvent,
+      );
+    }
+
+    const history = await projection.eventLoaderUpTo!({
+      tenantId: context.tenantId,
+      aggregateId: context.aggregateId,
+      upToEvent,
+    });
+    if (history.length === 0) return null;
+
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        deliveredCount: delivered.length,
+        refoldEventCount: history.length,
+      },
+      "Store miss with refoldOnStoreMiss — re-folding from the event log",
+    );
+
+    // Merge delivered events the history read missed back into the fold's
+    // declared order before folding — a tail append could let an event that
+    // belongs in the middle overwrite last-write-wins fields.
+    const seen = new Set(history.map((e) => e.id));
+    const missing = delivered.filter((e) => !seen.has(e.id));
+    const combined = [...(history as E[]), ...missing].sort((a, b) =>
+      compareFoldEvents(projection, a, b),
+    );
+    let state = projection.init();
+    for (const e of combined) {
+      state = projection.apply(state, e);
+    }
+    return state;
+  }
+
+  /**
+   * Streaming store-miss re-fold for order-insensitive folds: pages the
+   * aggregate's history via `eventLoaderUpToPaged`, folding each page and
+   * discarding it. At most one page of events (plus the fold state and a set of
+   * seen dedup keys) is held at once — the difference between a bounded working
+   * set and OOMing on a 100k-event aggregate, where the array path's single
+   * unbounded read materialises every EventPayload blob simultaneously.
+   *
+   * Parity with the array `refoldUpToDelivered`:
+   * - Dedup: the store returns each page raw (undeduplicated), so the last
+   *   row always matches what was actually read and the cursor never stalls.
+   *   This `seen` set (idempotencyKey ?? id) does the deduplication instead,
+   *   reproducing `deduplicateEvents`'s effect across page boundaries — which
+   *   the strict `>` cursor alone cannot (a retry can share an idempotencyKey
+   *   under a different EventId).
+   * - Order: immaterial — this path is gated on `refoldOnOutOfOrder: false`.
+   * - Missing delivered: any delivered event the history read did not return
+   *   (event-log read lag) is applied on top, as the array path does.
+   */
+  private async streamRefoldUpToDelivered<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    delivered: E[],
+    context: ProjectionStoreContext,
+    upToEvent: E,
+  ): Promise<State | null> {
+    const PAGE_SIZE = this.refoldPageSize;
+    // Safety net only: the paged loader's cursor is expected to strictly
+    // advance every call. If that contract is ever violated (e.g. a
+    // non-advancing cursor from a repository bug), this bounds the loop
+    // instead of hanging the fold worker for the aggregate indefinitely.
+    // 100k pages * 1000/page default covers a 100M-event aggregate.
+    const MAX_PAGES = 100_000;
+    const seen = new Set<string>();
+    let state = projection.init();
+    let after: { timestamp: number; eventId: string } | undefined;
+    let refoldEventCount = 0;
+    let pageCount = 0;
+
+    for (;;) {
+      if (++pageCount > MAX_PAGES) {
+        throw new Error(
+          `streamRefoldUpToDelivered exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
+        );
+      }
+      // Caller guards eventLoaderUpToPaged is set.
+      const page = await projection.eventLoaderUpToPaged!({
+        tenantId: context.tenantId,
+        aggregateId: context.aggregateId,
+        upToEvent,
+        after,
+        limit: PAGE_SIZE,
+      });
+      if (page.length === 0) break;
+
+      for (const event of page) {
+        const dedupKey = event.idempotencyKey || event.id;
+        if (seen.has(dedupKey)) continue;
+        seen.add(dedupKey);
+        state = projection.apply(state, event as E);
+        refoldEventCount++;
+      }
+
+      const last = page[page.length - 1]!;
+      after = { timestamp: last.createdAt, eventId: last.id };
+      if (page.length < PAGE_SIZE) break;
+    }
+
+    if (refoldEventCount === 0) return null;
+
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        deliveredCount: delivered.length,
+        refoldEventCount,
+        streamed: true,
+      },
+      "Store miss with refoldOnStoreMiss — streamed re-fold from the event log",
+    );
+
+    for (const event of delivered) {
+      const dedupKey = event.idempotencyKey || event.id;
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      state = projection.apply(state, event);
+    }
+
+    return state;
+  }
+}

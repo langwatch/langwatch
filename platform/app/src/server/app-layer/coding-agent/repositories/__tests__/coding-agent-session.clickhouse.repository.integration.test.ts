@@ -17,12 +17,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import { CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import type { CodingAgentSessionRow } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
 import { CodingAgentSessionClickHouseRepository } from "../coding-agent-session.clickhouse.repository";
 import { CodingAgentTraceSessionClickHouseRepository } from "../coding-agent-trace-session.repository";
 import { SessionMetricSeriesClickHouseRepository } from "../session-metric-series.repository";

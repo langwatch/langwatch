@@ -1,0 +1,474 @@
+import { performance } from "node:perf_hooks";
+import { createLogger } from "@langwatch/observability";
+import {
+  incrementEsFoldCacheRedisError,
+  incrementEsFoldCacheTotal,
+  incrementEsFoldDedupUnavailable,
+  observeEsFoldCacheEntryBytes,
+  observeEsFoldCacheGetDuration,
+  observeEsFoldCacheStoreDuration,
+} from "~/server/metrics";
+import type { FoldCacheClient } from "./foldCache/foldCacheClient";
+import {
+  decodeFoldCacheEntry,
+  encodeFoldCacheEntry,
+} from "./foldCache/foldCacheEntry";
+import type { FoldProjectionStore } from "./foldProjection.types";
+import type { ProjectionStoreContext } from "./projectionStoreContext";
+
+const logger = createLogger("langwatch:event-sourcing:cached-fold-store");
+
+interface CachedFoldStoreOptions<State = unknown> {
+  keyPrefix: string;
+  ttlSeconds?: number;
+  /**
+   * The projection schema version this cache is keyed by. Overrides the version
+   * the wrapped store declares (`FoldProjectionStore.projectionVersion`), which
+   * is the normal source — see {@link CachedFoldStore.cacheKey} for why a
+   * version belongs in the key at all, and why taking it from the store rather
+   * than from each composition site is what keeps writer and reader agreeing.
+   *
+   * Set it only when the wrapped store cannot declare its own.
+   */
+  version?: string;
+  /**
+   * Reads the state's own version, recorded on the entry. Defaults to the
+   * `UpdatedAt` field, which `AbstractFoldProjection` maintains as strictly
+   * increasing per apply.
+   */
+  updatedAtOf?: (state: State) => number;
+}
+
+/**
+ * The fold cache TTL is a correctness invariant, not a latency knob. A cache
+ * miss is treated as authoritative only because it means the last write is at
+ * least a TTL old and has therefore settled across the ClickHouse replicas, so
+ * the TTL MUST stay >= the maximum cross-replica replication lag — the fold
+ * cache is the event processor's read-your-write consistency layer (ADR-099).
+ *
+ * The replication assumption today is 5 minutes, which is BOTH the default and
+ * the floor. Raising the TTL only ever adds settle margin and is always safe;
+ * dropping it below the replication lag is a correctness bug, so a configured
+ * override below the floor is clamped up to it rather than honoured. The default
+ * therefore equals the floor, and the override can only raise the TTL.
+ *
+ * ONE MISS DOES NOT CARRY THAT IMPLICATION, and it is a deploy-time event.
+ * "The last write is at least a TTL old" only follows within a single key
+ * namespace, and the projection version is part of the key (see
+ * {@link CachedFoldStore.cacheKey}). A release that changes a fold's projection
+ * version — including the release that first put the version in the key at all
+ * — moves every one of that fold's aggregates to a fresh namespace, so the
+ * first read of each in-flight aggregate misses with a write that may be
+ * seconds old. What that costs, exactly once per aggregate:
+ *
+ * - the read falls through to the durable tier, which for a read-back store
+ *   (ADR-099) answers from its last committed row. The reads resolve through
+ *   `resolveClickHouseClient` with no primary pinning, so a mid-ingest
+ *   aggregate can be answered by a replica that has not caught up and resume
+ *   from older state — accumulating counters then re-accumulate what the lagging
+ *   row is missing; and
+ * - the applied-event-id set starts empty in the new namespace, so a redelivery
+ *   inside that window dedups only if the durable tier persists the set next to
+ *   its row (`getWithApplied`) and that row is the current one. Where it does
+ *   not, the redelivery blind-re-applies and is counted
+ *   (`es_fold_dedup_unavailable{reason="cache_miss"}`).
+ *
+ * Both self-heal on the aggregate's next write, which lands in the new
+ * namespace, so the exposure is one fold step per in-flight aggregate rather
+ * than a window that persists. Operators see it as a correlated spike in
+ * `es_fold_cache_total{result="miss"}` and in the clickhouse-tier
+ * `es_fold_cache_get_duration_milliseconds` at deploy time, decaying to the
+ * steady state within one TTL.
+ *
+ * There is deliberately NO fallback read of the previous namespace. A cache
+ * entry carries the fold's state and nothing that says which shape it is in —
+ * the stores gate on the projection version stamped on their ROW, which an
+ * entry from the previous namespace does not have — so adopting one would be
+ * exactly the laundering the version key exists to prevent, decided on a guess.
+ * Nor can the durable read stand in for that check: it is the read the entry
+ * would be preferred over, so combining "the entry is fresher than the row" with
+ * a possibly-lagging row cannot tell a fresher entry from a stale one, and
+ * getting it wrong drops a committed fold step. A version bump is an
+ * invalidation by intent; this is the price of it being honest.
+ */
+const FOLD_CACHE_REPLICATION_LAG_SECONDS = 300;
+const DEFAULT_FOLD_CACHE_TTL_SECONDS = FOLD_CACHE_REPLICATION_LAG_SECONDS;
+const MIN_FOLD_CACHE_TTL_SECONDS = FOLD_CACHE_REPLICATION_LAG_SECONDS;
+
+/**
+ * The TTL is resolved on every construction (and thus potentially every fold
+ * step), so a below-floor override would log per call. Warn once per process
+ * instead — the misconfiguration is static, one loud line is enough.
+ */
+let ttlFloorClampWarned = false;
+
+/**
+ * Resolves the cache TTL from LANGWATCH_FOLD_CACHE_TTL_SECONDS, read at call
+ * time so operators can raise residency without a redeploy, clamped up to the
+ * replication-lag floor so an override can never silently drop below the
+ * correctness invariant. Unset, empty, or unparseable falls back to the default
+ * (which already sits at the floor).
+ */
+function resolveFoldCacheTtlSeconds(): number {
+  const raw = process.env.LANGWATCH_FOLD_CACHE_TTL_SECONDS;
+  if (raw === undefined || raw === "") return DEFAULT_FOLD_CACHE_TTL_SECONDS;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return DEFAULT_FOLD_CACHE_TTL_SECONDS;
+
+  if (parsed < MIN_FOLD_CACHE_TTL_SECONDS) {
+    if (!ttlFloorClampWarned) {
+      ttlFloorClampWarned = true;
+      logger.warn(
+        {
+          configuredSeconds: parsed,
+          floorSeconds: MIN_FOLD_CACHE_TTL_SECONDS,
+          env: "LANGWATCH_FOLD_CACHE_TTL_SECONDS",
+        },
+        "Configured fold cache TTL is below the replication-lag floor — clamping up; a TTL under the floor breaks the fold cache's read-your-write consistency guarantee (ADR-099)",
+      );
+    }
+    return MIN_FOLD_CACHE_TTL_SECONDS;
+  }
+  return parsed;
+}
+
+function readUpdatedAt<State>(state: State): number {
+  const value = (state as { UpdatedAt?: unknown })?.UpdatedAt;
+  return typeof value === "number" ? value : Date.now();
+}
+
+/**
+ * Wraps a fold store with a write-through cache tier.
+ *
+ * - `get()`: cache first, durable store on miss.
+ * - `store()`: durable store first (throws on failure), then the cache.
+ *
+ * The tier arrives as a {@link FoldCacheClient}, so this class names no storage
+ * technology and issues no protocol of its own — which client backs it is the
+ * composition root's decision (ADR-102 §3), not a branch in here.
+ *
+ * Its telemetry still says "redis" (`es_fold_cache_redis_error_total`, the
+ * `redis` tier label on the get-duration histogram). Those names are a
+ * production contract — the Grafana rule "Fold Cache Redis Errors" fires on the
+ * counter — so they are deliberately left alone rather than renamed in step
+ * with the class.
+ *
+ * The entry also carries the ids of the events folded into it. Queue delivery
+ * is at-least-once, so a fold job that fails after its state was stored is
+ * re-dispatched with the same events; most fold handlers accumulate (counters,
+ * sums, appends) rather than being idempotent, and would double-count. The
+ * executor uses that set to recognise and skip a redelivery.
+ *
+ * The cache is the FAST tier for that set, not the only one. When the inner
+ * store implements `getWithApplied` (first adopter: the codingAgentSession
+ * ClickHouse store) it also persists the set durably alongside the state row,
+ * and this wrapper reads it back on a cache miss — so a retry that reaches a
+ * cold cache still recognises a batch it already committed, closing the
+ * cold-cache redelivery double-count. An inner store without `getWithApplied`
+ * keeps the pre-durable behaviour: eviction or cache loss drops the set,
+ * degrading to a blind re-apply, not to something worse.
+ */
+export class CachedFoldStore<State> implements FoldProjectionStore<State> {
+  private readonly keyPrefix: string;
+  private readonly ttlSeconds: number;
+  private readonly updatedAtOf: (state: State) => number;
+
+  /**
+   * Forwarded from the wrapped store so a second cache tier — or anything else
+   * asking a store what shape it speaks — sees the version through the wrapper
+   * rather than having it stop here.
+   */
+  readonly projectionVersion?: string;
+
+  /**
+   * Forwarded for the same reason as the version: the executor reads it off the
+   * store the projection holds, which is this wrapper. Left to stop here, a
+   * store whose gate can refuse a row would look to the executor like a store
+   * that never refuses one — and the rebuild that makes refusing safe would
+   * never be armed.
+   */
+  readonly refoldsOnMiss?: boolean;
+
+  constructor(
+    private readonly inner: FoldProjectionStore<State>,
+    private readonly cache: FoldCacheClient,
+    options: CachedFoldStoreOptions<State>,
+  ) {
+    this.keyPrefix = options.keyPrefix;
+    this.ttlSeconds = options.ttlSeconds ?? resolveFoldCacheTtlSeconds();
+    this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
+    this.projectionVersion = options.version ?? inner.projectionVersion;
+    this.refoldsOnMiss = inner.refoldsOnMiss;
+  }
+
+  async get(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<State | null> {
+    return (await this.getWithApplied(aggregateId, context)).state;
+  }
+
+  /**
+   * The state together with the ids already folded into it. A cache hit serves
+   * both from the entry. On a miss the read falls through to the durable store,
+   * which carries the applied-set too when it implements `getWithApplied` (so a
+   * cold-cache retry can still dedup) and an empty set otherwise.
+   */
+  async getWithApplied(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    /**
+     * Forwarded verbatim from the durable tier. DECLARED, not incidental: every
+     * ADR-099 adopter is wrapped by this store, so the executor's decision to
+     * skip a pointless unwindowed re-read on an `undecodable` row reaches it
+     * only through here. Left undeclared it survived purely because
+     * `readDurable` happens to return the inner object unchanged, and a routine
+     * refactor to `{ state, appliedEventIds }` would have silently disabled it.
+     */
+    miss?: "absent" | "undecodable";
+  }> {
+    // The executor's read-window fallback re-reads moments after its windowed
+    // attempt already consulted the cache — a second cache read is a
+    // guaranteed miss that would double-count the cache and dedup metrics, so
+    // the retry goes straight to the durable tier. Deliberately NO
+    // dedup-unavailable accounting here: the windowed attempt already ran the
+    // full miss path (including that accounting) for this same delivery —
+    // counting again on the retry would double-count one logical read.
+    if (context.bypassReadCache) {
+      return await this.readDurable(aggregateId, context);
+    }
+
+    const cached = await this.readCached(aggregateId, context);
+    const isRetry = (context.deliveryAttempt ?? 1) > 1;
+
+    if (cached.hit) {
+      if (isRetry && cached.legacy) {
+        incrementEsFoldDedupUnavailable(this.keyPrefix, "legacy_entry");
+      }
+      return {
+        state: cached.state,
+        appliedEventIds: cached.appliedEventIds,
+      };
+    }
+
+    // A retry with no applied-set is the moment a batch gets re-applied on top
+    // of state that already holds it. A durable store that persists the set
+    // next to its row can still answer, though — so only count dedup as
+    // unavailable when even that came back empty. Named by reason so an incident
+    // can tell a cold cache from a cache-tier fault from a corrupt entry.
+    const durable = await this.readDurable(aggregateId, context);
+    if (isRetry && durable.appliedEventIds.length === 0) {
+      incrementEsFoldDedupUnavailable(this.keyPrefix, cached.reason);
+    }
+
+    return durable;
+  }
+
+  private async readCached(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<
+    | { hit: true; state: State; appliedEventIds: string[]; legacy: boolean }
+    | { hit: false; reason: "cache_miss" | "read_error" | "unreadable" }
+  > {
+    const key = this.cacheKey(aggregateId, context);
+    const startedAt = performance.now();
+
+    let raw: string | null;
+    try {
+      raw = await this.cache.read(key);
+    } catch (error) {
+      incrementEsFoldCacheRedisError(this.keyPrefix, "get");
+      incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
+      logger.warn(
+        {
+          aggregateId,
+          tenantId: String(context.tenantId),
+          error: String(error),
+        },
+        "Fold cache read failed — falling through to the durable store",
+      );
+      return { hit: false, reason: "read_error" };
+    }
+
+    if (raw === null) {
+      incrementEsFoldCacheTotal(this.keyPrefix, "miss");
+      return { hit: false, reason: "cache_miss" };
+    }
+
+    incrementEsFoldCacheTotal(this.keyPrefix, "hit");
+    observeEsFoldCacheGetDuration(
+      this.keyPrefix,
+      "redis",
+      performance.now() - startedAt,
+    );
+
+    let decoded: ReturnType<typeof decodeFoldCacheEntry<State>>;
+    try {
+      decoded = decodeFoldCacheEntry<State>(raw);
+    } catch (error) {
+      // An unreadable entry is not a reason to fail the fold: the durable store
+      // still holds the state. Treated as a miss so the read falls through —
+      // but counted, because it also loses the applied-set, and a redelivery
+      // against a lost set double-counts.
+      incrementEsFoldCacheRedisError(this.keyPrefix, "get");
+      incrementEsFoldCacheTotal(this.keyPrefix, "fallback_error");
+      logger.error(
+        {
+          aggregateId,
+          tenantId: String(context.tenantId),
+          error: String(error),
+        },
+        "Fold cache entry was unreadable — falling through to the durable store, dedup unavailable for this read",
+      );
+      return { hit: false, reason: "unreadable" };
+    }
+
+    return {
+      hit: true,
+      state: decoded.state,
+      appliedEventIds: decoded.appliedEventIds,
+      // Written before the applied-set existed: readable, but carries no record
+      // of what was applied.
+      legacy: decoded.updatedAt === null,
+    };
+  }
+
+  /**
+   * The durable read behind a cache miss. When the inner store persists the
+   * applied-event-id set next to its row (`getWithApplied`), that set comes back
+   * too, so a retry with a cold cache can still recognise a batch it committed;
+   * otherwise the set is empty and dedup falls back to blind re-apply.
+   */
+  private async readDurable(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
+  }> {
+    const startedAt = performance.now();
+    const result = this.inner.getWithApplied
+      ? await this.inner.getWithApplied(aggregateId, context)
+      : {
+          state: await this.inner.get(aggregateId, context),
+          appliedEventIds: [] as string[],
+        };
+    observeEsFoldCacheGetDuration(
+      this.keyPrefix,
+      "clickhouse",
+      performance.now() - startedAt,
+    );
+    return result;
+  }
+
+  async store(state: State, context: ProjectionStoreContext): Promise<void> {
+    const aggregateId = context.key ?? context.aggregateId;
+    const startedAt = performance.now();
+
+    await this.inner.store(state, context);
+    await this.writeToCache(state, aggregateId, context);
+
+    observeEsFoldCacheStoreDuration(
+      this.keyPrefix,
+      performance.now() - startedAt,
+    );
+  }
+
+  /**
+   * A cache write failure is logged, not thrown: the durable write above
+   * already succeeded, so the next read falls through to state that is
+   * genuinely there. What is lost is the read-your-writes window and the
+   * applied-set, so it is counted rather than swallowed silently.
+   *
+   * Encoding is handled separately from the write. A state that will not
+   * serialise is a payload bug in the caller, not a cache outage, so counting
+   * it as `es_fold_cache_redis_error_total{operation="set"}` would point an
+   * incident at the wrong tier; it is logged on its own and the cache write is
+   * skipped, which leaves `store()` as non-fatal as it was.
+   */
+  private async writeToCache(
+    state: State,
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<void> {
+    const key = this.cacheKey(aggregateId, context);
+
+    // The applied-event-id set is decided upstream and stamped on the context:
+    // FoldProjectionExecutor.appliedIdsForCommit unions it on a retry and
+    // resets it on a fresh delivery, at all four of its commit sites, before
+    // store() runs. This tier is a dumb read/write cache (ADR-099), so it
+    // persists that set verbatim — it does not re-read the cache to re-merge,
+    // which on the executor path was a guaranteed no-op (an extra cache read
+    // plus a full state decode). The only other caller, replay, writes a
+    // fresh row carrying no set; an absent value is treated as empty, matching
+    // that path's prior result.
+    let payload: string;
+    try {
+      payload = encodeFoldCacheEntry({
+        state,
+        updatedAt: this.updatedAtOf(state),
+        appliedEventIds: context.appliedEventIds ?? [],
+      });
+    } catch (error) {
+      // Not a cache fault: the durable write already landed, and the state
+      // this projection produced is the thing that will not serialise.
+      logger.error(
+        { aggregateId, error: String(error) },
+        "Fold state could not be encoded for the cache — skipping the cache write",
+      );
+      return;
+    }
+
+    observeEsFoldCacheEntryBytes(this.keyPrefix, Buffer.byteLength(payload));
+
+    try {
+      await this.cache.write(key, payload, this.ttlSeconds);
+    } catch (error) {
+      incrementEsFoldCacheRedisError(this.keyPrefix, "set");
+      logger.warn(
+        { aggregateId, error: String(error) },
+        "Fold cache write failed after the durable write — reads fall through to the durable store",
+      );
+    }
+  }
+
+  /**
+   * The cache key, scoped by the projection version the wrapped store speaks.
+   *
+   * The version is in the key because a HIT returns before `readDurable`, so
+   * the durable store's version gate — and the executor's
+   * `assertUndecodableIsRecoverable` behind it — never runs on that path. Left
+   * out, a build that changed the state shape would read the previous shape
+   * straight out of the cache, fold onto it, and commit the result stamped at
+   * the CURRENT version, laundering it past the very gate that exists to reject
+   * it. The TTL does not bound that: a hot aggregate rewrites its key many
+   * times per trace, refreshing the stale shape forward for as long as it stays
+   * hot. Keyed by version, a version change simply MISSES: the read falls
+   * through to the durable tier, whose gate sees the old row and answers
+   * `undecodable`, which is the outcome ADR-099 designed for.
+   *
+   * A store that declares no version keeps the pre-version key exactly, so an
+   * unversioned fold is unaffected and no adopter's keys move by accident.
+   *
+   * The cost is a namespace rotation on every version change: the entries under
+   * the previous version are still warm and are passed over, not waited out. A
+   * version bump is therefore a deploy-time event with read-your-write
+   * consequences for whatever is mid-flight, not a free relabel — see the
+   * TTL contract above for what exactly it costs and why nothing reads the
+   * previous namespace to soften it.
+   */
+  private cacheKey(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): string {
+    const version =
+      this.projectionVersion === undefined ? "" : `${this.projectionVersion}:`;
+    return `fold:${this.keyPrefix}:${version}${String(context.tenantId)}:${aggregateId}`;
+  }
+}

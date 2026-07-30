@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import type { RecordMetricCorrelationCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { CanonicalMetricDataPoint } from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/metricDataPoint";
+import type { RecordMetricCorrelationCommandData } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/commands";
 import {
   type MetricRequestCollectionResult,
   MetricRequestCollectionService,

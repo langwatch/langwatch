@@ -4,15 +4,15 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import {
   affectedRollupBuckets,
   buildMetricRollups,
-} from "~/server/event-sourcing/pipelines/metric-processing/rollup";
-import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
+} from "~/server/event-sourcing.old/pipelines/metric-processing/rollup";
+import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/constants";
 import type {
   CanonicalMetricDataPoint,
   MetricRollupRow,
   MetricUsageEstimate,
   MetricUsageEstimateQuery,
-} from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
+} from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/metricDataPoint";
+import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
 import type {
   MetricDataPointBulkWrite,
   MetricDataPointRepository,

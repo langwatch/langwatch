@@ -4,7 +4,7 @@ import type {
   WebhookDeliveryInput,
   WebhookFailureResponse,
 } from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
-import { isDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { isDispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import {
   assertWebhookDelivered,
   sendWebhook,

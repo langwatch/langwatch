@@ -26,13 +26,13 @@ import type {
   GovernanceKpisClickHouseRepository,
 } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { describe, expect, it } from "vitest";
-import { MapProjectionExecutor } from "~/server/event-sourcing/projections/mapProjectionExecutor";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import { MapProjectionExecutor } from "~/server/event-sourcing.old/projections/mapProjectionExecutor";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import {
   createSpanReceivedEvent,
   type TestSpanReceivedEventOptions,
-} from "~/server/event-sourcing/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
-import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
+import type { SpanReceivedEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
 import { createGovernanceKpisProjection } from "../governanceProjections.composition";
 import { GovernanceKpisMapProjection } from "../governanceKpis.mapProjection";
 import { GovernanceKpisAppendStore } from "../governanceKpis.store";

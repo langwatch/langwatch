@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ExecuteEvaluationCommandData } from "../../event-sourcing/pipelines/evaluation-processing/schemas/commands";
+import type { ExecuteEvaluationCommandData } from "../../event-sourcing.old/pipelines/evaluation-processing/schemas/commands";
 import type { RAGChunk, RAGSpan, Span } from "../../tracer/types";
 import {
   buildPreconditionTraceDataFromCommand,

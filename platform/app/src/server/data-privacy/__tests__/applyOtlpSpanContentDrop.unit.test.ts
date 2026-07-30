@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   OtlpKeyValue,
   OtlpSpan,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import { stripOtlpSpanContent } from "../applyOtlpSpanContentDrop";
 import {
   type Disposition,

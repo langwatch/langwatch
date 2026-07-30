@@ -24,7 +24,7 @@ import { prisma } from "../../../db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../event-sourcing.old/__tests__/integration/testContainers";
 import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";

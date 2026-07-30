@@ -4,7 +4,7 @@ import type {
   CanonicalMetricDataPoint,
   MetricUsageEstimate,
   MetricUsageEstimateQuery,
-} from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
+} from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/metricDataPoint";
 
 export interface MetricDataPointWrite {
   point: CanonicalMetricDataPoint;

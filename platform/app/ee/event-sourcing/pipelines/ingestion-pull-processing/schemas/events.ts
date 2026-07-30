@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { computeNextRunAt } from "~/server/app-layer/scheduler/nextRunAt";
-import { EventSchema } from "~/server/event-sourcing/domain/types";
+import { EventSchema } from "~/server/event-sourcing.old/domain/types";
 import {
   INGESTION_PULL_EVENT_TYPES,
   INGESTION_PULL_EVENT_VERSIONS,

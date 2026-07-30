@@ -27,7 +27,7 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing.old/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
@@ -70,32 +70,32 @@ import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRete
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import { EventSourcing } from "../event-sourcing";
-import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
+import { EventSourcing } from "../event-sourcing.old";
+import type { PipelineRepositories } from "../event-sourcing.old/pipelineRegistry";
 import {
   type AppCommands,
   PipelineRegistry,
-} from "../event-sourcing/pipelineRegistry";
-import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.adapter";
-import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
+} from "../event-sourcing.old/pipelineRegistry";
+import { buildAutomationDispatchPorts } from "../event-sourcing.old/pipelines/automations/automationDispatch.adapter";
+import { createExperimentRunItemAppendStore } from "../event-sourcing.old/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
   ExperimentRunStateRepositoryClickHouse,
   ExperimentRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/experiment-run-processing/repositories";
-import { LangyAnalyticsEventAppendStore } from "../event-sourcing/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
+} from "../event-sourcing.old/pipelines/experiment-run-processing/repositories";
+import { LangyAnalyticsEventAppendStore } from "../event-sourcing.old/pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.store";
 import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/simulation-processing/repositories";
+} from "../event-sourcing.old/pipelines/simulation-processing/repositories";
 import {
   InMemoryProcessStore,
   PrismaProcessStore,
-} from "../event-sourcing/process-manager";
+} from "../event-sourcing.old/process-manager";
 import {
   type FoldCacheClient,
   InMemoryFoldCacheClient,
   RedisFoldCacheClient,
-} from "../event-sourcing/projections/foldCache/foldCacheClient";
+} from "../event-sourcing.old/projections/foldCache/foldCacheClient";
 import { ExperimentService } from "../experiments/experiment.service";
 import { InviteService } from "../invites/invite.service";
 import { OrganizationRepository } from "../repositories/organization.repository";

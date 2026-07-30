@@ -16,7 +16,7 @@ import type { ClusteringErrorCode } from "~/server/app-layer/topic-clustering/cl
 import type {
   TopicClusteringRunMode,
   TopicClusteringSkipReason,
-} from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
+} from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/schemas/constants";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";

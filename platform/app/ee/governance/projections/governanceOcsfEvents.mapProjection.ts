@@ -54,17 +54,17 @@ import {
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { spanCostService } from "@ee/governance/services/spanDerivation.composition";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import { stringAttr } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-summary.utils";
+import { stringAttr } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/trace-summary.utils";
 import {
   type SpanReceivedEvent,
   spanReceivedEventSchema,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import type { NormalizedSpan } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
-} from "~/server/event-sourcing/projections/abstractMapProjection";
-import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
+} from "~/server/event-sourcing.old/projections/abstractMapProjection";
+import type { AppendStore } from "~/server/event-sourcing.old/projections/mapProjection.types";
 import { GOVERNANCE_ATTR } from "../services/governanceAttributeKeys";
 import {
   normalizeGovernanceSpanOrNull,

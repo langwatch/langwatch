@@ -1,29 +1,29 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
 
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import {
   BLOB_OPERATOR_DELETE_LUA,
   type BlobDeleteOutcome,
-} from "~/server/event-sourcing/queues/groupQueue/blobDeleteLua";
+} from "~/server/event-sourcing.old/queues/groupQueue/blobDeleteLua";
 import {
   blobHolderSetKey,
   blobLeaseSetKey,
   redisBlobKey,
   redisBlobKeyPrefix,
-} from "~/server/event-sourcing/queues/groupQueue/blobKeys";
+} from "~/server/event-sourcing.old/queues/groupQueue/blobKeys";
 import {
   BlobSweeper,
   type BlobSweepReport,
-} from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
+} from "~/server/event-sourcing.old/queues/groupQueue/blobSweeper";
 import {
   BLOB_SWEEP_LUA,
   type BlobSweepOutcome,
-} from "~/server/event-sourcing/queues/groupQueue/blobSweepLua";
+} from "~/server/event-sourcing.old/queues/groupQueue/blobSweepLua";
 import {
   CachedLuaScript,
   isNoScriptResult,
-} from "~/server/event-sourcing/queues/groupQueue/cachedLuaScript";
-import { GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing/queues/groupQueue/scripts";
+} from "~/server/event-sourcing.old/queues/groupQueue/cachedLuaScript";
+import { GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing.old/queues/groupQueue/scripts";
 
 import type {
   OpsBlobPage,

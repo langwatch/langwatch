@@ -5,7 +5,7 @@ import { defineConfig } from "vitest/config";
 // This package has no `.env` of its own — `LANGWATCH_TEST_CLICKHOUSE_URL`
 // lives in the application's, same as every other consumer of the native
 // no-docker test mode (CLAUDE.md, "Running with no container runtime").
-config({ path: join(__dirname, "../../.env") });
+config({ path: join(__dirname, "../../.env"), quiet: true });
 
 export default defineConfig({
   test: {

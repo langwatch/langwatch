@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { EventSourcing } from "../event-sourcing/eventSourcing";
-import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import type { EventSourcing } from "../event-sourcing.old/eventSourcing";
+import type { AppCommands } from "../event-sourcing.old/pipelineRegistry";
 import type { AppConfig } from "./config";
 import type {
   AppDependencies,

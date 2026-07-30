@@ -16,7 +16,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
-import { getTestClickHouseClient } from "../../event-sourcing/__tests__/integration/testContainers";
+import { getTestClickHouseClient } from "../../event-sourcing.old/__tests__/integration/testContainers";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";

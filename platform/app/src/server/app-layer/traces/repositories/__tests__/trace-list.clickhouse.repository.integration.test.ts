@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
 import { boundedSubquery } from "../../filter-to-clickhouse/subqueries";
 import { TraceListClickHouseRepository } from "../trace-list.clickhouse.repository";
 import type { TraceListQuery } from "../trace-list.repository";

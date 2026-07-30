@@ -8,8 +8,8 @@ import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.s
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import type { EventSourcing } from "../event-sourcing/eventSourcing";
-import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import type { EventSourcing } from "../event-sourcing.old/eventSourcing";
+import type { AppCommands } from "../event-sourcing.old/pipelineRegistry";
 import type { AnnotationService } from "../annotations/annotation.service";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";

@@ -10,9 +10,9 @@ import {
   asStringMap,
 } from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { EvaluationAnalyticsRow } from "~/server/event-sourcing.old/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
+import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import { queryWindowed } from "../../clients/clickhouse/windowed-read";
 import type { EvaluationAnalyticsRepository } from "./evaluation-analytics.repository";
 

@@ -48,7 +48,7 @@ import {
 } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,

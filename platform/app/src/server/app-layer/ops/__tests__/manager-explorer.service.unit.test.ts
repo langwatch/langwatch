@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
+import type { ProcessStore } from "~/server/event-sourcing.old/process-manager/stores/processStore.types";
 
 import { ManagerExplorerService } from "../manager-explorer.service";
 
-vi.mock("~/server/event-sourcing/introspection", () => ({
+vi.mock("~/server/event-sourcing.old/introspection", () => ({
   getProcessManagerMetadata: vi.fn(),
 }));
 
-import { getProcessManagerMetadata } from "~/server/event-sourcing/introspection";
+import { getProcessManagerMetadata } from "~/server/event-sourcing.old/introspection";
 
 const perAggregate = {
   processName: "triggerSettlement",

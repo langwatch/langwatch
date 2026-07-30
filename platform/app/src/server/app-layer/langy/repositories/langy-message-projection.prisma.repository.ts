@@ -1,7 +1,7 @@
 import type { LangyMessageProjectionRecord } from "@langwatch/langy";
 import type { Prisma } from "@prisma/client";
-import type { AppendStore } from "~/server/event-sourcing/projections/mapProjection.types";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import type { AppendStore } from "~/server/event-sourcing.old/projections/mapProjection.types";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 
 type Row = Prisma.LangyMessageProjectionGetPayload<object>;
 

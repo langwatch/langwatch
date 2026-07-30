@@ -22,13 +22,13 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { point } from "~/server/event-sourcing/pipelines/metric-processing/__tests__/fixtures/metric-point.fixtures";
-import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
-import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
+import { point } from "~/server/event-sourcing.old/pipelines/metric-processing/__tests__/fixtures/metric-point.fixtures";
+import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/constants";
+import type { CanonicalMetricDataPoint } from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/metricDataPoint";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
 import { MetricDataPointClickHouseRepository } from "../metric-data-point.clickhouse.repository";
 
 let ch: ClickHouseClient;

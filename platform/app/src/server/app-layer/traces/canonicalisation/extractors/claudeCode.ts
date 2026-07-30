@@ -40,7 +40,7 @@
  * RAW_API_BODIES) so the bodies carry input/output text on every turn.
  */
 
-import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
+import { capPayloadString } from "~/server/event-sourcing.old/pipelines/trace-processing/utils/capOversizedLogRecord";
 
 import { ATTR_KEYS } from "./_constants";
 import { asNumber } from "./_guards";

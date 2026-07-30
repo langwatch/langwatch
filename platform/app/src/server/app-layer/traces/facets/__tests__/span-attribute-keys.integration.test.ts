@@ -23,7 +23,7 @@ import { seedSpans } from "../../../../analytics/clickhouse/__tests__/test-utils
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
 import { buildSpanAttributeKeysFacetQuery } from "../span-attribute-keys";
 
 const TENANT_ID = "facet-span-attr-keys-test";

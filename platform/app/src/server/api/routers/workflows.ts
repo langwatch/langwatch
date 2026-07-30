@@ -23,7 +23,7 @@ import {
 import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
-import { pMapLimited } from "../../event-sourcing/replay/pMapLimited";
+import { pMapLimited } from "../../event-sourcing.old/replay/pMapLimited";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";

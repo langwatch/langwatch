@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import { GatewayBudgetDebitsAppendStore } from "../gatewayBudgetDebits.store";
 import { GovernanceKpisAppendStore } from "../governanceKpis.store";
 import { GovernanceOcsfEventsAppendStore } from "../governanceOcsfEvents.store";

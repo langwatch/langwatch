@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/commands";
 import type {
   CustomMetadata,
   ReservedTraceMetadata,

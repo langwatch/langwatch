@@ -4,9 +4,9 @@ import { runIngestionPull } from "@ee/governance/services/pullers/pullerWorker";
 import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import type { CommandBus } from "~/server/event-sourcing/commands/commandBus";
-import type { EventSourcing } from "~/server/event-sourcing/eventSourcing";
-import { mapCommands } from "~/server/event-sourcing/mapCommands";
+import type { CommandBus } from "~/server/event-sourcing.old/commands/commandBus";
+import type { EventSourcing } from "~/server/event-sourcing.old/eventSourcing";
+import { mapCommands } from "~/server/event-sourcing.old/mapCommands";
 
 const logger = createLogger("langwatch:enterprise:event-sourcing");
 

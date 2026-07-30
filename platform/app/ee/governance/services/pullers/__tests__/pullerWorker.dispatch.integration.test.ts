@@ -29,7 +29,7 @@ import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { getTestClickHouseClient } from "~/server/event-sourcing.old/__tests__/integration/testContainers";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import { runIngestionPull } from "../pullerWorker";
 

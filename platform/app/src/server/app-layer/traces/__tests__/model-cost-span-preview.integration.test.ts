@@ -21,7 +21,7 @@ import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../event-sourcing.old/__tests__/integration/testContainers";
 import {
   deriveUnmappedCostSuggestion,
   previewCostRuleMatchingSpans,

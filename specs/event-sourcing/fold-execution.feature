@@ -63,3 +63,14 @@ Feature: Applying a delivery to a fold is one governed read-decide-write cycle
     When one delivery is applied and another is skipped as a redelivery
     Then the applied delivery is counted on its own and the size of its batch is recorded
     And the skipped delivery is counted separately, with no batch size recorded for it
+
+  Scenario: every failure lands on the same counter as a success, so the denominator is every attempt
+    Given a fold whose store cannot be reached
+    When a delivery is applied
+    Then the failure is counted on the same measure that counts successes
+    And a projection failing every delivery does not read as one that is merely quiet
+
+  Scenario: a fold that throws in its own apply is not the one failure nothing counts
+    Given a fold whose own logic raises on an event it was not built for
+    When a delivery is applied
+    Then that failure is counted alongside store failures

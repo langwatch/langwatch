@@ -4,14 +4,14 @@ import {
   getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { createTenantId } from "../../../../event-sourcing/domain/tenantId";
-import { LEGACY_HOLDER_LEASE_GUARD } from "../../../../event-sourcing/queues/groupQueue/blobConstants";
+} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
+import { createTenantId } from "../../../../event-sourcing.old/domain/tenantId";
+import { LEGACY_HOLDER_LEASE_GUARD } from "../../../../event-sourcing.old/queues/groupQueue/blobConstants";
 import {
   blobHolderSetKey,
   blobLeaseSetKey,
   redisBlobKey,
-} from "../../../../event-sourcing/queues/groupQueue/blobKeys";
+} from "../../../../event-sourcing.old/queues/groupQueue/blobKeys";
 import { BlobStoreRedisRepository } from "../../repositories/blob-store.redis.repository";
 
 const hasTestcontainers = !!(process.env.REDIS_URL || process.env.CI_REDIS_URL);

@@ -17,7 +17,7 @@
  * read paths call: it gates, reads the logs, and never fails the read.
  */
 import type { Logger } from "pino";
-import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
+import { capPayloadString } from "~/server/event-sourcing.old/pipelines/trace-processing/utils/capOversizedLogRecord";
 import type { Span } from "~/server/tracer/types";
 import {
   type ClaudeContentLog,

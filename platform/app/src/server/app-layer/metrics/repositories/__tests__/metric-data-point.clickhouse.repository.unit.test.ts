@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalMetricDataPoint } from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
+import type { CanonicalMetricDataPoint } from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/metricDataPoint";
 import { MetricDataPointClickHouseRepository } from "../metric-data-point.clickhouse.repository";
 
 function dataPoint(): CanonicalMetricDataPoint {

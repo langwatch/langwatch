@@ -16,8 +16,8 @@
  * cross-tenant write into a loud failure.
  */
 
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
+import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
+import type { TenantId } from "~/server/event-sourcing.old/domain/tenantId";
 
 /**
  * Throws unless the record's tenant is the tenant the router resolved for it.

@@ -15,11 +15,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
+import type { EvaluationAnalyticsRow } from "~/server/event-sourcing.old/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../../event-sourcing.old/__tests__/integration/testContainers";
 import { EvaluationAnalyticsClickHouseRepository } from "../evaluation-analytics.clickhouse.repository";
 
 let ch: ClickHouseClient;

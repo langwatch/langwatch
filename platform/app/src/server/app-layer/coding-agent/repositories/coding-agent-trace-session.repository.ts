@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { CodingAgentTraceSessionRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentTraceSessions.mapProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { CodingAgentTraceSessionRecord } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/projections/codingAgentTraceSessions.mapProjection";
+import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
 

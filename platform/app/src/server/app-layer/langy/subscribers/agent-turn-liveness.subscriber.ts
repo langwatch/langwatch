@@ -13,10 +13,10 @@ import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing.old/pipelines/langy-conversation-processing/schemas/events";
+import type { ProjectionCursor } from "~/server/event-sourcing.old/projections/stateProjection.types";
+import { DispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
+import type { EventSubscriberDefinition } from "~/server/event-sourcing.old/subscribers/eventSubscriber.types";
 
 import { projectionNotReadyError } from "./projection-cursor";
 

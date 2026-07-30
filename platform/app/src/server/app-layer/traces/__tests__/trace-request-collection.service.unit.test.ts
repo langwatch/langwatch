@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   PIIRedactionLevel,
   RecordSpanCommandData,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/commands";
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "../../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
+import type { OtlpSpan } from "../../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import type { SpanDedupService } from "../span-dedupe.service";
 import { TraceRequestCollectionService } from "../trace-request-collection.service";
 

@@ -30,8 +30,8 @@ import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/tra
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
+import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
 
 const tenantId = `test-rollup-${generate("tenant").toString()}`;
 // All spans below land in one minute bucket so the rollup collapses to a

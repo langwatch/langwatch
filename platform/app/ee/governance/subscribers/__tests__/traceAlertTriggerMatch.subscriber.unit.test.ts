@@ -4,11 +4,11 @@ import { TriggerAction, TriggerKind } from "@prisma/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
-import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { TriggerContext } from "~/server/event-sourcing.old/pipeline/processManagerDefinition";
+import { RecordTriggerMatchCommand } from "~/server/event-sourcing.old/pipelines/automations/commands/recordTriggerMatch.command";
+import { settleWindowBucket } from "~/server/event-sourcing.old/pipelines/automations/settleWindow";
+import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
+import type { TraceProcessingEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
 import {
   createTraceAlertTriggerMatchHandler,
   createTraceAlertTriggerMatchSubscriber,

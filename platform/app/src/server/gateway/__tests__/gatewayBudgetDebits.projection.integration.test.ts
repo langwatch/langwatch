@@ -42,16 +42,16 @@ import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
+import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import {
   createSpanReceivedEvent,
   msToUnixNano,
-} from "~/server/event-sourcing/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/projections/__tests__/fixtures/trace-summary-test.fixtures";
 import type {
   SpanReceivedEvent,
   TraceProcessingEvent,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "../budget.repository";
 import { GatewayBudgetService } from "../budget.service";
@@ -136,7 +136,7 @@ function gatewaySpanEvent({
 function testClickHouseRepository(): GatewayBudgetClickHouseRepository {
   return new GatewayBudgetClickHouseRepository(async () => {
     const { getTestClickHouseClient } = await import(
-      "~/server/event-sourcing/__tests__/integration/testContainers"
+      "~/server/event-sourcing.old/__tests__/integration/testContainers"
     );
     const client = getTestClickHouseClient();
     if (!client) throw new Error("Test CH client not initialised");

@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Event } from "~/server/event-sourcing/domain/types";
-import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type { Event } from "~/server/event-sourcing.old/domain/types";
+import { EventSourcing } from "~/server/event-sourcing.old/eventSourcing";
+import type { IntentContext } from "~/server/event-sourcing.old/pipeline/processManagerDefinition";
 import type {
   StateProjectionStore,
   StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
-import { createMockEventStore } from "~/server/event-sourcing/services/__tests__/testHelpers";
+} from "~/server/event-sourcing.old/projections/stateProjection.types";
+import { createMockEventStore } from "~/server/event-sourcing.old/services/__tests__/testHelpers";
 
 import { createIngestionPullProcessingPipeline } from "../pipeline";
 import {

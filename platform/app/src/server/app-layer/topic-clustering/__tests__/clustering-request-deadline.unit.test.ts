@@ -56,7 +56,7 @@ vi.mock("../../../langevals/stagedFetch", () => ({
   stagedLangevalsFetch: stagedLangevalsFetchMock,
 }));
 
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
+import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import {
   fetchTopicsBatchClustering,
   fetchTopicsIncrementalClustering,

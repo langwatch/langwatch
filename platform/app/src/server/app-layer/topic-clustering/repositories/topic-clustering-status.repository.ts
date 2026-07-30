@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
-import type { TopicClusteringRunHistoryEntry } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/process-manager/topicClusteringProcess.types";
+import type { TopicClusteringRunHistoryEntry } from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
 
 import { parseRunHistoryRuns } from "./topic-clustering-run-history-projection.prisma.repository";
 

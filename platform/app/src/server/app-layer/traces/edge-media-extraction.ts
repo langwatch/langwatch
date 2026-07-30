@@ -37,11 +37,11 @@ import {
   computeDroppedKeys,
   rolesDroppedFromChatArrays,
 } from "~/server/data-privacy/dropKeyCatalog";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { RecordSpanCommandData } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/commands";
 import type {
   OtlpKeyValue,
   OtlpSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import { featureFlagService } from "~/server/featureFlag";
 import { getEdgeMediaExtractFailOpenCounter } from "~/server/metrics";
 import type { ExtractedRef } from "~/server/stored-objects/content-extractor";

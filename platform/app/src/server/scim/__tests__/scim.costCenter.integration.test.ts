@@ -12,7 +12,7 @@ import { prisma } from "../../db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "../../event-sourcing.old/__tests__/integration/testContainers";
 import { ScimService } from "../scim.service";
 import type { ScimCreateUserRequest, ScimPatchRequest } from "../scim.types";
 import { SCIM_ENTERPRISE_USER_SCHEMA } from "../scim.types";

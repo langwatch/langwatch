@@ -3,7 +3,7 @@ import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/cli
 import { AnalyticsClientUnavailableError } from "~/server/app-layer/analytics/errors";
 import { validateTimeZone } from "~/server/app-layer/analytics/query-builders/_shared";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import type {
   FindMonitorPerformanceParams,
   MonitorPerformanceBucket,

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   NormalizedAttributes,
   NormalizedEvent,
-} from "../../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "../../../../event-sourcing.old/pipelines/trace-processing/schemas/spans";
 import { CanonicalizeSpanAttributesService } from "../canonicalizeSpanAttributesService";
 import type { ExtractorContext } from "../extractors/_types";
 

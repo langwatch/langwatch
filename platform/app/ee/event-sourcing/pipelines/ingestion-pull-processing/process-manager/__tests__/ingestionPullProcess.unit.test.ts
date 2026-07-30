@@ -3,13 +3,13 @@ import { ingestionPullPM } from "@ee/event-sourcing/pipelines/ingestion-pull-pro
 import { INGESTION_PULL_EVENT_TYPES } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/constants";
 import type { IngestionPullProcessingEvent } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { describe, expect, it } from "vitest";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import { buildProcessManager } from "~/server/event-sourcing.old/pipeline/processBuilder";
 import type {
   ProcessDefinition,
   ProcessEventEnvelope,
   ProcessInput,
-} from "~/server/event-sourcing/process-manager";
-import { buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
+} from "~/server/event-sourcing.old/process-manager";
+import { buildProcessDefinition } from "~/server/event-sourcing.old/process-manager/processRuntime";
 
 import {
   INGESTION_PULL_PROCESS_NAME,

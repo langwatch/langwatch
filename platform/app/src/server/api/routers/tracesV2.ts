@@ -55,12 +55,12 @@ import {
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   stripRolesFromChatArrayJson,
 } from "~/server/data-privacy/dropKeyCatalog";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { DerivedTraceEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/trace-events.derivation";
+import { changeTraceNameInputSchema } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/commands";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
 import type { Span, SpanInputOutput } from "~/server/tracer/types";
 import {
   findPromptReferenceInAncestors,

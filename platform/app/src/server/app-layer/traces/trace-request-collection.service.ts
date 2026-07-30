@@ -8,7 +8,7 @@ import { getLangWatchTracer } from "langwatch";
 import type {
   PIIRedactionLevel,
   RecordSpanCommandData,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+} from "../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
 import {
   instrumentationScopeSchema,
   type OtlpInstrumentationScope,
@@ -16,8 +16,8 @@ import {
   type OtlpSpan,
   resourceSchema,
   spanSchema,
-} from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { TraceRequestUtils } from "../../event-sourcing/pipelines/trace-processing/utils/traceRequest.utils";
+} from "../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
+import { TraceRequestUtils } from "../../event-sourcing.old/pipelines/trace-processing/utils/traceRequest.utils";
 import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
 import type { SpanDedupService } from "./span-dedupe.service";
 

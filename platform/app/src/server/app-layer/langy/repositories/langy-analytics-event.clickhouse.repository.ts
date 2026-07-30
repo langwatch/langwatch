@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import type {
   LangyAnalyticsEventRecord,
   LangyAnalyticsEventRepository,

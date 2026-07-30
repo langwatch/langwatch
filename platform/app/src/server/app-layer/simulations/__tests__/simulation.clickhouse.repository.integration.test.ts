@@ -5,7 +5,7 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../event-sourcing.old/__tests__/integration/testContainers";
 import { createResilientClickHouseClient } from "../../clients/clickhouse";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 

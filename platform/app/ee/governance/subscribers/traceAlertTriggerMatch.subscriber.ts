@@ -3,16 +3,16 @@
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { RecordTriggerMatchPort } from "~/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
+import type { TriggerContext } from "~/server/event-sourcing.old/pipeline/processManagerDefinition";
+import type { RecordTriggerMatchPort } from "~/server/event-sourcing.old/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   STALE_TRACE_THRESHOLD_MS,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/traceOriginGuards";
-import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
+import type { TraceProcessingEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import { passesTraceOriginGuards } from "~/server/event-sourcing.old/pipelines/trace-processing/traceOriginGuards";
+import type { EventSubscriberDefinition } from "~/server/event-sourcing.old/subscribers/eventSubscriber.types";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 
 /** Debounce window before a trace is matched against automations. */

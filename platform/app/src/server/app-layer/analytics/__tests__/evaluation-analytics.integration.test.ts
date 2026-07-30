@@ -20,12 +20,12 @@ import { EvaluationAnalyticsRollupClickHouseRepository } from "~/server/app-laye
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/server/event-sourcing.old/__tests__/integration/testContainers";
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsRow,
-} from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
-import type { EvaluationAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.mapProjection";
+} from "~/server/event-sourcing.old/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
+import type { EvaluationAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.mapProjection";
 
 const tenantId = `test-eval-${nanoid()}`;
 

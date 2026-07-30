@@ -15,10 +15,10 @@ import type { AnnotationService } from "~/server/annotations/annotation.service"
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { DatasetService } from "~/server/datasets/dataset.service";
-import type { AutomationDispatchCollaborators } from "~/server/event-sourcing/pipelines/automations/automationDispatch.adapter";
-import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
-import { CachedFoldStore } from "~/server/event-sourcing/projections/cachedFoldStore";
-import type { FoldCacheClient } from "~/server/event-sourcing/projections/foldCache/foldCacheClient";
+import type { AutomationDispatchCollaborators } from "~/server/event-sourcing.old/pipelines/automations/automationDispatch.adapter";
+import { TraceSummaryStore } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceSummary.store";
+import { CachedFoldStore } from "~/server/event-sourcing.old/projections/cachedFoldStore";
+import type { FoldCacheClient } from "~/server/event-sourcing.old/projections/foldCache/foldCacheClient";
 import { TraceService } from "~/server/traces/trace.service";
 import type { EvaluationRunService } from "../evaluations/evaluation-run.service";
 import type { ProjectService } from "../projects/project.service";

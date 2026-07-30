@@ -4,18 +4,18 @@ import type { ChainableCommander, Cluster } from "ioredis";
 import {
   CachedLuaScript,
   isNoScriptResult,
-} from "~/server/event-sourcing/queues/groupQueue/cachedLuaScript";
+} from "~/server/event-sourcing.old/queues/groupQueue/cachedLuaScript";
 import {
   decodeJobEnvelope,
   readJobRoutingMeta,
-} from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
-import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
+} from "~/server/event-sourcing.old/queues/groupQueue/jobEnvelope";
+import { RedisJobBlobStore } from "~/server/event-sourcing.old/queues/groupQueue/redisJobBlobStore";
 import {
   GROUP_QUEUE_REGISTRY_KEY,
   PARK_HELPER_LUA,
   TTL_HELPER_LUA,
-} from "~/server/event-sourcing/queues/groupQueue/scripts";
-import { TieredBlobStore } from "~/server/event-sourcing/queues/groupQueue/tieredBlobStore";
+} from "~/server/event-sourcing.old/queues/groupQueue/scripts";
+import { TieredBlobStore } from "~/server/event-sourcing.old/queues/groupQueue/tieredBlobStore";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { normalizeErrorMessage } from "../normalize-error-message";

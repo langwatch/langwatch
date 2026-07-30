@@ -6,7 +6,7 @@ import type {
   RawEventRow,
 } from "../repositories/event-explorer.repository";
 
-vi.mock("~/server/event-sourcing/introspection", () => ({
+vi.mock("~/server/event-sourcing.old/introspection", () => ({
   getProjectionMetadata: vi.fn(() => [
     { projectionName: "traceMetrics", aggregateType: "Trace" },
     { projectionName: "experimentRun", aggregateType: "Experiment" },
@@ -348,8 +348,8 @@ describe("EventExplorerService", () => {
     describe("when apply throws for an event", () => {
       it("skips that event and continues", async () => {
         const { getDejaViewProjections } = await vi.importMock<
-          typeof import("~/server/event-sourcing/introspection")
-        >("~/server/event-sourcing/introspection");
+          typeof import("~/server/event-sourcing.old/introspection")
+        >("~/server/event-sourcing.old/introspection");
         (getDejaViewProjections as ReturnType<typeof vi.fn>).mockReturnValue([
           {
             projectionName: "traceMetrics",

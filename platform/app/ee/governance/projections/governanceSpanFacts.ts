@@ -43,9 +43,9 @@ import {
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "@ee/governance/services/governanceAttributeKeys";
 import { spanNormalizationPipelineService } from "@ee/governance/services/spanDerivation.composition";
-import { stringAttr } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-summary.utils";
-import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { stringAttr } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/trace-summary.utils";
+import type { SpanReceivedEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import type { NormalizedSpan } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
 
 /** Fallback `SourceType` label when the receiver stamped no source type. */
 export const GOVERNANCE_SOURCE_TYPE_UNKNOWN = "unknown";

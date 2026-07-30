@@ -1,7 +1,7 @@
-import { definePipeline } from "~/server/event-sourcing";
-import type { CommandBus } from "~/server/event-sourcing/commands/commandBus";
-import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
-import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
+import { definePipeline } from "~/server/event-sourcing.old";
+import type { CommandBus } from "~/server/event-sourcing.old/commands/commandBus";
+import type { ProcessManagerApplier } from "~/server/event-sourcing.old/pipeline/processBuilder";
+import type { StateProjectionStore } from "~/server/event-sourcing.old/projections/stateProjection.types";
 
 import {
   ConfigureIngestionPullCommand,

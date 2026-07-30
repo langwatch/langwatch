@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 
-import type { TopicModelEntry } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
+import type { TopicModelEntry } from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/schemas/events";
 
 const logger = createLogger("langwatch:topic-clustering:seed");
 

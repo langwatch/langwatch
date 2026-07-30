@@ -1,6 +1,6 @@
-import { getProcessManagerMetadata } from "~/server/event-sourcing/introspection";
-import type { ProcessRef } from "~/server/event-sourcing/process-manager/processManager.types";
-import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
+import { getProcessManagerMetadata } from "~/server/event-sourcing.old/introspection";
+import type { ProcessRef } from "~/server/event-sourcing.old/process-manager/processManager.types";
+import type { ProcessStore } from "~/server/event-sourcing.old/process-manager/stores/processStore.types";
 
 /** The aggregate's current position in one manager's machine. */
 export interface AggregateProcessManagerInstance {

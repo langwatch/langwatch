@@ -24,8 +24,8 @@ import type {
 import type {
   AppendStore,
   BulkAppendContext,
-} from "~/server/event-sourcing/projections/mapProjection.types";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+} from "~/server/event-sourcing.old/projections/mapProjection.types";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import {
   assertRecordsTenant,
   assertRecordTenant,

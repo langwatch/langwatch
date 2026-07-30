@@ -3,12 +3,12 @@
 import { spanNormalizationPipelineService } from "@ee/governance/services/spanDerivation.composition";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
 import type {
   SpanReceivedEvent,
   TraceProcessingEvent,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import type { EventSubscriberDefinition } from "~/server/event-sourcing.old/subscribers/eventSubscriber.types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   GATEWAY_VIRTUAL_KEY_ID_ATTR,

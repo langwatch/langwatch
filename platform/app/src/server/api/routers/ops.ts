@@ -19,7 +19,7 @@ import {
   getEventSubscriberMetadata,
   getKillSwitchDescriptors,
   getProjectionMetadata,
-} from "~/server/event-sourcing/introspection";
+} from "~/server/event-sourcing.old/introspection";
 import {
   getFeatureFlagStore,
   listFeatureFlagFamilies,

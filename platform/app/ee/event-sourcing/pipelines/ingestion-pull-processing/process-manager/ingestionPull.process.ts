@@ -3,8 +3,8 @@ import type {
   EventHandler,
   ProcessHandlerContext,
   WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { ProcessIntent } from "~/server/event-sourcing/process-manager";
+} from "~/server/event-sourcing.old/pipeline/processManagerDefinition";
+import type { ProcessIntent } from "~/server/event-sourcing.old/process-manager";
 
 import {
   type IngestionPullProcessingEvent,

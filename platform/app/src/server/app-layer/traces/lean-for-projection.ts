@@ -13,16 +13,16 @@
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
 import type {
   OtlpResource,
   OtlpSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   hasOversizedAttribute,
-} from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/utils/capOversizedAttributes";
 
 /**
  * Spans whose serialized command payload exceeds this threshold are spooled to S3 at

@@ -2,7 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type {
   MetricUsageEstimate,
   MetricUsageEstimateQuery,
-} from "~/server/event-sourcing/pipelines/metric-processing/schemas/metricDataPoint";
+} from "~/server/event-sourcing.old/pipelines/metric-processing/schemas/metricDataPoint";
 
 const DIMENSIONS: Record<MetricUsageEstimateQuery["groupBy"], string[]> = {
   organization: ["OrganizationId"],

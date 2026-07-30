@@ -6,12 +6,12 @@ import {
   type TopicClusteringRunHistoryData,
   type TopicClusteringRunHistoryEntry,
   topicClusteringRunHistoryEntrySchema,
-} from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+} from "~/server/event-sourcing.old/pipelines/topic-clustering-processing/projections/topicClusteringRunHistory.foldProjection";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
   StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+} from "~/server/event-sourcing.old/projections/stateProjection.types";
 import { KSUID_RESOURCES } from "~/utils/constants";
 
 type Row = Prisma.TopicClusteringRunHistoryProjectionGetPayload<object>;

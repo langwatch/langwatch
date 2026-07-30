@@ -4,7 +4,7 @@ import {
   queryWindowed,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,

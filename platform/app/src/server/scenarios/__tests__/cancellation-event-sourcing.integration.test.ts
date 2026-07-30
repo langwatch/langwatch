@@ -35,7 +35,7 @@ import {
   getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "../../event-sourcing.old/__tests__/integration/testContainers";
 import type {
   CancellationMessage,
   CancellationSubscriber,

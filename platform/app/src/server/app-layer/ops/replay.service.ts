@@ -3,8 +3,8 @@
 import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { env } from "~/env.mjs";
-import { createReplayRuntime } from "~/server/event-sourcing/replay/replayPreset";
-import type { ReplayProgress } from "~/server/event-sourcing/replay/types";
+import { createReplayRuntime } from "~/server/event-sourcing.old/replay/replayPreset";
+import type { ReplayProgress } from "~/server/event-sourcing.old/replay/types";
 import type {
   ReplayHistoryEntry,
   ReplayRepository,

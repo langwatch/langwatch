@@ -24,7 +24,7 @@ import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "../../event-sourcing.old/__tests__/integration/testContainers";
 import type { Protections } from "../../traces/protections";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { enrichTracesWithEvaluations } from "../enrich-evaluations";

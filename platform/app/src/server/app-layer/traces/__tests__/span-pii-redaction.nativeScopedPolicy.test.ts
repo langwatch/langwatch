@@ -9,7 +9,7 @@ import {
 import type {
   OtlpKeyValue,
   OtlpSpan,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+} from "../../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import {
   type BatchClearPIIFunction,
   type DataPrivacyResolver,
@@ -23,7 +23,7 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: vi.fn(async () => false) },
 }));
 
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import { featureFlagService } from "~/server/featureFlag";
 
 const TENANT = createTenantId("project-web-app");

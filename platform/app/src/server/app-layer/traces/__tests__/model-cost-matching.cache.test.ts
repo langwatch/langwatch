@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
-import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
 
 // Prompt-cache cost: a span whose prompt was mostly served from cache must be
 // priced at the provider's cache-read rate, not the full input rate. A cached

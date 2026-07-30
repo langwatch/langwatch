@@ -4,9 +4,9 @@ import {
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import type { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
-import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing.old/pipelines/langy-conversation-processing/schemas/events";
+import type { ProjectionCursor } from "~/server/event-sourcing.old/projections/stateProjection.types";
+import type { EventSubscriberDefinition } from "~/server/event-sourcing.old/subscribers/eventSubscriber.types";
 
 import { projectionNotReadyError } from "./projection-cursor";
 

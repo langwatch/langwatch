@@ -35,13 +35,13 @@ import {
   serializeLangyTurnError,
 } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
-import type { CommandEnvelope } from "~/server/event-sourcing/commands/commandEnvelope";
+import type { CommandEnvelope } from "~/server/event-sourcing.old/commands/commandEnvelope";
 import {
   createTenantId,
   type TenantId,
-} from "~/server/event-sourcing/domain/tenantId";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
+} from "~/server/event-sourcing.old/domain/tenantId";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing.old/pipelines/langy-conversation-processing/schemas/events";
+import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing.old/stores/rehydrationWindow";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   LangyConversationNotFoundError,

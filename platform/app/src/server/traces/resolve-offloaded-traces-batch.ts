@@ -29,7 +29,7 @@ import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-i
 import type {
   NormalizedAttributes,
   NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 import type {
   ResolvedTraceSpans,

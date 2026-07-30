@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Event } from "~/server/event-sourcing";
-import { createTenantId } from "~/server/event-sourcing";
+import type { Event } from "~/server/event-sourcing.old";
+import { createTenantId } from "~/server/event-sourcing.old";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,
@@ -19,8 +19,8 @@ import {
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "~/server/event-sourcing.old/pipelines/trace-processing/utils/capOversizedAttributes";
 import {
   EVENTREF_ATTR_PREFIX,
   IO_ATTR_KEYS,

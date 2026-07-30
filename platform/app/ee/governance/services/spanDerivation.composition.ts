@@ -25,8 +25,8 @@
 
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
-import { SpanCostService } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/span-cost.service";
-import { SpanStatusService } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/span-status.service";
+import { SpanCostService } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/span-cost.service";
+import { SpanStatusService } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/span-status.service";
 
 /**
  * OTLP span → `NormalizedSpan`. Not cheap: it opens a tracer span and runs

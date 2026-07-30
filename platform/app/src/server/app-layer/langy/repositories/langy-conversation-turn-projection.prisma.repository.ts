@@ -9,11 +9,11 @@ import {
 } from "@langwatch/langy";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
   StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+} from "~/server/event-sourcing.old/projections/stateProjection.types";
 
 /**
  * The status values this column accepts, derived from the ONE definition rather

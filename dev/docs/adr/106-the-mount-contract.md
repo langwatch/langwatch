@@ -65,7 +65,8 @@ files owns it.
 | `fold` + `collapse: "latest"` | a fold accumulates, so a discarded event is a contribution that never arrives |
 | scope `event` + `collapse: "batch"` | a lane holding one event can never form a batch, so the setting is a no-op that reads as an optimisation |
 | `fold` + a store other than `replace` | a fold reads its prior state back, which only a `replace` store offers |
-| any new table choosing `merge` | see decision 5 — the kind is closed to new adopters |
+| `map` + `replace` | no executor accepts it — a map's executor takes an append or merge store, so this mount would validate with nothing able to run it |
+| `merge`, at all | see decision 5 — the kind is closed, and the checker has no reopening mechanism |
 
 The table is exhaustive over the combinations the system can express, and it is
 the ADR's actual content — the prose above it exists to explain why a table is
@@ -96,6 +97,15 @@ guarantee exactly-once upstream, which nothing in this system can.
 each leaves by one of two routes: a `replace` store written with the whole
 bucket value, or derivation at read time. Guarding a kind nobody new may choose
 is cheaper than guarding one everybody may.
+
+**The checker refuses `merge` unconditionally, and carries no grandfathering
+mechanism.** That is deliberate rather than an oversight, and it works because
+the three existing tables do not pass through this checker: they are mounted by
+pipelines that have not yet been rewritten. By the time one of them reaches a
+mount, it has been rewritten — and the rewrite is precisely where it leaves
+`merge`. An allowlist would be a permanent affordance built for three rows that
+are supposed to disappear, and every such affordance eventually acquires a
+fourth entry.
 
 ### 3. Refusal happens at composition, not at first event
 

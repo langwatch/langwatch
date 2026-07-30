@@ -3,7 +3,7 @@
  *
  * This file exists solely to mirror the hard-floor that already lives in the
  * integration globalSetup (see
- * src/server/event-sourcing/__tests__/integration/globalSetup.ts). Unit tests
+ * src/server/event-sourcing.old/__tests__/integration/globalSetup.ts). Unit tests
  * need no containers or other setup, so the hard-floor is the only thing here.
  *
  * Why a hard-floor on unit too: `langwatch-app-ci` runs `test-unit` (4 shards)

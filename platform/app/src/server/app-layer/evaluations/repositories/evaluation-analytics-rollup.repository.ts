@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type { EvaluationAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.mapProjection";
+import type { EvaluationAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.mapProjection";
 
 /**
  * Per-evaluation insert into `evaluation_analytics_rollup` (ADR-034

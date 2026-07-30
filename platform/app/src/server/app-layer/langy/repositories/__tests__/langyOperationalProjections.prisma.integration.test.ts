@@ -8,8 +8,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { LangyConversationNotFoundError } from "~/server/app-layer/langy/errors";
 import { LangyMessageService } from "~/server/app-layer/langy/langy-message.service";
 import { prisma } from "~/server/db";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { Event } from "~/server/event-sourcing/domain/types";
+import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
+import type { Event } from "~/server/event-sourcing.old/domain/types";
 import {
   LangyAgentRespondedEventSchema,
   LangyAgentTurnAcceptedEventSchema,
@@ -21,10 +21,10 @@ import {
   LangyPlanUpdatedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing";
-import { MapProjectionExecutor } from "~/server/event-sourcing/projections/mapProjectionExecutor";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
+} from "~/server/event-sourcing.old/pipelines/langy-conversation-processing";
+import { MapProjectionExecutor } from "~/server/event-sourcing.old/projections/mapProjectionExecutor";
+import type { ProjectionStoreContext } from "~/server/event-sourcing.old/projections/projectionStoreContext";
+import { StateProjectionExecutor } from "~/server/event-sourcing.old/projections/stateProjectionExecutor";
 import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 import { PrismaLangyConversationTurnProjectionRepository } from "../langy-conversation-turn-projection.prisma.repository";

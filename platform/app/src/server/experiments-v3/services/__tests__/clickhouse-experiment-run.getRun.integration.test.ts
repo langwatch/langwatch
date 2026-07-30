@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+} from "../../../event-sourcing.old/__tests__/integration/testContainers";
 
 // getRun resolves its ClickHouse client through getClickHouseClientForProject;
 // point that at the testcontainer client so the real query path runs.

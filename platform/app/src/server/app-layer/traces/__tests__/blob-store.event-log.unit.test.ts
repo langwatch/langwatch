@@ -22,19 +22,19 @@ import {
   IO_PREVIEW_BYTES,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { createTenantId } from "~/server/event-sourcing.old/domain/tenantId";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
+import type { SpanReceivedEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
+import { eventToRecord } from "~/server/event-sourcing.old/stores/eventStoreUtils";
+import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import {
   resolveOffloadedTraces,
   type WarnLogger,

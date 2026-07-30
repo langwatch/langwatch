@@ -59,7 +59,7 @@ import { LangyConversationService } from "~/server/app-layer/langy/langy-convers
 import { PrismaLangyConversationRepository } from "~/server/app-layer/langy/repositories/langy-conversation.prisma.repository";
 import { createLangyConversationUpdateBroadcastSubscriber } from "~/server/app-layer/langy/subscribers/langy-conversation-update-broadcast.subscriber";
 import { prisma } from "~/server/db";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing.old/pipelines/langy-conversation-processing/schemas/events";
 import { createInnerTRPCContext } from "../../trpc";
 import { langyRouter } from "../langy";
 

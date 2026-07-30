@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   CanonicalLogRecord,
   LogTraceContribution,
-} from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
+} from "~/server/event-sourcing.old/pipelines/log-processing/schemas/logRecord";
 import { IO_PREVIEW_BYTES } from "../lean-for-projection";
 import {
   type LogRequestCollectionResult,

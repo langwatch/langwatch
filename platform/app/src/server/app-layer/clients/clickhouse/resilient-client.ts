@@ -5,7 +5,7 @@ import {
   incrementConventionViolation,
   observeClickHouseQueryDuration,
 } from "~/server/clickhouse/metrics";
-import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
+import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing.old/services/errorHandling";
 import {
   CONVENTION_GATE_THROWS,
   findConventionViolations,

@@ -14,7 +14,7 @@ import {
 import { render } from "@react-email/render";
 import { createHash } from "crypto";
 import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
-import { toDispatchError } from "~/server/event-sourcing/queues/dispatchError";
+import { toDispatchError } from "~/server/event-sourcing.old/queues/dispatchError";
 import { env } from "../../env.mjs";
 import { computeDefaultFrom, sendEmail } from "./emailSender";
 import {
