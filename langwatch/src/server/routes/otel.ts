@@ -228,6 +228,123 @@ async function enforcePlanLimit(
 }
 
 /**
+ * Everything the receiver writes onto an OTLP request on its own authority,
+ * for one signal. Two rules with different scopes live here together because
+ * they are the same concern (what the payload is not allowed to decide) and
+ * because they must not drift apart:
+ *
+ *   - `langwatch.api_key.id` is rewritten on EVERY authenticated request. The
+ *     redaction deny-list exempts that name, which is only sound while the
+ *     value cannot come from the payload, so this must never become
+ *     conditional. See enforceApiKeyIdOnTraceRequest.
+ *   - The ingest-key provenance stamp (source / origin / organization_id /
+ *     template.id) applies only to ingestion-key traffic, which is the only
+ *     traffic that has a source identity to claim.
+ *
+ * The casts bridge nullability differences between the OTLP SDK types and the
+ * structural slice these helpers mutate (resource → attributes); neither helper
+ * reads the deeper fields that differ.
+ */
+async function applyReceiverProvenanceToTraces({
+  request,
+  resolved,
+}: {
+  request: IExportTraceServiceRequest;
+  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+}): Promise<void> {
+  const typedRequest = request as unknown as Parameters<
+    typeof enforceApiKeyIdOnTraceRequest
+  >[0];
+  enforceApiKeyIdOnTraceRequest(
+    typedRequest,
+    resolved?.type === "apiKey" ? resolved.apiKeyId : null,
+  );
+
+  if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
+
+  // Whether this tool's direct-OTLP usage is bundled (non-billed per token).
+  // Cached per (org, sourceType); drives the trace summary's billed-vs-non-
+  // billed cost split. Gateway usage never reaches here.
+  const nonBillable = await resolveSourceNonBillable({
+    organizationId: resolved.organizationId,
+    sourceType: resolved.ingestSourceType,
+  });
+  stampIngestKeyProvenanceOnTraceRequest(
+    request as unknown as Parameters<
+      typeof stampIngestKeyProvenanceOnTraceRequest
+    >[0],
+    {
+      apiKeyId: resolved.apiKeyId,
+      sourceType: resolved.ingestSourceType,
+      organizationId: resolved.organizationId,
+      templateId: resolved.ingestionTemplateId,
+      nonBillable,
+    },
+  );
+}
+
+/** {@link applyReceiverProvenanceToTraces} for the logs signal. */
+async function applyReceiverProvenanceToLogs({
+  request,
+  resolved,
+}: {
+  request: unknown;
+  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+}): Promise<void> {
+  enforceApiKeyIdOnLogRequest(
+    request as Parameters<typeof enforceApiKeyIdOnLogRequest>[0],
+    resolved?.type === "apiKey" ? resolved.apiKeyId : null,
+  );
+
+  if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
+
+  // Log-based tools (Claude Code et al. emit OTLP logs, not spans) need the
+  // same bundled-vs-billed resolution the trace path does; without it their
+  // cost never gets the non-billable marker and a bundled coding session reads
+  // as real spend.
+  const nonBillable = await resolveSourceNonBillable({
+    organizationId: resolved.organizationId,
+    sourceType: resolved.ingestSourceType,
+  });
+  stampIngestKeyProvenanceOnLogRequest(
+    request as Parameters<typeof stampIngestKeyProvenanceOnLogRequest>[0],
+    {
+      apiKeyId: resolved.apiKeyId,
+      sourceType: resolved.ingestSourceType,
+      organizationId: resolved.organizationId,
+      templateId: resolved.ingestionTemplateId,
+      nonBillable,
+    },
+  );
+}
+
+/** {@link applyReceiverProvenanceToTraces} for the metrics signal. */
+function applyReceiverProvenanceToMetrics({
+  request,
+  resolved,
+}: {
+  request: unknown;
+  resolved: Awaited<ReturnType<typeof tokenResolver.resolve>>;
+}): void {
+  enforceApiKeyIdOnMetricRequest(
+    request as Parameters<typeof enforceApiKeyIdOnMetricRequest>[0],
+    resolved?.type === "apiKey" ? resolved.apiKeyId : null,
+  );
+
+  if (resolved?.type !== "apiKey" || !resolved.ingestSourceType) return;
+
+  stampIngestKeyProvenanceOnMetricRequest(
+    request as Parameters<typeof stampIngestKeyProvenanceOnMetricRequest>[0],
+    {
+      apiKeyId: resolved.apiKeyId,
+      sourceType: resolved.ingestSourceType,
+      organizationId: resolved.organizationId,
+      templateId: resolved.ingestionTemplateId,
+    },
+  );
+}
+
+/**
  * Best-effort extraction of customer trace_ids from an OTLP traces body.
  * Returns up to `max` unique hex-encoded trace_ids. Never throws — if the
  * body is empty, malformed, or unparsable, returns an empty array. Used to
@@ -370,48 +487,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/traces", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      // Receiver-authoritative `langwatch.api_key.id`, for EVERY authenticated
-      // request rather than only ingest-key traffic. Redaction exempts this
-      // attribute name from the secret-name deny-list, which is only sound
-      // while the value cannot come from the payload. See
-      // enforceApiKeyIdOnTraceRequest.
-      enforceApiKeyIdOnTraceRequest(
-        traceRequest as unknown as Parameters<
-          typeof enforceApiKeyIdOnTraceRequest
-        >[0],
-        resolved.type === "apiKey" ? resolved.apiKeyId : null,
-      );
-
-      // Receiver-authoritative provenance stamp for ingestion-key traces.
-      // Overwrites any payload-supplied provenance keys (langwatch.source /
-      // langwatch.origin / langwatch.organization_id / langwatch.template.id)
-      // — even a malicious upstream cannot forge a different source / org
-      // identity onto its own traces.
-      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
-        // Whether this tool's direct-OTLP usage is bundled (non-billed per
-        // token). Cached per (org, sourceType); drives the trace summary's
-        // billed-vs-non-billed cost split. Gateway usage never reaches here.
-        const nonBillable = await resolveSourceNonBillable({
-          organizationId: resolved.organizationId,
-          sourceType: resolved.ingestSourceType,
-        });
-        // OTLP SDK types and the local stamp helper agree structurally on
-        // the slice we mutate (resourceSpans → resource → attributes). The
-        // cast bridges nullability differences in deeper fields the helper
-        // never reads.
-        stampIngestKeyProvenanceOnTraceRequest(
-          traceRequest as unknown as Parameters<
-            typeof stampIngestKeyProvenanceOnTraceRequest
-          >[0],
-          {
-            apiKeyId: resolved.apiKeyId,
-            sourceType: resolved.ingestSourceType,
-            organizationId: resolved.organizationId,
-            templateId: resolved.ingestionTemplateId,
-            nonBillable,
-          },
-        );
-      }
+      await applyReceiverProvenanceToTraces({
+        request: traceRequest,
+        resolved,
+      });
 
       const collectionResult =
         await getApp().traces.collection.handleOtlpTraceRequest(
@@ -496,37 +575,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/logs", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
-      // Same receiver-authoritative rule as the trace path.
-      enforceApiKeyIdOnLogRequest(
-        logRequest as unknown as Parameters<
-          typeof enforceApiKeyIdOnLogRequest
-        >[0],
-        resolved.type === "apiKey" ? resolved.apiKeyId : null,
-      );
-
-      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
-        // Log-based tools (Claude Code et al. emit OTLP logs, not spans)
-        // need the same bundled-vs-billed resolution the trace path does —
-        // without it their cost never gets the non-billable marker and a
-        // bundled coding session reads as real spend. Cached per
-        // (org, sourceType).
-        const nonBillable = await resolveSourceNonBillable({
-          organizationId: resolved.organizationId,
-          sourceType: resolved.ingestSourceType,
-        });
-        stampIngestKeyProvenanceOnLogRequest(
-          logRequest as unknown as Parameters<
-            typeof stampIngestKeyProvenanceOnLogRequest
-          >[0],
-          {
-            apiKeyId: resolved.apiKeyId,
-            sourceType: resolved.ingestSourceType,
-            organizationId: resolved.organizationId,
-            templateId: resolved.ingestionTemplateId,
-            nonBillable,
-          },
-        );
-      }
+      await applyReceiverProvenanceToLogs({
+        request: logRequest,
+        resolved,
+      });
 
       const result = await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: project.id,
@@ -619,31 +671,10 @@ secured.access(handlerManagedAuth(AUTH_REASON)).post("/metrics", async (c) => {
       }
       const metricsRequest = parsed.request;
 
-      // Same receiver-authoritative rule as the trace path.
-      enforceApiKeyIdOnMetricRequest(
-        metricsRequest as unknown as Parameters<
-          typeof enforceApiKeyIdOnMetricRequest
-        >[0],
-        resolved.type === "apiKey" ? resolved.apiKeyId : null,
-      );
-
-      // Receiver-authoritative provenance stamp for ingestion-key metrics —
-      // same contract as traces + logs, so the source / origin / org identity
-      // rides every OTLP signal and an upstream payload cannot forge a
-      // different one.
-      if (resolved.type === "apiKey" && resolved.ingestSourceType) {
-        stampIngestKeyProvenanceOnMetricRequest(
-          metricsRequest as unknown as Parameters<
-            typeof stampIngestKeyProvenanceOnMetricRequest
-          >[0],
-          {
-            apiKeyId: resolved.apiKeyId,
-            sourceType: resolved.ingestSourceType,
-            organizationId: resolved.organizationId,
-            templateId: resolved.ingestionTemplateId,
-          },
-        );
-      }
+      applyReceiverProvenanceToMetrics({
+        request: metricsRequest,
+        resolved,
+      });
 
       // Body successfully parsed — mark the API key as used
       if (resolved.type === "apiKey") {
