@@ -53,11 +53,13 @@ function getService(): ScenarioCancellationService {
         scenarioRunId,
         occurredAt,
       }) => {
-        await getApp().simulations.cancelRun({
-          tenantId,
-          scenarioRunId,
-          occurredAt,
-        });
+        await getApp().simulations.cancelRun(
+          {
+            scenarioRunId,
+            occurredAt,
+          },
+          { tenantId: tenantId },
+        );
       },
       dispatchFinishRun: async ({
         tenantId,
@@ -67,14 +69,16 @@ function getService(): ScenarioCancellationService {
         status,
         occurredAt,
       }) => {
-        await getApp().simulations.finishRun({
-          tenantId,
-          scenarioRunId,
-          batchRunId,
-          scenarioSetId,
-          status,
-          occurredAt,
-        });
+        await getApp().simulations.finishRun(
+          {
+            scenarioRunId,
+            batchRunId,
+            scenarioSetId,
+            status,
+            occurredAt,
+          },
+          { tenantId: tenantId },
+        );
       },
     });
   }

@@ -207,7 +207,6 @@ export class ScenarioFailureHandler {
         try {
           await getApp().simulations.finishRun(
             {
-              tenantId: projectId,
               scenarioRunId,
               occurredAt: timestamp,
               status,

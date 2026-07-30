@@ -9,6 +9,11 @@ import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
+import type {
+  NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
 import {
   deserializeAttributes,
   ensureStringRecord,
@@ -23,11 +28,6 @@ import {
   mapClickHouseEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
 } from "~/server/evaluations/evaluation-run.mappers";
-import type {
-  NormalizedSpan,
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "~/server/app-layer/traces/ingest/normalizedSpan";
 import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse";
 import type { Event, Span, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";

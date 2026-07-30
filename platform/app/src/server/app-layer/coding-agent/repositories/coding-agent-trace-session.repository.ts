@@ -1,7 +1,7 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import type { CodingAgentTraceSession } from "~/server/event-sourcing/coding-agent-processing/schema";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;

@@ -6,8 +6,9 @@
  * ({@link ./resolve-offloaded-traces-batch}) so the eventref shape is decoded
  * in exactly one place.
  */
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+
 import type { NormalizedAttributes } from "~/server/app-layer/traces/ingest/normalizedSpan";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 
 /** One decoded eventref pointer ready to fetch from event_log. */
 export interface EventRefEntry {

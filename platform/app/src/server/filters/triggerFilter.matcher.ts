@@ -1,6 +1,6 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DerivedTraceEvent } from "~/server/app-layer/traces/trace-event";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type {
   PreconditionFieldMatcher,
   PreconditionTraceData,

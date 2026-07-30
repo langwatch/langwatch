@@ -28,11 +28,11 @@ import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
+import type { NormalizedSpan } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import type {
   ExtractedIO,
   TraceIOExtractionService,
 } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
