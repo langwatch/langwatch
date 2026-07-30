@@ -24,6 +24,7 @@
 
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
+import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import type { FilterField } from "~/server/filters/types";
 import {
   isSlimEligibleTraceMetricKey,
@@ -44,15 +45,21 @@ import {
 const SLIM_TABLE = "trace_analytics" as const;
 const ta = "ta";
 
-/** Group-by keys the slim builder serves (typed columns + Attributes reads). */
+/**
+ * Group-by keys the slim builder serves (typed columns + Attributes reads).
+ *
+ * `metadata.model` is deliberately NOT here: model group-bys need per-SPAN
+ * attribution (the legacy builder's span-model partition join) so buckets
+ * partition the ungrouped totals; slim has no span data. The router sends
+ * them to `trace_summaries`; see SLIM_TRACE_GROUP_BY_KEYS in route-table.ts.
+ */
 export type SlimGroupByKey =
   | "topics.topics"
   | "traces.trace_name"
   | "metadata.user_id"
   | "metadata.thread_id"
   | "metadata.customer_id"
-  | "metadata.labels"
-  | "metadata.model";
+  | "metadata.labels";
 
 /**
  * Slim column / Attributes-map read for a registry metric (Phase 2 hoisted
@@ -119,7 +126,6 @@ function isSlimGroupByKey(groupBy: string): groupBy is SlimGroupByKey {
     case "metadata.thread_id":
     case "metadata.customer_id":
     case "metadata.labels":
-    case "metadata.model":
       return true;
     default:
       return false;
@@ -148,8 +154,6 @@ function slimGroupByExpression(groupBy?: string): string | null {
     case "metadata.labels":
       // Slim Labels is Array(String); arrayJoin to one row per label.
       return `arrayJoin(if(empty(${ta}.Labels), [''], ${ta}.Labels))`;
-    case "metadata.model":
-      return `arrayJoin(if(empty(${ta}.Models), ['unknown'], ${ta}.Models))`;
     default: {
       const _exhaustive: never = groupBy;
       throw new Error(`Unhandled slim group-by: ${String(_exhaustive)}`);
@@ -164,7 +168,7 @@ function slimGroupByExpression(groupBy?: string): string | null {
  * `HAVING group_key != ''` clause.
  */
 function slimGroupByHandlesUnknown(groupBy?: string): boolean {
-  return groupBy === "metadata.model" || groupBy === "traces.trace_name";
+  return groupBy === "traces.trace_name";
 }
 
 // isPercentile + percentileFor are shared with eval-slim-timeseries-query.ts
@@ -202,12 +206,25 @@ function slimAggExpression(agg: AggregationTypes, column: string): string {
  * `ReplacingMergeTree(UpdatedAt)`. Same pattern as the legacy
  * `dedupedTraceSummaries` helper, parameterised for the slim table + its
  * OccurredAt partition column.
+ *
+ * `TRACE_ANALYTICS_HAS_SIGNAL_SQL`: the store now writes dimension-only
+ * states — a topic, an annotation, a rename, with no span or log record —
+ * where it used to not write them at all (that always-write is what lets the
+ * fold trust an absent read). This filter is what keeps such rows out of the
+ * product's numbers: a row on this table is otherwise counted as A TRACE by
+ * every aggregate below. The verdict is DERIVED from columns the row already
+ * carries — no schema change — and defined next to the in-memory predicate it
+ * mirrors, so the two cannot drift apart silently. Outer SELECT only: the
+ * verdict is monotonic non-decreasing across a trace's versions (spans only
+ * accumulate), so the latest version speaks for the trace and the
+ * max(UpdatedAt) grouping needs no second filter.
  */
 function dedupedSlim(alias: string, dateClause: string): string {
   return `(
     SELECT *
     FROM ${SLIM_TABLE}
     WHERE TenantId = {tenantId:String}
+      AND ${TRACE_ANALYTICS_HAS_SIGNAL_SQL}
       ${dateClause}
       AND (TenantId, TraceId, UpdatedAt) IN (
         SELECT TenantId, TraceId, max(UpdatedAt)

@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import { trackServerEvent } from "~/server/posthog";
 import type {
   ReactorContext,
   ReactorDefinition,
@@ -33,7 +34,9 @@ export interface ProjectMetadataReactorDeps {
  * Reactor that marks the project as having received its first message.
  *
  * Sets project.firstMessage = true, project.integrated (unless optimization_studio),
- * and detects the SDK language from span resource attributes.
+ * and detects the SDK language from span resource attributes. On the
+ * firstMessage transition it also tracks the `first_trace_integrated`
+ * analytics event against the org admin.
  *
  * Uses a long dedup TTL so we only hit the database once per project in a given window.
  */
@@ -48,6 +51,34 @@ export interface ProjectMetadataReactorDeps {
  */
 function isRealFirstIngest(foldState: TraceSummaryData): boolean {
   return foldState.attributes?.["langwatch.origin"] !== "sample";
+}
+
+/**
+ * Tracks the project's first real trace as an integration milestone, against
+ * the org admin: that is the same distinct_id posthog-js identifies the user
+ * with in the browser, so this server event joins the browser person.
+ */
+async function trackFirstTraceIntegrated({
+  projects,
+  tenantId,
+  attrs,
+}: {
+  projects: ProjectService;
+  tenantId: string;
+  attrs: Record<string, string>;
+}): Promise<void> {
+  const { userId } = await projects.resolveOrgAdmin(tenantId);
+  if (!userId) return;
+
+  trackServerEvent({
+    userId,
+    event: "first_trace_integrated",
+    properties: {
+      sdk_language: attrs["sdk.language"] ?? "unknown",
+      sdk_framework: attrs["langwatch.sdk.framework"] ?? "unknown",
+    },
+    projectId: tenantId,
+  });
 }
 
 export function createProjectMetadataReactor(
@@ -127,6 +158,16 @@ export function createProjectMetadataReactor(
             language,
           },
         });
+
+        // Fired after the metadata write commits, so a failed write retries
+        // the event on the project's next trace instead of dropping it.
+        if (!project.firstMessage) {
+          await trackFirstTraceIntegrated({
+            projects: deps.projects,
+            tenantId,
+            attrs,
+          });
+        }
       } catch (error) {
         logger.error(
           {

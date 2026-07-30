@@ -10,7 +10,10 @@ import {
   asStringMap,
 } from "~/server/clickhouse/recordDecode";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import {
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+  type TraceAnalyticsRow,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { queryWindowed } from "../../clients/clickhouse/windowed-read";
@@ -148,6 +151,10 @@ function toClickHouseRecord(
 
     AppliedEventIds: [...appliedEventIds],
 
+    // NOTE: `row.hasSignal` is deliberately NOT serialised — there is no
+    // HasSignal column. Readers derive the verdict from the columns above via
+    // TRACE_ANALYTICS_HAS_SIGNAL_SQL, and `fromRecord` re-derives it on the
+    // way back, so the flag round-trips without a schema change.
     _retention_days: retentionDays,
   };
 }
@@ -378,15 +385,22 @@ export class TraceAnalyticsClickHouseRepository
    *      it are the progress ranking. Reading the array length costs only its
    *      offsets column, and every other key is a scalar already in the row.
    *
-   * This ordering is BEST-EFFORT, not total. All four keys can be equal on two
-   * concurrent versions — same latest event, same span count, same saturated
-   * watermark length, and (precisely because the anchor is now frozen) the same
-   * OccurredAt — in which case `LIMIT 1` still picks arbitrarily and the loser's
-   * contributions and applied-id watermark are dropped. Closing that needs a
-   * unique persisted version/writer identity on the row, which this table does
-   * not have; the ranking narrows the window rather than eliminating it. The
-   * residual case requires two writers to resume from the same committed version
-   * AND land on the same `updatedAt` millisecond AND make identical progress.
+   * The four progress keys are BEST-EFFORT, not total: two concurrent versions
+   * can be equal on every one — same latest event, same span count, same
+   * saturated watermark length, and (precisely because the anchor is now
+   * frozen) the same OccurredAt. `toString(AppliedEventIds) DESC` closes what
+   * that used to leave open: a bare `LIMIT 1` picked ARBITRARILY, so two reads
+   * could crown different winners and the fold would resume from one version
+   * while the applied-id watermark it trusted came from the other. The
+   * watermark CONTENTS discriminate where its length cannot — two writers
+   * racing the same committed version folded different batches, so their
+   * merged id sets differ even at equal size — and any versions still equal on
+   * all five keys carry the same watermark and the same progress, making the
+   * pick between them immaterial. No key can know which fold got further; what
+   * the dedup machinery needs is the SAME winner every read, and a total order
+   * over existing columns provides it without a schema change. Cost: the
+   * serialisation runs only over the handful of candidate rows that survived
+   * the IN-tuple.
    */
   private async queryLatestVersion({
     tenantId,
@@ -422,7 +436,8 @@ export class TraceAnalyticsClickHouseRepository
           LastEventOccurredAt DESC,
           SpanCount DESC,
           length(AppliedEventIds) DESC,
-          OccurredAt ASC
+          OccurredAt ASC,
+          toString(AppliedEventIds) DESC
         LIMIT 1
       `,
       query_params: {
@@ -498,6 +513,20 @@ function fromRecord(record: Record<string, unknown>): TraceAnalyticsRow {
         : Boolean(record.HasAnnotation),
 
     attributes: asStringMap(record.Attributes),
+
+    // Derived, not read — there is no HasSignal column. Mirrors
+    // TRACE_ANALYTICS_HAS_SIGNAL_SQL door for door, including the version
+    // door: a pre-00056 row decodes SpanCount/EarliestSpanStartMs as default
+    // 0, but everything written back then had passed the write-gate.
+    hasSignal:
+      asNumber(record.SpanCount) > 0 ||
+      asNumber(record.EarliestSpanStartMs) > 0 ||
+      !["", "0"].includes(
+        asStringMap(record.Attributes)[
+          "langwatch.reserved.log_record_count"
+        ] ?? "",
+      ) ||
+      String(record.Version ?? "") < TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
 
     spanCount: asNumber(record.SpanCount),
     annotationIds: asStringArray(record.AnnotationIds),

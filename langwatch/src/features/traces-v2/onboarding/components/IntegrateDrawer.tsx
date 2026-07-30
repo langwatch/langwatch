@@ -1,6 +1,7 @@
 import { Box, Grid, HStack, Tabs, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { AnalyticsBoundary } from "react-contextual-analytics";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Drawer } from "~/components/ui/drawer";
 import { DocsLinks } from "~/features/onboarding/components/sections/observability/DocsLinks";
@@ -204,66 +205,70 @@ export function IntegrationContent({
   }, [enabled, onSegmentChange]);
 
   return (
-    <VStack align="stretch" gap={6}>
-      {/* API key generator at the top — minting a token is the first
-          step of integration. The lifted onboarding screens below
-          read the token via ActiveProjectProvider, so they
-          automatically pick up the freshly-scoped credential. */}
-      <ApiKeyIntegrationInfoCard
-        organizationId={organizationId}
-        projectId={projectId}
-        token={token}
-        onTokenGenerated={onTokenGenerated}
-      />
+    // Namespaces the analytics events the lifted onboarding sections emit
+    // (prompt/skill/config copies) when they render on this surface.
+    <AnalyticsBoundary name="traces_integrate">
+      <VStack align="stretch" gap={6}>
+        {/* API key generator at the top — minting a token is the first
+            step of integration. The lifted onboarding screens below
+            read the token via ActiveProjectProvider, so they
+            automatically pick up the freshly-scoped credential. */}
+        <ApiKeyIntegrationInfoCard
+          organizationId={organizationId}
+          projectId={projectId}
+          token={token}
+          onTokenGenerated={onTokenGenerated}
+        />
 
-      <Tabs.Root
-        value={segment}
-        onValueChange={(e) => onSegmentChange(e.value as Segment)}
-        variant="line"
-        size="sm"
-        colorPalette="orange"
-      >
-        <Text textStyle="xs" color="fg.muted" marginBottom={2}>
-          All four end up in the same explorer.
-        </Text>
-        <Tabs.List>
-          {SEGMENTS.map((s) => (
-            <Tabs.Trigger key={s.value} value={s.value}>
-              <HStack gap={1.5}>
-                <Box as="span">{s.label}</Box>
-                <Kbd>{s.shortcut}</Kbd>
-              </HStack>
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-
-        <Box paddingTop={3} paddingBottom={4}>
-          <Text
-            color="fg"
-            textStyle="md"
-            fontWeight="medium"
-            letterSpacing="-0.01em"
-            lineHeight="snug"
-          >
-            {activeSegmentDescription}
+        <Tabs.Root
+          value={segment}
+          onValueChange={(e) => onSegmentChange(e.value as Segment)}
+          variant="line"
+          size="sm"
+          colorPalette="orange"
+        >
+          <Text textStyle="xs" color="fg.muted" marginBottom={2}>
+            All four end up in the same explorer.
           </Text>
-        </Box>
+          <Tabs.List>
+            {SEGMENTS.map((s) => (
+              <Tabs.Trigger key={s.value} value={s.value}>
+                <HStack gap={1.5}>
+                  <Box as="span">{s.label}</Box>
+                  <Kbd>{s.shortcut}</Kbd>
+                </HStack>
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
 
-        <Tabs.Content value="mcp" padding={0}>
-          <ViaMcpClientScreen />
-        </Tabs.Content>
-        <Tabs.Content value="skill" padding={0}>
-          {/* Traces onboarding leads with tracing — that's the job here. */}
-          <SkillList primarySkillId={TRACING_SKILL_ID} />
-        </Tabs.Content>
-        <Tabs.Content value="prompt" padding={0}>
-          <PromptList primarySkillId={TRACING_SKILL_ID} />
-        </Tabs.Content>
-        <Tabs.Content value="sdk" padding={0}>
-          <ManualSetup />
-        </Tabs.Content>
-      </Tabs.Root>
-    </VStack>
+          <Box paddingTop={3} paddingBottom={4}>
+            <Text
+              color="fg"
+              textStyle="md"
+              fontWeight="medium"
+              letterSpacing="-0.01em"
+              lineHeight="snug"
+            >
+              {activeSegmentDescription}
+            </Text>
+          </Box>
+
+          <Tabs.Content value="mcp" padding={0}>
+            <ViaMcpClientScreen />
+          </Tabs.Content>
+          <Tabs.Content value="skill" padding={0}>
+            {/* Traces onboarding leads with tracing — that's the job here. */}
+            <SkillList primarySkillId={TRACING_SKILL_ID} />
+          </Tabs.Content>
+          <Tabs.Content value="prompt" padding={0}>
+            <PromptList primarySkillId={TRACING_SKILL_ID} />
+          </Tabs.Content>
+          <Tabs.Content value="sdk" padding={0}>
+            <ManualSetup />
+          </Tabs.Content>
+        </Tabs.Root>
+      </VStack>
+    </AnalyticsBoundary>
   );
 }
 

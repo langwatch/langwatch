@@ -37,16 +37,17 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
 
   describe("given an additive metric on total cost", () => {
     describe("when grouped by model and the aggregation is sum", () => {
-      // The rollup's `Model` is per-SPAN, so it splits a multi-model trace's
-      // cost across models; legacy attributes the whole-trace cost to every
-      // model in `Models[]`. Slim carries the same per-trace `Models[]` array
-      // and the same trace-level columns, so it reproduces legacy exactly.
-      it("routes to trace_analytics (slim), never the rollup", () => {
+      // Model group-bys attribute additive metrics per SPAN via the legacy
+      // builder's span-model partition join, so buckets sum exactly to the
+      // ungrouped totals. Slim has no span data (it can only reproduce the
+      // old whole-trace attribution that over-counted multi-model traces),
+      // and the rollup is ungrouped-only.
+      it("routes to trace_summaries (the span-model partition join lives there)", () => {
         const table = pickAnalyticsTable({
           series: [series("performance.total_cost", "sum")],
           groupBy: "metadata.model",
         });
-        expect(table).toBe("trace_analytics");
+        expect(table).toBe("trace_summaries");
       });
     });
 
@@ -109,9 +110,9 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
           series: [series("performance.completion_time", "avg")],
           groupBy: "metadata.model",
         });
-        // Slim's avg(TotalDurationMs) over arrayJoin(Models) is exactly what
-        // legacy computes, so slim serves it rather than falling to legacy.
-        expect(table).toBe("trace_analytics");
+        // Model group-bys need the legacy builder's span-model partition
+        // join; neither fast-path table can serve them.
+        expect(table).toBe("trace_summaries");
       });
     });
 
@@ -204,12 +205,12 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
 
     describe("when grouped by model", () => {
-      it("routes to trace_analytics (slim) — rollup can't do percentiles, and slim's per-trace Models[] matches legacy's arrayJoin(Models)", () => {
+      it("routes to trace_summaries: model group-bys always take the legacy span-model partition join", () => {
         const table = pickAnalyticsTable({
           series: [series("performance.completion_time", "median")],
           groupBy: "metadata.model",
         });
-        expect(table).toBe("trace_analytics");
+        expect(table).toBe("trace_summaries");
       });
     });
   });
@@ -485,9 +486,9 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
       expect(__testOnly__.ROLLUP_TRACE_GROUP_BY_KEYS.size).toBe(0);
     });
 
-    it("serves metadata.model from slim, matching legacy's arrayJoin(Models)", () => {
+    it("keeps metadata.model OFF slim: model group-bys need the legacy span-model partition join", () => {
       expect(__testOnly__.SLIM_TRACE_GROUP_BY_KEYS.has("metadata.model")).toBe(
-        true,
+        false,
       );
     });
   });

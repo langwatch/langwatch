@@ -500,30 +500,42 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
 
   describe("given a trace whose only signal so far is an assigned topic", () => {
     describe("when its cached state is lost and a later span arrives", () => {
-      /** @scenario a signal with nothing else to store is not lost to a cold cache */
-      it("rebuilds the classification from the event log instead of losing it", async () => {
+      /**
+       * @scenario a signal with nothing else to store is not lost to a cold cache
+       *
+       * Until the always-write change this protection came from `refoldOnStoreMiss`
+       * rebuilding the topic out of `event_log` — the row was simply not
+       * written. Now the row IS written (readers derive hasSignal=false to keep it out of
+       * analytics) and the later span resumes from the read-back directly:
+       * same guarantee, no event_log replay, which is what lets the fold
+       * declare `trustAbsentMiss`.
+       */
+      it("resumes the classification from the committed row instead of losing it", async () => {
         const { repo, rows } = recordingRepo();
         const fold = new TraceAnalyticsFoldProjection({
           store: new TraceAnalyticsStore(repo),
         });
-        // The real loader is bounded at the delivered event; a fake that always
-        // returned the whole history would fold the span before it arrived.
-        fold.eventLoaderUpTo = async ({ upToEvent }) =>
-          [topicEvent, spanEvent].filter(
-            (event) => event.occurredAt <= upToEvent.occurredAt,
-          );
+        // A loader that fails the test if the executor still replays history:
+        // the whole point of the always-write row is that it never needs to.
+        fold.eventLoaderUpTo = async () => {
+          throw new Error("event_log must not be read — the row carries the state");
+        };
         const executor = new FoldProjectionExecutor();
 
         await executor.execute(fold, topicEvent, context);
 
-        // Nothing worth committing yet, so nothing was written — the topic
-        // lives only in the cache the next delivery is assumed to have lost.
-        expect(rows).toEqual([]);
+        // The dimension-only state was committed — flagged out of analytics,
+        // but durably there for the next delivery to resume from.
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.hasSignal).toBe(false);
+        expect(rows[0]!.topicId).toBe("topic-1");
 
         const resumed = await executor.execute(fold, spanEvent, context);
 
         expect(resumed.topicId).toBe("topic-1");
         expect(resumed.spanCount).toBe(1);
+        // The span turned it into a real trace: the rewrite is visible.
+        expect(rows[rows.length - 1]!.hasSignal).toBe(true);
       });
     });
   });
