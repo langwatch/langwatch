@@ -108,44 +108,51 @@ describe("validateProviderApiKey for google_agent_platform", () => {
     // Three separate cases, not one covering both fields at once: an `||`
     // guard degrading to `&&` would still return no candidates when BOTH
     // are missing, and only a case with exactly one present catches that.
-    const expectUnreachable = async (credentials: Record<string, string>) => {
+    /** @scenario A credential missing its project or location is not probed at all */
+    it("rejects the check without probing when both project and location are missing", async () => {
       mockFetch.mockResolvedValue(generated());
 
       await expect(
-        validateProviderApiKey("google_agent_platform", credentials),
+        validateProviderApiKey("google_agent_platform", {
+          GOOGLE_AGENT_PLATFORM_API_KEY:
+            CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+        }),
       ).rejects.toMatchObject({ code: "provider_unreachable" });
 
-      // Nothing to ask without both a project and a location, so nothing
-      // was sent — true whichever one is the one missing.
+      // Nothing to ask without both a project and a location, so nothing was sent.
       expect(mockFetch).not.toHaveBeenCalled();
-    };
-
-    /** @scenario A credential missing its project or location is not probed at all */
-    it("rejects the check without probing when both project and location are missing", async () => {
-      await expectUnreachable({
-        GOOGLE_AGENT_PLATFORM_API_KEY:
-          CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
-      });
     });
 
     /** @scenario A credential missing its project or location is not probed at all */
     it("rejects the check without probing when only the location is missing", async () => {
-      await expectUnreachable({
-        GOOGLE_AGENT_PLATFORM_API_KEY:
-          CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
-        GOOGLE_AGENT_PLATFORM_PROJECT:
-          CREDENTIALS.GOOGLE_AGENT_PLATFORM_PROJECT,
-      });
+      mockFetch.mockResolvedValue(generated());
+
+      await expect(
+        validateProviderApiKey("google_agent_platform", {
+          GOOGLE_AGENT_PLATFORM_API_KEY:
+            CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+          GOOGLE_AGENT_PLATFORM_PROJECT:
+            CREDENTIALS.GOOGLE_AGENT_PLATFORM_PROJECT,
+        }),
+      ).rejects.toMatchObject({ code: "provider_unreachable" });
+
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     /** @scenario A credential missing its project or location is not probed at all */
     it("rejects the check without probing when only the project is missing", async () => {
-      await expectUnreachable({
-        GOOGLE_AGENT_PLATFORM_API_KEY:
-          CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
-        GOOGLE_AGENT_PLATFORM_LOCATION:
-          CREDENTIALS.GOOGLE_AGENT_PLATFORM_LOCATION,
-      });
+      mockFetch.mockResolvedValue(generated());
+
+      await expect(
+        validateProviderApiKey("google_agent_platform", {
+          GOOGLE_AGENT_PLATFORM_API_KEY:
+            CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+          GOOGLE_AGENT_PLATFORM_LOCATION:
+            CREDENTIALS.GOOGLE_AGENT_PLATFORM_LOCATION,
+        }),
+      ).rejects.toMatchObject({ code: "provider_unreachable" });
+
+      expect(mockFetch).not.toHaveBeenCalled();
     });
   });
 
