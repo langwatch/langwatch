@@ -56,7 +56,7 @@ async function main() {
   const child = spawn(
     "node",
     ["sdks/typescript/dist/cli/index.js", "login", "--device"],
-    { env, stdio: ["ignore", "pipe", "pipe"], cwd: process.cwd() + "/.." },
+    { env, stdio: ["ignore", "pipe", "pipe"], cwd: process.cwd() + "/../.." },
   );
 
   let buf = "";
@@ -168,7 +168,7 @@ async function main() {
     {
       env,
       stdio: ["ignore", "pipe", "pipe"],
-      cwd: process.cwd() + "/..",
+      cwd: process.cwd() + "/../..",
     },
   );
   whoami.stdout.on("data", (c) => process.stdout.write(c));
