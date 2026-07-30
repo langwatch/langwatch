@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 export type UnknownRecord = Record<string, unknown>;
 
 /**
@@ -47,8 +45,4 @@ export function stableStringify(value: unknown): string {
     return current;
   };
   return JSON.stringify(normalize(value));
-}
-
-export function sha256(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
 }
