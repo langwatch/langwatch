@@ -2,9 +2,9 @@
 
 **Date:** 2026-07-30
 
-**Status:** Draft
+**Status:** Proposed
 
-> One-line: one server-side compiler turns constrained query text into a **closed JSON IR** and then into ClickHouse SQL, exposed through **one service with two transports** (REST + tRPC), so a caller can ask an arbitrary question of their own traces and spans and get a table back — with tenant scope injected by the compiler and every identifier drawn from a developer-authored allowlist.
+> One-line: one server-side compiler turns constrained query text into a **closed JSON IR** and then into ClickHouse SQL, exposed through **one service with two transports** (REST + tRPC), so a caller can ask an arbitrary question of their own traces and spans and get a table back — with tenant scope injected by the compiler, every identifier drawn from a developer-authored allowlist, and content-visibility rules applied to filters as well as to output.
 
 ## Context
 
@@ -20,7 +20,7 @@ So in shipped terms the starting point is zero, and the design question is not "
 
 ## Decision
 
-**We will ship LWQL as a single service with two transports, over a closed IR.** Four parts are settled; the rest is listed as open rather than implied.
+**We will ship LWQL as a single service with two transports, over a closed IR.**
 
 **1. The name is LWQL.** `TRQL` is Trigger.dev's and `TraceQL` is Grafana Tempo's; either would collide the moment it reaches an API path, an SDK method name, or an error string. `LWQL` follows the established convention (PromQL, LogQL, NRQL, KQL, SPL). Reversible today, effectively irreversible after the first SDK release. No trademark search has been performed.
 
@@ -32,36 +32,35 @@ The spike already demonstrates the shape: every identifier-bearing field derives
 
 **4. One service, two transports.** A single entry point — `runLwqlQuery({ projectId, request, callerId })` — is called by both the REST route and the tRPC procedure; neither transport carries query logic. **Tenant scope is injected by the compiler from the RBAC-checked `projectId`, never read from the request body.** Read-only surfaces must be declared as queries: the spike declared its read path as a tRPC `.mutation()`, which is a defect to correct rather than a pattern to copy.
 
+**5. LWQL compiles to the IR and does not choose storage.** The query layer emits IR and hands it to the existing analytics destination router, which already decides which table or rollup answers a given shape — per the ADR-034 Phase 3 split, `aggregation-builder` now emits only the legacy `trace_summaries` SQL as a fallback while destination routing lives in `~/server/app-layer/analytics`. LWQL therefore names no tables.
+
+This resolves the engine question without choosing an engine, and it decouples LWQL from [#5912](https://github.com/langwatch/langwatch/issues/5912): the fold-projection rewrite happens *behind* the router, so it sequences independently of this work rather than blocking it.
+
+Existing time-bucketing is reused rather than re-derived. `getDateTruncFunction` is already timezone-correct across minute / interval / day / week / month, threading a validated timezone through each branch. Re-deriving calendar bucketing is a classic source of defects that stay latent for a year.
+
+**6. Content-visibility rules apply to filter and aggregation targets, not only to output columns.** A field subject to content gating is gated identically wherever it appears in a query, not merely where it would be returned.
+
+The gated field set is **derived from `app-layer/traces/visibility-window.service`**, never restated in the query layer. That service is the existing definition of what counts as content — `redactTraceContent` covers `input`, `output`, `expected_output`, `contexts` and `error`; `redactSpanContent` covers `input`, `output`, `error` and `params`. A hand-maintained parallel list in the query layer would drift the moment a field is added to either, and the drift would be silent. **A test asserts parity**, so extending the redaction set without teaching LWQL about it fails CI rather than shipping.
+
+**7. Synchronous by default, with async for expensive queries, and caps are v1 gates.** A row cap and a maximum queryable time-span ship in v1 rather than as follow-ons, per the product requirement that unbounded scans be prevented by default. Queries exceeding the synchronous budget are executed asynchronously with pagination over the result. The existing per-tenant `TenantRateLimiter` — tiered and tested, currently wired only into the websocket broadcast path — is reused rather than duplicated.
+
+**8. `explain` is internal-only in v1.** Returning generated SQL is a debugging affordance for internal users, not a public API capability. It can widen later; a public `explain` cannot be narrowed once SDKs depend on it.
+
 ## Rationale / Trade-offs
 
 The load-bearing choice is *allowlist-totality*: every dimension, metric and aggregation is a closed enum mapped to a developer-authored ClickHouse expression. This is what makes a user-supplied query language safe to expose at all, and it is why schema disclosure is cheap — knowing the table shape buys an attacker nothing when the identifier set is closed.
 
 It also sets the cost: every new queryable column is a deliberate act. That is the intended trade. Starting restrictive and widening is reversible; starting permissive and narrowing is not, because by then the data has left. Where a question resolved asymmetrically, we resolved it toward the reversible direction.
 
+Decision 6 follows the same asymmetry. Gating a field's output while leaving it available as a filter target satisfies a projection-only rule without actually withholding the field, so the rule is stated over *every* position a field can occupy in a query. Deriving that set from the redaction service rather than restating it is the difference between a rule that holds and a rule that held on the day it was written.
+
 We rejected a structured form/filter UI because it inverts the requirement: a form can only ask questions someone anticipated, and the point of this surface is the unanticipated question.
 
 ## Consequences
 
-**A classification gap this ADR must close, and which predates it.** [ADR-028](./028-visibility-blur-teaser-redaction.md) gates *content* for out-of-window callers while stating in its own summary that "existence, timestamps, and **aggregates stay fully visible**." That was safe when aggregates meant fixed, developer-authored dashboard charts. It stops being safe once the **filter is caller-supplied**: a caller-controlled content-matching predicate composed with an unredacted aggregate can reveal gated content *without ever projecting it* — so a projection-only rule is satisfied while the data still leaves.
-
-The consequence for LWQL is concrete: **filter reach and aggregate output must be classified on the same content-vs-metadata axis as projection.** Closing projection alone is insufficient. This is the one open question that blocks building rather than merely sequencing.
-
-An equivalent composition is reachable in the platform today, outside this proposal. Specifics are deliberately not documented here and have been routed to the maintainer privately.
-
-**Downstream:**
-
-- ADR-028 needs an amendment from its owner: its aggregate carve-out predates any caller-supplied-filter aggregate surface. It is also still `Status: Proposed` while its service layer ships.
-- Engine drift is already measurable between the two candidate read paths: the spike emits bare `arrayJoin(Models)` while the analytics builder emits `arrayJoin(if(empty(Models), ['unknown'], Models))`. Traces with no models are silently dropped by one and bucketed as `unknown` by the other — two different numbers for one question, before either has shipped. Whichever path hosts LWQL, this must be reconciled rather than inherited.
-- A per-tenant rate limiter already exists (`TenantRateLimiter`, tiered, tested) but is wired only into the websocket broadcast path. A query surface should reuse it rather than ship unthrottled or invent a second one.
-
-## Open questions — deliberately not decided here
-
-This ADR is `Draft` because these are unresolved, and three of them were resolved once and then reopened under adversarial review:
-
-1. **The classification axis** (above) — blocks implementation.
-2. **Which engine hosts the compilation path** — the existing analytics engine (ADR-034/066/068 lineage) or the spike's compiler. **Time-bucketing is the deciding capability and must be settled first:** the spike has no time bucketing at all, while the analytics read path has timezone-aware bucketing across three tables. Deciding the engine before the bucketing question inverts the dependency. This also commits in-flight work on #5912 and so needs that work's owner.
-3. **Synchronous vs async execution, and the v1 caps** — specifically whether a concurrency ceiling and a maximum queryable time-span are v1 gates or follow-ons.
-4. **Whether `explain` (returning the generated SQL) is opt-in for all callers or internal-only.**
+- **ADR-028 needs an amendment from its owner.** Its summary states that "existence, timestamps, and **aggregates stay fully visible**" — a carve-out written when aggregates meant fixed, developer-authored dashboard charts, and which predates any caller-supplied-filter aggregate surface. Decision 6 is LWQL's local resolution; the platform-level rule belongs in ADR-028 itself. That ADR is also still `Status: Proposed` while its service layer ships, which should be corrected independently.
+- **Engine drift between the two candidate read paths must be reconciled, not inherited.** The spike emits bare `arrayJoin(Models)` while the analytics builder emits `arrayJoin(if(empty(Models), ['unknown'], Models))`. Traces with no models are silently dropped by one and bucketed as `unknown` by the other — two different numbers for one question, before either has shipped.
+- **Every queryable column is an ongoing cost.** Allowlist-totality means the schema does not grow by accident; adding a field is a code change with a review, by design.
 
 ## References
 
