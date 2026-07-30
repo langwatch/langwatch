@@ -112,7 +112,8 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
             - name: tmp-dir
-              emptyDir: {}
+              emptyDir:
+                sizeLimit: {{ $root.Values.cronjobs.scratchSizeLimit }}
           restartPolicy: OnFailure
 {{- end }}
 {{- end }}

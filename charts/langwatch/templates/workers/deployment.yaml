@@ -219,7 +219,8 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.workers.scratchSizeLimit }}
         {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
         - name: stored-objects-data
           persistentVolumeClaim:

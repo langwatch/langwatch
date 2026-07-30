@@ -156,7 +156,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.langwatch_nlp.scratchSizeLimit }}
         - name: log-dir
-          emptyDir: {}
+          emptyDir:
+            sizeLimit: {{ .Values.langwatch_nlp.scratchSizeLimit }}
 {{- end }}

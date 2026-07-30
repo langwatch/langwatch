@@ -634,6 +634,8 @@ app:
 
   # PriorityClass for the app pods, overriding global.scheduling.priorityClassName.
   # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
+  ## @param app.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 1Gi
   ## @param app.priorityClassName [string] PriorityClass for app pods (overrides global.scheduling.priorityClassName).
   priorityClassName: ""
 
@@ -774,6 +776,8 @@ workers:
     revisionHistoryLimit: 10
   # PriorityClass for the worker pods, overriding global.scheduling.priorityClassName.
   # See: https://kubespec.dev/v1/Pod#spec.priorityClassName
+  ## @param workers.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 1Gi
   ## @param workers.priorityClassName [string] PriorityClass for worker pods (overrides global.scheduling.priorityClassName).
   priorityClassName: ""
   # Additional Kubernetes resources
@@ -914,6 +918,8 @@ langwatch_nlp:
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
+  ## @param langwatch_nlp.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 1Gi
   ## @param langwatch_nlp.priorityClassName [string] PriorityClass for NLP pods (overrides global.scheduling.priorityClassName).
   priorityClassName: ""
   ## @param langwatch_nlp.extraEnvs [array] Additional environment variables.
@@ -1047,6 +1053,8 @@ langevals:
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
+  ## @param langevals.scratchSizeLimit [string, default: 2Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 2Gi
   ## @param langevals.priorityClassName [string] PriorityClass for Langevals pods (overrides global.scheduling.priorityClassName).
   priorityClassName: ""
   ## @param langevals.extraEnvs [array] Additional environment variables.
@@ -1083,6 +1091,8 @@ cronjobs:
   # Enable or disable all cron jobs
   ## @param cronjobs.enabled [default: true] Enable all cron jobs.
   enabled: true
+  ## @param cronjobs.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
+  scratchSizeLimit: 1Gi
   ## @param cronjobs.labels [object] Additional labels for CronJob resources.
   labels: {}
 

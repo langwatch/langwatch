@@ -191,6 +191,9 @@ guardrails:
   streamChunkWindow: 50ms
 
 # Pod-level security.
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
+scratchSizeLimit: 1Gi
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 65532
