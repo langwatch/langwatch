@@ -327,7 +327,7 @@ export async function assertScopesBelongToOrg(
 /**
  * Every id must come back from an org-scoped lookup. An id that names
  * another tenant's row simply does not match the `where`, so absence from
- * the result is the refusal — the query never has to compare tenants
+ * the result is the refusal: the query never has to compare tenants
  * itself.
  */
 async function assertAllResolve(
@@ -478,7 +478,7 @@ export type VirtualKeyReader = Pick<VirtualKeyService, "getById">;
  * The precondition every by-id MUTATION shares: the key has to exist.
  * Authorization is a separate, permission-based decision the caller makes
  * on the returned key's scopes, so this deliberately does not filter by
- * visibility — a holder of a scope role binding can operate on a key its
+ * visibility: a holder of a scope role binding can operate on a key its
  * membership set never surfaces (vk-scope-rbac.feature).
  */
 export async function requireExistingVk(
@@ -499,9 +499,9 @@ export async function requireExistingVk(
  * `virtual_key_not_found`, because a distinguishable "forbidden" would be
  * an existence oracle for keys in teams the caller has no part in.
  *
- * The membership set is the caller's own, derived per door — a session
+ * The membership set is the caller's own, derived per door. A session
  * loads it from its user's rows, a project credential synthesizes the one
- * its project implies — but the check itself is shared, so the two doors
+ * its project implies. The check itself is shared, so the two doors
  * cannot drift on what "visible" means.
  */
 export async function requireVisibleVk(

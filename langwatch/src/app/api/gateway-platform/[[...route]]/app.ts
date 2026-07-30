@@ -412,8 +412,8 @@ const ERROR_TYPE_BY_STATUS: Record<number, string> = {
  */
 function trpcErrorResponse(c: GatewayContext, error: unknown): Response {
   // The service layer and the shared preconditions raise HandledErrors
-  // (ADR-045). They already carry the two things this envelope needs — a
-  // stable code and the status to answer with — so read them directly
+  // (ADR-045). They already carry the two things this envelope needs, a
+  // stable code and the status to answer with, so read them directly
   // instead of scraping a prefix off the message, which is what the
   // TRPCError branch below has to do.
   if (error instanceof HandledError) {
