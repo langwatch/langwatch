@@ -311,14 +311,39 @@ app.kubernetes.io/instance: {{ .Release.Name }}
            sovereign install fails at deploy time rather than on the first
            write, when the chart would otherwise have rendered green. */}}
       {{- $azureEndpoint := .Values.app.dataplane.providers.azureBlob.endpoint.value }}
+      {{- $azureEndpointFromSecret := .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
+      {{- $hasAuthority := or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name }}
       {{- if and $azureEndpoint (not (contains ".blob.core.windows.net" $azureEndpoint)) }}
-        {{- if not (or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name) }}
+        {{- if not $hasAuthority }}
           {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.endpoint is %q, which is not the Azure public cloud — a token-based authMode also requires providers.azureBlob.authorityHost so tokens are requested from the matching identity authority" $azureEndpoint) }}
         {{- end }}
+      {{/* A secret-backed endpoint is checked as if it were sovereign. Helm
+           cannot read the Secret, so the hostname is unknowable at render
+           time and assuming "public cloud" is the one guess that fails
+           silently — the deploy succeeds and the first storage call is
+           refused. An install that IS on the public cloud does not need to
+           set endpoint at all (it defaults), so requiring an authority
+           alongside a secret-backed endpoint costs a correct configuration
+           nothing and catches the sovereign one. */}}
+      {{- else if and $azureEndpointFromSecret (not $hasAuthority) }}
+        {{- $errors = append $errors "app.dataplane.providers.azureBlob.endpoint is supplied through a Secret, so the chart cannot tell whether it is the Azure public cloud — a token-based authMode therefore also requires providers.azureBlob.authorityHost. Set it to the identity authority matching that endpoint, or drop the endpoint override if this install is on the public cloud" }}
       {{- end }}
       {{- if eq $azureAuthMode "workloadIdentity" }}
         {{- if not (include "langwatch.serviceAccountName" .) }}
           {{- $errors = append $errors "azureBlob authMode workloadIdentity requires global.serviceAccount (create=true or name) so the Entra identity has a ServiceAccount to bind to" }}
+        {{/* A ServiceAccount without the client-id annotation fails the same
+             way as a pod without the webhook label, one layer down: the chart
+             renders, the pods come up healthy, and the webhook has no identity
+             to bind them to, so the first Blob operation fails claiming the
+             cluster is misconfigured. Only enforceable when WE create the
+             account — an account the operator names lives outside this chart
+             and its annotations are not ours to read, so that path is a
+             documented prerequisite instead. */}}
+        {{- else if ((.Values.global).serviceAccount).create }}
+          {{- $saAnnotations := ((.Values.global).serviceAccount).annotations | default dict }}
+          {{- if not (index $saAnnotations "azure.workload.identity/client-id") }}
+            {{- $errors = append $errors "azureBlob authMode workloadIdentity with global.serviceAccount.create=true also requires the annotation azure.workload.identity/client-id on global.serviceAccount.annotations — without it the admission webhook has no identity to bind the pods to and every storage operation fails at runtime" }}
+          {{- end }}
         {{- end }}
       {{- end }}
     {{- end }}
