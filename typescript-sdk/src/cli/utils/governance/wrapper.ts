@@ -323,7 +323,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		process.stderr.write(`path selection failed: ${(err as Error).message}\n`);
 		process.exit(2);
 	}
-	if (pathChoice.aborted) {
+	if (pathChoice.isAborted) {
 		process.stderr.write(`${lwTag()} cancelled, ${tool} was not started.\n`);
 		process.exit(130);
 	}

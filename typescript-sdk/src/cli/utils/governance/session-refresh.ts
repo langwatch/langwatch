@@ -67,6 +67,17 @@ export type SessionRefreshOutcome =
   /** Control plane unreachable; the existing token may still be fine. */
   | { status: "failed"; message: string };
 
+/**
+ * The reason a refresh failed, as a string worth showing someone. Rejections
+ * do not always arrive as `Error`: a polyfilled fetch can reject with a bare
+ * string or an `AbortError`-shaped object, and `(err as Error).message` on
+ * those is `undefined`, which is what the wrapper would otherwise print as
+ * the reason the session died.
+ */
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 function applyRefreshResult(
   cfg: GovernanceConfig,
   result: deviceFlow.RefreshResult,
@@ -113,7 +124,7 @@ export async function refreshSession(
     const rejected =
       err instanceof deviceFlow.DeviceFlowError && err.kind === "unauthorized";
     if (!rejected) {
-      return { status: "failed", message: (err as Error).message };
+      return { status: "failed", message: messageOf(err) };
     }
 
     let onDisk: GovernanceConfig | null = null;
@@ -124,7 +135,7 @@ export async function refreshSession(
     }
     const rotated = onDisk?.refresh_token;
     if (!rotated || rotated === attempted) {
-      return { status: "rejected", message: (err as Error).message };
+      return { status: "rejected", message: messageOf(err) };
     }
 
     try {
@@ -136,7 +147,7 @@ export async function refreshSession(
         err2.kind === "unauthorized";
       return {
         status: rejected2 ? "rejected" : "failed",
-        message: (err2 as Error).message,
+        message: messageOf(err2),
       };
     }
   }

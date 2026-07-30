@@ -348,7 +348,7 @@ describe("resolveWrapperPath", () => {
           saveImpl: save,
           env: {},
         });
-        expect(out.aborted).toBe(true);
+        expect(out.isAborted).toBe(true);
         expect(out.mode).not.toBe("gateway");
         expect(out.prompted).toBe(false);
         expect(save).not.toHaveBeenCalled();

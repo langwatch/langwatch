@@ -91,6 +91,33 @@ describe("cli-api — auth contract", () => {
   });
 
   describe("when the access token has aged out but the session is alive", () => {
+    it("refreshes before sending when the recorded expiry has passed", async () => {
+      const cfg = {
+        ...baseCfg("at_old"),
+        refresh_token: "rt_old",
+        // Already spent, so the proactive check fires and the request goes
+        // out once with the rotated token instead of eating a 401 first.
+        expires_at: 1,
+      };
+      const { fetchImpl, seen } = spyFetch(ok({ hasPersonalVKs: true }));
+
+      await getGovernanceStatus(cfg, {
+        fetchImpl,
+        refreshDeps: {
+          refreshImpl: (async () => ({
+            access_token: "at_new",
+            refresh_token: "rt_new",
+            expires_in: 3600,
+          })) as never,
+          saveImpl: vi.fn(),
+          loadImpl: vi.fn() as never,
+        },
+      });
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0]?.authHeader).toBe("Bearer at_new");
+    });
+
     it("refreshes and retries once, so the caller never sees the 401", async () => {
       const cfg = { ...baseCfg("at_old"), refresh_token: "rt_old" };
       const responses = [

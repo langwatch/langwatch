@@ -25,8 +25,12 @@
  *   3. exactly one allowed path (policy gate) - used silently.
  *   4. both allowed + TTY + not forced-auto-login - PROMPT, persist the
  *      answer, print a one-line tip.
- *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - default gateway,
- *      no prompt, no persist.
+ *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - direct OTLP,
+ *      no prompt, no persist. Nobody is there to consent to the gateway
+ *      billing model usage to the org, so it is never chosen implicitly.
+ *
+ * Cancelling the prompt in case 4 cancels the run rather than picking a
+ * path on the user's behalf.
  *
  * The `--tool-mode` flag is a WRAPPER flag: it is stripped from the args
  * before they are forwarded to the real tool. Every other arg is
@@ -160,7 +164,7 @@ export interface ResolveWrapperPathResult {
    * True when the user cancelled the path prompt. `mode` is then a
    * placeholder the caller must not act on; it should stop the run.
    */
-  aborted?: boolean;
+  isAborted?: boolean;
 }
 
 /**
@@ -324,7 +328,7 @@ export async function resolveWrapperPath(
     // User aborted the prompt (Ctrl-C / empty). Cancelling the question
     // cancels the run: picking a path for them would either start the tool
     // they just interrupted or bill their organization for it.
-    return { mode: "ingestion", prompted: false, aborted: true };
+    return { mode: "ingestion", prompted: false, isAborted: true };
   }
 
   // Remember the choice so subsequent runs don't prompt.

@@ -76,9 +76,27 @@ const CLI_POLICY = handlerManagedAuth(
 );
 
 // ---------------------------------------------------------------------------
-// Constants — tunable via env if a customer ever needs longer windows.
-// Defaults match GitHub CLI / gh-style flows.
+// Constants. Defaults match GitHub CLI / gh-style flows; the refresh-token
+// idle window is tunable via env for deployments with a stricter policy.
 // ---------------------------------------------------------------------------
+
+/**
+ * Read a positive-integer override, falling back to `fallback` when unset,
+ * unparseable, or non-positive. A typo must not silently produce a session
+ * window of zero or NaN seconds.
+ */
+function positiveIntFromEnv(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    logger.warn(
+      { raw, fallback },
+      "ignoring invalid CLI token TTL override; using the default",
+    );
+    return fallback;
+  }
+  return parsed;
+}
 
 /** Lifetime of an unredeemed device_code, in seconds. */
 const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
@@ -86,17 +104,26 @@ const DEVICE_CODE_TTL_SECONDS = 600; // 10 min
 const MIN_POLL_INTERVAL_SECONDS = 5;
 /** Access token lifetime. Short; refresh is the rotation path. */
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1h
+const DEFAULT_REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90d
+
 /**
  * Refresh token lifetime. Rotated on every refresh, so this is how long a
  * session survives with the CLI sitting idle, not how long the session
  * lasts: each `langwatch <tool>` run that refreshes restarts the window.
  * Someone who points a coding agent at LangWatch and comes back a couple
  * of months later should still be connected, so the idle window is a
- * quarter rather than a month. Organizations that want a hard ceiling set
- * `Organization.maxSessionDurationDays`, which /refresh enforces against
- * the original session start.
+ * quarter rather than a month.
+ *
+ * Shorten it with `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` when a stolen
+ * `~/.langwatch/config.json` needs to go stale sooner than that. Two other
+ * ceilings apply regardless: `Organization.maxSessionDurationDays` caps
+ * total session age at /refresh, and revocation takes effect on the next
+ * request because `validateAccessToken` reads Redis every time.
  */
-const REFRESH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 90; // 90d
+const REFRESH_TOKEN_TTL_SECONDS = positiveIntFromEnv(
+  process.env.LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS,
+  DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+);
 /** Min seconds between successive /exchange polls per device_code. */
 const POLL_RATE_LIMIT_SECONDS = 4;
 

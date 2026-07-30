@@ -67,11 +67,18 @@ export interface RecoverExpiredSessionOptions {
   writeImpl?: (s: string) => void;
 }
 
+/** What happened, shared by the interactive and non-interactive branches. */
+function expiredSessionIntro(tool: string): string {
+  return (
+    `${lwTag()} your LangWatch session expired, so direct OTLP telemetry for ` +
+    `${tool} could not be set up.\n`
+  );
+}
+
 /** The line every non-interactive caller gets, so the wording lives once. */
 export function expiredSessionHelp(tool: string): string {
   return (
-    `${lwTag()} your LangWatch session expired, so direct OTLP telemetry for ` +
-    `${tool} could not be set up.\n` +
+    expiredSessionIntro(tool) +
     `Run \`langwatch login --device\` to reconnect, then run this again.\n` +
     `${lwTag()} did not route ${tool} through the LangWatch gateway: that path ` +
     `bills model usage to your organization, and you did not pick it.\n`
@@ -102,20 +109,19 @@ export async function recoverExpiredSession(
   }
 
   writeImpl(
-    `${lwTag()} your LangWatch session expired, so direct OTLP telemetry for ` +
-      `${tool} could not be set up.\n` +
+    expiredSessionIntro(tool) +
       `${lwTag()} staying on the path you picked: ${tool} keeps using your own ` +
       `plan, and nothing is billed through LangWatch.\n`,
   );
 
   const answer = await promptImpl({
     type: "confirm",
-    name: "login",
+    name: "confirmed",
     message: "Log in to LangWatch again now?",
     initial: true,
   });
 
-  if (answer?.login !== true) {
+  if (answer?.confirmed !== true) {
     return {
       status: "abort",
       message:

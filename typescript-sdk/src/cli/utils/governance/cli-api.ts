@@ -117,6 +117,11 @@ async function authorizedFetch(
 
   const outcome = await refreshSession(cfg, deps);
   if (outcome.status !== "refreshed") return res;
+  // Replaying a POST/PUT/DELETE here is safe only because every
+  // control-plane handler validates the bearer before it touches state, so
+  // a 401 first attempt cannot have committed a write. That argument is
+  // specific to 401: do not widen this retry to statuses such as 409 or 5xx,
+  // which can follow a partially applied write.
   return f(url, init(cfg.access_token!));
 }
 

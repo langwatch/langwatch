@@ -264,6 +264,11 @@ interface RunOpts {
   includeToolStubs?: boolean;
   /** Optional extra env-vars to inject (e.g. LANGWATCH_AUTO_LOGIN=1). */
   extraEnv?: Record<string, string>;
+  /**
+   * Env-vars to drop from the harness defaults, for scenarios about what
+   * the wrapper does when nothing pins the path.
+   */
+  unsetEnv?: string[];
 }
 
 interface RunResult {
@@ -334,9 +339,18 @@ function runCli(args: string[], opts: RunOpts = {}): Promise<RunResult> {
   // Always suppress the OS browser open() side-effect from the device-flow
   // login so tests don't pop a real browser tab on the dev machine.
   env.LANGWATCH_BROWSER = "none";
+  // This suite's subject is the gateway path: provider base-URL injection,
+  // VK auth, the budget pre-check, codex's `--profile`. The gateway bills
+  // model usage to the organization, so the wrapper only ever takes it when
+  // asked, and a non-TTY child like this one is never asked. Pin it here so
+  // each scenario states the path it exercises instead of leaning on a
+  // default. The "implicit path choice" describe below covers the unpinned
+  // case, and drops this var to do it.
+  env.LANGWATCH_TOOL_MODE = "gateway";
   if (opts.extraEnv) {
     for (const [k, v] of Object.entries(opts.extraEnv)) env[k] = v;
   }
+  for (const k of opts.unsetEnv ?? []) delete env[k];
   // Detach stdin from the vitest worker — passing "ignore" means the
   // child gets /dev/null on fd 0, which prevents any inherited stdio
   // from blocking exit. stdout/stderr are pipes so we can capture
@@ -816,6 +830,51 @@ describe("governance CLI wrappers — e2e", () => {
         writeToolStub(tool, `exit-code:${code}`);
         const res = await runCli([tool]);
         expect(res.status).toBe(code);
+      });
+    });
+  });
+
+  // The gateway spends the organization's provider credits. Reaching it has
+  // to be a decision someone made: the prompt, a pinned `tool_mode`,
+  // `--tool-mode=gateway`, or `LANGWATCH_TOOL_MODE=gateway`. Every scenario
+  // above pins it; these two prove that without a pin the wrapper does not
+  // find its way there on its own, which is the bug this suite guards.
+  describe("implicit path choice — nothing pins the mode", () => {
+    describe("when a non-TTY run has no tool-mode pin", () => {
+      it("never injects gateway credentials and never reaches the gateway", async () => {
+        writeLoggedInConfig();
+        writeToolStub("claude", "echo-env");
+        const res = await runCli(["claude"], {
+          unsetEnv: ["LANGWATCH_TOOL_MODE"],
+        });
+
+        // The direct-OTLP path the wrapper takes instead cannot complete
+        // against this fake control plane, so the run stops. What matters is
+        // where it did NOT go.
+        expect(res.status).not.toBe(0);
+        const env = envFromStub(res.stdout ?? "");
+        expect(env.ANTHROPIC_BASE_URL ?? "").toBe("");
+        expect(env.ANTHROPIC_AUTH_TOKEN ?? "").toBe("");
+        expect(res.stdout ?? "").not.toContain(TEST_VK);
+        expect(recordedGwRequests).toHaveLength(0);
+      });
+    });
+
+    // The exception, and it is an explicit org-level one: cursor carries
+    // `allowOtelDirect: false`, so the gateway is the only path left and the
+    // wrapper takes it with a notice rather than dead-ending.
+    describe("when platform policy leaves the gateway as the only path", () => {
+      it("still routes there, and says so", async () => {
+        writeLoggedInConfig();
+        writeToolStub("cursor", "echo-env");
+        const res = await runCli(["cursor"], {
+          unsetEnv: ["LANGWATCH_TOOL_MODE"],
+        });
+
+        expect(res.status).toBe(0);
+        const env = envFromStub(res.stdout ?? "");
+        expect(env.OPENAI_BASE_URL).toBe(gwUrl);
+        expect(env.OPENAI_API_KEY).toBe(TEST_VK);
       });
     });
   });

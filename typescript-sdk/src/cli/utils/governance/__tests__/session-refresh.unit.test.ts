@@ -144,6 +144,43 @@ describe("refreshSession", () => {
     expect(cfg.access_token).toBe("lw_at_new");
   });
 
+  it("describes a non-Error rejection instead of reporting undefined", async () => {
+    const outcome = await refreshSession(baseConfig(), {
+      // A polyfilled fetch can reject with a bare string; the reason still
+      // has to read as something when the wrapper prints it.
+      refreshImpl: (async () => {
+        throw "socket hang up";
+      }) as never,
+      loadImpl: (() => baseConfig()) as never,
+      saveImpl: vi.fn(),
+    });
+
+    expect(outcome).toMatchObject({
+      status: "failed",
+      message: "socket hang up",
+    });
+  });
+
+  it("reports a network failure on the sibling-token retry, not a dead session", async () => {
+    const refreshImpl = vi.fn(async (_opts: unknown, token: string) => {
+      if (token === "lw_rt_old") {
+        throw new DeviceFlowError("unauthorized", "already spent");
+      }
+      throw new Error("connect ECONNREFUSED");
+    });
+
+    const outcome = await refreshSession(baseConfig(), {
+      refreshImpl: refreshImpl as never,
+      loadImpl: (() => baseConfig({ refresh_token: "lw_rt_sibling" })) as never,
+      saveImpl: vi.fn(),
+    });
+
+    // The retry died on the wire rather than being refused, so the wrapper
+    // should talk about connectivity, not send the user back to login.
+    expect(outcome.status).toBe("failed");
+    expect(outcome).toMatchObject({ message: "connect ECONNREFUSED" });
+  });
+
   it("reports a network failure separately, leaving the token in place", async () => {
     const cfg = baseConfig();
     const outcome = await refreshSession(cfg, {

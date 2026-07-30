@@ -85,7 +85,7 @@ describe("recoverExpiredSession", () => {
       cfg,
       tool: "codex",
       isTTY: true,
-      promptImpl: (async () => ({ login: true })) as never,
+      promptImpl: (async () => ({ confirmed: true })) as never,
       loginImpl: (async () => fresh) as never,
       writeImpl: (s) => writes.push(s),
     });
@@ -105,7 +105,7 @@ describe("recoverExpiredSession", () => {
       cfg,
       tool: "codex",
       isTTY: true,
-      promptImpl: (async () => ({ login: false })) as never,
+      promptImpl: (async () => ({ confirmed: false })) as never,
       loginImpl: loginImpl as never,
       writeImpl: () => undefined,
     });
@@ -136,7 +136,7 @@ describe("recoverExpiredSession", () => {
       cfg,
       tool: "codex",
       isTTY: true,
-      promptImpl: (async () => ({ login: true })) as never,
+      promptImpl: (async () => ({ confirmed: true })) as never,
       loginImpl: (async () => {
         throw new Error("device code expired");
       }) as never,
@@ -153,7 +153,7 @@ describe("recoverExpiredSession", () => {
       cfg,
       tool: "codex",
       isTTY: true,
-      promptImpl: (async () => ({ login: true })) as never,
+      promptImpl: (async () => ({ confirmed: true })) as never,
       loginImpl: (async () => ({
         gateway_url: cfg.gateway_url,
         control_plane_url: cfg.control_plane_url,
