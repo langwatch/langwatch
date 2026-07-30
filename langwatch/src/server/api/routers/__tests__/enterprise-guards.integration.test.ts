@@ -139,20 +139,20 @@ describe("enterprise feature guards", () => {
   });
 
   afterAll(async () => {
-    // The bindings hold an FK to CustomRole, so they go first.
+    // Literal ids rather than namespace filters: the org and team tenancy
+    // guards refuse a relation predicate, and the roles the tests create
+    // carry this org anyway. The bindings hold an FK to CustomRole, so
+    // they go first.
     await cleanupTestRows(prisma, [
       ["roleBinding", { organizationId }],
-      [
-        "teamUser",
-        { team: { slug: { startsWith: `--test-team-${testNamespace}` } } },
-      ],
-      ["team", { slug: { startsWith: `--test-team-${testNamespace}` } }],
-      ["customRole", { organization: { slug: `--test-org-${testNamespace}` } }],
-      [
-        "organizationUser",
-        { organization: { slug: `--test-org-${testNamespace}` } },
-      ],
-      ["organization", { slug: `--test-org-${testNamespace}` }],
+      // The suite's own tests create invites and teams, so everything is
+      // swept by organization rather than by the ids beforeAll captured.
+      ["organizationInvite", { organizationId }],
+      ["teamUser", { team: { organizationId } }],
+      ["customRole", { organizationId }],
+      ["team", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
       ["user", { email: `test-${testNamespace}@example.com` }],
     ]);
   });

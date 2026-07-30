@@ -197,9 +197,9 @@ describe("organization member role plan limit enforcement", () => {
     // deleting them explicitly means a broken teardown says so.
     await cleanupTestRows(prisma, [
       ["roleBinding", { organizationId }],
-      ["teamUser", { team: { slug: `--test-team-${testNamespace}` } }],
+      ["teamUser", { teamId }],
       ["customRole", { organizationId }],
-      ["team", { slug: `--test-team-${testNamespace}` }],
+      ["team", { id: teamId }],
       ["organizationUser", { organizationId }],
       ["organization", { id: organizationId }],
       ["user", { email: { endsWith: `${testNamespace}@example.com` } }],

@@ -202,7 +202,9 @@ describe.skipIf(!hasCredentialsSecret)(
           },
         ],
         ["teamUser", { team: { organizationId } }],
-        ["organizationUser", { organization: { slug: `--test-${ns}` } }],
+        // The org-tenancy guard wants a literal organizationId; a relation
+        // filter on the org's slug does not bound the query for it.
+        ["organizationUser", { organizationId }],
         ["project", { team: { organizationId } }],
         ["team", { organizationId }],
         ["organization", { slug: `--test-${ns}` }],

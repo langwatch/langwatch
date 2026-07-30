@@ -145,7 +145,10 @@ describe.skipIf(!hasCredentialsSecret)(
 
     afterAll(async () => {
       await cleanupTestRows(prisma, [
-        ["modelProvider", { organizationId: { in: [orgId, otherOrgId] } }],
+        // ModelProvider's tenancy guard takes a literal organizationId,
+        // not an in-list, so one entry per organization.
+        ["modelProvider", { organizationId: orgId }],
+        ["modelProvider", { organizationId: otherOrgId }],
         ["roleBinding", { organizationId: orgId }],
         ["organizationUser", { organizationId: { in: [orgId, otherOrgId] } }],
         [
