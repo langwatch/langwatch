@@ -55953,15 +55953,34 @@ ingress:
 Things worth knowing before you change it:
 
 - **Blocked requests answer 503** on ingress-nginx. The exact code is
-  controller-dependent (the Ingress API does not specify it) but every controller
-  fails closed. Expect a low background rate in your ingress 5xx metrics from
-  scanners — that is the block working, not the app faulting.
+  controller-dependent (the Ingress API does not specify what a backend with no
+  endpoints returns), and this is verified against ingress-nginx only — if you
+  run a different controller, confirm it answers 5xx rather than falling through
+  to another rule before relying on the block. Expect a low background rate in
+  your ingress 5xx metrics from scanners — that is the block working, not the
+  app faulting.
 - **In-cluster callers are unaffected** — the agent, gateway and CronJobs use the
   internal Service.
 - **It covers this ingress only.** If you publish the app another way (NodePort,
   LoadBalancer, your own Ingress), restrict these paths where that route ends.
-- **The chart refuses configurations that would defeat the block**, such as an
-  `ingress.hosts` path nested under a blocked prefix.
+- **The chart refuses configurations that would defeat the block.** Each of
+  these renders a manifest that looks protected and is not, so the chart fails
+  at render time rather than shipping it:
+  - an `ingress.hosts` path nested under a blocked prefix (it out-matches the
+    blackhole)
+  - a blocked prefix with a trailing slash, a repeated slash, or surrounding
+    whitespace (none of them match any real request path)
+  - a regex `pathType: ImplementationSpecific` path, which ingress-nginx ranks
+    *above* prefix rules
+  - the `nginx.ingress.kubernetes.io/default-backend` annotation, which is
+    defined as the handler for a backend with no endpoints — exactly what the
+    blackhole is, so it converts the block into a proxy
+  - a host whose `http.paths` list is empty, which would leave an Ingress whose
+    only rules are blackholes
+- **The block depends on nobody being able to create an EndpointSlice named for
+  the blackhole Service.** It is selector-less, so endpoints can only arrive by
+  hand — restrict `discovery.k8s.io/endpointslices: create` in this namespace if
+  that is not already the case.
 - **AWS LBC (default `target-type: instance`) and GKE without NEG** reject a
   ClusterIP backend and stop reconciling the Ingress. Set
   `alb.ingress.kubernetes.io/target-type: ip` (or the NEG equivalent), or empty
