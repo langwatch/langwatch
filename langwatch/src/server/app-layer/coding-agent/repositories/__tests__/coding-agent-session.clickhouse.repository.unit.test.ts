@@ -7,7 +7,19 @@
  * catches a parse that happens to align on whole hours. The stamp suite is
  * unaffected — it works in raw epoch numbers.
  */
-process.env.TZ = "Asia/Kolkata";
+// Through node:process, NOT the global. Under a vm pool with isolate:false a
+// worker reuses one context across files, and the `process` global vitest
+// hands that context wraps the real one — assigning TZ on it misses Node's
+// native env setter, which is the thing that flushes V8's cached timezone.
+// So whenever another file had already used Date in this worker, the
+// assignment silently did nothing, the guard below collapsed to "expected +0
+// not to be +0", and which files shared a worker depended on the sequencer —
+// a per-shard coin flip. node:process is the real object; its setter flushes
+// the cache even mid-context. Verified against a deterministic repro
+// (TZ=UTC, one worker, a Date-using suite loaded first).
+import { env as nodeProcessEnv } from "node:process";
+
+nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { register } from "prom-client";
