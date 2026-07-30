@@ -166,7 +166,12 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install langwatch deps
-        run: pnpm install --frozen-lockfile --filter "@langwatch/web..."
+        # node-pty (in the app's closure via mcp-server) falls back to
+        # `node-gyp rebuild` on linux, and this job bypasses the shared setup
+        # action that puts node-gyp on PATH.
+        run: |
+          npm install -g node-gyp@12.3.0
+          pnpm install --frozen-lockfile --filter "@langwatch/web..."
 
       - name: Apply DB migrations
         working-directory: langwatch

@@ -59,7 +59,9 @@ COPY langwatch/vendor ./langwatch/vendor
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
 RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
 COPY langwatch ./langwatch
-RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
+WORKDIR /app/langwatch
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
+WORKDIR /app
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
 # gigabyte of vite, vitest, playwright and biome. A filtered re-install with
@@ -91,7 +93,9 @@ RUN CI=true pnpm install --frozen-lockfile --prod --filter "@langwatch/web..."
 # generated client (it is not a declared dependency).
 RUN CI=true pnpm prune --prod
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
-RUN cd langwatch && pnpm prisma generate
+WORKDIR /app/langwatch
+RUN pnpm prisma generate
+WORKDIR /app
 
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine

@@ -112,11 +112,11 @@ describe("Dockerfile runtime stage", () => {
       // Copying the whole tree satisfies this more strongly than naming the
       // package: it cannot go stale when a new root workspace package is
       // added. Either shape is accepted; neither being present is the bug.
-      const copiesWholeTree =
+      const hasWholeTreeCopy =
         /COPY --from=builder \/app\/packages\s+\.\/packages/.test(stage);
 
       expect(
-        copiesWholeTree || stage.includes(`/app/packages/${dir}`),
+        hasWholeTreeCopy || stage.includes(`/app/packages/${dir}`),
         `The runtime stage must COPY /app/packages/${dir} (or the whole /app/packages tree) — langwatch/node_modules/@langwatch/* symlinks into it, so omitting it makes the app fail at boot with "Cannot find module".`,
       ).toBe(true);
     });
