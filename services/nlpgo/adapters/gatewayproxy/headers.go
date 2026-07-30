@@ -5,9 +5,9 @@
 // domain.Credential, and forwards the call to the gateway dispatcher.
 //
 // Three TS callsites talk to /proxy/v1/*:
-//   - langwatch/src/server/routes/playground.ts
+//   - platform/app/src/server/routes/playground.ts
 //   - langwatch/src/server/modelProviders/model.factory.ts
-//   - langwatch/src/server/modelProviders/utils.ts
+//   - platform/app/src/server/modelProviders/utils.ts
 //
 // All three send the customer's provider credentials as
 // `x-litellm-<field>` headers. This file owns the header → Credential

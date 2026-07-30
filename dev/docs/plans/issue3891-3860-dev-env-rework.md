@@ -14,11 +14,11 @@ Re-scoped 2026-05-06 after Drew's clarification:
 
 So #3860 AC2 / AC3 / AC6 are **back in scope**. The mental model:
 
-- **Contributor's `langwatch/.env` is the source of truth** for non-overridden URLs.
+- **Contributor's `platform/app/.env` is the source of truth** for non-overridden URLs.
 - **Each mode is a URL-rewrite preset** — it controls (a) which compose services start and (b) which URLs in env get rewritten to localhost (overriding the `.env` value).
 - "default to remote" = "leave `.env` alone unless a mode explicitly overrides".
 
-Implementation: a `langwatch/.env.dev-up` overlay file is loaded LAST as `env_file` in the relevant services. Compose's `x-common-env` no longer hard-sets `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` / `LANGWATCH_NLP_SERVICE` / `LANGEVALS_ENDPOINT` — those come from `langwatch/.env` by default and are overridden by `.env.dev-up` when a mode wants the local container.
+Implementation: a `platform/app/.env.dev-up` overlay file is loaded LAST as `env_file` in the relevant services. Compose's `x-common-env` no longer hard-sets `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` / `LANGWATCH_NLP_SERVICE` / `LANGEVALS_ENDPOINT` — those come from `platform/app/.env` by default and are overridden by `.env.dev-up` when a mode wants the local container.
 
 Mode → (services, URL overrides):
 
@@ -30,7 +30,7 @@ Mode → (services, URL overrides):
 | `nlp` | + langwatch_nlp + langevals | + `LANGWATCH_NLP_SERVICE`, `LANGEVALS_ENDPOINT` |
 | `full-local` | `--profile full` (everything) | all five |
 
-Migration mode uses a `compose.dev.migration.yml` overlay that adds host port mappings to postgres + clickhouse so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
+Migration mode uses a `infra/compose.dev.migration.yml` overlay that adds host port mappings to postgres + clickhouse so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
 
 `make quickstart` accepts a positional mode arg for non-interactive usage: `make quickstart frontend-only`, `make quickstart backend-shared`, etc. `make quickstart help` continues to print the mode reference.
 
@@ -50,13 +50,13 @@ Deprecated targets (`make dev*` / `make dev-up`) become thin shims onto the new 
 
 ## Scope split
 
-### #3891 — boxd.mk
+### #3891 — dev/boxd.mk
 
 | Deliverable | File |
 |---|---|
-| Make targets | `boxd.mk` (new), `Makefile` (include) |
-| Pure shell helpers (slug, env discovery, hostname rewrite) | `scripts/boxd-fork.sh` (new) |
-| Unit + integration tests for helpers | `scripts/__tests__/boxd-fork.unit.bats` (new), `scripts/__tests__/boxd-fork.integration.bats` (new) |
+| Make targets | `dev/boxd.mk` (new), `Makefile` (include) |
+| Pure shell helpers (slug, env discovery, hostname rewrite) | `dev/scripts/boxd-fork.sh` (new) |
+| Unit + integration tests for helpers | `dev/scripts/__tests__/boxd-fork.unit.bats` (new), `dev/scripts/__tests__/boxd-fork.integration.bats` (new) |
 | Docs (philosophy, target reference, troubleshooting, threat model) | `dev/docs/boxd-makefile.md` (new) |
 | BDD spec for verifiable behavior | `specs/setup/boxd-fork-vm.feature` (new, `@unimplemented` per repo convention) |
 
@@ -64,26 +64,26 @@ Deprecated targets (`make dev*` / `make dev-up`) become thin shims onto the new 
 
 | Deliverable | File |
 |---|---|
-| Stable named volumes for stateful services + singleton redis with host port | `compose.dev.yml` (edit) |
-| `quickstart help` non-interactive mode + per-mode hint + fail-fast on env mismatch + idempotency notes | `scripts/dev.sh` (edit) |
+| Stable named volumes for stateful services + singleton redis with host port | `infra/compose.dev.yml` (edit) |
+| `quickstart help` non-interactive mode + per-mode hint + fail-fast on env mismatch + idempotency notes | `dev/scripts/dev.sh` (edit) |
 | Deprecation wrappers around `make dev*` and `make dev-up` | `Makefile` (edit) |
 | Updated dev section + new entry point | `CLAUDE.md` (edit), `dev/docs/adr/004-docker-dev-environment.md` (amendment) |
 | BDD spec for new behavior | `specs/setup/quickstart-entry-point.feature` (new, `@unimplemented`) |
 
-## boxd.mk design
+## dev/boxd.mk design
 
 ### File layout
 
 ```
-boxd.mk                       # Make targets (orchestration only)
-scripts/boxd-fork.sh          # Shell helpers (pure-ish: slug, env discovery, hostname rewrite, env-cp, port mapping)
-scripts/__tests__/boxd-fork.unit.bats        # tests for slugifier, env discovery, hostname rewrite
-scripts/__tests__/boxd-fork.integration.bats # tests with mocked boxd, gh, git
+dev/boxd.mk                       # Make targets (orchestration only)
+dev/scripts/boxd-fork.sh          # Shell helpers (pure-ish: slug, env discovery, hostname rewrite, env-cp, port mapping)
+dev/scripts/__tests__/boxd-fork.unit.bats        # tests for slugifier, env discovery, hostname rewrite
+dev/scripts/__tests__/boxd-fork.integration.bats # tests with mocked boxd, gh, git
 dev/docs/boxd-makefile.md     # human-facing docs
 specs/setup/boxd-fork-vm.feature # behavior spec (unimplemented stub)
 ```
 
-The targets are thin orchestrators that source `scripts/boxd-fork.sh` and call its functions. This keeps the Makefile readable and makes the slug/env/rewrite logic unit-testable with bats.
+The targets are thin orchestrators that source `dev/scripts/boxd-fork.sh` and call its functions. This keeps the Makefile readable and makes the slug/env/rewrite logic unit-testable with bats.
 
 ### Slugifier — exact spec
 
@@ -110,7 +110,7 @@ Examples (asserted in unit tests):
 - `issue3891/boxd-mk-and-quickstart-rework` → `issue3891-boxd-mk-and-quickstart-rework`
 - 60-char input → truncated to ≤40, no trailing `-`.
 
-Distinct from `scripts/worktree.sh::generate_slug` (50 chars, word-boundary truncation): `worktree.sh` makes branch names from titles; `boxd-fork.sh` makes VM names from already-slug-shaped branches. Different concerns; not unifying yet.
+Distinct from `dev/scripts/worktree.sh::generate_slug` (50 chars, word-boundary truncation): `worktree.sh` makes branch names from titles; `boxd-fork.sh` makes VM names from already-slug-shaped branches. Different concerns; not unifying yet.
 
 ### Naming
 
@@ -193,14 +193,14 @@ boxd-connect-issue:
 	  $(BOXD_CONNECT) "$$vm" "$$tmux"
 ```
 
-`BOXD_CONNECT` is a function in `scripts/boxd-fork.sh` that:
+`BOXD_CONNECT` is a function in `dev/scripts/boxd-fork.sh` that:
 1. Checks VM exists (`boxd list --json | jq …`); error+exit if not (AC#19)
 2. If suspended, runs `boxd resume <vm>` and waits for ready (AC#20)
 3. SSHes via `boxd connect <vm>` and runs `tmux attach -t <tmux>` — with a fallback if the session isn't there (AC#18: clear message + nonzero exit, no attach into nothing)
 
 ## #3860 design (subset)
 
-### compose.dev.yml volume changes
+### infra/compose.dev.yml volume changes
 
 ```yaml
 volumes:
@@ -236,7 +236,7 @@ Two worktrees can both `up` postgres simultaneously — they'd both bind the con
 
 Wait — that's wrong. If two compose projects both create a container named `langwatch-issue123-postgres` and `langwatch-issue456-postgres`, both binding `/var/lib/postgresql/data` to volume `langwatch-db-data`, postgres will refuse to start the second one (lock file). That's actually the desired behavior — the second `quickstart` errors clearly.
 
-`scripts/dev.sh` adds detection: before `up`, check if any container named `*-postgres` is running with the shared volume mounted. If yes, print a clear message: *"postgres is already up in another worktree (project=<other>). Stop it first or reuse it."*
+`dev/scripts/dev.sh` adds detection: before `up`, check if any container named `*-postgres` is running with the shared volume mounted. If yes, print a clear message: *"postgres is already up in another worktree (project=<other>). Stop it first or reuse it."*
 
 ### Quickstart help
 
@@ -256,7 +256,7 @@ LangWatch development environment
   Redis is a singleton on host :6379.
 ```
 
-Implemented by checking `$1` in `scripts/dev.sh`: if it's `help`, print and exit.
+Implemented by checking `$1` in `dev/scripts/dev.sh`: if it's `help`, print and exit.
 
 ### Deprecation wrappers in Makefile
 
@@ -275,14 +275,14 @@ One release of grace. Filing a follow-up to remove.
 
 ```bash
 # Inside ensure_prepared, before docker up:
-if grep -qE '^IS_SAAS\s*=\s*"?true"?\s*$' langwatch/.env 2>/dev/null \
-   && ! grep -qE '^BLOCK_LOCAL_HTTP_CALLS\s*=\s*"?true"?\s*$' langwatch/.env 2>/dev/null; then
+if grep -qE '^IS_SAAS\s*=\s*"?true"?\s*$' platform/app/.env 2>/dev/null \
+   && ! grep -qE '^BLOCK_LOCAL_HTTP_CALLS\s*=\s*"?true"?\s*$' platform/app/.env 2>/dev/null; then
   echo "ERROR: IS_SAAS=true requires BLOCK_LOCAL_HTTP_CALLS=true (SSRF guard)" >&2
   exit 1
 fi
 ```
 
-(`compose.dev.yml`'s common-env already sets `BLOCK_LOCAL_HTTP_CALLS: "true"` so this is a defense-in-depth check on the source `.env`, not the runtime.)
+(`infra/compose.dev.yml`'s common-env already sets `BLOCK_LOCAL_HTTP_CALLS: "true"` so this is a defense-in-depth check on the source `.env`, not the runtime.)
 
 ## AC → task mapping
 
@@ -290,19 +290,19 @@ fi
 
 | AC | Where addressed |
 |---|---|
-| 1 (boxd.mk + include) | `boxd.mk`, `Makefile` |
-| 2 (target list) | `boxd.mk` |
-| 3 (philosophy line in help) | `boxd.mk` `help` target |
-| 4 (each target prints intent + confirm destructive) | `boxd.mk` per-target |
+| 1 (dev/boxd.mk + include) | `dev/boxd.mk`, `Makefile` |
+| 2 (target list) | `dev/boxd.mk` |
+| 3 (philosophy line in help) | `dev/boxd.mk` `help` target |
+| 4 (each target prints intent + confirm destructive) | `dev/boxd.mk` per-target |
 | 5 (golden VM pre-warmed) | `boxd-golden` calls `make dev-full` inside the VM via `boxd exec` |
-| 6 (golden-reset) | `boxd.mk` |
-| 7 (seed hook) | `boxd.mk` defines empty `seed-golden:` target documented as override-me |
+| 6 (golden-reset) | `dev/boxd.mk` |
+| 7 (seed hook) | `dev/boxd.mk` defines empty `seed-golden:` target documented as override-me |
 | 8 (staleness ops doc) | `dev/docs/boxd-makefile.md` |
-| 9 (naming convention) | `scripts/boxd-fork.sh` |
+| 9 (naming convention) | `dev/scripts/boxd-fork.sh` |
 | 10 (single fork primitive) | `_boxd-fork-impl` make target shared across pr/branch/issue |
 | 11 (fork has branch checked out + ready) | impl |
 | 12 (fork-issue creates worktree branch + tmux+claude inside VM) | impl |
-| 13 (slugifier spec) | `scripts/boxd-fork.sh::boxd_slug` + bats tests |
+| 13 (slugifier spec) | `dev/scripts/boxd-fork.sh::boxd_slug` + bats tests |
 | 14 (collision rule) | impl + warning |
 | 15 (existing-worktree behavior) | impl: idempotent reuse, error on existing VM |
 | 16 (cross-fork PRs via gh) | impl |
@@ -318,20 +318,20 @@ fi
 | 26 (hostname-rewrite allowlist) | impl, tested |
 | 27 (ports 3000, 5563, others) | impl |
 | 28 (dev/docs/ entry) | `dev/docs/boxd-makefile.md` |
-| 29 (make help grep-able) | `boxd.mk` `help` target |
+| 29 (make help grep-able) | `dev/boxd.mk` `help` target |
 
 ### #3860 (quickstart) — 10 ACs
 
 | AC | Where addressed | Status |
 |---|---|---|
 | 1 (single entry point) | `Makefile` deprecation wrappers, `CLAUDE.md`, `ADR-004` | done |
-| 2 (intent-based prompting) | `scripts/dev.sh` 5-mode prompt | done |
+| 2 (intent-based prompting) | `dev/scripts/dev.sh` 5-mode prompt | done |
 | 3 (default = fastest path) | `frontend-only` mode = no compose, ~instant | done |
-| 4 (stateful shared volumes + collision detection) | `compose.dev.yml`, `scripts/dev.sh` | done |
-| 5 (redis singleton + host port) | `compose.dev.yml` | done |
-| 6 (URL rewrite on profile flip) | `scripts/dev.sh` writes `langwatch/.env.dev-up` per mode; `compose.dev.yml` honours it via env_file overlay | done |
-| 7 (idempotent + fail-fast IS_SAAS guard) | `scripts/dev.sh` | done |
-| 8 (per-mode hints + `quickstart help`) | `scripts/dev.sh` | done |
+| 4 (stateful shared volumes + collision detection) | `infra/compose.dev.yml`, `dev/scripts/dev.sh` | done |
+| 5 (redis singleton + host port) | `infra/compose.dev.yml` | done |
+| 6 (URL rewrite on profile flip) | `dev/scripts/dev.sh` writes `platform/app/.env.dev-up` per mode; `infra/compose.dev.yml` honours it via env_file overlay | done |
+| 7 (idempotent + fail-fast IS_SAAS guard) | `dev/scripts/dev.sh` | done |
+| 8 (per-mode hints + `quickstart help`) | `dev/scripts/dev.sh` | done |
 | 9 (deprecation warnings on old paths) | `Makefile`, `CLAUDE.md`, `ADR-004` | done |
 | 10 (no CI regressions, `pnpm test:*` pass) | verified by running typecheck + test:unit | gate |
 
@@ -340,7 +340,7 @@ fi
 | Risk | Likelihood | Mitigation |
 |---|---|---|
 | Stable shared `db-data` volume conflicts with someone's existing per-worktree volume | High (everyone has stale `lw-<hash>-db-data`) | Migration note in ADR-004 amendment + `make quickstart` prints warning if old volumes detected |
-| `boxd.mk` external-vs-internal CLI surface drift (issue calls out both) | Med | Use only commands that exist in both: `info`, `list`, `new`, `fork`, `exec`, `cp`, `proxy`, `connect`, `pause`, `resume`, `destroy`. No `local` / `auto-suspend` calls |
+| `dev/boxd.mk` external-vs-internal CLI surface drift (issue calls out both) | Med | Use only commands that exist in both: `info`, `list`, `new`, `fork`, `exec`, `cp`, `proxy`, `connect`, `pause`, `resume`, `destroy`. No `local` / `auto-suspend` calls |
 | Bats tests don't run in CI (no workflow runs them) | Low | They run locally for the slugifier + env helpers; integration via @unimplemented spec for parity tracking |
 | Fork pruning is out of scope but the user's quota fills up | Low | Documented in `dev/docs/boxd-makefile.md`; follow-up issue filed |
 | `make dev` deprecation warning breaks someone's muscle-memory workflow | Med | Warning is on stderr only; command still works for one release |
@@ -350,8 +350,8 @@ fi
 
 ## Test strategy
 
-- **`scripts/__tests__/boxd-fork.unit.bats`** — slugifier (5 cases per AC#13), `boxd_vm_name`, `boxd_tmux_name`, env-file discovery, hostname rewrite (allowlist + value-pattern + leave-alone)
-- **`scripts/__tests__/boxd-fork.integration.bats`** — fork-pr/branch/issue with mocked `boxd`, `gh`, `git`. Asserts the orchestration order: resolve → fork → cp creds → cp envs → proxy new → exec tmux. Same mocking pattern as `worktree.integration.bats`.
+- **`dev/scripts/__tests__/boxd-fork.unit.bats`** — slugifier (5 cases per AC#13), `boxd_vm_name`, `boxd_tmux_name`, env-file discovery, hostname rewrite (allowlist + value-pattern + leave-alone)
+- **`dev/scripts/__tests__/boxd-fork.integration.bats`** — fork-pr/branch/issue with mocked `boxd`, `gh`, `git`. Asserts the orchestration order: resolve → fork → cp creds → cp envs → proxy new → exec tmux. Same mocking pattern as `worktree.integration.bats`.
 - **`specs/setup/boxd-fork-vm.feature`** — `@unimplemented` BDD scenarios mirroring the bats tests for parity tracking.
 - **`specs/setup/quickstart-entry-point.feature`** — `@unimplemented` BDD scenarios for the deprecation, help-mode, and shared-volume behavior.
 - **No JS/TS tests added** — neither feature touches TS code paths. `pnpm typecheck` and `pnpm test:unit` run only as regression gates (AC10 of #3860).
@@ -361,12 +361,12 @@ fi
 
 1. ✅ Investigation (this doc)
 2. Branch + git config
-3. `scripts/boxd-fork.sh` skeleton + slugifier + bats unit tests (TDD)
-4. `boxd.mk` skeleton + golden + connect-* targets
+3. `dev/scripts/boxd-fork.sh` skeleton + slugifier + bats unit tests (TDD)
+4. `dev/boxd.mk` skeleton + golden + connect-* targets
 5. fork-* targets including env discovery, hostname rewrite, creds transport, port mapping
 6. Bats integration tests (mocked boxd)
-7. `compose.dev.yml` shared-volume changes + redis host port
-8. `scripts/dev.sh` help mode + per-mode hints + idempotency / fail-fast / collision detection
+7. `infra/compose.dev.yml` shared-volume changes + redis host port
+8. `dev/scripts/dev.sh` help mode + per-mode hints + idempotency / fail-fast / collision detection
 9. `Makefile` deprecation wrappers
 10. `CLAUDE.md` + `ADR-004` updates
 11. `dev/docs/boxd-makefile.md`

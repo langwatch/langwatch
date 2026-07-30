@@ -113,7 +113,7 @@ Run this in order on prod:
 
 ## If something goes wrong
 
-- **Users can't sign in**: check `langwatch/server.log` for `langwatch:better-auth` errors. Likely culprits: missing env vars (`NEXTAUTH_SECRET`, provider client secrets), or the bcrypt verify failing.
+- **Users can't sign in**: check `platform/app/server.log` for `langwatch:better-auth` errors. Likely culprits: missing env vars (`NEXTAUTH_SECRET`, provider client secrets), or the bcrypt verify failing.
 - **Sessions not persisting**: check `Session` table for rows. If rows exist but `auth.api.getSession` returns null, the cookie is likely being blocked by SameSite/Secure in a non-HTTPS environment.
 - **OAuth callback errors**: the migration preserves the legacy NextAuth callback paths via a Next.js rewrite + a `redirectURI` override on the genericOAuth providers (auth0/okta). Existing customer applications in Auth0/Okta should continue to work without updating their allowed callbacks. If errors persist, double-check that the customer's IdP has `${NEXTAUTH_URL}/api/auth/callback/{provider}` (NOT `/api/auth/oauth2/callback/{provider}`) in its allowed redirect URI list — that's the path we pin to.
 - **Admin impersonation broken**: verify the legacy `Session.impersonating` JSON column is still present — it's preserved by the migration but worth double-checking in prod.

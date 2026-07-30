@@ -4,7 +4,7 @@ Feature: BetterAuth config (unmounted)
   I want a fully-configured BetterAuth instance ready to use
   So that I can swap NextAuth for it in a single cutover without gaps
 
-  # The file `langwatch/src/server/better-auth/index.ts` exports a `betterAuth`
+  # The file `platform/app/src/server/better-auth/index.ts` exports a `betterAuth`
   # instance with every provider we care about and every custom hook ported
   # from the NextAuth callbacks. BetterAuth is now the live auth handler,
   # mounted at `/api/auth/[...all]`.

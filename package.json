@@ -32,13 +32,20 @@
   },
   "files": [
     "packages/server/dist/",
+    "packages/api/",
+    "packages/automations/",
     "packages/handled-error/",
     "packages/langy/",
-    "langwatch/",
-    "langevals/",
-    "python-sdk/",
-    "mcp-server/",
-    "scripts/",
+    "packages/observability/",
+    "packages/react-rum/",
+    "packages/redaction/",
+    "packages/ssrf/",
+    "platform/app/",
+    "services/langevals/",
+    "sdks/python/",
+    "sdks/typescript/",
+    "mcp/typescript/",
+    "dev/scripts/",
     "skills/",
     "feature-map.json",
     "README.md",
@@ -46,13 +53,13 @@
     "pnpm-workspace.yaml",
     "pnpm-lock.yaml",
     "packages/server/package.json",
-    "typescript-sdk/package.json",
-    "agentic-e2e-tests/package.json"
+    "tests/agentic-e2e/package.json"
   ],
   "scripts": {
     "dev": "pnpm --filter @langwatch/web dev",
-    "dev:single": "pnpm --filter @langwatch/web dev:single",
-    "dev:haven": "pnpm --filter @langwatch/web dev:haven",
+    "dev:app": "pnpm --filter @langwatch/web dev:app",
+    "dev:worker": "pnpm --filter @langwatch/web dev:worker",
+    "dev:concurrent": "pnpm --filter @langwatch/web dev:concurrent",
     "dev:cli": "pnpm --filter @langwatch/server-cli dev",
     "start": "pnpm --filter @langwatch/web start",
     "build": "pnpm -r --filter \"!@langwatch/server\" build",
@@ -72,8 +79,8 @@
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "prisma:migrate": "pnpm --filter @langwatch/web prisma:migrate",
     "prisma:seed": "pnpm --filter @langwatch/web prisma:seed",
-    "pack:npm": "bash scripts/pack-npm.sh",
-    "release:dry-run": "bash scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50"
+    "pack:npm": "bash dev/scripts/pack-npm.sh",
+    "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

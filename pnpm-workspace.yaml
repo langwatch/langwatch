@@ -2,33 +2,32 @@
 # See dev/docs/adr/076-single-pnpm-workspace.md.
 #
 # This used to be six independent install roots with six lockfiles: the repo
-# root, langwatch/, typescript-sdk/, mcp-server/, skills/ and
-# agentic-e2e-tests/. mcp-server was BOTH its own root and a member of
-# langwatch/'s workspace, so CI installed it twice on every app build; skills/
-# and agentic-e2e-tests/ needed `--ignore-workspace` to escape a workspace they
+# root, platform/app/, sdks/typescript/, mcp/typescript/, skills/ and
+# tests/agentic-e2e/. mcp/typescript was BOTH its own root and a member of
+# platform/app/'s workspace, so CI installed it twice on every app build; skills/
+# and tests/agentic-e2e/ needed `--ignore-workspace` to escape a workspace they
 # were never members of; and each root carried its own `overrides` block, so a
 # security pin applied in one could be silently absent from another.
 #
 # One install from the repo root now covers all of it.
 packages:
-  - "langwatch"
-  - "langwatch/packages/*"
+  - "platform/app"
   - "packages/*"
-  - "mcp-server"
-  - "typescript-sdk"
+  - "mcp/typescript"
+  - "sdks/typescript"
   - "skills"
-  - "agentic-e2e-tests"
+  - "tests/agentic-e2e"
 
 # pnpm 10 already defaults this to false. It is stated explicitly because the
-# merge is what made it load-bearing: typescript-sdk/ is the package `langwatch`
-# and langwatch/ (now @langwatch/web) depends on `langwatch@1.0.0`, meaning the
+# merge is what made it load-bearing: sdks/typescript/ is the package `langwatch`
+# and platform/app/ (now @langwatch/web) depends on `langwatch@1.0.0`, meaning the
 # PUBLISHED SDK. With the two in one workspace, flipping this to true silently
 # switches the app — and everything built from it, including the production
 # image — onto the SDK working copy. Linking the working copy is a deliberate
 # change (`"langwatch": "workspace:*"`), not something to acquire by accident.
 linkWorkspacePackages: false
 
-# Supply-chain age gate. Previously set only on langwatch/'s root, so five of
+# Supply-chain age gate. Previously set only on platform/app/'s root, so five of
 # the six projects had no gate at all. Repo-wide now.
 minimumReleaseAge: 10080
 # Adding workspace packages forces a re-resolve; these shipped fresh releases
@@ -47,22 +46,22 @@ minimumReleaseAgeExclude:
 
 # The union of what the six roots each pinned separately. Overrides are
 # workspace-root-only in pnpm, which is precisely why the old split let these
-# lists drift: `langsmith` was pinned in langwatch/ and skills/ but not at the
-# root, `esbuild` at the root and in skills/ but not in langwatch/, and hono /
+# lists drift: `langsmith` was pinned in platform/app/ and skills/ but not at the
+# root, `esbuild` at the root and in skills/ but not in platform/app/, and hono /
 # uuid / ip-address / qs / form-data / js-yaml only in skills/.
 # NOTE ON UNCONDITIONAL PINS. Three of these lists lived in a member's
-# `pnpm.overrides` (langwatch/, typescript-sdk/, skills/) where they applied to
+# `pnpm.overrides` (platform/app/, sdks/typescript/, skills/) where they applied to
 # that project ALONE. Merged here they apply to everything, so an unconditional
 # `pkg: version` that was fine for one project can break another. Three were
 # deliberately NOT carried up, because each is a DIRECT dependency of the
 # project that pinned it and its own declaration governs it just as well:
 #
-#   zod: ^4.0.14                   (typescript-sdk) — the app is on zod ^3.25.76
+#   zod: ^4.0.14                   (sdks/typescript) — the app is on zod ^3.25.76
 #                                  and @langwatch/langy compiles against it via
 #                                  the `zod/v4` subpath. Global would force the
 #                                  app to zod 4 and break that arrangement.
 #
-#   ...and typescript-sdk's whole OpenTelemetry pin set, eleven entries in
+#   ...and sdks/typescript's whole OpenTelemetry pin set, eleven entries in
 #   all: api, api-logs 0.205.0, sdk-logs 0.205.0, core, resources,
 #   sdk-trace-base, sdk-node 0.219.0, instrumentation 0.219.0,
 #   context-async-hooks, exporter-logs-otlp-http 0.219.0 and
@@ -89,7 +88,7 @@ overrides:
   lodash: ^4.18.1
   glob: ^11.1.0
   picomatch: ">=4.0.4"
-  # Intersection of langwatch/'s `>=10.6 <11` and skills//mcp-server's `>=10.26.0`.
+  # Intersection of platform/app/'s `>=10.6 <11` and skills//mcp/typescript's `>=10.26.0`.
   liquidjs: ">=10.26.0 <11"
   # `-` removes the dependency outright: the app talks to neither engine and
   # both arrive only as unused transitive baggage.
@@ -117,7 +116,7 @@ overrides:
   # langchain serialization injection (#223)
   "langchain@<0.3.37": ">=0.3.37"
   "@langchain/core@<0.3.80": ">=0.3.80"
-  # langsmith SDK floor (from mcp-server and skills)
+  # langsmith SDK floor (from mcp/typescript and skills)
   "langsmith@<0.6.0": ">=0.6.0"
   # merge prototype pollution (#194) via exec-sh
   "merge@<2.1.1": ">=2.1.1"
@@ -140,10 +139,10 @@ overrides:
   "dompurify@<3.4.11": ">=3.4.11 <4"
   # validator incomplete filtering (#216) via class-validator
   "validator@<13.15.22": ">=13.15.22"
-  # express-rate-limit DoS (from mcp-server)
+  # express-rate-limit DoS (from mcp/typescript)
   "express-rate-limit@>=8.2.0 <8.2.2": ">=8.2.2"
-  # glob ReDoS (from mcp-server) is covered by the unconditional `glob: ^11.1.0`
-  # above, which langwatch/ carried and is the stricter of the two.
+  # glob ReDoS (from mcp/typescript) is covered by the unconditional `glob: ^11.1.0`
+  # above, which platform/app/ carried and is the stricter of the two.
   # Next.js DoS with Server Components (#872). next is an unused optional peer
   # dep of better-auth (the app is a Vite app).
   "next@>=13.0.0 <15.5.15": ">=15.5.15"
@@ -159,8 +158,8 @@ overrides:
   # GHSA-75px-5xx7-5xc7, GHSA-jvwf-75h9-cwgg, GHSA-685m-2w69-288q,
   # GHSA-wcpc-wj8m-hjx6, GHSA-f38q-mgvj-vph7 / CVE-2026-44289/44290/44291/44293).
   #
-  # The three roots disagreed on the 8.x floor: langwatch/ required >=8.0.2,
-  # skills/ >=8.0.2, mcp-server/ >=8.6.0. Taking the strictest — a package
+  # The three roots disagreed on the 8.x floor: platform/app/ required >=8.0.2,
+  # skills/ >=8.0.2, mcp/typescript/ >=8.6.0. Taking the strictest — a package
   # patched in one project was, until now, left vulnerable in the others, which
   # is the whole reason these lists are merged.
   # Per-major floors, NOT the single unconditional union three old roots
@@ -186,7 +185,7 @@ overrides:
   "@opentelemetry/exporter-prometheus@<0.217.0": ">=0.217.0"
   "@opentelemetry/sdk-node@<0.217.0": ">=0.217.0"
   # From skills/ (liquidjs is in the alignment block above, intersected with
-  # langwatch/'s narrower `>=10.6 <11`)
+  # platform/app/'s narrower `>=10.6 <11`)
   "hono@<4.12.25": ">=4.12.25"
   "uuid@<11.1.1": ">=11.1.1 <12"
   "ip-address@<=10.1.0": ">=10.1.1"
@@ -195,8 +194,8 @@ overrides:
   "js-yaml@>=4.0.0 <4.2.0": ">=4.2.0 <5"
 
   # --- vite ---
-  # langwatch/pnpm-workspace.yaml carried an unconditional `vite: 8.0.10`, but
-  # langwatch/package.json's `pnpm.overrides` carried these two ranges as well
+  # platform/app/pnpm-workspace.yaml carried an unconditional `vite: 8.0.10`, but
+  # platform/app/package.json's `pnpm.overrides` carried these two ranges as well
   # and they are what the old lockfile actually resolved to (8.0.16, never
   # 8.0.10). Keeping the ranges preserves the resolution the app already
   # shipped; skills/'s 7.x line is left alone by both.
@@ -214,8 +213,8 @@ packageExtensions:
     dependencies:
       protobufjs: "^7.5.4"
 
-# Union of the three roots' allowlists. node-pty is skills/ and mcp-server's;
-# the rest came from langwatch/.
+# Union of the three roots' allowlists. node-pty is skills/ and mcp/typescript's;
+# the rest came from platform/app/.
 onlyBuiltDependencies:
   - "@prisma/client"
   - "@prisma/engines"
