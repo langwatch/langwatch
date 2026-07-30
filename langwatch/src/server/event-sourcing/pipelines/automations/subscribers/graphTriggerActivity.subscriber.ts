@@ -7,8 +7,24 @@ const logger = createLogger(
   "langwatch:triggers:graph-trigger-activity-subscriber",
 );
 
-/** Locked ADR-034 Phase 5 real-time debounce. */
-export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
+/**
+ * Real-time debounce (ADR-034 Phase 5), widened from the original 5s.
+ *
+ * The handler below evaluates EVERY active graph trigger on the project, one
+ * analytics query each, serially — so a sweep costs `N triggers` queries and
+ * the steady-state load is `Σ(active graph triggers) ÷ this window`, a figure
+ * that scales with how many alerts customers configure rather than with
+ * traffic. At 5s a project holding ~100 graph alerts contributes ~20 queries a
+ * second on its own, whether or not anything happened.
+ *
+ * 15s keeps this path meaningfully ahead of the 30s `graphAlertSweep` backstop
+ * (GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS) — which is the latency floor the system
+ * already guarantees — while cutting the query rate to a third. It is a dial,
+ * not a fix: the shape stays O(triggers) until the sweep either batches its
+ * queries or gates them on whether the delivered event could move the trigger
+ * at all.
+ */
+export const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 15_000;
 
 export interface GraphTriggerActivityDeps {
   triggers: TriggerService;
