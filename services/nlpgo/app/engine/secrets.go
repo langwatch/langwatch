@@ -2,6 +2,7 @@ package engine
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
@@ -52,19 +53,45 @@ func resolveSecretsInMap(m map[string]string, secrets map[string]string) map[str
 }
 
 // redactSecrets replaces any occurrence of a resolved secret *value* in s with
-// a placeholder. The HTTP error path returns err.Error() as the node error
-// message, and Go transport/build errors commonly embed the full request URL
-// (e.g. `Get "https://api/x?token=rotated-value": dial ...`) — so a secret
-// substituted into the URL/query/headers could otherwise be reflected into
-// execution events, traces, and logs on failure. Scrub before returning.
+// a placeholder. It is the engine's scrubber for DIAGNOSTIC text — node error
+// messages, tracebacks, stdout and stderr.
+//
+// It covers every node kind not because each kind was enumerated but by
+// construction: redactNodeSecrets calls it from dispatch, dispatch is the sole
+// caller of dispatchNode (the executor switch), and dispatch itself has exactly
+// two callers, runLayer and runLayerStream. Adding a node kind cannot route
+// around it without adding a third caller of dispatchNode. The HTTP path also
+// calls it directly, where Go transport errors embed the full request URL (e.g.
+// `Get "https://api/x?token=rotated-value": dial ...`) and would otherwise
+// reflect a substituted secret into execution events, traces, and logs.
+//
+// Longest value first, and that ordering is load-bearing rather than tidy. When
+// one secret's value contains another's — versioned or paired keys, `…live` and
+// `…live-v2`, are the ordinary case — replacing the SHORTER one first chops the
+// longer one into "[redacted]" plus a surviving tail, and the pass for the
+// longer value then finds no intact match left. Go randomizes map iteration, so
+// before this sort the outcome varied run to run and the bad outcome was the
+// common one. A fragment left beside a "[redacted]" tag is worse than no
+// redaction: the tag reads as proof the value was scrubbed.
+//
+// What it does NOT catch: this is a literal substring replace, so any transform
+// defeats it — base64, hex or URL encoding, case folding, or a `key[:8]` slice.
+// A code node runs arbitrary Python over a live `secrets.NAME` namespace, so
+// treat this as closing ACCIDENTAL disclosure (a secret interpolated into a
+// message that then raises), NOT as a boundary against code written to
+// exfiltrate. The author of the code already holds the secret.
 func redactSecrets(s string, secrets map[string]string) string {
 	if s == "" || len(secrets) == 0 {
 		return s
 	}
+	values := make([]string, 0, len(secrets))
 	for _, v := range secrets {
-		if v == "" {
-			continue
+		if v != "" {
+			values = append(values, v)
 		}
+	}
+	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })
+	for _, v := range values {
 		s = strings.ReplaceAll(s, v, "[redacted]")
 	}
 	return s
