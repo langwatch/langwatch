@@ -196,7 +196,7 @@ it("renders error badge on ClickHouse memory limit", () => {
 });
 ```
 
-Shell behavior tested with [bats](https://github.com/bats-core/bats-core) (e.g. `scripts/__tests__/*.bats`) uses the same `@scenario` token, expressed as a hash-comment directly above the `@test` line:
+Shell behavior tested with [bats](https://github.com/bats-core/bats-core) (e.g. `dev/scripts/__tests__/*.bats`) uses the same `@scenario` token, expressed as a hash-comment directly above the `@test` line:
 
 ```bash
 # @scenario "Stale localhost NEXTAUTH_URL is rewritten to the fork's proxy URL"

@@ -29,9 +29,9 @@
         boxd-preview boxd-preview-down boxd-preview-status \
         seed-golden _boxd-fork-impl _boxd-require
 
-BOXD_FORK_LIB := scripts/boxd-fork.sh
+BOXD_FORK_LIB := dev/scripts/boxd-fork.sh
 # Recipes call bash explicitly so the bash-only sourcing helpers in
-# scripts/boxd-fork.sh (e.g. `[[ … ]]`) work even when Make's default SHELL
+# dev/scripts/boxd-fork.sh (e.g. `[[ … ]]`) work even when Make's default SHELL
 # is /bin/sh. The prefix must be concatenated with the function call inside
 # the same `-c` argument; passing them as separate args is a common bash
 # pitfall (the second arg becomes $0, never executes).

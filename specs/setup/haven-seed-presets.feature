@@ -14,7 +14,7 @@ Feature: Seed presets — a database that is ready to look at
   # tools/thuishaven): `app/db_test.go` (TestDBSeed, TestDBReset). The full
   # ingest-through-the-collector path is only exercised manually, so those
   # scenarios stay `@unimplemented`. The parity checker
-  # (`langwatch/scripts/check-feature-parity.ts`) scans tools/thuishaven's Go
+  # (`platform/app/scripts/check-feature-parity.ts`) scans tools/thuishaven's Go
   # tests: @unit scenarios are bound by `// @scenario` annotations above those
   # test funcs.
 

@@ -122,8 +122,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   const hostname = "0.0.0.0";
 
   // Dev-only single-process mode: host the background worker stack inside this
-  // web process instead of a separate `pnpm run start:workers` process. Opt-in
-  // via WORKERS_IN_PROCESS=1 (see scripts/start.sh + `pnpm dev:single`). Never
+  // web process instead of a separate `pnpm run start:workers` process. This is
+  // the DEFAULT locally — WORKERS_IN_PROCESS=1 is what `pnpm dev` sets (see
+  // scripts/start.sh); `pnpm dev:concurrent` is the two-process opt-out. Never
   // honoured in production — prod runs web and worker as separate deployments.
   //
   // Gate on NODE_ENV === "development" exactly (not `dev`, which is
@@ -167,7 +168,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     logger.warn(
       "AI Gateway menu is on by default but no gateway secrets are set. " +
         "The UI will render but /api/internal/gateway/* will return 503. " +
-        "See langwatch/.env.example for the required block.",
+        "See platform/app/.env.example for the required block.",
     );
   }
 

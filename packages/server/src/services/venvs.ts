@@ -61,7 +61,7 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
   );
 }
 
-// The extras every install gets (see langevals/pyproject.toml for the full
+// The extras every install gets (see services/langevals/pyproject.toml for the full
 // set). `--extra all` is the union of these plus the three optional ones
 // below; naming them individually is how we drop some without dropping the
 // rest.
@@ -100,7 +100,7 @@ function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
       lockFile: join(root, "services", "langevals", "uv.lock"),
       // langevals's evaluator routes (ROUGE Score, exact match, llm-as-judge,
       // etc.) live in subpackages declared as optional dependencies in
-      // langevals/pyproject.toml: langevals-ragas, langevals-openai,
+      // services/langevals/pyproject.toml: langevals-ragas, langevals-openai,
       // langevals-langevals, langevals-azure, langevals-lingua,
       // langevals-presidio, langevals-legacy. Each is a separate `langevals_*`
       // distribution; server.py auto-registers FastAPI routes for any

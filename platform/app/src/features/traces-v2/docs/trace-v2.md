@@ -116,7 +116,7 @@ The foundation gives you something to put behind the feature flag immediately. T
 
 ### Definitions
 
-A **lens** (internal term) is a named config object containing: columns, grouping, default filters, sort order, conditional formatting rules, and visualization mode. A **view** (user-facing term) is a lens rendered as a tab in the UI. A **built-in view** is a hardcoded lens shipped with the product. **Custom views** are user-created and saved. The full LensConfig schema lives in `langwatch/src/features/traces-v2/lens/schema.ts`.
+A **lens** (internal term) is a named config object containing: columns, grouping, default filters, sort order, conditional formatting rules, and visualization mode. A **view** (user-facing term) is a lens rendered as a tab in the UI. A **built-in view** is a hardcoded lens shipped with the product. **Custom views** are user-created and saved. The full LensConfig schema lives in `platform/app/src/features/traces-v2/lens/schema.ts`.
 
 ### Phase 0: Schema Validation (COMPLETED)
 

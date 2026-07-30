@@ -2,7 +2,7 @@
 //
 // Debits are NOT sent from the gateway. Cost is captured on the OTel span
 // emitted by the trace bridge; the control plane's trace-fold reactor
-// (langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/
+// (platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/
 // gatewayBudgetSync.reactor.ts) writes ClickHouse ledger rows from the
 // span attributes. Single source of truth, no PG dual-write.
 package budget

@@ -23,7 +23,7 @@ While every request made through the instrumented client will be traced, some op
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
 ```
 
 ## Usage
@@ -50,8 +50,8 @@ import (
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 )
 
 func main() {

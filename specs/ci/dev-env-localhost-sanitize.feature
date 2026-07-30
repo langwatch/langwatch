@@ -9,7 +9,7 @@ Feature: Dev launchers strip stale localhost-pinned NEXTAUTH_URL / BASE_HOST
   etc.) wins over the dynamic-port fallback, and login then 403s because
   the cookie origin no longer matches the host port.
 
-  The launchers source scripts/lib/sanitize-dev-env.sh, which rewrites
+  The launchers source dev/scripts/lib/sanitize-dev-env.sh, which rewrites
   stale localhost values to the current APP_PORT but leaves real proxy /
   tunnel overrides (https://*.boxd.sh, ngrok URLs, 127.0.0.1, etc.) alone.
 

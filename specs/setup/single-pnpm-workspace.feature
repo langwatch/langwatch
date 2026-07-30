@@ -17,7 +17,7 @@ Feature: One workspace for every JavaScript project in the repo
   # The @unimplemented ones are the ones a unit test cannot honestly reach —
   # they are about what a PACKED ARTIFACT contains or what a full install
   # resolves. Their enforcement is the build: the fail-closed assertions inside
-  # scripts/pack-npm.sh (the tarball must carry the lockfile, the prebuilt
+  # dev/scripts/pack-npm.sh (the tarball must carry the lockfile, the prebuilt
   # client, every tracked source file, and nothing secret-shaped), and the
   # npx-server-smoke job, which packs, installs and boots the artifact on
   # three platforms. Binding them to a manifest-inspecting unit test would

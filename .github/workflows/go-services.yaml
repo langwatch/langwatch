@@ -67,9 +67,9 @@ jobs:
               - 'platform/app/src/server/tracer/types.ts'
               - 'platform/app/src/server/filters/types.ts'
               - 'platform/app/src/server/evaluations/types.ts'
-              - 'langwatch/src/server/modelProviders/llmModels.json'
-              - 'langwatch/src/app/api/openapiLangWatch.json'
-              - 'langevals/ts-integration/evaluators.generated.ts'
+              - 'platform/app/src/server/modelProviders/llmModels.json'
+              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 
   docker:

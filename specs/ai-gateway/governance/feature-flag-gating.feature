@@ -15,7 +15,7 @@ Feature: Governance visibility rides a single feature flag
   operators control it. The default lives in
   `platform/app/src/server/featureFlag/registry.ts`; frontend exposure in
   `platform/app/src/server/featureFlag/frontendFeatureFlags.ts`; the CLI
-  device-login gate in `langwatch/src/server/routes/auth-cli.ts`
+  device-login gate in `platform/app/src/server/routes/auth-cli.ts`
   (ADR-038 Decision 7 pins the registry default and the gate fallback as
   a pair that moves together).
 

@@ -8,7 +8,7 @@
  *   - the langevals uv venv synced with the `langevals` + `topic_clustering`
  *     extras (uv resolves these on first `uv run`)
  *   - LANGEVALS_STAGING_THRESHOLD_BYTES set low enough to force staging
- *   - OPENAI_API_KEY available (vitest auto-loads from langwatch/.env)
+ *   - OPENAI_API_KEY available (vitest auto-loads from platform/app/.env)
  *
  * Run locally:
  *   pnpm test:e2e:langevals-staging
@@ -240,7 +240,7 @@ function requireOpenAIKey(): string {
   const key = process.env.OPENAI_API_KEY;
   if (!key) {
     throw new Error(
-      "OPENAI_API_KEY must be set for the staged-payload e2e (the wrapper script sources it from langwatch/.env)",
+      "OPENAI_API_KEY must be set for the staged-payload e2e (the wrapper script sources it from platform/app/.env)",
     );
   }
   return key;

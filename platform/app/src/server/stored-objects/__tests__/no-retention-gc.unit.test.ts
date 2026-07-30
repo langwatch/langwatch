@@ -4,7 +4,7 @@
  * Negative regression test for AC16:
  *   "No automatic retention, time-based GC, or orphan reaping runs"
  *
- * Asserts that no file under langwatch/src/server (outside the stored-objects
+ * Asserts that no file under platform/app/src/server (outside the stored-objects
  * module) references the string "stored_objects" in a way that would imply a
  * background purge, GC, or retention job is running against the stored_objects
  * table.

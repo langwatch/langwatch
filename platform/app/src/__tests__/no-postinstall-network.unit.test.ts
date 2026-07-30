@@ -15,7 +15,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Resolve package.json relative to this test file's location:
-// src/__tests__/ -> ../../ -> langwatch/package.json
+// src/__tests__/ -> ../../ -> platform/app/package.json
 const PACKAGE_JSON_PATH = path.join(__dirname, "../../package.json");
 
 interface PackageJson {
@@ -43,7 +43,7 @@ function hasNetworkCall(script: string): boolean {
   return FORBIDDEN_PATTERNS.some((pattern) => pattern.test(script));
 }
 
-describe("langwatch/package.json", () => {
+describe("platform/app/package.json", () => {
   describe("when install-lifecycle scripts are inspected", () => {
     it("postinstall does not download from the network", () => {
       const script = pkg.scripts?.postinstall;

@@ -39,7 +39,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 
 /** The port this checkout took. Anything that is not the committed default. */
 const APP_PORT = "5623";
-/** What `langwatch/.env` ships with, and what `override: true` reinstates. */
+/** What `platform/app/.env` ships with, and what `override: true` reinstates. */
 const COMMITTED_URL = "http://localhost:5560";
 
 const envBackup: Record<string, string | undefined> = {};

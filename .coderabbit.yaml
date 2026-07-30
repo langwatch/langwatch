@@ -1,3 +1,7 @@
+# The ancillary README for this config — what belongs in a linter vs. in the
+# reviewer, and why four sibling dotfiles cannot leave the repo root — is at
+# dev/lint/README.md. This file has to stay here: CodeRabbit reads
+# .coderabbit.yaml from the repository root only.
 # yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
 # Docs: https://docs.coderabbit.ai/reference/configuration
 #
@@ -53,17 +57,17 @@ reviews:
     gitleaks:
       enabled: true
     # Pattern-based PII / unsafe-code rules. CR does not autoload community
-    # packs — the ruleset lives at .semgrep/langwatch.yml in this repo.
+    # packs — the ruleset lives at dev/lint/semgrep/langwatch.yml in this repo.
     semgrep:
       enabled: true
-      config_file: .semgrep/langwatch.yml
+      config_file: dev/lint/semgrep/langwatch.yml
     # Deterministic syntactic rules (AC3). The ruleset is NOT CodeRabbit-owned —
-    # it lives at /.ast-grep/ and runs as a plain linter in CI and via
+    # it lives at dev/lint/ast-grep/ and runs as a plain linter in CI and via
     # `make lint-rules`. CodeRabbit is one consumer of it, not the gate.
     ast-grep:
       essential_rules: true
       rule_dirs:
-        - .ast-grep/rules
+        - dev/lint/ast-grep/rules
 
   path_instructions:
     # ── AC4: structural ${...} guard ───────────────────────────────────────
@@ -81,7 +85,7 @@ reviews:
         content. This rule applies to path names only — file contents are
         not in scope here.
 
-    # ── AC2: PII rules (judgment-level — patterns are in .semgrep) ────────
+    # ── AC2: PII rules (judgment-level — patterns are in dev/lint/semgrep) ────────
     - path: "platform/app/src/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines in this PR. Do NOT flag
@@ -109,8 +113,8 @@ reviews:
 
     # ── AC3: layering / convention rules (judgment, not syntax) ────────────
     # Syntactic checks (no `any`, inline import(), form.watch() in child,
-    # export * from re-export shims) live in /.ast-grep/rules/.
-    # ClickHouse fully-qualified table names live in .semgrep/langwatch.yml.
+    # export * from re-export shims) live in /dev/lint/ast-grep/rules/.
+    # ClickHouse fully-qualified table names live in dev/lint/semgrep/langwatch.yml.
     # path_instructions only carries the judgment calls.
     #
     # NOTE: each layering/convention rule below is in its own path_instructions

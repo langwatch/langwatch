@@ -17,8 +17,8 @@ name: gateway-matrix
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
-#   - langwatch/src/server/gateway/  (control plane)
-#   - langwatch/src/server/event-sourcing/pipelines/trace-processing/
+#   - platform/app/src/server/gateway/  (control plane)
+#   - platform/app/src/server/event-sourcing/pipelines/trace-processing/
 #     reactors/gatewayBudgetSync.reactor.ts
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only

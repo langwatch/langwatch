@@ -1344,7 +1344,7 @@ secured.access(CLI_POLICY).post("/project-key", async (c: Context) => {
 // envelope (RFC 7231 §6.5.2) with the upgrade URL inline so the CLI can
 // render an actionable upsell without a follow-up call. Mirrors the
 // tRPC `requireEnterprisePlan` middleware shape from
-// `langwatch/src/server/api/enterprise.ts` but speaks REST 402 instead
+// `platform/app/src/server/api/enterprise.ts` but speaks REST 402 instead
 // of TRPCError FORBIDDEN.
 // ---------------------------------------------------------------------------
 

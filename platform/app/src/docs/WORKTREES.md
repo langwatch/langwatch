@@ -17,8 +17,8 @@ make worktree add-dark-mode
 Or call the script directly:
 
 ```bash
-./scripts/worktree.sh 1663           # issue-based
-./scripts/worktree.sh add-dark-mode  # feature-based
+./dev/scripts/worktree.sh 1663           # issue-based
+./dev/scripts/worktree.sh add-dark-mode  # feature-based
 ```
 
 The script will:
@@ -39,7 +39,7 @@ langwatch/                                    # Repo root
 ├── .worktrees/                               # All worktrees (gitignored)
 │   ├── issue1663-fix-scenario-runs/          # Issue-based worktree
 │   └── feat-add-dark-mode/                   # Feature-based worktree
-├── scripts/worktree.sh                       # Worktree creation script
+├── dev/scripts/worktree.sh                       # Worktree creation script
 └── ...
 ```
 

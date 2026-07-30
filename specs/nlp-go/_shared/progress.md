@@ -85,7 +85,7 @@ In progress / queued:
 - ⏳ sarah — C consumer swap: replace nlpgo's HTTP gatewayclient with a
   thin adapter over the new dispatcher pkg (~20min ETA at last check)
 - ⏳ ash — port topic_clustering tests from langwatch_nlp/tests/ to
-  langevals/evaluators/topic_clustering/tests
+  services/langevals/evaluators/topic_clustering/tests
 - ⏳ ash — sister PR on langwatch-saas/infrastructure (memory tier 3072MB
   for topic_clustering Lambda + run the lambda generator)
 - ⏳ next iteration — end-to-end QA: dogfood a real workflow run on the
@@ -234,7 +234,7 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] Engine integration tests through real chi router via httptest (sarah) — 8 sync workflow tests + 2 SSE streaming tests + 5 proxypass round-trip tests + 3 realistic code-block tests (stdlib + missing-import UX + urllib network) + 12 dispatcheradapter credential tests. All green.
 - [x] **Real workflow end-to-end against live OpenAI** (sarah, 2f4e7087a) — `TestSync_RealWorkflowEndToEnd_OpenAI`, gated by `live_openai`. Posts a Studio-shape DSL through `/go/studio/execute_sync`, signature node hits real OpenAI gpt-5-mini via in-process dispatcher.
 - [x] **TS integration test against live nlpgo subprocess** (sarah, ba6d13353) — `platform/app/src/server/nlpgo/__tests__/nlpgoFetch.integration.test.ts`. Spawns real nlpgo binary, mocks FF=true, calls real `nlpgoFetch` helper with Studio-shape DSL, asserts model output. **Stays on CI.**
-- [x] Topic clustering migrated to langevals (ash) — workspace member at `langevals/evaluators/topic_clustering/`, TS topicClustering.ts flag-forks, lambda module + API Gateway routes in `langwatch-saas#460`. Tests skipped in CI per rchaves; manual exercise points at langevals on :5561.
+- [x] Topic clustering migrated to langevals (ash) — workspace member at `services/langevals/evaluators/topic_clustering/`, TS topicClustering.ts flag-forks, lambda module + API Gateway routes in `langwatch-saas#460`. Tests skipped in CI per rchaves; manual exercise points at langevals on :5561.
 - [x] PR opened — PR #3483 (https://github.com/langwatch/langwatch/pull/3483). QA evidence table embedded with 20 numbered proof points.
 - [ ] CodeRabbit review addressed (small inline comments outstanding; not blocking review)
 - [ ] **Browser dogfood — deferred to a focused follow-up iter.** Local pnpm dev wedged in this worktree (CH bootstrap completes, app server bg task exits 1). The TS integration test above proves the same chain headlessly with a real subprocess + real OpenAI; the browser screenshot is purely visual confirmation of the Optimize-button hide.

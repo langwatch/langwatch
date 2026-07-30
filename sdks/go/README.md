@@ -17,8 +17,8 @@ export OPENAI_API_KEY="your-openai-api-key"        # For OpenAI examples
 ### 2. Install
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go
-go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+go get github.com/langwatch/langwatch/sdks/go
+go get github.com/langwatch/langwatch/sdks/go/instrumentation/openai
 ```
 
 ### 3. Add 3 Bits of Code
@@ -33,8 +33,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
@@ -266,7 +266,7 @@ go run cmd/main.go run-examples                # Run all
 The `LangWatchTracer` wraps OpenTelemetry tracers to provide LangWatch-specific functionality:
 
 ```go
-import langwatch "github.com/langwatch/langwatch/sdk-go"
+import langwatch "github.com/langwatch/langwatch/sdks/go"
 
 tracer := langwatch.Tracer("my-service")
 ctx, span := tracer.Start(context.Background(), "my-operation")

@@ -18,7 +18,7 @@ the whole stack (app → `services/langyagent` → aigateway → provider) works
 
 ## Prerequisites
 
-A running LangWatch app stack with Langy reachable — e.g. `pnpm dev:haven`
+A running LangWatch app stack with Langy reachable — e.g. `make haven up`
 (see root `CLAUDE.md`, "Local dev by hostname"), or any stack where you can
 reach the app's tRPC/SSE endpoints and sign in as a real user.
 

@@ -461,7 +461,7 @@ export const registry: IntegrationRegistry = [
     install: {
       go: {
         "go get":
-          "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go",
+          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goOpenaiSource as unknown as string),
@@ -479,7 +479,7 @@ export const registry: IntegrationRegistry = [
     install: {
       go: {
         "go get":
-          "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go",
+          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goAzureSource as unknown as string),
@@ -501,7 +501,7 @@ export const registry: IntegrationRegistry = [
     install: {
       go: {
         "go get":
-          "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go",
+          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goAnthropicSource as unknown as string),
@@ -519,7 +519,7 @@ export const registry: IntegrationRegistry = [
     install: {
       go: {
         "go get":
-          "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go",
+          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goGeminiSource as unknown as string),
@@ -537,7 +537,7 @@ export const registry: IntegrationRegistry = [
     install: {
       go: {
         "go get":
-          "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go",
+          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goGroqSource as unknown as string),
@@ -559,7 +559,7 @@ export const registry: IntegrationRegistry = [
     install: {
       go: {
         "go get":
-          "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go",
+          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goGrokSource as unknown as string),
@@ -574,7 +574,7 @@ export const registry: IntegrationRegistry = [
     install: {
       go: {
         "go get":
-          "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go",
+          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goMistralSource as unknown as string),
@@ -596,7 +596,7 @@ export const registry: IntegrationRegistry = [
     install: {
       go: {
         "go get":
-          "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go",
+          "go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go",
       },
     },
     snippet: goRef(goOllamaSource as unknown as string),

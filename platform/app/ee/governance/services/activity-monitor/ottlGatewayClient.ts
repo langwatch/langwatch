@@ -139,7 +139,7 @@ function sign(secret: string, canonicalString: string): string {
  * specifically because the older `LW_GATEWAY_BASE_URL` is overloaded:
  * the Go gateway re-uses that exact name for the OPPOSITE direction
  * (gateway → control-plane), and both processes source the same
- * `langwatch/.env`, so dev would always have one of them wrong.
+ * `platform/app/.env`, so dev would always have one of them wrong.
  *
  * Resolution order — prefer the new name, fall back to the old:
  *   1. LW_GATEWAY_INTERNAL_URL  (canonical, defaults to :5563 in dev)

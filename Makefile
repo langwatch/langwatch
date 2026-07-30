@@ -24,7 +24,7 @@ help:
 	@echo ""
 	@echo "  Local dev by hostname (thuishaven):"
 	@echo "    make haven install                  go install the haven binary (then run 'haven ...' directly)"
-	@echo "    make haven up                       start this worktree's stack (bootstraps itself; == pnpm dev:haven)"
+	@echo "    make haven up                       start this worktree's stack (bootstraps itself)"
 	@echo "    make haven status                   every stack + shared-server health, one shot"
 	@echo "    make haven <cmd>                    any haven subcommand (see 'haven help')"
 	@echo "    (dashboard at https://langwatch.localhost)"
@@ -38,7 +38,7 @@ help:
 	@echo "    (once it is up, every 'pnpm dev' stack exports to it, tagged by worktree)"
 	@echo "    make worktree <issue|name>          create a git worktree for an issue/feature"
 	@echo "    make down                           stop all services"
-	@echo "    make test-scripts                   run bats unit tests under scripts/__tests__/"
+	@echo "    make test-scripts                   run bats unit tests under dev/scripts/__tests__/"
 	@echo "    make herrgen                        regenerate the Go error codes for TypeScript"
 	@echo "    make herrgen-check                  fail if those generated codes are stale (CI)"
 	@echo ""
@@ -67,7 +67,7 @@ help:
 	@echo ""
 	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
 
-include boxd.mk
+include dev/boxd.mk
 # dev/haven.mk is included at the BOTTOM of this file: its `make haven <sub>`
 # passthrough neutralises the trailing words (e.g. `down`, `install`) as no-op
 # goals, and for that override to beat the real `down` / `install` recipes it
@@ -81,12 +81,12 @@ include boxd.mk
 
 COMPOSE = docker compose -f infra/compose.dev.yml --project-directory .
 
-# Sources scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
+# Sources dev/scripts/lib/sanitize-dev-env.sh and rewrites stale localhost-pinned
 # NEXTAUTH_URL / BASE_HOST exports to the compose-derived APP_PORT (default
 # 5560). Real overrides like boxd-proxy URLs are left untouched. Prepended
 # to every dev `up` recipe so `make dev*` paths can't silently 403 on login
 # if a previous session leaked the env (lw#3453).
-SANITIZE_DEV_ENV = APP_PORT=$${APP_PORT:-5560} . scripts/lib/sanitize-dev-env.sh && sanitize_localhost_dev_env
+SANITIZE_DEV_ENV = APP_PORT=$${APP_PORT:-5560} . dev/scripts/lib/sanitize-dev-env.sh && sanitize_localhost_dev_env
 
 # Install git hooks (idempotent, runs automatically before dev targets)
 setup-hooks:
@@ -136,7 +136,7 @@ service-watch:
 			--build.exclude_dir "tmp,vendor,node_modules"
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
-# (interactive) or `./scripts/dev.sh <preset>` directly. Preset list:
+# (interactive) or `./dev/scripts/dev.sh <preset>` directly. Preset list:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
 
@@ -147,7 +147,7 @@ service-watch:
 refresh-dev-s3:
 	@bash platform/app/scripts/refresh-dev-s3-env.sh
 
-# Run all *.unit.bats tests under scripts/__tests__/. Dev-only — these
+# Run all *.unit.bats tests under dev/scripts/__tests__/. Dev-only — these
 # tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
 # `worktree.sh` / `boxd-fork.sh`. CI does NOT run them; the launchers
 # are local dev tools, not part of the shipped product. If you're
@@ -166,7 +166,7 @@ test-scripts:
 		echo "  Linux:  sudo apt-get install -y bats" >&2; \
 		exit 1; \
 	fi
-	bats scripts/__tests__/*.unit.bats
+	bats dev/scripts/__tests__/*.unit.bats
 
 # Mirror the Go services' herr error codes into
 # packages/handled-error/src/codes.generated.ts, so the TypeScript control
@@ -213,10 +213,10 @@ SEMGREP  := $(shell if command -v semgrep >/dev/null 2>&1; then echo semgrep; el
 
 lint-rules:
 	$(call _need_astgrep)
-	@echo "==> ast-grep (.ast-grep/rules)"
-	@$(AST_GREP) scan -c .ast-grep/sgconfig.yml
-	@echo "==> semgrep (.semgrep/langwatch.yml)"
-	@$(SEMGREP) --config .semgrep/langwatch.yml --quiet --error .
+	@echo "==> ast-grep (dev/lint/ast-grep/rules)"
+	@$(AST_GREP) scan -c dev/lint/ast-grep/sgconfig.yml
+	@echo "==> semgrep (dev/lint/semgrep/langwatch.yml)"
+	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error .
 
 # What CI gates on. Scans only files this branch changed, so a large
 # pre-existing baseline never blocks work on an unrelated file.
@@ -225,11 +225,11 @@ lint-rules-changed:
 	@files=$$(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.ts' '*.tsx'); \
 	if [ -z "$$files" ]; then echo "No changed TS/TSX files."; exit 0; fi; \
 	echo "==> ast-grep over $$(echo "$$files" | wc -l | tr -d ' ') changed file(s)"; \
-	$(AST_GREP) scan -c .ast-grep/sgconfig.yml $$files
+	$(AST_GREP) scan -c dev/lint/ast-grep/sgconfig.yml $$files
 
 lint-rules-test:
 	$(call _need_astgrep)
-	@cd .ast-grep && $(AST_GREP) test -c sgconfig.yml -t rule-tests
+	@cd dev/lint/ast-grep && $(AST_GREP) test -c sgconfig.yml -t rule-tests
 
 # golangci-lint's config is version: "2"; a v1 binary refuses it outright,
 # which is why "run the Go checks before pushing" quietly stopped happening.
@@ -320,12 +320,12 @@ ifeq (quickstart,$(firstword $(MAKECMDGOALS)))
   endif
 endif
 quickstart:
-	@./scripts/dev.sh $(QUICKSTART_ARG)
+	@./dev/scripts/dev.sh $(QUICKSTART_ARG)
 
 # Non-interactive mode reference (#3860 AC#8). Use `make quickstart-help` —
 # `make quickstart help` collides with the existing `help` target.
 quickstart-help:
-	@./scripts/dev.sh help
+	@./dev/scripts/dev.sh help
 
 # =============================================================================
 # ISOLATED DEV INSTANCES (for AI agents / parallel worktrees)
@@ -339,11 +339,11 @@ _dev-up-deprecation-warning:
 
 # Start isolated instance (detached). Usage: make dev-up [PROFILE=scenarios]
 dev-up: _dev-up-deprecation-warning
-	@./scripts/dev-up.sh $(PROFILE)
+	@./dev/scripts/dev-up.sh $(PROFILE)
 
 # Stop isolated instance
 dev-down: _dev-up-deprecation-warning
-	@./scripts/dev-down.sh
+	@./dev/scripts/dev-down.sh
 
 # Tail logs for isolated instance
 dev-logs: _dev-up-deprecation-warning
@@ -357,14 +357,14 @@ ifeq (worktree,$(firstword $(MAKECMDGOALS)))
   $(eval $(WORKTREE_ARG):;@:)
 endif
 worktree:
-	@./scripts/worktree.sh $(WORKTREE_ARG)
+	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
 sync-all-openapi:
 	pnpm run task generateOpenAPISpec
 	cd sdks/typescript && pnpm run generate:openapi-types
 	cd sdks/python && make generate/api-client
 
-# Included last on purpose (see the note next to `include boxd.mk`): the
+# Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real
 # `down` / `install` targets so its override wins.
 include dev/haven.mk

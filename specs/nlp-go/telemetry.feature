@@ -34,9 +34,9 @@ Feature: Telemetry — every span carries the correct origin
     And the request body does NOT redundantly carry the origin (header is the source of truth)
 
     Examples:
-      | call_site                                                     | origin           |
+      | call_site                                                        | origin           |
       | platform/app/src/server/workflows/runWorkflow.ts                 | workflow         |
-      | langwatch/src/server/routes/playground.ts                     | playground       |
+      | platform/app/src/server/routes/playground.ts                     | playground       |
       | platform/app/src/server/scenarios/.../workflow-agent.adapter.ts  | scenario         |
       | platform/app/src/server/scenarios/.../code-agent.adapter.ts      | scenario         |
       | platform/app/src/server/app-layer/topic-clustering/clustering.ts | topic_clustering |

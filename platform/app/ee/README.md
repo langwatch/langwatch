@@ -1,6 +1,6 @@
 # LangWatch Enterprise Modules
 
-Everything under `langwatch/ee/` is the Enterprise Edition of LangWatch. It is
+Everything under `platform/app/ee/` is the Enterprise Edition of LangWatch. It is
 **not** covered by the repository's Apache 2.0 license — it is governed by the
 [LangWatch Enterprise License](./LICENSE.md).
 

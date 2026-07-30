@@ -1,4 +1,4 @@
-// Generated from langevals (see langevals/scripts/generate_evaluators_ts.py).
+// Generated from langevals (see services/langevals/scripts/generate_evaluators_ts.py).
 // Zod-first: the schemas below are the source of truth and the TypeScript types
 // are inferred with z.infer. Do not edit by hand.
 import { z } from "zod";

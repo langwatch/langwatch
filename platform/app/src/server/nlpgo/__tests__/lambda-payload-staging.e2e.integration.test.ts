@@ -28,7 +28,7 @@
  *   - go not on PATH -> skip
  *
  * To run locally against lw-dev (eu-central-1):
- *   bash langwatch/scripts/refresh-dev-s3-env.sh   # fresh SSO creds in .env
+ *   bash platform/app/scripts/refresh-dev-s3-env.sh   # fresh SSO creds in .env
  *   S3_DOGFOOD_BUCKET=runtime-storage-dev \
  *   S3_BUCKET_NAME=runtime-storage-dev \
  *   S3_REGION=eu-central-1 \

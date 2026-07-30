@@ -65,7 +65,7 @@ describe("roleSatisfiesRunIn", () => {
 
   describe("given the in-process 'all' role", () => {
     // The regression the P0 fix guards: a worker-only reactor MUST run under
-    // "all", otherwise `pnpm dev:single` boots the worker stack but every
+    // "all", otherwise `pnpm dev` boots the worker stack but every
     // runIn-gated reactor is silently skipped.
     it("satisfies a worker-only runIn filter", () => {
       expect(

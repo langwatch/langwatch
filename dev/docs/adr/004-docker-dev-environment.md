@@ -89,7 +89,7 @@ make down             # Stop all
 
 **Key files:**
 - `infra/compose.dev.yml` - Docker Compose configuration
-- `scripts/dev.sh` - Interactive profile chooser
+- `dev/scripts/dev.sh` - Interactive profile chooser
 - `Makefile` - Convenience targets
 
 **Trade-offs accepted:**
@@ -104,7 +104,7 @@ The `pnpm_store` named volume persists downloaded packages across container rest
 
 ### Context
 
-The original design used `VOLUME_PREFIX` for volume naming but `scripts/dev.sh` did not set it when running from worktrees, causing container and volume collisions between parallel worktrees.
+The original design used `VOLUME_PREFIX` for volume naming but `dev/scripts/dev.sh` did not set it when running from worktrees, causing container and volume collisions between parallel worktrees.
 
 ### Changes
 
@@ -147,11 +147,11 @@ The 2026-03 worktree-isolation amendment treated **every** volume as per-worktre
 
 Migration mode uses `infra/compose.dev.migration.yml` to expose host ports so the contributor can run `pnpm prisma migrate dev` and `pnpm clickhouse:migrate` from their host shell.
 
-`make quickstart` accepts a positional mode arg (`make quickstart frontend-only`) for non-interactive runs. `make quickstart-help` (or `./scripts/dev.sh help`) prints the mode reference.
+`make quickstart` accepts a positional mode arg (`make quickstart frontend-only`) for non-interactive runs. `make quickstart-help` (or `./dev/scripts/dev.sh help`) prints the mode reference.
 
 **Stateful services share volumes across worktrees.** `db-data`, `clickhouse-data`, and `redis-data` use stable names (`langwatch-db-data`, `langwatch-clickhouse-data`, `langwatch-redis-data`) — they no longer interpolate `VOLUME_PREFIX`. Sign up once, persist forever.
 
-Trade-off: only one worktree can have the same stateful container `up` at a time (postgres locks `/var/lib/postgresql/data`). `scripts/dev.sh` detects this (`check_stateful_collision`) and fails fast with a clear message pointing at the other compose project.
+Trade-off: only one worktree can have the same stateful container `up` at a time (postgres locks `/var/lib/postgresql/data`). `dev/scripts/dev.sh` detects this (`check_stateful_collision`) and fails fast with a clear message pointing at the other compose project.
 
 **Redis is a singleton with a fixed host port.** `redis:alpine` exposes `:6379` on the host and uses the shared `langwatch-redis-data` volume. Parallel worktrees reuse the same redis instance.
 
@@ -159,7 +159,7 @@ Trade-off: only one worktree can have the same stateful container `up` at a time
 
 **Deprecated targets** (`make dev`, `dev-nlp`, `dev-scenarios`, `dev-test`, `dev-full`, and `dev-up` / `dev-down` / `dev-logs`) print a deprecation warning and forward to the corresponding `quickstart` mode for one release before being removed.
 
-**Fail-fast SSRF guard.** `scripts/dev.sh` errors if `platform/app/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
+**Fail-fast SSRF guard.** `dev/scripts/dev.sh` errors if `platform/app/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
 
 ### Migration
 
@@ -189,9 +189,13 @@ independently. Collapsing them is a *dev-only* convenience, never a prod change.
 
 ### Decision
 
-Add an **opt-in single-process dev mode**, off by default. The default for
-`pnpm dev` is unchanged (two processes). Setting `WORKERS_IN_PROCESS=1` (or
-running `pnpm dev:single`) hosts the worker stack inside the app process.
+Make **single-process dev the default**. `pnpm dev` sets
+`WORKERS_IN_PROCESS=1` and hosts the worker stack inside the app process; the
+two-process topology is still available as `pnpm dev:concurrent`, and
+`pnpm dev:app` / `pnpm dev:worker` run one side on its own. Amended after the
+default was inverted: a laptop running several worktrees cannot afford a second
+Node process per stack, and haven had already defaulted this way, so plain
+`pnpm dev` disagreeing with it was the surprise rather than the safeguard.
 
 A new process role `"all"` runs the web server AND the worker-side wiring in one
 process. The three prior `processRole === "worker"` gates now go through

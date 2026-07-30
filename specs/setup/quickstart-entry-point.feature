@@ -5,10 +5,10 @@ Feature: make quickstart is the single dev environment entry point with intent-b
 
   # Behavior is in `infra/compose.dev.yml` + `infra/compose.dev.migration.yml` (volume
   # names + env_file overlay + host port overlay), `Makefile` (deprecation
-  # wrappers + positional MODE arg pass-through), and `scripts/dev.sh`
+  # wrappers + positional MODE arg pass-through), and `dev/scripts/dev.sh`
   # (intent-based prompt + write_overrides + fail-fast + collision detection).
   # The `write_overrides` URL rewrite scenarios are bound to
-  # `scripts/__tests__/dev-overrides.unit.bats`. End-to-end shell+docker
+  # `dev/scripts/__tests__/dev-overrides.unit.bats`. End-to-end shell+docker
   # scenarios (intent prompt UX, idempotency, cross-worktree volume sharing,
   # singleton redis, deprecation warnings) remain `@unimplemented` until a
   # docker-aware integration suite exists.
@@ -67,7 +67,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # auth/TLS. dev.sh verifies the listener with `redis-cli ... ping` (PONG)
   # before reusing it, errors out when :6379 is occupied by something
   # unverifiable, and only starts its own container when the port is free.
-  # Bound to `scripts/__tests__/dev-redis-detection.unit.bats`.
+  # Bound to `dev/scripts/__tests__/dev-redis-detection.unit.bats`.
 
   @unit
   Scenario: redis-cli PONG reply means the listener is a usable local Redis
@@ -113,7 +113,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # false-positives when this same project's redis is already running from a prior
   # run — docker compose would simply reuse it. The check now exempts this
   # project's own redis container and only fails on a foreign listener it cannot
-  # bind over. Bound to `scripts/__tests__/dev-redis-detection.unit.bats`.
+  # bind over. Bound to `dev/scripts/__tests__/dev-redis-detection.unit.bats`.
 
   @unit
   Scenario: the host-redis collision check is skipped when SKIP_HOST_REDIS_CHECK is set

@@ -35,7 +35,7 @@ const guides: Guide[] = [
   {
     icon: <FaGolang size={16} color="#00ADD8" />,
     label: "Get going with our Golang SDK",
-    href: "https://github.com/langwatch/langwatch/tree/main/sdk-go",
+    href: "https://github.com/langwatch/langwatch/tree/main/sdks/go",
     event: "integration_guide_click",
     language: "golang",
     bg: "gray.100",

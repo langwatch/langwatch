@@ -132,7 +132,7 @@ type LocalServiceUrls = {
  * Native local-services mode: run integration tests against always-on local
  * ClickHouse/Redis/Postgres instead of docker testcontainers. Activated by
  * LANGWATCH_TEST_CLICKHOUSE_URL + LANGWATCH_TEST_REDIS_URL (typically set in
- * langwatch/.env, loaded by vitest.integration.config.ts). Each service gets
+ * platform/app/.env, loaded by vitest.integration.config.ts). Each service gets
  * a dedicated test database (test_langwatch on ClickHouse, a numbered redis
  * db, LANGWATCH_TEST_DATABASE_URL's database on Postgres) so suites never
  * touch dev data. Never active in CI.

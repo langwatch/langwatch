@@ -122,7 +122,7 @@ func TestDepsStale(t *testing.T) {
 //
 // @scenario A fresh clone needs one install
 func TestEnsureDepsInstallsAtTheWorkspaceRoot(t *testing.T) {
-	// A checkout shaped like the repo: lockfile at the root, none in langwatch/.
+	// A checkout shaped like the repo: lockfile at the root, none in platform/app/.
 	repo := func(t *testing.T) (root, lwDir string) {
 		t.Helper()
 		root = t.TempDir()

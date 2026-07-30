@@ -32,7 +32,7 @@ jobs:
         id: detect
         with:
           # push-strategy diff: the test job spends real LLM money, so it
-          # must not run on pushes that touched nothing under langevals/.
+          # must not run on pushes that touched nothing under services/langevals/.
           push-strategy: diff
           filters: |
             relevant:

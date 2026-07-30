@@ -305,7 +305,7 @@ describe("Langy current-surfaces coverage", () => {
   });
 
   describe("when the user updates a trigger", () => {
-    // triggers:update has a real CLI surface (typescript-sdk/src/cli/commands/
+    // triggers:update has a real CLI surface (sdks/typescript/src/cli/commands/
     // triggers/update.ts) but the 42-scenario set only covers list + create —
     // a real gap, since triggers:create/:update are both in
     // LANGY_CANDIDATE_PERMISSIONS.

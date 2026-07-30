@@ -22,7 +22,7 @@ digraph TraceArchitecture {
 
   // ───────────────────────── React surface ─────────────────────────
   subgraph cluster_ui {
-    label="UI (langwatch/src/features/traces-v2)";
+    label="UI (platform/app/src/features/traces-v2)";
     style="rounded";
     color="#bae6fd";
 

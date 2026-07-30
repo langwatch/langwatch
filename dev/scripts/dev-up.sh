@@ -1,0 +1,146 @@
+#!/bin/bash
+# Non-interactive development environment launcher for AI agents.
+# Starts services in detached mode, finds free ports, isolates volumes per worktree.
+#
+# Usage:
+#   ./scripts/dev-up.sh [PROFILE]
+#
+# Profiles: dev (default), search, nlp, scenarios, test, full
+#
+# Outputs .dev-port with the assigned app port for agent discovery.
+# Each worktree gets isolated containers and volumes (except pnpm cache).
+set -e
+
+PROFILE="${1:-}"
+COMPOSE="docker compose -f infra/compose.dev.yml --project-directory ."
+
+# ---------------------------------------------------------------------------
+# Derive a stable, unique prefix from the repo directory path.
+# Two worktrees on the same machine will always get different prefixes.
+# ---------------------------------------------------------------------------
+DIR_HASH=$(echo -n "$PWD" | md5sum | cut -c1-8)
+VOLUME_PREFIX="lw-${DIR_HASH}"
+COMPOSE_PROJECT_NAME="langwatch-${DIR_HASH}"
+export VOLUME_PREFIX COMPOSE_PROJECT_NAME
+
+# ---------------------------------------------------------------------------
+# Find a free port starting from a base value.
+# Checks both host processes (lsof) and Docker port bindings.
+# ---------------------------------------------------------------------------
+find_free_port() {
+  local port=$1
+  while lsof -i :"$port" >/dev/null 2>&1 || docker ps --format '{{.Ports}}' 2>/dev/null | grep -q "0.0.0.0:${port}->"; do
+    port=$((port + 1))
+  done
+  echo "$port"
+}
+
+APP_PORT=$(find_free_port 5560)
+AI_SERVER_PORT=$(find_free_port 3456)
+export APP_PORT AI_SERVER_PORT
+
+# Strip any stale http://localhost:<oldport> exports of NEXTAUTH_URL /
+# BASE_HOST so dynamic-port worktrees don't 403 on login (lw#3453). Real
+# overrides (e.g. boxd proxy URLs) are left alone — see comment in helper.
+. "$(dirname "$0")/lib/sanitize-dev-env.sh"
+sanitize_localhost_dev_env
+
+# ---------------------------------------------------------------------------
+# Ensure .env files exist
+# ---------------------------------------------------------------------------
+if [ ! -f "platform/app/.env" ] && [ -f "platform/app/.env.example" ]; then
+  echo "Creating platform/app/.env from example..."
+  cp platform/app/.env.example platform/app/.env
+fi
+
+# ---------------------------------------------------------------------------
+# Prepare host files (codegen, prisma, etc.)
+# The source directory is mounted into Docker, so generated files must exist
+# on the host before containers start.
+# ---------------------------------------------------------------------------
+echo "Preparing host files..."
+(
+  cd platform/app
+  if [ ! -d node_modules ]; then
+    echo "Installing host dependencies..."
+    pnpm install
+  fi
+  pnpm run start:prepare:files 2>/dev/null || echo "WARNING: start:prepare:files had errors (non-fatal)"
+)
+
+# ---------------------------------------------------------------------------
+# Build compose command with optional profile
+# ---------------------------------------------------------------------------
+COMPOSE_CMD="$COMPOSE"
+if [ -n "$PROFILE" ] && [ "$PROFILE" != "dev" ]; then
+  COMPOSE_CMD="$COMPOSE --profile $PROFILE"
+fi
+
+# ---------------------------------------------------------------------------
+# Start services in detached mode
+# ---------------------------------------------------------------------------
+echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
+
+# Write URL overrides into platform/app/.env.dev-up. Same shared helper as
+# dev/scripts/dev.sh — only the URLs whose services actually start for this
+# profile are overridden (#3860 AC#6). The helper honors each service's
+# compose profile membership: langwatch_nlp runs under [nlp, scenarios,
+# full], langevals only under [nlp, full]. test/debug profiles add no
+# extra URL overrides.
+. "$(dirname "$0")/lib/write-dev-overrides.sh"
+# Map compose-profile names (dev-up's input) to write-dev-overrides preset
+# names. The profile system and the quickstart preset system are not the
+# same thing — `nlp` and `full` are profile names; `all-local-nlp` and
+# `full-local` are preset names. dev-up.sh is for per-worktree isolated
+# stacks; we always want at least the all-local baseline (CH+PG+Redis+app),
+# then layer compose profiles on top via $COMPOSE_PROFILES.
+DEV_UP_PRESET="all-local"
+case "${PROFILE:-}" in
+  nlp)                       DEV_UP_PRESET="all-local-nlp" ;;
+  full|scenarios|workers)    DEV_UP_PRESET="full-local" ;;
+esac
+write_dev_overrides "$DEV_UP_PRESET" platform/app/.env.dev-up
+
+$COMPOSE_CMD up -d
+
+# ---------------------------------------------------------------------------
+# Save port info for agent/skill discovery
+# ---------------------------------------------------------------------------
+cat > .dev-port <<EOF
+APP_PORT=${APP_PORT}
+AI_SERVER_PORT=${AI_SERVER_PORT}
+COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
+VOLUME_PREFIX=${VOLUME_PREFIX}
+BASE_URL=http://localhost:${APP_PORT}
+EOF
+
+echo ""
+echo "Services starting in background."
+echo "  App:        http://localhost:${APP_PORT}"
+echo "  Project:    ${COMPOSE_PROJECT_NAME}"
+echo "  Port file:  .dev-port"
+echo ""
+
+# ---------------------------------------------------------------------------
+# Wait for the app to become healthy (up to 5 minutes)
+# ---------------------------------------------------------------------------
+echo "Waiting for app to be ready..."
+TIMEOUT=300
+ELAPSED=0
+while [ $ELAPSED -lt $TIMEOUT ]; do
+  # Check for any HTTP response (connection accepted = app is up)
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${APP_PORT}" 2>/dev/null || true)
+  if [ -n "$HTTP_CODE" ] && [ "$HTTP_CODE" != "000" ]; then
+    echo "App is ready (HTTP ${HTTP_CODE}) at http://localhost:${APP_PORT}"
+    exit 0
+  fi
+  sleep 5
+  ELAPSED=$((ELAPSED + 5))
+  if [ $((ELAPSED % 30)) -eq 0 ]; then
+    echo "  Still waiting... (${ELAPSED}s / ${TIMEOUT}s)"
+  fi
+done
+
+echo "WARNING: App did not respond within ${TIMEOUT}s. Check logs with: make dev-logs"
+echo "  COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} VOLUME_PREFIX=${VOLUME_PREFIX} docker compose -f infra/compose.dev.yml --project-directory . logs -f app"
+exit 1

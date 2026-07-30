@@ -20,7 +20,7 @@ describe("Docker container", () => {
       // Build from repo root (mcp-server needs langevals/ for build)
       const repoRoot = process.cwd().replace(/\/mcp-server.*$/, "");
       execSync(
-        `docker build -t ${IMAGE_NAME} -f mcp-server/Dockerfile .`,
+        `docker build -t ${IMAGE_NAME} -f mcp/typescript/Dockerfile .`,
         {
           cwd: repoRoot,
           stdio: "pipe",

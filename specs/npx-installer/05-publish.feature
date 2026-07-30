@@ -50,12 +50,12 @@ Feature: CI smoke + publish for `@langwatch/server`
   Scenario: Smoke job triggers
     Given the smoke workflow file is "/.github/workflows/npx-server-smoke.yml"
     Then it triggers on:
-      | trigger                   | detail                                                                 |
-      | workflow_dispatch         | manual                                                                 |
-      | schedule                  | "0 4 * * *" (nightly, UTC)                                             |
-      | push paths                | package.json, pnpm-workspace.yaml, packages/server/**                   |
-      | push paths                | langwatch_nlp/pyproject.toml, langevals/**/pyproject.toml               |
-      | push paths                | services/aigateway/**, langwatch/package.json, platform/app/scripts/**     |
+      | trigger           | detail                                                                    |
+      | workflow_dispatch | manual                                                                    |
+      | schedule          | "0 4 * * *" (nightly, UTC)                                                |
+      | push paths        | package.json, pnpm-workspace.yaml, packages/server/**                     |
+      | push paths        | langwatch_nlp/pyproject.toml, services/langevals/**/pyproject.toml        |
+      | push paths        | services/aigateway/**, platform/app/package.json, platform/app/scripts/** |
 
   # =========================================================================
   # Publish job
@@ -68,7 +68,7 @@ Feature: CI smoke + publish for `@langwatch/server`
     And it publishes "@langwatch/server@3.1.1" to npm
 
   Scenario: Version-lock guard refuses mismatched tag and package version
-    Given "langwatch/package.json" version is "3.1.1"
+    Given "platform/app/package.json" version is "3.1.1"
     But the release tag is "v3.2.0"
     When the publish job runs
     Then the job fails fast with "version mismatch: tag=v3.2.0 package.json=3.1.1"

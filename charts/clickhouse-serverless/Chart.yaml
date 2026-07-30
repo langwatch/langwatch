@@ -6,6 +6,6 @@ appVersion: "25.10.2.65"
 version: 0.2.0
 home: https://github.com/langwatch/langwatch
 sources:
-  - https://github.com/langwatch/langwatch/tree/main/clickhouse-serverless
+  - https://github.com/langwatch/langwatch/tree/main/infra/clickhouse-serverless
 maintainers:
   - name: LangWatch Team

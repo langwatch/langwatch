@@ -52,7 +52,7 @@ function getPrecedingLines(key: string, windowSize = 5): string[] {
   return envExampleLines.slice(start, idx);
 }
 
-describe("langwatch/.env.example", () => {
+describe("platform/app/.env.example", () => {
   describe("when the gateway-secret declarations are inspected", () => {
     /** @scenario .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER */
     it("declares a non-empty sentinel value for LW_VIRTUAL_KEY_PEPPER", () => {

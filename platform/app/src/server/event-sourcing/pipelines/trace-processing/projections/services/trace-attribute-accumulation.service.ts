@@ -45,7 +45,7 @@ export const SPAN_ATTR_MAPPINGS = [
   // without this key they never accrue at all.
   ["langwatch.model_provider_id", "langwatch.model_provider_id"],
   // Governance ingest markers — stamped on every span by the
-  // /api/ingest/otel/:sourceId receiver (langwatch/src/server/routes/ingest/ingestionRoutes.ts).
+  // /api/ingest/otel/:sourceId receiver (platform/app/src/server/routes/ingest/ingestionRoutes.ts).
   // Hoisted into trace_summaries so the ActivityMonitorService dashboard
   // queries can roll up spend / users / events by ingestion source without
   // having to scan stored_spans. The receiver is the only emitter of

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Tests for scripts/lib/sanitize-dev-env.sh — guards lw#3453 ("make
+ * Tests for dev/scripts/lib/sanitize-dev-env.sh — guards lw#3453 ("make
  * quickstart" on a worktree where APP_PORT != 5560 must not 403 on login
  * because of a stale localhost-pinned NEXTAUTH_URL inherited from a prior
  * shell). Real proxy-style overrides (boxd, ngrok, https) must pass
@@ -16,7 +16,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
-const HELPER = path.join(REPO_ROOT, "scripts/lib/sanitize-dev-env.sh");
+const HELPER = path.join(REPO_ROOT, "dev/scripts/lib/sanitize-dev-env.sh");
 
 function runHelper(env: Record<string, string | undefined>): {
   stdout: string;

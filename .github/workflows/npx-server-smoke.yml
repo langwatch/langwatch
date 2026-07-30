@@ -44,7 +44,7 @@ on:
       # receives, so a change to it is precisely what this job exists to
       # validate — but it was missing from this list, so two packaging bugs
       # went out on a push that started no smoke run at all and looked green.
-      - "scripts/pack-npm.sh"
+      - "dev/scripts/pack-npm.sh"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -143,7 +143,7 @@ jobs:
           pnpm --filter @langwatch/server-cli run test:invariants
 
       # Same prebuild as npx-server-publish.yml: every published artifact
-      # ships platform/app/dist + mcp-server/dist (the publish sanity check
+      # ships platform/app/dist + mcp/typescript/dist (the publish sanity check
       # asserts both), so the artifact THIS job boots must carry them too —
       # otherwise the smoke exercises a tree shape no npm user ever receives
       # and pays a full on-runner vite build for it inside the health budget.
@@ -163,7 +163,7 @@ jobs:
         # package.json — no go.mod/cmd/, etc).
         run: |
           mkdir -p "$GITHUB_WORKSPACE/_pack"
-          bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
+          bash dev/scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
           tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           echo "Tarball: $tarball"

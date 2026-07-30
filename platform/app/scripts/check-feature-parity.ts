@@ -44,9 +44,9 @@ const REPO_ROOT = resolve(__dirname, "../../..");
 /**
  * Every tree that holds `.feature` files.
  *
- * `typescript-sdk/specs` is here because leaving it out made the whole tree
+ * `sdks/typescript/specs` is here because leaving it out made the whole tree
  * INVISIBLE: its scenarios counted for nothing, and — worse — an `@scenario`
- * annotation in `typescript-sdk/src` (which IS scanned) could never resolve
+ * annotation in `sdks/typescript/src` (which IS scanned) could never resolve
  * against them, so binding one was reported as a typo. A spec tree the checker
  * cannot see is the same "0/0, all bound ✓" trap a `.feature` file with no tags
  * falls into, one directory up.
@@ -86,7 +86,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
  * line.
  */
 const DEFAULT_BATS_TEST_ROOTS: string[] = [
-  "scripts/__tests__",
+  "dev/scripts/__tests__",
   "platform/app/scripts/__tests__",
 ];
 
@@ -142,7 +142,7 @@ const DEFAULT_PYTHON_TEST_ROOTS: string[] = [
  *     prevents the list from rotting.
  */
 const LEGACY_UNBOUND: string[] = [
-  // typescript-sdk/specs is absent from THIS list, but do not read that as
+  // sdks/typescript/specs is absent from THIS list, but do not read that as
   // "the tree is fully resolved" — it is not. Adding the tree to SPECS_ROOTS
   // made it discoverable, and every scenario in it that carries a `@unit` /
   // `@integration` tag is bound. Most of its scenarios carry no tag at all and

@@ -63,10 +63,10 @@ export async function ensureLangwatchDeps(
 	const langwatchDir = locateLangwatchDir();
 	if (!langwatchDir) throw new Error("langwatch app dir not found");
 
-	// The install now runs from the tarball ROOT, not from langwatch/. Since
+	// The install now runs from the tarball ROOT, not from platform/app/. Since
 	// ADR-076 the repo is a single pnpm workspace, so the lockfile and the
 	// workspace definition live at the root and langwatch/ is one member of it.
-	// The tree pnpm produces is unchanged — langwatch/node_modules is still
+	// The tree pnpm produces is unchanged — platform/app/node_modules is still
 	// where the app resolves from — only the directory we invoke pnpm in moved.
 	const rootDir = appRoot();
 	const nodeModulesPath = join(langwatchDir, "node_modules");
@@ -185,7 +185,7 @@ export async function ensureLangwatchDeps(
 	if (!distAlreadyBuilt) {
 		// Full prod build: start:prepare:files → build:scenario-child-process → vite build.
 		// start:prepare:files generates Prisma client, Zod types, SDK versions,
-		// langevals types (from the source committed in langevals/ts-integration/),
+		// langevals types (from the source committed in services/langevals/ts-integration/),
 		// and the mcp-server bundle. vite build emits dist/client/ for static serving.
 		// Without dist/client/, every UI route returns 404 and only /api/* works.
 		await execAndPipe(
@@ -244,7 +244,7 @@ export async function ensureLangwatchDeps(
 	}
 
 	// Workspace members living OUTSIDE langwatch/ (mcp-server, packages/*)
-	// cannot reach langwatch/node_modules by walking up, so their declared
+	// cannot reach platform/app/node_modules by walking up, so their declared
 	// peerDependencies resolve nowhere in the relocated tree. Materialize
 	// each peer as a member-local link to the app's resolved instance —
 	// the "consumer provides the peer" contract made explicit on disk.
@@ -379,7 +379,7 @@ export function assertWorkspaceLinksResolve(nodeModulesPath: string): void {
  *
  * Takes several roots because ADR-076 moved the store. The install root is now
  * the workspace root, so the store is at <root>/node_modules/.pnpm and
- * langwatch/node_modules holds only symlinks — checking langwatch/node_modules
+ * platform/app/node_modules holds only symlinks — checking platform/app/node_modules
  * alone reintroduced exactly the bug described above, silently, for every npx
  * user. Both are checked: the root for current trees, langwatch/ for ones
  * installed before the merge. Exported for tests.

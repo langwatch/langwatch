@@ -866,7 +866,7 @@ export const storeResults = async (
 
 /**
  * Topic clustering runs on langevals (the workspace member at
- * langevals/evaluators/topic_clustering — see contract.md §11). Returns
+ * services/langevals/evaluators/topic_clustering — see contract.md §11). Returns
  * the base URL, or `null` if LANGEVALS_ENDPOINT is unset, in which case
  * the caller warns and skips.
  */

@@ -173,7 +173,7 @@ jobs:
       # above already covers it and a filtered re-install here would only
       # re-resolve the same lockfile for a subset.
       #
-      # node_modules/ never reaches the tarball (scripts/pack-npm.sh excludes
+      # node_modules/ never reaches the tarball (dev/scripts/pack-npm.sh excludes
       # it), so end users still run `pnpm install` once on first start, which
       # is what generates the platform-specific Prisma client via prisma's
       # postinstall hook — see packages/server/src/services/node-deps.ts.
@@ -186,7 +186,7 @@ jobs:
         id: pack
         run: |
           mkdir -p _pack
-          bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
+          bash dev/scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
           tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           echo "tarball size:"; ls -lh "$tarball"

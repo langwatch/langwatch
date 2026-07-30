@@ -716,7 +716,7 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
 
 // §4.5 — `/budget/debit` is removed. Cost recording is now driven by the
 // trace-fold reactor on the trace-processing pipeline
-// (langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/
+// (platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/
 // gatewayBudgetSync.reactor.ts), which folds OTel span usage attributes
 // into the ClickHouse `gateway_budget_ledger_events` table. Single source
 // of truth, no PG dual-write — see CLAUDE.md & the migration

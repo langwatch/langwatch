@@ -77,7 +77,7 @@ const optionalIfBuildTime = (schema) => {
  * Only a plain `http://localhost:<port>` is treated as stale. Anything else is
  * someone's deliberate setup: `127.0.0.1`, a proxy in front of a preview
  * environment, a tunnel, or haven's `app.<slug>.langwatch.localhost`. Same rule
- * as the shell-side twin `scripts/lib/sanitize-dev-env.sh`, which covers the
+ * as the shell-side twin `dev/scripts/lib/sanitize-dev-env.sh`, which covers the
  * Docker launchers.
  *
  * Mutates the env object so direct `process.env.BASE_HOST` readers (the MCP
@@ -651,7 +651,7 @@ export function assertGatewaySecretsAllOrNone(env) {
       "========================================================================",
       "AI Gateway secrets are partially configured.",
       `  Missing: ${missing.join(", ")}`,
-      "  Either set ALL three secrets (see langwatch/.env.example) or UNSET",
+      "  Either set ALL three secrets (see platform/app/.env.example) or UNSET",
       "  them all. Partial config leaves /api/internal/gateway/* returning",
       "  503 auth_upstream_unavailable at request time.",
       "  Generate each value with: openssl rand -hex 32",

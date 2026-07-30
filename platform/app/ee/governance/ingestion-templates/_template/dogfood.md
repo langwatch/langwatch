@@ -1,6 +1,6 @@
 # Dogfood ritual — `<TEMPLATE_SLUG>`
 
-> **Starter file. Each tile copies this into `langwatch/ee/governance/ingestion-templates/<TEMPLATE_SLUG>/dogfood.md`** and replaces every `<TEMPLATE_SLUG>` occurrence with its own slug (`claude_code` / `cursor` / `claude_cowork` / `raw_otlp_advanced`). Per-tile customization sections are marked `<TEMPLATE-SPECIFIC: …>`.
+> **Starter file. Each tile copies this into `platform/app/ee/governance/ingestion-templates/<TEMPLATE_SLUG>/dogfood.md`** and replaces every `<TEMPLATE_SLUG>` occurrence with its own slug (`claude_code` / `cursor` / `claude_cowork` / `raw_otlp_advanced`). Per-tile customization sections are marked `<TEMPLATE-SPECIFIC: …>`.
 
 This ritual is the **acceptance gate** for the `<TEMPLATE_SLUG>` tile shipping green-checked in `/me`. **No tile turns green until BOTH the fixture track AND the real-user track below have been run end-to-end with screenshots in the PR body.** Same B6 discipline rchaves bug-bashed the dashboard chrome with.
 

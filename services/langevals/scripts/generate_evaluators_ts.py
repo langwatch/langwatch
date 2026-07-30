@@ -260,7 +260,7 @@ def generate_evaluator_definition_type() -> str:
 
 def generate_definitions(evaluators_info: Dict[str, Dict[str, Any]]) -> str:
     out = (
-        "// Generated from langevals (see langevals/scripts/generate_evaluators_ts.py).\n"
+        "// Generated from langevals (see services/langevals/scripts/generate_evaluators_ts.py).\n"
         "// Zod-first: the schemas below are the source of truth and the TypeScript types\n"
         "// are inferred with z.infer. Do not edit by hand.\n"
         'import { z } from "zod";\n\n'

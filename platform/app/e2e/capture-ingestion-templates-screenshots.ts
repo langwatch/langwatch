@@ -19,7 +19,7 @@ import { chromium } from "playwright";
  *      capture the empty drawer state).
  *
  * Usage:
- *   npx tsx langwatch/e2e/capture-ingestion-templates-screenshots.ts
+ *   npx tsx platform/app/e2e/capture-ingestion-templates-screenshots.ts
  *
  * Output (5 files):
  *   - me-settings-personal-otlp-panel.png

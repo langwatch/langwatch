@@ -6,7 +6,7 @@
  * IngestionSourceService.createSource so this script doesn't depend on
  * the service module being importable from outside the langwatch/ workspace
  * (tsx + ESM + the monorepo layout sometimes mis-resolves named exports
- * when the importer lives outside langwatch/node_modules).
+ * when the importer lives outside platform/app/node_modules).
  *
  * Outputs the resolved IDs and the raw ingest secret as a single JSON
  * line on stdout so a shell wrapper can consume + curl-post a real

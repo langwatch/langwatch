@@ -134,7 +134,7 @@ boxd connect langwatch-issueN
 tmux new -s claude-issueN
 ```
 
-**Stale localhost URL slipped through the rewrite.** Add the key to the allowlist in `scripts/boxd-fork.sh` (`boxd_rewrite_env`). The current allowlist: any `localhost:<port>` or `127.0.0.1:<port>` value, with `LW_GATEWAY_BASE_URL` routing to `aigw.<vm>.boxd.sh` and everything else routing to the default proxy.
+**Stale localhost URL slipped through the rewrite.** Add the key to the allowlist in `dev/scripts/boxd-fork.sh` (`boxd_rewrite_env`). The current allowlist: any `localhost:<port>` or `127.0.0.1:<port>` value, with `LW_GATEWAY_BASE_URL` routing to `aigw.<vm>.boxd.sh` and everything else routing to the default proxy.
 
 **Git auth doesn't work inside the fork.** The host's git uses `credential.https://github.com.helper=boxd` — boxd ships a credential helper that the golden image inherits. If your laptop has a different setup, `git push` from inside the fork will prompt for credentials. Workaround: `boxd connect <vm>` and run `gh auth login`.
 

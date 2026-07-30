@@ -47,7 +47,7 @@ stay vulnerable in another, and nothing announced the gap.
 them. `typescript-sdk` could not depend on either.
 
 Blocking the merge outright: **the application and the SDK had the same package
-name.** `langwatch/package.json` was `langwatch@3.7.0`; `sdks/typescript/package.json`
+name.** `platform/app/package.json` was `langwatch@3.7.0`; `sdks/typescript/package.json`
 was `langwatch@1.0.0`. pnpm rejects duplicate names in one workspace. The
 collision had already produced a latent oddity — the application declared
 `"langwatch": "1.0.0"`, a dependency on its own name, which resolved to the
@@ -97,11 +97,11 @@ single workspace puts it at the package root, where npm removes it, leaving the
 end user's first boot with nothing for `--frozen-lockfile` to check.
 
 Nesting costs nothing on the consuming side because the CLI already locates the
-application by walking up for `langwatch/package.json`
+application by walking up for `platform/app/package.json`
 (`locatePackageSource()` in `packages/server/src/services/app-dir.ts`), so it
 finds `app/` by itself and every downstream path resolves unchanged.
 
-`scripts/pack-npm.sh` becomes the assembler. It reads `files` from
+`dev/scripts/pack-npm.sh` becomes the assembler. It reads `files` from
 `package.json` — still the single source of truth for *what* ships — and decides
 only *where* it lands. The two `.npmignore` files are deleted; their trimming
 rules move into one explicit exclude list next to the copy that applies them.
@@ -143,7 +143,7 @@ ADR, not a packaging change.
 Merging the override lists was the fiddliest part, and there were more lists
 than the workspace files suggested. pnpm reads overrides from **both**
 `pnpm-workspace.yaml` and the root `package.json`'s `pnpm` field, and
-`langwatch/package.json` and `sdks/typescript/package.json` each carried a
+`platform/app/package.json` and `sdks/typescript/package.json` each carried a
 second, larger block that was live only while those directories were install
 roots. Merged naively they go silently dead — pnpm ignores a `pnpm` field in a
 non-root member — which would have quietly dropped around fifty pins, most of

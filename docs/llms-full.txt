@@ -23453,7 +23453,7 @@ keywords: azure openai, langwatch, typescript, javascript, sdk, instrumentation,
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
   <div>
-  <a href="https://github.com/langwatch/langwatch/tree/main/typescript-sdk" target="_blank">
+  <a href="https://github.com/langwatch/langwatch/tree/main/sdks/typescript" target="_blank">
     <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
   </a>
   </div>
@@ -23921,7 +23921,7 @@ keywords: openai, langwatch, typescript, javascript, sdk, instrumentation
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
   <div>
-  <a href="https://github.com/langwatch/langwatch/tree/main/typescript-sdk" target="_blank">
+  <a href="https://github.com/langwatch/langwatch/tree/main/sdks/typescript" target="_blank">
     <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
   </a>
   </div>
@@ -24062,7 +24062,7 @@ keywords: vercel ai sdk, langwatch, tracing, observability, vercel, ai, sdk
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
   <div>
-  <a href="https://github.com/langwatch/langwatch/tree/main/typescript-sdk" target="_blank">
+  <a href="https://github.com/langwatch/langwatch/tree/main/sdks/typescript" target="_blank">
     <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
   </a>
   </div>
@@ -27199,7 +27199,7 @@ LangWatch supports tracing Anthropic Claude API calls using the same `otelopenai
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -27216,8 +27216,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -27289,7 +27289,7 @@ LangWatch supports tracing Azure OpenAI API calls using the same `otelopenai` mi
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -27306,8 +27306,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -27381,7 +27381,7 @@ LangWatch supports tracing Google Gemini models through Google Cloud Vertex AI's
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -27398,8 +27398,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -27470,7 +27470,7 @@ LangWatch supports tracing Grok (xAI) API calls using the same `otelopenai` midd
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -27487,8 +27487,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -27559,7 +27559,7 @@ LangWatch can trace calls to the Groq API, allowing you to monitor its high-spee
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -27576,8 +27576,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -27648,7 +27648,7 @@ LangWatch supports tracing local models served by Ollama through its OpenAI-comp
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -27664,8 +27664,8 @@ import (
 	"context"
 	"log"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -27737,7 +27737,7 @@ LangWatch provides automatic instrumentation for the official `openai-go` client
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdks/go github.com/openai/openai-go
 ```
 
 ## Usage
@@ -27754,8 +27754,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"
@@ -27849,8 +27849,8 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	langwatch "github.com/langwatch/langwatch/sdks/go"
+	otelopenai "github.com/langwatch/langwatch/sdks/go/instrumentation/openai"
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"go.opentelemetry.io/otel"

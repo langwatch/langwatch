@@ -253,7 +253,7 @@ jobs:
           E2E_BROWSER_CHANNEL: chrome
         run: |
           # Start the app in background
-          cd langwatch && PORT=5570 pnpm start &
+          cd platform/app && PORT=5570 pnpm start &
           APP_PID=$!
 
           # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)

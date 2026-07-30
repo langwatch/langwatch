@@ -788,24 +788,24 @@ See `~/workspace/orchard-codex/plans/unimpl-reduction-2026-04-25.md` for the orc
 | specs/features/prompts/custom-prompt-tags.feature | "Validation accepts well-formed custom tag names" | DUPLICATE | prompt-tag.repository.unit.test.ts "when name is a valid custom tag" suite covers canary/ab-test/my_tag/v2 |
 | specs/features/prompts/custom-prompt-tags.feature | "Full lifecycle of a custom tag" | DUPLICATE | Full CRUD + assign/cascade lifecycle covered across api/prompts/prompt-tags.integration.test.ts and server/prompt-config/prompt-tags.integration.test.ts |
 | specs/features/prompts/custom-prompt-tags.feature | "Delete and recreate a seeded tag" | DUPLICATE | DELETE + POST + reassign flow covered by api/prompts/prompt-tags.integration.test.ts and prompt-tags.integration.test.ts assignment suites |
-| specs/features/devtools/worktree-creation.feature | "Derives slug from issue title" | KEEP | scripts/worktree.sh generate_slug() implemented, covered by worktree.unit.bats but no @scenario binding |
+| specs/features/devtools/worktree-creation.feature | "Derives slug from issue title" | KEEP | dev/scripts/worktree.sh generate_slug() implemented, covered by worktree.unit.bats but no @scenario binding |
 | specs/features/devtools/worktree-creation.feature | "Truncates slug to 40 characters at word boundary" | UPDATE | Implementation truncates at 50 chars (max_len=50), spec says 40 — feature/code disagree |
-| specs/features/devtools/worktree-creation.feature | "Strips special characters from slug" | KEEP | scripts/worktree.sh strips non-alphanumeric, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Builds branch name from issue number" | KEEP | scripts/worktree.sh build_branch_name() implemented, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Builds branch name from feature name" | KEEP | scripts/worktree.sh build_branch_name() handles feat/ prefix, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Derives directory name from issue branch" | KEEP | scripts/worktree.sh derive_directory() implemented, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Derives directory name from feature branch" | KEEP | scripts/worktree.sh derive_directory() implemented, covered by worktree.unit.bats |
-| specs/features/devtools/worktree-creation.feature | "Creates worktree from issue number" | KEEP | scripts/worktree.sh main() implemented, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Creates worktree from feature name" | KEEP | scripts/worktree.sh implemented, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Checks out existing remote branch" | KEEP | scripts/worktree.sh git ls-remote check, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Copies all .env files to new worktree" | KEEP | scripts/worktree.sh copies subdirectory .env*, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Warns when .env files are missing from main checkout" | KEEP | scripts/worktree.sh prints warnings, no integration test asserts warning text |
-| specs/features/devtools/worktree-creation.feature | "Exits when worktree directory already exists" | KEEP | scripts/worktree.sh exits non-zero, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Installs dependencies and prints summary with issue URL" | KEEP | scripts/worktree.sh runs pnpm install + prints URL, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Prints summary without issue URL for feature worktrees" | KEEP | scripts/worktree.sh skips issue URL for feat/, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Fails gracefully when gh CLI is not available for issue input" | KEEP | scripts/worktree.sh checks command -v gh, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Fails when no argument is provided" | KEEP | scripts/worktree.sh exits with usage message, covered by worktree.integration.bats |
-| specs/features/devtools/worktree-creation.feature | "Fetches from origin before creating worktree" | KEEP | scripts/worktree.sh runs git fetch origin, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Strips special characters from slug" | KEEP | dev/scripts/worktree.sh strips non-alphanumeric, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Builds branch name from issue number" | KEEP | dev/scripts/worktree.sh build_branch_name() implemented, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Builds branch name from feature name" | KEEP | dev/scripts/worktree.sh build_branch_name() handles feat/ prefix, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Derives directory name from issue branch" | KEEP | dev/scripts/worktree.sh derive_directory() implemented, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Derives directory name from feature branch" | KEEP | dev/scripts/worktree.sh derive_directory() implemented, covered by worktree.unit.bats |
+| specs/features/devtools/worktree-creation.feature | "Creates worktree from issue number" | KEEP | dev/scripts/worktree.sh main() implemented, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Creates worktree from feature name" | KEEP | dev/scripts/worktree.sh implemented, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Checks out existing remote branch" | KEEP | dev/scripts/worktree.sh git ls-remote check, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Copies all .env files to new worktree" | KEEP | dev/scripts/worktree.sh copies subdirectory .env*, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Warns when .env files are missing from main checkout" | KEEP | dev/scripts/worktree.sh prints warnings, no integration test asserts warning text |
+| specs/features/devtools/worktree-creation.feature | "Exits when worktree directory already exists" | KEEP | dev/scripts/worktree.sh exits non-zero, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Installs dependencies and prints summary with issue URL" | KEEP | dev/scripts/worktree.sh runs pnpm install + prints URL, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Prints summary without issue URL for feature worktrees" | KEEP | dev/scripts/worktree.sh skips issue URL for feat/, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Fails gracefully when gh CLI is not available for issue input" | KEEP | dev/scripts/worktree.sh checks command -v gh, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Fails when no argument is provided" | KEEP | dev/scripts/worktree.sh exits with usage message, covered by worktree.integration.bats |
+| specs/features/devtools/worktree-creation.feature | "Fetches from origin before creating worktree" | KEEP | dev/scripts/worktree.sh runs git fetch origin, covered by worktree.integration.bats |
 | specs/features/devtools/orchestrator-bug-fix-workflow.feature | "Detects bug by GitHub label" | KEEP | orchestrate skill SKILL.md classifies by label first, no automated test |
 | specs/features/devtools/orchestrator-bug-fix-workflow.feature | "Detects bug by title keyword \"fix\"" | KEEP | orchestrate skill SKILL.md classifies by title keywords (fix/bug/broken/crash) |
 | specs/features/devtools/orchestrator-bug-fix-workflow.feature | "Detects bug by title keyword \"bug\"" | KEEP | orchestrate skill SKILL.md classifies by bug keyword |

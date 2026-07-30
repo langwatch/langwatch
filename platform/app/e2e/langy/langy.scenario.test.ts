@@ -4,7 +4,7 @@
 //
 //   cd platform/app/e2e/langy && npx vitest run langy.scenario.test.ts --reporter=verbose
 //
-// Just Works against a running `pnpm dev:haven` stack. Override any of them
+// Just Works against a running `make haven up` stack. Override any of them
 // to point at a different stack (see README.md).
 
 import { openai } from "@ai-sdk/openai";

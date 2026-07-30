@@ -104,7 +104,7 @@ func TestRepoInputsRelocatedSet(t *testing.T) {
 	// A repo restructure moves the whole migration directory. The relocated
 	// merged migrations are history, not additions — only what the branch adds
 	// on top is judged.
-	previousDir := "langwatch/src/server/clickhouse/migrations"
+	previousDir := "platform/app/src/server/clickhouse/migrations"
 	root := initRepo(t)
 	commitMigrationAt(t, root, previousDir, "00040_a.sql")
 	commitMigrationAt(t, root, previousDir, "00041_b.sql")

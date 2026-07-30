@@ -154,7 +154,7 @@ export async function startDeviceCode(
  * "Unknown device" — multi-device users need this to revoke
  * individual sessions without nuking every device they're logged in
  * on (Ariana QA finding). See
- * `langwatch/src/server/routes/auth-cli.ts#clientInfoSchema` for the
+ * `platform/app/src/server/routes/auth-cli.ts#clientInfoSchema` for the
  * server contract.
  */
 function collectClientInfo(): {

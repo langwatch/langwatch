@@ -285,7 +285,7 @@ Auto-open browser on macOS (`open`) and Linux (`xdg-open`). Skip if `--no-open` 
 Triggers:
 - `workflow_dispatch` (manual)
 - `schedule: '0 4 * * *'` (nightly 04:00 UTC)
-- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
+- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `services/langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
 
 Matrix:
 - `macos-latest` (arm64)
@@ -338,7 +338,10 @@ Version is read from `platform/app/package.json`. The `@langwatch/server` packag
 | `/.github/workflows/langwatch-server-publish.yml`     | replaced by `npx-server-publish.yml`                |
 | `Makefile` targets `python-build`, `python-install`, `start` | uv/pip flow gone; `start` redundant with new CLI |
 
-**Keep** `.python-version` (used by langwatch_nlp + langevals).
+**Keep** the `.python-version` pin (used by the Python projects). It now lives in each
+one — `sdks/python/`, `services/langevals/`, `mcp/typescript/` — rather than at the repo
+root, because `uv` resolves it by walking up from its working directory and the repo root
+holds no Python of its own.
 
 ---
 

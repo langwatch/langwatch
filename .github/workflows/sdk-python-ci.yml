@@ -37,7 +37,7 @@ jobs:
         with:
           # push-strategy diff + no release-please-manifest entry: the e2e
           # step spends real LLM money, so it must not run on pushes or
-          # release PRs that touched nothing under python-sdk/. An SDK
+          # release PRs that touched nothing under sdks/python/. An SDK
           # release PR still matches via sdks/python/CHANGELOG.md.
           #
           # NO NEGATION PATTERNS. dorny/paths-filter ORs a filter's patterns
@@ -46,7 +46,7 @@ jobs:
           # `!sdks/python/src/langwatch/__version__.py` to keep a release-please
           # version bump from paying for the suite; instead it made `relevant`
           # true on every PR in the repo, and `test` ran its ~9 minutes on
-          # changes that never touched python-sdk/. Measured on a PR with zero
+          # changes that never touched sdks/python/. Measured on a PR with zero
           # python-sdk files: `Changes output set to ["relevant"]`.
           #
           # The exclusion is not expressible under OR semantics, so it is gone

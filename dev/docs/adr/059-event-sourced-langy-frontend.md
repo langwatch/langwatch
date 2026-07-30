@@ -189,7 +189,7 @@ Sharpen the seams the later phases build on; no behaviour change.
 - Scaffold `packages/langy` modeled on `packages/handled-error`: `private`,
   `"type": "module"`, `exports → ./src/index.ts`, `incremental` +
   per-package `tsBuildInfoFile`, `zod` as **peer** dependency; add
-  `"@langwatch/langy": "workspace:*"` to `langwatch/package.json`.
+  `"@langwatch/langy": "workspace:*"` to `platform/app/package.json`.
 - Move in, as the seed, `features/langy/stores/langyTurnPhase.ts` + its unit
   test; update the `langyStore` import.
 - Move the event schemas (`pipelines/langy-conversation-processing/schemas/

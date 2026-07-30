@@ -7,7 +7,7 @@
  * Reads from the unified trace store (the same `trace_summaries` +
  * `stored_log_records` tables every other LangWatch surface uses) filtered by
  * `Attributes['langwatch.origin.kind'] = "ingestion_source"`. The receiver
- * (langwatch/src/server/routes/ingest/ingestionRoutes.ts) stamps that marker
+ * (platform/app/src/server/routes/ingest/ingestionRoutes.ts) stamps that marker
  * on every span/log record; trace-attribute-accumulation hoists it from
  * stored_spans into trace_summaries.Attributes so the rollup queries here
  * don't need to scan span-level data.

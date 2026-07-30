@@ -25,7 +25,7 @@ If no feature file exists for your task, create one before writing code.
 
 Nothing in the day-to-day loop needs Docker or colima. If you run ClickHouse,
 Postgres and Redis natively (brew, or a LaunchAgent), point `.env` at them and
-set these three, and `pnpm dev:haven` brings up the whole application stack,
+set these three, and `make haven up` brings up the whole application stack,
 everything except the observability container, with no container runtime
 installed at all:
 
@@ -35,7 +35,7 @@ LANGWATCH_HAVEN_OBS=0         # skip the LGTM telemetry stack
 LANGY_UNSAFE_HOST_ACCESS=1    # run the langyagent worker on the host, not in colima
 ```
 
-haven resolves its own knobs from `langwatch/.env` (then `.env.portless`) as
+haven resolves its own knobs from `platform/app/.env` (then `.env.portless`) as
 well as the shell, so these travel with the worktree; an exported variable still
 wins for a single run. Postgres and Redis stay haven-managed either way: it
 starts them through brew, not a container.
@@ -55,7 +55,7 @@ the sandboxed/container langy tiers. Both are opt-in.
 
 ### Local dev by hostname — thuishaven / portless (recommended)
 
-Stop juggling ports. Opt in with `pnpm dev:haven` and traffic routes through
+Stop juggling ports. Opt in with `make haven up` and traffic routes through
 **`haven`** (the Go orchestrator in `tools/thuishaven`, binary `cmd/haven`), which
 gives every worktree's services a
 stable hostname via the [portless](https://github.com/vercel-labs/portless) proxy —
@@ -67,10 +67,10 @@ so there is no `/etc/hosts`, DNS, or sudo for name resolution, and two worktrees
 can never collide.
 
 Hostname routing is **opt-in** — `pnpm dev` uses the plain `PORT`+offset scheme;
-`pnpm dev:haven` (or `make haven up`) routes through haven.
+`make haven up` (or `make haven up`) routes through haven.
 
 ```bash
-pnpm dev:haven          # == make haven up (bootstraps portless itself on first run)
+make haven up          # == make haven up (bootstraps portless itself on first run)
 make haven install      # optional: go install so plain `haven ...` works everywhere
 make haven status       # every stack, service health, shared servers — one shot
 haven up +langy         # add a service to this worktree's stack, sticky
@@ -110,9 +110,18 @@ For per-PR / per-issue cloud environments via boxd, see `dev/docs/boxd-makefile.
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
-**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
+**Running the app outside Docker (the default for TS work):** just run `pnpm dev` from the repo root (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
 
-**Two processes vs one (workers).** By default `pnpm dev` runs the app and the background workers as two Node processes (a separate `workers` lane under `concurrently`), matching prod's separate app/worker deployments. To run them as a **single process** locally, use `pnpm dev:single` (or `WORKERS_IN_PROCESS=1 pnpm dev`): the app boots with the `"all"` process role and hosts the worker stack in-process via `startWorkers()`, saving the RAM of a second Node process. **Under haven the default is a single process:** `pnpm dev:haven` hosts the workers in the app child (no separate `workers` lane) to save the RAM of a second Node process — the sensible default when a laptop juggles several worktrees. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. Opt into a standalone `workers` lane with `haven up +workers` (sticky, per worktree; `pnpm dev:workers:haven` wraps it). This is dev-only — `NODE_ENV=production` ignores the flag. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
+**One process by default (workers).** `pnpm dev` runs the app and the background workers as a **single** Node process: it sets `WORKERS_IN_PROCESS=1`, the app boots with the `"all"` process role, and it hosts the worker stack in-process via `startWorkers()`. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. The dev surface is four scripts and no flags to remember, all runnable from the repo root:
+
+| Script | What runs |
+|---|---|
+| `pnpm dev` | app + workers in one process (the default) |
+| `pnpm dev:app` | app only, no workers |
+| `pnpm dev:worker` | workers only |
+| `pnpm dev:concurrent` | app + workers as two processes, the way prod deploys them |
+
+haven already defaulted to a single process, so plain `pnpm dev` disagreeing with it was the surprise rather than the safeguard; opt into a standalone `workers` lane under haven with `haven up +workers` (sticky, per worktree). This is dev-only — `NODE_ENV=production` ignores the flag and prod runs web and worker as separate deployments. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
 
 ### AI Gateway (Go, services/aigateway/)
 

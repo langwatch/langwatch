@@ -90,7 +90,7 @@ jobs:
         with:
           filters: |
             relevant:
-              - 'langwatch/**'
+              - 'platform/app/**'
               # Root workspace members the app's `...` closure installs from
               # source — a change there is a change to the app.
               - 'packages/**'
@@ -109,16 +109,16 @@ jobs:
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
             # The parity scanner binds @scenario annotations from test files
-            # across many roots, not just specs/ and langwatch/. This list MUST
+            # across many roots, not just specs/ and platform/app/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
             # DEFAULT_GO_TEST_ROOTS, DEFAULT_PYTHON_TEST_ROOTS,
-            # DEFAULT_BATS_TEST_ROOTS in langwatch/scripts/check-feature-parity.ts),
+            # DEFAULT_BATS_TEST_ROOTS in platform/app/scripts/check-feature-parity.ts),
             # otherwise a binding change in an unlisted root merges without the
             # gate ever running and silently breaks parity on main (e.g. #5143
-            # edited only scripts/__tests__/*.bats and slipped through).
+            # edited only dev/scripts/__tests__/*.bats and slipped through).
             feature-parity:
               - 'specs/**'
-              - 'langwatch/**'
+              - 'platform/app/**'
               - 'packages/**'
               - 'skills/**'
               - 'tools/**'
@@ -129,7 +129,7 @@ jobs:
               - 'pkg/**'
               - 'services/langevals/**'
               - 'langwatch_server/**'
-              - 'scripts/**'
+              - 'dev/scripts/**'
               - '.github/workflows/langwatch-app-ci.yml'
 
   typecheck:
@@ -145,7 +145,7 @@ jobs:
           install: "@langwatch/web..."
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       # tsgo (and tsc) write incremental .tsbuildinfo caches to explicit paths
@@ -165,11 +165,11 @@ jobs:
             ${{ runner.os }}-tsbuildinfo-
 
       - name: Run typecheck
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm typecheck
 
       - name: Run typecheck (tests)
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm run typecheck:tests
 
       - name: Notify Slack on failure
@@ -210,12 +210,12 @@ jobs:
           install: "@langwatch/web..."
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       - name: Run unit tests (shard ${{ matrix.shard }}/4)
         id: unit-tests
-        working-directory: langwatch
+        working-directory: platform/app
         run: |
           # shardFailureReporter feeds the globalSetup hard-floor so a wedged
           # shard that already printed failures exits 1, not a masked 0.
@@ -243,7 +243,7 @@ jobs:
 
       - name: Extract test failures
         if: failure()
-        working-directory: langwatch
+        working-directory: platform/app
         run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
@@ -251,7 +251,7 @@ jobs:
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        working-directory: langwatch
+        working-directory: platform/app
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-unit
 
       - name: Upload unit test coverage to Codecov
@@ -356,7 +356,7 @@ jobs:
           install: "@langwatch/web..."
 
       - name: Prepare files
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm start:prepare:files
 
       # traceparent-roundtrip.integration.test.ts runs the REAL nlpgo service,
@@ -378,7 +378,7 @@ jobs:
           key: ${{ runner.os }}-nlpgo-testbin-${{ hashFiles('services/nlpgo/**/*.go', 'go.sum') }}
 
       - name: Setup database
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm prisma:migrate
 
       - name: Install Goose migration tool
@@ -390,7 +390,7 @@ jobs:
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
       - name: Run ClickHouse migrations
-        working-directory: langwatch
+        working-directory: platform/app
         # ClickHouse's HTTP probe can answer SELECT 1 via curl while the
         # Node @clickhouse/client still sees ECONNREFUSED on its first
         # connect (IPv6/IPv4 dual-stack bind race under --network host).
@@ -410,7 +410,7 @@ jobs:
 
       - name: Run integration tests (shard ${{ matrix.shard }}/4)
         id: integration-tests
-        working-directory: langwatch
+        working-directory: platform/app
         # Integration files run sequentially in a single long-lived fork worker
         # (fileParallelism:false, for Redis contention), so v8 coverage data
         # accumulates across every file in the shard. Two levers keep that
@@ -444,7 +444,7 @@ jobs:
 
       - name: Extract test failures
         if: failure()
-        working-directory: langwatch
+        working-directory: platform/app
         run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
@@ -452,7 +452,7 @@ jobs:
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
-        working-directory: langwatch
+        working-directory: platform/app
         run: bash ../.github/scripts/notify-slack-test-failure.sh test-integration
 
       - name: Upload integration test coverage to Codecov
@@ -519,7 +519,7 @@ jobs:
       # So run Biome ourselves and let a non-zero exit fail the job. A config
       # error and a lint violation both surface here.
       - name: Biome (blocking — config errors included)
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm lint
 
       - name: Set up reviewdog
@@ -612,15 +612,15 @@ jobs:
 
           # --- ANNOTATE (cannot fail the job) ---
           #
-          # Biome ran with langwatch/ as its cwd, so its paths are relative to
+          # Biome ran with platform/app as its cwd, so its paths are relative to
           # that; reviewdog matches against a repo-root diff. Rewriting the
-          # paths here rather than running reviewdog from langwatch/ keeps the
+          # paths here rather than running reviewdog from platform/app keeps the
           # mapping explicit — a path that silently fails to match the diff
           # would filter every finding away and read as a clean pass.
           #
           # The gate below reads biome.raw.json, NOT this file: it compares
-          # against a base tree whose paths are langwatch-relative too.
-          jq '.diagnostics |= map(.location.path = "langwatch/" + .location.path)' \
+          # against a base tree whose paths are app-relative too.
+          jq '.diagnostics |= map(.location.path = "platform/app/" + .location.path)' \
             biome.raw.json > biome.rdjson
 
           # A single un-capped `github-pr-review` pass died on `422 Body is too
@@ -661,7 +661,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh lint
 
-  # The ast-grep ruleset at /.ast-grep/ encodes deterministic house rules.
+  # The ast-grep ruleset at dev/lint/ast-grep/ encodes deterministic house rules.
   # coderabbit-config-check.yml only proves each rule still matches its own
   # fixture; until this job existed, nothing ran them against actual code
   # except CodeRabbit, once per PR, as a comment.
@@ -690,7 +690,7 @@ jobs:
         run: pip install "ast-grep-cli==0.42.3"
 
       - name: Rule fixtures must still pass
-        working-directory: .ast-grep
+        working-directory: dev/lint/ast-grep
         run: ast-grep test -c sgconfig.yml -t rule-tests
 
       - name: Scan changed files
@@ -704,7 +704,7 @@ jobs:
           fi
           echo "$files" | sed 's/^/  /'
           # shellcheck disable=SC2086
-          ast-grep scan -c .ast-grep/sgconfig.yml $files
+          ast-grep scan -c dev/lint/ast-grep/sgconfig.yml $files
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -726,7 +726,7 @@ jobs:
           install: "@langwatch/web..."
 
       - name: Check feature-file parity
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm check:feature-parity
 
       - name: Notify Slack on failure
@@ -785,7 +785,7 @@ jobs:
         with:
           path: |
             platform/app/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'platform/app/vite.config.ts') }}
+          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('platform/app/src/**/*', 'platform/app/vite.config.ts') }}
           restore-keys: |
             ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
@@ -808,7 +808,7 @@ jobs:
         run: pnpm --filter @langwatch/mcp-server run build
 
       - name: Build
-        working-directory: langwatch
+        working-directory: platform/app
         run: pnpm build
 
       # A successful `vite build` only proves the bundle compiles, not that it
@@ -816,7 +816,7 @@ jobs:
       # catch runtime boot failures (white screens from chunk-init errors).
       # Uses the runner's preinstalled Google Chrome (no browser download).
       - name: Boot smoke test
-        working-directory: langwatch
+        working-directory: platform/app
         env:
           SMOKE_BROWSER_CHANNEL: chrome
         run: |
@@ -865,20 +865,20 @@ jobs:
           install: "@langwatch/web..."
 
       - name: Stage canary fixture inside vitest root
-        working-directory: langwatch
+        working-directory: platform/app
         run: cp ../.github/scripts/__fixtures__/intentional-failure.test.ts ./_ci_canary.test.ts
 
       - name: Run intentional failure
         id: canary
         continue-on-error: true
-        working-directory: langwatch
+        working-directory: platform/app
         run: |
           pnpm vitest run _ci_canary.test.ts \
             --reporter=default --reporter=json --outputFile=test-results.json
 
       - name: Extract failures
         if: always()
-        working-directory: langwatch
+        working-directory: platform/app
         run: bash ../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Assert detection worked

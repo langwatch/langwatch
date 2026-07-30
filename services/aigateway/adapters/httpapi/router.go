@@ -149,7 +149,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
 	// LangWatch governance ingestion pipeline to validate and execute
 	// OTTL statements over inbound OTLP payloads. See
-	// `langwatch/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
+	// `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
 	// for the matching client.
 	if deps.OTTLServer != nil {
 		r.Route("/internal", func(in chi.Router) {

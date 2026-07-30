@@ -7,7 +7,7 @@
 # Usage:
 #   docker compose -f infra/compose.dev.yml -f infra/compose.dev.migration.yml --project-directory . up postgres clickhouse
 #
-# scripts/dev.sh wires this together when "migration" mode is selected.
+# dev/scripts/dev.sh wires this together when "migration" mode is selected.
 
 services:
   postgres:
