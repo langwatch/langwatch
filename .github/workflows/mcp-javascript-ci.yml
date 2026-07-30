@@ -39,6 +39,13 @@ jobs:
           filters: |
             relevant:
               - 'mcp-server/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config live at the repo root since ADR-076; a dependency
+              # or override change touches only these.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/mcp-javascript-ci.yml'
               - '.github/actions/setup-pnpm-node/**'
 

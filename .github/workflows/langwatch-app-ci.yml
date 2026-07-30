@@ -91,6 +91,20 @@ jobs:
           filters: |
             relevant:
               - 'langwatch/**'
+              # Root workspace members the app's `...` closure installs from
+              # source — a change there is a change to the app.
+              - 'packages/**'
+              # The single lockfile, workspace definition, root manifest and
+              # hoist config all live at the repo root since ADR-076. A PR that
+              # bumps a dependency or adds a security override touches ONLY
+              # these — without them here, such a PR runs zero app CI while
+              # langwatch-app-complete reports success via allowed-skips.
+              # Dependabot targets the root weekly, so that is the common case,
+              # not the odd one.
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
@@ -105,6 +119,8 @@ jobs:
             feature-parity:
               - 'specs/**'
               - 'langwatch/**'
+              - 'packages/**'
+              - 'skills/**'
               - 'tools/**'
               - 'mcp-server/**'
               - 'typescript-sdk/**'
@@ -476,6 +492,20 @@ jobs:
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "@langwatch/web..."
+
+      # The ADR-076 workspace invariants: one lockfile, one workspace
+      # definition, no member carrying overrides pnpm would ignore, the app and
+      # the SDK on different names. They previously ran only in
+      # npx-server-smoke, which is deliberately NOT a required check and whose
+      # path filter misses most of the manifests these assert about — so the
+      # exact drift they exist to catch (a second lockfile reappearing, a
+      # member overrides block) merged with no job running at all. This job is
+      # required via langwatch-app-complete and now triggers on the root
+      # manifests. Takes ~200ms.
+      - name: Check the workspace invariants (ADR-076)
+        run: |
+          pnpm install --frozen-lockfile --filter "@langwatch/server-cli..."
+          pnpm --filter @langwatch/server-cli exec vitest run test/workspace-invariants.test.ts
 
       # THE GATE. Everything below this step is annotation, not enforcement.
       #
