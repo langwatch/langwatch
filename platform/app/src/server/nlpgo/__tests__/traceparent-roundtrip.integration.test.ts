@@ -111,7 +111,12 @@ const shouldRun = hasTestcontainers && hasGo();
 // single CI shard or local re-run reuses the build artifact across
 // vitest restarts. `os.tmpdir()` would work too, but keeping it inside
 // the repo means `make clean` / artifact cleanup picks it up.
-const NLPGO_TEST_BIN_DIR = path.join(REPO_ROOT, "platform", "app", ".vitest-tmp");
+const NLPGO_TEST_BIN_DIR = path.join(
+  REPO_ROOT,
+  "platform",
+  "app",
+  ".vitest-tmp",
+);
 const NLPGO_TEST_BIN = path.join(
   NLPGO_TEST_BIN_DIR,
   process.platform === "win32" ? "nlpgo-test.exe" : "nlpgo-test",

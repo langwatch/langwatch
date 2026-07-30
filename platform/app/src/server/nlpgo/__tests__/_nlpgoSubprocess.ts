@@ -32,7 +32,12 @@ import { setTimeout as sleep } from "node:timers/promises";
 // up 6 = repo root.
 export const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
-const NLPGO_TEST_BIN_DIR = path.join(REPO_ROOT, "platform", "app", ".vitest-tmp");
+const NLPGO_TEST_BIN_DIR = path.join(
+  REPO_ROOT,
+  "platform",
+  "app",
+  ".vitest-tmp",
+);
 const NLPGO_TEST_BIN = path.join(
   NLPGO_TEST_BIN_DIR,
   process.platform === "win32" ? "nlpgo-test.exe" : "nlpgo-test",

@@ -6,7 +6,7 @@ End-to-end tests for LangWatch using Playwright, designed to be authored and mai
 
 ```bash
 # 1. Start infrastructure services (from this directory)
-cd agentic-e2e-tests
+cd tests/agentic-e2e
 docker compose up -d
 
 # 2. Run database migrations (first time only)

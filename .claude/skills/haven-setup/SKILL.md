@@ -110,7 +110,7 @@ If either is set to a `minikube`/`docker.internal`-style host and you're running
 ## Step 5: Bring it up
 
 ```bash
-cd langwatch
+cd platform/app
 LANGWATCH_HAVEN_CH=0 LANGWATCH_HAVEN_PG=0 LANGWATCH_HAVEN_REDIS=0 \
 LANGWATCH_HAVEN_OBS=0 LANGY_UNSAFE_HOST_ACCESS=1 HAVEN_AGENT=1 \
 LANGY_EGRESS_REQUIRE_TLS=false \

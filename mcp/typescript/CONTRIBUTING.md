@@ -15,7 +15,7 @@ Thank you for your interest in contributing to the LangWatch MCP Server! This gu
 1. **Clone the repository and navigate to the MCP server directory:**
    ```bash
    git clone https://github.com/langwatch/langwatch.git
-   cd langwatch/mcp-server
+   cd langwatch/mcp/typescript
    ```
 
 2. **Install dependencies and build the MCP server:**

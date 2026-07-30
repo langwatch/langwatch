@@ -6,7 +6,7 @@ Exercises all new dataset SDK methods against a real LangWatch instance.
 Usage:
     export LANGWATCH_API_KEY="sk-lw-..."
     export LANGWATCH_ENDPOINT="http://localhost:5560"  # or https://app.langwatch.ai
-    cd python-sdk && poetry run python examples/dataset_crud_example.py
+    cd sdks/python && poetry run python examples/dataset_crud_example.py
 """
 
 import os

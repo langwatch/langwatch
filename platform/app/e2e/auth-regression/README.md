@@ -90,7 +90,7 @@ ralph audit and exercises a specific bug class:
 ## Running a single script
 
 ```sh
-cd langwatch
+cd platform/app
 DATABASE_URL="postgresql://langwatch_db:smoketest@localhost:5434/langwatch_db?sslmode=disable&schema=langwatch_db" \
 SKIP_REDIS=1 BUILD_TIME=1 NODE_ENV=development \
 NEXTAUTH_URL=http://localhost:5571 \

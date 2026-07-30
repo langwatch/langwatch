@@ -22,7 +22,10 @@ import {
 } from "../components/capabilities/capabilityRegistry";
 
 const CLI_PROGRAM_PATH = fileURLToPath(
-  new URL("../../../../../../sdks/typescript/src/cli/program.ts", import.meta.url),
+  new URL(
+    "../../../../../../sdks/typescript/src/cli/program.ts",
+    import.meta.url,
+  ),
 );
 
 /**

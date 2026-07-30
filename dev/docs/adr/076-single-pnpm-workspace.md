@@ -55,7 +55,7 @@ published SDK only because the two lived in different workspaces.
 
 The hard constraint on any change is the published `@langwatch/server` tarball.
 It ships the application's source plus `platform/app/pnpm-lock.yaml`, and runs
-`pnpm -C langwatch install --frozen-lockfile` on the end user's machine at first
+`pnpm -C platform/app install --frozen-lockfile` on the end user's machine at first
 boot (`packages/server/src/services/node-deps.ts`). Removing the application's
 lockfile breaks `npx @langwatch/server` for every end user.
 

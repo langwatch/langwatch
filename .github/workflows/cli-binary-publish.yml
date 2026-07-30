@@ -236,7 +236,7 @@ jobs:
       # since neither tool exists on ubuntu. Until then, do NOT claim the
       # darwin assets are signed anywhere in the docs or release notes.
       - name: Build binary
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           TARGET: ${{ matrix.target }}
           ASSET: ${{ steps.names.outputs.asset }}
@@ -256,7 +256,7 @@ jobs:
         # so a version mismatch now blocks ALL five uploads rather than being
         # noticed after four of them already landed.
         if: matrix.target == 'bun-linux-x64'
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           ASSET: ${{ steps.names.outputs.asset }}
           VERSION: ${{ needs.resolve.outputs.version }}
@@ -270,7 +270,7 @@ jobs:
           fi
 
       - name: Compute sha256 sidecar
-        working-directory: typescript-sdk
+        working-directory: sdks/typescript
         env:
           ASSET: ${{ steps.names.outputs.asset }}
         run: |

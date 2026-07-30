@@ -162,11 +162,15 @@ async function main() {
 
   // Trail with `langwatch whoami` showing the lazy-minted VK.
   console.log("\n$ langwatch whoami");
-  const whoami = spawn("node", ["sdks/typescript/dist/cli/index.js", "whoami"], {
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-    cwd: process.cwd() + "/..",
-  });
+  const whoami = spawn(
+    "node",
+    ["sdks/typescript/dist/cli/index.js", "whoami"],
+    {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+      cwd: process.cwd() + "/..",
+    },
+  );
   whoami.stdout.on("data", (c) => process.stdout.write(c));
   whoami.stderr.on("data", (c) => process.stderr.write(c));
   await new Promise((res) => whoami.on("close", res));

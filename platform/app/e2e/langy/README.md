@@ -25,7 +25,7 @@ reach the app's tRPC/SSE endpoints and sign in as a real user.
 ## Run
 
 ```bash
-cd langwatch/e2e/langy
+cd platform/app/e2e/langy
 LANGY_APP_URL=<your app URL, e.g. https://app.<slug>.langwatch.localhost:1355> \
 LANGY_PROJECT_ID=<project id> \
 LANGY_ADMIN_EMAIL=<a real user's email on that project> \
@@ -73,7 +73,7 @@ rubric (`LANGY_CORE_RULE_CRITERIA`, etc.) that encodes Langy's AGENTS.md absolut
 rules. Run it the same way:
 
 ```bash
-cd langwatch/e2e/langy
+cd platform/app/e2e/langy
 npx vitest run langy-dogfood.scenario.test.ts --reporter=verbose
 ```
 

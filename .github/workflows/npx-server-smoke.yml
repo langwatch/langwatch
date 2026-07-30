@@ -152,7 +152,7 @@ jobs:
       # above already covers it. Same redundancy that was removed from
       # npx-server-publish.yml.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm -C langwatch run build
+        run: pnpm -C platform/app run build
         env:
           NODE_ENV: production
 
