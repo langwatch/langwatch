@@ -146,7 +146,12 @@ export function findConventionViolations(query: string): ConventionViolation[] {
     const table = name as CatalogueTable;
     if (!referencesTable(sql, name)) continue;
 
-    const prunes = [shape.partitionColumn, ...(shape.prunableColumns ?? [])];
+    // Only some catalogue entries declare extra prunable columns, and the
+    // catalogue is `as const`, so the property has to be narrowed rather than
+    // defaulted — `?? []` cannot rescue a key the type does not carry.
+    const prunable =
+      "prunableColumns" in shape ? (shape.prunableColumns ?? []) : [];
+    const prunes = [shape.partitionColumn, ...prunable];
     if (
       !prunes.some((column) => hasComparison(sql, column)) &&
       !isExempt({ sql, table, rule: "partition_predicate" })
