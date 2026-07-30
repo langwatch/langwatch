@@ -499,6 +499,19 @@ const cases: Case[] = [
     trace: makeTrace({ computedInput: "hello", computedOutput: "world" }),
     expected: true,
   },
+  {
+    // Same narrowing, positive direction: dispatch cannot surface a trace whose
+    // only match would have come from a span name it never loaded. The SQL side
+    // does surface it, which is exactly the asymmetry the spec pins.
+    name: "free text without loaded spans misses a span-name-only match",
+    query: "codex",
+    trace: makeTrace({
+      traceName: "checkout flow",
+      computedInput: "hello",
+      computedOutput: "world",
+    }),
+    expected: false,
+  },
   // Boolean composition
   {
     name: "AND requires both sides",
@@ -850,6 +863,11 @@ describe("free text compiled to ClickHouse", () => {
     expect(sql).toContain("ifNull(TraceName, '') ILIKE");
     expect(sql).toContain("FROM stored_spans");
     expect(sql).toContain("SpanName ILIKE");
+    // The span subquery crosses into another table, so its tenant predicate is
+    // the one whose regression leaks across tenants rather than just returning
+    // the wrong rows. Pin it here even though `boundedSubquery` owns it.
+    expect(sql).toContain("TenantId = {tenantId:String}");
+    expect(compiled!.params).toMatchObject({ tenantId: "tenant-1" });
     expect(Object.values(compiled!.params)).toContain("%codex%");
   });
 

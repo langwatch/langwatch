@@ -598,6 +598,20 @@ describe("ClickHouseTraceService", () => {
         expect(sql).toContain("lower(ifNull(ts.ComputedOutput, ''))");
         expect(sql).toContain("lower(ifNull(ts.TraceName, ''))");
         expect(sql).toContain("lower(sp.SpanName)");
+
+        // Presence alone would pass just as happily if the branches were
+        // AND-joined, which is the actual regression to fear: an AND of four
+        // substring tests matches nothing. Pin the join operator. The slice
+        // stops at EXISTS so the span subquery's own internal ANDs (its tenant,
+        // trace and time predicates) stay out of the assertion.
+        const columnBranches = sql.slice(
+          sql.indexOf("lower(ifNull(ts.ComputedInput, ''))"),
+          sql.indexOf("EXISTS ("),
+        );
+        expect(columnBranches).toContain(" OR ");
+        expect(columnBranches).not.toContain(" AND ");
+        // ...and the span branch is OR-ed onto them, not AND-ed.
+        expect(sql).toContain("OR EXISTS (");
       });
 
       // The 3-char floor exists because the ngrambf_v1 skip indexes are
@@ -617,6 +631,29 @@ describe("ClickHouseTraceService", () => {
         const call = mockClickHouseQuery.mock.calls[0]!;
         expect(call[0].query_params.searchQuery).toBeUndefined();
         expect(call[0].query).not.toContain("lower(sp.SpanName)");
+      });
+
+      // The privacy-relevant asymmetry in this change: the two Computed*
+      // branches stay gated on the I/O protections, while trace and span names
+      // are operation names already visible in the list and so are searched
+      // either way. Pin it so neither half drifts.
+      it("drops a redacted IO column but keeps the name branches", async () => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
+          { ...protections, canSeeCapturedOutput: false },
+        );
+
+        const sql = mockClickHouseQuery.mock.calls[0]![0].query;
+        expect(sql).not.toContain("lower(ifNull(ts.ComputedOutput, ''))");
+        expect(sql).toContain("lower(ifNull(ts.ComputedInput, ''))");
+        expect(sql).toContain("lower(ifNull(ts.TraceName, ''))");
+        expect(sql).toContain("lower(sp.SpanName)");
       });
     });
 

@@ -236,7 +236,13 @@ function evaluateFreeText(
   const value = extractStringValue(tag).toLowerCase();
   const inputMatch = ilikeContains(trace.summary.computedInput, value);
   const outputMatch = ilikeContains(trace.summary.computedOutput, value);
-  const nameMatch = trace.summary.traceName.toLowerCase().includes(value);
+  // `?? ""` rather than a bare deref: the type says string, but the only place
+  // that coalesce actually happens is the analytics repository's row mapping, so
+  // a summary built from a fold state that predates the field would throw here
+  // and take the whole evaluation (including trigger dispatch) down with it.
+  const nameMatch = (trace.summary.traceName ?? "")
+    .toLowerCase()
+    .includes(value);
   const spanMatch =
     trace.spans?.some((s) => s.name.toLowerCase().includes(value)) ?? false;
 

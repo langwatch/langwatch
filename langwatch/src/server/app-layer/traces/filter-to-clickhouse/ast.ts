@@ -289,10 +289,13 @@ function translateFreeText(
   // off `trace_summaries`; the subquery covers every other span via
   // `stored_spans.SpanName` (backed by `idx_span_name`).
   //
-  // Both name branches are compared through a definite expression rather than
-  // a bare Nullable column, so they can only be true or false. That keeps the
-  // clause's three-valued logic exactly as it was when a computed I/O column
-  // is NULL, which the parity suite pins.
+  // `TraceName` is `String DEFAULT ''`, so the `ifNull` wrapper is belt-and-
+  // braces rather than load-bearing; it matches how `meta-handlers.ts` already
+  // reads the column. What matters is that both name branches evaluate to a
+  // definite true/false, never a NULL, so the clause's three-valued logic when a
+  // computed I/O column is NULL stays exactly as it was. The parity suite pins
+  // that. The span subquery is tenant-scoped and time-bounded by
+  // `boundedSubquery`.
   const clause = `(ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ifNull(TraceName, '') ILIKE ${p} OR ${boundedSubquery(
     "stored_spans",
     "StartTime",

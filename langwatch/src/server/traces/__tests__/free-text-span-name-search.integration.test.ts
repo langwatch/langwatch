@@ -79,13 +79,26 @@ function traceRow({
   };
 }
 
-function spanRow({ traceId, spanName }: { traceId: string; spanName: string }) {
+/**
+ * `parentSpanId` matters: `TraceName` covers the root span's name, so the
+ * subquery only earns its keep on NON-root spans. A fixture where every span is
+ * a root would pass on the trace-name branch alone and never exercise it.
+ */
+function spanRow({
+  traceId,
+  spanName,
+  parentSpanId = null,
+}: {
+  traceId: string;
+  spanName: string;
+  parentSpanId?: string | null;
+}) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
     TraceId: traceId,
     SpanId: `span-${nanoid()}`,
-    ParentSpanId: null,
+    ParentSpanId: parentSpanId,
     Sampled: 1,
     StartTime: new Date(now),
     EndTime: new Date(now + 5),
@@ -192,8 +205,15 @@ beforeAll(async () => {
   await ch.insert({
     table: "stored_spans",
     values: [
-      // Mixed case on purpose: matching must be case-insensitive.
-      spanRow({ traceId: BY_SPAN_NAME, spanName: "Codex.Exec" }),
+      // The regression case, as a genuine CHILD span (its trace's own name is
+      // "checkout flow", so only the subquery can find it) and mixed case on
+      // purpose, since matching must be case-insensitive.
+      spanRow({ traceId: BY_SPAN_NAME, spanName: "root" }),
+      spanRow({
+        traceId: BY_SPAN_NAME,
+        spanName: "Codex.Exec",
+        parentSpanId: "span-root-checkout",
+      }),
       spanRow({ traceId: BY_TRACE_NAME, spanName: "http.request" }),
       spanRow({ traceId: BY_INPUT, spanName: "http.request" }),
       spanRow({ traceId: BY_OUTPUT, spanName: "http.request" }),
@@ -218,6 +238,26 @@ afterAll(async () => {
 
 describe("free-text search over span names (integration)", () => {
   describe("given a trace whose span name is the only place the term appears", () => {
+    // Guards the fixture itself: if the matching span were a root, the
+    // trace-name branch could carry these tests and the subquery would go
+    // untested. Its trace is named "checkout flow", so only the subquery matches.
+    it("has the matching span as a non-root span", async () => {
+      const rows = await (
+        await ch.query({
+          query: `SELECT SpanName, isNull(ParentSpanId) AS is_root
+                  FROM stored_spans
+                  WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
+                    AND lower(SpanName) LIKE '%codex%'`,
+          query_params: { tenantId, traceId: BY_SPAN_NAME },
+          format: "JSONEachRow",
+        })
+      ).json<{ SpanName: string; is_root: number }>();
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.SpanName).toBe("Codex.Exec");
+      expect(Number(rows[0]!.is_root)).toBe(0);
+    });
+
     it("surfaces it through the traces-v2 search bar", async () => {
       const found = await searchViaCompiledFilter(TERM);
       expect(found).toContain(BY_SPAN_NAME);
