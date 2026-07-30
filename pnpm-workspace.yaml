@@ -170,10 +170,16 @@ overrides:
   # static code fails there (`Cannot read properties of undefined (reading
   # 'v1')` in ExportTraceServiceRequest.encode; reproduced locally on 8.6.5,
   # 8.6.6 and 8.7.1 — the OTLP decode suite is green only with the
-  # transformer on 7.5.6, which is the state every green CI run of this
-  # branch actually had). Both floors sit at their majors' advisory-patched
-  # releases (CVE-2026-44289..44293), so nothing is left below a fixed
-  # version; the majors just stop being force-merged.
+  # transformer on the 7.x line, the state every green CI run actually had).
+  # Both floors sit at their majors' advisory-patched releases
+  # (CVE-2026-44289..44293), so nothing is left below a fixed version; the
+  # majors just stop being force-merged.
+  #
+  # The 0.55.0 transformer pin itself is DELIBERATE and stays: the app
+  # consumes a deprecated type that later transformer releases removed (the
+  # `@opentelemetry/otlp-transformer-next` alias exists for the new line).
+  # So do not "simplify" these two selectors back into one union — the 7.x
+  # branch is load-bearing for as long as that pin lives.
   "protobufjs@<7.5.6": ">=7.5.6 <8.0.0"
   "protobufjs@>=8.0.0 <8.6.0": ">=8.6.0"
   # OpenTelemetry Prometheus exporter crash via malformed HTTP (CVE-2026-44902)
