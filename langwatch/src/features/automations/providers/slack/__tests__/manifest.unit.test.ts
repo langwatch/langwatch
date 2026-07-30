@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SLACK_APP_MANIFEST } from "../client";
 
 describe("Slack app manifest", () => {
-  describe("given the copy-paste manifest for \"Create app → From a manifest\"", () => {
+  describe('given the copy-paste manifest for "Create app → From a manifest"', () => {
     describe("when validating the manifest", () => {
       it("declares a bot_user alongside the bot oauth scopes", () => {
         expect(SLACK_APP_MANIFEST).toMatch(/scopes:\s*\n\s*bot:/);
