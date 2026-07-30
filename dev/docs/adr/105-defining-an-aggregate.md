@@ -6,6 +6,10 @@
 existing pipelines convert in the order named below, and none of them is
 rewritten by this decision.
 
+**Amended:** 2026-07-30 — see "Amendment: a process manager is one
+declaration too" below for `defineProcess`, the same rule applied to
+ADR-098's other kind of durable work.
+
 **Builds on:** ADR-098 (the projection kinds, and the delivery-identity
 sequence — a monotonic per-group sequence assigned at staging, not an
 ordering guarantee — that keeps a redelivered job from being applied twice),
@@ -353,6 +357,171 @@ Convert in this order, and for these reasons:
 Ordering rationale in one line: retire the extra mount point first because it
 blocks everything, then the folds where forgetting a version already caused
 damage, then the bulk, then the cosmetics.
+
+## Amendment: a process manager is one declaration too (2026-07-30)
+
+ADR-098 decision 1 names the process manager as the durable, at-least-once
+half of post-event work — one pure step, `evolve(previousState, input) ->
+{ state, nextWakeAt, intents }` — and gives it its own identity,
+`(processName, projectId, processKey)`. It did not give it a declaration
+shape. The `packages/event-sourcing/src/process/` builder,
+`defineProcess`, is that shape, curried the same way `defineAggregate` is
+and for the identical reason (§7's circularity argument applies unchanged:
+`State` is inferred from the state schema, `evolve` must be checked against
+it, and `.evolve()` needs both `State` and the generated intent creators
+already resolved).
+
+### An intent type is derived the same way an event type is, and for the same reason
+
+An intent's persisted discriminator is `${processName}/${key}`, built from
+the intents map's own keys — never written a second time as a parallel
+constant. The pre-existing implementation this replaces paired every
+intents map with a hand-maintained twin:
+
+```ts
+export const TRIGGER_SETTLEMENT_INTENT_TYPES = {
+  NOTIFY_DIGEST: "notifyDigest", PERSIST_MATCH: "persistMatch", ...
+} as const satisfies { readonly [K in keyof Intents]: K };
+```
+
+`satisfies` proves the twin agrees with the map at the moment both are
+written; it proves nothing about the moment either one next changes. That is
+the identical disease §"One event is declared in four places that can
+disagree" describes for events, on the outbox side instead of the log side:
+`intentType` is a column on `ProcessManagerOutbox`, read back by a
+dispatcher until the message is delivered, so a renamed map key orphans a
+row exactly the way a renamed event key orphans an `event_log` row. It gets
+the identical fix — the ratchet. `intentTypes` is a derived, exported list on
+every built process, and `aggregate/ratchet.ts`'s
+`checkTypeStringRatchet`/`mergeSnapshot` are reused unchanged: both functions
+already operate on a `{ [name: string]: string[] }` snapshot keyed by
+declaration name, so a process's name slots into the identical comparison an
+aggregate's does. No second ratchet module exists or is needed.
+
+The outbox table is shared across every process manager (a dispatcher scopes
+its lease to a set of `processNames` for exactly this reason), so qualifying
+the type string by process name is not cosmetic: two processes each naming
+an intent, say, `"notify"`, would otherwise mint the identical bare
+`intentType` into a table one dispatcher's handler map indexes by type
+alone.
+
+### A message key is a pure function of its own intent's payload, never of the clock or of a value the payload forgot to declare
+
+`messageKey: (payload) => string` is declared once, per intent, next to the
+payload schema it keys — not authored by hand at every call site the way the
+pre-existing implementation required (`ctx.intents.persistMatch("persist:...",
+{...})`, key and payload as two separate arguments a caller could let drift).
+Restricting the function's only input to `z.infer<Payload>` is not a style
+preference; it closes two shapes of bug found in the evidence this
+declaration replaces:
+
+- **A key minted from the wall clock.** `ctx.now`/`ctx.at` change on every
+  retry of the *same* logical intent, so a key built from either one never
+  collapses a redelivery — it manufactures a fresh key each time instead.
+- **A key minted from a value the process computed but never put in the
+  payload.** The evidence keyed `persistMatch` as
+  `` `persist:${traceId}:${match.settleWindowBucket}` `` while
+  `persistMatchIntentSchema` declared only `{ triggerId, traceId }` —
+  `settleWindowBucket` lived in the process's own state, not in the intent it
+  was supposedly identifying. Two evolutions that were the same logical
+  intent could therefore compute different keys and both dispatch.
+
+Typing `messageKey` as `(payload: z.infer<Payload>) => string` makes both
+mistakes fail to typecheck rather than ship: the only data the function can
+reach is the data that will be compared for equality the next time the same
+logical intent is produced, so "derived from something outside the payload"
+is not an expressible shape any more. A payload that needs a field to key on
+correctly must declare that field — which is itself a useful pressure: it
+keeps a payload's *identity* visible in its own schema instead of
+implicit in whatever the process happened to be holding when it built the
+key.
+
+### The wake contract is a discriminated variant of the process kind, not one interface with two `nextWakeAt` fields
+
+The implementation this replaces defined `nextWakeAt` twice on the same
+result interface — once required, with one doc, and once optional, with a
+different doc — to cover two situations at once: a step that computes its
+own deadline, and a step whose deadline the runtime already knows from a
+fixed interval. Overlapping optionals is the wrong shape for "exactly one of
+these two situations is ever true", the same way ADR-098 decision 6 rejects
+collapsing "absent" and "undecodable" into one reading of a missing row: two
+situations that call for different handling should not share a field whose
+presence is the only thing distinguishing them.
+
+`defineProcess` instead builds one of two process kinds, and the kind
+decides the step-result shape:
+
+- **Evolve-driven** (`.on(aggregate).evolve(fn)`): `EvolveStep` carries
+  `nextWakeAt: number | null`, REQUIRED. This kind computes its own deadline
+  on every step — a trace's settlement window, an experiment run's progress
+  timeout — so there is no fallback cadence to leave unstated. `null` clears
+  whatever was armed; a number replaces it; "leave it as it was" is spelled
+  by returning the same number back, never by omission.
+- **Fixed-interval** (`.schedule({ everyMs }).onWake(fn)`): `ScheduleStep`
+  carries no `nextWakeAt` field at all. A periodic sweep or a periodic prune
+  has no other cadence to compute — the runtime re-arms the wake from
+  `everyMs` after every firing — so the field is not optional-and-usually-
+  omitted, it does not exist on this kind's type.
+
+The two kinds are a discriminated union, `Process<Name, State, Intents,
+Events> = EvolveDrivenProcess<...> | ScheduledProcess<...>`, and the curried
+builder makes the choice structural rather than a runtime check: `.on()`
+leads only to `.evolve()`, `.schedule()` leads only to a required `.onWake()`
+with the other result shape, and there is no path that reaches both. A
+process needing both an event-driven deadline and an unrelated periodic
+sweep is two declarations, not one — the evidence already keeps its
+settlement process and its prune process separate for this reason; the new
+shape makes that separation the only representable one.
+
+### What stays exactly as declared, never rederived
+
+The id extractor is absent from `defineAggregate` for the same reason it is
+absent here: identity resolution is an application concern, not something
+the pure core owns. A process's group key — `lane: { kind: "processManager",
+name }`, `scope: { kind: "aggregate", aggregateType: name, aggregateId:
+processKey }` — is instead a small exported helper,
+`processGroupKey(process, { tenantId, processKey })`, built over ADR-100's
+existing typed descriptor rather than a new one: a process's own commit is a
+read-modify-write exactly like a fold's, so it earns the identical mutual-
+exclusion scope, and there is no separate "aggregate type" to name for a
+process the way a fold names the aggregate it folds — the entity a process
+instance is about *is* the process, so the process's own declared name fills
+that slot.
+
+### Consequences
+
+- The hand-maintained intent-type map this amendment removes is the same
+  shape ADR-105's main text measured for events: a declared string and a
+  second structure whose only job is agreeing with it. `defineProcess`
+  removes the second structure the same way `defineAggregate` removes it —
+  by never introducing one.
+- The ratchet gains a second declaration kind to protect without gaining a
+  second implementation: `checkTypeStringRatchet` and `mergeSnapshot` are
+  reused unchanged, keyed by process name instead of aggregate name.
+- A process's wake contract is now enforced by which builder path a
+  declaration takes, not by a runtime check on which fields a step result
+  happens to include. A step that forgets to state `nextWakeAt` on an
+  evolve-driven process is a compile error, not a silently-dropped deadline.
+
+### References for this amendment
+
+- `langwatch/packages/event-sourcing/src/process/process.types.ts` — the
+  intent type machinery: `IntentTypeString`, `IntentDef.messageKey`,
+  `EvolveStep`/`ScheduleStep` as a discriminated variant of the process kind.
+- `langwatch/packages/event-sourcing/src/process/defineProcess.ts` — the
+  curried builder, and the guards (name/key separator, empty intents map,
+  non-positive schedule interval) that keep a declaration routable.
+- `langwatch/packages/event-sourcing/src/process/processGroupKey.ts` — the
+  process group-key helper built over ADR-100's existing descriptor.
+- `langwatch/packages/event-sourcing/src/aggregate/ratchet.ts` — the ratchet
+  this amendment reuses unchanged for intent type strings.
+- `langwatch/src/server/event-sourcing.old/pipelines/automations/process-manager/triggerSettlementProcess.types.ts`,
+  `triggerSettlement.process.ts` — the hand-maintained intent-type map and the
+  hand-typed message keys this amendment replaces, including the
+  `settleWindowBucket`-outside-the-payload key this ADR's typed `messageKey`
+  makes inexpressible.
+- `specs/event-sourcing/process-declaration.feature` — the behaviour this
+  amendment's declaration must satisfy.
 
 ## References
 

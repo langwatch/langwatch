@@ -21,16 +21,6 @@
  * application cannot mount a projection it cannot import.
  */
 
-export {
-  defineAggregate,
-} from "./aggregate/defineAggregate";
-export type {
-  AggregateCommanded,
-  AggregateEvented,
-  AggregateNamed,
-  AggregateStated,
-  BuildOptions,
-} from "./aggregate/defineAggregate";
 export type {
   Aggregate,
   AggregateEvent,
@@ -43,37 +33,20 @@ export type {
   EventTypeString,
   EventUnion,
 } from "./aggregate/aggregate.types";
-
-export { deriveStateVersion, resolveStateVersion } from "./aggregate/stateVersion";
-export { checkTypeStringRatchet, mergeSnapshot } from "./aggregate/ratchet";
+export type {
+  AggregateCommanded,
+  AggregateEvented,
+  AggregateNamed,
+  AggregateStated,
+  BuildOptions,
+} from "./aggregate/defineAggregate";
+export { defineAggregate } from "./aggregate/defineAggregate";
 export type { RatchetViolation, TypeStringSnapshot } from "./aggregate/ratchet";
-
-export { createFoldExecutor } from "./projections/foldExecutor";
-export type {
-  FoldDelivery,
-  FoldExecutorDeps,
-  FoldOutcome,
-} from "./projections/foldExecutor";
-export { createMapExecutor } from "./projections/mapExecutor";
-export type { MapDelivery, MapExecutorDeps } from "./projections/mapExecutor";
-export { checkOrderInvariance } from "./projections/orderInvariance";
-export type { OrderInvarianceReport } from "./projections/orderInvariance";
-
-export { compileSchema, createCompiledSchemaCache, timeValidation } from "./schema/compiled";
-export type {
-  CompiledSchema,
-  CompiledSchemaCache,
-  ValidationTiming,
-} from "./schema/compiled";
-
+export { checkTypeStringRatchet, mergeSnapshot } from "./aggregate/ratchet";
 export {
-  ConfigurationError,
-  EventSourcingError,
-  MalformedGroupKeyError,
-  UndecodableStateError,
-} from "./errors";
-export type { ErrorContext } from "./errors";
-
+  deriveStateVersion,
+  resolveStateVersion,
+} from "./aggregate/stateVersion";
 export {
   escapeSegment,
   parseGroupKey,
@@ -89,19 +62,84 @@ export type {
   StatefulLaneKind,
   StatefulScope,
 } from "./dispatch/groupKey.types";
-
-export { noopMetrics } from "./ports/metrics";
+export type { ErrorContext } from "./errors";
+export {
+  ConfigurationError,
+  EventSourcingError,
+  MalformedGroupKeyError,
+  UndecodableStateError,
+} from "./errors";
+export type {
+  CollapseKind,
+  Idempotency,
+  Mount,
+  MountShape,
+  MountViolation,
+  ProjectionKind,
+  ScopeKind,
+  StoreKind,
+} from "./mount/mount.types";
+export {
+  COLLAPSE_KINDS,
+  IDEMPOTENCY_KINDS,
+  PROJECTION_KINDS,
+  SCOPE_KINDS,
+  STORE_KINDS,
+} from "./mount/mount.types";
+export type { LegalMountShape } from "./mount/validateMount";
+export { LEGAL_MOUNT_SHAPES, validateMount } from "./mount/validateMount";
 export type {
   CounterHandle,
   HistogramHandle,
   HistogramSpec,
-  Metrics,
   MetricLabels,
   MetricSpec,
+  Metrics,
 } from "./ports/metrics";
-
+export { noopMetrics } from "./ports/metrics";
 export { EVENT_SOURCING_TRACER, tracer, withSpan } from "./ports/tracing";
-
+export type {
+  ProcessEvolved,
+  ProcessEvolvedWaked,
+  ProcessIntented,
+  ProcessNamed,
+  ProcessOnEvents,
+  ProcessScheduled,
+  ProcessScheduledWaked,
+  ProcessStated,
+} from "./process/defineProcess";
+export { defineProcess } from "./process/defineProcess";
+export type {
+  EventUnionOf,
+  EvolveDrivenProcess,
+  EvolveFn,
+  EvolveStep,
+  EvolveWakeFn,
+  IntentCreators,
+  IntentData,
+  IntentDef,
+  IntentMap,
+  IntentTypeString,
+  IntentUnion,
+  Process,
+  ProcessBase,
+  ProcessContext,
+  ProcessIntent,
+  ScheduledProcess,
+  ScheduleStep,
+  ScheduleWakeFn,
+} from "./process/process.types";
+export { processGroupKey } from "./process/processGroupKey";
+export type {
+  FoldDelivery,
+  FoldExecutorDeps,
+  FoldOutcome,
+} from "./projections/foldExecutor";
+export { createFoldExecutor } from "./projections/foldExecutor";
+export type { MapDelivery, MapExecutorDeps } from "./projections/mapExecutor";
+export { createMapExecutor } from "./projections/mapExecutor";
+export type { OrderInvarianceReport } from "./projections/orderInvariance";
+export { checkOrderInvariance } from "./projections/orderInvariance";
 export type {
   AppendStore,
   BatchContext,
@@ -114,3 +152,13 @@ export type {
   StoredState,
   TenantId,
 } from "./projections/store.types";
+export type {
+  CompiledSchema,
+  CompiledSchemaCache,
+  ValidationTiming,
+} from "./schema/compiled";
+export {
+  compileSchema,
+  createCompiledSchemaCache,
+  timeValidation,
+} from "./schema/compiled";
