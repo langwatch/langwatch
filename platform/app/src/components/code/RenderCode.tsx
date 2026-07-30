@@ -8,6 +8,14 @@ import {
 } from "~/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter";
 import { toaster } from "../ui/toaster";
 
+/** A resolved highlight, tagged with the inputs it was produced from. */
+interface Highlighted {
+  code: string;
+  language: string;
+  colorMode: "light" | "dark";
+  html: string;
+}
+
 export const RenderCode = ({
   code,
   language,
@@ -39,18 +47,33 @@ export const RenderCode = ({
       });
   };
 
-  const [html, setHtml] = useState<string | null>(null);
+  const [highlighted, setHighlighted] = useState<Highlighted | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const highlight = colorMode === "dark" ? codeToHtmlDark : codeToHtml;
-    void highlight({ code, lang: language }).then((result) => {
-      if (!cancelled) setHtml(result);
+    void highlight({ code, lang: language }).then((html) => {
+      if (!cancelled) setHighlighted({ code, language, colorMode, html });
     });
     return () => {
       cancelled = true;
     };
   }, [code, language, colorMode]);
+
+  // Tagged with its inputs and compared here, rather than cleared inside the
+  // effect: highlighting is async, so on the render right after `code` changes
+  // the PREVIOUS highlight is still in state, and rendering it shows the
+  // previous snippet — visible when switching language tabs. Deriving "is this
+  // highlight still current?" from the props keeps the plain-text fallback
+  // showing the right code until the new highlight lands, with no dependence
+  // on effect or microtask ordering.
+  const html =
+    highlighted &&
+    highlighted.code === code &&
+    highlighted.language === language &&
+    highlighted.colorMode === colorMode
+      ? highlighted.html
+      : null;
 
   return (
     <Box position="relative" className="group" style={propsStyle}>
@@ -77,7 +100,7 @@ export const RenderCode = ({
           dangerouslySetInnerHTML={{ __html: html }}
         />
       ) : (
-        // Fallback while Shiki loads — plain unhighlighted text.
+        // Fallback until the highlight for THIS code resolves — plain text.
         <Box as="pre" margin={0} whiteSpace="pre-wrap">
           {code}
         </Box>
