@@ -132,7 +132,10 @@ describe("redactSlackActionParams", () => {
   });
 
   it("passes webhook params through untouched", () => {
-    const params = { slackDelivery: "webhook" as const, slackWebhook: "https://x" };
+    const params = {
+      slackDelivery: "webhook" as const,
+      slackWebhook: "https://x",
+    };
     expect(redactSlackActionParams(params)).toEqual(params);
   });
 });

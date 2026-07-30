@@ -17,12 +17,12 @@
  * @see specs/scenarios/workflow-agent-mapping.feature
  */
 
-import type React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentWorkflowEditorDrawer } from "../AgentWorkflowEditorDrawer";
 import type { ScenarioInputMappingSectionProps } from "~/components/suites/ScenarioInputMappingSection";
+import { AgentWorkflowEditorDrawer } from "../AgentWorkflowEditorDrawer";
 
 // ---------------------------------------------------------------------------
 // Dependency mocks — mirror AgentCodeEditorDrawer.integration.test.tsx
@@ -107,10 +107,15 @@ vi.mock("~/hooks/useDrawer", () => ({
 // ---------------------------------------------------------------------------
 
 vi.mock("~/components/suites/ScenarioInputMappingSection", () => ({
-  ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
+  ScenarioInputMappingSection: ({
+    inputs,
+  }: ScenarioInputMappingSectionProps) => (
     <div data-testid="scenario-mapping-section">
       {inputs.map((i) => (
-        <div key={i.identifier} data-testid={`scenario-mapping-input-${i.identifier}`}>
+        <div
+          key={i.identifier}
+          data-testid={`scenario-mapping-input-${i.identifier}`}
+        >
           {i.identifier}
         </div>
       ))}
@@ -277,7 +282,9 @@ describe("AgentWorkflowEditorDrawer", () => {
       // covers an output, so workflowInputs = [{identifier:"unwired_field"}],
       // and the section receives and renders it.
       await waitFor(() => {
-        expect(screen.getByTestId("scenario-mapping-input-unwired_field")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("scenario-mapping-input-unwired_field"),
+        ).toBeInTheDocument();
       });
     });
   });

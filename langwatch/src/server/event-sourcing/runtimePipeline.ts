@@ -16,7 +16,8 @@ export class EventSourcingPipeline<
     string,
     Projection
   >,
-> implements RegisteredPipeline<EventType, ProjectionTypes> {
+> implements RegisteredPipeline<EventType, ProjectionTypes>
+{
   public readonly name: string;
   public readonly aggregateType: AggregateType;
   public readonly service: EventSourcingService<EventType, ProjectionTypes>;

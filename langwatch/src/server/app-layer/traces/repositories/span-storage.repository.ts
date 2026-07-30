@@ -16,17 +16,52 @@ import type { SpanInsertData } from "../types";
 export const MAX_DERIVATION_SPANS = 512;
 
 /**
- * Clamps a requested span-read limit to the `[1, MAX_DERIVATION_SPANS]` range.
- * `MAX_DERIVATION_SPANS` is a hard ceiling a caller can only lower, never raise,
- * so every full-span / derivation read is bounded even for a leaked trace_id.
+ * Clamps a requested span-read limit to the `[1, max]` range (default ceiling
+ * `MAX_DERIVATION_SPANS`). The ceiling is hard — a caller can only lower it,
+ * never raise it — so every span read is bounded even for a leaked trace_id.
  * A missing or non-finite limit (undefined, NaN, Infinity) defaults to the
  * ceiling so the value never propagates into a ClickHouse `UInt32` param.
  */
-export function clampSpanReadLimit(limit?: number): number {
-  const requested = Number.isFinite(limit)
-    ? (limit as number)
-    : MAX_DERIVATION_SPANS;
-  return Math.min(Math.max(1, Math.trunc(requested)), MAX_DERIVATION_SPANS);
+export function clampSpanReadLimit(
+  limit?: number,
+  { max = MAX_DERIVATION_SPANS }: { max?: number } = {},
+): number {
+  const requested = Number.isFinite(limit) ? (limit as number) : max;
+  return Math.min(Math.max(1, Math.trunc(requested)), max);
+}
+
+/**
+ * Per-query safety ceiling for the light single-shot per-trace projections
+ * (span summaries, signal keys, resource info, trace events, summary deltas).
+ * These rows are slim — no SpanAttributes values, input/output, or Events
+ * payloads — so the ceiling is generous, but it exists because traces have
+ * been seen with 20k–100k+ spans and an unbounded read materializes every
+ * row in ClickHouse and Node at once. The complete view of huge traces is
+ * the cursor-paged span-tree read (`findSpanSummariesPage`), which never
+ * needs more than one page in memory.
+ */
+export const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
+
+/**
+ * Cursor for keyed span-summary pagination: the page starts strictly after
+ * `(startTimeMs, spanId)` in `(StartTimeMs ASC, SpanId ASC)` order. Keyed
+ * instead of offset-based so pages stay stable while spans are still being
+ * ingested, and so ClickHouse never scans-and-discards `offset` rows.
+ */
+export interface SpanSummaryPageCursor {
+  startTimeMs: number;
+  spanId: string;
+}
+
+/**
+ * One page of the keyed span-summary walk. `hasMore` is derived from an
+ * over-fetched `limit + 1`-th row, so exhaustion is known without a follow-up
+ * empty fetch — the extra fetch would both waste a round trip and (on the
+ * repository side) be indistinguishable from a missed partition hint.
+ */
+export interface SpanSummaryPage {
+  rows: SpanSummaryRow[];
+  hasMore: boolean;
 }
 
 export interface SpanSummaryRow {
@@ -36,6 +71,14 @@ export interface SpanSummaryRow {
   durationMs: number;
   statusCode: number | null;
   spanType: string | null;
+  /** Tool display name (`gen_ai.tool.name` ?? `tool_name`), tool spans only. */
+  toolName: string | null;
+  /** Claude model-call join key (`request_id`), llm_request spans only. */
+  requestId: string | null;
+  /** Claude prompt-pairing scope (`query_source`). */
+  querySource: string | null;
+  /** Tool-call join key (`tool_use_id` ?? `gen_ai.tool.call.id`). */
+  toolUseId: string | null;
   model: string | null;
   /**
    * USD cost: `gen_ai.usage.cost` when the SDK reported one, otherwise
@@ -50,6 +93,13 @@ export interface SpanSummaryRow {
   cacheReadTokens: number | null;
   cacheCreationTokens: number | null;
   startTimeMs: number;
+  /**
+   * Row version, not span timing: bumped every time a span is re-projected.
+   * The live delta poll keys off this rather than `startTimeMs`, because a
+   * span updated in place (end time, duration, status, cost) keeps its start
+   * time and a start-keyed poll could never see it.
+   */
+  updatedAtMs: number;
 }
 
 /**
@@ -98,6 +148,22 @@ export interface SpanResourceInfo {
  */
 export interface OccurredAtHint {
   occurredAtMs?: number;
+}
+
+/**
+ * Params for the claim-check resolution read (ADR-069). The partition hint is
+ * REQUIRED here, unlike the optional {@link OccurredAtHint} every other read
+ * takes: this one runs `fallback: "none"`, and a windowed read with no hint has
+ * no narrow window to accept — it runs the unbounded scan the read exists to
+ * avoid. Making the hint part of the contract keeps that promise true for the
+ * next adopter instead of relying on every caller remembering to pass one.
+ */
+export interface NormalizedSpanByIdParams {
+  tenantId: string;
+  traceId: string;
+  spanId: string;
+  /** Centre of the partition window: the SPAN'S OWN start, epoch ms. */
+  occurredAtMs: number;
 }
 
 /**
@@ -163,6 +229,14 @@ export interface SpanStorageRepository {
     } & OccurredAtHint,
   ): Promise<Span | null>;
   /**
+   * Claim-check resolution read (ADR-069): one canonical span by identity,
+   * windowed by the reference's partition hint with no unbounded fallback —
+   * a miss stays cheap because the caller retries via the queue.
+   */
+  findNormalizedSpanById(
+    params: NormalizedSpanByIdParams,
+  ): Promise<NormalizedSpan | null>;
+  /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
    * trace-detail read, derived from the spans' OTel events. Events-only
    * (ARRAY JOIN over the `Events.*` columns, no heavy span attribute scan),
@@ -196,19 +270,31 @@ export interface SpanStorageRepository {
   findSpanResourcesByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]>;
-  findSpanSummariesPaginated(
+  /**
+   * One page of span summaries in `(StartTimeMs, SpanId)` order, starting
+   * strictly after `cursor` (or from the beginning when omitted). Callers
+   * derive the next cursor from the last row when `hasMore` is set; a page
+   * with `hasMore: false` is authoritative end-of-trace.
+   */
+  findSpanSummariesPage(
     params: {
       tenantId: string;
       traceId: string;
       limit: number;
-      offset: number;
+      cursor?: SpanSummaryPageCursor;
     } & OccurredAtHint,
-  ): Promise<{ rows: SpanSummaryRow[]; total: number }>;
+  ): Promise<SpanSummaryPage>;
+  /**
+   * Spans of a trace whose row version is newer than `sinceUpdatedAtMs`.
+   * Keyed on the row version, not the span start: an in-place update (end
+   * time, duration, status, cost) keeps the span's start time, so a
+   * start-keyed poll would never observe it.
+   */
   findSpanSummariesSince(
     params: {
       tenantId: string;
       traceId: string;
-      sinceStartTimeMs: number;
+      sinceUpdatedAtMs: number;
     } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]>;
   findSpansPaginated(
@@ -274,6 +360,12 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
+  async findNormalizedSpanById(
+    _params: NormalizedSpanByIdParams,
+  ): Promise<NormalizedSpan | null> {
+    return null;
+  }
+
   async getSpanByIds(
     _params: {
       tenantId: string;
@@ -324,22 +416,22 @@ export class NullSpanStorageRepository implements SpanStorageRepository {
     return [];
   }
 
-  async findSpanSummariesPaginated(
+  async findSpanSummariesPage(
     _params: {
       tenantId: string;
       traceId: string;
       limit: number;
-      offset: number;
+      cursor?: SpanSummaryPageCursor;
     } & OccurredAtHint,
-  ): Promise<{ rows: SpanSummaryRow[]; total: number }> {
-    return { rows: [], total: 0 };
+  ): Promise<SpanSummaryPage> {
+    return { rows: [], hasMore: false };
   }
 
   async findSpanSummariesSince(
     _params: {
       tenantId: string;
       traceId: string;
-      sinceStartTimeMs: number;
+      sinceUpdatedAtMs: number;
     } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]> {
     return [];

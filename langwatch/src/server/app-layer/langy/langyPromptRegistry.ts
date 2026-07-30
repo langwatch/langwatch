@@ -1,6 +1,13 @@
 /**
  * Langy prompt registry loader.
  *
+ * WIRED for the per-turn override only. `langy-turn.service.ts` resolves the
+ * system block through `resolveLangyPrompt` when LANGY_PROMPT_PROJECT_ID names
+ * the project holding these rows; unset skips the registry entirely and the
+ * in-repo fallback is used verbatim. The `agentDefinition` handle still has no
+ * runtime consumer — the manager writes its embedded AGENTS.md — so seeding
+ * that one changes nothing yet.
+ *
  * Langy has two prompt surfaces we want stored as VERSIONED rows in LangWatch's
  * own prompt registry (`LlmPromptConfig`), rather than hardcoded:
  *
@@ -66,16 +73,34 @@ export const LANGY_PROMPT_DEFAULT_TAG = "production";
  * the loader, the seed script, and the turn service all read the exact same
  * bytes — no drift between what we seed as version 1 and what we fall back to.
  */
+/**
+ * This block is PREPENDED to the turn context, so it is read before AGENTS.md
+ * and must never contradict it. It said three things that did:
+ *
+ *   - that Langy reaches the platform "via the available MCP tools", and then
+ *     named twelve of them (`search_traces`, `get_analytics`, …). There is no
+ *     LangWatch MCP server and there never was; AGENTS.md rule 1 says the CLI is
+ *     the only interface. Naming tools that do not exist in a block the model
+ *     reads first is an instruction to hallucinate them.
+ *   - that it does not "run shell" — which is precisely how the CLI is reached.
+ *   - to report "a relevant LangWatch UI URL", which rule 9 forbids outright:
+ *     the panel renders the command's own `platformUrl` as a trusted, rewritten
+ *     card action, and a URL the model writes is a worker-side host
+ *     (`host.docker.internal`, a container port) that would not resolve.
+ *
+ * What survives is the part only this block can say — the role framing and the
+ * act-don't-narrate stance. Everything about HOW to reach the platform belongs
+ * to AGENTS.md, which is the one place that describes it correctly.
+ */
 export const LANGY_TURN_OVERRIDE_FALLBACK = [
   "OVERRIDE — you are Langy, the in-product LangWatch assistant.",
-  "You are NOT a code/repo assistant. You do not edit files, run shell, or scaffold projects.",
-  "Your only job is to read and act on the user's LangWatch project via the available MCP tools",
-  "(search_traces, get_trace, get_analytics, list_evaluators, list_prompts, list_datasets,",
-  "list_scenarios, list_agents, list_monitors, list_dashboards, list_workflows, list_triggers,",
-  "create_*, update_*, run_*).",
-  "Call tools immediately — never describe what you would do, never list your capabilities,",
-  "never ask which project, never offer 'next actions'. Pick a reasonable default, act, report",
-  "the result tersely with a relevant LangWatch UI URL when applicable.",
+  "You are NOT a general code/repo assistant: your job is to read and act on the",
+  "user's LangWatch project, using the `langwatch` CLI in your shell as described",
+  "in AGENTS.md.",
+  "Act immediately — never describe what you would do, never list your capabilities,",
+  "never ask which project, never hand the work back. Pick a reasonable default and act.",
+  "The panel renders links, names and counts as cards, so your prose never restates one:",
+  "after an action it carries what the reader might want next, or nothing at all.",
 ].join(" ");
 
 export interface ResolveLangyPromptParams {
@@ -93,16 +118,31 @@ export interface ResolveLangyPromptParams {
 
 export interface ResolvedLangyPrompt {
   text: string;
-  source: "registry" | "fallback";
+  /**
+   * Which path produced `text`:
+   *
+   *  - `registry` — a promoted row was read.
+   *  - `fallback` — a GENUINE miss: no row, or a row whose prompt is empty.
+   *    An operator demoting or deleting the row is deliberate, so the in-repo
+   *    copy is the right answer.
+   *  - `error`    — the read FAILED (Prisma timeout, connection blip). The
+   *    text is the fallback because the caller must be handed something, but
+   *    the distinction matters: a caller composing a per-conversation prefix
+   *    can hold its last good text rather than swap the model's instructions
+   *    mid-conversation over a transient failure. See
+   *    `resolveLangyTurnOverride` in `langy-turn.service.ts`.
+   */
+  source: "registry" | "fallback" | "error";
 }
 
 /**
  * Resolve a Langy prompt from the registry, falling back to the in-repo copy.
  *
  * NEVER throws. A registry hit with a non-empty `prompt` wins; anything else
- * (no row, empty prompt, read error) yields the fallback. The `source` field
- * lets callers surface which path was taken (metrics / a version label on the
- * worker's rendered AGENTS.md).
+ * (no row, empty prompt, read error) yields the fallback text, with `source`
+ * telling a miss apart from a failure so callers can treat them differently
+ * and surface which path was taken (metrics / a span attribute / a version
+ * label on the worker's rendered AGENTS.md).
  */
 export async function resolveLangyPrompt(
   params: ResolveLangyPromptParams,
@@ -129,6 +169,7 @@ export async function resolveLangyPrompt(
       { error, handle, projectId, tag },
       "langy prompt registry read failed — using in-repo fallback",
     );
+    return { text: fallback, source: "error" };
   }
   return { text: fallback, source: "fallback" };
 }

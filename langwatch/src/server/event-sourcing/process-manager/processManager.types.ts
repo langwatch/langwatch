@@ -33,10 +33,20 @@ export interface ProcessEventEnvelope {
   payload: JsonValue;
 }
 
-/** What a process consumes: a committed event, or its own due wake-up. */
+/**
+ * What a process consumes: a committed event, or its own due wake-up.
+ *
+ * BOTH variants carry `now`, the instant the input is actually being handled,
+ * alongside the instant it refers to (`scheduledFor` for a wake, the
+ * envelope's `occurredAt` for an event). They diverge whenever the fleet was
+ * down or the subscriber backed up. A definition that schedules purely from
+ * the referenced instant either replays every missed slot one commit at a
+ * time (wakes) or writes a `nextWakeAt` that is already in the past (events).
+ * Handing `now` in as data keeps `evolve` pure while letting it clamp.
+ */
 export type ProcessInput =
-  | { kind: "event"; event: ProcessEventEnvelope }
-  | { kind: "wake"; scheduledFor: number };
+  | { kind: "event"; event: ProcessEventEnvelope; now: number }
+  | { kind: "wake"; scheduledFor: number; now: number };
 
 /**
  * An effect the process intends to cause. `messageKey` is the deterministic

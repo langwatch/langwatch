@@ -1,6 +1,6 @@
 /**
  * Shared, cross-instance frameNonce dedup for the Langy relay
- * (LANGY_WORKER_REDESIGN_PLAN §0a/§0b): the intra-turn replay guard.
+ * (see `langyFrameAuth.ts` / `langyTurnRelay.ts`): the intra-turn replay guard.
  *
  * A Redis SET per (conversation, turn) records the frameNonces already seen.
  * Because it lives in Redis, any of the load-balanced web instances agrees —

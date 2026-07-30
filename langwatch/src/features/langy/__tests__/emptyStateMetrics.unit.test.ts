@@ -8,7 +8,7 @@ describe("emptyStateMetrics", () => {
       const wide = emptyStateMetrics({ variant: "sidebar", width: 900 });
 
       expect(narrow).toEqual(wide);
-      expect(narrow.markSize).toBe(34);
+      expect(narrow.markSize).toBe(40);
       expect(narrow.greetingSize).toBe(23);
     });
   });
@@ -19,22 +19,24 @@ describe("emptyStateMetrics", () => {
         expect(emptyStateMetrics({ variant: "floating", width: 340 })).toEqual(
           emptyStateMetrics({ variant: "floating", width: 200 }),
         );
-        expect(emptyStateMetrics({ variant: "floating", width: 340 }).markSize).toBe(
-          36,
-        );
+        expect(
+          emptyStateMetrics({ variant: "floating", width: 340 }).markSize,
+        ).toBe(42);
       });
     });
 
     describe("when the card is at or above the roomy width", () => {
-      it("keeps the full-width look unchanged from the previous design", () => {
+      it("clamps to the roomy anchor with the stepped-up hero mark", () => {
         const roomy = emptyStateMetrics({ variant: "floating", width: 432 });
 
-        expect(roomy.markSize).toBe(44);
+        expect(roomy.markSize).toBe(51);
         expect(roomy.greetingSize).toBe(27);
         expect(roomy.heroMarginBottom).toBe(34);
         expect(roomy.rowPaddingY).toBe(13);
         // 432 and 416 both clamp to the same roomy anchor.
-        expect(roomy).toEqual(emptyStateMetrics({ variant: "floating", width: 416 }));
+        expect(roomy).toEqual(
+          emptyStateMetrics({ variant: "floating", width: 416 }),
+        );
       });
     });
 
@@ -42,8 +44,8 @@ describe("emptyStateMetrics", () => {
       it("eases the hero between the two anchors", () => {
         const mid = emptyStateMetrics({ variant: "floating", width: 378 });
 
-        expect(mid.markSize).toBeGreaterThan(36);
-        expect(mid.markSize).toBeLessThan(44);
+        expect(mid.markSize).toBeGreaterThan(42);
+        expect(mid.markSize).toBeLessThan(51);
         expect(mid.greetingSize).toBeGreaterThanOrEqual(24);
         expect(mid.greetingSize).toBeLessThanOrEqual(27);
       });
@@ -65,8 +67,9 @@ describe("emptyStateMetrics", () => {
         // The panel resolver never yields a real width below 340, but the parent
         // seeds 432 on the server; an accidental NaN must not collapse the hero.
         expect(
-          emptyStateMetrics({ variant: "floating", width: Number.NaN }).markSize,
-        ).toBe(44);
+          emptyStateMetrics({ variant: "floating", width: Number.NaN })
+            .markSize,
+        ).toBe(51);
       });
     });
   });

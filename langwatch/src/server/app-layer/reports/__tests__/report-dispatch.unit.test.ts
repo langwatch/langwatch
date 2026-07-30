@@ -1,15 +1,15 @@
-import type { Project, Trigger } from "@prisma/client";
-import { TriggerAction, TriggerKind } from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
-import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import type {
   ReportChart,
   ReportTraceRow,
 } from "@langwatch/automations/templating/templateContext";
+import type { Project, Trigger } from "@prisma/client";
+import { TriggerAction, TriggerKind } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import {
   dispatchScheduledReport,
-  reportWindowMs,
   type ReportDispatchDeps,
+  reportWindowMs,
 } from "../report-dispatch";
 
 const HOUR_MS = 60 * 60 * 1000;

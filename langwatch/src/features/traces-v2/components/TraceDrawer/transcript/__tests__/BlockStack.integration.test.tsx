@@ -27,9 +27,7 @@ describe("BlockStack", () => {
       render(<BlockStack blocks={[block]} toolCalls={[]} />, { wrapper });
 
       expect(screen.getByText("hi")).toBeInTheDocument();
-      expect(
-        screen.getByText("Hidden additional context"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Hidden additional context")).toBeInTheDocument();
       // Collapsed: the bulky tail of the context is not rendered in full.
       expect(screen.queryByText(/UNIQUE_TAIL_TOKEN/)).not.toBeInTheDocument();
     });

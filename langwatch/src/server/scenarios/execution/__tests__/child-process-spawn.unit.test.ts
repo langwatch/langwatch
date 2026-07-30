@@ -84,7 +84,9 @@ describe("resolveChildProcessSpawn", () => {
 
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.objectContaining({
-            bundlePath: expect.stringContaining("dist/scenario-child-process.js"),
+            bundlePath: expect.stringContaining(
+              "dist/scenario-child-process.js",
+            ),
           }),
           expect.stringContaining("pre-compiled bundle"),
         );

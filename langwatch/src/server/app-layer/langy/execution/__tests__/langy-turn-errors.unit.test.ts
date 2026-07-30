@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
-
 import { handledErrorFromHerr } from "@langwatch/handled-error";
+import { describe, expect, it } from "vitest";
 import { LangyModelNotConfiguredError } from "~/server/app-layer/langy/errors";
 
 import {
   AGENT_CHAT_TIMEOUT_MS,
+  classifyLangyTurnError,
   LangyAgentAtCapacityError,
   LangyAgentErroredError,
   LangyAgentSessionLostError,
@@ -13,7 +13,6 @@ import {
   LangyGithubRepoNotAccessibleError,
   LangyWorkerRestartingError,
   LangyWorkerStoppedError,
-  classifyLangyTurnError,
   langyAgentErrorFromErrorFrame,
   langyAgentErrorFromFrame,
   serializeLangyTurnError,
@@ -101,9 +100,10 @@ describe("langyAgentErrorFromFrame", () => {
         });
 
         expect(error).toBeInstanceOf(LangyModelNotConfiguredError);
-        const serialized = JSON.parse(
-          serializeLangyTurnError(error),
-        ) as Record<string, unknown>;
+        const serialized = JSON.parse(serializeLangyTurnError(error)) as Record<
+          string,
+          unknown
+        >;
         expect(serialized.kind).toBe("langy_model_not_configured");
         // The chain persists losslessly: herr ⇄ HandledError, one model.
         expect(serialized.reasons).toEqual([
@@ -115,6 +115,8 @@ describe("langyAgentErrorFromFrame", () => {
             traceId: "0af7651916cd43dd8448eb211c80319c",
             meta: {
               http_status: 400,
+              message:
+                "no model provider configured for this organization — add a provider API key in Settings → Model Providers",
             },
           },
         ]);
@@ -135,11 +137,17 @@ describe("langyAgentErrorFromFrame", () => {
         });
 
         expect(error).toBeInstanceOf(LangyAgentErroredError);
-        const serialized = JSON.parse(
-          serializeLangyTurnError(error),
-        ) as Record<string, unknown>;
+        const serialized = JSON.parse(serializeLangyTurnError(error)) as Record<
+          string,
+          unknown
+        >;
         expect(serialized.reasons).toEqual([
-          { code: "rate_limited", kind: "rate_limited", fault: "customer" },
+          {
+            code: "rate_limited",
+            kind: "rate_limited",
+            fault: "customer",
+            meta: { message: "rate limited" },
+          },
         ]);
       });
 
@@ -243,7 +251,9 @@ describe("serializeLangyTurnError", () => {
   describe("given any classified failure", () => {
     it("never leaks the raw message onto the wire", () => {
       const serialized = serializeLangyTurnError(
-        new LangyAgentUnavailableError("manager responded 401", { status: 401 }),
+        new LangyAgentUnavailableError("manager responded 401", {
+          status: 401,
+        }),
       );
 
       expect(serialized).not.toContain("manager responded");

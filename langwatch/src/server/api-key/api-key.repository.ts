@@ -1,9 +1,4 @@
-import type {
-  ApiKey,
-  Prisma,
-  PrismaClient,
-  RoleBinding,
-} from "@prisma/client";
+import type { ApiKey, Prisma, PrismaClient, RoleBinding } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 
@@ -140,20 +135,13 @@ export class ApiKeyRepository {
     return this.prisma.apiKey.findFirst({
       where: {
         lookupId,
-        OR: [
-          { userId: null },
-          { user: { deactivatedAt: null } },
-        ],
+        OR: [{ userId: null }, { user: { deactivatedAt: null } }],
       },
       include: { roleBindings: true },
     });
   }
 
-  async findById({
-    id,
-  }: {
-    id: string;
-  }): Promise<ApiKeyWithBindings | null> {
+  async findById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.prisma.apiKey.findUnique({
       where: { id },
       include: { roleBindings: true },
@@ -179,7 +167,7 @@ export class ApiKeyRepository {
       where: {
         organizationId,
         revokedAt: null,
-        name: { notIn: HIDDEN_SYSTEM_KEY_NAMES },
+        name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
         OR: [{ userId }, { userId: null, ingestSourceType: null }],
       },
       include: {
@@ -204,7 +192,7 @@ export class ApiKeyRepository {
       where: {
         organizationId,
         revokedAt: null,
-        name: { notIn: HIDDEN_SYSTEM_KEY_NAMES },
+        name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
       },
       include: {
         roleBindings: {
@@ -236,7 +224,13 @@ export class ApiKeyRepository {
     });
   }
 
-  async upgradeHash({ id, hashedSecret }: { id: string; hashedSecret: string }): Promise<void> {
+  async upgradeHash({
+    id,
+    hashedSecret,
+  }: {
+    id: string;
+    hashedSecret: string;
+  }): Promise<void> {
     await this.prisma.apiKey.update({
       where: { id },
       data: { hashedSecret },
@@ -319,11 +313,7 @@ export class ApiKeyRepository {
     });
   }
 
-  async findProjectWithTeam({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<{
+  async findProjectWithTeam({ projectId }: { projectId: string }): Promise<{
     id: string;
     team: { id: string; organizationId: string };
   } | null> {

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frameauth"
 	"github.com/langwatch/langwatch/services/langyagent/internal/frames"
@@ -22,11 +24,11 @@ var (
 
 // RelayClient pushes a turn's signed output frames to the control-plane relay
 // (POST /api/internal/langy/relay/frames) as ONE long-lived ndjson stream — the
-// self-drive successor to holding the /chat response open (LANGY_WORKER_REDESIGN
-// §0/§0b). The manager is the SOLE signer: it SIGNS each frame with the
-// conversation's runToken (frameauth) before it leaves the process, so the relay
-// can verify possession without the secret ever crossing the wire. opencode never
-// holds the runToken and never reaches the relay.
+// self-drive successor to holding the /chat response open (see app.go and the
+// rest of adapters/controlplane). The manager is the SOLE signer: it SIGNS each
+// frame with the conversation's runToken (frameauth) before it leaves the
+// process, so the relay can verify possession without the secret ever crossing
+// the wire. opencode never holds the runToken and never reaches the relay.
 //
 // One RelayClient is shared; each turn Opens its own RelayStream (the worker holds
 // one connection per turn — the load balancer pins it, keeping frames in order).
@@ -43,7 +45,13 @@ type RelayClient struct {
 // cancel or a client disconnect aborts the push).
 func NewRelayClient(internalSecret string) *RelayClient {
 	return &RelayClient{
-		client:         &http.Client{},
+		// otelhttp injects traceparent on the stream-open request, so the
+		// control plane's connection-lifetime relay span joins the turn's
+		// trace. The CLIENT span it opens spans the whole stream — same
+		// shape as the server side.
+		client: &http.Client{
+			Transport: otelhttp.NewTransport(nil),
+		},
 		internalSecret: internalSecret,
 	}
 }

@@ -145,7 +145,9 @@ describe("given the Zod-first evaluator catalog", () => {
       render(<Catalog />);
 
       await waitFor(() =>
-        expect(screen.getByText(/Evaluator catalog \(Zod-first\)/)).toBeVisible(),
+        expect(
+          screen.getByText(/Evaluator catalog \(Zod-first\)/),
+        ).toBeVisible(),
       );
       // Defaults come straight from the Zod schema (.parse({}))
       expect(
@@ -157,9 +159,9 @@ describe("given the Zod-first evaluator catalog", () => {
       // catalog (which drives the mapping UI) classifies them as optional — not
       // required. expected_output is unique to exact_match in this showcase.
       expect(screen.getByText("expected_output · optional")).toBeVisible();
-      expect(
-        screen.getAllByText("output · optional").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText("output · optional").length).toBeGreaterThan(
+        0,
+      );
 
       await page.screenshot({
         path: "/tmp/pr4651/evaluator-catalog-zod.png",

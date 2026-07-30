@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
-	"github.com/langwatch/langwatch/services/aigateway/adapters/customertracebridge"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/app"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -34,8 +34,8 @@ func (s *stubProviders) Dispatch(_ context.Context, _ *domain.Request, _ domain.
 func (s *stubProviders) DispatchStream(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
 	return nil, nil
 }
-func (s *stubProviders) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, error) {
-	return nil, nil
+func (s *stubProviders) ListModels(_ context.Context, _ []domain.Credential) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
+	return nil, nil, nil
 }
 
 // BenchmarkRouter_ChatCompletions measures the full HTTP round-trip through

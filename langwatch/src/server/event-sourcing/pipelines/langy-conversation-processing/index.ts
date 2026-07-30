@@ -1,11 +1,7 @@
-export { createLangyConversationProcessingPipeline } from "./pipeline";
-export type { LangyConversationProcessingPipelineDeps } from "./pipeline";
-
 export {
+  AcceptAgentTurnCommand,
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,
-  RecordMessageCommand,
-  AcceptAgentTurnCommand,
   CreateConversationCommand,
   FailAgentResponseCommand,
   FailToolCallCommand,
@@ -14,31 +10,24 @@ export {
   ImportMessageCommand,
   InitiateToolCallCommand,
   RecordAgentResponseCommand,
+  RecordMessageCommand,
   RecordTurnHandoffCommand,
   SucceedToolCallCommand,
   UpdateConversationMetadataCommand,
 } from "./commands";
-
-export { langyEphemeralSignalSchema } from "./ephemeral";
 export type {
   LangyEphemeralPublisher,
   LangyEphemeralSignal,
-  LangyStatusSignal,
   LangyProgressSignal,
+  LangyStatusSignal,
 } from "./ephemeral";
+export { langyEphemeralSignalSchema } from "./ephemeral";
+export type { LangyConversationProcessingPipelineDeps } from "./pipeline";
+export { createLangyConversationProcessingPipeline } from "./pipeline";
 
 export * from "./projections";
 
-export * from "./schemas/constants";
+// Constants, shared JSON/part shapes, and event PAYLOAD schemas moved to
+// @langwatch/langy (ADR-059) — import them from the package directly. Only the
+// server-envelope event schemas remain here.
 export * from "./schemas/events";
-export {
-  langyJsonValueSchema,
-  langyMessageRoleSchema,
-  langyMessagePartSchema,
-} from "./schemas/shared";
-export type {
-  LangyJsonObject,
-  LangyJsonValue,
-  LangyMessageRole,
-  LangyMessagePart,
-} from "./schemas/shared";

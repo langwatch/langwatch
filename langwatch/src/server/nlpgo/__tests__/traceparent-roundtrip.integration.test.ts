@@ -41,10 +41,10 @@
  *   - testcontainers Redis + ClickHouse are not running
  */
 import {
+  type ChildProcess,
   execFileSync,
   execSync,
   spawn,
-  type ChildProcess,
 } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
@@ -53,16 +53,12 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceRequestCollectionService } from "~/server/app-layer/traces/trace-request-collection.service";
-import {
-  definePipeline,
-  type AggregateType,
-} from "~/server/event-sourcing";
+import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import { type AggregateType, definePipeline } from "~/server/event-sourcing";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -73,15 +69,16 @@ import {
   getTenantIdString,
 } from "~/server/event-sourcing/__tests__/integration/testHelpers";
 import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
+import { AssignTopicCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/assignTopicCommand";
+import { RecordSpanCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/recordSpanCommand";
+import { SpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection";
+import { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.store";
+import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
-import { RecordSpanCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/recordSpanCommand";
-import { AssignTopicCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/assignTopicCommand";
-import { SpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection";
-import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.store";
-import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
+import { makeQueueName } from "~/server/queues/makeQueueName";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const otlpRoot = require("@opentelemetry/otlp-transformer/build/src/generated/root");
@@ -161,7 +158,11 @@ function ensureNlpgoBinary(timeoutMs = 600_000): string {
         if (e.isDirectory()) {
           if (e.name === "node_modules" || e.name.startsWith(".")) continue;
           stack.push(full);
-        } else if (e.name.endsWith(".go") || e.name === "go.mod" || e.name === "go.sum") {
+        } else if (
+          e.name.endsWith(".go") ||
+          e.name === "go.mod" ||
+          e.name === "go.sum"
+        ) {
           try {
             const m = fs.statSync(full).mtimeMs;
             if (m > newest) newest = m;
@@ -190,15 +191,11 @@ function ensureNlpgoBinary(timeoutMs = 600_000): string {
   // dir like `.claude/worktrees/...` whose absolute path could in
   // principle contain spaces or shell metachars; binding through argv
   // sidesteps that entirely (CodeQL js/shell-command-injection-from-environment).
-  execFileSync(
-    "go",
-    ["build", "-o", NLPGO_TEST_BIN, "./cmd/service"],
-    {
-      cwd: REPO_ROOT,
-      stdio: process.env.NLPGO_TEST_LOG === "1" ? "inherit" : "pipe",
-      timeout: timeoutMs,
-    },
-  );
+  execFileSync("go", ["build", "-o", NLPGO_TEST_BIN, "./cmd/service"], {
+    cwd: REPO_ROOT,
+    stdio: process.env.NLPGO_TEST_LOG === "1" ? "inherit" : "pipe",
+    timeout: timeoutMs,
+  });
   return NLPGO_TEST_BIN;
 }
 
@@ -353,18 +350,29 @@ describe.skipIf(!shouldRun)(
       otlpDeliveries.length = 0;
       nlpgoStderrBuf = "";
 
-      // Flush Redis once so reactor-job orphans from prior runs don't
-      // log "Unknown job in global queue" noise (matches the
+      // Clear reactor-job orphans from prior runs once, so they don't log
+      // "Unknown job in global queue" noise (matches the
       // loopPrevention.reactor.integration.test.ts pattern). Wrap in
       // a one-retry helper so a transient ETIMEDOUT on a saturated CI
       // runner doesn't kill the whole suite before the test even runs.
+      //
+      // Scoped to the global queue's own keys, NOT flushdb(): flushdb empties
+      // the whole logical database, so it deleted the in-flight state of
+      // every other suite sharing it — the failure then surfaces in a file
+      // that never called flushdb.
       const redis = getTestRedisConnection();
       if (redis) {
+        const clearGlobalQueue = async () => {
+          const stale = await redis.keys(
+            `${makeQueueName("event-sourcing/jobs")}*`,
+          );
+          if (stale.length > 0) await redis.del(...stale);
+        };
         try {
-          await redis.flushall();
+          await clearGlobalQueue();
         } catch {
           await sleep(2_000);
-          await redis.flushall();
+          await clearGlobalQueue();
         }
       }
 
@@ -422,9 +430,7 @@ describe.skipIf(!shouldRun)(
                   for (const ss of rs.scopeSpans ?? []) {
                     for (const s of ss.spans ?? []) {
                       spanCount++;
-                      traceIds.add(
-                        Buffer.from(s.traceId).toString("hex"),
-                      );
+                      traceIds.add(Buffer.from(s.traceId).toString("hex"));
                       spanNames.push(s.name);
                     }
                   }
@@ -693,65 +699,63 @@ describe.skipIf(!shouldRun)(
     // (saturated runner) get a second chance before the suite is
     // declared red. A real regression — nlpgo emitting the wrong
     // trace_id — fails both attempts and surfaces normally.
-    it(
-      "every span persisted in ClickHouse shares the inbound trace_id, and at least one links back to the inbound span_id",
-      { timeout: 300_000, retry: 1 },
-      async () => {
-        const traceparent = `00-${PARENT_TRACE_ID}-${PARENT_SPAN_ID}-01`;
-        const body = makeWorkflowBody(PARENT_TRACE_ID);
+    it("every span persisted in ClickHouse shares the inbound trace_id, and at least one links back to the inbound span_id", {
+      timeout: 300_000,
+      retry: 1,
+    }, async () => {
+      const traceparent = `00-${PARENT_TRACE_ID}-${PARENT_SPAN_ID}-01`;
+      const body = makeWorkflowBody(PARENT_TRACE_ID);
 
-        const resp = await fetch(
-          `http://127.0.0.1:${NLPGO_PORT}/go/studio/execute_sync`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              traceparent,
-              "X-LangWatch-Origin": "evaluation",
-              "X-LangWatch-Causality-Depth": "0",
-            },
-            body: JSON.stringify(body),
+      const resp = await fetch(
+        `http://127.0.0.1:${NLPGO_PORT}/go/studio/execute_sync`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            traceparent,
+            "X-LangWatch-Origin": "evaluation",
+            "X-LangWatch-Causality-Depth": "0",
           },
-        );
-        const respText = await resp.text();
-        expect(resp.ok, `nlpgo response ${resp.status}: ${respText}`).toBe(
-          true,
-        );
+          body: JSON.stringify(body),
+        },
+      );
+      const respText = await resp.text();
+      expect(resp.ok, `nlpgo response ${resp.status}: ${respText}`).toBe(true);
 
-        // Poll ClickHouse for the persisted spans. Three flush windows
-        // chain here: nlpgo's BatchSpanProcessor (5s scheduled delay) +
-        // OTLP HTTP roundtrip + the event-sourcing fold/map projections.
-        // The integration shard runs this alongside other heavyweight
-        // subprocess + pipeline tests under a 4-wide vitest pool; on a
-        // saturated CI runner the chain has been observed to need well
-        // past 45s purely from scheduler contention (the spans DO land,
-        // just late). First widening (45s→120s, 90s→180s outer) absorbed
-        // most contention but still flaked at ~194s total. 240s deadline
-        // + 300s outer it() budget below absorb the long tail too. The
-        // budget widenings cannot mask a real regression because the
-        // assertions still require the spans to actually arrive under
-        // the inbound trace_id — they just give the documented async
-        // chain more wall-clock on a fully saturated CI runner.
-        //
-        // CRITICAL: we must NOT exit the loop on the first non-empty
-        // result. The studio root span ends AFTER its children, so BSP
-        // exports it in a LATER batch — children show up first, root
-        // second. If we asserted on the first non-empty snapshot, we'd
-        // see only execute_component(parent=studio_root) rows and miss
-        // the studio_root(parent=inbound) row that the assertion actually
-        // depends on. Exit only when the load-bearing row arrives.
-        const ch = getTestClickHouseClient()!;
+      // Poll ClickHouse for the persisted spans. Three flush windows
+      // chain here: nlpgo's BatchSpanProcessor (5s scheduled delay) +
+      // OTLP HTTP roundtrip + the event-sourcing fold/map projections.
+      // The integration shard runs this alongside other heavyweight
+      // subprocess + pipeline tests under a 4-wide vitest pool; on a
+      // saturated CI runner the chain has been observed to need well
+      // past 45s purely from scheduler contention (the spans DO land,
+      // just late). First widening (45s→120s, 90s→180s outer) absorbed
+      // most contention but still flaked at ~194s total. 240s deadline
+      // + 300s outer it() budget below absorb the long tail too. The
+      // budget widenings cannot mask a real regression because the
+      // assertions still require the spans to actually arrive under
+      // the inbound trace_id — they just give the documented async
+      // chain more wall-clock on a fully saturated CI runner.
+      //
+      // CRITICAL: we must NOT exit the loop on the first non-empty
+      // result. The studio root span ends AFTER its children, so BSP
+      // exports it in a LATER batch — children show up first, root
+      // second. If we asserted on the first non-empty snapshot, we'd
+      // see only execute_component(parent=studio_root) rows and miss
+      // the studio_root(parent=inbound) row that the assertion actually
+      // depends on. Exit only when the load-bearing row arrives.
+      const ch = getTestClickHouseClient()!;
 
-        interface SpanRow {
-          TraceId: string;
-          SpanId: string;
-          ParentSpanId: string | null;
-          SpanName: string;
-        }
+      interface SpanRow {
+        TraceId: string;
+        SpanId: string;
+        ParentSpanId: string | null;
+        SpanName: string;
+      }
 
-        async function fetchRows(): Promise<SpanRow[]> {
-          const result = await ch.query({
-            query: `
+      async function fetchRows(): Promise<SpanRow[]> {
+        const result = await ch.query({
+          query: `
               SELECT TraceId, SpanId, ParentSpanId, SpanName
               FROM stored_spans
               WHERE TenantId = {tenantId:String}
@@ -764,175 +768,174 @@ describe.skipIf(!shouldRun)(
                   GROUP BY TenantId, TraceId, SpanId
                 )
             `,
-            query_params: {
-              tenantId: tenantIdString,
-              traceId: PARENT_TRACE_ID,
-            },
-            format: "JSONEachRow",
-          });
-          return await result.json<SpanRow>();
-        }
+          query_params: {
+            tenantId: tenantIdString,
+            traceId: PARENT_TRACE_ID,
+          },
+          format: "JSONEachRow",
+        });
+        return await result.json<SpanRow>();
+      }
 
-        const hasLinkedSpan = (rows: SpanRow[]): boolean =>
-          rows.some(
-            (r) => (r.ParentSpanId ?? "").toLowerCase() === PARENT_SPAN_ID,
-          );
+      const hasLinkedSpan = (rows: SpanRow[]): boolean =>
+        rows.some(
+          (r) => (r.ParentSpanId ?? "").toLowerCase() === PARENT_SPAN_ID,
+        );
 
-        // Count event_log rows for the inbound trace_id. recordSpan's
-        // aggregateId IS the trace_id, so this tells us whether the
-        // command actually persisted events to the event store. Split
-        // from fetchRows on purpose: event_log empty + stored_spans
-        // empty means the command never dispatched (collection-service
-        // bug, queue-not-routing, etc.); event_log non-empty + stored_
-        // spans empty means the map projection isn't consuming
-        // (groupQueue worker not draining, projection error, etc.).
-        async function countEventLogRows(): Promise<number> {
-          const result = await ch.query({
-            query: `
+      // Count event_log rows for the inbound trace_id. recordSpan's
+      // aggregateId IS the trace_id, so this tells us whether the
+      // command actually persisted events to the event store. Split
+      // from fetchRows on purpose: event_log empty + stored_spans
+      // empty means the command never dispatched (collection-service
+      // bug, queue-not-routing, etc.); event_log non-empty + stored_
+      // spans empty means the map projection isn't consuming
+      // (groupQueue worker not draining, projection error, etc.).
+      async function countEventLogRows(): Promise<number> {
+        const result = await ch.query({
+          query: `
               SELECT count() AS n
               FROM event_log
               WHERE TenantId = {tenantId:String}
                 AND AggregateType = 'trace'
                 AND AggregateId = {traceId:String}
             `,
-            query_params: {
-              tenantId: tenantIdString,
-              traceId: PARENT_TRACE_ID,
-            },
-            format: "JSONEachRow",
-          });
-          const rs = await result.json<{ n: number | string }>();
-          return Number(rs[0]?.n ?? 0);
+          query_params: {
+            tenantId: tenantIdString,
+            traceId: PARENT_TRACE_ID,
+          },
+          format: "JSONEachRow",
+        });
+        const rs = await result.json<{ n: number | string }>();
+        return Number(rs[0]?.n ?? 0);
+      }
+
+      let rows: SpanRow[] = [];
+      let eventLogCount = 0;
+      const deadline = Date.now() + 240_000;
+      while (Date.now() < deadline) {
+        rows = await fetchRows();
+        if (rows.length > 0 && hasLinkedSpan(rows)) break;
+        await sleep(500);
+      }
+      // Capture event_log count AFTER the polling loop so the
+      // diagnostic shows the most-up-to-date pipeline state — if
+      // events landed late but projection still didn't fire, we see
+      // it.
+      try {
+        eventLogCount = await countEventLogRows();
+      } catch {
+        eventLogCount = -1;
+      }
+
+      // Build a diagnostic summary that splits the pipeline into its
+      // observable stages, so the assertion message tells us WHICH
+      // stage broke instead of a bare "expected 0 to be greater than 0".
+      const buildDiagnostic = (): string => {
+        const traceIdsSeen = new Set<string>();
+        let totalSpans = 0;
+        for (const d of otlpDeliveries) {
+          for (const t of d.traceIds) traceIdsSeen.add(t);
+          totalSpans += d.spanCount;
         }
-
-        let rows: SpanRow[] = [];
-        let eventLogCount = 0;
-        const deadline = Date.now() + 240_000;
-        while (Date.now() < deadline) {
-          rows = await fetchRows();
-          if (rows.length > 0 && hasLinkedSpan(rows)) break;
-          await sleep(500);
-        }
-        // Capture event_log count AFTER the polling loop so the
-        // diagnostic shows the most-up-to-date pipeline state — if
-        // events landed late but projection still didn't fire, we see
-        // it.
-        try {
-          eventLogCount = await countEventLogRows();
-        } catch {
-          eventLogCount = -1;
-        }
-
-        // Build a diagnostic summary that splits the pipeline into its
-        // observable stages, so the assertion message tells us WHICH
-        // stage broke instead of a bare "expected 0 to be greater than 0".
-        const buildDiagnostic = (): string => {
-          const traceIdsSeen = new Set<string>();
-          let totalSpans = 0;
-          for (const d of otlpDeliveries) {
-            for (const t of d.traceIds) traceIdsSeen.add(t);
-            totalSpans += d.spanCount;
-          }
-          const otlpForInbound = otlpDeliveries.filter((d) =>
-            d.traceIds.includes(PARENT_TRACE_ID),
-          );
-          const otherTraceIds = [...traceIdsSeen].filter(
-            (t) => t !== PARENT_TRACE_ID,
-          );
-          const totalRejected = otlpDeliveries.reduce(
-            (s, d) => s + (d.rejectedSpans ?? 0),
-            0,
-          );
-          const collectionErrors = otlpDeliveries
-            .map((d) => d.collectionErrorMessage)
-            .filter((m): m is string => !!m && m.length > 0);
-          const collectionThrows = otlpDeliveries
-            .map((d) => d.collectionThrew)
-            .filter((m): m is string => !!m);
-          const stderrTail = nlpgoStderrBuf.slice(-4000);
-          return [
-            `inbound trace_id: ${PARENT_TRACE_ID}`,
-            `OTLP requests received by fake langwatch: ${otlpDeliveries.length}`,
-            `  → carrying inbound trace_id: ${otlpForInbound.length}`,
-            `  → other trace_ids seen on the wire: ${
-              otherTraceIds.length === 0 ? "(none)" : otherTraceIds.join(", ")
-            }`,
-            `total spans across all OTLP deliveries: ${totalSpans}`,
-            `span names on the wire: ${
-              otlpDeliveries.flatMap((d) => d.spanNames).join(", ") || "(none)"
-            }`,
-            // Collection-service stage — between the wire and the event
-            // store. Non-zero rejectedSpans means the spans hit the
-            // service but were dropped/deduped/failed; collectionErrors
-            // carries the per-span reason; collectionThrows means the
-            // service crashed mid-call.
-            `collection-service rejected spans: ${totalRejected}`,
-            `collection-service errors: ${
-              collectionErrors.length === 0
-                ? "(none)"
-                : collectionErrors.join(" | ")
-            }`,
-            `collection-service threw: ${
-              collectionThrows.length === 0
-                ? "(none)"
-                : collectionThrows.join("\n---\n")
-            }`,
-            // Event store stage — between the collection service and
-            // the map projection. -1 means the diagnostic query itself
-            // threw (CH down, schema drift). Non-zero count + zero CH
-            // rows narrows the bug to the spanStorage map projection /
-            // groupQueue worker. Zero count + collection-service
-            // rejected=0 + no throw narrows the bug to the command
-            // dispatch path.
-            `event_log rows under inbound trace_id: ${eventLogCount}`,
-            `CH rows under inbound trace_id: ${rows.length}`,
-            `nlpgo stderr tail (last 4000 chars):\n${
-              stderrTail || "(empty — nlpgo logged nothing on stderr)"
-            }`,
-          ].join("\n");
-        };
-
-        // CORE ASSERTION 1 — spans landed in CH under the INBOUND trace_id.
-        // Pre-fix, this query would return zero rows because nlpgo
-        // had emitted them under a fresh trace_id.
-        expect(
-          rows.length,
-          `no spans landed in CH under the inbound trace_id ${PARENT_TRACE_ID} — ` +
-            `nlpgo either didn't emit OTLP or emitted them under a different trace_id (the 2026-05-14 bug).\n` +
-            `Pipeline diagnostic:\n${buildDiagnostic()}`,
-        ).toBeGreaterThan(0);
-
-        // CORE ASSERTION 2 — every row matches the inbound trace_id.
-        // (Defense in depth — the query filter already enforces this,
-        // but pin it as a behavioral contract anyway.)
-        for (const row of rows) {
-          expect(row.TraceId.toLowerCase()).toBe(PARENT_TRACE_ID);
-        }
-
-        // CORE ASSERTION 3 — at least one span has parent_span_id
-        // matching the inbound span_id. This is the load-bearing
-        // claim: in Studio's waterfall the eval workflow's root span
-        // renders as a child of the parent trace's root span.
-        const linkedToParent = rows.filter(
-          (r) => (r.ParentSpanId ?? "").toLowerCase() === PARENT_SPAN_ID,
+        const otlpForInbound = otlpDeliveries.filter((d) =>
+          d.traceIds.includes(PARENT_TRACE_ID),
         );
-        expect(
-          linkedToParent.length,
-          `no span has ParentSpanId == inbound ${PARENT_SPAN_ID} — ` +
-            `startStudioSpan failed to extract the W3C parent context.\n` +
-            `Spans seen in CH: ${
-              rows
-                .map(
-                  (r) =>
-                    `${r.SpanName}(span_id=${r.SpanId}, parent=${
-                      r.ParentSpanId ?? "<root>"
-                    })`,
-                )
-                .join(", ") || "(none)"
-            }\n` +
-            `Pipeline diagnostic:\n${buildDiagnostic()}`,
-        ).toBeGreaterThan(0);
-      },
-    );
+        const otherTraceIds = [...traceIdsSeen].filter(
+          (t) => t !== PARENT_TRACE_ID,
+        );
+        const totalRejected = otlpDeliveries.reduce(
+          (s, d) => s + (d.rejectedSpans ?? 0),
+          0,
+        );
+        const collectionErrors = otlpDeliveries
+          .map((d) => d.collectionErrorMessage)
+          .filter((m): m is string => !!m && m.length > 0);
+        const collectionThrows = otlpDeliveries
+          .map((d) => d.collectionThrew)
+          .filter((m): m is string => !!m);
+        const stderrTail = nlpgoStderrBuf.slice(-4000);
+        return [
+          `inbound trace_id: ${PARENT_TRACE_ID}`,
+          `OTLP requests received by fake langwatch: ${otlpDeliveries.length}`,
+          `  → carrying inbound trace_id: ${otlpForInbound.length}`,
+          `  → other trace_ids seen on the wire: ${
+            otherTraceIds.length === 0 ? "(none)" : otherTraceIds.join(", ")
+          }`,
+          `total spans across all OTLP deliveries: ${totalSpans}`,
+          `span names on the wire: ${
+            otlpDeliveries.flatMap((d) => d.spanNames).join(", ") || "(none)"
+          }`,
+          // Collection-service stage — between the wire and the event
+          // store. Non-zero rejectedSpans means the spans hit the
+          // service but were dropped/deduped/failed; collectionErrors
+          // carries the per-span reason; collectionThrows means the
+          // service crashed mid-call.
+          `collection-service rejected spans: ${totalRejected}`,
+          `collection-service errors: ${
+            collectionErrors.length === 0
+              ? "(none)"
+              : collectionErrors.join(" | ")
+          }`,
+          `collection-service threw: ${
+            collectionThrows.length === 0
+              ? "(none)"
+              : collectionThrows.join("\n---\n")
+          }`,
+          // Event store stage — between the collection service and
+          // the map projection. -1 means the diagnostic query itself
+          // threw (CH down, schema drift). Non-zero count + zero CH
+          // rows narrows the bug to the spanStorage map projection /
+          // groupQueue worker. Zero count + collection-service
+          // rejected=0 + no throw narrows the bug to the command
+          // dispatch path.
+          `event_log rows under inbound trace_id: ${eventLogCount}`,
+          `CH rows under inbound trace_id: ${rows.length}`,
+          `nlpgo stderr tail (last 4000 chars):\n${
+            stderrTail || "(empty — nlpgo logged nothing on stderr)"
+          }`,
+        ].join("\n");
+      };
+
+      // CORE ASSERTION 1 — spans landed in CH under the INBOUND trace_id.
+      // Pre-fix, this query would return zero rows because nlpgo
+      // had emitted them under a fresh trace_id.
+      expect(
+        rows.length,
+        `no spans landed in CH under the inbound trace_id ${PARENT_TRACE_ID} — ` +
+          `nlpgo either didn't emit OTLP or emitted them under a different trace_id (the 2026-05-14 bug).\n` +
+          `Pipeline diagnostic:\n${buildDiagnostic()}`,
+      ).toBeGreaterThan(0);
+
+      // CORE ASSERTION 2 — every row matches the inbound trace_id.
+      // (Defense in depth — the query filter already enforces this,
+      // but pin it as a behavioral contract anyway.)
+      for (const row of rows) {
+        expect(row.TraceId.toLowerCase()).toBe(PARENT_TRACE_ID);
+      }
+
+      // CORE ASSERTION 3 — at least one span has parent_span_id
+      // matching the inbound span_id. This is the load-bearing
+      // claim: in Studio's waterfall the eval workflow's root span
+      // renders as a child of the parent trace's root span.
+      const linkedToParent = rows.filter(
+        (r) => (r.ParentSpanId ?? "").toLowerCase() === PARENT_SPAN_ID,
+      );
+      expect(
+        linkedToParent.length,
+        `no span has ParentSpanId == inbound ${PARENT_SPAN_ID} — ` +
+          `startStudioSpan failed to extract the W3C parent context.\n` +
+          `Spans seen in CH: ${
+            rows
+              .map(
+                (r) =>
+                  `${r.SpanName}(span_id=${r.SpanId}, parent=${
+                    r.ParentSpanId ?? "<root>"
+                  })`,
+              )
+              .join(", ") || "(none)"
+          }\n` +
+          `Pipeline diagnostic:\n${buildDiagnostic()}`,
+      ).toBeGreaterThan(0);
+    });
   },
 );

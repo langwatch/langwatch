@@ -27,7 +27,7 @@
  */
 
 import type { PrismaClient } from "@prisma/client";
-import { z, type ZodRawShape } from "zod";
+import { type ZodRawShape, z } from "zod";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -51,12 +51,9 @@ type McpServerLike = {
   ): unknown;
 };
 
-import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
-import {
-  hasOrganizationPermission,
-  type Permission,
-} from "../server/api/rbac";
+import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
+import { hasOrganizationPermission, type Permission } from "../server/api/rbac";
 
 const SURFACE = "mcp" as const;
 
@@ -119,7 +116,10 @@ export function registerGovernanceMcpTools(
       return `${NEEDS_OAUTH_PREFIX}This governance MCP tool requires an OAuth-authenticated session (mint via /api/mcp/authorize). Project-apiKey-only sessions can use read tools but cannot perform writes.`;
     }
     const allowed = await hasOrganizationPermission(
-      { prisma: ctx.prisma, session: { user: { id: rctx.callerUserId } } as any },
+      {
+        prisma: ctx.prisma,
+        session: { user: { id: rctx.callerUserId } } as any,
+      },
       rctx.organizationId,
       permission,
     );
@@ -138,7 +138,10 @@ export function registerGovernanceMcpTools(
     // implicit. Only enforce permission when a userId is present.
     if (!rctx.callerUserId) return null;
     const allowed = await hasOrganizationPermission(
-      { prisma: ctx.prisma, session: { user: { id: rctx.callerUserId } } as any },
+      {
+        prisma: ctx.prisma,
+        session: { user: { id: rctx.callerUserId } } as any,
+      },
       rctx.organizationId,
       permission,
     );
@@ -151,7 +154,9 @@ export function registerGovernanceMcpTools(
   const templateService = IngestionTemplateService.create(ctx.prisma);
   const ingestionKeyService = IngestionKeyService.create(ctx.prisma);
 
-  const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
+  const text = (value: string) => ({
+    content: [{ type: "text" as const, text: value }],
+  });
   const json = (value: unknown) => text(JSON.stringify(value, null, 2));
 
   // ── IngestionTemplate ────────────────────────────────────────────────
@@ -164,7 +169,9 @@ export function registerGovernanceMcpTools(
       const r = await resolve();
       const denied = await requireRead(r, "aiTools:view");
       if (denied) return text(denied);
-      const rows = await templateService.listForUser({ organizationId: r.organizationId });
+      const rows = await templateService.listForUser({
+        organizationId: r.organizationId,
+      });
       return json(rows);
     },
   );
@@ -207,7 +214,11 @@ export function registerGovernanceMcpTools(
     "governance_ingestion_templates_create",
     "Author a new org-scoped ingestion template. The slug is auto-generated from displayName + a random suffix. Requires aiTools:manage. Mirrors POST /api/governance/ingestion-templates.",
     {
-      source_type: z.string().describe("Lowercase + underscores. Discriminator that matches an upstream emitter (e.g. 'codex_internal')."),
+      source_type: z
+        .string()
+        .describe(
+          "Lowercase + underscores. Discriminator that matches an upstream emitter (e.g. 'codex_internal').",
+        ),
       display_name: z.string(),
       description: z.string().optional(),
       icon_asset: z.string().optional(),
@@ -238,7 +249,9 @@ export function registerGovernanceMcpTools(
     "Update the ottlRules of an org-authored template. Platform rows are immutable. Requires aiTools:manage. Mirrors PATCH /api/governance/ingestion-templates/:id/ottl-rules.",
     {
       id: z.string(),
-      ottl_rules: z.string().describe("New ottlRules body. Empty string permitted."),
+      ottl_rules: z
+        .string()
+        .describe("New ottlRules body. Empty string permitted."),
     },
     async ({ id, ottl_rules }) => {
       const r = await resolve();

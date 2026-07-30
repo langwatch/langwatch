@@ -75,7 +75,7 @@ type Options struct {
 // destroy a credential and must NOT be able to create one. Anything broader here
 // would let a future change quietly hand the manager minting power.
 type CredentialRevoker interface {
-	Revoke(ctx context.Context, endpoint, apiKeyID string) error
+	Revoke(ctx context.Context, endpoint, projectID, apiKeyID string) error
 }
 
 // Pool owns the per-conversation worker registry (the former Manager). It
@@ -385,12 +385,12 @@ func (p *Pool) revokeKeyOf(w *Worker, reason string) {
 	if p.revoker == nil || w == nil || w.apiKeyID == "" {
 		return
 	}
-	apiKeyID, endpoint, conversationID := w.apiKeyID, w.langwatchEndpoint, w.conversationID
+	apiKeyID, projectID, endpoint, conversationID := w.apiKeyID, w.projectID, w.langwatchEndpoint, w.conversationID
 	go func() {
 		defer clog.HandlePanic(p.baseCtx, false)
 		ctx, cancel := context.WithTimeout(p.baseCtx, revokeTimeout)
 		defer cancel()
-		if err := p.revoker.Revoke(ctx, endpoint, apiKeyID); err != nil {
+		if err := p.revoker.Revoke(ctx, endpoint, projectID, apiKeyID); err != nil {
 			clog.Get(p.baseCtx).Warn("revoking worker session key failed — it will expire and be reaped instead",
 				zap.String("conversation", conversationID),
 				zap.String("reason", reason),
@@ -416,7 +416,7 @@ func capabilitiesFor(creds domain.Credentials) []app.Capability {
 }
 
 func (p *Pool) Acquire(ctx context.Context, conversationID string, creds domain.Credentials) (app.Worker, error) {
-	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)))
+	wantedSig := domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier)
 
 	p.mu.Lock()
 	if w, ok := p.workers[conversationID]; ok {
@@ -589,7 +589,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		}
 	}()
 
-	// Egress seam (ADR-043 / ADR-047): the enforcing guard stands up THIS
+	// Egress seam (ADR-076 / ADR-047): the enforcing guard stands up THIS
 	// worker's outbound forward proxy here and returns its loopback port (which
 	// buildWorkerEnv points HTTPS_PROXY at); it can fail the spawn closed. The
 	// observe-only / pass-through guards run no proxy (ProxyPort 0).
@@ -665,11 +665,18 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 	if p.otelRelay != nil {
 		otelToken, err = p.otelRelay.Register(otelrelay.WorkerInfo{
 			ConversationID:    conversationID,
+			ActorUserID:       creds.ActorUserID,
 			LangwatchEndpoint: creds.LangwatchEndpoint,
 			LangwatchAPIKey:   creds.LangwatchAPIKey,
 			Model:             creds.Model,
 			GatewayBaseURL:    creds.GatewayBaseURL,
 			LLMVirtualKey:     creds.LLMVirtualKey,
+			// ADR-061 mirror lane: the tier + source tenant ride the envelope.
+			// The tier is in the credential signature, so this worker's registered
+			// tier is never stale (a change respawned it).
+			MirrorTier:           creds.MirrorTier,
+			SourceOrganizationID: creds.OrganizationID,
+			SourceProjectID:      creds.ProjectID,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("register worker telemetry relay: %w", err)
@@ -877,6 +884,7 @@ func (p *Pool) spawnInner(ctx context.Context, conversationID string, creds doma
 		uid:               uid,
 		credSig:           sig,
 		apiKeyID:          creds.LangwatchAPIKeyID,
+		projectID:         creds.ProjectID,
 		langwatchEndpoint: creds.LangwatchEndpoint,
 		lastSeen:          time.Now(),
 	}, nil

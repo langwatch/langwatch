@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
   Badge,
   Box,
@@ -15,16 +14,20 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
-import { api } from "~/utils/api";
+import { useMemo } from "react";
+import { formatDuration } from "~/components/ops/shared/formatters";
+import { PhaseTimeline } from "~/components/ops/shared/PhaseTimeline";
+import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
+import { Link } from "~/components/ui/link";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
-import { Link } from "~/components/ui/link";
-import { formatDuration } from "~/components/ops/shared/formatters";
-import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
-import { PhaseTimeline } from "~/components/ops/shared/PhaseTimeline";
+import type {
+  ReplayHistoryEntry,
+  ReplayStatus,
+} from "~/server/app-layer/ops/repositories/replay.repository";
+import { api } from "~/utils/api";
 import { CowboyAnimation } from "./CowboyAnimation";
 import { parseActiveProjections } from "./parseActiveProjections";
-import type { ReplayStatus, ReplayHistoryEntry } from "~/server/app-layer/ops/repositories/replay.repository";
 
 const MESH_PULSE_CSS = `
   @keyframes meshPulse {
@@ -55,9 +58,7 @@ export function ReplayProgressContent({ runId }: { runId: string }) {
   const isRunning = isLiveRun && liveStatus?.state === "running";
 
   const stateColor = replayStateColor(
-    isLiveRun
-      ? (liveStatus?.state ?? "idle")
-      : (historyEntry?.state ?? "idle"),
+    isLiveRun ? (liveStatus?.state ?? "idle") : (historyEntry?.state ?? "idle"),
   );
 
   const progressPercent =
@@ -150,7 +151,9 @@ function LiveRunView({
 }) {
   const throughputRate = useMemo(() => {
     if (!status.startedAt || !status.eventsProcessed) return null;
-    const end = status.completedAt ? new Date(status.completedAt).getTime() : Date.now();
+    const end = status.completedAt
+      ? new Date(status.completedAt).getTime()
+      : Date.now();
     const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
@@ -195,13 +198,17 @@ function LiveRunView({
         <Stat.Root>
           <Stat.Label>Rate</Stat.Label>
           <Stat.ValueText textStyle="lg">
-            {throughputRate !== null ? `${throughputRate.toLocaleString()}/s` : "\u2014"}
+            {throughputRate !== null
+              ? `${throughputRate.toLocaleString()}/s`
+              : "\u2014"}
           </Stat.ValueText>
         </Stat.Root>
         <Stat.Root>
           <Stat.Label>Elapsed</Stat.Label>
           <Stat.ValueText textStyle="lg">
-            {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "\u2014"}
+            {status.startedAt
+              ? formatDuration(status.startedAt, status.completedAt)
+              : "\u2014"}
           </Stat.ValueText>
         </Stat.Root>
       </SimpleGrid>
@@ -235,9 +242,7 @@ function LiveRunView({
                 </Status.Root>
                 <Text textStyle="sm" fontWeight="semibold">
                   Replay{" "}
-                  {status.state === "running"
-                    ? "in progress"
-                    : status.state}
+                  {status.state === "running" ? "in progress" : status.state}
                 </Text>
                 {activeProjectionNames.length > 0 && isRunning && (
                   <Badge size="sm" variant="subtle">
@@ -285,8 +290,14 @@ function LiveRunView({
                 <Badge
                   key={name}
                   size="sm"
-                  variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
-                  colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
+                  variant={
+                    isRunning && activeProjections.has(name)
+                      ? "solid"
+                      : "subtle"
+                  }
+                  colorPalette={
+                    isRunning && activeProjections.has(name) ? "orange" : "gray"
+                  }
                 >
                   {name}
                 </Badge>
@@ -318,10 +329,7 @@ function HistoricalRunView({
   return (
     <VStack align="stretch" gap={4}>
       {/* Phase timeline — all done for completed, none for failed */}
-      <PhaseTimeline
-        currentPhase={null}
-        completedState={entry.state}
-      />
+      <PhaseTimeline currentPhase={null} completedState={entry.state} />
 
       {/* Status card */}
       <Card.Root>
@@ -373,10 +381,20 @@ function HistoricalRunView({
                 borderWidth="1px"
                 borderColor="red.200"
               >
-                <Text textStyle="xs" fontWeight="medium" color="red.500" marginBottom={1}>
+                <Text
+                  textStyle="xs"
+                  fontWeight="medium"
+                  color="red.500"
+                  marginBottom={1}
+                >
                   Error
                 </Text>
-                <Text textStyle="xs" color="red.500" whiteSpace="pre-wrap" wordBreak="break-word">
+                <Text
+                  textStyle="xs"
+                  color="red.500"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                >
                   {entry.error}
                 </Text>
               </Box>

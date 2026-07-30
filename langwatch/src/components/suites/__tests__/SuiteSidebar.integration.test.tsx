@@ -11,10 +11,10 @@
  * @see specs/features/suites/suite-sidebar-status-summary.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SimulationSuite } from "@prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SimulationSuite } from "@prisma/client";
 
 // VoiceAgentsCallout pulls project context via useOrganizationTeamProject,
 // which in turn fires tRPC queries the bare SuiteSidebar test rig doesn't
@@ -30,17 +30,15 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-import { SuiteSidebar, SUITE_SIDEBAR_COLLAPSED_KEY } from "../SuiteSidebar";
 import { NowProvider } from "../NowProvider";
+import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../SuiteSidebar";
 import { ALL_RUNS_ID } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function makeSuite(
-  overrides: Partial<SimulationSuite> = {},
-): SimulationSuite {
+function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
   return {
     id: "suite_1",
     projectId: "project_1",
@@ -97,7 +95,11 @@ describe("<SuiteSidebar/>", () => {
 
   describe("given suites exist", () => {
     const suites = [
-      makeSuite({ id: "suite_1", name: "Critical Path", slug: "critical-path" }),
+      makeSuite({
+        id: "suite_1",
+        name: "Critical Path",
+        slug: "critical-path",
+      }),
       makeSuite({ id: "suite_2", name: "Billing Edge", slug: "billing-edge" }),
       makeSuite({ id: "suite_3", name: "Quick Run", slug: "quick-run" }),
     ];
@@ -198,9 +200,7 @@ describe("<SuiteSidebar/>", () => {
           wrapper: Wrapper,
         });
 
-        expect(
-          screen.getByRole("img", { name: "Search" }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("img", { name: "Search" })).toBeInTheDocument();
       });
     });
 
@@ -250,10 +250,9 @@ describe("<SuiteSidebar/>", () => {
     ];
 
     it("does not display suite labels as tag pills", () => {
-      render(
-        <SuiteSidebar {...defaultProps} suites={suitesWithLabels} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteSidebar {...defaultProps} suites={suitesWithLabels} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.queryByText("nightly")).not.toBeInTheDocument();
       expect(screen.queryByText("regression")).not.toBeInTheDocument();
@@ -377,28 +376,24 @@ describe("<SuiteSidebar/>", () => {
 
     describe("when a suite has no run data", () => {
       it("does not display a run summary line", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+          wrapper: Wrapper,
+        });
 
         expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
       });
 
       it("does not display a status icon", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+          wrapper: Wrapper,
+        });
 
-        expect(screen.queryByTestId("status-icon-pass")).not.toBeInTheDocument();
-        expect(screen.queryByTestId("status-icon-fail")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("status-icon-pass"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("status-icon-fail"),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -460,10 +455,9 @@ describe("<SuiteSidebar/>", () => {
       const user = userEvent.setup();
       const onSelectSuite = vi.fn();
 
-      render(
-        <SuiteSidebar {...defaultProps} onSelectSuite={onSelectSuite} />,
-        { wrapper: Wrapper },
-      );
+      render(<SuiteSidebar {...defaultProps} onSelectSuite={onSelectSuite} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("All Runs"));
       expect(onSelectSuite).toHaveBeenCalledWith(ALL_RUNS_ID);
@@ -501,20 +495,19 @@ describe("<SuiteSidebar/>", () => {
   });
 
   describe("three-dot context menu", () => {
-    const suites = [
-      makeSuite({ id: "suite_1", name: "Critical Path" }),
-    ];
+    const suites = [makeSuite({ id: "suite_1", name: "Critical Path" })];
 
     describe("when hovering over a suite item", () => {
       it("shows a three-dot menu button", async () => {
         const user = userEvent.setup();
 
-        render(
-          <SuiteSidebar {...defaultProps} suites={suites} />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+          wrapper: Wrapper,
+        });
 
-        const suiteItem = screen.getByText("Critical Path").closest("[data-testid='suite-list-item']")!;
+        const suiteItem = screen
+          .getByText("Critical Path")
+          .closest("[data-testid='suite-list-item']")!;
         await user.hover(suiteItem);
 
         expect(screen.getByTestId("suite-menu-button")).toBeInTheDocument();
@@ -523,10 +516,9 @@ describe("<SuiteSidebar/>", () => {
 
     describe("when not hovering over a suite item", () => {
       it("renders the three-dot menu button in the DOM", () => {
-        render(
-          <SuiteSidebar {...defaultProps} suites={suites} />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} suites={suites} />, {
+          wrapper: Wrapper,
+        });
 
         expect(screen.getByTestId("suite-menu-button")).toBeInTheDocument();
       });
@@ -546,7 +538,9 @@ describe("<SuiteSidebar/>", () => {
           { wrapper: Wrapper },
         );
 
-        const suiteItem = screen.getByText("Critical Path").closest("[data-testid='suite-list-item']")!;
+        const suiteItem = screen
+          .getByText("Critical Path")
+          .closest("[data-testid='suite-list-item']")!;
         await user.hover(suiteItem);
 
         const menuButton = screen.getByTestId("suite-menu-button");
@@ -562,7 +556,11 @@ describe("<SuiteSidebar/>", () => {
 
   describe("when viewing the expanded sidebar (remove-redundant-suites-label)", () => {
     const suites = [
-      makeSuite({ id: "suite_1", name: "Critical Path", slug: "critical-path" }),
+      makeSuite({
+        id: "suite_1",
+        name: "Critical Path",
+        slug: "critical-path",
+      }),
       makeSuite({ id: "suite_2", name: "Billing Edge", slug: "billing-edge" }),
     ];
 
@@ -604,7 +602,11 @@ describe("<SuiteSidebar/>", () => {
 
   describe("collapsible sidebar", () => {
     const suites = [
-      makeSuite({ id: "suite_1", name: "Critical Path", slug: "critical-path" }),
+      makeSuite({
+        id: "suite_1",
+        name: "Critical Path",
+        slug: "critical-path",
+      }),
       makeSuite({ id: "suite_2", name: "Billing Edge", slug: "billing-edge" }),
     ];
 
@@ -647,7 +649,9 @@ describe("<SuiteSidebar/>", () => {
           screen.getByRole("button", { name: "Collapse sidebar" }),
         );
 
-        expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
+        expect(
+          screen.queryByPlaceholderText("Search..."),
+        ).not.toBeInTheDocument();
       });
 
       it("shows suite avatar icons", async () => {
@@ -718,9 +722,7 @@ describe("<SuiteSidebar/>", () => {
         await user.click(
           screen.getByRole("button", { name: "Collapse sidebar" }),
         );
-        await user.click(
-          screen.getByRole("button", { name: "Critical Path" }),
-        );
+        await user.click(screen.getByRole("button", { name: "Critical Path" }));
 
         expect(props.onSelectSuite).toHaveBeenCalledWith("critical-path");
       });
@@ -755,27 +757,43 @@ describe("<SuiteSidebar/>", () => {
         expect(
           screen.getByRole("button", { name: "Expand sidebar" }),
         ).toBeInTheDocument();
-        expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
+        expect(
+          screen.queryByPlaceholderText("Search..."),
+        ).not.toBeInTheDocument();
       });
     });
   });
 
   describe("given external sets with different timestamps", () => {
     const externalSets = [
-      { scenarioSetId: "oldest-set", passedCount: 3, failedCount: 2, totalCount: 5, lastRunTimestamp: 1000 },
-      { scenarioSetId: "newest-set", passedCount: 5, failedCount: 0, totalCount: 5, lastRunTimestamp: 3000 },
-      { scenarioSetId: "middle-set", passedCount: 4, failedCount: 1, totalCount: 5, lastRunTimestamp: 2000 },
+      {
+        scenarioSetId: "oldest-set",
+        passedCount: 3,
+        failedCount: 2,
+        totalCount: 5,
+        lastRunTimestamp: 1000,
+      },
+      {
+        scenarioSetId: "newest-set",
+        passedCount: 5,
+        failedCount: 0,
+        totalCount: 5,
+        lastRunTimestamp: 3000,
+      },
+      {
+        scenarioSetId: "middle-set",
+        passedCount: 4,
+        failedCount: 1,
+        totalCount: 5,
+        lastRunTimestamp: 2000,
+      },
     ];
 
     describe("when rendered in the expanded sidebar", () => {
       it("sorts external sets by most recent run first", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            externalSets={externalSets}
-          />,
-          { wrapper: Wrapper },
-        );
+        render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
+          wrapper: Wrapper,
+        });
 
         const items = screen.getAllByTestId("external-set-list-item");
         const labels = items.map((el) => el.textContent);

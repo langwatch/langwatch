@@ -38,10 +38,10 @@ import {
 import type {
   Formatter,
   NameType,
-  Payload,
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
+import { describeError } from "~/features/errors";
 import { availableFilters } from "~/server/filters/registry";
 import type { FilterField } from "~/server/filters/types";
 import { useRouter } from "~/utils/compat/next-router";
@@ -114,6 +114,21 @@ export const summaryGraphTypes: CustomGraphInput["graphType"][] = [
   "pie",
   "donnut",
 ];
+
+/**
+ * The floor a row of figures holds, in pixels.
+ *
+ * A figure is a label, a number, and — only once the comparison has arrived —
+ * a change and the previous value under it. Those last two lines appear late
+ * and are not there at all when there is nothing to compare against, so
+ * without a floor the row grows by a line the moment the data lands and
+ * shrinks again when the window changes. The floor is the tallest form of a
+ * figure, so the row is that height from the first paint and never moves.
+ *
+ * `input.height` deliberately does NOT reach here. It sizes a plotting area,
+ * and a row of figures has none: it is as tall as the type in it.
+ */
+const SUMMARY_ROW_MIN_HEIGHT = "101px";
 
 const GraphComponentMap: Partial<{
   [K in CustomGraphInput["graphType"]]: [
@@ -414,6 +429,13 @@ const CustomGraph_ = React.memo(
       { ...queryOpts, enabled: queryOpts.enabled && load },
     );
 
+    // The stale-data retry badge is a one-line `title` tooltip — a string-only
+    // slot, which is exactly what `describeError` exists for.
+    const timeseriesErrorDescription = describeError({
+      error: timeseries.error,
+      fallbackTitle: "Couldn't refresh this chart",
+    });
+
     // Monitor cards headline the value over the WHOLE period as one "full"
     // bucket, which run-weights it by construction. Averaging the daily
     // buckets instead would weigh a 1-run day the same as a 100-run day and
@@ -640,9 +662,17 @@ const CustomGraph_ = React.memo(
           currentAndPreviousData?.length === 0 ||
           (!isSummaryType && allValues.every((v) => v === 0)));
 
+      // The bar-chart placeholder stands in for a CURVE that is not there yet.
+      // A summary has no curve: it draws its own per-figure placeholders (a
+      // label and a skeletoned number for each series), so painting bars behind
+      // them stacks two different loading states on the same pixels. Every
+      // other graph type keeps it.
+      const showChartSkeleton =
+        timeseries.isLoading && input.graphType !== "summary";
+
       return (
         <Box width="full" height="full" position="relative">
-          {timeseries.isLoading && (
+          {showChartSkeleton && (
             <Box
               position="absolute"
               inset={0}
@@ -672,7 +702,7 @@ const CustomGraph_ = React.memo(
           )}
           {timeseries.error && !timeseries.data ? (
             <ChartErrorState
-              errorMessage={timeseries.error.message}
+              error={timeseries.error}
               onRetry={() => void timeseries.refetch()}
             />
           ) : (
@@ -692,7 +722,7 @@ const CustomGraph_ = React.memo(
                   }}
                   aria-label="Retry loading chart data"
                   onClick={() => void timeseries.refetch()}
-                  title={timeseries.error.message}
+                  title={timeseriesErrorDescription}
                 >
                   <Badge colorPalette="red" variant="solid" fontSize="xs">
                     Refresh failed — click to retry
@@ -761,7 +791,7 @@ const CustomGraph_ = React.memo(
         <HStack
           gap={0}
           align="start"
-          minHeight="101px"
+          minHeight={SUMMARY_ROW_MIN_HEIGHT}
           overflowX={"auto"}
           width="full"
         >

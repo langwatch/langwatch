@@ -30,8 +30,8 @@ import type {
   SimulationRunStartedEvent,
 } from "../../schemas/events";
 import {
-  SimulationRunStateFoldProjection,
   type SimulationRunStateData,
+  SimulationRunStateFoldProjection,
 } from "../simulationRunState.foldProjection";
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
@@ -44,14 +44,19 @@ function createReplacingMergeTreeStore(): FoldProjectionStore<SimulationRunState
   const rows: SimulationRunStateData[] = [];
   return {
     rows,
-    clear() { rows.length = 0; },
+    clear() {
+      rows.length = 0;
+    },
     async store(state: SimulationRunStateData): Promise<void> {
       rows.push({ ...state });
     },
-    async get(_key: string, _ctx: ProjectionStoreContext): Promise<SimulationRunStateData | null> {
+    async get(
+      _key: string,
+      _ctx: ProjectionStoreContext,
+    ): Promise<SimulationRunStateData | null> {
       if (rows.length === 0) return null;
       return rows.reduce((best, row) =>
-        row.UpdatedAt > best.UpdatedAt ? row : best
+        row.UpdatedAt > best.UpdatedAt ? row : best,
       );
     },
   };
@@ -100,7 +105,9 @@ function createStartedEvent(occurredAt = 1000): SimulationRunStartedEvent {
   };
 }
 
-function createMessageSnapshotEvent(occurredAt = 5000): SimulationMessageSnapshotEvent {
+function createMessageSnapshotEvent(
+  occurredAt = 5000,
+): SimulationMessageSnapshotEvent {
   return {
     id: "evt-snapshot",
     aggregateId: "run-1",
@@ -114,7 +121,12 @@ function createMessageSnapshotEvent(occurredAt = 5000): SimulationMessageSnapsho
       scenarioRunId: "run-1",
       messages: [
         { role: "user", content: "hello", id: "msg-1", trace_id: "trace-1" },
-        { role: "assistant", content: "hi there", id: "msg-2", trace_id: "trace-1" },
+        {
+          role: "assistant",
+          content: "hi there",
+          id: "msg-2",
+          trace_id: "trace-1",
+        },
       ],
       traceIds: ["trace-1", "trace-2"],
     },
@@ -144,7 +156,9 @@ function createFinishedEvent(occurredAt = 5200): SimulationRunFinishedEvent {
   };
 }
 
-function createErrorFinishedEvent(occurredAt = 5200): SimulationRunFinishedEvent {
+function createErrorFinishedEvent(
+  occurredAt = 5200,
+): SimulationRunFinishedEvent {
   return {
     id: "evt-finished",
     aggregateId: "run-1",
@@ -208,7 +222,7 @@ async function processFold(
   store.clear();
   for (const event of events) {
     allEventsSoFar.push(event);
-    const currentState = await store.get("run-1", ctx) ?? projection.init();
+    const currentState = (await store.get("run-1", ctx)) ?? projection.init();
 
     // Capture LastEventOccurredAt before apply
     const prevLastOccurred = currentState.LastEventOccurredAt ?? 0;
@@ -219,7 +233,9 @@ async function processFold(
     const eventOccurredAt = event.occurredAt ?? 0;
     if (eventOccurredAt > 0 && eventOccurredAt < prevLastOccurred) {
       // Re-fold from scratch in occurredAt order
-      const sorted = [...allEventsSoFar].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+      const sorted = [...allEventsSoFar].sort(
+        (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
+      );
       let refolded = projection.init();
       for (const e of sorted) {
         refolded = projection.apply(refolded, e);
@@ -259,17 +275,36 @@ describe("simulation run fold — event ordering invariants", () => {
   const store = createReplacingMergeTreeStore();
   const projection = new SimulationRunStateFoldProjection({ store });
 
-  function assertCorrectFinalState(state: SimulationRunStateData, label: string) {
+  function assertCorrectFinalState(
+    state: SimulationRunStateData,
+    label: string,
+  ) {
     expect(state.Status, `${label}: Status must be SUCCESS`).toBe("SUCCESS");
     expect(state.FinishedAt, `${label}: FinishedAt must be set`).not.toBeNull();
-    expect(state.ScenarioSetId, `${label}: ScenarioSetId must be preserved`).toBe("python-examples");
-    expect(state.BatchRunId, `${label}: BatchRunId must be preserved`).toBe("batch-1");
-    expect(state.ScenarioId, `${label}: ScenarioId must be preserved`).toBe("scenario-1");
+    expect(
+      state.ScenarioSetId,
+      `${label}: ScenarioSetId must be preserved`,
+    ).toBe("python-examples");
+    expect(state.BatchRunId, `${label}: BatchRunId must be preserved`).toBe(
+      "batch-1",
+    );
+    expect(state.ScenarioId, `${label}: ScenarioId must be preserved`).toBe(
+      "scenario-1",
+    );
     expect(state.Verdict, `${label}: Verdict must be set`).toBe("success");
     // Metrics must always be preserved regardless of ordering
-    expect(state.TotalCost, `${label}: TotalCost must be computed`).toBeGreaterThan(0);
-    expect(Object.keys(state.RoleCosts).length, `${label}: RoleCosts must have entries`).toBeGreaterThan(0);
-    expect(Object.keys(state.RoleLatencies).length, `${label}: RoleLatencies must have entries`).toBeGreaterThan(0);
+    expect(
+      state.TotalCost,
+      `${label}: TotalCost must be computed`,
+    ).toBeGreaterThan(0);
+    expect(
+      Object.keys(state.RoleCosts).length,
+      `${label}: RoleCosts must have entries`,
+    ).toBeGreaterThan(0);
+    expect(
+      Object.keys(state.RoleLatencies).length,
+      `${label}: RoleLatencies must have entries`,
+    ).toBeGreaterThan(0);
   }
 
   // --- Distinct timestamps (finished > snapshot) ---
@@ -282,13 +317,18 @@ describe("simulation run fold — event ordering invariants", () => {
       createMetricsComputedEvent("trace-2", 65100),
     ];
 
-    const allPerms = permutations(afterStarted).map(perm => [started, ...perm]);
+    const allPerms = permutations(afterStarted).map((perm) => [
+      started,
+      ...perm,
+    ]);
 
     describe(`when started is first, then ${afterStarted.length} events in all ${allPerms.length} orderings`, () => {
-      it.each(allPerms.map((perm, i) => ({
-        name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
-        perm,
-      })))("$name → final state is correct", async ({ name, perm }) => {
+      it.each(
+        allPerms.map((perm, i) => ({
+          name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
+          perm,
+        })),
+      )("$name → final state is correct", async ({ name, perm }) => {
         const state = await processFold(perm, store, projection);
         assertCorrectFinalState(state, name);
       });
@@ -307,13 +347,18 @@ describe("simulation run fold — event ordering invariants", () => {
       createMetricsComputedEvent("trace-2", 65100),
     ];
 
-    const allPerms = permutations(afterStarted).map(perm => [started, ...perm]);
+    const allPerms = permutations(afterStarted).map((perm) => [
+      started,
+      ...perm,
+    ]);
 
     describe(`when started is first, then ${afterStarted.length} events in all ${allPerms.length} orderings`, () => {
-      it.each(allPerms.map((perm, i) => ({
-        name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
-        perm,
-      })))("$name → final state is correct", async ({ name, perm }) => {
+      it.each(
+        allPerms.map((perm, i) => ({
+          name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
+          perm,
+        })),
+      )("$name → final state is correct", async ({ name, perm }) => {
         const state = await processFold(perm, store, projection);
         assertCorrectFinalState(state, name);
       });
@@ -323,35 +368,47 @@ describe("simulation run fold — event ordering invariants", () => {
   // Specific production-observed orderings
   describe("when processing in production-observed orderings", () => {
     it("started → snapshot → finished → metrics × 2 (happy path)", async () => {
-      const state = await processFold([
-        createStartedEvent(1000),
-        createMessageSnapshotEvent(5000),
-        createFinishedEvent(5000),
-        createMetricsComputedEvent("trace-1", 65000),
-        createMetricsComputedEvent("trace-2", 65100),
-      ], store, projection);
+      const state = await processFold(
+        [
+          createStartedEvent(1000),
+          createMessageSnapshotEvent(5000),
+          createFinishedEvent(5000),
+          createMetricsComputedEvent("trace-1", 65000),
+          createMetricsComputedEvent("trace-2", 65100),
+        ],
+        store,
+        projection,
+      );
       assertCorrectFinalState(state, "happy path");
     });
 
     it("started → finished → snapshot → metrics × 2 (finished before snapshot)", async () => {
-      const state = await processFold([
-        createStartedEvent(1000),
-        createFinishedEvent(5000),
-        createMessageSnapshotEvent(5000),
-        createMetricsComputedEvent("trace-1", 65000),
-        createMetricsComputedEvent("trace-2", 65100),
-      ], store, projection);
+      const state = await processFold(
+        [
+          createStartedEvent(1000),
+          createFinishedEvent(5000),
+          createMessageSnapshotEvent(5000),
+          createMetricsComputedEvent("trace-1", 65000),
+          createMetricsComputedEvent("trace-2", 65100),
+        ],
+        store,
+        projection,
+      );
       assertCorrectFinalState(state, "finished before snapshot");
     });
 
     it("started → metrics → snapshot → finished → metrics (metrics interleaved)", async () => {
-      const state = await processFold([
-        createStartedEvent(1000),
-        createMetricsComputedEvent("trace-1", 65000),
-        createMessageSnapshotEvent(5000),
-        createFinishedEvent(5000),
-        createMetricsComputedEvent("trace-2", 65100),
-      ], store, projection);
+      const state = await processFold(
+        [
+          createStartedEvent(1000),
+          createMetricsComputedEvent("trace-1", 65000),
+          createMessageSnapshotEvent(5000),
+          createFinishedEvent(5000),
+          createMetricsComputedEvent("trace-2", 65100),
+        ],
+        store,
+        projection,
+      );
       assertCorrectFinalState(state, "metrics interleaved");
     });
   });
@@ -359,16 +416,20 @@ describe("simulation run fold — event ordering invariants", () => {
   // Test with duplicate 60s-delayed metrics (ECST fires twice)
   describe("when duplicate delayed metrics arrive after finished", () => {
     it("preserves SUCCESS with all metrics applied", async () => {
-      const state = await processFold([
-        createStartedEvent(1000),
-        createMessageSnapshotEvent(5000),
-        createFinishedEvent(5000),
-        createMetricsComputedEvent("trace-1", 65000),
-        createMetricsComputedEvent("trace-2", 65100),
-        // Duplicate ECST fire
-        createMetricsComputedEvent("trace-1", 125000),
-        createMetricsComputedEvent("trace-2", 125100),
-      ], store, projection);
+      const state = await processFold(
+        [
+          createStartedEvent(1000),
+          createMessageSnapshotEvent(5000),
+          createFinishedEvent(5000),
+          createMetricsComputedEvent("trace-1", 65000),
+          createMetricsComputedEvent("trace-2", 65100),
+          // Duplicate ECST fire
+          createMetricsComputedEvent("trace-1", 125000),
+          createMetricsComputedEvent("trace-2", 125100),
+        ],
+        store,
+        projection,
+      );
       assertCorrectFinalState(state, "duplicate delayed metrics");
     });
   });
@@ -378,37 +439,56 @@ describe("simulation run fold — event ordering invariants", () => {
     it("re-folds to correct ERROR status", async () => {
       // Reproduces: queued processed → finished processed → started arrives late
       // Re-fold replays in occurredAt order: queued(500) → started(1000) → finished(5200)
-      const state = await processFold([
-        createQueuedEvent(500),
-        createErrorFinishedEvent(5200),
-        createStartedEvent(1000),  // late! triggers re-fold
-      ], store, projection);
+      const state = await processFold(
+        [
+          createQueuedEvent(500),
+          createErrorFinishedEvent(5200),
+          createStartedEvent(1000), // late! triggers re-fold
+        ],
+        store,
+        projection,
+      );
 
       expect(state.Status, "Status must be ERROR after re-fold").toBe("ERROR");
       expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
       expect(state.Verdict, "Verdict must be failure").toBe("failure");
-      expect(state.StartedAt, "StartedAt must be set from started event").not.toBeNull();
+      expect(
+        state.StartedAt,
+        "StartedAt must be set from started event",
+      ).not.toBeNull();
     });
 
     it("re-folds to correct SUCCESS status", async () => {
-      const state = await processFold([
-        createQueuedEvent(500),
-        createFinishedEvent(5200),
-        createStartedEvent(1000),  // late! triggers re-fold
-      ], store, projection);
+      const state = await processFold(
+        [
+          createQueuedEvent(500),
+          createFinishedEvent(5200),
+          createStartedEvent(1000), // late! triggers re-fold
+        ],
+        store,
+        projection,
+      );
 
-      expect(state.Status, "Status must be SUCCESS after re-fold").toBe("SUCCESS");
+      expect(state.Status, "Status must be SUCCESS after re-fold").toBe(
+        "SUCCESS",
+      );
       expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
     });
 
     it("preserves metadata from all events after re-fold", async () => {
-      const state = await processFold([
-        createQueuedEvent(500),
-        createErrorFinishedEvent(5200),
-        createStartedEvent(1000),  // late! triggers re-fold
-      ], store, projection);
+      const state = await processFold(
+        [
+          createQueuedEvent(500),
+          createErrorFinishedEvent(5200),
+          createStartedEvent(1000), // late! triggers re-fold
+        ],
+        store,
+        projection,
+      );
 
-      expect(state.Name, "Name from started should be preserved").toBe("test scenario");
+      expect(state.Name, "Name from started should be preserved").toBe(
+        "test scenario",
+      );
       expect(state.ScenarioSetId).toBe("python-examples");
     });
   });
@@ -416,11 +496,15 @@ describe("simulation run fold — event ordering invariants", () => {
   describe("when queued event arrives after finished (late delivery)", () => {
     /** @scenario "Late finish does not overwrite cancelled status" */
     it("preserves terminal status", async () => {
-      const state = await processFold([
-        createStartedEvent(1000),
-        createErrorFinishedEvent(5200),
-        createQueuedEvent(500),  // late!
-      ], store, projection);
+      const state = await processFold(
+        [
+          createStartedEvent(1000),
+          createErrorFinishedEvent(5200),
+          createQueuedEvent(500), // late!
+        ],
+        store,
+        projection,
+      );
 
       expect(state.Status, "Status must remain ERROR").toBe("ERROR");
       expect(state.FinishedAt, "FinishedAt must be set").not.toBeNull();
@@ -438,13 +522,18 @@ describe("simulation run fold — event ordering invariants", () => {
 
     const allPerms = permutations(events);
 
-    it.each(allPerms.map((perm, i) => ({
-      name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
-      perm,
-    })))("$name → final status is SUCCESS", async ({ name, perm }) => {
+    it.each(
+      allPerms.map((perm, i) => ({
+        name: `[${i}] ${perm.map(eventLabel).join(" → ")}`,
+        perm,
+      })),
+    )("$name → final status is SUCCESS", async ({ name, perm }) => {
       const state = await processFold(perm, store, projection);
       expect(state.Status, `${name}: Status must be SUCCESS`).toBe("SUCCESS");
-      expect(state.FinishedAt, `${name}: FinishedAt must be set`).not.toBeNull();
+      expect(
+        state.FinishedAt,
+        `${name}: FinishedAt must be set`,
+      ).not.toBeNull();
     });
   });
 });

@@ -1,15 +1,25 @@
-import { Heading, HStack, Text } from "@chakra-ui/react";
+import { Heading } from "@chakra-ui/react";
 import type React from "react";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { ProjectForm, type ProjectFormData } from "./ProjectForm";
 import { NEW_TEAM_VALUE } from "./projectFormValidation";
+
+/** Every list a freshly created project has to show up in right away. */
+function invalidateProjectListQueries(
+  utils: ReturnType<typeof api.useContext>,
+): void {
+  void utils.organization.getAll.invalidate();
+  void utils.limits.getUsage.invalidate();
+  void utils.team.getTeamsWithMembers.invalidate();
+  void utils.team.getTeamWithMembers.invalidate();
+  void utils.team.getTeamsWithRoleBindings.invalidate();
+}
 
 export function CreateProjectDrawer({
   open = true,
@@ -17,6 +27,7 @@ export function CreateProjectDrawer({
   navigateOnCreate = false,
   defaultTeamId,
   organizationId: organizationIdProp,
+  onCreated,
 }: {
   open?: boolean;
   onClose?: () => void;
@@ -26,11 +37,14 @@ export function CreateProjectDrawer({
    * When the user clicks "New Project" under Org B while viewing Org A, this ensures
    * the project is created in Org B instead of the current context. */
   organizationId?: string;
+  /** Fires on successful creation (before the drawer closes) so embedding
+   * surfaces without an ambient project (the CLI authorize page) can adopt
+   * the new project, e.g. select it in a picker once lists refresh. */
+  onCreated?: (result: { projectSlug: string }) => void;
 }): React.ReactElement {
   const { organization: currentOrganization } = useOrganizationTeamProject();
 
-  const effectiveOrganizationId =
-    organizationIdProp ?? currentOrganization?.id;
+  const effectiveOrganizationId = organizationIdProp ?? currentOrganization?.id;
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
   const { checkAndProceed } = useLicenseEnforcement("projects");
@@ -56,9 +70,7 @@ export function CreateProjectDrawer({
     // defaultValues seed and covers the race where useForm momentarily
     // holds the "" before the seed lands.
     const resolvedTeamId =
-      data.teamId === NEW_TEAM_VALUE
-        ? undefined
-        : data.teamId || defaultTeamId;
+      data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId || defaultTeamId;
 
     checkAndProceed(() => {
       createProject.mutate(
@@ -72,12 +84,7 @@ export function CreateProjectDrawer({
         },
         {
           onSuccess: (result) => {
-            // Invalidate queries so project appears immediately in lists
-            void queryClient.organization.getAll.invalidate();
-            void queryClient.limits.getUsage.invalidate();
-            void queryClient.team.getTeamsWithMembers.invalidate();
-            void queryClient.team.getTeamWithMembers.invalidate();
-            void queryClient.team.getTeamsWithRoleBindings.invalidate();
+            invalidateProjectListQueries(queryClient);
 
             trackEvent("project_created", {
               project_slug: result.projectSlug,
@@ -92,6 +99,8 @@ export function CreateProjectDrawer({
               meta: { closable: true },
             });
 
+            onCreated?.({ projectSlug: result.projectSlug });
+
             if (navigateOnCreate) {
               // Use hard redirect to ensure fresh data after project creation
               window.location.href = `/${result.projectSlug}`;
@@ -100,15 +109,10 @@ export function CreateProjectDrawer({
 
             handleClose();
           },
-          onError: (error) => {
-            if (isHandledByGlobalHandler(error)) return;
-            toaster.create({
-              title: "Error creating project",
-              description: error.message,
-              type: "error",
-              meta: { closable: true },
-            });
-          },
+          // No toast: `ProjectForm` renders `<HandledErrorAlert>` for this
+          // same error. A failed create is a state that is still true, not a
+          // moment that just passed, so the inline alert is the right surface
+          // — and it already carries the tips, docs link and error id.
         },
       );
     });
@@ -134,7 +138,7 @@ export function CreateProjectDrawer({
           <ProjectForm
             onSubmit={handleSubmit}
             isLoading={createProject.isLoading}
-            error={createProject.error?.message}
+            error={createProject.error}
             defaultTeamId={defaultTeamId}
             organizationId={effectiveOrganizationId}
           />

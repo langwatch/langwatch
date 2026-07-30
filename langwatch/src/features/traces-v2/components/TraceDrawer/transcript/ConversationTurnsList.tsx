@@ -3,7 +3,6 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState } from "react";
 import { LuChevronDown, LuChevronUp } from "react-icons/lu";
 import { ThreadedTurnView } from "./ThreadedTurnView";
-import { TurnView } from "./TurnView";
 import {
   type ChatLayout,
   type ConversationTurn,
@@ -53,8 +52,7 @@ export function ConversationTurnsList({
     canCollapseEarlier && !showEarlier
       ? Math.max(0, turns.length - TAIL_VISIBLE_TURNS)
       : 0;
-  const visibleTurns =
-    hiddenCount > 0 ? turns.slice(hiddenCount) : turns;
+  const visibleTurns = hiddenCount > 0 ? turns.slice(hiddenCount) : turns;
 
   // Once the user has revealed earlier turns we still want a way to collapse
   // them again — otherwise the only escape is closing and reopening the

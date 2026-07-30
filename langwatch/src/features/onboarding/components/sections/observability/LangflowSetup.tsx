@@ -1,8 +1,6 @@
 import { Accordion, Separator, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
-import { ExternalLink } from "react-feather";
-import { Link } from "../../../../../components/ui/link";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 import { CodePreview } from "./CodePreview";
 

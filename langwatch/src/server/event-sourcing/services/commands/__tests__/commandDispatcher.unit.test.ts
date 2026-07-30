@@ -12,8 +12,11 @@ import {
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
 import { ValidationError } from "../../errorHandling";
-import { processCommand } from "../commandDispatcher";
-import type { ProcessCommandParams } from "../commandDispatcher";
+import type {
+  ProcessCommandBatchParams,
+  ProcessCommandParams,
+} from "../commandDispatcher";
+import { processCommand, processCommandBatch } from "../commandDispatcher";
 
 // Mock the kill switch module
 vi.mock("../../../utils/killSwitch", () => ({
@@ -64,9 +67,7 @@ describe("processCommand", () => {
     };
   }
 
-  function createMockHandler(
-    events?: Event[],
-  ): CommandHandler<any, Event> {
+  function createMockHandler(events?: Event[]): CommandHandler<any, Event> {
     return {
       handle: vi.fn().mockResolvedValue(events ?? [makeValidEvent()]),
     };
@@ -195,9 +196,7 @@ describe("processCommand", () => {
       const params = createDefaultParams({ handler });
 
       await expect(processCommand(params)).rejects.toThrow(ValidationError);
-      await expect(processCommand(params)).rejects.toThrow(
-        /non-array value/,
-      );
+      await expect(processCommand(params)).rejects.toThrow(/non-array value/);
     });
   });
 
@@ -283,10 +282,9 @@ describe("processCommand", () => {
 
       // storeEventsFn should receive the stringified tenantId
       const expectedTenantId = createTenantId("12345");
-      expect(storeEventsFn).toHaveBeenCalledWith(
-        expect.any(Array),
-        { tenantId: expectedTenantId },
-      );
+      expect(storeEventsFn).toHaveBeenCalledWith(expect.any(Array), {
+        tenantId: expectedTenantId,
+      });
     });
 
     it("passes validated payload (not raw) to getAggregateId", async () => {
@@ -333,6 +331,311 @@ describe("processCommand", () => {
           customKey: "my-custom-key",
         }),
       );
+    });
+  });
+});
+
+// ADR-066 pillar 2 — coalesced same-command batch collapses N appends into one
+// storeEvents call. See specs/event-sourcing/producer-append-coalescing.feature.
+describe("processCommandBatch", () => {
+  const aggregateType: AggregateType = createTestAggregateType();
+  const commandType: CommandType = "lw.obs.trace.record_span";
+  const commandName = "recordSpan";
+
+  const payloadFor = (n: number): Record<string, unknown> => ({
+    tenantId: TEST_CONSTANTS.TENANT_ID_VALUE,
+    occurredAt: TEST_CONSTANTS.BASE_TIMESTAMP + n,
+    id: `agg-${n}`,
+  });
+
+  function makeValidEvent(): Event {
+    return createTestEvent(
+      TEST_CONSTANTS.AGGREGATE_ID,
+      aggregateType,
+      createTestTenantId(),
+      TEST_CONSTANTS.EVENT_TYPE_1,
+      TEST_CONSTANTS.BASE_TIMESTAMP,
+    );
+  }
+
+  // A valid event carrying an idempotency key derived from its command, so the
+  // store call can be asserted to preserve every payload's event and its key.
+  function eventWithKey(key: string): Event {
+    return { ...makeValidEvent(), idempotencyKey: key };
+  }
+
+  // Schema mock that echoes the payload as validated data, so each payload keeps
+  // its own tenantId / id through validation (unlike the single-path fixture,
+  // which returns one shared payload).
+  function createEchoCommandSchema(
+    overrides?: Partial<CommandSchema<any, CommandType>>,
+  ): CommandSchema<any, CommandType> {
+    return {
+      type: commandType,
+      validate: vi.fn().mockImplementation((p: any) => ({
+        success: true,
+        data: p,
+      })),
+      ...overrides,
+    };
+  }
+
+  function createDefaultBatchParams(
+    overrides?: Partial<ProcessCommandBatchParams<Event>>,
+  ): ProcessCommandBatchParams<Event> {
+    return {
+      payloads: [payloadFor(0)],
+      commandType,
+      commandSchema: createEchoCommandSchema(),
+      handler: {
+        handle: vi.fn(async (command: any) => [
+          eventWithKey(`k-${command.aggregateId}`),
+        ]),
+      },
+      getAggregateId: vi.fn((p: any) => p.id ?? TEST_CONSTANTS.AGGREGATE_ID),
+      storeEventsFn: vi.fn().mockResolvedValue(undefined),
+      aggregateType,
+      commandName,
+      pipelineName: "test-pipeline",
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+    mockedIsComponentDisabled.mockResolvedValue(false);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe("given several same-command payloads across aggregates", () => {
+    describe("when the batch is processed", () => {
+      /** @scenario 'many items for one aggregate become one insert' */
+      /** @scenario 'coalescing preserves every item' */
+      it("stores every payload's events in one call with idempotency keys preserved", async () => {
+        const storeEventsFn = vi.fn().mockResolvedValue(undefined);
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1), payloadFor(2)],
+          storeEventsFn,
+        });
+
+        await processCommandBatch(params);
+
+        expect(storeEventsFn).toHaveBeenCalledTimes(1);
+        const [events, context] = storeEventsFn.mock.calls[0]!;
+        expect((events as Event[]).map((e) => e.idempotencyKey)).toEqual([
+          "k-agg-0",
+          "k-agg-1",
+          "k-agg-2",
+        ]);
+        expect(context).toEqual({
+          tenantId: createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+        });
+      });
+    });
+  });
+
+  describe("given a payload that fails schema validation", () => {
+    describe("when the batch is processed", () => {
+      it("throws ValidationError and stores nothing", async () => {
+        const storeEventsFn = vi.fn();
+        const commandSchema = createEchoCommandSchema({
+          validate: vi.fn().mockImplementation((p: any) =>
+            p.id === "agg-1"
+              ? {
+                  success: false,
+                  error: {
+                    issues: [{ path: ["id"], message: "bad", code: "custom" }],
+                  },
+                }
+              : { success: true, data: p },
+          ),
+        });
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1)],
+          commandSchema,
+          storeEventsFn,
+        });
+
+        await expect(processCommandBatch(params)).rejects.toThrow(
+          ValidationError,
+        );
+        expect(storeEventsFn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the kill switch disables one payload mid-batch", () => {
+    describe("when the batch is processed", () => {
+      it("skips the disabled payload and stores the rest", async () => {
+        mockedIsComponentDisabled
+          .mockResolvedValueOnce(false)
+          .mockResolvedValueOnce(true)
+          .mockResolvedValueOnce(false);
+        const storeEventsFn = vi.fn().mockResolvedValue(undefined);
+        const handler = {
+          handle: vi.fn(async (command: any) => [
+            eventWithKey(`k-${command.aggregateId}`),
+          ]),
+        };
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1), payloadFor(2)],
+          handler,
+          storeEventsFn,
+        });
+
+        await processCommandBatch(params);
+
+        // The disabled payload never reached the handler; the batch continued.
+        expect(handler.handle).toHaveBeenCalledTimes(2);
+        const [events] = storeEventsFn.mock.calls[0]!;
+        expect((events as Event[]).map((e) => e.idempotencyKey)).toEqual([
+          "k-agg-0",
+          "k-agg-2",
+        ]);
+      });
+    });
+  });
+
+  describe("given payloads from two different tenants", () => {
+    describe("when the batch is processed", () => {
+      it("throws ValidationError before storing", async () => {
+        const storeEventsFn = vi.fn();
+        const params = createDefaultBatchParams({
+          payloads: [
+            payloadFor(0),
+            { ...payloadFor(1), tenantId: "other-tenant" },
+          ],
+          storeEventsFn,
+        });
+
+        await expect(processCommandBatch(params)).rejects.toThrow(
+          /mixes tenants/,
+        );
+        expect(storeEventsFn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a handler with post-store cleanup", () => {
+    describe("when the batch is stored", () => {
+      it("runs cleanup once per handled command", async () => {
+        const cleanupAfterStore = vi.fn().mockResolvedValue(undefined);
+        const handler = {
+          handle: vi.fn(async (command: any) => [
+            eventWithKey(`k-${command.aggregateId}`),
+          ]),
+          cleanupAfterStore,
+        };
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1)],
+          handler,
+          storeEventsFn: vi.fn().mockResolvedValue(undefined),
+        });
+
+        await processCommandBatch(params);
+
+        expect(cleanupAfterStore).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when one command's cleanup rejects", () => {
+      /** @contract 'a cleanup failure must never roll back durable events' */
+      it("still resolves, stores once, and runs the remaining cleanups", async () => {
+        const cleanupAfterStore = vi.fn(async (command: any) => {
+          if (command.aggregateId === "agg-1") {
+            throw new Error("cleanup boom");
+          }
+        });
+        const handler = {
+          handle: vi.fn(async (command: any) => [
+            eventWithKey(`k-${command.aggregateId}`),
+          ]),
+          cleanupAfterStore,
+        };
+        const storeEventsFn = vi.fn().mockResolvedValue(undefined);
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1), payloadFor(2)],
+          handler,
+          storeEventsFn,
+        });
+
+        await expect(processCommandBatch(params)).resolves.toBeUndefined();
+
+        // The durable append happened exactly once, and the failing cleanup
+        // neither rolled it back nor stopped the other commands' cleanups.
+        expect(storeEventsFn).toHaveBeenCalledTimes(1);
+        expect(cleanupAfterStore).toHaveBeenCalledTimes(3);
+        expect(
+          cleanupAfterStore.mock.calls.map(([command]) => command.aggregateId),
+        ).toEqual(["agg-0", "agg-1", "agg-2"]);
+      });
+    });
+  });
+
+  describe("given every handler returns no events", () => {
+    describe("when the batch is processed", () => {
+      it("skips the store call", async () => {
+        const storeEventsFn = vi.fn();
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1)],
+          handler: { handle: vi.fn().mockResolvedValue([]) },
+          storeEventsFn,
+        });
+
+        await processCommandBatch(params);
+
+        expect(storeEventsFn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a handler that throws on one payload", () => {
+    describe("when the batch is processed", () => {
+      it("fails the whole batch without storing", async () => {
+        const storeEventsFn = vi.fn();
+        const handler = {
+          handle: vi.fn(async (command: any) => {
+            if (command.aggregateId === "agg-1") {
+              throw new Error("handler boom");
+            }
+            return [eventWithKey(`k-${command.aggregateId}`)];
+          }),
+        };
+        const params = createDefaultBatchParams({
+          payloads: [payloadFor(0), payloadFor(1), payloadFor(2)],
+          handler,
+          storeEventsFn,
+        });
+
+        await expect(processCommandBatch(params)).rejects.toThrow(
+          "handler boom",
+        );
+        expect(storeEventsFn).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given an empty payload list", () => {
+    describe("when the batch is processed", () => {
+      it("does nothing", async () => {
+        const storeEventsFn = vi.fn();
+        const handler = { handle: vi.fn() };
+        const params = createDefaultBatchParams({
+          payloads: [],
+          handler,
+          storeEventsFn,
+        });
+
+        await processCommandBatch(params);
+
+        expect(handler.handle).not.toHaveBeenCalled();
+        expect(storeEventsFn).not.toHaveBeenCalled();
+      });
     });
   });
 });

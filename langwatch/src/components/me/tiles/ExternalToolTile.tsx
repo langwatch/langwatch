@@ -1,10 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { useState } from "react";
 
@@ -36,11 +30,7 @@ export function ExternalToolTile({
       padding={4}
       width="full"
     >
-      <HStack
-        cursor="pointer"
-        onClick={() => setExpanded(!expanded)}
-        gap={3}
-      >
+      <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
         <TileIcon
           iconAsset={iconAsset}
           iconKey={iconKey}
@@ -67,11 +57,7 @@ export function ExternalToolTile({
             <Markdown>{config.descriptionMarkdown}</Markdown>
           </Box>
           <Button size="sm" variant="outline" asChild alignSelf="start">
-            <a
-              href={config.linkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={config.linkUrl} target="_blank" rel="noopener noreferrer">
               <ExternalLink size={14} />{" "}
               {config.ctaLabel ?? `Open ${displayName}`}
             </a>

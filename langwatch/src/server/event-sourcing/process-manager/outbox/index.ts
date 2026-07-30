@@ -1,8 +1,8 @@
 export {
-  OutboxDispatcherService,
   type DispatchableMessage,
   type DispatchReport,
   type IntentHandler,
+  OutboxDispatcherService,
   type OutboxDispatcherServiceOptions,
 } from "./outboxDispatcherService";
 export {

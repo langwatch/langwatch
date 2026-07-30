@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 interface Props {
@@ -51,13 +51,11 @@ export function HomePagePicker({ organizationId }: Props) {
       void utils.user.homePagePickerState.invalidate({ organizationId });
       void utils.governance.resolveHome.invalidate({ organizationId });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Could not save home preference",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't save your home preference",
+      }),
   });
 
   const options = useMemo<PickerOption[]>(() => {
@@ -125,9 +123,7 @@ export function HomePagePicker({ organizationId }: Props) {
             <Box
               key={opt.value}
               borderWidth="1px"
-              borderColor={
-                selected === opt.value ? "blue.400" : "border.muted"
-              }
+              borderColor={selected === opt.value ? "blue.400" : "border.muted"}
               borderRadius="md"
               padding={3}
               backgroundColor={

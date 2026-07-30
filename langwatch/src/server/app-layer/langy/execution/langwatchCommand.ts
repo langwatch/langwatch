@@ -125,9 +125,20 @@ function tokenize(command: string): string[] {
   return tokens;
 }
 
-/** `langwatch`, `./bin/langwatch`, `/opt/homebrew/bin/langwatch`. */
+/**
+ * `langwatch`, `./bin/langwatch`, `/opt/homebrew/bin/langwatch` — and `lw`,
+ * which the package ships as a second bin and the CLI's own help calls "the
+ * advertised name". Recognising only the long spelling meant every `lw <noun>
+ * <verb>` the agent ran stayed an anonymous `bash` frame: no rename, no card,
+ * no digest.
+ */
 function isLangwatchProgram(token: string): boolean {
-  return token === "langwatch" || token.endsWith("/langwatch");
+  return (
+    token === "langwatch" ||
+    token === "lw" ||
+    token.endsWith("/langwatch") ||
+    token.endsWith("/lw")
+  );
 }
 
 /**
@@ -150,6 +161,17 @@ function isInCommandPosition(tokens: string[], index: number): boolean {
 function isFlagToken(token: string): boolean {
   return token.startsWith("-") && token.length > 1 && !/^-\d/.test(token);
 }
+
+/**
+ * Root-position global flags that consume the token after them.
+ *
+ * Only these, and only for skipping past the globals to find the resource. The
+ * CLI's other globals (`--agent`, and `--json`, whose field list is optional)
+ * are treated as boolean here: mistaking a boolean for a value-taker swallows
+ * the resource, whereas the reverse merely leaves the command unrecognised —
+ * which is what happens today anyway.
+ */
+const VALUE_TAKING_GLOBAL_FLAGS = new Set(["--output", "-o", "--jq"]);
 
 /**
  * The invocation's flags and positionals, from the tokens after the verb up to
@@ -189,7 +211,11 @@ function parseArgs(tokens: string[], from: number): Record<string, unknown> {
       continue;
     }
     const next = tokens[i + 1];
-    if (next !== undefined && !COMMAND_SEPARATORS.has(next) && !isFlagToken(next)) {
+    if (
+      next !== undefined &&
+      !COMMAND_SEPARATORS.has(next) &&
+      !isFlagToken(next)
+    ) {
       put(name, next);
       i++;
     } else {
@@ -209,7 +235,9 @@ function parseArgs(tokens: string[], from: number): Record<string, unknown> {
  * docs integration/python`. Those carry no capability, so the caller leaves the
  * frame as the shell call it was.
  */
-export function parseLangwatchCommand(command: string): LangwatchCommand | null {
+export function parseLangwatchCommand(
+  command: string,
+): LangwatchCommand | null {
   if (typeof command !== "string" || !command.trim()) return null;
 
   const tokens = tokenize(command);
@@ -217,11 +245,94 @@ export function parseLangwatchCommand(command: string): LangwatchCommand | null 
     if (!isLangwatchProgram(tokens[i]!)) continue;
     if (!isInCommandPosition(tokens, i)) continue;
 
-    const resource = tokens[i + 1];
-    const verb = tokens[i + 2];
+    // Skip root-position global flags before the resource. `lw --output json
+    // monitor list` is the spelling the CLI's own help text teaches (the root's
+    // copies are what render under "Global Options:"), and reading `--output`
+    // as the resource failed the identifier test and threw away the whole
+    // command rather than the flag.
+    //
+    // Which flags take a value is read from a list rather than guessed from
+    // "the next token is not a flag": guessing swallows the resource whenever a
+    // BOOLEAN global precedes it (`lw --agent monitor list` would read `list`
+    // as the resource and find no verb).
+    let at = i + 1;
+    while (at < tokens.length && isFlagToken(tokens[at]!)) {
+      const flag = tokens[at]!;
+      const name = flag.includes("=") ? flag.slice(0, flag.indexOf("=")) : flag;
+      const takesValue =
+        !flag.includes("=") && VALUE_TAKING_GLOBAL_FLAGS.has(name);
+      const next = tokens[at + 1];
+      at +=
+        takesValue &&
+        next !== undefined &&
+        !isFlagToken(next) &&
+        !COMMAND_SEPARATORS.has(next)
+          ? 2
+          : 1;
+    }
+
+    const resource = tokens[at];
+    const verb = tokens[at + 1];
     if (!resource || !verb) return null;
     if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
-    return { resource, verb, args: parseArgs(tokens, i + 3) };
+    return { resource, verb, args: parseArgs(tokens, at + 2) };
   }
   return null;
+}
+
+/**
+ * Every `langwatch <resource> <verb>` invocation in the command, in order — a
+ * compound command (`langwatch simulation-run get X && langwatch navigate
+ * open X`) carries several. Same command-position rules as
+ * {@link parseLangwatchCommand}, which stays "the first one". Quoted text is a
+ * single token to the tokenizer, so `echo "langwatch navigate open x"` yields
+ * nothing.
+ */
+export function parseAllLangwatchCommands(command: string): LangwatchCommand[] {
+  if (typeof command !== "string" || !command.trim()) return [];
+
+  const tokens = tokenize(command);
+  const found: LangwatchCommand[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (!isLangwatchProgram(tokens[i]!)) continue;
+    if (!isInCommandPosition(tokens, i)) continue;
+
+    const resource = tokens[i + 1];
+    const verb = tokens[i + 2];
+    if (!resource || !verb) continue;
+    if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) continue;
+    found.push({ resource, verb, args: parseArgs(tokens, i + 3) });
+  }
+  return found;
+}
+
+/**
+ * Shell syntax that lets a command's stdout carry text the CLI never printed:
+ * separators/pipes chaining a second command, redirection swallowing or
+ * replacing output, command/process substitution, and backslash trickery.
+ * Quotes don't matter here — this is a provenance check, not a parser, and a
+ * metacharacter INSIDE quotes is harmless to reject: the only cost of a false
+ * positive is that the result's platform link is not trusted.
+ */
+const OUTPUT_FORGING_SYNTAX = /[;|&<>`$\\\n()]/;
+
+/**
+ * True when `command` is ONE plain `langwatch` invocation and nothing else —
+ * no chaining, piping, redirection, or substitution anywhere in the string.
+ *
+ * This is the provenance gate for trusting the call's stdout as the CLI's own
+ * output (and therefore the platform API's): a compound command
+ * (`langwatch trace get x; echo '{…forged…}'`) parses as a langwatch call but
+ * its stdout is agent-authored. Callers that CACHE facts read from stdout
+ * (`platformUrl` → a navigation target) must require this; callers that only
+ * render stdout back to the same user (cards) need not.
+ */
+export function isSoleLangwatchInvocation(command: string): boolean {
+  if (typeof command !== "string" || !command.trim()) return false;
+  if (OUTPUT_FORGING_SYNTAX.test(command)) return false;
+
+  const tokens = tokenize(command);
+  const programIndex = tokens.findIndex((token) => isLangwatchProgram(token));
+  if (programIndex === -1) return false;
+  return isInCommandPosition(tokens, programIndex);
 }

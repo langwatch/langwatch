@@ -27,8 +27,8 @@
  *     npx tsx scripts/better-auth-smoketest.ts
  */
 
-import { hash } from "bcrypt";
 import { PrismaClient } from "@prisma/client";
+import { hash } from "bcrypt";
 import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
 const check = (label: string, condition: boolean, detail?: string): void => {
@@ -46,7 +46,9 @@ const SMOKETEST_USER_ID = "smoketest_user_1";
 const DEACTIVATED_USER_ID = "smoketest_deactivated";
 const DEACTIVATED_EMAIL = "deactivated@example.com";
 
-const parseSetCookie = (header: string | null): Record<string, string | boolean> => {
+const parseSetCookie = (
+  header: string | null,
+): Record<string, string | boolean> => {
   if (!header) return {};
   const parts = header.split(";").map((p) => p.trim());
   const result: Record<string, string | boolean> = {};
@@ -146,7 +148,10 @@ async function main() {
     !!parsedCookie["better-auth.session_token"],
   );
   check("HttpOnly flag", !!parsedCookie.httponly);
-  check("SameSite=Lax flag", parsedCookie.samesite === "Lax" || parsedCookie.samesite === "lax");
+  check(
+    "SameSite=Lax flag",
+    parsedCookie.samesite === "Lax" || parsedCookie.samesite === "lax",
+  );
   check(
     "Path=/ flag",
     parsedCookie.path === "/" || parsedCookie.path === "/" + "",
@@ -250,10 +255,7 @@ async function main() {
       sessionResult?.user.id === SMOKETEST_USER_ID,
       `got ${sessionResult?.user.id}`,
     );
-    check(
-      "user.email matches",
-      sessionResult?.user.email === SMOKETEST_EMAIL,
-    );
+    check("user.email matches", sessionResult?.user.email === SMOKETEST_EMAIL);
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -287,7 +289,11 @@ async function main() {
       headers: signOutHeaders,
       asResponse: true,
     });
-    check("signOut HTTP 200", signOutRes.status === 200, `got ${signOutRes.status}`);
+    check(
+      "signOut HTTP 200",
+      signOutRes.status === 200,
+      `got ${signOutRes.status}`,
+    );
     const clearCookie = signOutRes.headers.get("set-cookie");
     const parsedClear = parseSetCookie(clearCookie);
     const clearedToken = parsedClear["better-auth.session_token"];
@@ -302,7 +308,9 @@ async function main() {
   // ADMIN IMPERSONATION COMPAT via Session.impersonating
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[8] Admin impersonation compat via Session.impersonating JSON");
+  console.log(
+    "\n[8] Admin impersonation compat via Session.impersonating JSON",
+  );
   // Create a real impersonation target user. The compat layer in
   // iter 14 now verifies the target still exists + isn't deactivated,
   // so we need a real user in the DB (not a fake id).
@@ -352,10 +360,7 @@ async function main() {
       headers: { cookie: impCookie.split(";")[0] ?? "" },
     } as any;
     const adminSession = await getServerAuthSession({ req: fakeReq });
-    check(
-      "getServerAuthSession returned non-null",
-      !!adminSession,
-    );
+    check("getServerAuthSession returned non-null", !!adminSession);
     check(
       "user.id is the impersonated target",
       adminSession?.user.id === IMP_TARGET_ID,
@@ -414,7 +419,9 @@ async function main() {
   // LEGACY BCRYPT HASH COMPAT (on-prem upgrade path)
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[10] Legacy bcrypt hash (cost 10) from NextAuth still verifies");
+  console.log(
+    "\n[10] Legacy bcrypt hash (cost 10) from NextAuth still verifies",
+  );
   // Pre-computed bcrypt hash for "legacy-password-from-2024" with cost 10.
   // This simulates a user whose password was originally hashed by the old
   // NextAuth credentials provider using `hash(password, 10)` — we want
@@ -464,11 +471,7 @@ async function main() {
     },
     asResponse: true,
   });
-  check(
-    "signUp HTTP 200",
-    signUpRes.status === 200,
-    `got ${signUpRes.status}`,
-  );
+  check("signUp HTTP 200", signUpRes.status === 200, `got ${signUpRes.status}`);
   const newUser = await prisma.user.findUnique({
     where: { email: "newuser@example.com" },
   });
@@ -478,10 +481,7 @@ async function main() {
       where: { userId: newUser.id, provider: "credential" },
     });
     check("credential Account row created", !!newAccount);
-    check(
-      "credential Account has password hash",
-      !!newAccount?.password,
-    );
+    check("credential Account has password hash", !!newAccount?.password);
   }
 
   // NOTE: Rate limiting is NOT verifiable from this smoketest. BetterAuth's
@@ -494,7 +494,9 @@ async function main() {
   // [12] tRPC user.register flow (used by /auth/signup page)
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[12] tRPC user.register creates User + credential Account in a transaction");
+  console.log(
+    "\n[12] tRPC user.register creates User + credential Account in a transaction",
+  );
   await prisma.user.deleteMany({ where: { email: "trpc@example.com" } });
   // Simulate the tRPC register mutation by replicating its logic.
   // (We can't easily instantiate the full tRPC context in this script.)
@@ -534,7 +536,9 @@ async function main() {
   // [13] changePassword via Account row update
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[13] changePassword updates Account.password (not User.password)");
+  console.log(
+    "\n[13] changePassword updates Account.password (not User.password)",
+  );
   const newPassword = "new-password-after-change";
   const newPasswordHash = await hash(newPassword, 10);
   // Simulate the tRPC changePassword mutation logic
@@ -575,7 +579,9 @@ async function main() {
   // [14] UserService.create (used by SCIM webhook) still works
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[14] UserService.create still creates a User without password column");
+  console.log(
+    "\n[14] UserService.create still creates a User without password column",
+  );
   await prisma.user.deleteMany({ where: { email: "scim@example.com" } });
   // SCIM webhook path: creates a User with just name + email, no Account
   const scimUser = await prisma.user.create({
@@ -593,10 +599,14 @@ async function main() {
 
   console.log("\n[cleanup extra] Removing additional smoketest data...");
   await prisma.session.deleteMany({
-    where: { user: { email: { in: ["trpc@example.com", "scim@example.com"] } } },
+    where: {
+      user: { email: { in: ["trpc@example.com", "scim@example.com"] } },
+    },
   });
   await prisma.account.deleteMany({
-    where: { user: { email: { in: ["trpc@example.com", "scim@example.com"] } } },
+    where: {
+      user: { email: { in: ["trpc@example.com", "scim@example.com"] } },
+    },
   });
   await prisma.user.deleteMany({
     where: { email: { in: ["trpc@example.com", "scim@example.com"] } },
@@ -610,7 +620,9 @@ async function main() {
   // [9.5] Compat layer rejects impersonation of deleted target
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[9.5] Impersonation target deleted after start → fall back to admin");
+  console.log(
+    "\n[9.5] Impersonation target deleted after start → fall back to admin",
+  );
   if (freshSession && impCookie) {
     // Write a valid (non-expired) impersonation payload for a nonexistent user.
     await prisma.session.update({

@@ -2,11 +2,11 @@
 
 import { TriggerAction, TriggerKind } from "@prisma/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
 import { settleWindowBucket } from "~/server/event-sourcing/pipelines/automations/settleWindow";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
-import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
 import { createTraceAlertTriggerMatchHandler } from "../traceAlertTriggerMatch.subscriber";
@@ -181,12 +181,11 @@ describe("trace alert trigger match subscriber", () => {
 
         const idempotencyKeys = await Promise.all(
           [firstPayload, secondPayload].map(async (payload) => {
-            const [producedEvent] = await new RecordTriggerMatchCommand().handle(
-              {
+            const [producedEvent] =
+              await new RecordTriggerMatchCommand().handle({
                 tenantId: payload.tenantId,
                 data: payload,
-              } as never,
-            );
+              } as never);
             return producedEvent!.idempotencyKey;
           }),
         );

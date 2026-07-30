@@ -96,19 +96,23 @@ Feature: Trace search projection DSL
   # Validation — unknown and invalid paths
   # ==========================================================================
 
-  Scenario: Unknown select path returns 400
+  # A body that parses and then fails the schema is 422, not 400 — the shared
+  # request-validation contract, and the offending path is named in a structured
+  # reason rather than a sentence. See specs/features/domain-error-contract.feature.
+
+  Scenario: Unknown select path returns 422
     When I POST /api/traces/search with from "traces" and select ["trace_id", "nonexistent_field"]
-    Then the response status is 400
-    And the error message identifies "nonexistent_field" as an invalid path
+    Then the response status is 422
+    And a reason identifies "nonexistent_field" as an invalid path
 
-  Scenario: Unknown from entity returns 400
+  Scenario: Unknown from entity returns 422
     When I POST /api/traces/search with from "sessions" and select ["trace_id"]
-    Then the response status is 400
-    And the error message identifies "sessions" as an unsupported entity
+    Then the response status is 422
+    And a reason identifies "sessions" as an unsupported entity
 
-  Scenario: Empty select array returns 400
+  Scenario: Empty select array returns 422
     When I POST /api/traces/search with from "traces" and select []
-    Then the response status is 400
+    Then the response status is 422
 
   Scenario: Select without from defaults to the traces entity root
     When I POST /api/traces/search with select ["trace_id"] and no from field
@@ -211,10 +215,11 @@ Feature: Trace search projection DSL
     Then no modified trace is missed across pages
     And a trace modified again mid-pagination may reappear on a later page rather than being dropped
 
-  Scenario: Invalid dateField value returns 400
+  Scenario: Invalid dateField value returns 422
     When I POST /api/traces/search with dateField "created"
-    Then the response status is 400
-    And the error identifies "created" as an unsupported date axis
+    Then the response status is 422
+    And a reason identifies "created" as an unsupported date axis
+    And the permitted axes ride in that reason's meta.expected
 
   # ==========================================================================
   # Existing filters — unchanged

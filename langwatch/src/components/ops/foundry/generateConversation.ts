@@ -1,5 +1,5 @@
-import { shortId } from "./types";
 import type { ChatMessage, SpanConfig, TraceConfig } from "./types";
+import { shortId } from "./types";
 
 export interface ConversationOptions {
   turnCount: number;

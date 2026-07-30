@@ -46,7 +46,11 @@ let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;
 let summaryRepo: TraceSummaryClickHouseRepository;
 
-const baseMs = new Date("2026-06-15T12:00:00.000Z").getTime();
+// Minute-aligned "yesterday", never a fixed calendar date: inserts are stamped
+// with PLATFORM_DEFAULT_RETENTION_DAYS (49) and the table TTL-deletes rows
+// `_retention_days` after OccurredAt, so a fixed date eventually ages past the
+// horizon and the fixtures silently vanish before the reads.
+const baseMs = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
 
 function makeAnalyticsRow(
   overrides: Partial<TraceAnalyticsRow> = {},
@@ -79,6 +83,14 @@ function makeAnalyticsRow(
     reasoningTokens: null,
     hasError: false,
     hasAnnotation: null,
+    spanCount: 1,
+    annotationIds: [],
+    rootSpanStartTimeMs: 0,
+    traceNameFromFallback: false,
+    rootMetadataFromFallback: false,
+    traceNameUserOverridden: false,
+    lastEventOccurredAt: baseMs,
+    earliestSpanStartMs: baseMs,
     attributes: {},
     ...overrides,
   };
@@ -348,6 +360,10 @@ describe("trace_analytics slim fold (integration)", () => {
         subTopicId: state.subTopicId,
         traceName: state.traceName,
         models: state.models,
+        // The trace-summary state has no anchor of its own — the slim fold
+        // freezes it on the first contribution — so mirror the summary's
+        // occurred-at, which for this in-order fixture is the same instant.
+        storageAnchorMs: state.occurredAt,
         occurredAt: state.occurredAt,
         totalDurationMs: state.totalDurationMs,
         totalCost: state.totalCost,

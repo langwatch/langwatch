@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,
   type ResourceLimits,
 } from "../ResourceLimitsDisplay";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 
 /**
  * Pure unit tests for ResourceLimitsDisplay mapping functions.

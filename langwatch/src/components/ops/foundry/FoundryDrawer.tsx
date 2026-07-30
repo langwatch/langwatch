@@ -1,15 +1,25 @@
-import { useEffect, useRef, useState } from "react";
-import { Box, Flex, Text, Button, HStack, VStack, Input, Heading, Spacer } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Play, RotateCcw } from "lucide-react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useDrawer } from "~/hooks/useDrawer";
+import { useEffect, useRef, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
-import { useTraceStore } from "./traceStore";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useExecutionStore } from "./executionStore";
-import { usePresetStore } from "./presetStore";
 import { useFoundryProjectStore } from "./foundryProjectStore";
-import { SPAN_TYPE_ICONS, type SpanConfig } from "./types";
+import { usePresetStore } from "./presetStore";
 import { getFoundryExecutor } from "./traceExecutor";
+import { useTraceStore } from "./traceStore";
+import { SPAN_TYPE_ICONS, type SpanConfig } from "./types";
 
 export function FoundryDrawer() {
   const { project } = useOrganizationTeamProject();
@@ -22,7 +32,8 @@ export function FoundryDrawer() {
   const selectedSpanId = useTraceStore((s) => s.selectedSpanId);
   const selectSpan = useTraceStore((s) => s.selectSpan);
   const updateSpan = useTraceStore((s) => s.updateSpan);
-  const { running, setRunning, addLogEntry, updateLogEntry } = useExecutionStore();
+  const { running, setRunning, addLogEntry, updateLogEntry } =
+    useExecutionStore();
   const { builtIn } = usePresetStore();
   const [showPresets, setShowPresets] = useState(!trace.spans.length);
   const [lastTraceId, setLastTraceId] = useState<string | null>(null);
@@ -31,7 +42,11 @@ export function FoundryDrawer() {
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      )
+        return;
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
         sendRef.current?.click();
@@ -49,7 +64,12 @@ export function FoundryDrawer() {
     if (running || !apiKey) return;
     setRunning(true);
     const logId = `log-${Date.now()}`;
-    addLogEntry({ id: logId, traceId: logId, timestamp: Date.now(), status: "pending" });
+    addLogEntry({
+      id: logId,
+      traceId: logId,
+      timestamp: Date.now(),
+      status: "pending",
+    });
     const executor = getFoundryExecutor({
       apiKey,
       endpoint: window.location.origin,
@@ -62,7 +82,10 @@ export function FoundryDrawer() {
       setLastTraceId(traceId);
       setCopied(false);
     } catch (err) {
-      updateLogEntry(logId, { status: "error", error: err instanceof Error ? err.message : "Failed" });
+      updateLogEntry(logId, {
+        status: "error",
+        error: err instanceof Error ? err.message : "Failed",
+      });
     } finally {
       setRunning(false);
     }
@@ -72,7 +95,12 @@ export function FoundryDrawer() {
   const selectedSpan = selectedSpanId ? findSpan(spans, selectedSpanId) : null;
 
   return (
-    <Drawer.Root open={true} placement="end" size="md" onOpenChange={() => closeDrawer()}>
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="md"
+      onOpenChange={() => closeDrawer()}
+    >
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <HStack width="full">
@@ -109,10 +137,16 @@ export function FoundryDrawer() {
                     }}
                   >
                     <VStack align="start" gap={0}>
-                      <Text fontSize="sm" fontWeight="medium">{preset.name}</Text>
-                      <Text fontSize="xs" color="fg.muted" lineClamp={1}>{preset.description}</Text>
+                      <Text fontSize="sm" fontWeight="medium">
+                        {preset.name}
+                      </Text>
+                      <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+                        {preset.description}
+                      </Text>
                     </VStack>
-                    <Text fontSize="xs" color="fg.muted">{countSpans(preset.config.spans)} spans</Text>
+                    <Text fontSize="xs" color="fg.muted">
+                      {countSpans(preset.config.spans)} spans
+                    </Text>
                   </Flex>
                 ))}
               </VStack>
@@ -120,34 +154,70 @@ export function FoundryDrawer() {
               <>
                 <Box flex={1} overflow="auto" p={3}>
                   <HStack justify="space-between" mb={2}>
-                    <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" color="fg.muted">
+                    <Text
+                      fontSize="xs"
+                      fontWeight="medium"
+                      textTransform="uppercase"
+                      color="fg.muted"
+                    >
                       Spans ({countSpans(spans)})
                     </Text>
-                    <Button size="2xs" variant="ghost" onClick={() => setShowPresets(true)}>
+                    <Button
+                      size="2xs"
+                      variant="ghost"
+                      onClick={() => setShowPresets(true)}
+                    >
                       Change preset
                     </Button>
                   </HStack>
                   {spans.map((span) => (
-                    <CompactSpanNode key={span.id} span={span} depth={0} selectedId={selectedSpanId} onSelect={selectSpan} />
+                    <CompactSpanNode
+                      key={span.id}
+                      span={span}
+                      depth={0}
+                      selectedId={selectedSpanId}
+                      onSelect={selectSpan}
+                    />
                   ))}
 
                   {selectedSpan && (
-                    <Box mt={3} p={3} rounded="md" border="1px solid" borderColor="border" bg="bg.subtle">
-                      <Text fontSize="xs" fontWeight="medium" color="fg.muted" mb={2}>
+                    <Box
+                      mt={3}
+                      p={3}
+                      rounded="md"
+                      border="1px solid"
+                      borderColor="border"
+                      bg="bg.subtle"
+                    >
+                      <Text
+                        fontSize="xs"
+                        fontWeight="medium"
+                        color="fg.muted"
+                        mb={2}
+                      >
                         {SPAN_TYPE_ICONS[selectedSpan.type]} {selectedSpan.name}
                       </Text>
                       {selectedSpan.type === "llm" &&
                         selectedSpan.llm?.messages?.map((msg, i) => (
                           <Box key={i} mb={1}>
-                            <Text fontSize="10px" color="fg.muted" mb={0.5}>{msg.role}</Text>
+                            <Text fontSize="10px" color="fg.muted" mb={0.5}>
+                              {msg.role}
+                            </Text>
                             <Input
                               size="sm"
                               fontSize="xs"
                               value={msg.content}
                               onChange={(e) => {
-                                const msgs = [...(selectedSpan.llm?.messages ?? [])];
-                                msgs[i] = { ...msgs[i]!, content: e.target.value };
-                                updateSpan(selectedSpan.id, { llm: { ...selectedSpan.llm, messages: msgs } });
+                                const msgs = [
+                                  ...(selectedSpan.llm?.messages ?? []),
+                                ];
+                                msgs[i] = {
+                                  ...msgs[i]!,
+                                  content: e.target.value,
+                                };
+                                updateSpan(selectedSpan.id, {
+                                  llm: { ...selectedSpan.llm, messages: msgs },
+                                });
                               }}
                             />
                           </Box>
@@ -157,15 +227,28 @@ export function FoundryDrawer() {
                           size="sm"
                           fontSize="xs"
                           placeholder="Input..."
-                          value={selectedSpan.input?.type === "text" ? (selectedSpan.input.value as string) : ""}
-                          onChange={(e) => updateSpan(selectedSpan.id, { input: { type: "text", value: e.target.value } })}
+                          value={
+                            selectedSpan.input?.type === "text"
+                              ? (selectedSpan.input.value as string)
+                              : ""
+                          }
+                          onChange={(e) =>
+                            updateSpan(selectedSpan.id, {
+                              input: { type: "text", value: e.target.value },
+                            })
+                          }
                         />
                       )}
                     </Box>
                   )}
                 </Box>
 
-                <Box p={3} borderTop="1px solid" borderColor="border" bg="bg.subtle">
+                <Box
+                  p={3}
+                  borderTop="1px solid"
+                  borderColor="border"
+                  bg="bg.subtle"
+                >
                   <HStack gap={2}>
                     <Button
                       ref={sendRef}
@@ -179,7 +262,12 @@ export function FoundryDrawer() {
                     >
                       <Play size={14} /> Send Trace
                     </Button>
-                    <Button size="sm" variant="outline" onClick={resetTrace} title="Reset (R)">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={resetTrace}
+                      title="Reset (R)"
+                    >
                       <RotateCcw size={14} />
                     </Button>
                   </HStack>
@@ -202,15 +290,32 @@ export function FoundryDrawer() {
                         setTimeout(() => setCopied(false), 2000);
                       }}
                     >
-                      <Text fontSize="xs" color={copied ? "green.400" : "fg.default"} fontWeight="medium" mb={0.5}>
-                        {copied ? "Trace ID copied!" : "Trace sent — click to copy ID"}
+                      <Text
+                        fontSize="xs"
+                        color={copied ? "green.400" : "fg.default"}
+                        fontWeight="medium"
+                        mb={0.5}
+                      >
+                        {copied
+                          ? "Trace ID copied!"
+                          : "Trace sent — click to copy ID"}
                       </Text>
-                      <Text fontSize="11px" fontFamily="mono" color="fg.muted" truncate>
+                      <Text
+                        fontSize="11px"
+                        fontFamily="mono"
+                        color="fg.muted"
+                        truncate
+                      >
                         {lastTraceId}
                       </Text>
                     </Box>
                   )}
-                  <Text fontSize="10px" color="fg.muted" mt={1} textAlign="center">
+                  <Text
+                    fontSize="10px"
+                    color="fg.muted"
+                    mt={1}
+                    textAlign="center"
+                  >
                     ⌘Enter to send · R to reset
                   </Text>
                 </Box>
@@ -223,13 +328,29 @@ export function FoundryDrawer() {
   );
 }
 
-function CompactSpanNode({ span, depth, selectedId, onSelect }: { span: SpanConfig; depth: number; selectedId: string | null; onSelect: (id: string) => void }) {
+function CompactSpanNode({
+  span,
+  depth,
+  selectedId,
+  onSelect,
+}: {
+  span: SpanConfig;
+  depth: number;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
   const isSelected = selectedId === span.id;
   return (
     <>
       <Flex
-        align="center" gap={1} pl={`${depth * 12 + 4}px`} pr={1} py={0.5}
-        rounded="sm" cursor="pointer" fontSize="xs"
+        align="center"
+        gap={1}
+        pl={`${depth * 12 + 4}px`}
+        pr={1}
+        py={0.5}
+        rounded="sm"
+        cursor="pointer"
+        fontSize="xs"
         bg={isSelected ? "orange.500/10" : "transparent"}
         color={isSelected ? "orange.400" : "fg.default"}
         _hover={{ bg: isSelected ? "orange.500/10" : "bg.subtle" }}
@@ -237,10 +358,18 @@ function CompactSpanNode({ span, depth, selectedId, onSelect }: { span: SpanConf
       >
         <Text flexShrink={0}>{SPAN_TYPE_ICONS[span.type]}</Text>
         <Text truncate>{span.name}</Text>
-        <Text flexShrink={0} fontSize="10px" color="fg.muted">{span.durationMs}ms</Text>
+        <Text flexShrink={0} fontSize="10px" color="fg.muted">
+          {span.durationMs}ms
+        </Text>
       </Flex>
       {span.children.map((c) => (
-        <CompactSpanNode key={c.id} span={c} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
+        <CompactSpanNode
+          key={c.id}
+          span={c}
+          depth={depth + 1}
+          selectedId={selectedId}
+          onSelect={onSelect}
+        />
       ))}
     </>
   );

@@ -3,7 +3,7 @@
  *
  * ── THE BUG THIS EXISTS TO KILL ────────────────────────────────────────────
  *
- * Stream B (the raw-token fast path, ADR-048) gated on the asynchronous
+ * Stream B (the raw-token fast path, ADR-077) gated on the asynchronous
  * conversation projection:
  *
  *     const conv = await conversations.getById({ id, projectId, userId });

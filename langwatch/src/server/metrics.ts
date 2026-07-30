@@ -3,7 +3,6 @@ import { performance } from "node:perf_hooks";
 import {
   Counter,
   collectDefaultMetrics,
-  Gauge,
   Histogram,
   register,
 } from "prom-client";
@@ -206,6 +205,31 @@ const edgeSpoolFailOpenCounter = new Counter({
 export const getEdgeSpoolFailOpenCounter = (reason: "flag_store" | "spool") =>
   edgeSpoolFailOpenCounter.labels(reason);
 
+// Trace media extraction fail-open counter. The edge media extraction falls
+// back to the unmodified command data when the flag store, the data-privacy
+// policy probe, or the object store errors — ingestion is never blocked. A
+// healthy fleet emits this at ~zero rate; sustained increments (esp.
+// reason="storage") indicate an object-store outage worth alerting on.
+register.removeSingleMetric("langwatch_edge_media_extract_fail_open_total");
+const edgeMediaExtractFailOpenCounter = new Counter({
+  name: "langwatch_edge_media_extract_fail_open_total",
+  help: "Count of edge media-extraction fail-open events by failing stage",
+  labelNames: ["reason"] as const,
+});
+
+export const getEdgeMediaExtractFailOpenCounter = (
+  reason:
+    | "flag_store"
+    | "privacy_probe"
+    | "storage"
+    // Budget drops: parts left inline because the per-span cap or the
+    // extraction deadline was hit, or because one part's store failed while
+    // the rest of the span proceeded. Not errors of the hook itself.
+    | "part_cap"
+    | "deadline"
+    | "part_store",
+) => edgeMediaExtractFailOpenCounter.labels(reason);
+
 // Online-evaluator loop guard counter (post-2026-05-11 incident). A healthy
 // fleet emits this at ~zero rate. Sustained increments indicate either
 // causality_depth propagation is broken on the evaluator side or a customer
@@ -263,71 +287,6 @@ export const piiChecksCounter = new Counter({
 
 export const getPiiChecksCounter = (method: string) =>
   piiChecksCounter.labels(method);
-
-// ============================================================================
-// BullMQ Queue Metrics
-// ============================================================================
-
-export type BullMQQueueState =
-  | "waiting"
-  | "active"
-  | "completed"
-  | "failed"
-  | "delayed"
-  | "paused"
-  | "prioritized"
-  | "waiting-children";
-
-// Gauge for BullMQ job counts by state (from getJobCounts())
-register.removeSingleMetric("bullmq_job_total");
-const bullmqJobTotal = new Gauge({
-  name: "bullmq_job_total",
-  help: "Total number of jobs in the queue by state",
-  labelNames: ["queue_name", "state"] as const,
-});
-
-export const setBullMQJobCount = (
-  queueName: string,
-  state: BullMQQueueState,
-  count: number,
-) => bullmqJobTotal.labels(queueName, state).set(count);
-
-// Histogram for job wait time (time from enqueue to processing start)
-register.removeSingleMetric("bullmq_job_wait_duration_milliseconds");
-export const bullmqJobWaitDurationHistogram = new Histogram({
-  name: "bullmq_job_wait_duration_milliseconds",
-  help: "Time jobs spend waiting in queue before processing starts",
-  labelNames: ["queue_name"] as const,
-  buckets: [
-    10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000,
-    300000,
-  ],
-});
-
-export const getBullMQJobWaitDurationHistogram = (queueName: string) =>
-  bullmqJobWaitDurationHistogram.labels(queueName);
-
-export function recordJobWaitDuration(
-  job: { timestamp?: number },
-  queueName: string,
-): void {
-  if (job.timestamp) {
-    getBullMQJobWaitDurationHistogram(queueName).observe(
-      Date.now() - job.timestamp,
-    );
-  }
-}
-
-// Counter for stalled jobs
-register.removeSingleMetric("bullmq_job_stalled_total");
-const bullmqJobStalledTotal = new Counter({
-  name: "bullmq_job_stalled_total",
-  help: "Total number of jobs that have stalled",
-  labelNames: ["queue_name"] as const,
-});
-
-export const getBullMQJobStalledCounter = (queueName: string) =>
-  bullmqJobStalledTotal.labels(queueName);
 
 // ============================================================================
 // Event Sourcing Metrics
@@ -514,6 +473,52 @@ export const incrementEsFoldRefoldTotal = (
   outcome: "performed" | "declined" | "unavailable",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_fold_refold_on_miss_total");
+const esFoldRefoldOnMissTotal = new Counter({
+  name: "es_fold_refold_on_miss_total",
+  help: "Store-miss re-folds from the event log, by whether the aggregate had any history to replay",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * Makes the ADR-066 transitional net observable. `refoldOnStoreMiss` survives on
+ * the three read-back folds ONLY to rebuild aggregates whose committed row
+ * predates their read-back columns, and its deletion condition is "it stopped
+ * firing" — which without this counter is an assumption, not an observation. A
+ * transitional refold and a regression to the pre-ADR-066 steady state (every
+ * cache miss walking `event_log`, the 2026-07-23 `TOO_MANY_PARTS` outage) look
+ * identical from the outside; the difference is only visible as a rate that
+ * decays to nothing versus one that tracks `es_fold_projection_total`.
+ *
+ * `performed` — history was replayed, i.e. the net actually caught something.
+ * `absent` — the history read came back empty, so the aggregate was genuinely
+ * new and the executor fell through to `init()`. Expect a steady floor of these
+ * on high-cardinality folds; they are not transitional debt.
+ */
+export const incrementEsFoldRefoldOnMissTotal = (
+  projectionName: string,
+  outcome: "performed" | "absent",
+) => esFoldRefoldOnMissTotal.labels(projectionName, outcome).inc();
+
+register.removeSingleMetric("es_fold_read_window_fallback_total");
+const esFoldReadWindowFallbackTotal = new Counter({
+  name: "es_fold_read_window_fallback_total",
+  help: "Unwindowed retries after a fold's windowed store read missed, by whether the retry found the state",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * `recovered` — the row existed OUTSIDE the declared window; without the retry
+ * the fold would have started from init() and overwritten it. A non-trivial
+ * rate means the fold's `readWindow.widthMs` no longer matches how far the
+ * event's business time drifts from the table's partition column.
+ * `absent` — the aggregate is genuinely new; the retry confirmed the miss.
+ */
+export const incrementEsFoldReadWindowFallbackTotal = (
+  projectionName: string,
+  outcome: "recovered" | "absent",
+) => esFoldReadWindowFallbackTotal.labels(projectionName, outcome).inc();
+
 register.removeSingleMetric("es_reactor_collapsed_total");
 const esReactorCollapsedTotal = new Counter({
   name: "es_reactor_collapsed_total",
@@ -652,6 +657,62 @@ export const observeEsSubscriberDuration = ({
 }) =>
   esSubscriberDuration.labels(pipelineName, subscriberName).observe(durationMs);
 
+/**
+ * Outcome of a subscriber's enqueue-time fan-out decision (payload-cost
+ * doctrine invariant 4 — ADR-069):
+ *
+ * - `filtered` — the predicate declined; no job was minted.
+ * - `staged` — a job carrying the full event was handed off to the
+ *   subscriber's lane.
+ * - `referenced` — a job carrying a claim-check reference instead of the
+ *   payload was handed off.
+ *
+ * - `failed` — the filter, the stage hook or the handoff threw. The routing
+ *   path has no retry, so this subscriber's job for this event is gone.
+ *
+ * `staged` and `referenced` are counted only after the handoff succeeded: the
+ * queue accepted the job, or (in the no-queue configuration) the handler ran
+ * inline. A handoff that throws counts `failed` instead, so a queue outage
+ * cannot inflate either.
+ *
+ * - `killed` — an operator disabled this subscriber for the event's tenant, so
+ *   the seam never judged relevance. Counted rather than skipped silently:
+ *   subscriber fan-out is never replayed (ADR-069), so a kill drops those
+ *   events permanently, and an operator must be able to tell a killed
+ *   subscriber from an idle one — which is exactly when they are looking.
+ *
+ * The five outcomes therefore DO sum to "events routed to this subscriber",
+ * which is what makes `failed` readable as a rate: it is the only outcome that
+ * loses work unintentionally, and it is otherwise invisible — a permanent drop
+ * that moved no series looked exactly like a quiet day. `killed` loses work
+ * too, but deliberately, which is why it is its own outcome and not `filtered`:
+ * conflating "an operator stopped this" with "the subscriber judged it
+ * irrelevant" would hide the kill behind an ordinary-looking series.
+ */
+type SubscriberEnqueueOutcome =
+  | "filtered"
+  | "staged"
+  | "referenced"
+  | "failed"
+  | "killed";
+register.removeSingleMetric("es_subscriber_enqueue_total");
+const esSubscriberEnqueueTotal = new Counter({
+  name: "es_subscriber_enqueue_total",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, staged as a full event or referenced as a claim-check once the handoff succeeded, failed — the retry-less routing path lost the job — or killed, an operator disabled the subscriber for that tenant",
+  labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
+});
+
+export const incrementEsSubscriberEnqueueTotal = ({
+  pipelineName,
+  subscriberName,
+  outcome,
+}: {
+  pipelineName: string;
+  subscriberName: string;
+  outcome: SubscriberEnqueueOutcome;
+}) =>
+  esSubscriberEnqueueTotal.labels(pipelineName, subscriberName, outcome).inc();
+
 // --- Process manager metrics ---
 register.removeSingleMetric("es_process_manager_total");
 const esProcessManagerTotal = new Counter({
@@ -730,6 +791,142 @@ export const observeEsProcessOutboxDuration = ({
 }) =>
   esProcessOutboxDuration.labels(processName, intentType).observe(durationMs);
 
+// How late a wake fires relative to the instant it was scheduled for
+// (ADR-054): the direct answer to "is the scheduler stalling". Buckets run
+// to hours because a wake surviving a fleet outage legitimately fires very
+// late once — the ALERT is on sustained lag, not a single spike.
+register.removeSingleMetric("es_process_wake_lag_milliseconds");
+const esProcessWakeLag = new Histogram({
+  name: "es_process_wake_lag_milliseconds",
+  help: "Delay between a process wake's scheduled instant and it being handled",
+  labelNames: ["process_name"] as const,
+  buckets: [
+    100, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000, 21600000,
+    86400000,
+  ],
+});
+
+export const observeEsProcessWakeLag = ({
+  processName,
+  lagMs,
+}: {
+  processName: string;
+  lagMs: number;
+}) => esProcessWakeLag.labels(processName).observe(Math.max(0, lagMs));
+
+// How long a committed intent sat in the outbox before its dispatch began
+// (ADR-054): the direct answer to "is the outbox draining". Excludes retry
+// waits by design — attempt > 1 rows re-enter with backoff, so only the
+// first attempt measures pure queueing delay.
+register.removeSingleMetric("es_process_outbox_dispatch_lag_milliseconds");
+const esProcessOutboxDispatchLag = new Histogram({
+  name: "es_process_outbox_dispatch_lag_milliseconds",
+  help: "Delay between an intent being committed and its first dispatch starting",
+  labelNames: ["process_name"] as const,
+  buckets: [
+    50, 250, 1000, 5000, 15000, 60000, 300000, 900000, 1800000, 3600000,
+  ],
+});
+
+export const observeEsProcessOutboxDispatchLag = ({
+  processName,
+  lagMs,
+}: {
+  processName: string;
+  lagMs: number;
+}) =>
+  esProcessOutboxDispatchLag.labels(processName).observe(Math.max(0, lagMs));
+
+// Commits whose intents were dropped as already-dispatched (ADR-054).
+// Legitimate on event redelivery — but a sustained per-process rate is
+// exactly how the ADR-051 lost-day scheduling bug hid, so it is measured,
+// logged AND alertable rather than only logged.
+register.removeSingleMetric("es_process_intents_suppressed_total");
+const esProcessIntentsSuppressed = new Counter({
+  name: "es_process_intents_suppressed_total",
+  help: "Process-manager commits whose intents were suppressed as already-dispatched",
+  labelNames: ["process_name"] as const,
+});
+
+export const incrementEsProcessIntentsSuppressed = ({
+  processName,
+  count,
+}: {
+  processName: string;
+  count: number;
+}) => esProcessIntentsSuppressed.labels(processName).inc(count);
+
+// --- Topic clustering domain metrics (ADR-051/ADR-054) ---
+// Run-page outcomes as the domain sees them, not just generic es_* counters:
+// `failed_final` is the alertable one (retries exhausted, run_failed
+// recorded); `failed_retryable` is expected noise under provider hiccups.
+register.removeSingleMetric("topic_clustering_page_total");
+const topicClusteringPageTotal = new Counter({
+  name: "topic_clustering_page_total",
+  help: "Topic clustering page executions by outcome",
+  labelNames: ["outcome"] as const,
+});
+
+export const incrementTopicClusteringPageTotal = ({
+  outcome,
+}: {
+  outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+}) => topicClusteringPageTotal.labels(outcome).inc();
+
+register.removeSingleMetric("topic_clustering_page_duration_milliseconds");
+const topicClusteringPageDuration = new Histogram({
+  name: "topic_clustering_page_duration_milliseconds",
+  help: "Duration of one topic clustering page (langevals call included)",
+  labelNames: ["mode"] as const,
+  // A page is embeddings + LLM naming over up to 2000 traces — minutes are
+  // normal, and the outbox lease caps everything at 20.
+  buckets: [1000, 5000, 15000, 30000, 60000, 120000, 300000, 600000, 1200000],
+});
+
+export const observeTopicClusteringPageDuration = ({
+  mode,
+  durationMs,
+}: {
+  mode: "batch" | "incremental";
+  durationMs: number;
+}) => topicClusteringPageDuration.labels(mode).observe(durationMs);
+
+// --- Governance ingestion-pull domain metrics (ADR-054) ---
+// Pull-run outcomes as the domain sees them, not just generic es_* counters:
+// `failed_final` is the alertable one (retries exhausted, run_failed
+// recorded); `failed_retryable` is expected noise under provider hiccups.
+register.removeSingleMetric("ingestion_pull_total");
+const ingestionPullTotal = new Counter({
+  name: "ingestion_pull_total",
+  help: "Governance ingestion pull executions by outcome",
+  labelNames: ["outcome"] as const,
+});
+
+export const incrementIngestionPullTotal = ({
+  outcome,
+}: {
+  outcome: "completed" | "failed_retryable" | "failed_final";
+}) => ingestionPullTotal.labels(outcome).inc();
+
+register.removeSingleMetric("ingestion_pull_duration_milliseconds");
+const ingestionPullDuration = new Histogram({
+  name: "ingestion_pull_duration_milliseconds",
+  help: "Duration of one governance ingestion pull (adapter poll and OCSF sink writes)",
+  // Unlabelled on purpose: the executor only knows the sourceId, and the
+  // adapter kind lives behind the run port — no cheap low-cardinality label.
+  // A pull is a network poll plus row inserts, capped by the worker's
+  // 5-minute soft deadline, so buckets run 100ms to 5min.
+  buckets: [
+    100, 250, 500, 1000, 2500, 5000, 15000, 30000, 60000, 120000, 300000,
+  ],
+});
+
+export const observeIngestionPullDuration = ({
+  durationMs,
+}: {
+  durationMs: number;
+}) => ingestionPullDuration.observe(durationMs);
+
 // --- Fold cache metrics ---
 register.removeSingleMetric("es_fold_cache_total");
 const esFoldCacheTotal = new Counter({
@@ -779,8 +976,213 @@ const esFoldCacheRedisErrorTotal = new Counter({
 
 export const incrementEsFoldCacheRedisError = (
   projectionName: string,
-  operation: "get" | "set",
+  operation: "get" | "set" | "del",
 ) => esFoldCacheRedisErrorTotal.labels(projectionName, operation).inc();
+
+register.removeSingleMetric("es_fold_cache_entry_bytes");
+const esFoldCacheEntryBytes = new Histogram({
+  name: "es_fold_cache_entry_bytes",
+  help: "Serialized size of a cached fold state entry, in bytes",
+  labelNames: ["projection_name"] as const,
+  buckets: [1_024, 8_192, 65_536, 262_144, 1_048_576, 4_194_304, 16_777_216],
+});
+
+export const observeEsFoldCacheEntryBytes = (
+  projectionName: string,
+  bytes: number,
+) => esFoldCacheEntryBytes.labels(projectionName).observe(bytes);
+
+// ============================================================================
+// Fold redelivery
+// ============================================================================
+
+register.removeSingleMetric("es_fold_dedup_unavailable_total");
+const esFoldDedupUnavailable = new Counter({
+  name: "es_fold_dedup_unavailable_total",
+  help: "Retried fold deliveries that had no applied-event-id set to check against, by reason",
+  labelNames: ["projection_name", "reason"] as const,
+});
+
+/**
+ * A RETRY reached the fold with no record of what an earlier attempt applied.
+ *
+ * This is the moment the batch is about to be re-applied on top of durable
+ * state that already contains it. It has to be its own counter rather than a
+ * label on the cache result, because the dangerous case is invisible in the
+ * existing signals: a miss on a retry and a miss on a fresh delivery are the
+ * same observation, and `es_fold_duplicate_events_skipped_total` staying flat
+ * during an incident reads as good news whether dedup was idle or blind.
+ */
+export const incrementEsFoldDedupUnavailable = (
+  projectionName: string,
+  reason: "cache_miss" | "read_error" | "unreadable" | "legacy_entry",
+) => esFoldDedupUnavailable.labels(projectionName, reason).inc();
+
+register.removeSingleMetric("es_fold_duplicate_events_skipped_total");
+const esFoldDuplicateEventsSkipped = new Counter({
+  name: "es_fold_duplicate_events_skipped_total",
+  help: "Redelivered events recognised as already folded in and skipped",
+  labelNames: ["projection_name"] as const,
+});
+
+export const incrementEsFoldDuplicateEventsSkipped = (
+  projectionName: string,
+  count = 1,
+) => esFoldDuplicateEventsSkipped.labels(projectionName).inc(count);
+
+register.removeSingleMetric("es_fold_blind_reapply_events");
+const esFoldBlindReapplyEvents = new Histogram({
+  name: "es_fold_blind_reapply_events",
+  help: "Events re-applied on a retry that carried no applied-event-id set to check against",
+  labelNames: ["projection_name"] as const,
+  buckets: [1, 2, 5, 10, 25, 50, 100, 250, 500],
+});
+
+/**
+ * Blast radius of a blind re-apply, in events.
+ *
+ * `es_fold_dedup_unavailable_total` counts the *occurrences* of a retry
+ * arriving with nothing to check against; this measures how much accumulation
+ * each one re-applies. One re-applied event on a coalesced batch of 500 and
+ * 500 of them are the same increment on the counter and very different
+ * incidents — a coalescing fold can double-count an entire batch at once.
+ */
+export const observeEsFoldBlindReapplyEvents = (
+  projectionName: string,
+  events: number,
+) => esFoldBlindReapplyEvents.labels(projectionName).observe(events);
+
+// ============================================================================
+// Langy Metrics
+// ============================================================================
+//
+// Operational counters for the Langy turn flow. Per-tenant / per-conversation
+// attribution deliberately lives in the structured log lines next to each
+// increment, never as labels (see the cardinality doctrine above) — these
+// series answer "is Langy healthy fleet-wide?", the logs answer "which
+// tenant?".
+
+// One increment per turn-acceptance attempt at the admission boundary.
+register.removeSingleMetric("langwatch_langy_turns_total");
+const langyTurnsTotal = new Counter({
+  name: "langwatch_langy_turns_total",
+  help: "Langy turn-acceptance attempts by outcome at the admission boundary",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyTurnsCounter = (
+  outcome: "accepted" | "replay" | "busy" | "rejected" | "mismatch" | "error",
+) => langyTurnsTotal.labels(outcome);
+
+// One increment per dispatch attempt to the agent manager.
+register.removeSingleMetric("langwatch_langy_dispatch_total");
+const langyDispatchTotal = new Counter({
+  name: "langwatch_langy_dispatch_total",
+  help: "Langy turn dispatches to the agent manager by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyDispatchCounter = (
+  outcome:
+    | "accepted"
+    | "busy"
+    | "credentials_required"
+    | "rejected"
+    | "unavailable"
+    | "error",
+) => langyDispatchTotal.labels(outcome);
+
+// One increment per durable turn-result ingested on /api/internal/langy.
+register.removeSingleMetric("langwatch_langy_turn_results_total");
+const langyTurnResultsTotal = new Counter({
+  name: "langwatch_langy_turn_results_total",
+  help: "Durable Langy turn results ingested from the agent manager by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyTurnResultsCounter = (outcome: "completed" | "failed") =>
+  langyTurnResultsTotal.labels(outcome);
+
+// Incremented from the relay's per-connection tally when a frame stream ends.
+register.removeSingleMetric("langwatch_langy_relay_frames_total");
+const langyRelayFramesTotal = new Counter({
+  name: "langwatch_langy_relay_frames_total",
+  help: "Langy relay frames by processing result, summed per stream at close",
+  labelNames: ["result"] as const,
+});
+export const getLangyRelayFramesCounter = (
+  result: "applied" | "duplicate" | "rejected" | "terminal",
+) => langyRelayFramesTotal.labels(result);
+
+// Session-key lifecycle: minted per turn (when no live worker holds one),
+// revoked on turn end, reaped when the 6h TTL lapses.
+register.removeSingleMetric("langwatch_langy_session_keys_total");
+const langySessionKeysTotal = new Counter({
+  name: "langwatch_langy_session_keys_total",
+  help: "Langy session API keys by lifecycle operation",
+  labelNames: ["op"] as const,
+});
+export const getLangySessionKeysCounter = (
+  op: "minted" | "revoked" | "revoke_refused" | "reaped",
+) => langySessionKeysTotal.labels(op);
+
+// The message rate limit fails open on Redis trouble by design; a sustained
+// fail_open rate is a Redis outage worth alerting on without log grepping.
+register.removeSingleMetric("langwatch_langy_rate_limit_total");
+const langyRateLimitTotal = new Counter({
+  name: "langwatch_langy_rate_limit_total",
+  help: "Langy message rate-limit decisions that were not plain allows",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyRateLimitCounter = (outcome: "rejected" | "fail_open") =>
+  langyRateLimitTotal.labels(outcome);
+
+// Model-emitted ```langy-card blocks at the relay stamp (ADR-060 §8). The
+// failure outcomes are the drift alarm for prompt regressions in block
+// emission — a rising unsalvageable/invalid rate means the agent's emission
+// quality slipped, exactly like ADR-079's probe-miss counter for cards.
+register.removeSingleMetric("langwatch_langy_blocks_total");
+const langyBlocksTotal = new Counter({
+  name: "langwatch_langy_blocks_total",
+  help: "Model-emitted langy-card blocks stamped by the relay, by outcome",
+  labelNames: ["outcome"] as const,
+});
+export const getLangyBlocksCounter = (
+  outcome: "stamped" | "unsalvageable" | "invalid",
+) => langyBlocksTotal.labels(outcome);
+
+// ============================================================================
+// Fold redelivery
+// ============================================================================
+
+register.removeSingleMetric("es_fold_post_store_failure_total");
+const esFoldPostStoreFailure = new Counter({
+  name: "es_fold_post_store_failure_total",
+  help: "Fold deliveries that threw after their state was durably stored, by stage",
+  labelNames: ["projection_name", "stage"] as const,
+});
+
+/**
+ * A fold threw *after* its state was already written durably.
+ *
+ * Queue delivery is at-least-once and the fold's state is stored before
+ * reactors are dispatched, so anything that throws from that point fails the
+ * job without un-writing it: the queue re-delivers events the store already
+ * holds. Folds accumulate rather than being idempotent (trace summary does
+ * `spanCount + 1` and sums cost), so the re-apply double-counts.
+ *
+ * Every other fold signal reports this as a plain failure, which is
+ * indistinguishable from one that threw *before* the write and is therefore
+ * harmless to retry. The two need opposite responses, so they need separate
+ * counters.
+ *
+ * Rate against `es_fold_projection_total{status="failed"}` for the share of
+ * fold failures that land in the dangerous half.
+ */
+export const incrementEsFoldPostStoreFailure = ({
+  projectionName,
+  stage,
+}: {
+  projectionName: string;
+  stage: "reactor_dispatch";
+}) => esFoldPostStoreFailure.labels(projectionName, stage).inc();
 
 // ============================================================================
 // Stored Objects Metrics
@@ -849,6 +1251,73 @@ const storedObjectSizeBytesHistogram = new Histogram({
 
 export const getStoredObjectSizeBytesHistogram = (purpose: string) =>
   storedObjectSizeBytesHistogram.labels(purpose);
+
+// ============================================================================
+// Coding-agent session reads
+// ============================================================================
+
+/**
+ * `hit` — the window returned rows. `empty` — it returned none, which still
+ * paid the full dedup scan. `error` — the read threw, so its duration is a
+ * failure time and must not sit in the same distribution as the successes.
+ */
+export type CodingAgentSessionListReadOutcome = "hit" | "empty" | "error";
+
+register.removeSingleMetric(
+  "coding_agent_session_list_read_duration_milliseconds",
+);
+const codingAgentSessionListReadDuration = new Histogram({
+  name: "coding_agent_session_list_read_duration_milliseconds",
+  help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
+  labelNames: ["table", "outcome"] as const,
+  // Runs to 30s deliberately. This metric's job is to catch the unpruned scan
+  // becoming expensive enough to promote ADR-071's writer freeze from "next" to
+  // "now", and a top bucket at 5s would put exactly that degradation into
+  // `+Inf`, where a p99 cannot be resolved — the histogram would go blind at
+  // the moment it was supposed to speak.
+  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10_000, 30_000],
+});
+
+/**
+ * Prices ADR-071 sequencing step 2. `findManyRecent`'s inner `max(UpdatedAt)`
+ * subquery dropped its `StartedAt` bound, because a bound on a moving column
+ * inside a dedup scope returns a stale version. The scope therefore no longer
+ * prunes partitions and scans this tenant's sessions rather than the window's
+ * weeks — compact (sort-key columns plus `UpdatedAt`, one group row per
+ * session), but a real increase the ADR states rather than measures.
+ *
+ * Without this the ADR's own exit conditions are unfalsifiable: "the compact
+ * scan is acceptable" and "step 3's freeze can keep waiting" are both claims
+ * about this read's cost, and nothing else observes it. A rising p99 here is
+ * what promotes the freeze from deferred to due, and a flat one is what earns
+ * the deferral.
+ *
+ * `empty` is not noise. An empty window still runs the whole unwindowed dedup
+ * scan and materialises nothing in the outer `SELECT *`, so it isolates the
+ * scan's own floor from the cost of rendering rows.
+ *
+ * Duration only, deliberately. `client.query()` resolves a `ResultSet`, which
+ * carries `response_headers` but no parsed summary — the client parses
+ * `X-ClickHouse-Summary` (`read_rows`, `read_bytes`) for `insert`/`command`/
+ * `exec` alone, and for a streaming `SELECT` those counters are complete only
+ * under `wait_end_of_query=1`. Rows *returned* is capped by the caller's limit
+ * and so says nothing about the scan, which is why it is not recorded as a
+ * stand-in.
+ *
+ * `table` and `outcome` only: per-tenant attribution belongs in the structured
+ * log lines, never as a label (the cardinality doctrine above). This table is
+ * one row per session, so a tenant label would track the customer count.
+ */
+export const observeCodingAgentSessionListReadDuration = ({
+  table,
+  outcome,
+  durationMs,
+}: {
+  table: string;
+  outcome: CodingAgentSessionListReadOutcome;
+  durationMs: number;
+}) =>
+  codingAgentSessionListReadDuration.labels(table, outcome).observe(durationMs);
 
 // ============================================================================
 // withMetrics utility

@@ -9,8 +9,17 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import { useCallback, useRef, useState } from "react";
-import type { CustomModelEntry, SupportedParameter, MultimodalInput } from "../../server/modelProviders/customModel.schema";
-import { customModelEntrySchema, multimodalInputValues } from "../../server/modelProviders/customModel.schema";
+import type {
+  CustomModelEntry,
+  MultimodalInput,
+  SupportedParameter,
+} from "../../server/modelProviders/customModel.schema";
+import {
+  customModelEntrySchema,
+  multimodalInputValues,
+} from "../../server/modelProviders/customModel.schema";
+import { HorizontalFormControl } from "../HorizontalFormControl";
+import { Checkbox } from "../ui/checkbox";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -20,8 +29,6 @@ import {
   DialogRoot,
   DialogTitle,
 } from "../ui/dialog";
-import { Checkbox } from "../ui/checkbox";
-import { HorizontalFormControl } from "../HorizontalFormControl";
 
 /**
  * Optional sampling parameters the popover renders for this model.
@@ -73,8 +80,12 @@ export function AddCustomModelDialog({
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [maxTokens, setMaxTokens] = useState(String(DEFAULT_MAX_TOKENS));
-  const [supportedParameters, setSupportedParameters] = useState<SupportedParameter[]>([...DEFAULT_PARAMETERS]);
-  const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>([]);
+  const [supportedParameters, setSupportedParameters] = useState<
+    SupportedParameter[]
+  >([...DEFAULT_PARAMETERS]);
+  const [multimodalInputs, setMultimodalInputs] = useState<MultimodalInput[]>(
+    [],
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const displayNameTouched = useRef(false);
   const initialized = useRef(false);
@@ -85,7 +96,9 @@ export function AddCustomModelDialog({
     setModelId(initialValues.modelId);
     setDisplayName(initialValues.displayName);
     setMaxTokens(String(initialValues.maxTokens ?? DEFAULT_MAX_TOKENS));
-    setSupportedParameters([...(initialValues.supportedParameters ?? DEFAULT_PARAMETERS)]);
+    setSupportedParameters([
+      ...(initialValues.supportedParameters ?? DEFAULT_PARAMETERS),
+    ]);
     setMultimodalInputs([...(initialValues.multimodalInputs ?? [])]);
     displayNameTouched.current = true;
   }
@@ -120,17 +133,13 @@ export function AddCustomModelDialog({
 
   const toggleParameter = useCallback((param: SupportedParameter) => {
     setSupportedParameters((prev) =>
-      prev.includes(param)
-        ? prev.filter((p) => p !== param)
-        : [...prev, param],
+      prev.includes(param) ? prev.filter((p) => p !== param) : [...prev, param],
     );
   }, []);
 
   const toggleMultimodal = useCallback((input: MultimodalInput) => {
     setMultimodalInputs((prev) =>
-      prev.includes(input)
-        ? prev.filter((i) => i !== input)
-        : [...prev, input],
+      prev.includes(input) ? prev.filter((i) => i !== input) : [...prev, input],
     );
   }, []);
 
@@ -141,7 +150,9 @@ export function AddCustomModelDialog({
       modelId: modelId.trim(),
       displayName: displayName.trim(),
       mode: "chat",
-      maxTokens: Number.isNaN(parsedMaxTokens) ? DEFAULT_MAX_TOKENS : parsedMaxTokens,
+      maxTokens: Number.isNaN(parsedMaxTokens)
+        ? DEFAULT_MAX_TOKENS
+        : parsedMaxTokens,
       supportedParameters:
         supportedParameters.length > 0 ? supportedParameters : undefined,
       multimodalInputs:
@@ -181,7 +192,9 @@ export function AddCustomModelDialog({
       onOpenChange={(e) => !e.open && handleClose()}
       size="md"
     >
-      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
+      <DialogContent
+        {...(dialogBackground ? { background: dialogBackground } : {})}
+      >
         <DialogHeader>
           <DialogTitle>{isEditing ? "Edit Model" : "Add Model"}</DialogTitle>
         </DialogHeader>
@@ -191,7 +204,13 @@ export function AddCustomModelDialog({
             <HorizontalFormControl
               label="Model ID"
               helper="Exactly as your provider specifies it, e.g. a fine-tune ID or deployment name"
-              error={errors.modelId ? <Text color="red.500" fontSize="xs">{errors.modelId}</Text> : undefined}
+              error={
+                errors.modelId ? (
+                  <Text color="red.500" fontSize="xs">
+                    {errors.modelId}
+                  </Text>
+                ) : undefined
+              }
             >
               <Input
                 placeholder="e.g. gpt-5-custom"
@@ -204,7 +223,13 @@ export function AddCustomModelDialog({
             <HorizontalFormControl
               label="Display Name"
               helper="How this model appears in selectors across LangWatch"
-              error={errors.displayName ? <Text color="red.500" fontSize="xs">{errors.displayName}</Text> : undefined}
+              error={
+                errors.displayName ? (
+                  <Text color="red.500" fontSize="xs">
+                    {errors.displayName}
+                  </Text>
+                ) : undefined
+              }
             >
               <Input
                 placeholder="e.g. GPT-5 Custom"
@@ -217,7 +242,13 @@ export function AddCustomModelDialog({
             <HorizontalFormControl
               label="Max Tokens"
               helper="Maximum number of output tokens the model supports"
-              error={errors.maxTokens ? <Text color="red.500" fontSize="xs">{errors.maxTokens}</Text> : undefined}
+              error={
+                errors.maxTokens ? (
+                  <Text color="red.500" fontSize="xs">
+                    {errors.maxTokens}
+                  </Text>
+                ) : undefined
+              }
             >
               <Input
                 type="number"
@@ -263,11 +294,7 @@ export function AddCustomModelDialog({
               </HStack>
             </Box>
 
-            <Box
-              role="group"
-              aria-label="Multimodal Support"
-              paddingY={5}
-            >
+            <Box role="group" aria-label="Multimodal Support" paddingY={5}>
               <HStack
                 width="full"
                 flexDirection={["column", "column", "row"]}
@@ -303,11 +330,7 @@ export function AddCustomModelDialog({
             <Button variant="ghost" size="sm" onClick={handleClose}>
               Cancel
             </Button>
-            <Button
-              colorPalette="orange"
-              size="sm"
-              onClick={handleSubmit}
-            >
+            <Button colorPalette="orange" size="sm" onClick={handleSubmit}>
               {isEditing ? "Save" : "Add model"}
             </Button>
           </HStack>

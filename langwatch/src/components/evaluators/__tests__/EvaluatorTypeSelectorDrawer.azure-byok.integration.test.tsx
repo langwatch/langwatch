@@ -10,12 +10,7 @@
  * - "Non-Azure safety evaluators are unaffected by Azure Safety config"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -178,11 +173,7 @@ function primeAvailableEvaluators(
 
 const renderDrawer = (props = {}) =>
   render(
-    <EvaluatorTypeSelectorDrawer
-      open={true}
-      category="safety"
-      {...props}
-    />,
+    <EvaluatorTypeSelectorDrawer open={true} category="safety" {...props} />,
     { wrapper: Wrapper },
   );
 
@@ -209,14 +200,18 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
       /** @scenario Azure evaluators are disabled when no Azure Safety provider is configured */
       it("marks Azure Content Safety as disabled", async () => {
         await waitFor(() => {
-          const card = screen.getByTestId("evaluator-type-azure-content_safety");
+          const card = screen.getByTestId(
+            "evaluator-type-azure-content_safety",
+          );
           expect(card.getAttribute("data-disabled")).toBe("true");
         });
       });
 
       it("marks Azure Prompt Injection as disabled", async () => {
         await waitFor(() => {
-          const card = screen.getByTestId("evaluator-type-azure-prompt_injection");
+          const card = screen.getByTestId(
+            "evaluator-type-azure-prompt_injection",
+          );
           expect(card.getAttribute("data-disabled")).toBe("true");
         });
       });
@@ -268,9 +263,7 @@ describe("Feature: EvaluatorTypeSelectorDrawer Azure Safety BYOK gating", () => 
 
           await waitFor(() => {
             expect(
-              screen.getByTestId(
-                "evaluator-type-azure-content_safety-cta",
-              ),
+              screen.getByTestId("evaluator-type-azure-content_safety-cta"),
             ).toBeTruthy();
           });
 

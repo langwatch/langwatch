@@ -15,10 +15,37 @@ Feature: Adaptive home views
   Background:
     Given I am on the home page
 
+  # The greeting row's one sales-y ask, shared by every composition.
+
+  Scenario: A paying customer is not pitched the product they already pay for
+    Given my organization is on a paid plan
+    When the home page renders
+    Then the line asking whether I am considering LangWatch is not shown
+    And neither is the demo request beside it
+
+  Scenario: The ask is still there for an account that might buy
+    Given my organization is on the free plan
+    When the home page renders
+    Then the line and the demo request are both shown
+
+  Scenario: The ask never flashes at a paying customer
+    Given my plan has not been resolved yet
+    When the home page renders
+    Then neither the line nor the demo request is shown
+    And they appear only once the plan is known to be free
+
   Scenario: A project with no traces gets the first-run view
     Given the project has never received a trace
     When the home page resolves its view
     Then the page shows the onboarding checklist and the banners
+    And no stat row or recent-items section is shown
+
+  Scenario: The first-run view keeps the Langy home's lit block
+    Given the project has never received a trace
+    And the Langy home renders (see specs/home/langy-home.feature)
+    When the home page resolves its view
+    Then the lit block still leads the page, because asking is the best first step
+    And the onboarding checklist sits directly beneath it
     And no stat row or recent-items section is shown
 
   Scenario: An activated project gets the briefing view

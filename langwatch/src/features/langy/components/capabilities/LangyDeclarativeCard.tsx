@@ -6,9 +6,10 @@
  * hand-built; everything else lands here: the write fall-throughs (created /
  * updated / removed), the generic reads, the prompt diff, and the version-skew
  * fallback for a command this UI has never heard of. The widget vocabulary is
- * the catalog's (`stats` / `rows` / `facts` / `diff` / `text`), and each widget
- * reads the already-parsed card payload from the shared `@langwatch/cli-cards`
- * contract.
+ * the catalog's (`stats` / `rows` / `facts` / `diff` / `text` / `chart`), and
+ * each widget reads the already-parsed card payload from the shared
+ * `@langwatch/langy` contract — parsed against the card the result was
+ * DECIDED to be, not one re-derived from the command's name here.
  *
  * Honesty rule (same as the trace cards): output that cannot be read renders
  * as "couldn't read this result" with the deep link kept — never as a
@@ -16,23 +17,24 @@
  * a real answer and says so in real words.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
-import { parseCliResult, type CliResultDigest } from "@langwatch/cli-cards";
-import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
+import { type CliResultDigest, parseCardResult } from "@langwatch/langy";
+import { extractPlatformUrl } from "~/utils/platformHref";
 import {
-  useCapabilityData,
   type CapabilityData,
+  useCapabilityData,
 } from "../../hooks/useCapabilityData";
+import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import { StreamingStatCard } from "../StreamingStatCard";
 import {
   buildResourceHref,
   buildSurfaceHref,
+  type CapabilityCardInput,
+  type CapabilityDescriptor,
   extractPrimaryId,
   extractResourceName,
   extractToolText,
   SURFACE_LABEL,
   summaryLines,
-  type CapabilityCardInput,
-  type CapabilityDescriptor,
 } from "./capabilityRegistry";
 import { collectionOf, totalOf } from "./cliResultDocument";
 import {
@@ -40,6 +42,7 @@ import {
   CapabilityRowSkeletons,
   LangyCapabilityCard,
 } from "./LangyCapabilityCard";
+import { isPlottable, TimeseriesPlot } from "./LangyTimeseriesCard";
 
 const MAX_ROWS = 5;
 const MAX_FACTS = 6;
@@ -81,7 +84,8 @@ function firstString(value: unknown, keys: string[]): string | null {
 
 /** Renderable primitive → display text; null for anything structural. */
 function displayValue(value: unknown): string | null {
-  if (typeof value === "string") return value.trim() ? truncate(value, SNIPPET_MAX) : null;
+  if (typeof value === "string")
+    return value.trim() ? truncate(value, SNIPPET_MAX) : null;
   if (typeof value === "number") return value.toLocaleString();
   if (typeof value === "boolean") return value ? "yes" : "no";
   return null;
@@ -141,6 +145,11 @@ function statsOf(document: unknown): LangyTurnMetric[] {
   const rows = collectionOf(document);
   if (rows) {
     const total = totalOf(document) ?? rows.length;
+    // Just the count. Summing a "cost" stat here would mean guessing which key
+    // holds the money (`cost`? `totalCost`? `costUsd`?) across every collection
+    // the CLI can return — the payload-sniffing this renderer exists to avoid.
+    // When money is the answer, the agent says so by emitting a card that names
+    // it; the generic renderer does not infer it.
     return [{ value: total, label: total === 1 ? "result" : "results" }];
   }
   if (!document || typeof document !== "object") return [];
@@ -245,7 +254,13 @@ function RowsBody({
   const rows = collectionOf(document);
   if (!rows) {
     // The document is a single resource after all — read it as one.
-    return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+    return (
+      <FactsBody
+        descriptor={descriptor}
+        document={document}
+        projectSlug={projectSlug}
+      />
+    );
   }
 
   if (rows.length === 0) {
@@ -268,7 +283,8 @@ function RowsBody({
       {shown.map((row, index) => {
         const name = firstString(row, NAME_KEYS);
         const id = firstString(row, ROW_ID_KEYS);
-        const primary = name ?? id ?? `${capitalize(descriptor.noun.singular)} ${index + 1}`;
+        const primary =
+          name ?? id ?? `${capitalize(descriptor.noun.singular)} ${index + 1}`;
         const secondary =
           firstString(row, ["status", "state", "description"]) ??
           (name && id && id !== name ? id : null);
@@ -305,7 +321,13 @@ function FactsBody({
 }) {
   if (Array.isArray(document) || collectionOf(document)) {
     // The document is a collection after all — read it as one.
-    return <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+    return (
+      <RowsBody
+        descriptor={descriptor}
+        document={document}
+        projectSlug={projectSlug}
+      />
+    );
   }
 
   // The card's title already shows the resource's name — don't repeat it.
@@ -344,7 +366,13 @@ function StatsBody({
   const stats = statsOf(document);
   if (stats.length === 0) {
     // Nothing counts as a figure — the resource's fields still tell the story.
-    return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+    return (
+      <FactsBody
+        descriptor={descriptor}
+        document={document}
+        projectSlug={projectSlug}
+      />
+    );
   }
   return <StreamingStatCard metrics={stats} />;
 }
@@ -376,7 +404,8 @@ function DiffBody({
 
   return (
     <VStack align="stretch" gap={1.5}>
-      {version != null && (typeof version === "string" || typeof version === "number") ? (
+      {version != null &&
+      (typeof version === "string" || typeof version === "number") ? (
         <Text textStyle="2xs" color="fg.muted">
           Version {version}
         </Text>
@@ -384,7 +413,11 @@ function DiffBody({
       {fields.length > 0 ? (
         <VStack align="stretch" gap={0}>
           {fields.map((field) => (
-            <CapabilityRow key={field} primary={labelize(field)} secondary="changed" />
+            <CapabilityRow
+              key={field}
+              primary={labelize(field)}
+              secondary="changed"
+            />
           ))}
         </VStack>
       ) : content ? (
@@ -426,6 +459,14 @@ function writeSentence(tone: CapabilityDescriptor["tone"]): string {
   }
 }
 
+/**
+ * (`isUnconfirmedCreate` lived here. It is gone, and so is the "Couldn't
+ * confirm the resource was created" card it drew: a create whose result names
+ * nothing now renders no card at all, decided once at the selection boundary in
+ * `hasCapabilityCard`. Owning the doubt in a card was still a card about
+ * nothing, and it appeared beside the error card for the same operation.)
+ */
+
 export function LangyDeclarativeCard({
   descriptor,
   input,
@@ -434,7 +475,7 @@ export function LangyDeclarativeCard({
   projectSlug: rawProjectSlug,
 }: CapabilityCardInput) {
   const projectSlug = rawProjectSlug ?? null;
-  const { command, tone, body, noun } = descriptor;
+  const { tone, body, noun } = descriptor;
 
   // Hydration is for COLLECTION reads: fresh names and links for the entities
   // the result referenced. Facts/stats/diff keep the stored structure (the
@@ -443,11 +484,11 @@ export function LangyDeclarativeCard({
     digest: tone === "read" && body === "rows" ? (digest ?? null) : null,
   });
 
-  const parsed = parseCliResult({
-    resource: command.resource,
-    verb: command.verb,
-    output,
-  });
+  // Read against the card that was DECIDED, never a kind re-derived from the
+  // command's name here — that is a second decision point, and a promoted
+  // result would be read by the schema of the card it did not get. See
+  // ADR-079 §1.
+  const parsed = parseCardResult({ kind: descriptor.render, output });
   const document = parsed.ok ? parsed.card : null;
 
   if (hydration.status !== "idle") {
@@ -479,6 +520,7 @@ export function LangyDeclarativeCard({
         projectSlug={projectSlug}
         // A removed resource has no page left — link to the surface index.
         resourceId={removed ? null : id}
+        platformUrl={removed ? null : extractPlatformUrl(output)}
         icon={descriptor.icon}
       >
         <BodyLine>{writeSentence(tone)}</BodyLine>
@@ -496,6 +538,7 @@ export function LangyDeclarativeCard({
       title={title}
       projectSlug={projectSlug}
       resourceId={tone === "removed" ? null : id}
+      platformUrl={tone === "removed" ? null : extractPlatformUrl(output)}
       icon={descriptor.icon}
     >
       {parsed.ok ? (
@@ -553,9 +596,7 @@ function HydratedRowsCard({
       icon={descriptor.icon}
     >
       {hydration.isHydrating && hydration.rows.length === 0 ? (
-        <CapabilityRowSkeletons
-          count={Math.min(returned ?? 3, MAX_ROWS)}
-        />
+        <CapabilityRowSkeletons count={Math.min(returned ?? 3, MAX_ROWS)} />
       ) : hydration.rows.length > 0 ? (
         <VStack align="stretch" gap={0}>
           {hydration.rows.map((row) => (
@@ -604,11 +645,29 @@ function WidgetBody({
 }) {
   switch (descriptor.body) {
     case "rows":
-      return <RowsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+      return (
+        <RowsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
     case "facts":
-      return <FactsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+      return (
+        <FactsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
     case "stats":
-      return <StatsBody descriptor={descriptor} document={document} projectSlug={projectSlug} />;
+      return (
+        <StatsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
     case "diff":
       return (
         <DiffBody
@@ -622,10 +681,37 @@ function WidgetBody({
     case "text": {
       const lines = summaryLines(output, 3);
       if (lines.length === 0) {
-        return <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />;
+        return (
+          <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />
+        );
       }
       return <SummaryLinesBody lines={lines} />;
     }
+    // The same plot the timeseries card draws, not a second one. A document
+    // with nothing plottable in it is not a chart, whatever the catalog asked
+    // for, and its figures are the next most honest reading of it.
+    case "chart":
+      return isPlottable(document) ? (
+        <TimeseriesPlot payload={document} />
+      ) : (
+        <StatsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
+    // A widget the catalog grows before this switch does. Falling off the end
+    // of the switch returned `undefined` — a card with no body at all, which
+    // is how a registered `chart` widget rendered nothing for as long as it
+    // existed. Facts read every document, so they are the safe floor.
+    default:
+      return (
+        <FactsBody
+          descriptor={descriptor}
+          document={document}
+          projectSlug={projectSlug}
+        />
+      );
   }
 }
 
@@ -644,8 +730,7 @@ function TextFallbackBody({
   projectSlug: string | null;
 }) {
   const text = extractToolText(output).trim();
-  const looksLikeBrokenDocument =
-    text.startsWith("{") || text.startsWith("[");
+  const looksLikeBrokenDocument = text.startsWith("{") || text.startsWith("[");
   if (!text || looksLikeBrokenDocument) {
     return <UnreadableBody descriptor={descriptor} projectSlug={projectSlug} />;
   }

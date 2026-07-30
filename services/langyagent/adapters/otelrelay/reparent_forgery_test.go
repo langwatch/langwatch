@@ -44,7 +44,7 @@ func wirePayload(t *testing.T, resourceAttrs, spanAttrs []*commonpb.KeyValue) []
 
 func forward(t *testing.T, wire []byte) ptrace.Traces {
 	t.Helper()
-	out, err := ReparentOTLP(wire, "conv-1", trace.SpanContext{})
+	out, err := ReparentOTLP(wire, "conv-1", "user-1", trace.SpanContext{})
 	if err != nil {
 		t.Fatalf("ReparentOTLP: %v", err)
 	}
@@ -71,6 +71,7 @@ func countResourceAttr(td ptrace.Traces, k string) int {
 	return n
 }
 
+// @scenario "Repeating the provenance claim does not smuggle it through"
 func TestReparent_StripsForgedOriginRepeatedOnTheResource(t *testing.T) {
 	wire := wirePayload(t, []*commonpb.KeyValue{
 		kvStr(attrOrigin, "platform_internal"),
@@ -85,6 +86,7 @@ func TestReparent_StripsForgedOriginRepeatedOnTheResource(t *testing.T) {
 	}
 }
 
+// @scenario "Moving the provenance claim onto individual spans does not smuggle it through"
 func TestReparent_StripsForgedOriginFromSpans(t *testing.T) {
 	// Ingest resolves span origin before resource origin, so a span-level
 	// claim overrides whatever the resource says.
@@ -106,6 +108,7 @@ func TestReparent_StripsForgedOriginFromSpans(t *testing.T) {
 	}
 }
 
+// @scenario "Repeating a reserved grouping key does not override the manager's value"
 func TestReparent_ReservedKeysCannotBeSmuggledByRepetition(t *testing.T) {
 	wire := wirePayload(t, []*commonpb.KeyValue{
 		kvStr(attrThreadID, "attacker-thread"),
@@ -121,5 +124,34 @@ func TestReparent_ReservedKeysCannotBeSmuggledByRepetition(t *testing.T) {
 	v, ok := td.ResourceSpans().At(0).Resource().Attributes().Get(attrThreadID)
 	if !ok || v.AsString() != "conv-1" {
 		t.Fatalf("worker value survived for %s: got %q", attrThreadID, v.AsString())
+	}
+}
+
+// A span whose parent id is not in the same batch (the worker's exporter
+// splits its span forest across batches and omits some ancestors entirely)
+// must re-parent onto the turn span — never dangle off an id the customer's
+// trace may never contain. In-batch parentage is preserved untouched.
+func TestReparent_BatchLocalOrphansAttachToTurn(t *testing.T) {
+	td := ptrace.NewTraces()
+	ss := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty()
+
+	orphan := ss.Spans().AppendEmpty()
+	orphan.SetName("ai.streamText")
+	orphan.SetSpanID(pcommon.SpanID{1})
+	orphan.SetParentSpanID(pcommon.SpanID{9, 9, 9}) // ancestor never exported
+
+	child := ss.Spans().AppendEmpty()
+	child.SetName("ai.streamText.doStream")
+	child.SetSpanID(pcommon.SpanID{2})
+	child.SetParentSpanID(pcommon.SpanID{1}) // in-batch parent
+
+	turn := turnContext()
+	ReparentTraces(td, "conv-1", "user-a", turn)
+
+	if got := orphan.ParentSpanID(); got != pcommon.SpanID(turn.SpanID()) {
+		t.Fatalf("orphan parent = %s, want the turn span", got)
+	}
+	if got := child.ParentSpanID(); got != (pcommon.SpanID{1}) {
+		t.Fatalf("in-batch parentage must be preserved, got %s", got)
 	}
 }

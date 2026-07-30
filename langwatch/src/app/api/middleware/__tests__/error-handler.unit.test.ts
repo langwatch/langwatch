@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { InternalServerError } from "../../shared/errors";
 import { handleError } from "../error-handler";
 
@@ -59,6 +60,7 @@ describe("handleError()", () => {
   }
 
   describe("when error is a LimitExceededError", () => {
+    /** @scenario "A known failure is normalised by Hono to a client-safe body" */
     it("returns 403 with HandledError shape", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
@@ -73,6 +75,8 @@ describe("handleError()", () => {
       );
     });
 
+    /** @scenario "A known failure is normalised by Hono to a client-safe body" */
+    /** @scenario "An external contract wins over cross-transport symmetry" */
     it("includes meta fields in the response body", async () => {
       const error = new LimitExceededError("prompts", 5, 5);
       const app = createTestApp(error);
@@ -87,6 +91,7 @@ describe("handleError()", () => {
   });
 
   describe("when error carries remediation fields", () => {
+    /** @scenario "A handled error carries remediation for agent consumers" */
     it("emits tips, docsUrl and fault in the body", async () => {
       const error = new (class extends HandledError {
         constructor() {
@@ -110,6 +115,7 @@ describe("handleError()", () => {
       expect(body.fault).toBe("customer");
     });
 
+    /** @scenario "Remediation fields are additive and optional" */
     it("omits remediation keys when the error has none", async () => {
       const error = new (class extends HandledError {
         constructor() {
@@ -123,6 +129,35 @@ describe("handleError()", () => {
       const body = await res.json();
       expect(body).not.toHaveProperty("tips");
       expect(body).not.toHaveProperty("docsUrl");
+      expect(body.fault).toBe("customer");
+    });
+  });
+
+  describe("when error is a ModelNotConfiguredError", () => {
+    it("returns 400 with the missing-model cause instead of a generic 500", async () => {
+      const error = new ModelNotConfiguredError(
+        "evaluator.create_default",
+        "DEFAULT",
+        "Evaluator default model",
+        "project_123",
+      );
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      // ModelNotConfiguredError is a HandledError, so it goes through the
+      // generic HandledError branch and `error` carries its enumerated code —
+      // the one the presentation registry writes copy for. The UPPERCASE
+      // `MODEL_NOT_CONFIGURED` is only the legacy tRPC `data.cause`
+      // discriminator and never reaches this boundary.
+      expect(body.error).toBe("model_not_configured");
+      expect(body.featureKey).toBe("evaluator.create_default");
+      expect(body.role).toBe("DEFAULT");
+      expect(body.featureDisplayName).toBe("Evaluator default model");
+      expect(body.projectId).toBe("project_123");
+      expect(body.message).toContain("No model configured");
       expect(body.fault).toBe("customer");
     });
   });

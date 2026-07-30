@@ -330,7 +330,6 @@ function makeMessageSnapshotWithOpenAiFile(scenarioRunId: string) {
 
 let testApiKey: string;
 let testProjectId: string;
-let testProjectSlug: string;
 let orgId: string;
 let teamId: string;
 let previousBaseHost: string | undefined;
@@ -363,7 +362,6 @@ beforeAll(async () => {
   });
   testApiKey = created.apiKey;
   testProjectId = created.id;
-  testProjectSlug = created.slug;
 
   // Set BASE_HOST so the handler can build the redirect URL
   process.env.BASE_HOST = BASE_HOST;
@@ -746,14 +744,18 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
   });
 
   describe("when no scenarioSetId is provided", () => {
-    /** @scenario "DELETE without scenarioSetId returns 400" */
-    it("returns 400 and archives nothing — never wipes the whole project", async () => {
+    /** @scenario "DELETE without scenarioSetId is refused" */
+    it("refuses the request and archives nothing — never wipes the whole project", async () => {
       const res = await app.request("/api/scenario-events", {
         method: "DELETE",
         headers: { "X-Auth-Token": testApiKey },
       });
 
-      expect(res.status).toBe(400);
+      // 422, not 400: a request whose SHAPE is wrong is a schema failure, and
+      // the validation boundary now reports those as unprocessable with the
+      // offending fields attached. 400 is reserved for a body the parser could
+      // not read at all. What the test is really guarding is the line below.
+      expect(res.status).toBe(422);
       // The footgun guard: neither the run lookup nor any archive ran.
       expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
       expect(mockDeleteRun).not.toHaveBeenCalled();
@@ -761,14 +763,14 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
   });
 
   describe("when scenarioSetId is empty", () => {
-    /** @scenario "DELETE with empty scenarioSetId returns 400" */
-    it("returns 400 and archives nothing", async () => {
+    /** @scenario "DELETE with empty scenarioSetId is refused" */
+    it("refuses the request and archives nothing", async () => {
       const res = await app.request("/api/scenario-events?scenarioSetId=", {
         method: "DELETE",
         headers: { "X-Auth-Token": testApiKey },
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422);
       expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
       expect(mockDeleteRun).not.toHaveBeenCalled();
     });

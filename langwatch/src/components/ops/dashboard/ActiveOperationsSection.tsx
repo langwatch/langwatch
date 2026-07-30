@@ -7,15 +7,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
-import type { DashboardData } from "~/server/app-layer/ops/types";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
+import type { DashboardData } from "~/server/app-layer/ops/types";
+import NextLink from "~/utils/compat/next-link";
 
-export function ActiveOperationsSection({
-  data,
-}: {
-  data: DashboardData;
-}) {
+export function ActiveOperationsSection({ data }: { data: DashboardData }) {
   const statusQuery = useReplayStatus();
 
   const replayStatus = statusQuery.data;

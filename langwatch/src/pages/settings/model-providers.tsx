@@ -20,6 +20,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
+import { CodexCodingDefaultsAskHost } from "../../components/settings/CodexCodingDefaultsAsk";
 import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
 import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
@@ -37,6 +38,24 @@ export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
+  // A provider belongs to the organization and reaches the scopes attached
+  // to it, so the write path takes either handle and a project is only the
+  // narrower one. An organization on the agent-governance track has none
+  // until it needs one, and organization scope is the default for a new
+  // credential, so every action here works with or without a project. See
+  // specs/model-providers/providers-without-a-project.feature.
+  const projectId = project?.id;
+  const organizationId = organization?.id;
+
+  // One reason string per blocked action, `undefined` when the action
+  // works. Whatever is rendered inert carries its reason in a tooltip, so
+  // no control on this page can be clicked into silence.
+  const addProviderDisabledReason = !hasModelProvidersManagePermission
+    ? "You need model provider manage permissions to add new providers."
+    : undefined;
+  const rowActionsDisabledReason = !hasModelProvidersManagePermission
+    ? "You need model provider manage permissions to edit or delete providers."
+    : undefined;
   // Flat, uncollapsed list — see useAllModelProvidersList for why this
   // table can't use the collapsed Record from useModelProvidersSettings.
   const {
@@ -48,10 +67,14 @@ export default function ModelsPage() {
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
   const deleteMutation = api.modelProvider.delete.useMutation();
+  // Carries the tenant the row was opened from, so the confirm button
+  // always has the tenant the deletion runs against.
   const [providerToDelete, setProviderToDelete] = useState<{
     id?: string;
     provider: string;
     name: string;
+    projectId: string | undefined;
+    organizationId: string | undefined;
   } | null>(null);
 
   // Build the `available` payload the filter dropdown needs (org / teams /
@@ -111,14 +134,33 @@ export default function ModelsPage() {
   // The prior behavior of hiding already-configured providers prevented
   // the very multi-instance flow the scope picker exists to support.
   const addableProviders = useMemo(() => {
-    return Object.keys(modelProvidersRegistry).map((providerKey) => ({
-      provider: providerKey as keyof typeof modelProvidersRegistry,
-      name:
-        modelProvidersRegistry[
-          providerKey as keyof typeof modelProvidersRegistry
-        ]?.name ?? providerKey,
-      icon: modelProviderIcons[providerKey as keyof typeof modelProviderIcons],
-    }));
+    return Object.keys(modelProvidersRegistry)
+      .map((providerKey) => ({
+        provider: providerKey as keyof typeof modelProvidersRegistry,
+        name:
+          modelProvidersRegistry[
+            providerKey as keyof typeof modelProvidersRegistry
+          ]?.name ?? providerKey,
+        icon: modelProviderIcons[
+          providerKey as keyof typeof modelProviderIcons
+        ],
+        // Sign-in providers (Codex) are a niche, subscription-billed harness,
+        // not a general API-key provider — so they sort to the bottom of the
+        // add menu here. On Langy / onboarding the surface-aware grid promotes
+        // them to the top instead (see providersForSurface). The registry keeps
+        // literal entry types via `satisfies`, so widen to read the optional
+        // authFlow — same pattern as ModelProviderForm's isOAuthDeviceProvider.
+        authFlow: (
+          modelProvidersRegistry[
+            providerKey as keyof typeof modelProvidersRegistry
+          ] as { authFlow?: "api-key" | "oauth-device" } | undefined
+        )?.authFlow,
+      }))
+      .sort((a, b) => {
+        const aDevice = a.authFlow === "oauth-device" ? 1 : 0;
+        const bDevice = b.authFlow === "oauth-device" ? 1 : 0;
+        return aDevice - bDevice;
+      });
   }, []);
 
   const utils = api.useContext();
@@ -160,21 +202,17 @@ export default function ModelsPage() {
           */}
           <AddModelProviderMenu
             addableProviders={addableProviders}
-            disabled={!hasModelProvidersManagePermission}
-            disabledReason="You need model provider manage permissions to add new providers."
+            disabledReason={addProviderDisabledReason}
             onPick={(providerKey) => {
-              if (!project?.id) return;
               openDrawer("editModelProvider", {
-                projectId: project.id,
-                organizationId: organization?.id,
+                projectId,
+                organizationId,
                 providerKey,
                 modelProviderId: "new",
               });
             }}
           >
-            <PageLayout.HeaderButton
-              disabled={!hasModelProvidersManagePermission}
-            >
+            <PageLayout.HeaderButton disabled={!!addProviderDisabledReason}>
               <Plus /> Add Model Provider
             </PageLayout.HeaderButton>
           </AddModelProviderMenu>
@@ -202,12 +240,10 @@ export default function ModelsPage() {
                     miss on a fresh empty screen. */}
                 <AddModelProviderMenu
                   addableProviders={addableProviders}
-                  disabled={!hasModelProvidersManagePermission}
-                  disabledReason="You need model provider manage permissions to add new providers."
+                  disabledReason={addProviderDisabledReason}
                   onPick={(providerKey) => {
-                    if (!project?.id) return;
                     openDrawer("editModelProvider", {
-                      projectId: project.id,
+                      projectId,
                       organizationId: organization?.id,
                       providerKey,
                       modelProviderId: "new",
@@ -217,7 +253,7 @@ export default function ModelsPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={!hasModelProvidersManagePermission}
+                    disabled={!!addProviderDisabledReason}
                     data-testid="empty-state-add-model-provider"
                   >
                     <HStack gap={1}>
@@ -305,80 +341,83 @@ export default function ModelsPage() {
                           />
                         </Table.Cell>
                         <Table.Cell textAlign="right">
-                          {isSystem ? // System (env-fed) providers can't be edited
-                          // through the UI — their config lives in the
-                          // server's process env. Hide the menu so the
-                          // row reads as read-only at a glance.
-                          null : (
+                          {/* System (env-fed) providers can't be edited
+                              through the UI: their config lives in the
+                              server's process env. Hide the menu so the
+                              row reads as read-only at a glance. */}
+                          {isSystem ? null : (
                             <Menu.Root>
                               <Tooltip
-                                content="You need model provider manage permissions to edit or delete providers."
-                                disabled={hasModelProvidersManagePermission}
+                                content={rowActionsDisabledReason ?? ""}
+                                disabled={!rowActionsDisabledReason}
                               >
                                 <TriggerAnchor>
                                   <Menu.Trigger asChild>
                                     <Button
                                       variant="ghost"
-                                      disabled={
-                                        !hasModelProvidersManagePermission
-                                      }
+                                      disabled={!!rowActionsDisabledReason}
                                     >
                                       <MoreVertical />
                                     </Button>
                                   </Menu.Trigger>
                                 </TriggerAnchor>
                               </Tooltip>
-                              <Menu.Content>
-                                <Menu.Item
-                                  value="edit"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    openDrawer("editModelProvider", {
-                                      projectId: project?.id,
-                                      organizationId: organization?.id,
-                                      modelProviderId: provider.id,
-                                      providerKey: provider.provider,
-                                    });
-                                  }}
-                                >
-                                  <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={2}
+                              {!rowActionsDisabledReason && (
+                                <Menu.Content>
+                                  <Menu.Item
+                                    value="edit"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openDrawer("editModelProvider", {
+                                        projectId,
+                                        organizationId,
+                                        modelProviderId: provider.id,
+                                        providerKey: provider.provider,
+                                      });
+                                    }}
                                   >
-                                    <Edit size={14} />
-                                    Edit Provider
-                                  </Box>
-                                </Menu.Item>
-                                <Menu.Item
-                                  value="delete"
-                                  color="red"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setProviderToDelete({
-                                      id: provider.id ?? undefined,
-                                      provider: provider.provider,
-                                      // Match the row label (the instance name,
-                                      // e.g. "OpenAI2") instead of the generic
-                                      // registry name so the dialog names the
-                                      // exact provider the user clicked.
-                                      name:
-                                        (provider as { name?: string }).name ??
-                                        providerSpec?.name ??
-                                        provider.provider,
-                                    });
-                                  }}
-                                >
-                                  <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={2}
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      gap={2}
+                                    >
+                                      <Edit size={14} />
+                                      Edit Provider
+                                    </Box>
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="delete"
+                                    color="red"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setProviderToDelete({
+                                        id: provider.id ?? undefined,
+                                        provider: provider.provider,
+                                        // Match the row label (the instance name,
+                                        // e.g. "OpenAI2") instead of the generic
+                                        // registry name so the dialog names the
+                                        // exact provider the user clicked.
+                                        name:
+                                          (provider as { name?: string })
+                                            .name ??
+                                          providerSpec?.name ??
+                                          provider.provider,
+                                        projectId,
+                                        organizationId,
+                                      });
+                                    }}
                                   >
-                                    <Trash2 size={14} />
-                                    Delete Provider
-                                  </Box>
-                                </Menu.Item>
-                              </Menu.Content>
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      gap={2}
+                                    >
+                                      <Trash2 size={14} />
+                                      Delete Provider
+                                    </Box>
+                                  </Menu.Item>
+                                </Menu.Content>
+                              )}
                             </Menu.Root>
                           )}
                         </Table.Cell>
@@ -398,15 +437,25 @@ export default function ModelsPage() {
             still see the table so they can spot + fix the now-invalid
             orphan defaults. Mounting unconditionally lets the
             getDefaultModelsForProject tRPC query fire in parallel
-            with getAllForProject above, instead of waterfalling. */}
-        <DefaultModelsSection
-          filter={scopeFilter}
-          onFilterChange={handleScopeFilterChange}
-          enabledProviderKeys={enabledProviderKeys}
-          noProvidersConfigured={!isLoading && enabledProviders.length === 0}
-          hierarchy={hierarchy}
-          displayNames={defaultModelsDisplayNames}
-        />
+            with getAllForProject above, instead of waterfalling.
+            Defaults are a per-project setting, so before the first
+            project the section has nothing to read and stays out. */}
+        {projectId && (
+          <DefaultModelsSection
+            filter={scopeFilter}
+            onFilterChange={handleScopeFilterChange}
+            enabledProviderKeys={enabledProviderKeys}
+            noProvidersConfigured={!isLoading && enabledProviders.length === 0}
+            hierarchy={hierarchy}
+            displayNames={defaultModelsDisplayNames}
+          />
+        )}
+
+        {/* The codex drawer closes itself the moment its sign-in completes
+            (the poll persisted the row already); the coding-defaults ask it
+            queues is rendered here, on the page, so the question survives
+            the drawer. */}
+        <CodexCodingDefaultsAskHost />
 
         <Dialog.Root
           open={!!providerToDelete}
@@ -441,10 +490,10 @@ export default function ModelsPage() {
                 loading={deleteMutation.isPending}
                 onClick={async () => {
                   if (!providerToDelete) return;
-                  if (!project?.id) return;
                   await deleteMutation.mutateAsync({
                     id: providerToDelete.id,
-                    projectId: project.id,
+                    projectId: providerToDelete.projectId,
+                    organizationId: providerToDelete.organizationId,
                     provider: providerToDelete.provider,
                   });
                   setProviderToDelete(null);
@@ -480,11 +529,14 @@ export default function ModelsPage() {
  * caller passes (header button in the page top-right + outline button
  * in the empty state). Keeping both callsites on a single helper means
  * the provider list never drifts between the two surfaces.
+ *
+ * `disabledReason` is the single switch: set it and the trigger is
+ * inert with that reason on hover, and no menu is mounted at all, so
+ * adding can never open onto a list of providers that lead nowhere.
  */
 function AddModelProviderMenu({
   children,
   addableProviders,
-  disabled,
   disabledReason,
   onPick,
 }: {
@@ -494,17 +546,22 @@ function AddModelProviderMenu({
     name: string;
     icon: React.ReactNode;
   }>;
-  disabled: boolean;
-  disabledReason: string;
+  disabledReason: string | undefined;
   onPick: (providerKey: string) => void;
 }) {
+  if (disabledReason) {
+    return (
+      <Tooltip content={disabledReason}>
+        <TriggerAnchor>{children}</TriggerAnchor>
+      </Tooltip>
+    );
+  }
+
   return (
     <Menu.Root>
-      <Tooltip content={disabledReason} disabled={!disabled}>
-        <TriggerAnchor>
-          <Menu.Trigger asChild>{children}</Menu.Trigger>
-        </TriggerAnchor>
-      </Tooltip>
+      <TriggerAnchor>
+        <Menu.Trigger asChild>{children}</Menu.Trigger>
+      </TriggerAnchor>
       <Menu.Content>
         {addableProviders.map((provider) => (
           <Menu.Item

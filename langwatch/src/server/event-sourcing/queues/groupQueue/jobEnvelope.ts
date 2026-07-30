@@ -3,12 +3,12 @@ import { randomUUID } from "node:crypto";
 import type { Logger } from "@langwatch/observability";
 
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
-
+import { errText, safeParseErrText } from "../../parseErrorText";
 import { MAX_BLOB_BYTES } from "./blobConstants";
 import {
+  type CompressionCodec,
   compress,
   compressionMediaType,
-  type CompressionCodec,
   contentHashSource,
   decodePayload,
   decompress,
@@ -71,7 +71,7 @@ async function boundedDecompress(data: Buffer): Promise<Buffer> {
  * Inflate + parse a body, naming the failure if it will not read.
  *
  * Named `decode*`, not `read*`: every `read*` in this file contractually never
- * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeHold`…),
+ * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeLease`…),
  * and this throws the `DecodeFailureError`s the drop path dispatches on.
  *
  * A body that is present but unreadable — bad compression frame, a codec this
@@ -116,51 +116,6 @@ function parseInlineBody(body: string): Record<string, unknown> {
     });
   }
 }
-
-const errText = (err: unknown): string =>
-  err instanceof Error ? err.message : String(err);
-
-/**
- * A parse failure's message, with any echoed source text removed.
- *
- * **This is a PII guard, not tidiness.** V8 quotes the offending input back at
- * you: `JSON.parse("patient@hospital.example …")` throws
- * `Unexpected token 'p', "patient@ho"... is not valid JSON` — ten characters of
- * raw body. That message reaches the drop log (`GroupQueue.recordDrop` →
- * `err:`), and `redactStorageUrisInText` only strips storage URIs, so the
- * fragment would land in prod logs verbatim. The body is exactly the thing we
- * promised never to log (a staged payload can carry tenant PII), and it is the
- * thing we could not read anyway.
- *
- * Pre-dates this fix: the bare-JSON path already threw a raw `SyntaxError` that
- * #5736 then started logging. Fixed here rather than inherited (#5538).
- *
- * Keeps the diagnosis (`Unexpected token 'p'`, `Unterminated string`, position)
- * and drops only the quoted echo. zlib messages ("incorrect header check")
- * never echo input, so they pass through untouched.
- */
-const safeParseErrText = (err: unknown): string => {
-  const raw = errText(err);
-  // ALLOWLIST, not blocklist: keep the leading diagnosis and drop everything from
-  // the first delimiter a parser uses to hand input back — `"` (V8's echo, quoted
-  // or truncated) or `[`/`{` (msgpackr's `{"type":"Buffer","data":[83,69]}`, whose
-  // byte array decodes straight back to the plaintext).
-  //
-  // Matching V8's exact wording instead was the first attempt and it leaked: V8
-  // only appends `"..."` at ~21+ chars and echoes the WHOLE string below that, so
-  // a 9-digit SSN or a 6-digit OTP sailed through untouched. A blocklist over one
-  // library's message shapes re-opens on every runtime upgrade — the same
-  // fragility `DecodeFailureReason` exists to avoid for classification.
-  //
-  // What survives the cut is vocabulary, not payload: "Unexpected token 'x'",
-  // "Unterminated string in JSON at position 30", "incorrect header check". The
-  // single-quoted token is one character — kept because it is the most useful
-  // byte in the message and one character is not a secret.
-  const cut = raw.search(/["[{]/);
-  const head = (cut === -1 ? raw : raw.slice(0, cut)).trim().replace(/[,\s]+$/, "");
-  const name = err instanceof Error ? err.name : "Error";
-  return head ? `${name}: ${head}` : name;
-};
 
 /**
  * Decode-side twin of {@link assertPayloadWithinCap}: values staged before the
@@ -253,7 +208,7 @@ export interface EnvelopeHeader {
   r?: string;
   /** GQ2 content-addressed tiered blob reference. */
   ref?: BlobRef;
-  /** GQ2 per-stage hold token — the holder-set member for this staged occupancy. */
+  /** GQ2 per-stage lease holder identity for this staged occupancy. */
   h?: string;
   /** Routing fields read by the Lua dispatcher and ops dashboard WITHOUT parsing the body. */
   p?: string;
@@ -569,7 +524,11 @@ export async function encodeJobEnvelope({
     // GQ2 never serializes `jobData` as a whole — only the payload. The old
     // `JSON.stringify(jobData)` above this branch was a second full pass whose
     // result this path then threw away.
-    const { bytes, codec, json: payloadJson } = encodePayload(payload, {
+    const {
+      bytes,
+      codec,
+      json: payloadJson,
+    } = encodePayload(payload, {
       msgpackEnabled: msgpackWritesEnabled(),
     });
     const payloadBytes = bytes.length;
@@ -590,7 +549,7 @@ export async function encodeJobEnvelope({
       });
       header.e = ref.tier;
       header.ref = ref;
-      // Per-stage hold token: the holder-set member identifying this staged
+      // Per-stage lease holder identity for this staged
       // occupancy. Lives in the (inline) header, never in the content-addressed
       // body, so it doesn't perturb the blob hash that collapses the fan-out.
       header.h = randomUUID();
@@ -602,7 +561,11 @@ export async function encodeJobEnvelope({
     return finalize(
       ENVELOPE_PREFIX_V2,
       header,
-      await inlineBody(payloadJson ?? bytes.toString("utf-8"), payloadBytes, header),
+      await inlineBody(
+        payloadJson ?? bytes.toString("utf-8"),
+        payloadBytes,
+        header,
+      ),
     );
   }
 
@@ -615,7 +578,7 @@ export async function encodeJobEnvelope({
 
   // GQ1 fallback path: reached when the caller opted into writes but didn't
   // supply BOTH a tiered store and a projectId. Loud so a composition-root
-  // regression can't silently ship a pipeline without dedup / holder refcount /
+  // regression can't silently ship a pipeline without dedup / blob leasing /
   // tenant namespacing (2026-06-24 review).
   if (queueName) gqEnvelopeGQ2DowngradeTotal.inc({ queue_name: queueName });
   if (logger) {
@@ -679,9 +642,9 @@ export async function decodeJobEnvelope({
   if (header.e === "redis" || header.e === "s3") {
     if (!header.ref) {
       throw new DecodeFailureError({
-      message: "Malformed job envelope: tiered body without a blob ref",
-      reason: "malformed_envelope",
-    });
+        message: "Malformed job envelope: tiered body without a blob ref",
+        reason: "malformed_envelope",
+      });
     }
     if (!tieredBlobs) {
       throw new Error(
@@ -694,9 +657,9 @@ export async function decodeJobEnvelope({
         : await tieredBlobs.get(header.ref);
     if (!data) {
       throw new DecodeFailureError({
-      message: "Job envelope tiered blob is missing (deleted or expired)",
-      reason: "missing_blob",
-    });
+        message: "Job envelope tiered blob is missing (deleted or expired)",
+        reason: "missing_blob",
+      });
     }
     const parsedBody = await decodeBody(data);
     return mergeMachinery(parsedBody, header);
@@ -706,9 +669,9 @@ export async function decodeJobEnvelope({
   if (header.e === "ref") {
     if (typeof header.r !== "string" || header.r.length === 0) {
       throw new DecodeFailureError({
-      message: "Malformed job envelope: ref body without a blob id",
-      reason: "malformed_envelope",
-    });
+        message: "Malformed job envelope: ref body without a blob id",
+        reason: "malformed_envelope",
+      });
     }
     if (!blobs) {
       throw new Error(
@@ -721,9 +684,9 @@ export async function decodeJobEnvelope({
         : await blobs.get({ id: header.r });
     if (!data) {
       throw new DecodeFailureError({
-      message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
-      reason: "missing_blob",
-    });
+        message: `Job envelope blob ${header.r} is missing (deleted or expired)`,
+        reason: "missing_blob",
+      });
     }
     return await decodeBody(data);
   }
@@ -771,8 +734,79 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
 }
 
 /**
- * Header-taking variant of {@link readEnvelopeBlobId} — for callers that have
- * already parsed the envelope and don't want a second `Buffer.from + JSON.parse`.
+ * Reads the retry attempt from the header alone (envelope values) or via a full
+ * parse (legacy bare JSON). Never throws; an absent or unreadable attempt is
+ * null, which the caller reads as "this message cannot say".
+ *
+ * This exists so the retry count can live ON THE MESSAGE and still be legible
+ * to the one reader that cannot decode a message: when a job's body is held in
+ * a blob store that is temporarily unreachable, the ladder that decides whether
+ * to retry or give up has nothing but the value in hand. The header is plain
+ * inline JSON in front of the body, so it is readable with no blob I/O.
+ *
+ * GQ1 envelopes never lifted machinery into the header (`routingHeader` sets
+ * only the routing trio), so their attempt is inside the body and this reports
+ * null rather than guessing.
+ */
+export function readJobAttempt(value: string): number | null {
+  try {
+    const machinery = isEnvelope(value)
+      ? ((splitEnvelope(value).header.m ?? {}) as Record<string, unknown>)
+      : (JSON.parse(value) as Record<string, unknown>);
+    const attempt = machinery.__attempt;
+    // Reported verbatim: this is a reader, and one that silently reshapes what
+    // is stored cannot be used to check what was written. `__attempt` is lifted
+    // out of the payload by name, so a job whose payload carried that key could
+    // name a number past the budget — the ladder then treats it as already
+    // spent and retires the job, which is the fail-closed direction.
+    return typeof attempt === "number" &&
+      Number.isInteger(attempt) &&
+      attempt > 0
+      ? attempt
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The same value with its retry attempt stamped into the header, rewriting the
+ * HEADER ONLY.
+ *
+ * The body string is reused byte for byte, which is the whole point: the body
+ * is what the blob store content-addresses and what identical jobs share, so
+ * re-encoding it to change a counter would split that shared copy and churn the
+ * lease identity. Advancing an attempt is metadata, and costs no blob I/O.
+ *
+ * GQ1 and legacy bare JSON are returned unchanged. The asymmetry is worth
+ * naming: bare JSON's attempt is still READABLE by {@link readJobAttempt} (it
+ * is an ordinary body field), just not advanceable here — so for those the
+ * group's retry chain is what keeps the ladder finite.
+ */
+export function withJobAttempt({
+  value,
+  attempt,
+}: {
+  value: string;
+  attempt: number;
+}): string {
+  if (!value.startsWith(ENVELOPE_PREFIX_V2)) return value;
+  try {
+    const { header, body } = splitEnvelope(value);
+    return finalize(
+      ENVELOPE_PREFIX_V2,
+      { ...header, m: { ...(header.m ?? {}), __attempt: attempt } },
+      body,
+    );
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * The GQ1 offloaded-blob id from a parsed envelope header, or null for inline
+ * bodies, GQ2 tiered refs, and legacy JSON. The retirement paths read it via
+ * {@link readEnvelopeRetirement} so completion/restage pay a single parse.
  */
 export function readEnvelopeBlobIdFromHeader(
   header: EnvelopeHeader,
@@ -781,74 +815,76 @@ export function readEnvelopeBlobIdFromHeader(
 }
 
 /**
- * Returns the GQ1 offloaded-blob id of an envelope value, or null for inline
- * bodies, GQ2 tiered refs, legacy JSON, and unreadable values. Used by the
- * completion and restage paths to delete blobs whose staged value is retired.
- */
-export function readEnvelopeBlobId(value: string): string | null {
-  try {
-    if (!isEnvelope(value)) return null;
-    const { header } = splitEnvelope(value);
-    return readEnvelopeBlobIdFromHeader(header);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Header-taking variant of {@link readEnvelopeHold} — for callers that have
+ * Header-taking variant of {@link readEnvelopeLease} — for callers that have
  * already parsed the envelope and don't want a second `Buffer.from + JSON.parse`.
  */
-export function readEnvelopeHoldFromHeader(
+export function readEnvelopeLeaseFromHeader(
   header: EnvelopeHeader,
-): { ref: BlobRef; token: string } | null {
+): { ref: BlobRef; holderId: string } | null {
   if (
     (header.e === "redis" || header.e === "s3") &&
     header.ref &&
     typeof header.h === "string"
   ) {
-    return { ref: header.ref, token: header.h };
+    return { ref: header.ref, holderId: header.h };
   }
   return null;
 }
 
 /**
- * Returns the GQ2 ref together with its per-stage hold token (the holder-set
- * member), or null for inline bodies, GQ1 refs, legacy JSON, and unreadable
- * values. The acquire/release seams use this to reference-count the blob
- * without depending on the Lua-internal slot id.
+ * Every tiered ref the decoder would fetch, whether or not it carries a lease.
+ *
+ * The tenant guard MUST key off this rather than off {@link readEnvelopeLeaseFromHeader}:
+ * that one additionally requires `header.h`, so an envelope with a valid
+ * cross-tenant `ref` and no holder id yields no lease, skips the guard, and is
+ * still fetched by `decodeJobEnvelope` — which has no tenant check of its own.
+ * A forged or mis-routed envelope could read another tenant's blob that way.
+ * Validate the ref; use the lease only for renewal (ADR-030 §5).
  */
-export function readEnvelopeHold(
+export function readEnvelopeTieredRefFromHeader(
+  header: EnvelopeHeader,
+): BlobRef | null {
+  if ((header.e === "redis" || header.e === "s3") && header.ref) {
+    return header.ref;
+  }
+  return null;
+}
+
+/**
+ * Returns the GQ2 ref together with its per-stage lease holder identity, or
+ * null for inline bodies, GQ1 refs, legacy JSON, and unreadable values.
+ */
+export function readEnvelopeLease(
   value: string,
-): { ref: BlobRef; token: string } | null {
+): { ref: BlobRef; holderId: string } | null {
   try {
     if (!isEnvelope(value)) return null;
     const { header } = splitEnvelope(value);
-    return readEnvelopeHoldFromHeader(header);
+    return readEnvelopeLeaseFromHeader(header);
   } catch {
     return null;
   }
 }
 
 /**
- * Single parse for retirement: given a staged value, return the GQ2 hold and/or
- * GQ1 blob id from ONE `splitEnvelope`. Prefer over calling `readEnvelopeHold`
- * + `readEnvelopeBlobId` in sequence on the completion / restage hot path
+ * Single parse for retirement: given a staged value, return the GQ2 lease and/or
+ * GQ1 blob id from ONE `splitEnvelope`. Prefer over calling `readEnvelopeLease`
+ * + the blob-id read in sequence on the completion / restage hot path
  * (2026-06-24 review).
  */
 export function readEnvelopeRetirement(value: string): {
-  hold: { ref: BlobRef; token: string } | null;
+  lease: { ref: BlobRef; holderId: string } | null;
   blobId: string | null;
 } {
   try {
-    if (!isEnvelope(value)) return { hold: null, blobId: null };
+    if (!isEnvelope(value)) return { lease: null, blobId: null };
     const { header } = splitEnvelope(value);
     return {
-      hold: readEnvelopeHoldFromHeader(header),
+      lease: readEnvelopeLeaseFromHeader(header),
       blobId: readEnvelopeBlobIdFromHeader(header),
     };
   } catch {
-    return { hold: null, blobId: null };
+    return { lease: null, blobId: null };
   }
 }
 

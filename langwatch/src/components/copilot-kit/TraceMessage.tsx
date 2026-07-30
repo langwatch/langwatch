@@ -1,17 +1,9 @@
-import {
-  Alert,
-  Button,
-  HStack,
-  Spinner,
-  type StackProps,
-  Text,
-} from "@chakra-ui/react";
-import { LuListTree, LuRefreshCw } from "react-icons/lu";
+import { Button, HStack, type StackProps } from "@chakra-ui/react";
+import { LuListTree } from "react-icons/lu";
 import { TracePreviewHoverCard } from "~/features/traces-v2/components/TraceIdPeek";
 import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { easyCatchToast } from "../../utils/easyCatchToast";
 
 // Constants
 export const TRACE_QUERY_CONFIG = {

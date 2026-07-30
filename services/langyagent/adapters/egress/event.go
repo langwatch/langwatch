@@ -1,9 +1,17 @@
 package egress
 
-import "go.uber.org/zap"
+import (
+	"context"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
+	"go.uber.org/zap"
+)
 
 // egressDecision is the verb attached to every observed outbound flow. Rung 0
-// (ADR-043) makes every enforcement action ALSO a monitored event, so a
+// (ADR-076) makes every enforcement action ALSO a monitored event, so a
 // deny/throttle is a monitored deny/throttle — the same event with a different
 // verb. The control plane never sees these; they are pod-local telemetry.
 type egressDecision string
@@ -29,7 +37,16 @@ const (
 	egressDeniedCleartext egressDecision = "denied_cleartext"
 	// egressDeniedSNIMismatch: the TLS ClientHello SNI did not match the CONNECT
 	// authority the decision was made against (domain-fronting attempt).
-	egressDeniedSNIMismatch    egressDecision = "denied_sni_mismatch"
+	egressDeniedSNIMismatch egressDecision = "denied_sni_mismatch"
+	// egressDeniedSNIUnreadable: the stream is a TLS handshake but no SNI could
+	// be recovered from it, while an allow-list (or the enforced floor) is in
+	// force. Fragmentation alone does not get you here — the peek reassembles a
+	// ClientHello split across records — so what remains is ClientHello data that
+	// is malformed, incomplete, or unsupported (including a record version no TLS
+	// record uses), or a peer that claims a handshake and then sends nothing.
+	// Under an enforcing policy "cannot read" must fail closed — otherwise the
+	// anti-fronting check is opt-out.
+	egressDeniedSNIUnreadable  egressDecision = "denied_sni_unreadable"
 	egressDeniedPrivateAddress egressDecision = "denied_private_address"
 )
 
@@ -37,7 +54,7 @@ const (
 // destination). Used at the call site to choose 403 vs. tunnel.
 func (d egressDecision) blocked() bool {
 	switch d {
-	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch, egressDeniedPrivateAddress:
+	case egressDenied, egressDeniedCleartext, egressDeniedSNIMismatch, egressDeniedSNIUnreadable, egressDeniedPrivateAddress:
 		return true
 	default:
 		return false
@@ -55,7 +72,7 @@ type egressEvent struct {
 	Bytes          int64
 }
 
-// egressMonitor is the rung-0 flag sink (ADR-043). The enforcing adapter calls
+// egressMonitor is the rung-0 flag sink (ADR-076). The enforcing adapter calls
 // record() on every per-CONNECT decision so enforcement and monitoring are the
 // same event. The default is logEgressMonitor (pod log); an operator wiring a
 // richer attributed-telemetry sink injects it at NewEnforcingGuard time.
@@ -64,24 +81,52 @@ type egressMonitor interface {
 }
 
 // logEgressMonitor is the default monitor: it emits every decision to the pod
-// log, so "every enforcement action is a monitored event" holds out of the box.
+// log AND bumps the langy.egress.decisions counter, so "every enforcement
+// action is a monitored event" holds out of the box and allow/deny/throttle
+// rates are graphable without log scraping.
 type logEgressMonitor struct {
-	log *zap.Logger
+	log       *zap.Logger
+	decisions metric.Int64Counter
 }
 
 // newLogEgressMonitor returns the default egress monitor, which reports each
 // decision to the service log. It is the fallback when no richer sink is wired.
 func newLogEgressMonitor(log *zap.Logger) *logEgressMonitor {
-	return &logEgressMonitor{log: log}
+	return &logEgressMonitor{log: log, decisions: newEgressDecisionCounter()}
+}
+
+// newEgressDecisionCounter builds the decision counter on the same global
+// meter as internal/telemetry's instruments (ADR-047: egress monitoring hangs
+// off the manager's one meter). The noop fallback mirrors the relay's
+// drop counter: telemetry must never be the reason egress breaks.
+func newEgressDecisionCounter() metric.Int64Counter {
+	const name = "langy.egress.decisions"
+	counter, err := otel.Meter("langwatch-langyagent").Int64Counter(
+		name,
+		metric.WithDescription("Count of worker egress decisions, tagged by the decision verb (allowed_floor / allowed_monitor / allowed_listed / throttled / denied*)."),
+	)
+	if err == nil {
+		return counter
+	}
+	fallback, _ := noop.NewMeterProvider().Meter("langwatch-langyagent").Int64Counter(name)
+	return fallback
 }
 
 // record emits one structured line per egress decision — allowed or refused —
 // so a tenant's outbound attempts stay auditable. Host and port are recorded;
 // request contents and credentials deliberately are not. A nil monitor or nil
 // logger is a no-op so callers never have to guard the call site.
+//
+// The metric carries only the bounded decision verb: host and conversation id
+// are unbounded attribute values that belong in the log line, not a counter.
 func (m *logEgressMonitor) record(e egressEvent) {
 	if m == nil || m.log == nil {
 		return
+	}
+	if m.decisions != nil {
+		m.decisions.Add(context.Background(), 1, metric.WithAttributes(
+			attribute.String("decision", string(e.Decision)),
+		))
 	}
 	m.log.Info("langy egress",
 		zap.String("conversation", e.ConversationID),

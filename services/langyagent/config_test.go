@@ -124,7 +124,9 @@ func TestLoadConfig_InvalidPortFailsFast(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_NonLocalLowersSampleRatio(t *testing.T) {
+// No environment lowers the default for backend services: full sampling holds
+// in production too, unless an operator says otherwise.
+func TestLoadConfig_NonLocalStillSamplesEverything(t *testing.T) {
 	clearLangyEnv(t)
 	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
 	t.Setenv("ENVIRONMENT", "production")
@@ -133,8 +135,8 @@ func TestLoadConfig_NonLocalLowersSampleRatio(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
 	}
-	if got := cfg.OTel.SamplerChoice().Ratio; got != 0.1 {
-		t.Errorf("non-local sampler ratio = %v, want 0.1", got)
+	if got := cfg.OTel.SamplerChoice().Ratio; got != 1.0 {
+		t.Errorf("non-local sampler ratio = %v, want 1.0 (backend services sample everything by default)", got)
 	}
 }
 
@@ -270,5 +272,35 @@ func TestLoadConfig_ShutdownHandoffBudgetsWithinGracefulAccepted(t *testing.T) {
 	}
 	if cfg.ShutdownHandoffDeadline() != 4*time.Second {
 		t.Errorf("ShutdownHandoffDeadline = %s, want 4s", cfg.ShutdownHandoffDeadline())
+	}
+}
+
+func TestLoadConfig_SamplerDefaultsToFullParentBased(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	choice := cfg.OTel.SamplerChoice()
+	if !choice.ParentBased || choice.Ratio != 1.0 {
+		t.Fatalf("ops telemetry must default to full parent-based sampling, got %+v", choice)
+	}
+}
+
+func TestLoadConfig_SamplerEnvStillWins(t *testing.T) {
+	clearLangyEnv(t)
+	t.Setenv("LANGY_INTERNAL_SECRET", "secret")
+	t.Setenv("OTEL_TRACES_SAMPLER", "parentbased_traceidratio")
+	t.Setenv("OTEL_TRACES_SAMPLER_ARG", "0.2")
+
+	cfg, err := LoadConfig(context.Background())
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	choice := cfg.OTel.SamplerChoice()
+	if !choice.ParentBased || choice.Ratio != 0.2 {
+		t.Fatalf("operator sampler must win over the service default, got %+v", choice)
 	}
 }

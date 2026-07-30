@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import { computeEffectiveTeamRoleUpdates } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 
 describe("computeEffectiveTeamRoleUpdates()", () => {
@@ -24,15 +24,11 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
       });
 
       it("returns requested updates for MEMBER org role", () => {
-        const requested = [
-          { teamId: "team-1", role: TeamUserRole.ADMIN },
-        ];
+        const requested = [{ teamId: "team-1", role: TeamUserRole.ADMIN }];
 
         const result = computeEffectiveTeamRoleUpdates({
           requestedTeamRoleUpdates: requested,
-          currentMemberships: [
-            { teamId: "team-1", role: TeamUserRole.VIEWER },
-          ],
+          currentMemberships: [{ teamId: "team-1", role: TeamUserRole.VIEWER }],
           newOrganizationRole: OrganizationUserRole.MEMBER,
         });
 
@@ -42,9 +38,7 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
 
     describe("when new org role is EXTERNAL", () => {
       it("includes requested updates and falls back uncovered memberships to VIEWER", () => {
-        const requested = [
-          { teamId: "team-1", role: TeamUserRole.VIEWER },
-        ];
+        const requested = [{ teamId: "team-1", role: TeamUserRole.VIEWER }];
 
         const result = computeEffectiveTeamRoleUpdates({
           requestedTeamRoleUpdates: requested,
@@ -58,8 +52,16 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
 
         expect(result).toEqual([
           { teamId: "team-1", role: TeamUserRole.VIEWER },
-          { teamId: "team-2", role: TeamUserRole.VIEWER, customRoleId: undefined },
-          { teamId: "team-3", role: TeamUserRole.VIEWER, customRoleId: undefined },
+          {
+            teamId: "team-2",
+            role: TeamUserRole.VIEWER,
+            customRoleId: undefined,
+          },
+          {
+            teamId: "team-3",
+            role: TeamUserRole.VIEWER,
+            customRoleId: undefined,
+          },
         ]);
       });
 
@@ -99,17 +101,23 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
         });
 
         expect(result).toEqual([
-          { teamId: "team-1", role: TeamUserRole.VIEWER, customRoleId: undefined },
-          { teamId: "team-2", role: TeamUserRole.VIEWER, customRoleId: undefined },
+          {
+            teamId: "team-1",
+            role: TeamUserRole.VIEWER,
+            customRoleId: undefined,
+          },
+          {
+            teamId: "team-2",
+            role: TeamUserRole.VIEWER,
+            customRoleId: undefined,
+          },
         ]);
       });
 
       it("returns empty array when all memberships are already VIEWER", () => {
         const result = computeEffectiveTeamRoleUpdates({
           requestedTeamRoleUpdates: [],
-          currentMemberships: [
-            { teamId: "team-1", role: TeamUserRole.VIEWER },
-          ],
+          currentMemberships: [{ teamId: "team-1", role: TeamUserRole.VIEWER }],
           newOrganizationRole: OrganizationUserRole.EXTERNAL,
         });
 
@@ -130,8 +138,16 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
         });
 
         expect(result).toEqual([
-          { teamId: "team-1", role: TeamUserRole.MEMBER, customRoleId: undefined },
-          { teamId: "team-3", role: TeamUserRole.MEMBER, customRoleId: undefined },
+          {
+            teamId: "team-1",
+            role: TeamUserRole.MEMBER,
+            customRoleId: undefined,
+          },
+          {
+            teamId: "team-3",
+            role: TeamUserRole.MEMBER,
+            customRoleId: undefined,
+          },
         ]);
       });
 

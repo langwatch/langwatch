@@ -1,18 +1,18 @@
 import {
-  Avatar,
+  Box,
   Container,
   Heading,
   HStack,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
-
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
+import { UserAvatar } from "~/components/UserAvatar";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 export default function Annotations() {
   const router = useRouter();
@@ -40,9 +40,13 @@ export default function Annotations() {
           {queueMembers?.map((member) => {
             return (
               <Tooltip key={member.id} content={member.name}>
-                <Avatar.Root size="xs">
-                  <Avatar.Fallback name={member.name ?? ""} />
-                </Avatar.Root>
+                <Box display="inline-flex">
+                  <UserAvatar
+                    size="xs"
+                    name={member.name ?? ""}
+                    image={member.image}
+                  />
+                </Box>
               </Tooltip>
             );
           })}
@@ -53,11 +57,7 @@ export default function Annotations() {
 
   return (
     <AnnotationsLayout>
-      <Container
-        maxWidth={"calc(100vw - 330px)"}
-        padding={0}
-        margin={0}
-      >
+      <Container maxWidth={"calc(100vw - 330px)"} padding={0} margin={0}>
         <AnnotationsTable
           noDataTitle="No queued annotations for this queue"
           noDataDescription="Add a message to this queue to get started."

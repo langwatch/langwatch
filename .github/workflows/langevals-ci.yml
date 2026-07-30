@@ -16,7 +16,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede an outdated run on a PR branch, never on main: every commit
+  # that lands on main has to keep its own validation, and cancelling here
+  # would let a merge silently void the run for the commit before it.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   changes:
@@ -28,6 +31,9 @@ jobs:
       - uses: ./.github/actions/detect-changes
         id: detect
         with:
+          # push-strategy diff: the test job spends real LLM money, so it
+          # must not run on pushes that touched nothing under langevals/.
+          push-strategy: diff
           filters: |
             relevant:
               - 'langevals/**'

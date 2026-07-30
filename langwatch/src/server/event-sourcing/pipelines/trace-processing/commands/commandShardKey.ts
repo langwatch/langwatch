@@ -1,12 +1,13 @@
 /**
- * Shared shard-bucketing helper for the trace-processing command group keys.
+ * Shared shard-bucketing helper for the trace-processing command group key.
  *
- * `spanCommandGroupKey` (recordSpan) and `logCommandGroupKey` (recordLog) both
- * fan a hot trace's records across `traceId:<shard>` lanes on the GroupQueue.
- * They bucket on the record's span id with the SAME rolling hash and the SAME
- * clamp shape; this module holds that one implementation so the two callers stay
- * byte-identical. Each caller keeps its own public API and its own
- * `MAX_*_SHARD_COUNT` constant (both 128 today, but independently tunable).
+ * `spanCommandGroupKey` (recordSpan) fans a hot trace's spans across
+ * `traceId:<shard>` lanes on the GroupQueue, bucketing on the record's span id
+ * with the rolling hash and clamp shape defined here. Holding the shard math in
+ * one module keeps a record's bucket byte-stable — deterministic across
+ * processes and restarts, the property a record's retries and its dedup squash
+ * window depend on. `spanCommandGroupKey` keeps its own public API and its own
+ * `MAX_SPAN_SHARD_COUNT` constant.
  */
 
 // FNV-1a (32-bit) constants. A record's bucket must be deterministic across

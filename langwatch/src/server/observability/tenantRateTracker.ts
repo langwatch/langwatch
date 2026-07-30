@@ -60,7 +60,8 @@ export class TenantRateTracker {
    * unbounded before trimming existed). Bounds the hash at ~one field per
    * active minute over the window.
    */
-  private static readonly RETENTION_MINUTES = TenantRateTracker.TTL_SECONDS / 60;
+  private static readonly RETENTION_MINUTES =
+    TenantRateTracker.TTL_SECONDS / 60;
   /**
    * Batch size for the on-read orphan trim. A hash that predates trimming can
    * hold hundreds of thousands of fields; delete them in chunks so a single
@@ -295,7 +296,7 @@ export class TenantRateTracker {
  * before the first `/`). Returns null when the groupId has no slash.
  *
  * WARNING: this is convention, not enforced. Today every groupId
- * producer happens to put the tenantId first, and DISPATCH_LUA also
+ * producer happens to put the tenantId first, and DISPATCH_BATCH_LUA also
  * relies on this exact parse. A future cross-tenant groupId (or any
  * group that doesn't follow the prefix rule) would silently land in
  * the wrong bucket here — the right long-term fix is to document the

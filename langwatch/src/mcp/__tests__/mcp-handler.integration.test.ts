@@ -17,8 +17,8 @@ import {
   describe,
   expect,
   it,
-  vi,
   type MockInstance,
+  vi,
 } from "vitest";
 import type { McpHandler } from "../handler";
 
@@ -166,6 +166,12 @@ function createPkceChallenge() {
   return { codeVerifier, codeChallenge };
 }
 
+// Matches TEST_REDIRECT_URI / TEST_CLIENT_ID below — the values every
+// /oauth/token test request in this file sends, since the token endpoint now
+// requires them to match what /mcp/authorize bound to the code.
+const TEST_REDIRECT_URI = "http://localhost/callback";
+const TEST_CLIENT_ID = "test_client";
+
 /**
  * Stores a mock auth code in the Redis mock that the handler can retrieve.
  */
@@ -174,17 +180,23 @@ function mockAuthCodeInRedis({
   codeChallenge,
   apiKey = VALID_API_KEY,
   expiresAt,
+  redirectUri = TEST_REDIRECT_URI,
+  clientId = TEST_CLIENT_ID,
 }: {
   code: string;
   codeChallenge: string;
   apiKey?: string;
   expiresAt?: number;
+  redirectUri?: string;
+  clientId?: string;
 }) {
   const entry = JSON.stringify({
     projectId: PROJECT_ID,
     encryptedApiKey: `encrypted:${apiKey}`,
     codeChallenge,
     codeChallengeMethod: "S256",
+    redirectUri,
+    clientId,
     expiresAt: expiresAt ?? Date.now() + 600_000,
   });
 
@@ -227,9 +239,9 @@ async function sendRequest({
   if (
     path === "/mcp" &&
     (method === "POST" || method === "GET") &&
-    !fetchHeaders["accept"]
+    !fetchHeaders.accept
   ) {
-    fetchHeaders["accept"] = "text/event-stream, application/json";
+    fetchHeaders.accept = "text/event-stream, application/json";
   }
 
   const res = await fetch(url, {
@@ -401,7 +413,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=http://localhost/callback`,
+        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
       });
 
       expect(res.status).toBe(200);
@@ -427,7 +439,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=wrong-verifier`,
+        body: `grant_type=authorization_code&code=${code}&code_verifier=wrong-verifier&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
       });
 
       expect(res.status).toBe(400);
@@ -495,7 +507,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=invalid-code&code_verifier=some-verifier`,
+        body: `grant_type=authorization_code&code=invalid-code&code_verifier=some-verifier&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
       });
 
       expect(res.status).toBe(400);
@@ -503,6 +515,165 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(body.error).toBe("invalid_grant");
     });
   });
+
+  // --- Security: redirect_uri / client_id binding (RFC 6749 §10.6, §4.1.3),
+  //     and dynamic client registration persistence (RFC 7591) ---
+  //
+  // /mcp/authorize binds an issued code to the exact client_id + redirect_uri
+  // it validated (see mcp-authorize.rolebinding.unit.test.ts for the
+  // authorize-side registered-client check). The exchange below re-validates
+  // that binding — a code minted for one redirect_uri/client_id must never be
+  // redeemable with a different one, otherwise whoever crafted the original
+  // authorization request (not necessarily the user who approved it) could
+  // exfiltrate the code to a URI they control.
+  //
+  // Wrapped in its own rate-limiter reset: /oauth/token and /oauth/register
+  // share one IP-keyed limiter (10/min) across this whole file's ~30 other
+  // tests, several of which also hit these endpoints. Without resetting
+  // before AND after, this block's extra calls would push later tests (or
+  // get pushed by earlier ones) over the shared budget and 429 instead of
+  // exercising what they're actually testing.
+  describe("OAuth security: redirect_uri/client_id binding + registration", () => {
+    beforeEach(() => {
+      handler.clearRateLimiters();
+    });
+    afterEach(() => {
+      handler.clearRateLimiters();
+    });
+
+    describe("when the token exchange omits redirect_uri", () => {
+      /** @scenario Token exchange is rejected when redirect_uri is missing */
+      it("returns 400 with invalid_request error", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&client_id=${TEST_CLIENT_ID}`,
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_request");
+        expect(body.error_description).toContain("redirect_uri is required");
+      });
+    });
+
+    describe("when the token exchange omits client_id", () => {
+      /** @scenario Token exchange is rejected when client_id is missing */
+      it("returns 400 with invalid_request error", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&redirect_uri=${TEST_REDIRECT_URI}`,
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_request");
+        expect(body.error_description).toContain("client_id is required");
+      });
+    });
+
+    describe("when the token exchange presents a different redirect_uri than the one bound at authorize", () => {
+      /** @scenario Token exchange is rejected when redirect_uri does not match the authorization request */
+      it("returns 400 with invalid_grant and never issues a token", async () => {
+        const code = randomUUID();
+        const { codeVerifier, codeChallenge } = createPkceChallenge();
+        mockAuthCodeInRedis({ code, codeChallenge });
+
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=https://attacker.invalid/callback&client_id=${TEST_CLIENT_ID}`,
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_grant");
+        expect(body.error_description).toContain("redirect_uri");
+        expect(body.access_token).toBeUndefined();
+      });
+    });
+
+    describe("when the token exchange presents a different client_id than the one bound at authorize", () => {
+      /** @scenario Token exchange is rejected when client_id does not match the authorization request */
+      it("returns 400 with invalid_grant and never issues a token", async () => {
+        const code = randomUUID();
+        const { codeVerifier, codeChallenge } = createPkceChallenge();
+        mockAuthCodeInRedis({ code, codeChallenge });
+
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=mcp_someone_elses_client`,
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_grant");
+        expect(body.error_description).toContain("client_id");
+        expect(body.access_token).toBeUndefined();
+      });
+    });
+
+    // --- Security: dynamic client registration persistence (RFC 7591) ---
+
+    describe("when a new OAuth client registers", () => {
+      /** @scenario Dynamic client registration persists the redirect_uris binding */
+      it("persists the client_id -> redirect_uris binding to Redis", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/register`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            client_name: "test-client",
+            redirect_uris: ["https://registered.example/callback"],
+          }),
+        });
+
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.client_id).toMatch(/^mcp_/);
+
+        // The whole point: this registration must be durably retrievable by
+        // /mcp/authorize later, not just echoed back in this response.
+        expect(mockRedis.set).toHaveBeenCalledWith(
+          `mcp:oauth:client:${body.client_id}`,
+          JSON.stringify({
+            redirectUris: ["https://registered.example/callback"],
+            clientName: "test-client",
+          }),
+          "EX",
+          expect.any(Number),
+        );
+      });
+    });
+
+    describe("when OAuth client registration is missing redirect_uris", () => {
+      /** @scenario Dynamic client registration rejects a request with no redirect_uris */
+      it("returns 400 with invalid_client_metadata", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/register`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ client_name: "test-client" }),
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_client_metadata");
+      });
+    });
+  }); // end "OAuth security: redirect_uri/client_id binding + registration"
 
   // --- Bearer Token DB Validation ---
 
@@ -552,7 +723,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=http://localhost/callback`,
+        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
       });
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
@@ -594,7 +765,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=http://localhost/callback`,
+        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
       });
       const tokenBody = await tokenRes.json();
       const accessToken = tokenBody.access_token;
@@ -871,10 +1042,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // from the main app (~/server/db, ~/server/redis, etc.)
       const fs = await import("node:fs");
       const path = await import("node:path");
-      const mcpServerDir = path.resolve(__dirname, "../../../../mcp-server/src");
+      const mcpServerDir = path.resolve(
+        __dirname,
+        "../../../../mcp-server/src",
+      );
       const createMcpServerSrc = fs.readFileSync(
         path.join(mcpServerDir, "create-mcp-server.ts"),
-        "utf-8"
+        "utf-8",
       );
       // Should not import from the main app
       expect(createMcpServerSrc).not.toContain("~/server/");
@@ -1013,7 +1187,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=http://localhost/callback`,
+        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=${TEST_CLIENT_ID}`,
       });
       const tokenBody = (await tokenRes.json()) as { access_token: string };
       const accessToken = tokenBody.access_token;
@@ -1159,7 +1333,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
           method: "tools/call",
           params: {
             name: "fetch_langwatch_docs",
-            arguments: { url: "https://langwatch.ai/docs/integration/overview.md" },
+            arguments: {
+              url: "https://langwatch.ai/docs/integration/overview.md",
+            },
           },
         },
         headers: {
@@ -1218,9 +1394,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       // Parse SSE stream to get the endpoint event with session URL
       const sseBody = sseChunks.join("");
-      const endpointMatch = sseBody.match(
-        /event:\s*endpoint\ndata:\s*(.+)/,
-      );
+      const endpointMatch = sseBody.match(/event:\s*endpoint\ndata:\s*(.+)/);
       expect(endpointMatch).toBeTruthy();
 
       const messagesPath = endpointMatch![1]!.trim();

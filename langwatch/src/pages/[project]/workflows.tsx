@@ -6,14 +6,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus, Workflow } from "lucide-react";
+import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
+import { workflowContextChip } from "~/features/langy/logic/langyContextChips";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { NoDataInfoBlock } from "../../components/NoDataInfoBlock";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
 import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
+import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
 import { api } from "../../utils/api";
 
 function Workflows() {
@@ -65,30 +67,41 @@ function Workflows() {
                 <Skeleton key={index} height="200px" />
               ))}
             {workflows.data?.map((workflow) => (
-              <Link
-                href={`/${project?.slug}/studio/${workflow.id}`}
+              // Armed, the card can be handed to Langy; the link still opens the
+              // studio exactly as before. The chip id matches the one
+              // `/studio/<id>` derives, so pointing at a card and then opening
+              // it is one chip.
+              <LangyContextTarget
                 key={workflow.id}
-                display="block"
-                asChild
+                target={workflowContextChip({
+                  workflowId: workflow.id,
+                  name: workflow.name,
+                })}
               >
-                <WorkflowCard
-                  workflowId={workflow.id}
-                  query={workflows}
-                  name={workflow.name}
-                  icon={workflow.icon}
-                  onClick={(e) => {
-                    let target = e.target as HTMLElement;
-                    while (target.parentElement) {
-                      if (target.classList.contains("js-inner-menu")) {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        return false;
+                <Link
+                  href={`/${project?.slug}/studio/${workflow.id}`}
+                  display="block"
+                  asChild
+                >
+                  <WorkflowCard
+                    workflowId={workflow.id}
+                    query={workflows}
+                    name={workflow.name}
+                    icon={workflow.icon}
+                    onClick={(e) => {
+                      let target = e.target as HTMLElement;
+                      while (target.parentElement) {
+                        if (target.classList.contains("js-inner-menu")) {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          return false;
+                        }
+                        target = target.parentElement;
                       }
-                      target = target.parentElement;
-                    }
-                  }}
-                />
-              </Link>
+                    }}
+                  />
+                </Link>
+              </LangyContextTarget>
             ))}
           </Grid>
         </VStack>

@@ -464,6 +464,7 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an AI-SDK file+audio part (typescript scenario SDK shape)", () => {
+    /** @scenario "Raw realtime audio is wrapped into a playable container at store time" */
     it("calls storeFromBytes with the audio mediaType and rewrites the part to {type:'input_audio', input_audio:{url, mimeType}}", async () => {
       const base64Payload = makeBase64Payload("PCM16_AUDIO_BYTES");
       const mimeType = "audio/pcm16";
@@ -498,12 +499,15 @@ describe("extractInlineMediaFromEvent", () => {
       });
 
       expect(service.storeFromBytes).toHaveBeenCalledOnce();
-      expect(service.storeFromBytes).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mediaType: "audio/pcm16",
-          bytes: Buffer.from("PCM16_AUDIO_BYTES"),
-        }),
-      );
+      // Raw pcm16 is WAV-wrapped at store time (44-byte RIFF header + the
+      // original samples) and stored as audio/wav so the externalized
+      // reference is playable everywhere it is served.
+      const storedArgs = vi.mocked(service.storeFromBytes).mock.calls[0]![0];
+      expect(storedArgs.mediaType).toBe("audio/wav");
+      expect(storedArgs.bytes.subarray(0, 4).toString("ascii")).toBe("RIFF");
+      expect(
+        storedArgs.bytes.subarray(44).equals(Buffer.from("PCM16_AUDIO_BYTES")),
+      ).toBe(true);
 
       const content = (rewrittenEvent as { message: { content: unknown[] } })
         .message.content;
@@ -517,7 +521,7 @@ describe("extractInlineMediaFromEvent", () => {
         input_audio: {
           data: undefined,
           url: `/api/files/proj-1/${storedId}`,
-          mimeType: "audio/pcm16",
+          mimeType: "audio/wav",
         },
       });
 

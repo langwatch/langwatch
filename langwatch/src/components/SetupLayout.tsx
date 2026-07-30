@@ -1,8 +1,8 @@
 import { Box, Button, Card, Container, HStack, Spacer } from "@chakra-ui/react";
-import Head from "~/utils/compat/next-head";
-import { signOut } from "~/utils/auth-client";
 import type { PropsWithChildren } from "react";
 import { LogOut } from "react-feather";
+import { signOut } from "~/utils/auth-client";
+import Head from "~/utils/compat/next-head";
 
 export const SetupLayout = ({
   children,

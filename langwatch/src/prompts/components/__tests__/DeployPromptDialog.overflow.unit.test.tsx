@@ -18,10 +18,12 @@ vi.mock("~/utils/api", () => ({
   api: {
     prompts: {
       getAllVersionsForPrompt: {
-        useQuery: (...args: unknown[]) => mockUseQuery("getAllVersionsForPrompt", ...args),
+        useQuery: (...args: unknown[]) =>
+          mockUseQuery("getAllVersionsForPrompt", ...args),
       },
       getTagsForConfig: {
-        useQuery: (...args: unknown[]) => mockUseQuery("getTagsForConfig", ...args),
+        useQuery: (...args: unknown[]) =>
+          mockUseQuery("getTagsForConfig", ...args),
       },
       assignTag: {
         useMutation: () => ({
@@ -101,7 +103,14 @@ vi.mock("~/components/ui/select", () => {
     ...rest
   }: {
     children: React.ReactNode;
-    collection: { items: Array<{ label: string; value: string; version: number; commitMessage: string }> };
+    collection: {
+      items: Array<{
+        label: string;
+        value: string;
+        version: number;
+        commitMessage: string;
+      }>;
+    };
     value: string[];
     onValueChange: (details: { value: string[] }) => void;
     "aria-label"?: string;
@@ -109,8 +118,8 @@ vi.mock("~/components/ui/select", () => {
   }) => (
     <div
       data-testid="select-root"
-      data-flex={rest["flex"] as string | undefined}
-      data-max-width={rest["maxWidth"] as string | undefined}
+      data-flex={rest.flex as string | undefined}
+      data-max-width={rest.maxWidth as string | undefined}
     >
       <select
         aria-label={rest["aria-label"] as string}
@@ -119,7 +128,12 @@ vi.mock("~/components/ui/select", () => {
       >
         <option value="">Select version</option>
         {collection.items.map(
-          (item: { label: string; value: string; version: number; commitMessage: string }) => (
+          (item: {
+            label: string;
+            value: string;
+            version: number;
+            commitMessage: string;
+          }) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>
@@ -165,8 +179,16 @@ function setupPromptTags(extraTags: Array<{ name: string; id?: string }> = []) {
 }
 
 function setupQueries({
-  versions = [] as Array<{ version: number; versionId: string; commitMessage: string }>,
-  tags = [] as Array<{ tagId: string; promptTag: { name: string }; versionId: string }>,
+  versions = [] as Array<{
+    version: number;
+    versionId: string;
+    commitMessage: string;
+  }>,
+  tags = [] as Array<{
+    tagId: string;
+    promptTag: { name: string };
+    versionId: string;
+  }>,
 } = {}) {
   mockUseQuery.mockImplementation((queryName: string) => {
     if (queryName === "getAllVersionsForPrompt") {

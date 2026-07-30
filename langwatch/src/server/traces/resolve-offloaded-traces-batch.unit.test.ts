@@ -256,6 +256,41 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
     });
   });
 
+  describe("given an eventref already decoded by attribute deserialization", () => {
+    describe("when resolved as a batch", () => {
+      it("restores the full value and removes the reserved attribute", async () => {
+        const { blobStore } =
+          makeConcurrencyTrackingBlobStore("full batch output");
+        const span = makeSpan({
+          spanAttributes: {
+            "langwatch.output": "preview",
+            [`${EVENTREF_ATTR_PREFIX}langwatch.output`]: {
+              field: "langwatch.output",
+              eventId: "evt-decoded",
+            },
+          },
+        });
+
+        const results = await resolveOffloadedTracesBatch({
+          projectId: "proj-1",
+          spansPerTrace: [[span]],
+          blobStore,
+          ioExtractionService: realIOService,
+          logger: createMockLogger(),
+        });
+
+        expect(results[0]!.resolvedSpans[0]!.spanAttributes).toMatchObject({
+          "langwatch.output": "full batch output",
+        });
+        expect(
+          results[0]!.resolvedSpans[0]!.spanAttributes[
+            `${EVENTREF_ATTR_PREFIX}langwatch.output`
+          ],
+        ).toBeUndefined();
+      });
+    });
+  });
+
   describe("given a trace with no offloaded spans", () => {
     describe("when resolved as a batch", () => {
       it("issues zero event_log reads and returns the spans untouched", async () => {

@@ -1006,10 +1006,8 @@ describe("ClickHouseTraceService", () => {
           summaryCall.query.match(/OccurredAt <= fromUnixTimestamp64Milli/g) ??
             [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.sumFromMs).toBe(
-          1_000_000 - TWO_DAYS_MS,
-        );
-        expect(summaryCall.query_params.sumToMs).toBe(2_000_000 + TWO_DAYS_MS);
+        expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
+        expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
       });
     });
 
@@ -1045,10 +1043,8 @@ describe("ClickHouseTraceService", () => {
           summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
             [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.sumFromMs).toBe(
-          1_000_000 - TWO_DAYS_MS,
-        );
-        expect(summaryCall.query_params.sumToMs).toBe(2_000_000 + TWO_DAYS_MS);
+        expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
+        expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
       });
 
       it("keeps the summary read unbounded when the ids resolve to no rows", async () => {
@@ -1074,8 +1070,8 @@ describe("ClickHouseTraceService", () => {
         // No OccurredAt predicate inlined at all, and no window params.
         expect(summaryCall.query).not.toContain("OccurredAt >=");
         expect(summaryCall.query).not.toContain("OccurredAt <=");
-        expect(summaryCall.query_params.sumFromMs).toBeUndefined();
-        expect(summaryCall.query_params.sumToMs).toBeUndefined();
+        expect(summaryCall.query_params.fromMs).toBeUndefined();
+        expect(summaryCall.query_params.toMs).toBeUndefined();
       });
 
       it("fails open to the unbounded read when the resolve query errors", async () => {
@@ -1104,7 +1100,7 @@ describe("ClickHouseTraceService", () => {
         expect(traces).toHaveLength(1);
         const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
         expect(summaryCall.query).not.toContain("OccurredAt >=");
-        expect(summaryCall.query_params.sumFromMs).toBeUndefined();
+        expect(summaryCall.query_params.fromMs).toBeUndefined();
       });
     });
   });
@@ -1134,7 +1130,9 @@ describe("isClickHouseMemoryLimitError", () => {
     );
 
     const wrapped = new ClickHouseUnavailableError({
-      reasons: [new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)")],
+      reasons: [
+        new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)"),
+      ],
     });
     expect(isClickHouseMemoryLimitError(wrapped)).toBe(true);
   });

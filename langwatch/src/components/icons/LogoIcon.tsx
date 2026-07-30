@@ -1,5 +1,3 @@
-import React from "react";
-
 export function LogoIcon({ width, height }: { width: number; height: number }) {
   return (
     <svg

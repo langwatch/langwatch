@@ -6,15 +6,15 @@ import {
   ModelDefaultsApiService,
 } from "@/client-sdk/services/model-defaults/model-defaults-api.service";
 
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import type { CommandResult } from "../../utils/output";
 
 type ScopeKind = "project" | "team" | "organization";
 
 export interface SetModelDefaultOptions {
   scope?: ScopeKind;
   scopeId?: string;
-  format?: string;
 }
 
 function resolveScope(
@@ -56,13 +56,19 @@ function resolveScope(
  * key, or creates a new config when nothing is attached. Mirrors the
  * server-side `setRoleAtScope` upsert so CLI and UI converge on the
  * same single-config-per-scope shape.
+ *
+ * Returns what it did rather than printing it: the output port renders the
+ * result in whatever format the caller asked for (utils/output.ts). Both paths
+ * keep the shape the previous `--format json` branch established — including
+ * the `created` discriminator, which is the only way a machine caller can tell
+ * an upsert from a fresh config.
  */
 export const setModelDefaultCommand = async (
   key: string,
   model: string,
   options: SetModelDefaultOptions,
-): Promise<void> => {
-  checkApiKey();
+): Promise<CommandResult | void> => {
+  await resolveCredentials();
 
   const service = new ModelDefaultsApiService();
   const spinner = createSpinner(
@@ -91,16 +97,13 @@ export const setModelDefaultCommand = async (
       spinner.succeed(
         `Updated config ${chalk.green(current.id)} at ${target.scopeType.toLowerCase()}:${target.scopeId}`,
       );
-      if (options.format === "json") {
-        console.log(
-          JSON.stringify(
-            { id: current.id, key, model, scope: target, created: false },
-            null,
-            2,
-          ),
-        );
-      }
-      return;
+      return {
+        data: { id: current.id, key, model, scope: target, created: false },
+        table: () => {
+          // Nothing further to print: the spinner line above was the whole
+          // human output before the migration, and stays so.
+        },
+      };
     }
 
     const created = await service.createConfig({
@@ -110,17 +113,15 @@ export const setModelDefaultCommand = async (
     spinner.succeed(
       `Created config ${chalk.green(created.id)} at ${target.scopeType.toLowerCase()}:${target.scopeId}`,
     );
-    if (options.format === "json") {
-      console.log(
-        JSON.stringify(
-          { id: created.id, key, model, scope: target, created: true },
-          null,
-          2,
-        ),
-      );
-    }
+    return {
+      data: { id: created.id, key, model, scope: target, created: true },
+      table: () => {
+        // Nothing further to print: the spinner line above was the whole
+        // human output before the migration, and stays so.
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "set default model", format: options?.format });
+    failSpinner({ spinner, error, action: "set default model" });
     process.exit(1);
   }
 };

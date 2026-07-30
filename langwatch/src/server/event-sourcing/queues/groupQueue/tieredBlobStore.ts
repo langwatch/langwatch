@@ -6,7 +6,11 @@ import type { Logger } from "@langwatch/observability";
 import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
+import {
+  mintAzureBlobUri,
+  mintFileUri,
+  mintS3Uri,
+} from "~/server/stored-objects/uri";
 
 import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";
@@ -221,6 +225,13 @@ export class TieredBlobStore {
         });
       case "file":
         return mintFileUri({ root: destination.root, projectId, sha256: hash });
+      case "azure":
+        return mintAzureBlobUri({
+          accountName: destination.accountName,
+          container: destination.container,
+          projectId,
+          sha256: hash,
+        });
       default: {
         const unhandled: never = destination;
         throw new Error(
@@ -260,8 +271,8 @@ export class TieredBlobStore {
       await this.objectStoreFor(projectId).put(uri, data, mediaType);
       return { tier: "s3", projectId, hash };
     }
-    // GQ2 blobs are refcounted (holder-set eager reclaim), so the TTL is only
-    // the orphan backstop — 4 days, not GQ1's 7-day staged-residence window.
+    // GQ2 Redis blobs reclaim lazily when their renewable lease/backstop window
+    // goes untouched — 4 days, not GQ1's 7-day staged-residence window.
     await this.redisBlobs.put({
       id: redisBlobId({ projectId, hash }),
       data,
@@ -368,10 +379,8 @@ export class TieredBlobStore {
   }
 
   /**
-   * Deletes a blob. A redis-tier blob is normally reclaimed inside the holder
-   * Lua (UNLINK in the same eval as the last release); this method is the
-   * general-purpose / out-of-band delete — the s3 reclaim path, or a direct
-   * caller holding a ref — so it handles both tiers.
+   * Explicitly deletes a blob for administrative/direct callers. GQ2 lease
+   * release and transfer paths never call this; normal reclaim is lazy.
    */
   async delete(ref: BlobRef): Promise<void> {
     if (ref.tier === "redis") {

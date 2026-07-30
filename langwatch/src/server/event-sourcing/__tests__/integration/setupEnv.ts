@@ -32,8 +32,7 @@ process.env.LW_GATEWAY_INTERNAL_SECRET =
   process.env.LW_GATEWAY_INTERNAL_SECRET ??
   "unit-test-gateway-internal-secret-32b!";
 process.env.LW_GATEWAY_JWT_SECRET =
-  process.env.LW_GATEWAY_JWT_SECRET ??
-  "unit-test-gateway-jwt-secret-32-bytes!";
+  process.env.LW_GATEWAY_JWT_SECRET ?? "unit-test-gateway-jwt-secret-32-bytes!";
 // Disable the per-IP receiver rate-limit globally for integration tests.
 // Tests that fire many POSTs from one IP (volume regression, dogfood
 // smoke, auth-contract suite) would otherwise shed at the rate-limiter
@@ -44,6 +43,15 @@ process.env.LW_GATEWAY_JWT_SECRET =
 process.env.LW_INGEST_RATE_LIMIT_DISABLED =
   process.env.LW_INGEST_RATE_LIMIT_DISABLED ?? "1";
 
+// Deterministic encryption key so suites that store model-provider
+// credentials (encrypted at rest) can run in CI. Must be a 32-byte hex
+// string — the NEXTAUTH_SECRET fallback in utils/encryption.ts is not
+// hex in CI, so without this the encrypt() call throws. Honors an
+// existing value so localdev keeps its real secret.
+process.env.CREDENTIALS_SECRET =
+  process.env.CREDENTIALS_SECRET ??
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
 if (process.env.CI && process.env.CI_REDIS_URL) {
   process.env.REDIS_URL = process.env.CI_REDIS_URL;
   // Must delete BUILD_TIME to allow redis.ts to create connections
@@ -53,4 +61,32 @@ if (process.env.CI && process.env.CI_REDIS_URL) {
 if (process.env.CI && process.env.CI_CLICKHOUSE_URL) {
   process.env.CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
   process.env.TEST_CLICKHOUSE_URL = process.env.CI_CLICKHOUSE_URL;
+}
+
+// Give each worker its own Redis logical database.
+//
+// The integration suite ran one file at a time for years because concurrent
+// files fight over Redis: BullMQ derives its keys from the queue name alone,
+// so two workers building the same pipeline share a queue and consume each
+// other's jobs. That is a Redis problem specifically -- the ClickHouse and
+// Postgres fixtures were already written against per-suite tenant ids, so
+// they do not collide.
+//
+// Redis ships 16 logical databases and `select` isolates them completely, so
+// pointing worker N at database N removes the contention without a second
+// container or a rewrite of the suites.
+//
+// Off unless asked for: this only makes sense alongside fileParallelism, and
+// a single-worker run should keep using whichever database the URL already
+// names. `flushdb` is therefore per worker; a `flushall` would still cross
+// the boundary, which is why the suite has none left.
+if (process.env.VITEST_ISOLATE_WORKER_REDIS === "1" && process.env.REDIS_URL) {
+  const workerId = Number(
+    process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1",
+  );
+  if (Number.isFinite(workerId)) {
+    const url = new URL(process.env.REDIS_URL);
+    url.pathname = `/${workerId % 16}`;
+    process.env.REDIS_URL = url.toString();
+  }
 }

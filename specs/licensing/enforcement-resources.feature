@@ -189,6 +189,34 @@ Feature: Resource Limit Enforcement (Workflows, Prompts, Evaluators, Scenarios, 
     Then the request fails with FORBIDDEN
     And the error message contains "maximum number of teams"
 
+  # A personal workspace is provisioned for a user, not asked for by the
+  # organization, so it must never spend the organization's team allowance.
+  # The same count backs enforcement, the usage page, and the license status
+  # panel, so a personal team is invisible to all three or to none of them.
+
+  @integration
+  Scenario: Personal teams do not count toward the team limit
+    Given the organization has a license with maxTeams 1
+    And the organization has 3 personal teams
+    When I create a team in the organization
+    Then the team is created successfully
+
+  @integration
+  Scenario: Real teams still reach the limit alongside personal teams
+    Given the organization has a license with maxTeams 1
+    And the organization has 1 team
+    And the organization has 1 personal team
+    When I create a team in the organization
+    Then the request fails with FORBIDDEN
+    And the error message contains "maximum number of teams"
+
+  @integration
+  Scenario: The reported team usage excludes personal teams
+    Given the organization has 1 team
+    And the organization has 1 personal team
+    When I view the organization usage
+    Then the reported team count is 1
+
   # ============================================================================
   # UI: Click-then-Modal Pattern (All Resources)
   # ============================================================================

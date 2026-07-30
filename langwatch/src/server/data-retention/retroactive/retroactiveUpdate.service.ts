@@ -44,8 +44,7 @@ export class RetroactiveMutationInProgressError extends Error {
 // needle is built in app code and passed via query_params — building it
 // inside ClickHouse with concat() ran into double-vs-single-quote escaping
 // (CH treats "..." as identifier names).
-const TENANT_FILTER_SQL =
-  "position(command, {tenantFilterNeedle:String}) > 0";
+const TENANT_FILTER_SQL = "position(command, {tenantFilterNeedle:String}) > 0";
 
 /**
  * Mirrors the way ClickHouse renders a string literal into

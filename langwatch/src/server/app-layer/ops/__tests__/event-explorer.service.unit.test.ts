@@ -1,9 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventExplorerService } from "../event-explorer.service";
 import type {
   EventExplorerRepository,
   RawEventRow,
-  AggregateSearchResult,
 } from "../repositories/event-explorer.repository";
 
 vi.mock("~/server/event-sourcing/pipelineRegistry", () => ({
@@ -108,7 +107,8 @@ describe("EventExplorerService", () => {
           tenantIds: [],
         });
 
-        const call = (repo.findAggregates as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+        const call = (repo.findAggregates as ReturnType<typeof vi.fn>).mock
+          .calls[0]![0];
         expect(call.sinceMs).toBe(new Date("2024-06-15").getTime());
       });
     });
@@ -172,7 +172,10 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo();
         const service = new EventExplorerService(repo);
 
-        await service.searchAggregates({ query: "trace_abc", tenantIds: ["t1"] });
+        await service.searchAggregates({
+          query: "trace_abc",
+          tenantIds: ["t1"],
+        });
 
         expect(repo.searchAggregates).toHaveBeenCalledWith({
           query: "trace_abc",
@@ -255,7 +258,12 @@ describe("EventExplorerService", () => {
     describe("when dejaView projection not found", () => {
       it("returns null state with event count", async () => {
         const rows: RawEventRow[] = [
-          { eventId: "e1", eventType: "ExperimentStarted", eventTimestamp: "1700000000000", payload: "{}" },
+          {
+            eventId: "e1",
+            eventType: "ExperimentStarted",
+            eventTimestamp: "1700000000000",
+            payload: "{}",
+          },
         ];
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
@@ -279,8 +287,18 @@ describe("EventExplorerService", () => {
     describe("when events match projection eventTypes", () => {
       it("folds them via apply function", async () => {
         const rows: RawEventRow[] = [
-          { eventId: "e1", eventType: "TraceIngested", eventTimestamp: "1700000000000", payload: "{}" },
-          { eventId: "e2", eventType: "TraceUpdated", eventTimestamp: "1700000001000", payload: "{}" },
+          {
+            eventId: "e1",
+            eventType: "TraceIngested",
+            eventTimestamp: "1700000000000",
+            payload: "{}",
+          },
+          {
+            eventId: "e2",
+            eventType: "TraceUpdated",
+            eventTimestamp: "1700000001000",
+            payload: "{}",
+          },
         ];
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
@@ -302,7 +320,12 @@ describe("EventExplorerService", () => {
     describe("when events don't match projection eventTypes", () => {
       it("skips them", async () => {
         const rows: RawEventRow[] = [
-          { eventId: "e1", eventType: "UnrelatedEvent", eventTimestamp: "1700000000000", payload: "{}" },
+          {
+            eventId: "e1",
+            eventType: "UnrelatedEvent",
+            eventTimestamp: "1700000000000",
+            payload: "{}",
+          },
         ];
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
@@ -339,8 +362,18 @@ describe("EventExplorerService", () => {
         ]);
 
         const rows: RawEventRow[] = [
-          { eventId: "e1", eventType: "TraceIngested", eventTimestamp: "1700000000000", payload: "{}" },
-          { eventId: "e2", eventType: "TraceIngested", eventTimestamp: "1700000001000", payload: "{}" },
+          {
+            eventId: "e1",
+            eventType: "TraceIngested",
+            eventTimestamp: "1700000000000",
+            payload: "{}",
+          },
+          {
+            eventId: "e2",
+            eventType: "TraceIngested",
+            eventTimestamp: "1700000001000",
+            payload: "{}",
+          },
         ];
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),

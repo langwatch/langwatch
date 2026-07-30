@@ -15,14 +15,14 @@ afterEach(() => {
 });
 
 describe('setupObservability Integration - Shutdown Behavior', () => {
-  it('should provide a shutdown function that works', async () => {
+  it('provides a shutdown function that works', async () => {
     const logger = createMockLogger();
     const handle = setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
     expect(typeof handle.shutdown).toBe('function');
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it('should handle shutdown errors gracefully', async () => {
+  it('handles shutdown errors gracefully', async () => {
     const logger = createMockLogger();
     const handle = setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
     // Mock shutdown to throw

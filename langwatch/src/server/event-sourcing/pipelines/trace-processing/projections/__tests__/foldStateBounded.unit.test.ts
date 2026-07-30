@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   applySpanToSummary,
   MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
 } from "../traceSummary.foldProjection";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Regression guard for the O(n^2) fold incident: a single long-lived trace
@@ -36,7 +39,11 @@ function foldNSpans(n: number): TraceSummaryData {
         "gen_ai.usage.output_tokens": 5,
       },
       events: [
-        { name: "thumbs_up_down", timeUnixMs: 1500 + i, attributes: { value: "up" } },
+        {
+          name: "thumbs_up_down",
+          timeUnixMs: 1500 + i,
+          attributes: { value: "up" },
+        },
       ],
     });
     state = applySpanToSummary({ state, span });

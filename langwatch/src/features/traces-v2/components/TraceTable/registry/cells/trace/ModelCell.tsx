@@ -2,7 +2,6 @@ import {
   Badge,
   chakra,
   HoverCard,
-  HStack,
   Icon,
   Portal,
   Text,
@@ -16,7 +15,6 @@ import {
   ProviderIconGlyph,
 } from "~/server/modelProviders/iconsMap";
 import type { TraceListItem } from "../../../../../types/trace";
-import { abbreviateModel } from "../../../../../utils/formatters";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 import { FilterChip } from "../FilterChip";
@@ -208,7 +206,7 @@ function renderModel(row: TraceListItem, density: Density) {
     );
   }
   const rawPrimary = row.models[0]!;
-  const primary = abbreviateModel(rawPrimary);
+  const primary = rawPrimary;
   const overflow = row.models.length - 1;
   const compact = density === "compact";
   // "Known" = the provider was recognised, which is the table's proxy

@@ -1,3 +1,4 @@
+import type { LangyConversationStateData } from "@langwatch/langy";
 import {
   type LangyConversationProjection,
   LangyProjectionTitleSource,
@@ -8,7 +9,6 @@ import type { Event } from "~/server/event-sourcing/domain/types";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type { StateProjectionDefinition } from "~/server/event-sourcing/projections/stateProjection.types";
 import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
-import type { LangyConversationStateData } from "~/server/event-sourcing/pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 
 type Row = LangyConversationProjection;

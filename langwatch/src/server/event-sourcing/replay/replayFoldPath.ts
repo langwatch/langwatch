@@ -1,43 +1,43 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
-import type {
-  RegisteredFoldProjection,
-  ReplayProgress,
-  ReplayResult,
-  BatchPhase,
-  BatchCompleteInfo,
-  ReplayContext,
-} from "./types";
 import { isAtOrBeforeCutoff } from "./replayConstants";
+import {
+  discoverProjectionAggregates,
+  filterDiscoveredByAggregateIds,
+} from "./replayDiscovery";
+import {
+  pauseProjection,
+  unpauseProjection,
+  waitForActiveJobs,
+} from "./replayDrain";
 import type { DiscoveredAggregate } from "./replayEventLoader";
 import {
   batchLoadAggregateEvents,
   getBoundedCutoffs,
   maxEventPosition,
 } from "./replayEventLoader";
-import {
-  aggregateKey,
-  markPendingBatch,
-  markCutoffBatch,
-  markCompletedBatch,
-  unmarkBatch,
-  clearFailedBatchMarkers,
-  getCompletedSet,
-  getCutoffMarkers,
-  removeStaleMarker,
-  cleanupAll,
-} from "./replayMarkers";
-import {
-  pauseProjection,
-  unpauseProjection,
-  waitForActiveJobs,
-} from "./replayDrain";
 import { FoldAccumulator } from "./replayExecutor";
 import type { ReplayLogWriter } from "./replayLog";
 import {
-  discoverProjectionAggregates,
-  filterDiscoveredByAggregateIds,
-} from "./replayDiscovery";
+  aggregateKey,
+  cleanupAll,
+  clearFailedBatchMarkers,
+  getCompletedSet,
+  getCutoffMarkers,
+  markCompletedBatch,
+  markCutoffBatch,
+  markPendingBatch,
+  removeStaleMarker,
+  unmarkBatch,
+} from "./replayMarkers";
+import type {
+  BatchCompleteInfo,
+  BatchPhase,
+  RegisteredFoldProjection,
+  ReplayContext,
+  ReplayProgress,
+  ReplayResult,
+} from "./types";
 
 /**
  * Replays a single fold projection across discovered aggregates: discovery,

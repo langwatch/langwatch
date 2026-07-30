@@ -16,11 +16,11 @@
  */
 import { useEffect, useMemo } from "react";
 import {
+  matchPath,
   useLocation,
   useNavigate,
   useParams,
   useSearchParams,
-  matchPath,
 } from "react-router";
 
 // Route patterns for resolving pathname (Next.js-style)
@@ -85,6 +85,7 @@ const ROUTE_PATTERNS = [
   "/:project/evaluations/:id/edit/choose",
   "/:project/evaluations/:id/edit",
   "/:project/evaluations",
+  "/:project/online-evaluations",
   "/:project/experiments/workbench/:slug",
   "/:project/experiments/workbench",
   "/:project/experiments/:experiment",
@@ -196,12 +197,12 @@ export interface CompatRouter {
   push: (
     url: string | { pathname?: string; query?: Record<string, any> },
     as?: string,
-    options?: NextRouterOptions
+    options?: NextRouterOptions,
   ) => Promise<boolean>;
   replace: (
     url: string | { pathname?: string; query?: Record<string, any> },
     as?: string,
-    options?: NextRouterOptions
+    options?: NextRouterOptions,
   ) => Promise<boolean>;
   back: () => void;
   reload: () => void;
@@ -214,7 +215,7 @@ export interface CompatRouter {
 export function buildUrl(
   url: string | { pathname?: string; query?: Record<string, any> },
   routeParamKeys?: Set<string>,
-  currentPathname?: string
+  currentPathname?: string,
 ): string {
   // React Router's location is the source of truth in an SPA. Callers inside
   // the useRouter() hook pass it explicitly; other callers fall back to
@@ -334,7 +335,9 @@ class RouterSingleton {
   }
 
   get asPath(): string {
-    return window.location.pathname + window.location.search + window.location.hash;
+    return (
+      window.location.pathname + window.location.search + window.location.hash
+    );
   }
 
   get isReady(): boolean {
@@ -344,7 +347,7 @@ class RouterSingleton {
   push(
     url: string | { pathname?: string; query?: Record<string, any> },
     _as?: string,
-    options?: NextRouterOptions
+    options?: NextRouterOptions,
   ): Promise<boolean> {
     const target = _as ?? buildUrl(url);
     if (_routerInstance) {
@@ -365,7 +368,7 @@ class RouterSingleton {
   replace(
     url: string | { pathname?: string; query?: Record<string, any> },
     _as?: string,
-    options?: NextRouterOptions
+    options?: NextRouterOptions,
   ): Promise<boolean> {
     const target = _as ?? buildUrl(url);
     if (_routerInstance) {
@@ -476,7 +479,10 @@ export function useRouter(): CompatRouter {
         // The `as` string is the actual browser URL; `url` is the internal route
         // descriptor which may contain [param] placeholders.
         const target = _as ?? buildUrl(url, routeParamKeys, location.pathname);
-        navigate(target, { replace: false, flushSync: options?.flushSync });
+        void navigate(target, {
+          replace: false,
+          flushSync: options?.flushSync,
+        });
         if (options?.scroll !== false) {
           window.scrollTo(0, 0);
         }
@@ -484,7 +490,7 @@ export function useRouter(): CompatRouter {
       },
       replace: (url, _as?, options?) => {
         const target = _as ?? buildUrl(url, routeParamKeys, location.pathname);
-        navigate(target, { replace: true, flushSync: options?.flushSync });
+        void navigate(target, { replace: true, flushSync: options?.flushSync });
         if (options?.scroll !== false) {
           window.scrollTo(0, 0);
         }
@@ -493,7 +499,7 @@ export function useRouter(): CompatRouter {
       back: () => navigate(-1),
       reload: () => window.location.reload(),
       prefetch: () => Promise.resolve(),
-      beforePopState: () => {},
+      beforePopState: () => undefined,
     };
   }, [navigate, location, params, searchParams]);
 }

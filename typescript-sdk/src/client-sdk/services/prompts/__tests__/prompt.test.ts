@@ -15,11 +15,11 @@ describe("Prompt", () => {
       });
     });
 
-    it("should compile a prompt", () => {
+    it("compiles a prompt", () => {
       expect(result.prompt).toBe("Hello Alice, how is the weather today?");
     });
 
-    it("should compile the messages", () => {
+    it("compiles the messages", () => {
       expect(result.messages[1]?.content).toBe("Tell me about weather");
     });
   });
@@ -36,15 +36,15 @@ describe("Prompt", () => {
       });
     });
 
-    it("should compile a prompt", () => {
+    it("compiles a prompt", () => {
       expect(result.prompt).toBe("Hello Alice, how is the weather today?");
     });
 
-    it("should compile the messages", () => {
+    it("compiles the messages", () => {
       expect(result.messages[1]?.content).toBe("Tell me about weather");
     });
 
-    it("should throw on strict compilation with missing variables", () => {
+    it("throws on strict compilation with missing variables", () => {
       expect(() => {
         prompt.compileStrict({});
       }).toThrow(PromptCompilationError);

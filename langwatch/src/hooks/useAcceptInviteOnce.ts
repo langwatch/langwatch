@@ -1,10 +1,9 @@
 import { useEffect, useSyncExternalStore } from "react";
-
+import { toaster } from "~/components/ui/toaster";
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "~/server/invites/errors";
 import { api } from "~/utils/api";
 import { hardRedirect } from "~/utils/hardRedirect";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { toaster } from "~/components/ui/toaster";
 
 /**
  * Module-scoped set of invite codes that have already had a `mutate` call
@@ -28,11 +27,13 @@ const submittedInviteCodes = new Set<string>();
  * terminal state.
  */
 interface InviteOutcome {
-  status: Extract<
-    AcceptInviteStatus,
-    "success" | "already-accepted" | "error"
-  >;
-  errorMessage: string | null;
+  status: Extract<AcceptInviteStatus, "success" | "already-accepted" | "error">;
+  /**
+   * The failure itself, not a string lifted off it. The page renders it through
+   * the code-keyed registry, which needs the whole payload (code, meta, tips,
+   * trace id) — `error.message` is the code slug since #5984.
+   */
+  error: unknown;
 }
 const inviteOutcomes = new Map<string, InviteOutcome>();
 const outcomeListeners = new Set<() => void>();
@@ -70,7 +71,8 @@ export type AcceptInviteStatus =
 
 export interface UseAcceptInviteOnceResult {
   status: AcceptInviteStatus;
-  errorMessage: string | null;
+  /** The failure, for the page to explain via `~/features/errors`. */
+  error: unknown;
 }
 
 export interface UseAcceptInviteOnceOptions {
@@ -112,7 +114,7 @@ export function useAcceptInviteOnce({
     onSuccess: (data, variables) => {
       recordInviteOutcome(variables.inviteCode, {
         status: "success",
-        errorMessage: null,
+        error: null,
       });
       toaster.create({
         title: "Invite Accepted",
@@ -128,17 +130,17 @@ export function useAcceptInviteOnce({
       if (error.message === INVITE_ALREADY_ACCEPTED_MESSAGE) {
         recordInviteOutcome(variables.inviteCode, {
           status: "already-accepted",
-          errorMessage: null,
+          error: null,
         });
         hardRedirect("/");
         return;
       }
       recordInviteOutcome(variables.inviteCode, {
         status: "error",
-        errorMessage: error.message,
+        error,
       });
-      // Real failure (expired invite, email mismatch, …). The page renders
-      // `errorMessage` inline; also capture for observability.
+      // Real failure (expired invite, email mismatch, …). The page explains
+      // the error inline; also capture for observability.
       captureException(toError(error), {
         tags: { source: "useAcceptInviteOnce" },
       });
@@ -164,8 +166,7 @@ export function useAcceptInviteOnce({
 
   return {
     status: deriveStatus(mutation, shouldTrigger, storedOutcome),
-    errorMessage:
-      mutation.error?.message ?? storedOutcome?.errorMessage ?? null,
+    error: mutation.error ?? storedOutcome?.error ?? null,
   };
 }
 

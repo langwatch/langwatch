@@ -146,6 +146,9 @@ describe("Workflows REST API", () => {
         expect(body[0].id).toBe(workflow.id);
         expect(body[0].name).toBe("Test Workflow");
         expect(body[0].description).toBe("A test workflow");
+        // Each row's platform link addresses THAT workflow's editor, never
+        // the bare /workflows index.
+        expect(body[0].platformUrl).toContain(`/studio/${workflow.id}`);
       });
 
       it("excludes archived workflows", async () => {
@@ -193,6 +196,7 @@ describe("Workflows REST API", () => {
           isEvaluator: true,
           isComponent: false,
         });
+        expect(body.platformUrl).toContain(`/studio/${workflow.id}`);
       });
     });
 
@@ -530,7 +534,10 @@ describe("Workflows REST API", () => {
           { data: [{ question: "x" }], dataset_id: "dataset_123" },
         );
 
-        expect(res.status).toBe(400);
+        // 422: the body failed the request SCHEMA (the two fields are mutually
+        // exclusive). The "no committed version" case below stays 400 — that
+        // one is the handler refusing a well-formed request.
+        expect(res.status).toBe(422);
       });
     });
 

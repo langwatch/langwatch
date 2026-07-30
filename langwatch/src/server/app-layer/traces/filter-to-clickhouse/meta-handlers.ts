@@ -102,9 +102,7 @@ const TRACE_ID_DEF: FieldDef = {
   evaluateInMemory: (tag, negated, trace) => {
     const value = extractStringValue(tag);
     const id = trace.summary.traceId;
-    const matched = value.includes("*")
-      ? likeMatch(id, value)
-      : id === value;
+    const matched = value.includes("*") ? likeMatch(id, value) : id === value;
     return negated ? !matched : matched;
   },
 };
@@ -368,7 +366,11 @@ const SPAN_ID_DEF: FieldDef = {
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
       return wrap(
-        boundedSubquery("stored_spans", "StartTime", `SpanId LIKE {${p}:String}`),
+        boundedSubquery(
+          "stored_spans",
+          "StartTime",
+          `SpanId LIKE {${p}:String}`,
+        ),
         negated,
       );
     }

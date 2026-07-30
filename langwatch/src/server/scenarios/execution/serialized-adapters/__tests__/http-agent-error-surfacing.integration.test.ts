@@ -15,8 +15,8 @@
  * http-agent.adapter.logging.unit.test.ts.
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import http from "node:http";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import {
   afterAll,
   afterEach,
@@ -666,7 +666,10 @@ describe("given a request that sets Authorization and x-api-key headers (diagnos
 
       const serialized = JSON.stringify(collectEntries(logger));
       // Only assert the placeholder if the log includes the header names at all
-      if (serialized.includes("Authorization") || serialized.includes("x-api-key")) {
+      if (
+        serialized.includes("Authorization") ||
+        serialized.includes("x-api-key")
+      ) {
         expect(serialized).toContain(REDACTED);
       }
     });

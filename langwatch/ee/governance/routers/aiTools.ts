@@ -20,16 +20,17 @@
  * So this router OWNS the catalog entity only - the per-tile behaviors
  * are wired client-side against existing endpoints.
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   AiToolEntryService,
   SUPPORTED_TILE_TYPES,
 } from "@ee/governance/services/aiToolEntry.service";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const typeSchema = z.enum(
   SUPPORTED_TILE_TYPES as readonly [string, ...string[]],
@@ -65,12 +66,31 @@ export const aiToolsRouter = createTRPCRouter({
    * User-facing list - returns enabled, non-archived entries the
    * caller can see (org-scoped + their team-scoped, with team
    * overriding org by slug). Powers the /me portal grid.
+   *
+   * Lazily provisions the standard default catalog for orgs that never
+   * had any entry, so the first portal load of a fresh org renders
+   * tiles instead of the empty state (see ensureDefaultCatalog for the
+   * zero-row guard that keeps admin-curated-empty catalogs untouched).
    */
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("aiTools:view"))
     .query(async ({ ctx, input }) => {
       const service = AiToolEntryService.create(ctx.prisma);
+      try {
+        await service.ensureDefaultCatalog({
+          organizationId: input.organizationId,
+        });
+      } catch (error) {
+        // Non-fatal: the list must keep serving whatever exists even if
+        // provisioning hiccups (it retries on the next load).
+        captureException(toError(error), {
+          extra: {
+            origin: "aiTools.list.ensureDefaultCatalog",
+            organizationId: input.organizationId,
+          },
+        });
+      }
       return await service.listForUser({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
@@ -224,9 +244,7 @@ export const aiToolsRouter = createTRPCRouter({
           departmentIds: input.departmentIds,
           order: input.order,
           enabled: input.enabled,
-          type: input.type as
-            | (typeof SUPPORTED_TILE_TYPES)[number]
-            | undefined,
+          type: input.type as (typeof SUPPORTED_TILE_TYPES)[number] | undefined,
           config: input.config,
           actorUserId: ctx.session.user.id,
         });

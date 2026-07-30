@@ -1,5 +1,4 @@
 import {
-  Avatar,
   Box,
   type BoxProps,
   Button,
@@ -12,7 +11,8 @@ import {
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
-import { type UseFormReturn, FormProvider, useForm } from "react-hook-form";
+import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
+import { UserAvatar } from "~/components/UserAvatar";
 
 import { HistoryIcon } from "../../components/icons/History";
 import { Popover } from "../../components/ui/popover";
@@ -20,7 +20,7 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { useWorkflowStore, serializeWorkflow } from "../hooks/useWorkflowStore";
+import { serializeWorkflow, useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
 import { NewVersionFields } from "./VersionToBeUsed";
@@ -78,13 +78,8 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
     },
   });
 
-  const {
-    versions,
-    currentVersion,
-    hasChanges,
-    canSaveNewVersion,
-    nextVersion,
-  } = useVersionState({ project, form });
+  const { versions, currentVersion, hasChanges, canSaveNewVersion } =
+    useVersionState({ project, form });
 
   const commitVersion = api.workflow.commitVersion.useMutation();
   const restoreVersion = api.workflow.restoreVersion.useMutation();
@@ -246,18 +241,15 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                     )}
                   </HStack>
                   <HStack fontSize="12px">
-                    <Avatar.Root
+                    <UserAvatar
                       size="2xs"
                       backgroundColor="orange.400"
                       color="white"
                       width="16px"
                       height="16px"
-                    >
-                      <Avatar.Fallback
-                        name={version.author?.name ?? ""}
-                        fontSize="6.4px"
-                      />
-                    </Avatar.Root>
+                      name={version.author?.name ?? ""}
+                      image={version.author?.image}
+                    />
                     {version.author?.name}
                     {/* {" · "}
                     <Tooltip
@@ -414,4 +406,3 @@ export const useVersionState = ({
     versionToBeEvaluated,
   };
 };
-

@@ -1,5 +1,5 @@
-import { TriggerAction } from "../enums";
 import { z } from "zod";
+import { TriggerAction } from "../enums";
 import type { PreviewEnvelope, SharedDef } from "./types";
 
 /** Shape check: `something@something.something` with no whitespace anywhere.

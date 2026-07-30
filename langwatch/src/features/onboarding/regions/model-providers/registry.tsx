@@ -58,13 +58,19 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     label: "Google Gemini",
     defaultModel: "gemini-2.5-flash",
     defaultBaseUrl: "https://generativelanguage.googleapis.com/v1",
+    // Google answers the same key on /v1, /v1beta and the OpenAI-compatible
+    // surface, and which one a key was minted for is not knowable up front.
+    apiRoot: "https://generativelanguage.googleapis.com",
     icon: singleIcon("/images/external-icons/google.svg", "Google Gemini"),
     externalDocsUrl: "https://ai.google.dev/",
     fieldMetadata: {
       GEMINI_API_KEY: {
         label: "Gemini API Key",
+        // Naming the API restriction is the whole point: a Google Cloud key
+        // is commonly scoped to one API, and a customer told only "Gemini
+        // API key" has no way to know this is the Generative Language API.
         description:
-          "Your Google AI Studio API key from aistudio.google.com/apikey",
+          "Your Google AI Studio key, or a Google Cloud key allowed to call the Generative Language API. On Google Cloud, Vertex AI is usually the better fit.",
       },
     },
   },
@@ -232,6 +238,30 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
     },
   },
+  {
+    // Last in the array on purpose: settings lists providers in registry
+    // order, and Codex only serves the coding-assistant surfaces. The
+    // surfaces where it SHOULD lead (Langy setup, onboarding) pull it to
+    // the front through `recommendedOn` — see ModelProviderGrid.
+    key: "codex",
+    backendModelProviderKey: "openai_codex",
+    label: "Codex (OpenAI account)",
+    defaultModel: "gpt-5.6-terra",
+    // A distinct terminal-prompt glyph, NOT OpenAI's logo: it must not read as
+    // the plain OpenAI card sitting right next to it, and it mirrors the
+    // settings icon (src/components/icons/Codex.tsx).
+    icon: themedIcon(
+      "/images/external-icons/codex-lighttheme.svg",
+      "/images/external-icons/codex-darktheme.svg",
+      "Codex",
+    ),
+    externalDocsUrl: "https://chatgpt.com/codex",
+    authFlow: "oauth-device",
+    recommendedOn: ["langy", "onboarding"],
+    // Codex cannot run evaluations or prompt executions (subscription
+    // terms); offering it on those setup flows would strand them.
+    hiddenOn: ["evaluations", "prompts"],
+  },
 ];
 
 export function getModelProvider(
@@ -247,3 +277,10 @@ export const providerDefaultBaseUrls: Record<string, string> =
       .filter((p) => p.defaultBaseUrl)
       .map((p) => [p.backendModelProviderKey, p.defaultBaseUrl!]),
   );
+
+/** Version-less API roots keyed by backendModelProviderKey — see `apiRoot`. */
+export const providerApiRoots: Record<string, string> = Object.fromEntries(
+  modelProviderRegistry
+    .filter((p) => p.apiRoot)
+    .map((p) => [p.backendModelProviderKey, p.apiRoot!]),
+);

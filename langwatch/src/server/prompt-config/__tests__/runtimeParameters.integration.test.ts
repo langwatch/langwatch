@@ -1,13 +1,15 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { prisma } from "~/server/db";
 import { projectFactory } from "~/factories/project.factory";
-import { PromptService, type VersionedPrompt } from "../prompt.service";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
+import { prisma } from "~/server/db";
+import { PromptService, type VersionedPrompt } from "../prompt.service";
 
 vi.mock("~/server/modelProviders/resolveModelForFeature", () => ({
-  resolveModelForFeature: vi.fn().mockResolvedValue({ model: "openai/gpt-5-mini" }),
+  resolveModelForFeature: vi
+    .fn()
+    .mockResolvedValue({ model: "openai/gpt-5-mini" }),
 }));
 
 describe("Feature: Prompt runtime parameters", () => {
@@ -296,9 +298,7 @@ describe("Feature: Prompt runtime parameters", () => {
         localConfigData: {
           prompt: "You are a sync assistant",
           model: "openai/gpt-5-mini",
-          messages: [
-            { role: "user", content: "{{input}}" },
-          ],
+          messages: [{ role: "user", content: "{{input}}" }],
           inputs: [{ identifier: "input", type: "str" as const }],
           outputs: [{ identifier: "output", type: "str" as const }],
         },
@@ -318,9 +318,7 @@ describe("Feature: Prompt runtime parameters", () => {
       const localConfigData = {
         prompt: "You are a conflict assistant",
         model: "openai/gpt-5-mini",
-        messages: [
-          { role: "user" as const, content: "{{input}}" },
-        ],
+        messages: [{ role: "user" as const, content: "{{input}}" }],
         inputs: [{ identifier: "input", type: "str" as const }],
         outputs: [{ identifier: "output", type: "str" as const }],
       };
@@ -354,9 +352,7 @@ describe("Feature: Prompt runtime parameters", () => {
       const localConfigData = {
         prompt: "You are a stale assistant",
         model: "openai/gpt-5-mini",
-        messages: [
-          { role: "user" as const, content: "{{input}}" },
-        ],
+        messages: [{ role: "user" as const, content: "{{input}}" }],
         inputs: [{ identifier: "input", type: "str" as const }],
         outputs: [{ identifier: "output", type: "str" as const }],
       };

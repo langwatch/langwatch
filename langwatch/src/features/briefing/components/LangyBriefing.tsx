@@ -1,16 +1,16 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { GitPullRequest, Sparkles } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
-import { QuietHeadline } from "./QuietHeadline";
-import { useRouter } from "~/utils/compat/next-router";
 import { LangyPanelSurface } from "~/features/asaplangy";
+import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
+import { useRouter } from "~/utils/compat/next-router";
 import type {
   BriefingData,
   BriefingReceipt,
   BriefingSeverity,
   ScenarioBar,
 } from "../types";
+import { QuietHeadline } from "./QuietHeadline";
 
 /**
  * Langy's briefing — the first thing the returning user's eye lands on.
@@ -300,70 +300,85 @@ export function LangyBriefing({
           </VStack>
         ) : null}
 
-        <HStack
-          justify="space-between"
-          align="center"
-          gap={3}
-          wrap="wrap"
-          marginTop="auto"
-          paddingTop={2}
-        >
-          <HStack gap={2} wrap="wrap" align="center" minWidth={0}>
-            <chakra.button
-              type="button"
-              onClick={onAsk}
-              display="inline-flex"
-              alignItems="center"
-              gap={2}
-              fontFamily="mono"
-              fontSize="12.5px"
-              color="fg.muted"
-              cursor="pointer"
-              _hover={{ color: "fg" }}
-              transition="color 130ms ease"
-            >
-              Investigate
-              <Box
-                as="kbd"
-                borderWidth="1px"
-                borderColor="border.emphasized"
-                borderRadius="6px"
-                paddingX="6px"
-                paddingY="1px"
-                fontSize="10.5px"
-                color="fg.subtle"
-              >
-                ⌘I
-              </Box>
-            </chakra.button>
-            {/* One-click asks built from the project's own data — a chip is a
-                question already answered by the time the panel opens. */}
-            {data.suggestions?.map((question) => (
-              <chakra.button
-                key={question}
-                type="button"
-                onClick={() => onAskSubmit?.(question)}
-                fontFamily="mono"
-                fontSize="11.5px"
-                color="fg.muted"
-                borderWidth="1px"
-                borderColor="border.muted"
-                borderRadius="full"
-                paddingX={2.5}
-                paddingY="3px"
-                cursor="pointer"
-                whiteSpace="nowrap"
-                transition="color 130ms ease, border-color 130ms ease"
-                _hover={{ color: "orange.fg", borderColor: "orange.emphasized" }}
-              >
-                {question}
-              </chakra.button>
-            ))}
+        {/* The ask row exists to hand the sheet to Langy, so its controls
+            render only when their handlers do — without Langy the sheet
+            closes on the status figures (or the session link) instead of a
+            row of buttons that would open a panel that never mounts. */}
+        {onAsk ||
+        (onAskSubmit && data.suggestions?.length) ||
+        data.sessionHref ? (
+          <HStack
+            justify="space-between"
+            align="center"
+            gap={3}
+            wrap="wrap"
+            marginTop="auto"
+            paddingTop={2}
+          >
+            <HStack gap={2} wrap="wrap" align="center" minWidth={0}>
+              {onAsk ? (
+                <chakra.button
+                  type="button"
+                  onClick={onAsk}
+                  display="inline-flex"
+                  alignItems="center"
+                  gap={2}
+                  fontFamily="mono"
+                  fontSize="12.5px"
+                  color="fg.muted"
+                  cursor="pointer"
+                  _hover={{ color: "fg" }}
+                  transition="color 130ms ease"
+                >
+                  Investigate
+                  <Box
+                    as="kbd"
+                    borderWidth="1px"
+                    borderColor="border.emphasized"
+                    borderRadius="6px"
+                    paddingX="6px"
+                    paddingY="1px"
+                    fontSize="10.5px"
+                    color="fg.subtle"
+                  >
+                    ⌘I
+                  </Box>
+                </chakra.button>
+              ) : null}
+              {/* One-click asks built from the project's own data — a chip is a
+                  question already answered by the time the panel opens. */}
+              {onAskSubmit
+                ? data.suggestions?.map((question) => (
+                    <chakra.button
+                      key={question}
+                      type="button"
+                      onClick={() => onAskSubmit(question)}
+                      fontFamily="mono"
+                      fontSize="11.5px"
+                      color="fg.muted"
+                      borderWidth="1px"
+                      borderColor="border.muted"
+                      borderRadius="full"
+                      paddingX={2.5}
+                      paddingY="3px"
+                      cursor="pointer"
+                      whiteSpace="nowrap"
+                      transition="color 130ms ease, border-color 130ms ease"
+                      _hover={{
+                        color: "orange.fg",
+                        borderColor: "orange.emphasized",
+                      }}
+                    >
+                      {question}
+                    </chakra.button>
+                  ))
+                : null}
+            </HStack>
+            {data.sessionHref ? (
+              <BriefingLink label="Open session" href={data.sessionHref} />
+            ) : null}
           </HStack>
-          {data.sessionHref ? (
-            <BriefingLink label="Open session" href={data.sessionHref} />
-          ) : null}
-        </HStack>
+        ) : null}
       </VStack>
     </LangyPanelSurface>
   );

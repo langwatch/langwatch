@@ -78,7 +78,7 @@ export { GET, POST, PUT, PATCH, DELETE } from "./things.service";
 - **Tracing + logging** via `@langwatch/observability` (automatic, disable with `tracer: false` / `logger: false`)
 - **Auth, org, resource limits** applied in the right order per-endpoint
 - **Input/output/params/query validation** from Zod schemas, auto-wired to OpenAPI
-- **Error formatting** that duck-types `HandledError` (code, meta, reasons, traceId/spanId) and catches Zod errors
+- **Error formatting + logging** for `HandledError` (code, meta, reasons, traceId/spanId, fault/tips/docsUrl) and Zod errors
 - **Versioned routing** at `/api/{name}/{date}/...` with forward-copying from previous versions
 
 ## Handler signature
@@ -188,10 +188,31 @@ v.sse(
 
 Throw `HandledError` subclasses (from `@langwatch/handled-error`). The framework:
 
-1. Catches and serializes them with `code`, `meta`, `reasons`, `traceId`/`spanId`
-2. Catches `ZodError` and maps each issue to a `schema_failure` reason (cher-style)
+1. Catches and serializes them with `code`, `meta`, `reasons`, `traceId`/`spanId`,
+   plus the remediation channel (`fault`, `tips`, `docsUrl`)
+2. Catches `ZodError` and promotes it to a `ValidationError`, mapping each issue
+   to a `schema_failure` reason
 3. Returns union format for unversioned requests (includes legacy `error` field)
 4. Returns clean format for versioned requests
+5. Publishes the error it sent, and the status it sent it as, for the request
+   logger to consume
+
+The request logger writes **exactly one** error record per failed request.
+Level comes from `fault` when the error is handled (`customer` → warn,
+`platform` / `provider` → error) and from the status code otherwise (5xx →
+error, 4xx → warn) — so an unknown error, which is flattened to a 500, logs at
+`error` with its cause, while an unhandled `HTTPException` carrying a 4xx logs
+at `warn`. The error handler deliberately logs
+nothing itself: a second record there would double every error-log-derived
+alert and count. It publishes the *promoted* error, so a `ZodError` is reported
+as the 422 `ValidationError` the caller actually received rather than the 500 a
+re-derivation would guess.
+
+Only real `HandledError` instances are trusted. An object that merely grows a
+`code` + `httpStatus` + `serialize()` is treated as unknown and answered with a
+500 — it cannot talk its way into choosing its own status.
+
+Request bodies are never logged.
 
 Validation error example:
 

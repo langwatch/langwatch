@@ -1,20 +1,17 @@
+import {
+  cursorHasReachedEvent,
+  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
+} from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
-
 import type { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service";
+import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
-import {
-  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/constants";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 
-import {
-  projectionCursorHasReachedEvent,
-  projectionNotReadyError,
-} from "./projection-cursor";
+import { projectionNotReadyError } from "./projection-cursor";
 
 const logger = createLogger(
-  "langwatch:langy-conversation-update-broadcast-subscriber",
+  "langwatch:langy:conversation-update-broadcast-subscriber",
 );
 
 export interface LangyConversationFreshnessRecord {
@@ -63,7 +60,7 @@ export function createLangyConversationUpdateBroadcastSubscriber(
         projectId,
         conversationId,
       });
-      if (!record || !projectionCursorHasReachedEvent(record.cursor, event)) {
+      if (!record || !cursorHasReachedEvent(record.cursor, event)) {
         throw projectionNotReadyError({
           projectionName: "langyConversation",
           eventId: event.id,
@@ -76,6 +73,11 @@ export function createLangyConversationUpdateBroadcastSubscriber(
           JSON.stringify({
             event: "langy_conversation_updated",
             conversationId,
+            // The projection's position when this signal was published
+            // (ADR-059 §3): the client compares it with its own local cursor
+            // and fetches the event tail only when it is behind. A cursor is
+            // inert — no conversation content rides the tenant-wide channel.
+            cursor: record.cursor,
             // These fields are consumed by the server-side SSE authorization
             // gate and stripped from the client signal schema.
             ownerUserId: record.ownerUserId,

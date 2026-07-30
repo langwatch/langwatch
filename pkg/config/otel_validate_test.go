@@ -38,7 +38,7 @@ func TestResolve_AcceptsOnMachineDebugCollectors(t *testing.T) {
 		"http://host.docker.internal:4318",
 	} {
 		o := OTel{DebugCollectorEndpoint: endpoint}
-		assert.NoError(t, o.Resolve("local"), "on-machine endpoint %q must be accepted", endpoint)
+		assert.NoError(t, o.Resolve(), "on-machine endpoint %q must be accepted", endpoint)
 	}
 }
 
@@ -51,14 +51,14 @@ func TestResolve_RejectsLocalhostNamesThatResolveOffBox(t *testing.T) {
 	stubLocalhostDNS(t, []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("10.0.12.3")}, nil)
 	o := OTel{DebugCollectorEndpoint: "http://observability.langwatch.localhost:4318"}
 
-	assert.Error(t, o.Resolve("local"))
+	assert.Error(t, o.Resolve())
 }
 
 func TestResolve_RejectsLocalhostNamesThatDoNotResolve(t *testing.T) {
 	stubLocalhostDNS(t, nil, errors.New("no such host"))
 	o := OTel{DebugCollectorEndpoint: "http://observability.langwatch.localhost:4318"}
 
-	assert.Error(t, o.Resolve("local"))
+	assert.Error(t, o.Resolve())
 }
 
 func TestResolve_RejectsOffBoxDebugCollectors(t *testing.T) {
@@ -74,7 +74,7 @@ func TestResolve_RejectsOffBoxDebugCollectors(t *testing.T) {
 		"http://[fe80::1]:4318",
 	} {
 		o := OTel{DebugCollectorEndpoint: endpoint}
-		assert.Error(t, o.Resolve("local"), "off-box endpoint %q must be refused at boot", endpoint)
+		assert.Error(t, o.Resolve(), "off-box endpoint %q must be refused at boot", endpoint)
 	}
 }
 
@@ -85,16 +85,16 @@ func TestResolve_RejectsOffBoxDebugCollectors(t *testing.T) {
 func TestResolve_RejectsOutOfRangeLegacySampleRatio(t *testing.T) {
 	for _, ratio := range []float64{-1, -0.001, 1.001, 10} {
 		o := OTel{SampleRatio: ratio}
-		require.Error(t, o.Resolve("production"), "ratio %v must be refused before it reaches the sampler", ratio)
+		require.Error(t, o.Resolve(), "ratio %v must be refused before it reaches the sampler", ratio)
 	}
 	nan := OTel{SampleRatioSet: true, SampleRatio: math.NaN()}
-	require.Error(t, nan.Resolve("production"), "NaN must be refused before it reaches the sampler")
+	require.Error(t, nan.Resolve(), "NaN must be refused before it reaches the sampler")
 }
 
 func TestResolve_AcceptsTheFullLegacySampleRatioRange(t *testing.T) {
 	for _, ratio := range []float64{0, 0.1, 0.5, 1} {
 		o := OTel{SampleRatioSet: true, SampleRatio: ratio}
-		assert.NoError(t, o.Resolve("production"), "ratio %v is a legitimate operator choice", ratio)
+		assert.NoError(t, o.Resolve(), "ratio %v is a legitimate operator choice", ratio)
 	}
 }
 
@@ -102,7 +102,7 @@ func TestResolve_AcceptsTheFullLegacySampleRatioRange(t *testing.T) {
 
 func TestResolve_UsesTheOfficialEndpoint(t *testing.T) {
 	o := OTel{ExporterEndpoint: "http://collector:4318"}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	base, _ := o.PrimaryOTLP()
 	assert.Equal(t, "http://collector:4318", base)
@@ -112,7 +112,7 @@ func TestResolve_UsesTheOfficialEndpoint(t *testing.T) {
 
 func TestResolve_HonoursTheDeprecatedEndpointName(t *testing.T) {
 	o := OTel{OTLPEndpoint: "http://collector:4318"}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	base, _ := o.PrimaryOTLP()
 	assert.Equal(t, "http://collector:4318", base, "existing deployments must keep tracing through the rename")
@@ -125,7 +125,7 @@ func TestResolve_AcceptsBothEndpointNamesWhenEqual(t *testing.T) {
 		OTLPEndpoint:     "http://collector:4318",
 	}
 
-	assert.NoError(t, o.Resolve("production"), "equal values (modulo trailing slash) are not a conflict")
+	assert.NoError(t, o.Resolve(), "equal values (modulo trailing slash) are not a conflict")
 }
 
 // Two different live values is ambiguity; precedence is never silently
@@ -137,12 +137,12 @@ func TestResolve_RefusesConflictingEndpointNames(t *testing.T) {
 		OTLPEndpoint:     "http://other:4318",
 	}
 
-	assert.Error(t, o.Resolve("production"))
+	assert.Error(t, o.Resolve())
 }
 
 func TestResolve_LeavesTheExporterOffWhenNothingIsConfigured(t *testing.T) {
 	o := OTel{}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	base, headers := o.PrimaryOTLP()
 	assert.Empty(t, base, "no endpoint must mean OFF — never the SDK's localhost default")
@@ -156,7 +156,7 @@ func TestResolve_UsesTheSignalSpecificTracesEndpointAsIs(t *testing.T) {
 		ExporterEndpoint:       "http://collector:4318",
 		ExporterTracesEndpoint: "http://collector:4318/custom/traces",
 	}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	assert.Equal(t, "http://collector:4318/custom/traces", o.resolved.tracesEndpoint,
 		"per spec the signal-specific endpoint is used verbatim, no path appended")
@@ -169,7 +169,7 @@ func TestResolve_UsesTheSignalSpecificTracesEndpointAsIs(t *testing.T) {
 
 func TestResolve_ParsesOfficialHeaders(t *testing.T) {
 	o := OTel{ExporterHeaders: "X-Auth-Token=tok,X-Team=obs"}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	_, headers := o.PrimaryOTLP()
 	assert.Equal(t, map[string]string{"X-Auth-Token": "tok", "X-Team": "obs"}, headers)
@@ -179,7 +179,7 @@ func TestResolve_DecodesPercentEncodedHeaderValues(t *testing.T) {
 	// The W3C baggage format used by OTEL_EXPORTER_OTLP_HEADERS percent-encodes
 	// values; Grafana Cloud's copy-paste examples rely on it.
 	o := OTel{ExporterHeaders: "Authorization=Basic%20dXNlcjp0b2tlbg=="}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	_, headers := o.PrimaryOTLP()
 	assert.Equal(t, "Basic dXNlcjp0b2tlbg==", headers["Authorization"])
@@ -190,7 +190,7 @@ func TestResolve_TracesSpecificHeadersWin(t *testing.T) {
 		ExporterHeaders:       "X-Auth-Token=base",
 		ExporterTracesHeaders: "X-Auth-Token=traces",
 	}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	_, headers := o.PrimaryOTLP()
 	assert.Equal(t, "traces", headers["X-Auth-Token"])
@@ -202,12 +202,12 @@ func TestResolve_RefusesConflictingHeaderNames(t *testing.T) {
 		OTLPHeaders:     "X-Auth-Token=b",
 	}
 
-	assert.Error(t, o.Resolve("production"))
+	assert.Error(t, o.Resolve())
 }
 
 func TestResolve_HonoursTheDeprecatedHeadersName(t *testing.T) {
 	o := OTel{OTLPHeaders: "X-Auth-Token=tok"}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	_, headers := o.PrimaryOTLP()
 	assert.Equal(t, "tok", headers["X-Auth-Token"])
@@ -218,7 +218,7 @@ func TestResolve_HonoursTheDeprecatedHeadersName(t *testing.T) {
 func TestResolve_RefusesUnsupportedProtocols(t *testing.T) {
 	for _, protocol := range []string{"grpc", "http/json"} {
 		o := OTel{ExporterProtocol: protocol}
-		require.Error(t, o.Resolve("production"),
+		require.Error(t, o.Resolve(),
 			"protocol %q states an intent our exporters cannot satisfy — silence would be a lie", protocol)
 	}
 }
@@ -226,13 +226,13 @@ func TestResolve_RefusesUnsupportedProtocols(t *testing.T) {
 func TestResolve_AcceptsTheSupportedProtocol(t *testing.T) {
 	for _, protocol := range []string{"", "http/protobuf", "HTTP/Protobuf"} {
 		o := OTel{ExporterProtocol: protocol}
-		assert.NoError(t, o.Resolve("production"))
+		assert.NoError(t, o.Resolve())
 	}
 }
 
 func TestResolve_TracesExporterNoneTurnsOnlySpansOff(t *testing.T) {
 	o := OTel{ExporterEndpoint: "http://collector:4318", TracesExporter: "none"}
-	require.NoError(t, o.Resolve("production"))
+	require.NoError(t, o.Resolve())
 
 	assert.Empty(t, o.resolved.tracesEndpoint)
 	assert.Equal(t, "http://collector:4318/v1/metrics", o.resolved.metricsEndpoint,
@@ -248,7 +248,7 @@ func TestResolve_TracesExporterNoneTurnsOnlySpansOff(t *testing.T) {
 func TestResolve_RefusesUnknownTracesExporters(t *testing.T) {
 	o := OTel{TracesExporter: "console"}
 
-	assert.Error(t, o.Resolve("production"))
+	assert.Error(t, o.Resolve())
 }
 
 // ---- OTEL_SDK_DISABLED ----
@@ -259,7 +259,7 @@ func TestResolve_SDKDisabledTurnsEverythingOff(t *testing.T) {
 		ExporterEndpoint:       "http://collector:4318",
 		DebugCollectorEndpoint: "http://localhost:4318",
 	}
-	require.NoError(t, o.Resolve("local"))
+	require.NoError(t, o.Resolve())
 
 	base, _ := o.PrimaryOTLP()
 	assert.Empty(t, base)

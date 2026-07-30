@@ -1,5 +1,5 @@
+import { LANGY_EPHEMERAL_SIGNAL_TYPES } from "@langwatch/langy";
 import { z } from "zod";
-import { LANGY_EPHEMERAL_SIGNAL_TYPES } from "./schemas/constants";
 
 /**
  * Ephemeral signals for a Langy conversation (ADR-046).

@@ -4,7 +4,7 @@ import { checkFlagEnvOverride } from "./envOverride";
 import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
 import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
 import {
-  FeatureFlagStorePostgres,
+  type FeatureFlagStorePostgres,
   getFeatureFlagStore,
 } from "./featureFlagStore.postgres";
 import type { FeatureFlagKey } from "./registry";
@@ -90,9 +90,14 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
     const { distinctId, defaultValue = false } = opts;
     const definition = resolveFlagDefinition(flagKey);
 
-    const envOverride = checkFlagEnvOverride(flagKey, definition?.legacyEnvVar);
-    if (envOverride !== undefined) {
-      return envOverride;
+    if (definition?.envOverridable !== false) {
+      const envOverride = checkFlagEnvOverride(
+        flagKey,
+        definition?.legacyEnvVar,
+      );
+      if (envOverride !== undefined) {
+        return envOverride;
+      }
     }
     const forceOn = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
       .split(",")

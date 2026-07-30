@@ -15,6 +15,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [007](./007-event-sourcing-architecture.md)                       | Event sourcing architecture (fold/map projections)                                          | Accepted                                          |
 | [018](./018-form-validation-and-save.md)                          | Form validation and Save button behavior                                                    | Accepted                                          |
 | [021](./021-multi-scope-targeting-and-tenancy.md)                 | Multi-scope targeting and single-org tenancy enforcement                                    | Accepted                                          |
+| [021](./021-lean-fold-cache.md)                                   | Lean fold cache                                                                             | Superseded by [066](./066-projection-clickhouse-cached-store.md) / [022](./022-event-log-source-of-truth.md) |
 | [022](./022-data-retention.md)                                    | Per-tenant per-category data retention enforced by ClickHouse-native TTL                    | Accepted                                          |
 | [023](./023-orphan-sweep-reactor-chain.md)                        | Reactor-seeded self-perpetuating chain for retention orphan sweep                           | Superseded by [025](./025-remove-orphan-sweep.md) |
 | [024](./024-cold-path-tiered-storage.md)                          | Cold-path tiered storage for retention-managed tables                                       | Accepted                                          |
@@ -38,8 +39,24 @@ Document **important technical and architectural decisions** — context, trade-
 | [044](./044-scheduled-reports-automation-kind.md)                 | Scheduled reports — a schedule-triggered automation kind + generic event-sourcing scheduler | Proposed                                          |
 | [045](./045-domain-errors-handled-boundary.md)                    | Handled errors as the handled-error boundary (TS `HandledError` ⇔ Go `herr`)                | Accepted                                          |
 | [046](./046-event-sourced-langy-conversations.md)                 | Event-sourced Langy conversations                                                           | Superseded in part by 049                         |
+| [047](./047-langy-foundations.md)                                | Langy foundations — hexagonal Go service, caller-scoped sessions                           | Accepted                                         |
+| [048](./048-langy-shutdown-handoff.md)                           | Langy worker shutdown-handoff — checkpoint on SIGTERM, resume on the next worker           | Proposed                                         |
 | [049](./049-langy-projection-independent-reactions.md)            | Langy pilots projection-independent reactions                                               | Accepted                                          |
 | [050](./050-langy-versioned-prompts-and-dogfood-evals.md)         | Langy's prompts in the versioned prompt registry + dogfood scenarios/evals                  | Proposed                                          |
+| [053](./053-tenant-aware-egress-and-workload-isolation.md)       | Tenant-aware egress and per-workload sandbox isolation                                     | Proposed                                         |
+| [057](./057-token-gated-trace-sharing.md)                         | Token-gated trace sharing (ShareLink)                                                       | Accepted                                          |
+| [058](./058-full-stack-trace-correlation-browser-rum.md)         | Full-stack trace correlation — browser RUM into the internal trace                         | Draft                                            |
+| [059](./059-event-sourced-langy-frontend.md)                     | Event-sourced Langy frontend — shared projections in `packages/langy`                      | Accepted                                         |
+| [060](./060-langy-model-emitted-blocks.md)                       | The model's in-stream data channel — derived cards and choice questions                    | Accepted                                         |
+| [061](./061-langy-trace-dual-export.md)                          | Langy turns export twice — the customer's trace, and ours                                  | Accepted                                         |
+| [066](./066-projection-clickhouse-cached-store.md)                | `event_log` off the per-item hot path — read-back fold store + append coalescing            | Accepted                                          |
+| [068](./068-windowed-clickhouse-reads.md)                         | One windowed ClickHouse read with a measured fallback (`queryWindowed`)                      | Accepted                                          |
+| [069](./069-payload-cost-doctrine.md)                             | Payload cost is a scheduling input — extraction at ingest, byte bounds, memory by grant     | Accepted                                          |
+| [071](./071-coding-agent-session-immutable-storage-anchor.md)     | A storage anchor is immutable and platform-assigned — take the moving column out of the dedup scope | Accepted                                  |
+| [076](./076-langy-egress-enforcement.md)                          | Langy egress enforcement — monitor first, enforce last (implemented)                        | Accepted                                          |
+| [077](./077-langy-dual-stream.md)                                 | Langy dual-stream — raw token fast-path alongside the durable event-sourced stream          | Accepted                                          |
+| [078](./078-langy-user-turn-controls.md)                          | Langy user-initiated turn controls — stop for real, continue, resume-on-refresh             | Accepted                                          |
+| [079](./079-card-selection-is-deterministic.md)                   | Card selection is deterministic — the model supplies data, never presentation (amended 2026-07-22) | Accepted                                          |
 
 ## When to Write an ADR
 

@@ -23,7 +23,13 @@ export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
 export type CreateLlmConfigVersionParams = Omit<
   LlmPromptConfigVersion,
-  "id" | "author" | "config" | "createdAt" | "configData" | "name" | "runtimeParameters"
+  | "id"
+  | "author"
+  | "config"
+  | "createdAt"
+  | "configData"
+  | "name"
+  | "runtimeParameters"
 > & {
   configData: LatestConfigVersionSchema["configData"];
 };
@@ -231,8 +237,7 @@ export class LlmConfigVersionsRepository {
           id: `prompt_version_${nanoid()}`,
           version: nextVersion,
           configData: restVersionData.configData as Prisma.InputJsonValue,
-          runtimeParameters:
-            (runtimeParameters as Prisma.InputJsonValue) ?? {},
+          runtimeParameters: (runtimeParameters as Prisma.InputJsonValue) ?? {},
         },
       });
 
@@ -279,8 +284,7 @@ export class LlmConfigVersionsRepository {
         commitMessage: `Restore from version ${version.version}`,
         schemaVersion: version.schemaVersion as SchemaVersion,
         configData: version.configData as LlmConfigVersionDTO["configData"],
-        runtimeParameters:
-          parseRuntimeParameters(version.runtimeParameters),
+        runtimeParameters: parseRuntimeParameters(version.runtimeParameters),
       },
       organizationId,
     });

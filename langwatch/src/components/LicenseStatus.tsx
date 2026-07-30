@@ -1,12 +1,12 @@
-import { useState } from "react";
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
+import { useState } from "react";
 import { api } from "~/utils/api";
 import { LicenseDetailsCard } from "./license/LicenseDetailsCard";
 import { LicenseGeneratorDrawer } from "./license/LicenseGeneratorDrawer";
 import { LicenseLoadingSkeleton } from "./license/LicenseLoadingSkeleton";
+import { normalizeKeyForActivation } from "./license/licenseStatusUtils";
 import { NoLicenseCard } from "./license/NoLicenseCard";
 import { useLicenseActions } from "./license/useLicenseActions";
-import { normalizeKeyForActivation } from "./license/licenseStatusUtils";
 
 interface LicenseStatusProps {
   organizationId: string;
@@ -25,7 +25,6 @@ export function LicenseStatus({
     data: status,
     isLoading,
     isError,
-    error,
     refetch,
   } = api.license.getStatus.useQuery(
     { organizationId },
@@ -33,15 +32,10 @@ export function LicenseStatus({
       enabled: !!organizationId,
       refetchOnWindowFocus: false,
       staleTime: 30_000, // Consider fresh for 30 seconds
-    }
+    },
   );
 
-  const {
-    upload,
-    remove,
-    isUploading,
-    isRemoving,
-  } = useLicenseActions({
+  const { upload, remove, isUploading, isRemoving } = useLicenseActions({
     organizationId,
     onUploadSuccess: () => {
       setLicenseKey("");
@@ -76,7 +70,8 @@ export function LicenseStatus({
         <VStack align="start" gap={4}>
           <Text fontWeight="medium">Unable to load license</Text>
           <Text color="fg.muted">
-            Your license status could not be retrieved. Please try again or contact support if the issue persists.
+            Your license status could not be retrieved. Please try again or
+            contact support if the issue persists.
           </Text>
           <Button onClick={() => void refetch()} size="sm">
             Retry

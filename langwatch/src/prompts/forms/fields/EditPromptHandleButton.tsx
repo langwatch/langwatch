@@ -4,13 +4,13 @@ import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 const logger = createLogger(
   "langwatch:prompt-configs:edit-prompt-handle-button",
@@ -44,10 +44,13 @@ export function EditPromptHandleButton() {
     const id = form.watch("configId");
     if (!id) {
       logger.error({ id }, "Config ID is required");
+      // A local precondition, not a server failure — say what's actually
+      // wrong rather than the generic "we've been notified".
       toaster.create({
-        title: "Error changing prompt handle",
-        description: "Failed to change prompt handle",
+        title: "Couldn't change the prompt handle",
+        description: "Save this prompt before renaming its handle.",
         type: "error",
+        meta: { closable: true },
       });
       return;
     }
@@ -64,12 +67,12 @@ export function EditPromptHandleButton() {
     };
 
     const onError = (error: Error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      console.error(error);
-      toaster.create({
-        title: "Error changing prompt handle",
-        description: error.message,
-        type: "error",
+      // The toast shows the registry's copy for the code, so the raw error
+      // reaches no surface — this is its only local diagnostic.
+      logger.error({ error }, "Failed to change prompt handle");
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't change the prompt handle",
       });
     };
 

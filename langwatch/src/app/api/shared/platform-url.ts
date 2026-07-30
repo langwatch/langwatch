@@ -16,10 +16,7 @@ export function platformUrl({
   projectSlug: string;
   path: string;
 }): string {
-  const base = (env.BASE_HOST ?? "").replace(
-    /\/+$/,
-    "",
-  );
+  const base = (env.BASE_HOST ?? "").replace(/\/+$/, "");
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   return `${base}/${projectSlug}${cleanPath}`;
 }

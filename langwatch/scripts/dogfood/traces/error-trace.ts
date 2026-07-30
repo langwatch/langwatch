@@ -100,7 +100,8 @@ const spans: SpanInput[] = [
 
 function toAttrValue(v: string | number | boolean) {
   if (typeof v === "string") return { stringValue: v };
-  if (typeof v === "number") return Number.isInteger(v) ? { intValue: v } : { doubleValue: v };
+  if (typeof v === "number")
+    return Number.isInteger(v) ? { intValue: v } : { doubleValue: v };
   return { boolValue: v };
 }
 
@@ -119,9 +120,7 @@ const otlpSpans = spans.map((s) => {
       key,
       value: toAttrValue(value),
     })),
-    status: s.errorMessage
-      ? { code: 2, message: s.errorMessage }
-      : undefined,
+    status: s.errorMessage ? { code: 2, message: s.errorMessage } : undefined,
     events: s.errorMessage
       ? [
           {

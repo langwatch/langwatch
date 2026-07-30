@@ -26,7 +26,10 @@ import {
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type {
+  NormalizedAttributes,
+  NormalizedSpan,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 import type {
   ResolvedTraceSpans,
@@ -52,7 +55,7 @@ interface FetchTask {
 /** Internal: per-span plan built in the parse phase. */
 interface SpanPlan {
   /** Preview/regular attributes with reserved keys removed. */
-  cleanedAttrs: Record<string, string>;
+  cleanedAttrs: NormalizedAttributes;
   /** Which fetch key fills which attribute key. */
   refs: Array<{ attrKey: string; fetchKey: string }>;
   /** False when the span had no eventrefs (returned untouched). */
@@ -174,7 +177,7 @@ export async function resolveOffloadedTracesBatch({
   const fetchTasks = new Map<string, FetchTask>();
   const tracePlans: SpanPlan[][] = spansPerTrace.map((spans) =>
     spans.map((span) => {
-      const attrs = span.spanAttributes as Record<string, string>;
+      const attrs = span.spanAttributes;
       if (!hasEventRefs(attrs)) {
         return { cleanedAttrs: attrs, refs: [], hadRefs: false };
       }

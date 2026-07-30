@@ -41,6 +41,44 @@ export type LangyGithubWebhookAction =
   | "added"
   | "removed";
 
+/**
+ * Thrown when a `/setup` callback tries to bind an installation that another
+ * organization already owns — the cross-tenant installation-takeover guard.
+ *
+ * The `installation_id` at `/setup` is an attacker-controllable query param that
+ * is NOT part of the signed state, and `getInstallation` authenticates as the
+ * App (so it returns metadata for ANY installation of this App, on ANY account).
+ * Without this guard, a caller holding a valid signed state for their OWN org
+ * could point `/setup` at a victim org's installation id and have the upsert
+ * rebind that unique-`installationId` row to their org — silently stealing
+ * 1h `contents:write`/`pull_requests:write` tokens on the victim's private
+ * repos. The route maps this to the generic install-failed message so a blocked
+ * attacker learns nothing about whether the id exists.
+ */
+export class LangyGithubInstallationConflictError extends Error {
+  public readonly installationId: string;
+  public readonly existingOrganizationId: string;
+  public readonly attemptedOrganizationId: string;
+
+  constructor({
+    installationId,
+    existingOrganizationId,
+    attemptedOrganizationId,
+  }: {
+    installationId: string;
+    existingOrganizationId: string;
+    attemptedOrganizationId: string;
+  }) {
+    super(
+      `GitHub installation ${installationId} is already connected to a different organization`,
+    );
+    this.name = "LangyGithubInstallationConflictError";
+    this.installationId = installationId;
+    this.existingOrganizationId = existingOrganizationId;
+    this.attemptedOrganizationId = attemptedOrganizationId;
+  }
+}
+
 export class LangyGithubInstallationsService {
   constructor(
     private readonly repo: LangyGithubInstallationsRepository,
@@ -86,14 +124,14 @@ export class LangyGithubInstallationsService {
     organizationId: string;
   }): Promise<{ accountLogin: string }> {
     const details = await this.appTokens.getInstallation(installationId);
+
     let repositories: LangyGithubRepositoryRef[] | null = null;
     if (details.repositorySelection === "selected") {
       // Best-effort: cache the selected repo list so settings can show it
       // without a live call. A failure here must not fail the install.
       try {
-        repositories = await this.appTokens.listInstallationRepositories(
-          installationId,
-        );
+        repositories =
+          await this.appTokens.listInstallationRepositories(installationId);
       } catch (error) {
         logger.warn(
           { error, installationId },
@@ -101,7 +139,8 @@ export class LangyGithubInstallationsService {
         );
       }
     }
-    await this.repo.upsert({
+
+    const input = {
       installationId: details.installationId,
       organizationId,
       accountLogin: details.accountLogin,
@@ -109,7 +148,28 @@ export class LangyGithubInstallationsService {
       accountId: details.accountId,
       repositorySelection: details.repositorySelection,
       repositories,
-    });
+    };
+
+    // Cross-tenant takeover guard, made race-safe: `insertOrGetExisting`
+    // claims the installation atomically via the DB's unique index rather
+    // than this code checking-then-writing across two awaits, so two
+    // concurrent `/setup` calls racing for the same fresh installation id can
+    // never both observe "unclaimed". Whichever loses the race always sees
+    // the winner's committed org here.
+    const { wasInserted, row } = await this.repo.insertOrGetExisting(input);
+    if (!wasInserted) {
+      if (row.organizationId !== organizationId) {
+        throw new LangyGithubInstallationConflictError({
+          installationId: details.installationId,
+          existingOrganizationId: row.organizationId,
+          attemptedOrganizationId: organizationId,
+        });
+      }
+      // Genuine re-install under the SAME org: refresh the cached account +
+      // repo fields (the initial insert attempt above never landed).
+      await this.repo.upsert(input);
+    }
+
     return { accountLogin: details.accountLogin };
   }
 
@@ -152,9 +212,8 @@ export class LangyGithubInstallationsService {
           const details = await this.appTokens.getInstallation(installationId);
           let repositories: LangyGithubRepositoryRef[] | null = null;
           if (details.repositorySelection === "selected") {
-            repositories = await this.appTokens.listInstallationRepositories(
-              installationId,
-            );
+            repositories =
+              await this.appTokens.listInstallationRepositories(installationId);
           }
           await this.repo.setRepositories({
             installationId,
@@ -179,9 +238,8 @@ export class LangyGithubInstallationsService {
   async listRepositoriesForOrganization(
     organizationId: string,
   ): Promise<GithubRepository[]> {
-    const installations = await this.repo.findAllForOrganization(
-      organizationId,
-    );
+    const installations =
+      await this.repo.findAllForOrganization(organizationId);
     const seen = new Set<string>();
     const out: GithubRepository[] = [];
     for (const inst of installations) {
@@ -208,7 +266,7 @@ export class LangyGithubInstallationsService {
   /**
    * Mint the per-turn installation token Langy hands the worker.
    *
-   * Repo resolution (LANGY_GITHUB_AUTH_PLAN.md §7.2 — agent-infers, control
+   * Repo resolution (agent-infers, control
    * plane validates): when the turn carries an explicit `repositoryFullName`,
    * find the installation that can reach it and scope the token to ONLY that
    * repo. Otherwise scope to the installation's full repository set (still
@@ -229,9 +287,8 @@ export class LangyGithubInstallationsService {
     repositoryFullName?: string;
   }): Promise<LangyGithubTurnToken | null> {
     if (!this.configured) return null;
-    const installations = await this.repo.findAllForOrganization(
-      organizationId,
-    );
+    const installations =
+      await this.repo.findAllForOrganization(organizationId);
     const usable = installations.filter((i) => !i.suspendedAt);
     if (usable.length === 0) return null;
 

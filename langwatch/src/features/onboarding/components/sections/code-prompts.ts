@@ -125,53 +125,21 @@ Run the application and check that traces appear in your LangWatch dashboard at 
 - Do NOT forget to add LANGWATCH_API_KEY to .env
 - Do NOT use \`platform_\` MCP tools — this skill is about adding code, not creating platform resources`;
 
-export const PROMPT_EVALUATIONS = `Set Up Evaluations for Your Agent
+export const PROMPT_EXPERIMENTS = `Run Experiments for Your Agent
 
-You are using LangWatch for your AI agent project. Follow these instructions.
+Use LangWatch experiments for pre-deployment batch tests, prompt or model comparisons, regression checks, benchmarks, and CI quality gates.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
-First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+Read the agent code before creating a domain-specific dataset. Read the current documentation with \`langwatch docs evaluations/experiments/overview\` and \`langwatch docs evaluations/experiments/sdk\`. Build the experiment with the SDK that matches the project, run it with real credentials from the project environment, then verify it with \`langwatch experiment list --format json\`.
 
-# Set Up Evaluations for Your Agent
+Do not configure production monitors or guardrails. If the request concerns live traffic, use the online-evaluations skill instead.`;
 
-LangWatch Evaluations is a comprehensive quality assurance system. Understand which part the user needs:
+export const PROMPT_ONLINE_EVALUATIONS = `Set Up Online Evaluations and Guardrails
 
-| User says... | They need... | Go to... |
-|---|---|---|
-| "test my agent", "benchmark", "compare models" | **Experiments** | Step A |
-| "monitor production", "track quality", "block harmful content", "safety" | **Online Evaluation** (includes guardrails) | Step B |
-| "create an evaluator", "scoring function" | **Evaluators** | Step C |
-| "create a dataset", "test data" | **Datasets** | Step D |
-| "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
+Use LangWatch online evaluations to score live traces or threads asynchronously. Use guardrails only when an evaluator must synchronously stop or replace unsafe traffic.
 
-## Where Evaluations Fit
+Inspect existing evaluators and monitors first. Read the current documentation with \`langwatch docs evaluations/online-evaluation/overview\`, \`langwatch docs evaluations/online-evaluation/setup-monitors\`, and the relevant guardrail guide. Discover the installed CLI flags with \`langwatch monitor create --help\`, create the real monitor or guardrail, and verify the saved configuration and real behavior.
 
-Evaluations sit at the **component level of the testing pyramid** — they test specific aspects of your agent with many input/output examples. This is different from scenarios (end-to-end multi-turn conversation testing).
-
-Use evaluations when:
-- You have many examples with clear correct/incorrect answers
-- Testing RAG retrieval accuracy
-- Benchmarking classification, routing, or detection tasks
-- Running CI/CD quality gates
-
-Use scenarios instead when:
-- Testing multi-turn agent conversation behavior
-- Validating complex tool-calling sequences
-- Checking agent decision-making in realistic situations
-
-For onboarding, create 1-2 Jupyter notebooks (or scripts) maximum. Focus on generating domain-realistic data that's as close to real-world inputs as possible.
-
-## Common Mistakes
-
-- Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
-- Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT use \`platform_\` MCP tools for code-based features (experiments, guardrails) — write code
-- Do use \`platform_\` MCP tools for platform-based features (evaluators, monitors) when the user wants no-code
-- Do NOT skip running the experiment to verify it works
-- Monitors **measure** (async), guardrails **act** (sync, via code with \`as_guardrail=True\`) — both are online evaluation
-- Always set up \`LANGWATCH_API_KEY\` in \`.env\`
-- Always call \`discover_schema\` before creating evaluators via MCP to understand available types
-- Do NOT create prompts with \`langwatch prompt create\` CLI when using the platform approach — that's for code-based projects`;
+Do not create a batch experiment. If the request concerns a dataset, benchmark, comparison, or CI gate, use the experiments skill instead.`;
 
 export const PROMPT_SCENARIOS = `Test Your Agent with Scenarios
 
@@ -224,24 +192,29 @@ First, try to install the LangWatch MCP server for access to documentation and p
 - Do NOT manually edit \`prompts.json\` — use the CLI commands (\`langwatch prompt init\`, \`langwatch prompt create\`, \`langwatch prompt sync\`)
 - Do NOT skip \`langwatch prompt sync\` — prompts must be synced to the platform after creation`;
 
-export const PROMPT_ANALYTICS = `Analyze Agent Performance with LangWatch
+export const PROMPT_AGENT_PERFORMANCE = `Diagnose Your Agent's Production Behavior
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
-First, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it, they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, use that endpoint instead of app.langwatch.ai.
+Use the \`langwatch\` CLI for everything: install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
 
-# Analyze Agent Performance with LangWatch
+# Diagnose Your Agent's Production Behavior
 
-This skill uses LangWatch MCP tools to query and present analytics. It does NOT write code.
+This skill reads production traffic and answers: what is my agent doing, where is it failing, who is it annoying, and where is the money going. Read-only, plus one report file.
+
+1. Baseline the vital signs with \`langwatch analytics query\` presets (trace-count, total-cost, avg-latency, p95-latency, total-tokens, eval-pass-rate), then slice with \`--group-by\` to find where the numbers come from.
+2. Export evidence with \`langwatch trace export --format jsonl --limit 1000\` and mine it locally: failure patterns, dissatisfied users, token cost hotspots, edge cases, behavior changes between time windows, outliers.
+3. Read representative traces in full with \`langwatch trace get <traceId>\` and keep 2-3 example trace IDs per finding.
+4. Write a self-contained agent-performance-report.html where every finding links to real example traces, then summarize the top findings with numbers in the conversation.
+5. Close by recommending the agent-improve skill to turn findings into tested changes (\`npx skills add langwatch/skills/agent-improve\`).
 
 ## Common Mistakes
 
-- Do NOT skip \`discover_schema\` -- always call it first to understand available metrics before querying
-- Do NOT try to write code -- this skill uses MCP tools only, no SDK installation or code changes
-- Do NOT hardcode metric names -- discover them dynamically so they stay correct as the platform evolves
-- Do NOT use \`platform_\` MCP tools for creating resources -- this skill is read-only analytics
-- Do NOT present raw JSON to the user -- summarize the data in a clear, human-readable format`;
+- Do NOT modify code, prompts, or platform resources, this skill is read-only plus the report file
+- Do NOT report a pattern without linked example traces
+- Do NOT rely on aggregates alone, always read full traces per finding
+- Do NOT present raw JSON to the user, deliver the diagnosis in plain language with numbers`;
 
 export const PROMPT_LEVEL_UP = `${PROMPT_TRACING}
 
@@ -251,7 +224,7 @@ ${PROMPT_PROMPTS}
 
 ---
 
-${PROMPT_EVALUATIONS}
+${PROMPT_EXPERIMENTS}
 
 ---
 

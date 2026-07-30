@@ -1,7 +1,16 @@
-import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
+import {
+  Currency,
+  type OrganizationUserRole,
+  type PrismaClient,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import type Stripe from "stripe";
+import {
+  NoActiveSubscriptionError,
+  SubscriptionItemNotFoundError,
+} from "../errors";
 import { SubscriptionStatus } from "../planTypes";
+import type { BillingInterval } from "../utils/growthSeatEvent";
 import {
   createCheckoutLineItems,
   GROWTH_SEAT_PLAN_TYPES,
@@ -9,10 +18,9 @@ import {
   resolveGrowthSeatPlanType,
 } from "../utils/growthSeatEvent";
 import {
-  NoActiveSubscriptionError,
-  SubscriptionItemNotFoundError,
-} from "../errors";
-import type { BillingInterval } from "../utils/growthSeatEvent";
+  requireCheckoutCurrency,
+  resolveCheckoutCurrency,
+} from "../utils/stripeCustomerCurrency";
 
 type InviteInput = {
   email: string;
@@ -50,6 +58,18 @@ export const createSeatEventSubscriptionFns = ({
     isUpgradeFromTiered?: boolean;
     invites?: InviteInput[];
   }) {
+    // Resolve the currency before touching the database. A checkout we cannot
+    // build in the customer's own currency will be rejected outright, and every
+    // write below this point would have to be cleaned up afterwards.
+    const checkoutCurrency = requireCheckoutCurrency(
+      await resolveCheckoutCurrency({
+        stripe,
+        customerId,
+        organizationId,
+        requestedCurrency: currency,
+      }),
+    );
+
     // Find stale PENDING subs so we can clean up their PAYMENT_PENDING invites too
     const staleSubs = await db.subscription.findMany({
       where: {
@@ -90,7 +110,7 @@ export const createSeatEventSubscriptionFns = ({
     // doesn't leave orphaned pending records in the database.
     const lineItems = createCheckoutLineItems({
       coreMembers: membersToAdd,
-      currency,
+      currency: checkoutCurrency,
       interval: billingInterval,
     });
 
@@ -100,7 +120,10 @@ export const createSeatEventSubscriptionFns = ({
         data: {
           organizationId,
           status: SubscriptionStatus.PENDING,
-          plan: resolveGrowthSeatPlanType({ currency, interval: billingInterval }),
+          plan: resolveGrowthSeatPlanType({
+            currency: checkoutCurrency,
+            interval: billingInterval,
+          }),
           maxMembers: membersToAdd,
         },
       });
@@ -138,7 +161,7 @@ export const createSeatEventSubscriptionFns = ({
     });
 
     const selectedOptionsMetadata = {
-      selectedCurrency: currency,
+      selectedCurrency: checkoutCurrency,
       selectedBillingInterval: billingInterval,
     };
 
@@ -152,16 +175,14 @@ export const createSeatEventSubscriptionFns = ({
     const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] =
       {
         metadata: selectedOptionsMetadata,
-        billing_cycle_anchor: Math.floor(
-          billingCycleAnchor.getTime() / 1000,
-        ),
+        billing_cycle_anchor: Math.floor(billingCycleAnchor.getTime() / 1000),
         proration_behavior:
           "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
       };
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      currency: currency.toLowerCase(),
+      currency: checkoutCurrency.toLowerCase(),
       ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
       customer: customerId,
       customer_update: {
@@ -194,7 +215,9 @@ export const createSeatEventSubscriptionFns = ({
     const lastSubscription = await db.subscription.findFirst({
       where: {
         organizationId,
-        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED] },
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED],
+        },
         stripeSubscriptionId: { not: null },
       },
       orderBy: { createdAt: "desc" },
@@ -255,7 +278,9 @@ export const createSeatEventSubscriptionFns = ({
     const lastSubscription = await db.subscription.findFirst({
       where: {
         organizationId,
-        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED] },
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED],
+        },
         stripeSubscriptionId: { not: null },
       },
       orderBy: { createdAt: "desc" },
@@ -285,9 +310,7 @@ export const createSeatEventSubscriptionFns = ({
     // Fetch upcoming invoice WITH the proposed seat change
     const upcomingWithChange = await stripe.invoices.retrieveUpcoming({
       subscription: lastSubscription.stripeSubscriptionId,
-      subscription_items: [
-        { id: seatItem.id, quantity: newTotalSeats },
-      ],
+      subscription_items: [{ id: seatItem.id, quantity: newTotalSeats }],
       subscription_proration_behavior: "create_prorations",
     });
 
@@ -297,7 +320,8 @@ export const createSeatEventSubscriptionFns = ({
       subscription: lastSubscription.stripeSubscriptionId,
     });
 
-    const currency = (upcomingWithChange.currency?.toUpperCase() ?? Currency.USD) as Currency;
+    const currency = (upcomingWithChange.currency?.toUpperCase() ??
+      Currency.USD) as Currency;
     const billingInterval = seatItem.price.recurring?.interval ?? "month";
 
     // Subtract existing prorations from changed prorations to get ONLY
@@ -319,12 +343,15 @@ export const createSeatEventSubscriptionFns = ({
 
     const format = (cents: number) => {
       const amount = cents / 100;
-      return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
-        style: "currency",
-        currency,
-        minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-        maximumFractionDigits: 2,
-      }).format(amount);
+      return new Intl.NumberFormat(
+        currency === Currency.EUR ? "en-IE" : "en-US",
+        {
+          style: "currency",
+          currency,
+          minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+          maximumFractionDigits: 2,
+        },
+      ).format(amount);
     };
 
     return {

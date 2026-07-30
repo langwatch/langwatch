@@ -1,9 +1,6 @@
 import { memo } from "react";
 import { useShallow } from "zustand/react/shallow";
-import {
-  selectPeersOnTrace,
-  usePresenceStore,
-} from "../stores/presenceStore";
+import { selectPeersOnTrace, usePresenceStore } from "../stores/presenceStore";
 import { PresenceAvatarStack } from "./PresenceAvatarStack";
 
 interface TracePresenceAvatarsProps {

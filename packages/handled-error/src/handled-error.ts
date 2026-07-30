@@ -78,7 +78,14 @@ export interface SerializedHandledError {
  * pre-collapsed to type "unknown".
  */
 export interface HerrEnvelope {
+  /**
+   * The discriminant, OpenAI-compatible name. Go emits this and `code` with
+   * the same value; `type` stays required here so an envelope from a writer
+   * that only sets it still parses.
+   */
   type: string;
+  /** Always equal to `type` when Go wrote the envelope. Preferred when present. */
+  code?: string;
   message: string;
   meta?: Record<string, unknown>;
   trace_id?: string;
@@ -119,6 +126,11 @@ export function setTraceUrlProvider(provider: TraceUrlProvider): void {
  * if (err.code === "evaluation_not_found") { ... }   // cross-process safe
  * if (err instanceof EvaluationNotFoundError) { ...}  // same-process only
  * ```
+ *
+ * For the broader "is this handled at all?" question, call
+ * {@link HandledError.isHandled} rather than `instanceof HandledError`: it also
+ * matches instances whose class identity a bundler duplicated, which bare
+ * `instanceof` misses (see {@link hasHandledErrorBrand}).
  *
  * `meta` carries domain-specific context (e.g. `{ spanId }`) included in the
  * serialised shape. `httpStatus` is the suggested HTTP response code (defaults
@@ -211,28 +223,37 @@ export abstract class HandledError extends Error {
   }
 
   /**
-   * Type-safe guard: narrows `error` to the concrete subclass.
+   * Narrows `error` to the concrete subclass this is called on:
    *
-   * Usage:
    *   EvaluationNotFoundError.is(err)   // error is EvaluationNotFoundError
    *   NotFoundError.is(err)             // error is NotFoundError
-   *   HandledError.is(err)              // error is HandledError
+   *
+   * This is a plain `instanceof`, so it only holds within one module graph.
+   * At a boundary, ask {@link HandledError.isHandled} instead ("is this
+   * handled at all?"), or compare `err.code` to pick out one subclass.
    */
   static is<T extends HandledError>(
-    this: abstract new (...args: never) => T,
+    this: abstract new (
+      ...args: never
+    ) => T,
     error: unknown,
   ): error is T {
     return error instanceof this;
   }
 
-  /** Returns true when `error` is a known, handled HandledError. */
+  /**
+   * True when `error` is a handled error, including one whose class identity a
+   * bundler duplicated — see {@link hasHandledErrorBrand}. Prefer this over
+   * `instanceof HandledError` anywhere an error may have crossed a module
+   * boundary (route handlers, tRPC middleware, error formatters).
+   */
   static isHandled(error: unknown): error is HandledError {
-    return error instanceof HandledError;
+    return error instanceof HandledError || hasHandledErrorBrand(error);
   }
 
-  /** Returns true when `error` is an unhandled infrastructure Error. */
+  /** True when `error` is an unhandled infrastructure Error. */
   static isUnhandled(error: unknown): boolean {
-    return error instanceof Error && !(error instanceof HandledError);
+    return error instanceof Error && !HandledError.isHandled(error);
   }
 
   /**
@@ -248,14 +269,37 @@ export abstract class HandledError extends Error {
    * }
    * ```
    */
-  static toUserMessage(
-    error: unknown,
-    log?: (error: unknown) => void,
-  ): string {
-    if (error instanceof HandledError) return error.message;
+  static toUserMessage(error: unknown, log?: (error: unknown) => void): string {
+    if (HandledError.isHandled(error)) return error.message;
     log?.(error);
     return "An unknown error occurred";
   }
+}
+
+/**
+ * Structural test for the `isHandled` brand.
+ *
+ * `instanceof` compares class identity, which breaks when a bundler includes
+ * this module twice — Next.js/turbopack does this across route and server
+ * boundaries, so an error can be a genuine HandledError raised from a *second*
+ * copy of this class and still fail `instanceof`. Every instance carries the
+ * `isHandled` brand as an own property, so matching on that recognises those
+ * duplicates while still rejecting unrelated objects.
+ *
+ * The `instanceof Error` requirement is load-bearing, not belt-and-braces: the
+ * brand is an own *enumerable* field, so `JSON.parse(JSON.stringify(err))` — or
+ * a worker `postMessage` structured clone — produces a plain object that still
+ * carries `isHandled: true` but has no prototype, and therefore none of the
+ * methods this guard promises (`serialize`). Requiring a real `Error` rejects
+ * those while still admitting bundler duplicates, since `Error` is the realm's
+ * shared global. Wire payloads go through the boundary schema instead —
+ * `handledErrorFromHerr` here, or `isHandledErrorLike` in `packages/api`.
+ */
+function hasHandledErrorBrand(error: unknown): error is HandledError {
+  return (
+    error instanceof Error &&
+    (error as { isHandled?: unknown }).isHandled === true
+  );
 }
 
 /**
@@ -270,9 +314,12 @@ export function handledErrorFromHerr(
   body: HerrEnvelope,
   options: { httpStatus?: number } = {},
 ): HandledError {
+  // Go emits `code` and `type` with the same value; prefer `code` and fall back
+  // to `type` so an envelope from an older writer resolves identically.
+  const code = body.code ?? body.type;
   return new (class extends HandledError {
     constructor() {
-      super(body.type, body.message, {
+      super(code, body.message, {
         meta: body.meta,
         httpStatus: options.httpStatus,
         fault: body.fault,
@@ -282,13 +329,24 @@ export function handledErrorFromHerr(
         spanId: body.span_id,
         reasons: (body.reasons ?? []).map((r) => handledErrorFromHerr(r)),
       });
-      this.name = body.type;
+      this.name = code;
     }
   })();
 }
 
 function serializeReason(error: Error): SerializedReason {
-  if (error instanceof HandledError) {
+  if (HandledError.isHandled(error)) {
+    // A HandledError's message is safe to show by the class contract, and for
+    // a reason it is often the only prose there is (a herr-deserialized cause
+    // carries its message on `.message`, not in meta — FromBody/toErrorBody
+    // promote between the two on the Go side). Fold it into `meta.message` —
+    // the ADR-045 prose channel consumers already read — so the reason chain
+    // keeps naming the real failure across this serialization too. An explicit
+    // meta.message wins; a message that merely repeats the code adds nothing.
+    const meta =
+      error.message && error.message !== error.code && !error.meta.message
+        ? { ...error.meta, message: error.message }
+        : error.meta;
     return {
       code: error.code,
       // Deprecated back-compat alias — see SerializedReason.kind.
@@ -296,7 +354,7 @@ function serializeReason(error: Error): SerializedReason {
       fault: error.fault,
       ...(error.traceId ? { traceId: error.traceId } : {}),
       ...(error.spanId ? { spanId: error.spanId } : {}),
-      ...(Object.keys(error.meta).length > 0 && { meta: error.meta }),
+      ...(Object.keys(meta).length > 0 && { meta }),
       ...(error.tips.length > 0 && { tips: error.tips }),
       ...(error.docsUrl ? { docsUrl: error.docsUrl } : {}),
       ...(error.reasons.length > 0 && {
@@ -323,6 +381,25 @@ export interface HandledErrorOptions {
  * with identifying fields (e.g. `{ spanId }`).
  */
 export class NotFoundError extends HandledError {
+  /**
+   * `code` is a bare `string` on purpose, and that is NOT the same as saying
+   * any string is acceptable.
+   *
+   * This package sits UPSTREAM of every tree that enumerates codes: the app
+   * (`langwatch/src/features/errors/logic/codes.ts`), the MCP server and
+   * `langwatch/packages/api` all depend on it, and none of them can be
+   * depended on from here without inverting that edge into a cycle. There is
+   * also no single union to narrow to — each consumer owns its own code list,
+   * and a union of one of them would reject the others' perfectly valid codes.
+   *
+   * So the enumeration is enforced downstream instead, where the codes live:
+   * `langwatch/src/features/errors/logic/__tests__/codes.unit.test.ts` scans
+   * the app's trees for every code a handled error declares — including the
+   * `new NotFoundError("…", …)` shape specifically — and fails when a raised
+   * code is missing from `APP_ERROR_CODES`, which is the key set the client
+   * presentation registry must satisfy exhaustively. A code passed here
+   * without copy fails that guard, not the type checker.
+   */
   constructor(
     code: string,
     resource: string,

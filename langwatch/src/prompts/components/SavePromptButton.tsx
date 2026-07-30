@@ -40,7 +40,7 @@ export function SavePromptButton({
   isValid = true,
   isSaving = false,
   size = "sm",
-  variant = "primary"
+  variant = "primary",
 }: SavePromptButtonProps) {
   const formMethods = useFormContext<PromptConfigFormValues>();
   const configId = formMethods.watch("configId");
@@ -68,7 +68,9 @@ export function SavePromptButton({
 
   return (
     <Button
-      {...(variant === "primary" ? { colorPalette: "blue" } : { variant: "outline" })}
+      {...(variant === "primary"
+        ? { colorPalette: "blue" }
+        : { variant: "outline" })}
       size={size}
       onClick={onSave}
       disabled={!canSave || !isValid || isSaving}

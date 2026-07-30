@@ -48,9 +48,21 @@ describe("AdminWorkspaceViewAuditService", () => {
     });
     await prisma.user.createMany({
       data: [
-        { id: ADMIN_ID, email: `awva-admin-${suffix}@example.com`, name: "Admin" },
-        { id: VICTIM_ID, email: `awva-victim-${suffix}@example.com`, name: "Victim" },
-        { id: TEAM_MEMBER_ID, email: `awva-tm-${suffix}@example.com`, name: "TeamMember" },
+        {
+          id: ADMIN_ID,
+          email: `awva-admin-${suffix}@example.com`,
+          name: "Admin",
+        },
+        {
+          id: VICTIM_ID,
+          email: `awva-victim-${suffix}@example.com`,
+          name: "Victim",
+        },
+        {
+          id: TEAM_MEMBER_ID,
+          email: `awva-tm-${suffix}@example.com`,
+          name: "TeamMember",
+        },
       ],
     });
     await prisma.organizationUser.createMany({
@@ -105,7 +117,9 @@ describe("AdminWorkspaceViewAuditService", () => {
       })
       .catch(() => undefined);
     await prisma.teamUser
-      .deleteMany({ where: { teamId: { in: [PERSONAL_TEAM_ID, SHARED_TEAM_ID] } } })
+      .deleteMany({
+        where: { teamId: { in: [PERSONAL_TEAM_ID, SHARED_TEAM_ID] } },
+      })
       .catch(() => undefined);
     await prisma.team
       .deleteMany({ where: { id: { in: [PERSONAL_TEAM_ID, SHARED_TEAM_ID] } } })
@@ -300,7 +314,11 @@ describe("AdminWorkspaceViewAuditService", () => {
     const freshTeamId = `team-awva-fresh-${suffix}`;
     const freshUserId = `usr-awva-fresh-${suffix}`;
     await prisma.user.create({
-      data: { id: freshUserId, email: `awva-fresh-${suffix}@example.com`, name: "Fresh" },
+      data: {
+        id: freshUserId,
+        email: `awva-fresh-${suffix}@example.com`,
+        name: "Fresh",
+      },
     });
     await prisma.organizationUser.create({
       data: { organizationId: ORG_ID, userId: freshUserId, role: "MEMBER" },
@@ -349,7 +367,11 @@ describe("AdminWorkspaceViewAuditService", () => {
     const freshTeamId = `team-awva-ocsf-fail-${suffix}`;
     const freshUserId = `usr-awva-ocsf-fail-${suffix}`;
     await prisma.user.create({
-      data: { id: freshUserId, email: `awva-ocsf-${suffix}@example.com`, name: "OcsfFail" },
+      data: {
+        id: freshUserId,
+        email: `awva-ocsf-${suffix}@example.com`,
+        name: "OcsfFail",
+      },
     });
     await prisma.organizationUser.create({
       data: { organizationId: ORG_ID, userId: freshUserId, role: "MEMBER" },

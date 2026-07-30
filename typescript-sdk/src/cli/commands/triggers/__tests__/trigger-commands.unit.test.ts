@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 vi.mock("ora", () => ({
@@ -83,17 +83,20 @@ describe("listTriggersCommand()", () => {
     });
   });
 
-  describe("when format is json", () => {
-    it("outputs raw JSON", async () => {
+  describe("when a machine format is requested", () => {
+    it("returns the raw trigger list as the payload instead of printing", async () => {
       const triggers = [makeTrigger()];
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => triggers,
       });
 
-      await listTriggersCommand({ format: "json" });
+      const result = await listTriggersCommand();
 
-      expect(console.log).toHaveBeenCalledWith(JSON.stringify(triggers, null, 2));
+      // The command no longer decides the format — it hands the payload to
+      // the output port, which renders json/yaml/agents/--jq from this value.
+      expect(result?.data).toEqual(triggers);
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 });

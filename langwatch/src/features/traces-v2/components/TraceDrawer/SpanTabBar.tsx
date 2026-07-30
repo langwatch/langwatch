@@ -10,8 +10,6 @@ import {
 import { memo, useMemo, useRef } from "react";
 import {
   LuChevronDown,
-  LuChevronRight,
-  LuFileText,
   LuPanelBottomClose,
   LuPanelBottomOpen,
   LuPanelRightClose,
@@ -21,7 +19,6 @@ import {
   LuX,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
-import { Kbd } from "~/components/ops/shared/Kbd";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { PresenceMarker } from "~/features/presence/components/PresenceMarker";
@@ -32,13 +29,22 @@ import {
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { usePrefetchSpanDetail } from "../../hooks/usePrefetchSpanDetail";
-import { type DrawerTab, useDrawerStore } from "../../stores/drawerStore";
-import {
-  abbreviateModel,
-  formatDuration,
-  SPAN_TYPE_COLORS,
-} from "../../utils/formatters";
+import { useDrawerStore } from "../../stores/drawerStore";
+import { formatDuration, SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { OverflowMenu } from "../shared/OverflowMenu";
+
+/**
+ * Tab / menu label for a span: generic tool spans (claude_code.tool ...)
+ * append WHICH tool ran so five identical tool tabs stay tellable apart.
+ */
+export function spanTabLabel(span: {
+  name: string | null;
+  spanId: string;
+  toolName?: string | null;
+}): string {
+  const base = span.name ?? span.spanId;
+  return span.toolName ? `${base} · ${span.toolName}` : base;
+}
 
 /**
  * When more than this many spans are pinned, collapse the tail into a
@@ -247,7 +253,7 @@ export const SpanTabBar = memo(function SpanTabBar({
       list.push({
         id,
         activeId: isActive ? id : undefined,
-        label: span.name ?? span.spanId,
+        label: spanTabLabel(span),
         onSelect: () => selectSpan(span.spanId),
         render: () => (
           <SpanTab
@@ -269,7 +275,7 @@ export const SpanTabBar = memo(function SpanTabBar({
         menuContent: (
           <HStack gap={1.5}>
             <Text truncate maxWidth="200px">
-              {span.name ?? span.spanId}
+              {spanTabLabel(span)}
             </Text>
           </HStack>
         ),
@@ -280,7 +286,7 @@ export const SpanTabBar = memo(function SpanTabBar({
       list.push({
         id,
         activeId: id,
-        label: selectedSpan.name ?? selectedSpan.spanId,
+        label: spanTabLabel(selectedSpan),
         onSelect: () => selectSpan(selectedSpan.spanId),
         render: () => (
           <SpanTab
@@ -307,7 +313,7 @@ export const SpanTabBar = memo(function SpanTabBar({
         menuContent: (
           <HStack gap={1.5}>
             <Text truncate maxWidth="200px">
-              {selectedSpan.name ?? selectedSpan.spanId}
+              {spanTabLabel(selectedSpan)}
             </Text>
           </HStack>
         ),
@@ -484,7 +490,13 @@ function SpanTab({
     (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
   return (
     <Tooltip
-      content={`${span.name} · ${span.spanId}`}
+      content={
+        // spanTabLabel already falls back to the span id for nameless
+        // spans — appending it again would read `id · id`.
+        span.name
+          ? `${spanTabLabel(span)} · ${span.spanId}`
+          : spanTabLabel(span)
+      }
       positioning={{ placement: "bottom" }}
       openDelay={400}
     >
@@ -515,12 +527,12 @@ function SpanTab({
           maxWidth="180px"
           truncate
         >
-          {span.name}
+          {spanTabLabel(span)}
         </Text>
 
         {span.type === "llm" && span.model != null && (
           <Text textStyle="2xs" color="fg.subtle">
-            {abbreviateModel(span.model)}
+            {span.model}
           </Text>
         )}
 
@@ -666,7 +678,7 @@ function PinnedSpanOverflowMenu({
                   flex={1}
                   fontWeight={isActive ? "semibold" : "normal"}
                 >
-                  {span.name}
+                  {spanTabLabel(span)}
                 </Text>
                 <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
                   {formatDuration(span.durationMs)}

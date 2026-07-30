@@ -1,12 +1,11 @@
-import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import type { Unsubscribable } from "@trpc/server/observable";
-
-import { trpcClient } from "~/utils/api";
-import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 import type {
   LangyResourceContext,
   LangySkillContext,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
+import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { trpcClient } from "~/utils/api";
 
 /**
  * The per-turn request inputs the transport owns. Sourcing them HERE (from the
@@ -33,6 +32,14 @@ export type LangyTurnSignalEntry = Extract<
   { type: "status" | "progress" | "milestone" | "reasoning" | "plan" }
 >;
 
+/**
+ * How a turn stream terminated. "end" is the genuine end-of-turn frame — the
+ * answer is complete, so the caller may retire in-flight UI immediately.
+ * "closed" is a silent close (the subscription completed without an end frame —
+ * e.g. a quiet worker); the durable fold remains the only truth there.
+ */
+export type LangyTurnSettleReason = "end" | "error" | "closed";
+
 export interface LangyChatTransportDeps {
   /** Read the current turn inputs at send time (owns projectId → fixes regenerate). */
   getContext: () => LangyTurnRequestContext;
@@ -40,8 +47,22 @@ export interface LangyChatTransportDeps {
   onIds: (ids: { conversationId: string; turnId: string }) => void;
   /** Push a status/progress/milestone signal (drives StreamingStatusLine via the store). */
   onSignal: (signal: LangyTurnSignalEntry) => void;
-  /** Fired when a turn stream terminates (end or error) — the reconcile trigger. */
-  onTurnSettled?: () => void;
+  /**
+   * Forward a live-only navigate instruction, bare passthrough — dedup (the
+   * stream carries no entry id) and routing live in the panel, which alone
+   * holds both the router and the active turn id the dedup key needs.
+   */
+  onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
+  /** Fired when a turn stream terminates — the reconcile trigger. */
+  onTurnSettled?: (info: { reason: LangyTurnSettleReason }) => void;
+  /**
+   * Every wire entry, unfiltered and before any interpretation — the tap the
+   * developer drawer's tape records from. Deliberately a plain observer: it
+   * cannot alter dispatch, and it runs on entries this transport otherwise
+   * swallows (status, milestone), because "the UI showed nothing" and "the
+   * server sent nothing" are the two answers it exists to tell apart.
+   */
+  onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
 }
 
 /** The turn-start response the create/continue mutations return (ids, no stream). */
@@ -77,9 +98,12 @@ export function createLangyChatTransport(
     async sendMessages(options) {
       const ctx = deps.getContext();
       const turnInput = {
-        // One logical send, one identity. Any transport/proxy retry replays the
-        // same mutation body and therefore the same turn/message/admission.
-        requestId: crypto.randomUUID(),
+        // One logical send, one identity: minted fresh on every sendMessages
+        // call (each composer submit / regenerate re-arms with a new key), so
+        // a genuine re-send of the same text is a NEW turn. Transport/proxy
+        // retries replay the same mutation body — same key, same content —
+        // and collapse onto the same admitted turn.
+        idempotencyKey: crypto.randomUUID(),
         messages: options.messages,
         ...(options.trigger ? { trigger: options.trigger } : {}),
         projectId: ctx.projectId,
@@ -122,7 +146,9 @@ export function createLangyChatTransport(
         conversationId,
         turnId,
         onSignal: deps.onSignal,
+        ...(deps.onNavigate ? { onNavigate: deps.onNavigate } : {}),
         onSettled: deps.onTurnSettled,
+        ...(deps.onWireEntry ? { onWireEntry: deps.onWireEntry } : {}),
         abortSignal: options.abortSignal,
       });
     },
@@ -145,14 +171,18 @@ function subscribeTurnStream({
   conversationId,
   turnId,
   onSignal,
+  onNavigate,
   onSettled,
+  onWireEntry,
   abortSignal,
 }: {
   projectId: string;
   conversationId: string;
   turnId: string;
   onSignal: (signal: LangyTurnSignalEntry) => void;
-  onSettled?: () => void;
+  onNavigate?: (entry: Extract<LangyStreamEntry, { type: "navigate" }>) => void;
+  onSettled?: (info: { reason: LangyTurnSettleReason }) => void;
+  onWireEntry?: (entry: LangyStreamEntry, turnId: string) => void;
   abortSignal?: AbortSignal;
 }): ReadableStream<UIMessageChunk> {
   let sub: Unsubscribable | undefined;
@@ -162,20 +192,20 @@ function subscribeTurnStream({
       const textId = crypto.randomUUID();
       let closed = false;
 
-      const finish = () => {
+      const finish = (reason: LangyTurnSettleReason) => {
         if (closed) return;
         closed = true;
         controller.enqueue({ type: "text-end", id: textId });
         controller.enqueue({ type: "finish" });
         controller.close();
         sub?.unsubscribe();
-        onSettled?.();
+        onSettled?.({ reason });
       };
 
       controller.enqueue({ type: "start" });
       controller.enqueue({ type: "text-start", id: textId });
 
-      // The manager emits a "Getting ready…" status into the cold window
+      // The manager emits a readiness status ("Waking Langy up…") into the cold window
       // (worker tool prep produces no frames for many seconds). It is a
       // placeholder for SILENCE, so the first real output — text, a tool, the
       // model's reasoning — retires it; without this the status line would
@@ -191,10 +221,17 @@ function subscribeTurnStream({
 
       const onEntry = (entry: LangyStreamEntry) => {
         if (closed) return;
+        // The tape sees it first, and sees ALL of it — including the entries the
+        // switch below deliberately drops on the floor.
+        onWireEntry?.(entry, turnId);
         switch (entry.type) {
           case "delta":
             clearColdStartStatus();
-            controller.enqueue({ type: "text-delta", id: textId, delta: entry.text });
+            controller.enqueue({
+              type: "text-delta",
+              id: textId,
+              delta: entry.text,
+            });
             return;
           case "tool":
             clearColdStartStatus();
@@ -215,12 +252,17 @@ function subscribeTurnStream({
           case "milestone":
             onSignal(entry);
             return;
+          case "navigate":
+            // Not a message part, not a signal the status line renders — a
+            // one-shot action. Bare passthrough; the panel owns dedup + routing.
+            onNavigate?.(entry);
+            return;
           case "error":
             controller.enqueue({ type: "error", errorText: entry.error });
-            finish();
+            finish("error");
             return;
           case "end":
-            finish();
+            finish("end");
             return;
         }
       };
@@ -247,11 +289,12 @@ function subscribeTurnStream({
             if (closed) return;
             controller.enqueue({
               type: "error",
-              errorText: err instanceof Error ? err.message : "Langy stream error",
+              errorText:
+                err instanceof Error ? err.message : "Langy stream error",
             });
-            finish();
+            finish("error");
           },
-          onComplete: finish,
+          onComplete: () => finish("closed"),
         },
       );
 

@@ -14,6 +14,7 @@ import {
   type outputsSchema,
   type promptingTechniqueSchema,
 } from "~/prompts/schemas/field-schemas";
+import { describeLocalFileUpdate } from "./describe-local-file-update";
 import { SchemaVersion } from "./enums";
 import {
   HandleGenerationError,
@@ -31,8 +32,12 @@ import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
-import { PromptTagAssignmentRepository, TagValidationError } from "./repositories/llm-config-tag.repository";
 import {
+  PromptTagAssignmentRepository,
+  TagValidationError,
+} from "./repositories/llm-config-tag.repository";
+import {
+  diffRuntimeParameters,
   type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
@@ -95,7 +100,9 @@ export type VersionedPrompt = {
   authorId: string | null;
   author?: {
     id: string;
-    name: string;
+    name: string | null;
+    email: string | null;
+    image: string | null;
   } | null;
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
@@ -196,9 +203,17 @@ export class PromptService {
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId } = params;
 
-    if (params.tag && (params.version !== undefined || params.versionId !== undefined)) {
+    if (
+      params.tag &&
+      (params.version !== undefined || params.versionId !== undefined)
+    ) {
       logger.warn(
-        { idOrHandle, tag: params.tag, version: params.version, versionId: params.versionId },
+        {
+          idOrHandle,
+          tag: params.tag,
+          version: params.version,
+          versionId: params.versionId,
+        },
         "Mutual exclusion: cannot specify both version/versionId and tag",
       );
       throw new TagValidationError(
@@ -214,8 +229,7 @@ export class PromptService {
     // (see parsePromptShorthand, which also normalizes it away). Treat
     // `tag: "latest"` as "no tag filter" so that what we advertise in the
     // response (tags: [{name: "latest"}]) is round-trippable via ?tag=latest.
-    const normalizedTag =
-      params.tag === "latest" ? undefined : params.tag;
+    const normalizedTag = params.tag === "latest" ? undefined : params.tag;
 
     // If a tag is provided, resolve it to a versionId
     let resolvedVersionId = params.versionId;
@@ -281,9 +295,7 @@ export class PromptService {
     // comparison) — not the whole tag history for the config.
     const versionIdsToQuery = Array.from(
       new Set(
-        [currentVersionId, latestVersionId].filter(
-          (id): id is string => !!id,
-        ),
+        [currentVersionId, latestVersionId].filter((id): id is string => !!id),
       ),
     );
     const tagsByVersionId = await this.getTagsByVersionIds({
@@ -748,8 +760,9 @@ export class PromptService {
     );
     const latestVersion = {
       ...parseLlmConfigVersion(latestVersionRaw),
-      runtimeParameters:
-        parseRuntimeParameters(latestVersionRaw.runtimeParameters),
+      runtimeParameters: parseRuntimeParameters(
+        latestVersionRaw.runtimeParameters,
+      ),
     };
 
     const latestVersionId = latestVersion.id ?? "";
@@ -810,7 +823,13 @@ export class PromptService {
     >;
   }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
-    const { handle, scope, commitMessage, parameters: incomingParameters, ...configDataUpdates } = data;
+    const {
+      handle,
+      scope,
+      commitMessage,
+      parameters: incomingParameters,
+      ...configDataUpdates
+    } = data;
 
     this.versionService.assertNoSystemPromptConflict(configDataUpdates);
 
@@ -846,11 +865,12 @@ export class PromptService {
 
         // Get the latest version
         // TODO: This should use the version service instead of accessing the repository directly
-        const latestVersionRaw = await this.repository.versions.getLatestVersion(
-          updatedConfig.id,
-          projectId,
-          { tx },
-        );
+        const latestVersionRaw =
+          await this.repository.versions.getLatestVersion(
+            updatedConfig.id,
+            projectId,
+            { tx },
+          );
         const latestVersion = parseLlmConfigVersion(latestVersionRaw);
 
         const resolvedParameters =
@@ -890,9 +910,7 @@ export class PromptService {
               runtimeParameters: resolvedParameters,
             },
           } as LlmConfigWithLatestVersion,
-          newVersionId
-            ? [{ name: "latest", versionId: newVersionId }]
-            : [],
+          newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
         );
       },
     );
@@ -1144,12 +1162,20 @@ export class PromptService {
         return { action: "up_to_date", prompt: existingPrompt };
       } else {
         // Content differs - create new version
+        const allDifferences = [
+          ...(comparison.differences ?? []),
+          ...diffRuntimeParameters({
+            localParameters: params.parameters,
+            remoteParameters: existingPrompt.parameters,
+          }),
+        ];
         const updatedPrompt = await this.updatePrompt({
           idOrHandle: existingPrompt.id,
           projectId,
           data: {
             authorId,
-            commitMessage: commitMessage ?? "Updated from local file",
+            commitMessage:
+              commitMessage ?? describeLocalFileUpdate(allDifferences),
             ...this.transformToDbFormat(resolvedConfigData),
             schemaVersion: SchemaVersion.V1_0,
             parameters: params.parameters,
@@ -1311,7 +1337,9 @@ export class PromptService {
       author: config.latestVersion.author
         ? {
             id: config.latestVersion.author.id,
-            name: config.latestVersion.author.name,
+            name: config.latestVersion.author.name ?? null,
+            email: config.latestVersion.author.email ?? null,
+            image: config.latestVersion.author.image ?? null,
           }
         : null,
       updatedAt: config.updatedAt,

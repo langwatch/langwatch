@@ -158,6 +158,23 @@ type Error struct {
 	Traceback string
 }
 
+// TimeoutType and RunnerErrorType are the only two Error.Type values this
+// package produces itself; every other value is whatever Python exception class
+// the customer's own code raised.
+//
+// They are exported because the engine switches on them to pick the NodeError
+// code the client is shown, and that switch has no `default` that could tell a
+// renamed discriminant apart from a customer exception — a bare literal here
+// and a bare literal there meant renaming one side reclassified the timeout as
+// a generic code-runner error with nothing failing to compile.
+const (
+	// TimeoutType marks a run the executor stopped for exceeding its limit.
+	TimeoutType = "Timeout"
+	// RunnerErrorType marks the runner itself failing, as opposed to the
+	// customer's code raising.
+	RunnerErrorType = "RunnerError"
+)
+
 func (e *Error) String() string { return fmt.Sprintf("%s: %s", e.Type, e.Message) }
 
 // childEnv builds the environment handed to the user-code subprocess from
@@ -245,7 +262,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 				TimedOut:   timedOut,
 			}
 			if timedOut && res.Error == nil {
-				res.Error = &Error{Type: "Timeout", Message: "code_block_timeout"}
+				res.Error = &Error{Type: TimeoutType, Message: "code_block_timeout"}
 			}
 			return res, nil
 		}
@@ -258,7 +275,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			DurationMS: elapsed.Milliseconds(),
 			TimedOut:   true,
 			Stderr:     stderrBuf.String(),
-			Error:      &Error{Type: "Timeout", Message: "code_block_timeout"},
+			Error:      &Error{Type: TimeoutType, Message: "code_block_timeout"},
 		}, nil
 	}
 	if runErr != nil {
@@ -266,7 +283,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 			DurationMS: elapsed.Milliseconds(),
 			Stderr:     stderrBuf.String(),
 			Error: &Error{
-				Type:    "RunnerError",
+				Type:    RunnerErrorType,
 				Message: runErr.Error(),
 			},
 		}, nil
@@ -274,7 +291,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	return &Result{
 		DurationMS: elapsed.Milliseconds(),
 		Stderr:     stderrBuf.String(),
-		Error:      &Error{Type: "RunnerError", Message: "empty_result"},
+		Error:      &Error{Type: RunnerErrorType, Message: "empty_result"},
 	}, nil
 }
 

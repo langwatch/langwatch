@@ -1,8 +1,8 @@
-import type { AlertType, TriggerAction } from "@prisma/client";
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
   type NotificationCadence,
 } from "@langwatch/automations/cadences";
+import type { AlertType, TriggerAction } from "@prisma/client";
 import {
   type AllSlices,
   CLIENT_PROVIDERS,
@@ -228,7 +228,12 @@ export function reducer(
       }
       // Same for a trace automation: severity is an alert-only facet, so a
       // value left over from a prior "Alert" pick must not survive the switch.
-      return { ...state, source: "trace", customGraphId: null, alertType: null };
+      return {
+        ...state,
+        source: "trace",
+        customGraphId: null,
+        alertType: null,
+      };
     case "SET_CUSTOM_GRAPH_ID":
       return { ...state, customGraphId: action.value };
     case "SET_FILTERS":
@@ -624,7 +629,10 @@ export function reportInputFromDraft(report: ReportDraft): {
   const schedule = { cron: report.cron, timezone: report.timezone };
   if (report.sourceKind === "customGraph") {
     return {
-      source: { kind: "customGraph", customGraphId: report.customGraphId ?? "" },
+      source: {
+        kind: "customGraph",
+        customGraphId: report.customGraphId ?? "",
+      },
       schedule,
       compareToPrevious: false,
     };

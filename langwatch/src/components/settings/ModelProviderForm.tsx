@@ -14,23 +14,29 @@ import {
   isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../hooks/useAllModelProvidersList";
+import { useCredentialProbeGate } from "../../hooks/useCredentialProbeGate";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderForm } from "../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
 import {
+  getEmptyRequiredCredentialKeys,
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../utils/modelProviderHelpers";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
+import { toaster } from "../ui/toaster";
+import { useCodexCodingDefaultsAskStore } from "./CodexCodingDefaultsAsk";
+import { CodexSignIn } from "./CodexSignIn";
 import {
   draftFromProvider,
   EMPTY_ADVANCED_DRAFT,
@@ -280,6 +286,28 @@ export const EditModelProviderForm = ({
 
   const isLlmProvider = providerDefinition?.type === "llm";
 
+  // Same answer the credential fields render their required markers from.
+  const requiredKeys = useRequiredCredentialKeys({
+    providerKey: provider.provider,
+    displayKeys: state.displayKeys,
+    customKeys: state.customKeys,
+  });
+
+  // oauth-device providers (codex) credential through the provider's own
+  // sign-in flow: the drawer swaps the API-key fields for it, and Save
+  // (name / scope edits) skips every API-key validation path, since the
+  // sign-in already persisted the credentials server-side. Their model
+  // list comes from the registry catalog, so the custom-models section
+  // is hidden too. (The registry keeps literal entry types via
+  // `satisfies`, so widen to read the optional authFlow: same pattern
+  // as CredentialsSection's optionalKeys read.)
+  const isOAuthDeviceProvider =
+    (
+      providerDefinition as
+        | { authFlow?: "api-key" | "oauth-device" }
+        | undefined
+    )?.authFlow === "oauth-device";
+
   const {
     validate: validateApiKey,
     isValidating: isValidatingApiKey,
@@ -289,7 +317,17 @@ export const EditModelProviderForm = ({
     provider.provider,
     state.customKeys,
     projectId,
+    organization?.id,
+    state.scopes,
   );
+
+  // Shared with onboarding and the Langy model gate, so a refusal is not the
+  // end of the road on one surface and a hard block on the next.
+  const { probeRequired, recordRefusal, clearRefusal, saveLabel } =
+    useCredentialProbeGate({
+      customKeys: state.customKeys,
+      resetKey: providerId,
+    });
 
   const handleSave = useCallback(async () => {
     // Clear previous errors
@@ -305,9 +343,12 @@ export const EditModelProviderForm = ({
       state.initialKeys,
     );
 
-    // Validate keys according to schema before submitting
+    // Validate keys according to schema before submitting. oauth-device
+    // providers skip this entirely: the user never types credentials
+    // here, so a name/scope-only save must not trip on the token schema.
     if (
       providerDefinition?.keysSchema &&
+      !isOAuthDeviceProvider &&
       (!isUsingEnvVars || hasNonApiKeyChanges)
     ) {
       const keysSchema = z.union([
@@ -319,9 +360,25 @@ export const EditModelProviderForm = ({
       const result = keysSchema.safeParse(keysToValidate);
 
       if (!result.success) {
-        const parsedErrors = parseZodFieldErrors(
-          result.error as ZodErrorStructure,
-        );
+        const zodError = result.error as ZodErrorStructure;
+        const parsedErrors = parseZodFieldErrors(zodError);
+        // A rule that spans several credentials (an API key, or a base URL
+        // instead) names no single field, so it has no path to land on and
+        // would leave Save doing nothing visible. Anchor it on a required
+        // field the customer has left empty.
+        const schemaWideMessage = zodError.issues.find(
+          (issue) => !issue.path?.length,
+        )?.message;
+        if (schemaWideMessage) {
+          const anchorKey =
+            getEmptyRequiredCredentialKeys({
+              requiredKeys,
+              values: state.customKeys,
+            })[0] ?? Object.keys(state.displayKeys)[0];
+          if (anchorKey && !parsedErrors[anchorKey]) {
+            parsedErrors[anchorKey] = schemaWideMessage;
+          }
+        }
         setFieldErrors(parsedErrors);
         return;
       }
@@ -336,17 +393,32 @@ export const EditModelProviderForm = ({
     // console, hit a temporary 401, etc.). Safety providers like
     // azure_safety also skip this — their endpoints can't answer the
     // OpenAI-compatible probe at all.
-    if (isLlmProvider && userEnteredNewApiKey) {
+    if (
+      isLlmProvider &&
+      !isOAuthDeviceProvider &&
+      userEnteredNewApiKey &&
+      probeRequired
+    ) {
       const isValid = await validateApiKey();
-      if (!isValid) return;
+      if (!isValid) {
+        recordRefusal();
+        return;
+      }
+      clearRefusal();
     }
 
     void actions.submit();
   }, [
+    probeRequired,
+    recordRefusal,
+    clearRefusal,
     isLlmProvider,
+    isOAuthDeviceProvider,
     isUsingEnvVars,
     providerDefinition,
+    requiredKeys,
     state.customKeys,
+    state.displayKeys,
     state.initialKeys,
     actions,
     validateApiKey,
@@ -419,17 +491,44 @@ export const EditModelProviderForm = ({
           }
         />
 
-        <CredentialsSection
-          state={state}
-          actions={actions}
-          provider={provider}
-          fieldErrors={fieldErrors}
-          setFieldErrors={setFieldErrors}
-          projectId={projectId}
-          organizationId={organizationId}
-          apiKeyValidationError={apiKeyValidationError}
-          onApiKeyValidationClear={clearApiKeyError}
-        />
+        {isOAuthDeviceProvider ? (
+          <CodexSignIn
+            projectId={project?.id ?? ""}
+            scopes={state.scopes}
+            setAsCodingDefaults={false}
+            onConnected={(account) => {
+              // The sign-in poll already persisted the provider row
+              // server-side, so the drawer's Save has nothing left to do:
+              // close it over the refreshed list. The coding-defaults ask
+              // is queued to the page-level host (a dialog mounted in this
+              // drawer would be unmounted right here, mid-question).
+              useCodexCodingDefaultsAskStore.getState().request({
+                projectId: project?.id ?? "",
+                scopes: state.scopes,
+              });
+              toaster.create({
+                title: "Codex connected",
+                description: account.email
+                  ? `Signed in as ${account.email}`
+                  : undefined,
+                type: "success",
+              });
+              closeDrawer();
+            }}
+          />
+        ) : (
+          <CredentialsSection
+            state={state}
+            actions={actions}
+            provider={provider}
+            fieldErrors={fieldErrors}
+            setFieldErrors={setFieldErrors}
+            projectId={projectId}
+            organizationId={organizationId}
+            apiKeyValidationError={apiKeyValidationError}
+            onApiKeyValidationClear={clearApiKeyError}
+          />
+        )}
 
         <ExtraHeadersSection
           state={state}
@@ -437,7 +536,7 @@ export const EditModelProviderForm = ({
           provider={provider}
         />
 
-        {isLlmProvider && (
+        {isLlmProvider && !isOAuthDeviceProvider && (
           <CustomModelInputSection
             state={state}
             actions={actions}
@@ -485,7 +584,7 @@ export const EditModelProviderForm = ({
             }
             onClick={handleSave}
           >
-            Save
+            {saveLabel}
           </Button>
         </HStack>
       </VStack>

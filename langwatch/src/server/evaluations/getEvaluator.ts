@@ -4,7 +4,7 @@ import {
   type EvaluatorDefinition,
   type Evaluators,
   type EvaluatorTypes,
-} from "./evaluators.generated";
+} from "./evaluators";
 
 export const getEvaluatorDefinitions = (evaluator: string) => {
   for (const [key, val] of Object.entries(AVAILABLE_EVALUATORS)) {

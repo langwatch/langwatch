@@ -26,7 +26,6 @@ import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
 } from "./eventSourcingService.types";
-import type { JobRegistryEntry } from "./queues/queueManager";
 import { QueueManager } from "./queues/queueManager";
 
 /**

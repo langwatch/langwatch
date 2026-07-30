@@ -1,7 +1,6 @@
 import type { MiddlewareHandler } from "hono";
-
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
 
 export type ApiKeyServiceMiddlewareVariables = {
   apiKeyService: ApiKeyService;

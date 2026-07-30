@@ -1,6 +1,7 @@
 import type { ZodTypeAny } from "zod";
 
 import type { Event } from "../domain/types";
+import type { ProcessEventEnvelope } from "../process-manager/processManager.types";
 import { ConfigurationError } from "../services/errorHandling";
 import {
   defineProcessManager,
@@ -12,12 +13,8 @@ import {
 } from "./processManagerDefinition";
 
 type EventTypeOf<E extends Event> = E["type"] & string;
-type EventData<E extends Event, Type extends string> = Extract<
-  E,
-  { type: Type }
-> extends Event<infer Data>
-  ? Data
-  : never;
+type EventData<E extends Event, Type extends string> =
+  Extract<E, { type: Type }> extends Event<infer Data> ? Data : never;
 
 type OutboxOptions = NonNullable<
   ProcessManagerConfig<any, Record<string, IntentSpec<any>>>["outbox"]
@@ -33,7 +30,9 @@ export interface ProcessManagerStateStage<E extends Event, State> {
     schema: Schema,
     run: IntentSpec<Schema>["run"],
   ): ProcessManagerIntentStage<E, State, Record<Name, IntentSpec<Schema>>>;
-  schedule(options: { everyMs: number }): ProcessManagerScheduledStage<E, State>;
+  schedule(options: {
+    everyMs: number;
+  }): ProcessManagerScheduledStage<E, State>;
 }
 
 export interface ProcessManagerScheduledStage<E extends Event, State>
@@ -80,6 +79,9 @@ export interface ProcessManagerIntentStage<
     everyMs: number;
   }): ProcessManagerIntentStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerIntentStage<E, State, Intents>;
+  toPayload(
+    map: (event: E) => ProcessEventEnvelope["payload"],
+  ): ProcessManagerIntentStage<E, State, Intents>;
 }
 
 export interface ProcessManagerHandledStage<
@@ -98,6 +100,9 @@ export interface ProcessManagerHandledStage<
     everyMs: number;
   }): ProcessManagerHandledStage<E, State, Intents>;
   outbox(options: OutboxOptions): ProcessManagerHandledStage<E, State, Intents>;
+  toPayload(
+    map: (event: E) => ProcessEventEnvelope["payload"],
+  ): ProcessManagerHandledStage<E, State, Intents>;
 }
 
 export type ProcessManagerBuildableStage =
@@ -108,13 +113,13 @@ class ProcessManagerBuilder<E extends Event> {
   private stateValue: unknown;
   private hasState = false;
   private readonly intents: Record<string, IntentSpec<any>> = {};
-  private readonly handlers: Record<
-    string,
-    EventHandler<any, any, any>
-  > = {};
+  private readonly handlers: Record<string, EventHandler<any, any, any>> = {};
   private wakeHandler: WakeHandler<any, any> | undefined;
   private outboxOptions: OutboxOptions | undefined;
   private scheduleOptions: { everyMs: number } | undefined;
+  private payloadMapper:
+    | ((event: E) => ProcessEventEnvelope["payload"])
+    | undefined;
 
   constructor(private readonly name: string) {}
 
@@ -136,10 +141,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  on(
-    eventType: string,
-    handle: EventHandler<any, any, any>,
-  ): this {
+  on(eventType: string, handle: EventHandler<any, any, any>): this {
     if (this.handlers[eventType]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
@@ -165,6 +167,24 @@ class ProcessManagerBuilder<E extends Event> {
 
   outbox(options: OutboxOptions): this {
     this.outboxOptions = options;
+    return this;
+  }
+
+  /**
+   * The content boundary (ADR-052): narrows a committed event to the payload
+   * the process may see. The payload is persisted verbatim into process
+   * state and outbox rows, so any domain whose events carry customer
+   * content MUST declare one.
+   */
+  toPayload(map: (event: E) => ProcessEventEnvelope["payload"]): this {
+    if (this.payloadMapper) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" already declares toPayload`,
+        { name: this.name },
+      );
+    }
+    this.payloadMapper = map;
     return this;
   }
 
@@ -194,6 +214,9 @@ class ProcessManagerBuilder<E extends Event> {
       handlers: this.handlers,
       eventTypes: Object.keys(this.handlers),
       onWake: this.wakeHandler,
+      toPayload: this.payloadMapper as
+        | ((event: Event) => ProcessEventEnvelope["payload"])
+        | undefined,
       intents: this.intents,
       outbox: this.outboxOptions,
       schedule: this.scheduleOptions,

@@ -154,7 +154,8 @@ export function githubProgressFromToolParts(
 ): GithubProgressEvent[] {
   const events: GithubProgressEvent[] = [];
   for (const part of parts) {
-    if (typeof part.type !== "string" || !part.type.startsWith("tool-")) continue;
+    if (typeof part.type !== "string" || !part.type.startsWith("tool-"))
+      continue;
     const command = (part.input as { command?: unknown } | undefined)?.command;
     if (typeof command !== "string") continue;
     const step = githubStepOf(command);
@@ -163,7 +164,9 @@ export function githubProgressFromToolParts(
     if (part.state === "output-error") continue;
     if (part.state === "output-available") {
       events.push(
-        step.detail ? { stage: step.end, detail: step.detail } : { stage: step.end },
+        step.detail
+          ? { stage: step.end, detail: step.detail }
+          : { stage: step.end },
       );
     } else if (step.begin) {
       // Still running: the card shows the step as under way.
@@ -269,7 +272,10 @@ function tokenize(segment: string): string[] {
     .filter(Boolean);
   // `FOO=bar gh pr create` — step past inline env assignments to the real argv0.
   let start = 0;
-  while (start < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[start]!)) {
+  while (
+    start < tokens.length &&
+    /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[start]!)
+  ) {
     start++;
   }
   return tokens.slice(start);

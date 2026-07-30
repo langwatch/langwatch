@@ -14,9 +14,12 @@ import {
   type DaemonStatus,
 } from "../daemon/client";
 import {
+  inspectSocketTrust,
   isDaemonSupported,
   resolveBuildId,
   resolveIdentity,
+  UntrustedSocketDirError,
+  type SocketTrustProblem,
 } from "../daemon/identity";
 import {
   cleanStaleSocket,
@@ -46,6 +49,64 @@ function resolveIdleTimeout(option?: string): number {
   return DEFAULT_IDLE_TIMEOUT_MS;
 }
 
+/**
+ * The trust problems that mean "something is WRONG", as opposed to the two that
+ * simply mean "no daemon is running here yet".
+ *
+ * `requestStatus`/`requestStop` collapse every problem into `null`/`false`,
+ * which is right for them — an untrusted socket is exactly "no daemon" on the
+ * hot path. It is wrong for these commands: the user explicitly asked about the
+ * daemon, so silently reporting "not running" (or worse, "starting in the
+ * background" for a daemon that will immediately die) hides the one fact they
+ * need. `socket-missing` and `socket-dir-missing` are the ordinary empty state
+ * and are deliberately NOT in here.
+ */
+function describeTrustProblem(
+  problem: SocketTrustProblem,
+): string | null {
+  switch (problem) {
+    case "socket-missing":
+    case "socket-dir-missing":
+      return null;
+    case "socket-dir-not-a-directory":
+      return "its socket directory is not a directory";
+    case "socket-dir-foreign-owner":
+      return "its socket directory is owned by another user";
+    case "socket-dir-loose-mode":
+      return "its socket directory is readable or writable by other users";
+    case "socket-not-a-socket":
+      return "another file is sitting at the socket path";
+    case "socket-foreign-owner":
+      return "the socket is owned by another user";
+    case "socket-loose-mode":
+      return "the socket is readable or writable by other users";
+  }
+}
+
+/**
+ * Print the blocking trust problem, if there is one. Returns true when the
+ * caller must stop: a daemon whose socket cannot be trusted must not be
+ * reported as running, started, or stopped.
+ */
+function reportUntrustedSocket(socketPath: string): boolean {
+  const problem = inspectSocketTrust(socketPath);
+  if (!problem) return false;
+  const description = describeTrustProblem(problem);
+  if (description === null) return false;
+
+  console.error(
+    chalk.red(`Refusing to use the langwatch daemon: ${description}.`),
+  );
+  console.error(chalk.gray(`  socket: ${socketPath}`));
+  console.error(
+    chalk.gray(
+      "  Commands will keep working — they run in-process. Remove or fix the path above, " +
+        "or point LANGWATCH_DAEMON_DIR at a directory you own, to use the daemon again.",
+    ),
+  );
+  return true;
+}
+
 function requireSupport(): void {
   if (isDaemonSupported()) return;
   console.error(
@@ -66,6 +127,16 @@ export async function daemonStartCommand(options: {
   const idleTimeoutMs = resolveIdleTimeout(options.idleTimeout);
 
   if (!options.foreground) {
+    // Before anything else: `requestStatus` returns null for an untrusted
+    // socket, so without this we would skip the "already running" branch,
+    // spawn a child that dies on UntrustedSocketDirError, and cheerfully print
+    // "Daemon starting in the background." No daemon would start, and every
+    // later invocation would silently run in-process with no explanation.
+    if (reportUntrustedSocket(identity.socketPath)) {
+      process.exitCode = 1;
+      return;
+    }
+
     const existing = await requestStatus(identity.socketPath);
     if (existing) {
       console.log(
@@ -107,6 +178,20 @@ export async function daemonStartCommand(options: {
       // Two invocations raced to spawn one. Losing that race is a no-op.
       return;
     }
+    if (error instanceof UntrustedSocketDirError) {
+      // `ensureSocketDir` fails closed on a directory we cannot make private.
+      // The error already carries the actionable sentence; a stack trace on top
+      // of it would only bury the one line the user needs.
+      console.error(chalk.red(error.message));
+      console.error(
+        chalk.gray(
+          "  Commands still work — they run in-process. Point LANGWATCH_DAEMON_DIR " +
+            "at a directory you own to use the daemon.",
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
     throw error;
   }
 
@@ -120,6 +205,15 @@ export async function daemonStopCommand(): Promise<void> {
   requireSupport();
 
   const identity = resolveIdentity(process.env);
+
+  // `requestStop` returns false for an untrusted socket, which would otherwise
+  // surface as a flat "No daemon running." — and the user would have no idea
+  // why their daemon keeps not existing.
+  if (reportUntrustedSocket(identity.socketPath)) {
+    process.exitCode = 1;
+    return;
+  }
+
   const stopped = await requestStop(identity.socketPath);
 
   if (stopped) {

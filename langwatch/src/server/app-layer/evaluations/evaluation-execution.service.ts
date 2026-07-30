@@ -10,6 +10,10 @@ import {
 } from "~/server/evaluations/evaluators";
 import { isNativeEvaluatorType } from "~/server/evaluations/evaluators.native";
 import {
+  evaluatorUnavailability,
+  unavailableEvaluatorMessage,
+} from "~/server/evaluations/installedEvaluators";
+import {
   augmentEvaluationResult,
   executeNativeEvaluation,
 } from "~/server/evaluations/native/registry";
@@ -409,6 +413,19 @@ export class EvaluationExecutionService {
     const evaluator = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
     if (!evaluator) {
       throw new EvaluatorNotFoundError(evaluatorType);
+    }
+
+    // An evaluator this install skipped is not a broken one. Say which it is,
+    // and how to get it, rather than letting the request reach an evaluator
+    // service with no route for it and come back as a bare 404.
+    const unavailable = evaluatorUnavailability({ evaluatorType });
+    if (unavailable) {
+      throw new EvaluatorConfigError(
+        unavailableEvaluatorMessage({ unavailability: unavailable }),
+        {
+          meta: { evaluatorType },
+        },
+      );
     }
 
     const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];

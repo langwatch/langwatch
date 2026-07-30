@@ -2,9 +2,10 @@ import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import type * as NodeFs from "node:fs";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope, parseScopeArg } from "./_shared";
+import type { CommandResult } from "../../utils/output";
 
 export interface UpdateVirtualKeyOptions {
   name?: string;
@@ -15,7 +16,6 @@ export interface UpdateVirtualKeyOptions {
   clearRoutingPolicy?: boolean;
   configJson?: string;
   configFile?: string;
-  format?: string;
 }
 
 function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> | undefined {
@@ -41,11 +41,16 @@ function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> 
   return undefined;
 }
 
+/**
+ * Returns the updated key rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts). The update
+ * response carries no secret, only the record and its config.
+ */
 export const updateVirtualKeyCommand = async (
   id: string,
   options: UpdateVirtualKeyOptions,
-): Promise<void> => {
-  checkApiKey();
+): Promise<CommandResult | void> => {
+  await resolveCredentials();
 
   let config: Record<string, unknown> | undefined;
   try {
@@ -97,24 +102,24 @@ export const updateVirtualKeyCommand = async (
 
     spinner.succeed(`Updated virtual key "${chalk.cyan(updated.name)}"`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(updated, null, 2));
-      return;
-    }
-
-    console.log();
-    console.log(`${chalk.bold("ID:")}           ${updated.id}`);
-    console.log(`${chalk.bold("Name:")}         ${chalk.cyan(updated.name)}`);
-    if (updated.description) console.log(`${chalk.bold("Description:")}  ${updated.description}`);
-    console.log(`${chalk.bold("Scopes:")}       ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
-    console.log(`${chalk.bold("Routing pol.:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
-    console.log(`${chalk.bold("Updated:")}      ${new Date(updated.updated_at).toLocaleString()}`);
-    console.log();
-    console.log(chalk.gray("Config after update:"));
-    console.log(JSON.stringify(updated.config, null, 2));
-    console.log();
+    return {
+      data: updated,
+      table: () => {
+        console.log();
+        console.log(`${chalk.bold("ID:")}           ${updated.id}`);
+        console.log(`${chalk.bold("Name:")}         ${chalk.cyan(updated.name)}`);
+        if (updated.description) console.log(`${chalk.bold("Description:")}  ${updated.description}`);
+        console.log(`${chalk.bold("Scopes:")}       ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
+        console.log(`${chalk.bold("Routing pol.:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
+        console.log(`${chalk.bold("Updated:")}      ${new Date(updated.updated_at).toLocaleString()}`);
+        console.log();
+        console.log(chalk.gray("Config after update:"));
+        console.log(JSON.stringify(updated.config, null, 2));
+        console.log();
+      },
+    };
   } catch (error) {
-    failSpinner({ spinner, error, action: "update virtual key", format: options?.format });
+    failSpinner({ spinner, error, action: "update virtual key" });
     process.exit(1);
   }
 };

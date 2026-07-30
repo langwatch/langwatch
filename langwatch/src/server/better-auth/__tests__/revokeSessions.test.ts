@@ -8,7 +8,7 @@
  * actions like `user.deactivate` actually kick the user out.
  */
 import type { PrismaClient } from "@prisma/client";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockRedisGet = vi.fn();
 const mockRedisDel = vi.fn();
@@ -32,7 +32,9 @@ const makePrismaMock = (sessionTokens: string[] = []): PrismaClient =>
       findUnique: vi.fn(),
       findMany: vi
         .fn()
-        .mockResolvedValue(sessionTokens.map((sessionToken) => ({ sessionToken }))),
+        .mockResolvedValue(
+          sessionTokens.map((sessionToken) => ({ sessionToken })),
+        ),
       deleteMany: vi.fn().mockResolvedValue({ count: sessionTokens.length }),
     },
   }) as unknown as PrismaClient;
@@ -141,10 +143,12 @@ describe("revokeOtherSessionsForUser", () => {
           findUnique: vi
             .fn()
             .mockResolvedValue({ sessionToken: "current_token" }),
-          findMany: vi.fn().mockResolvedValue([
-            { sessionToken: "old_device_token" },
-            { sessionToken: "stolen_token" },
-          ]),
+          findMany: vi
+            .fn()
+            .mockResolvedValue([
+              { sessionToken: "old_device_token" },
+              { sessionToken: "stolen_token" },
+            ]),
           deleteMany: vi.fn().mockResolvedValue({ count: 2 }),
         },
       } as unknown as PrismaClient;
@@ -159,7 +163,9 @@ describe("revokeOtherSessionsForUser", () => {
       expect(mockRedisDel).toHaveBeenCalledWith("better-auth:old_device_token");
       expect(mockRedisDel).toHaveBeenCalledWith("better-auth:stolen_token");
       // The CURRENT token cache key should NOT be deleted
-      expect(mockRedisDel).not.toHaveBeenCalledWith("better-auth:current_token");
+      expect(mockRedisDel).not.toHaveBeenCalledWith(
+        "better-auth:current_token",
+      );
       // The DB delete should exclude the current session
       expect(prisma.session.deleteMany).toHaveBeenCalledWith({
         where: { userId: "user_1", NOT: { id: "current_session_id" } },

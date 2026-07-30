@@ -16,6 +16,7 @@ import {
   type EvaluatorTypes,
   evaluatorsSchema,
 } from "../../evaluations/evaluators";
+import { evaluatorUnavailability } from "../../evaluations/installedEvaluators";
 import { runEvaluationForTrace } from "../../evaluations/runEvaluation";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
@@ -40,15 +41,27 @@ export const evaluationsRouter = createTRPCRouter({
         : [...AZURE_SAFETY_ENV_VARS];
 
       return Object.fromEntries(
-        Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
-          key,
-          {
-            ...evaluator,
-            missingEnvVars: isAzureEvaluatorType(key)
-              ? azureMissingEnvVars
-              : evaluator.envVars.filter((envVar) => !process.env[envVar]),
-          },
-        ]),
+        Object.entries(AVAILABLE_EVALUATORS)
+          // Evaluators this install hides entirely (deprecated families it
+          // did not download) drop out of the offer; saved references to
+          // them still resolve against the static registry and fail their
+          // runs with the clear not-installed message.
+          .filter(
+            ([key]) =>
+              !evaluatorUnavailability({ evaluatorType: key })?.isHiddenFromUi,
+          )
+          .map(([key, evaluator]) => [
+            key,
+            {
+              ...evaluator,
+              missingEnvVars: isAzureEvaluatorType(key)
+                ? azureMissingEnvVars
+                : evaluator.envVars.filter((envVar) => !process.env[envVar]),
+              // Set when this install does not have the evaluator's code at
+              // all, which is a different thing from it being unconfigured.
+              unavailable: evaluatorUnavailability({ evaluatorType: key }),
+            },
+          ]),
       );
     }),
 

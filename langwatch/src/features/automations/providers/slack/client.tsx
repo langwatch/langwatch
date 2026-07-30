@@ -15,8 +15,19 @@ import {
   useListCollection,
   VStack,
 } from "@chakra-ui/react";
+import {
+  SLACK_BOT_TOKEN_KEPT,
+  type SlackActionParams,
+  type SlackDeliveryMethod,
+  type SlackPreview,
+  type SlackTemplateType,
+  slackDeliveryMethodOf,
+} from "@langwatch/automations/providers/slack";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
+import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { ExternalLink } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
 import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
@@ -30,8 +41,7 @@ import {
   LiquidEditor,
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
-import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
+import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
 import type {
@@ -39,15 +49,6 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../types";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import {
-  SLACK_BOT_TOKEN_KEPT,
-  slackDeliveryMethodOf,
-  type SlackActionParams,
-  type SlackDeliveryMethod,
-  type SlackPreview,
-  type SlackTemplateType,
-} from "@langwatch/automations/providers/slack";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,
@@ -247,13 +248,37 @@ function UpgradeToBotBanner({ onUpgrade }: { onUpgrade: () => void }) {
   );
 }
 
+/** One channel as the picker shows it: the ID is stored, the name is read. */
+function channelOption(channel: {
+  id: string;
+  name: string;
+  isPrivate?: boolean;
+}) {
+  return {
+    value: channel.id,
+    label: `${channel.isPrivate ? "🔒 " : "#"}${channel.name}`,
+  };
+}
+
+/**
+ * Terminates a sentence so another can follow it.
+ *
+ * `describeError` only ends in a full stop when the code has body copy to add
+ * — a bare title ("Couldn't load channels") comes back unpunctuated — and the
+ * hint below always glues the "you can still type it" affordance on the end.
+ */
+function endWithStop(sentence: string): string {
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
 /**
  * Channel field: a typeable combobox. Manual entry always works (type a name or
  * paste an ID); once a token is present the channel list is fetched
  * AUTOMATICALLY and drops in as filterable suggestions. Picking a suggestion
  * stores the channel ID (what `chat.postMessage` wants), while free typing is
- * kept verbatim so a custom / not-yet-listed channel still works. A missing
- * scope degrades to a hint, never a hard error.
+ * kept verbatim so a custom / not-yet-listed channel still works — committed
+ * on blur or Enter, not on every keystroke. A missing scope degrades to a
+ * hint, never a hard error.
  */
 function SlackChannelField({
   projectId,
@@ -312,29 +337,104 @@ function SlackChannelField({
     label: string;
     value: string;
   }>({ initialItems: [], filter: contains });
+  // A channel the bot can't list is still a real destination, so it gets its
+  // own entry once committed. That entry is what lets it be the combobox's
+  // SELECTION: the machine rewrites its input from the selected item's label,
+  // and an entry whose label is the typed text survives that rewrite unchanged.
+  const [customChannel, setCustomChannel] = useState("");
+  const listedIds = useMemo(
+    () => new Set((channelData ?? []).map((c) => c.id)),
+    [channelData],
+  );
   useEffect(() => {
+    const listed = (channelData ?? []).map(channelOption);
     set(
-      (channelData ?? []).map((c) => ({
-        value: c.id,
-        label: `${c.isPrivate ? "🔒 " : "#"}${c.name}`,
-      })),
+      customChannel && !listedIds.has(customChannel)
+        ? [...listed, { value: customChannel, label: customChannel }]
+        : listed,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelData]);
+  }, [channelData, customChannel]);
+
+  // The channel actually PICKED from the list — deliberately NOT
+  // `slice.channelId`, which also holds free-typed text. The combobox rewrites
+  // its own input to the selected item's label every time its `value` changes,
+  // so feeding half-typed text back as `value` wiped the box on every
+  // keystroke: the search never got past one character, and any channel that
+  // needed a longer search was unreachable.
+  const [selectedId, setSelectedId] = useState("");
+  // Once the author starts typing, the field is theirs — nothing below may
+  // reach in and rewrite what they are searching for.
+  const hasAuthorTyped = useRef(false);
+
+  // Text typed but not yet committed to the slice. A ref, not state, and
+  // deliberately NOT written through on every keystroke: writing the slice
+  // re-renders this whole form, and the combobox resyncs the input element
+  // from a PASSIVE effect, so the resync lands a render late and overwrites
+  // characters typed in between — "#adhoc" arrives as "#ahc". The search stays
+  // live on every keystroke; only the commit waits for the author to finish.
+  const pendingText = useRef<string | null>(null);
+  const commitTypedChannel = () => {
+    const typed = pendingText.current;
+    pendingText.current = null;
+    if (typed !== null && typed !== slice.channelId) {
+      // Typing over a picked channel replaces it, so the old pick must stop
+      // being the selection — otherwise the list keeps a tick beside a channel
+      // that is no longer this field's value. Clearing the selection outright
+      // would blank the box (the combobox rewrites its input from the selected
+      // item, and "nothing selected" stringifies to ""), so the typed channel
+      // becomes the selection instead, backed by its own collection entry.
+      if (!listedIds.has(typed)) setCustomChannel(typed);
+      setSelectedId(typed);
+      onChange({ ...slice, channelId: typed });
+    }
+  };
+
+  // A saved automation stores the channel ID, so the box would read "C0123…".
+  // Promoting it to a real selection once the list can resolve it lets the
+  // combobox fill in the channel NAME, which is what the author recognises.
+  useEffect(() => {
+    if (hasAuthorTyped.current) return;
+    const stored = (channelData ?? []).find((c) => c.id === slice.channelId);
+    if (stored) setSelectedId(stored.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelData, slice.channelId]);
 
   const canLoad =
     typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
   const returnedError =
-    list.data?.error && list.data.error !== "no_token"
-      ? list.data.error
-      : null;
+    list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
+  // A listing can succeed and still be short of the workspace. Saying nothing
+  // is the worst option: the author scrolls a list that looks complete, doesn't
+  // find their channel, and concludes the integration is broken.
+  // Both gaps can apply at once — an app without `groups:read` whose public
+  // channels then outrun the page budget — so they are listed, not ranked.
+  // Showing only the first would have the author fix one cause and still not
+  // find their channel.
+  const gaps = list.data?.gaps ?? [];
+  const gapHints = [
+    gaps.includes("private_channels_hidden")
+      ? "Private channels aren't listed — your Slack app needs the groups:read permission. Reinstall it with the manifest above."
+      : null,
+    gaps.includes("page_cap")
+      ? "This workspace has more channels than we can list here, so some are missing."
+      : null,
+  ].filter((line): line is string => line !== null);
+  const gapHint = gapHints.length
+    ? `${gapHints.join(" ")} Type the channel name or paste its ID above to use one that isn't shown.`
+    : null;
   const hint = list.isError
-    ? `Couldn't load channels: ${list.error?.message ?? "request failed"}. You can still type the channel above.`
+    ? `${endWithStop(
+        describeError({
+          error: list.error,
+          fallbackTitle: "Couldn't load channels",
+        }),
+      )} You can still type the channel above.`
     : returnedError === "missing_scope"
-      ? "Add the channels:read scope to your app and reinstall it to pick from a list — you can still type the channel above."
+      ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
       : returnedError
         ? "Couldn't load channels from Slack. Check the token, or type the channel above."
-        : null;
+        : gapHint;
 
   return (
     <Field.Root>
@@ -361,16 +461,24 @@ function SlackChannelField({
         width="full"
         allowCustomValue
         openOnClick
-        value={slice.channelId ? [slice.channelId] : []}
-        onValueChange={(details) =>
-          onChange({ ...slice, channelId: details.value[0] ?? "" })
-        }
+        value={selectedId ? [selectedId] : []}
+        // The stored channel shows through immediately — as its ID at first,
+        // upgraded to its name by the effect above once the list resolves it.
+        defaultInputValue={slice.channelId}
+        onValueChange={(details) => {
+          // A pick beats whatever was half-typed, and stores the ID rather
+          // than the "#name" label the author sees.
+          pendingText.current = null;
+          setSelectedId(details.value[0] ?? "");
+          onChange({ ...slice, channelId: details.value[0] ?? "" });
+        }}
         onInputValueChange={(details) => {
-          filter(details.inputValue);
-          // Immediate free entry (paste an ID / type a name). A real pick is
-          // handled by onValueChange so we keep the channel ID, not its label.
+          startTransition(() => filter(details.inputValue));
+          // Free entry (paste an ID / type a name that isn't listed) is held
+          // until the author leaves the field — see `commitTypedChannel`.
           if (details.reason === "input-change") {
-            onChange({ ...slice, channelId: details.inputValue });
+            hasAuthorTyped.current = true;
+            pendingText.current = details.inputValue;
           }
         }}
         onOpenChange={(details) => {
@@ -382,6 +490,10 @@ function SlackChannelField({
             placeholder={
               list.isPending ? "Loading channels…" : "#alerts or C0123…"
             }
+            onBlur={commitTypedChannel}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") commitTypedChannel();
+            }}
           />
           <Combobox.IndicatorGroup>
             {list.isPending ? <Spinner size="xs" /> : null}
@@ -672,7 +784,9 @@ function SlackConfigForm({
                   // reset effect above sees a consistent pair and leaves it
                   // alone.
                   ctx.setNotificationCadence(
-                    option.cadenceFit === "digest" ? "5min_digest" : "immediate",
+                    option.cadenceFit === "digest"
+                      ? "5min_digest"
+                      : "immediate",
                   );
                   onChange({
                     ...slice,
@@ -840,8 +954,8 @@ function SlackBotFields({
             <List.Root as="ol" gap={1} paddingLeft={4}>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste the
-                  copied manifest — it sets the permissions for you.
+                  Create the app with &ldquo;From a manifest&rdquo; and paste
+                  the copied manifest — it sets the permissions for you.
                 </Text>
               </List.Item>
               <List.Item>
@@ -852,7 +966,8 @@ function SlackBotFields({
               </List.Item>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Invite the bot to the channel you post to.
+                  Public channels work straight away. To post to a private
+                  channel, add the app to that channel first.
                 </Text>
               </List.Item>
             </List.Root>

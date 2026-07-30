@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  getStatusCodeFromError,
   getLogLevelFromStatusCode,
-  logHttpRequest,
+  getStatusCodeFromError,
   hasAuthorizationToken,
+  logHttpRequest,
 } from "../request/requestLogging";
 
 describe("requestLogging", () => {
@@ -37,7 +37,10 @@ describe("requestLogging", () => {
 
     describe("when error has both httpStatus and status", () => {
       it("prefers httpStatus", () => {
-        const err = Object.assign(new Error("conflict"), { httpStatus: 409, status: 500 });
+        const err = Object.assign(new Error("conflict"), {
+          httpStatus: 409,
+          status: 500,
+        });
         expect(getStatusCodeFromError(err)).toBe(409);
       });
     });
@@ -202,7 +205,9 @@ describe("requestLogging", () => {
 
     describe("when bearer authorization is present", () => {
       it("returns true", () => {
-        expect(hasAuthorizationToken({ authorization: "Bearer abc123" })).toBe(true);
+        expect(hasAuthorizationToken({ authorization: "Bearer abc123" })).toBe(
+          true,
+        );
       });
     });
 
@@ -232,14 +237,18 @@ describe("requestLogging", () => {
 
     describe("when authorization uses Basic scheme", () => {
       it("returns true", () => {
-        expect(hasAuthorizationToken({ authorization: "Basic xyz" })).toBe(true);
+        expect(hasAuthorizationToken({ authorization: "Basic xyz" })).toBe(
+          true,
+        );
       });
     });
 
     describe("when authorization header uses lowercase key", () => {
       it("returns true", () => {
         // The function signature accepts `authorization` (lowercase) by definition
-        expect(hasAuthorizationToken({ authorization: "Bearer token123" })).toBe(true);
+        expect(
+          hasAuthorizationToken({ authorization: "Bearer token123" }),
+        ).toBe(true);
       });
     });
 

@@ -12,31 +12,26 @@
  *
  * Spec: specs/ai-gateway/governance/ingestion-templates-catalog.feature
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   IngestionTemplateService,
-  InvalidSourceTypeError,
-  PlatformTemplateImmutableError,
   TemplateNotFoundError,
 } from "@ee/governance/services/ingestionTemplate.service";
+import { z } from "zod";
 
 import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-function mapServiceError(err: unknown): never {
-  if (err instanceof TemplateNotFoundError) {
-    throw new TRPCError({ code: "NOT_FOUND", message: err.message });
-  }
-  if (err instanceof PlatformTemplateImmutableError) {
-    throw new TRPCError({ code: "FORBIDDEN", message: err.message });
-  }
-  if (err instanceof InvalidSourceTypeError) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: err.message });
-  }
-  throw err;
-}
+/**
+ * There is no `mapServiceError` here any more.
+ *
+ * `TemplateNotFoundError`, `PlatformTemplateImmutableError` and
+ * `InvalidSourceTypeError` are `HandledError` subclasses now, so they carry
+ * their own code, status and remediation across the boundary and the
+ * formatter serialises them. Re-wrapping them into a `TRPCError` only threw
+ * that away — and rebuilt the copy from `err.message`, which survived solely
+ * on the formatter's authored-message heuristic.
+ */
 
 export const ingestionTemplatesRouter = createTRPCRouter({
   /**
@@ -86,7 +81,9 @@ export const ingestionTemplatesRouter = createTRPCRouter({
         id: input.id,
         organizationId: input.organizationId,
       });
-      if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      // The same named 404 the service raises. `meta.id` only echoes the id
+      // the caller already sent, so a cross-org probe still learns nothing.
+      if (!row) throw new TemplateNotFoundError(input.id);
       return row;
     }),
 
@@ -113,22 +110,20 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .use(checkOrganizationPermission("aiTools:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionTemplateService.create(ctx.prisma);
-      try {
-        return await service.createOrgTemplate({
-          organizationId: input.organizationId,
-          callerUserId: ctx.session.user.id,
-          sourceType: input.sourceType,
-          displayName: input.displayName,
-          description: input.description ?? null,
-          iconAsset: input.iconAsset ?? null,
-          credentialSchema:
-            input.credentialSchema === "otlp_token" ? null : input.credentialSchema ?? null,
-          ottlRules: input.ottlRules,
-          surface: "trpc",
-        });
-      } catch (err) {
-        mapServiceError(err);
-      }
+      return await service.createOrgTemplate({
+        organizationId: input.organizationId,
+        callerUserId: ctx.session.user.id,
+        sourceType: input.sourceType,
+        displayName: input.displayName,
+        description: input.description ?? null,
+        iconAsset: input.iconAsset ?? null,
+        credentialSchema:
+          input.credentialSchema === "otlp_token"
+            ? null
+            : (input.credentialSchema ?? null),
+        ottlRules: input.ottlRules,
+        surface: "trpc",
+      });
     }),
 
   /**
@@ -147,17 +142,13 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .use(checkOrganizationPermission("aiTools:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionTemplateService.create(ctx.prisma);
-      try {
-        return await service.updateOttlRules({
-          organizationId: input.organizationId,
-          callerUserId: ctx.session.user.id,
-          id: input.id,
-          ottlRules: input.ottlRules,
-          surface: "trpc",
-        });
-      } catch (err) {
-        mapServiceError(err);
-      }
+      return await service.updateOttlRules({
+        organizationId: input.organizationId,
+        callerUserId: ctx.session.user.id,
+        id: input.id,
+        ottlRules: input.ottlRules,
+        surface: "trpc",
+      });
     }),
 
   /**
@@ -168,17 +159,13 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .use(checkOrganizationPermission("aiTools:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionTemplateService.create(ctx.prisma);
-      try {
-        await service.archiveOrgTemplate({
-          organizationId: input.organizationId,
-          callerUserId: ctx.session.user.id,
-          id: input.id,
-          surface: "trpc",
-        });
-        return { ok: true as const };
-      } catch (err) {
-        mapServiceError(err);
-      }
+      await service.archiveOrgTemplate({
+        organizationId: input.organizationId,
+        callerUserId: ctx.session.user.id,
+        id: input.id,
+        surface: "trpc",
+      });
+      return { ok: true as const };
     }),
 
   /**
@@ -197,15 +184,11 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .use(checkOrganizationPermission("aiTools:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = IngestionTemplateService.create(ctx.prisma);
-      try {
-        return await service.cloneFromPlatform({
-          organizationId: input.organizationId,
-          callerUserId: ctx.session.user.id,
-          sourceTemplateId: input.sourceTemplateId,
-          surface: "trpc",
-        });
-      } catch (err) {
-        mapServiceError(err);
-      }
+      return await service.cloneFromPlatform({
+        organizationId: input.organizationId,
+        callerUserId: ctx.session.user.id,
+        sourceTemplateId: input.sourceTemplateId,
+        surface: "trpc",
+      });
     }),
 });

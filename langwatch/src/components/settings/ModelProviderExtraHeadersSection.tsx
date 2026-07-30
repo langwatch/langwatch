@@ -8,11 +8,11 @@ import {
 } from "@chakra-ui/react";
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import React from "react";
+import type { ExtraHeader } from "../../hooks/useExtraHeaders";
 import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import type { ExtraHeader } from "../../hooks/useExtraHeaders";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { SmallLabel } from "../SmallLabel";
 

@@ -4,11 +4,8 @@ import type { ReactNode } from "react";
 
 import { modelProviderIcons } from "../../../server/modelProviders/iconsMap";
 
-import {
-  ASSISTANT_PRESETS,
-  type AssistantKind,
-} from "./assistantIcons";
-import { TOOL_PRESETS, resolveToolPreset } from "./toolIcons";
+import { ASSISTANT_PRESETS, type AssistantKind } from "./assistantIcons";
+import { resolveToolPreset, TOOL_PRESETS } from "./toolIcons";
 import type { AiToolTileType } from "./types";
 
 const FALLBACK_ICONS: Record<AiToolTileType, ReactNode> = {

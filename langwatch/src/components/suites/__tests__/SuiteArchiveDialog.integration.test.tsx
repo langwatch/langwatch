@@ -51,7 +51,9 @@ describe("<SuiteArchiveDialog/>", () => {
       render(<SuiteArchiveDialog {...defaultProps} />, { wrapper: Wrapper });
 
       expect(
-        screen.getByText("Archived run plans will no longer appear in the sidebar. Test runs are preserved."),
+        screen.getByText(
+          "Archived run plans will no longer appear in the sidebar. Test runs are preserved.",
+        ),
       ).toBeInTheDocument();
     });
 
@@ -69,7 +71,9 @@ describe("<SuiteArchiveDialog/>", () => {
       const user = userEvent.setup();
       const onClose = vi.fn();
 
-      render(<SuiteArchiveDialog {...defaultProps} onClose={onClose} />, { wrapper: Wrapper });
+      render(<SuiteArchiveDialog {...defaultProps} onClose={onClose} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Cancel"));
       expect(onClose).toHaveBeenCalledOnce();
@@ -79,7 +83,9 @@ describe("<SuiteArchiveDialog/>", () => {
       const user = userEvent.setup();
       const onConfirm = vi.fn();
 
-      render(<SuiteArchiveDialog {...defaultProps} onConfirm={onConfirm} />, { wrapper: Wrapper });
+      render(<SuiteArchiveDialog {...defaultProps} onConfirm={onConfirm} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Cancel"));
       expect(onConfirm).not.toHaveBeenCalled();
@@ -92,7 +98,9 @@ describe("<SuiteArchiveDialog/>", () => {
       const user = userEvent.setup();
       const onConfirm = vi.fn();
 
-      render(<SuiteArchiveDialog {...defaultProps} onConfirm={onConfirm} />, { wrapper: Wrapper });
+      render(<SuiteArchiveDialog {...defaultProps} onConfirm={onConfirm} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Archive"));
       expect(onConfirm).toHaveBeenCalledOnce();
@@ -102,25 +110,32 @@ describe("<SuiteArchiveDialog/>", () => {
   describe("when isLoading is true", () => {
     /** @scenario "Buttons are disabled while archive is in progress" */
     it("disables the Cancel button", () => {
-      render(<SuiteArchiveDialog {...defaultProps} isLoading={true} />, { wrapper: Wrapper });
+      render(<SuiteArchiveDialog {...defaultProps} isLoading={true} />, {
+        wrapper: Wrapper,
+      });
 
       const cancelButton = screen.getByText("Cancel").closest("button");
       expect(cancelButton).toBeDisabled();
     });
 
     it("disables the Archive button", () => {
-      render(<SuiteArchiveDialog {...defaultProps} isLoading={true} />, { wrapper: Wrapper });
+      render(<SuiteArchiveDialog {...defaultProps} isLoading={true} />, {
+        wrapper: Wrapper,
+      });
 
       // When loading, the Archive button shows a spinner instead of text
       const buttons = screen.getAllByRole("button");
       const archiveButton = buttons.find(
-        (btn) => btn.textContent !== "Cancel" && !btn.getAttribute("aria-label"),
+        (btn) =>
+          btn.textContent !== "Cancel" && !btn.getAttribute("aria-label"),
       );
       expect(archiveButton).toBeDisabled();
     });
 
     it("shows a loading spinner instead of Archive text", () => {
-      render(<SuiteArchiveDialog {...defaultProps} isLoading={true} />, { wrapper: Wrapper });
+      render(<SuiteArchiveDialog {...defaultProps} isLoading={true} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.queryByText("Archive")).not.toBeInTheDocument();
       expect(document.querySelector(".chakra-spinner")).toBeInTheDocument();

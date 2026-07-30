@@ -219,7 +219,9 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   // the agent reached for. Deterministic — the identical request 404s
   // identically — so no auto-retry: the explainer's card points the user at
   // granting the app access, and they resend once it's granted.
-  langy_github_repo_not_accessible: terminal("langy_github_repo_not_accessible"),
+  langy_github_repo_not_accessible: terminal(
+    "langy_github_repo_not_accessible",
+  ),
 
   // Turn-START rejections from the control plane (LangyTurnService), not worker
   // failures: they reach the browser as coded TRPCErrors from the create/continue
@@ -234,6 +236,23 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   langy_egress_misconfigured: terminal("langy_egress_misconfigured"),
   langy_insufficient_scope: terminal("langy_insufficient_scope"),
   langy_turn_in_progress: terminal("langy_turn_in_progress"),
+
+  // Throttled by the per-user message limit. TERMINAL in the sense that matters
+  // here: an automatic re-drive is the single worst response, because it spends
+  // another request against the very limit that refused this one — the client
+  // hammering the wall it was just told to back off from. The explainer renders
+  // it as a composer notice asking for a few seconds' patience, and the user
+  // decides when to send again.
+  langy_rate_limited: terminal("langy_rate_limited"),
+
+  // Codex (sign-in-with-OpenAI). Both TERMINAL: an auto-retry re-drives the
+  // SAME failure. A dead OAuth session is fixed only by re-authenticating (the
+  // explainer's card carries the "Sign in to Codex" action, which re-drives the
+  // turn once connected), and a ChatGPT plan limit persists until it resets or
+  // the user switches models — so the card offers a manual "Try again" rather
+  // than a spinner that would hit the cap again instantly.
+  langy_codex_session_expired: terminal("langy_codex_session_expired"),
+  langy_codex_plan_limit: terminal("langy_codex_plan_limit"),
 
   // Unhandled. We do not know what we would be retrying INTO, so we don't.
   unknown: terminal("unknown"),

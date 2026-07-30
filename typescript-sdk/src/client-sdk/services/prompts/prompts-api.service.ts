@@ -7,7 +7,7 @@ import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { type InternalConfig } from "@/client-sdk/types";
 import { type CreatePromptBody, type UpdatePromptBody } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import { isLangWatchDomainError } from "@/internal/api/errors";
+import { isLangWatchHandledError } from "@/internal/api/errors";
 import { PromptsApiError } from "./errors";
 import {
   extractStatusFromResponse,
@@ -165,7 +165,7 @@ export class PromptsApiService {
       // read the status off the domain error first. Without this, the very thing
       // that makes the failure legible — the platform naming it — would stop
       // `exists()` recognising a missing prompt and turn a `false` into a throw.
-      if (isLangWatchDomainError(error) && error.httpStatus === 404) {
+      if (isLangWatchHandledError(error) && error.httpStatus === 404) {
         return false;
       }
 

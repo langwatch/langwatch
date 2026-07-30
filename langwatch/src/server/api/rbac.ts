@@ -6,7 +6,10 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import {
+  LiteMemberRestrictedError,
+  ProjectPermissionDeniedError,
+} from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 
@@ -102,6 +105,20 @@ export const Resources = {
   //   - aiTools:manage → org ADMIN only. Catalog editor surface at
   //     /settings/governance/tool-catalog (CRUD + reorder + enable).
   AI_TOOLS: "aiTools",
+  // The Langy in-product assistant. Its own resource rather than riding on
+  // `evaluations:view`, because starting a turn is not a read: it provisions
+  // credentials, spawns an OpenCode worker and spends the project's model
+  // budget. `langy:view` reads conversations; `langy:create` starts or
+  // continues a turn (and forks, which creates one); `langy:update` renames;
+  // `langy:delete` archives. Project-scoped, since conversations belong to a
+  // project — except `langy:manage`, which also appears in the ORG role bag
+  // to gate the org-wide GitHub App connection.
+  //
+  // Granted from MEMBER upward, and to org admins; VIEWER and EXTERNAL get
+  // nothing. The permission grain is not what keeps Langy scarce — the
+  // `release_langy_enabled` flag is — so it draws the line at "can this person
+  // act on the project at all" rather than trying to be finer than that.
+  LANGY: "langy",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -189,6 +206,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
+    // Langy (manage implies create/update/delete via the hierarchy rule)
+    "langy:view",
+    "langy:manage",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -269,6 +289,11 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
+    // Langy — may run the assistant, not administer it
+    "langy:view",
+    "langy:create",
+    "langy:update",
+    "langy:delete",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -392,6 +417,12 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
     "organization:view",
     "organization:manage",
     "organization:delete",
+    // Org admins get Langy at member level, and `langy:manage` additionally
+    // gates connecting the org-wide GitHub App, which grants Langy repository
+    // access for every project underneath. Manage implies the rest via the
+    // hierarchy rule.
+    "langy:view",
+    "langy:manage",
     // AI Governance — org-level permissions for the governance offering
     // (anomaly rules, ingestion sources, OCSF SIEM export, activity
     // monitor, top-level Govern section). Default-attached to ADMIN so
@@ -638,9 +669,21 @@ export const checkProjectPermission =
           ),
         });
       }
+      // `cause` carries the handled error, exactly as the EXTERNAL branch
+      // above does. Without it this denial crossed the boundary as bare prose,
+      // so the client had no code to key copy off and rendered the generic
+      // "unknown" state for a refusal we can name — and one the customer can
+      // act on by asking an admin for the permission named in `meta`.
+      //
+      // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled
+      // below: `handledErrorMiddleware` re-derives it from the handled cause's
+      // `httpStatus` (403). That is the right answer — the caller IS
+      // authenticated, they just lack the permission — and it now matches what
+      // the REST surface has always returned for the same refusal.
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "You do not have permission to access this project resource",
+        cause: new ProjectPermissionDeniedError(permission),
       });
     }
 
@@ -749,13 +792,17 @@ async function checkPermissionFromBindings({
   });
   const groupIds = groupMemberships.map((m) => m.groupId);
 
-  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes
+  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes.
+  // The direct-binding branch is gated on current organization membership so a
+  // stale cross-org binding (one naming this user at a scope in an org they no
+  // longer/never belonged to) is never selected. Membership — not the binding
+  // row — is the tenancy boundary.
   const bindings = await prisma.roleBinding.findMany({
     where: {
       organizationId,
       scopeId: { in: scopeIds },
       OR: [
-        { userId },
+        { userId, user: { orgMemberships: { some: { organizationId } } } },
         ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
       ],
     },
@@ -770,7 +817,13 @@ async function checkPermissionFromBindings({
     if (!teamScope) return false;
 
     const teamUser = await prisma.teamUser.findFirst({
-      where: { userId, teamId: teamScope.scopeId },
+      // Gate the legacy fallback on org membership too: a stale cross-org
+      // TeamUser row must not confer access any more than a stale RoleBinding.
+      where: {
+        userId,
+        teamId: teamScope.scopeId,
+        team: { organization: { members: { some: { userId } } } },
+      },
       select: { role: true, assignedRoleId: true },
     });
 
@@ -861,6 +914,31 @@ async function resolveBindingPermission(
 }
 
 /**
+ * The single source of truth for "is this user a CURRENT member of this org,
+ * and with what role". `null` means no `OrganizationUser` row — the caller must
+ * fail closed rather than fall through to bindings, because a stale cross-org
+ * RoleBinding can still name a non-member at a project/team scope.
+ *
+ * Every scoped permission path derives membership through here so a future
+ * tenancy fix lands once instead of in each resolver.
+ */
+async function getCurrentOrganizationRole({
+  prisma,
+  userId,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}): Promise<OrganizationUserRole | null> {
+  const member = await prisma.organizationUser?.findFirst({
+    where: { userId, organizationId },
+    select: { role: true },
+  });
+  return member?.role ?? null;
+}
+
+/**
  * Resolve a project permission check, returning the permission decision
  * along with the user's organization role.
  */
@@ -880,31 +958,30 @@ export async function resolveProjectPermission(
 
   const projectTeam = await ctx.prisma.project.findUnique?.({
     where: { id: projectId },
-    select: {
-      team: {
-        select: {
-          id: true,
-          organizationId: true,
-          organization: {
-            select: {
-              members: {
-                where: { userId: ctx.session.user.id },
-                select: { role: true },
-              },
-            },
-          },
-        },
-      },
-    },
+    select: { team: { select: { id: true, organizationId: true } } },
   });
 
   const teamId = projectTeam?.team.id;
   const organizationId = projectTeam?.team.organizationId;
-  const organizationRole =
-    projectTeam?.team.organization?.members[0]?.role ?? null;
 
   if (!teamId || !organizationId) {
-    return { permitted: false, organizationRole };
+    return { permitted: false, organizationRole: null };
+  }
+
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId,
+  });
+
+  // Fail closed on current organization membership. A user who is not an
+  // OrganizationUser of the owning org is denied outright, even if a stale
+  // RoleBinding (created through a since-closed cross-org path) still names them
+  // at this project/team scope. The membership check — not the binding row — is
+  // the authoritative tenancy boundary. See the same gate in resolveTeamPermission
+  // and batchScopePermissions, and the direct-binding predicate below.
+  if (organizationRole === null) {
+    return { permitted: false, organizationRole: null };
   }
 
   const permitted = await checkPermissionFromBindings({
@@ -957,12 +1034,18 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  const organizationUser = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId: ctx.session.user.id, organizationId: team.organizationId },
-    select: { role: true },
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId: team.organizationId,
   });
 
-  const organizationRole = organizationUser?.role ?? null;
+  // Fail closed on current organization membership — a non-member is denied even
+  // if a stale cross-org binding names them at this team scope. See the matching
+  // gate in resolveProjectPermission.
+  if (organizationRole === null) {
+    return { permitted: false, organizationRole: null };
+  }
 
   const permitted = await checkPermissionFromBindings({
     prisma: ctx.prisma,
@@ -1180,11 +1263,14 @@ async function loadScopeResolution(
   const userId = ctx.session?.user?.id;
   if (!userId) return null;
 
-  const orgMember = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId, organizationId: args.organizationId },
-    select: { role: true },
+  const organizationRole = await getCurrentOrganizationRole({
+    prisma: ctx.prisma,
+    userId,
+    organizationId: args.organizationId,
   });
-  if (!orgMember) return null;
+  // Fail closed on current membership — a non-member gets nothing, even if a
+  // stale cross-org binding names them at one of these scopes.
+  if (organizationRole === null) return null;
 
   const groupMemberships = await ctx.prisma.groupMembership.findMany({
     where: { userId, group: { organizationId: args.organizationId } },
@@ -1199,8 +1285,18 @@ async function loadScopeResolution(
           where: {
             organizationId: args.organizationId,
             scopeId: { in: scopeIds },
+            // Non-membership already short-circuits above, but gate the direct
+            // branch on membership too so this query is safe on its own if the
+            // early return is ever refactored away.
             OR: [
-              { userId },
+              {
+                userId,
+                user: {
+                  orgMemberships: {
+                    some: { organizationId: args.organizationId },
+                  },
+                },
+              },
               ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
             ],
           },
@@ -1246,7 +1342,7 @@ async function loadScopeResolution(
     : [];
 
   return {
-    organizationRole: orgMember.role,
+    organizationRole,
     bindingsByScope,
     customRoleById: new Map(customRoles.map((c) => [c.id, c])),
     needsLegacyFallback,
@@ -1457,9 +1553,22 @@ export async function batchScopePermissions(
   const teamsMap = new Map<string, boolean>();
   const projectsMap = new Map<string, boolean>();
 
+  // A project inherits TEAM-scoped bindings from its team, so the binding
+  // load must cover the projects' team ids too — `projectGrants` below
+  // checks `scopeKey(TEAM, teamId)`, and a binding that was never loaded
+  // can't grant. Without this, a member whose only access is a TEAM-scope
+  // binding (no legacy TeamUser rows) fails every project in the batch
+  // while the single-project resolver — which always queries the team
+  // scope — grants it.
   const resolution = await loadScopeResolution(ctx, {
     organizationId: args.organizationId,
-    scopeIds: [...args.teamIds, ...args.projectIds],
+    scopeIds: [
+      ...new Set([
+        ...args.teamIds,
+        ...args.projectIds,
+        ...Object.values(args.projectTeamId),
+      ]),
+    ],
   });
   if (!resolution) {
     args.teamIds.forEach((id) => teamsMap.set(id, false));
@@ -1524,9 +1633,7 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
  * on this directly instead of on the permission check that the demo silently
  * grants.
  */
-export function isDemoProjectId(
-  projectId: string | null | undefined,
-): boolean {
+export function isDemoProjectId(projectId: string | null | undefined): boolean {
   if (!projectId) return false;
   // Prefer dynamic process.env in tests; fall back to validated env.
   const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
@@ -1537,7 +1644,9 @@ export function isDemoProject(
   projectId: string,
   permission: Permission,
 ): boolean {
-  return isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission);
+  return (
+    isDemoProjectId(projectId) && DEMO_VIEW_PERMISSIONS.includes(permission)
+  );
 }
 
 // ============================================================================
@@ -1637,68 +1746,6 @@ export const authorizeInResolver = ({
   ctx.permissionChecked = true;
   return next();
 };
-
-// ============================================================================
-// PUBLIC SHARE HANDLING
-// ============================================================================
-
-type PublicResourceTypes = "TRACE" | "THREAD";
-
-export const checkPermissionOrPubliclyShared =
-  <
-    Key extends keyof InputType,
-    InputType extends { [key in Key]: string } & { projectId: string },
-  >(
-    permissionCheck: PermissionMiddleware<InputType>,
-    {
-      resourceType,
-      resourceParam,
-    }: {
-      resourceType: PublicResourceTypes | ((input: any) => PublicResourceTypes);
-      resourceParam: Key;
-    },
-  ) =>
-  async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
-    let allowed = false;
-    try {
-      await permissionCheck({
-        ctx,
-        input,
-        next: async () => true as any,
-      });
-      allowed = true;
-    } catch (e) {
-      if (e instanceof TRPCError && e.code === "UNAUTHORIZED") {
-        allowed = false;
-      } else {
-        throw e;
-      }
-    }
-
-    if (!allowed) {
-      const sharedResource = await ctx.prisma.publicShare.findFirst({
-        where: {
-          projectId: input.projectId,
-          resourceType:
-            typeof resourceType === "function"
-              ? resourceType(input)
-              : resourceType,
-          resourceId: input[resourceParam],
-        },
-      });
-      if (!sharedResource) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message:
-            "You do not have permission and this resource is not publicly shared",
-        });
-      }
-      ctx.publiclyShared = true;
-    }
-
-    ctx.permissionChecked = true;
-    return next();
-  };
 
 // ============================================================================
 // OPS PERMISSION

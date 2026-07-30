@@ -90,9 +90,7 @@ describe("getUriScheme", () => {
     });
 
     it("throws when there is no colon", () => {
-      expect(() => getUriScheme("notauri")).toThrow(
-        /Unrecognised URI scheme/,
-      );
+      expect(() => getUriScheme("notauri")).toThrow(/Unrecognised URI scheme/);
     });
   });
 });

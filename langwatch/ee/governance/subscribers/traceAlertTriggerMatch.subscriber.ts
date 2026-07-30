@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { NOTIFY_TRIGGER_ACTIONS } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { RecordTriggerMatchPort } from "~/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber";
 import { passesTraceOriginGuards } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
@@ -19,11 +19,17 @@ export function createTraceAlertTriggerMatchHandler(deps: {
     context: TriggerContext<TraceSummaryData>,
   ): Promise<void> => {
     if (!passesTraceOriginGuards(event, context.state)) return;
+    // Events already committed with an empty aggregateId (see the traceId
+    // guard in originGate.reactor) would fail recordTriggerMatch validation
+    // and poison the reactor job. There is no trace to match a trigger
+    // against, so skip rather than throw.
+    if (!context.aggregateId) return;
     const triggers = await deps.triggers.getActiveTraceTriggersForProject(
       context.tenantId,
     );
     for (const trigger of triggers) {
-      if (classifyTriggerFilters(trigger.filters).hasEvaluationFilters) continue;
+      if (classifyTriggerFilters(trigger.filters).hasEvaluationFilters)
+        continue;
       // Idempotency contract (at-least-once delivery): every input to the
       // command's idempotency key — triggerId, traceId, and the settle-window
       // bucket derived from occurredAt + traceDebounceMs — comes from the

@@ -7,26 +7,53 @@
  *   - `scopeType` + `scopeId` identifies the logical target (ADR-021): the
  *     single inline source of truth, with no typed FK columns mirroring it.
  */
+
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayBudget,
   GatewayBudgetWindow,
   PrismaClient,
 } from "@prisma/client";
 import { Prisma } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
-import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import {
+  budgetAppliesToProvider,
+  resolveApplicableBudgets,
+} from "./budgetResolution.service";
+import {
+  type BudgetScopeReach,
+  resolveBudgetScopeReach,
+} from "./budgetScopeReach";
 import { nextResetAt, shouldResetBudget } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
+import {
+  GatewayBudgetNotFoundError,
+  GatewayGroupBudgetUnsupportedError,
+  GatewayScopeOrgMismatchError,
+  VirtualKeyNotFoundError,
+} from "./errors";
+
+const logger = createLogger("langwatch:gateway:budget-service");
+
+export type BudgetListWithHealth = {
+  budgets: GatewayBudget[];
+  /**
+   * False when spend could not be totalled. Consumers must say so rather
+   * than render the untotalled figure as if it were real spend.
+   */
+  spendAvailable: boolean;
+  scopeReach: Map<string, BudgetScopeReach>;
+};
 
 export type BudgetScope =
   | { kind: "ORGANIZATION"; organizationId: string }
   | { kind: "TEAM"; teamId: string }
   | { kind: "PROJECT"; projectId: string }
   | { kind: "VIRTUAL_KEY"; virtualKeyId: string }
-  | { kind: "PRINCIPAL"; principalUserId: string };
+  | { kind: "PRINCIPAL"; principalUserId: string }
+  | { kind: "GROUP"; groupId: string };
 
 export type CreateBudgetInput = {
   organizationId: string;
@@ -37,6 +64,12 @@ export type CreateBudgetInput = {
   limitUsd: number | string | Prisma.Decimal;
   onBreach?: "BLOCK" | "WARN";
   timezone?: string | null;
+  /**
+   * ModelProvider row id the budget counts and constrains. Null (the
+   * default) counts every provider. Orthogonal to the scope target, which
+   * is what makes the full target x provider matrix expressible.
+   */
+  providerKey?: string | null;
   actorUserId: string;
 };
 
@@ -73,7 +106,15 @@ export type BudgetScopeTarget =
       secondary: string | null;
       projectSlug: string | null;
     }
-  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null };
+  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
+  | {
+      kind: "GROUP";
+      id: string;
+      name: string;
+      secondary: string | null;
+      /** Members the per-member allowance currently applies to. */
+      memberCount: number;
+    };
 
 export type BudgetLedgerLine = {
   id: string;
@@ -98,6 +139,10 @@ export type BudgetDetail = {
     occurredAt: Date;
     virtualKey: { name: string; displayPrefix: string } | null;
   }>;
+  /** False when spend could not be totalled, so `spentUsd` is not real spend. */
+  spendAvailable: boolean;
+  /** True when no active key can produce traffic this budget matches. */
+  unreachableByAnyKey: boolean;
 };
 
 export type BudgetCheckDecision = "allow" | "soft_warn" | "hard_block";
@@ -112,6 +157,13 @@ export type BudgetCheckInput = {
   virtualKeyId: string;
   principalUserId?: string | null;
   projectedCostUsd: number | string;
+  /**
+   * The provider this request would dispatch to, when the caller knows it.
+   * Given it, provider-filtered budgets are consulted; without it only
+   * unfiltered budgets are, so a provider filter can never block a request
+   * that was never going to that provider.
+   */
+  providerKey?: string | null;
 };
 
 export type BudgetCheckResult = {
@@ -186,7 +238,10 @@ export class GatewayBudgetService {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return await this.applyClickHouseSpend(budgets, project.team.organizationId);
+    return await this.applyClickHouseSpend(
+      budgets,
+      project.team.organizationId,
+    );
   }
 
   /**
@@ -205,23 +260,112 @@ export class GatewayBudgetService {
     budgets: GatewayBudget[],
     organizationId: string,
   ): Promise<GatewayBudget[]> {
-    if (!this.chRepo || budgets.length === 0) return budgets;
+    const { budgets: decorated } = await this.applyClickHouseSpendWithHealth(
+      budgets,
+      organizationId,
+    );
+    return decorated;
+  }
+
+  /**
+   * As applyClickHouseSpend, but also reports whether the returned spend
+   * figures came from the ledger at all.
+   *
+   * `GatewayBudget.spentUsd` in Postgres has had no writer since the ledger
+   * cutover, so falling back to it renders a confident `$0.00 / $X, 0%` on
+   * a budget that is in reality not being totalled and not being enforced.
+   * Callers must surface `spendAvailable: false` rather than show that zero
+   * as a spend figure.
+   */
+  private async applyClickHouseSpendWithHealth(
+    budgets: GatewayBudget[],
+    organizationId: string,
+  ): Promise<{ budgets: GatewayBudget[]; spendAvailable: boolean }> {
+    if (budgets.length === 0) return { budgets, spendAvailable: true };
+    if (!this.chRepo) return { budgets, spendAvailable: false };
+
     const projects = await this.prisma.project.findMany({
       where: { team: { organizationId }, archivedAt: null },
       select: { id: true },
     });
-    if (projects.length === 0) return budgets;
+    // No project means nothing has ever been able to emit a ledger row, so
+    // zero is the true total rather than a missing one.
+    if (projects.length === 0) return { budgets, spendAvailable: true };
+
     const tenantIds = projects.map((p) => p.id);
-    const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
-      tenantIds,
-      budgets,
-    );
+    let spends;
+    try {
+      spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
+        tenantIds,
+        budgets,
+      );
+    } catch (error) {
+      logger.error(
+        { organizationId, budgetCount: budgets.length, error },
+        "failed to read gateway budget spend totals",
+      );
+      return { budgets, spendAvailable: false };
+    }
+
     const spendByBudget = new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
-    return budgets.map((b) => {
-      const ch = spendByBudget.get(b.id);
-      if (ch === undefined) return b;
-      return { ...b, spentUsd: new Prisma.Decimal(ch) };
+    return {
+      spendAvailable: true,
+      budgets: budgets.map((b) => {
+        const ch = spendByBudget.get(b.id);
+        if (ch === undefined) return b;
+        return { ...b, spentUsd: new Prisma.Decimal(ch) };
+      }),
+    };
+  }
+
+  /**
+   * Budgets for the organization's list view, with the two health signals
+   * the view cannot render honestly without: whether spend could be totalled
+   * at all, and which budgets no active key can ever spend against.
+   */
+  async listWithHealth(organizationId: string): Promise<BudgetListWithHealth> {
+    const rows = await this.prisma.gatewayBudget.findMany({
+      where: { organizationId, archivedAt: null },
+      orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
+    return await this.decorateWithHealth(rows, organizationId);
+  }
+
+  /** As listWithHealth, for the budgets that apply to one project. */
+  async listForProjectWithHealth(
+    projectId: string,
+  ): Promise<BudgetListWithHealth> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { team: true },
+    });
+    if (!project) {
+      return { budgets: [], spendAvailable: true, scopeReach: new Map() };
+    }
+    const rows = await this.prisma.gatewayBudget.findMany({
+      where: {
+        organizationId: project.team.organizationId,
+        archivedAt: null,
+        OR: [
+          { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
+          { scopeType: "TEAM", scopeId: project.teamId },
+          { scopeType: "PROJECT", scopeId: project.id },
+        ],
+      },
+      orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
+    });
+    return await this.decorateWithHealth(rows, project.team.organizationId);
+  }
+
+  private async decorateWithHealth(
+    rows: GatewayBudget[],
+    organizationId: string,
+  ): Promise<BudgetListWithHealth> {
+    const [{ budgets, spendAvailable }, scopeReach] = await Promise.all([
+      this.applyClickHouseSpendWithHealth(rows, organizationId),
+      resolveBudgetScopeReach(this.prisma, organizationId, rows),
+    ]);
+    return { budgets, spendAvailable, scopeReach };
   }
 
   async get(id: string, organizationId: string): Promise<GatewayBudget | null> {
@@ -229,7 +373,10 @@ export class GatewayBudgetService {
       where: { id, organizationId },
     });
     if (!budget) return null;
-    const [decorated] = await this.applyClickHouseSpend([budget], organizationId);
+    const [decorated] = await this.applyClickHouseSpend(
+      [budget],
+      organizationId,
+    );
     return decorated ?? budget;
   }
 
@@ -243,8 +390,13 @@ export class GatewayBudgetService {
     id: string,
     organizationId: string,
   ): Promise<BudgetDetail | null> {
-    const budget = await this.get(id, organizationId);
-    if (!budget) return null;
+    const row = await this.prisma.gatewayBudget.findFirst({
+      where: { id, organizationId },
+    });
+    if (!row) return null;
+    const { budgets, spendAvailable, scopeReach } =
+      await this.decorateWithHealth([row], organizationId);
+    const budget = budgets[0] ?? row;
 
     const scopeTarget = await this.resolveScopeTarget(budget);
 
@@ -282,7 +434,13 @@ export class GatewayBudgetService {
       }));
     }
 
-    return { budget, scopeTarget, recentLedger };
+    return {
+      budget,
+      scopeTarget,
+      recentLedger,
+      spendAvailable,
+      unreachableByAnyKey: scopeReach.get(budget.id)?.reachable === false,
+    };
   }
 
   /**
@@ -318,6 +476,10 @@ export class GatewayBudgetService {
         // future iteration teaches the repo to fan out across projects.
         return null;
       case "PRINCIPAL":
+      case "GROUP":
+        // Principal and per-member group buckets span every project
+        // the person works in, so there is no single CH tenant to read
+        // their recent ledger from.
         return null;
     }
   }
@@ -398,6 +560,23 @@ export class GatewayBudgetService {
           secondary: user?.email ?? null,
         };
       }
+      case "GROUP": {
+        const group = await this.prisma.group.findUnique({
+          where: { id: budget.scopeId },
+          select: {
+            name: true,
+            slug: true,
+            _count: { select: { members: true } },
+          },
+        });
+        return {
+          kind: "GROUP",
+          id: budget.scopeId,
+          name: group?.name ?? budget.scopeId,
+          secondary: group?.slug ?? null,
+          memberCount: group?._count.members ?? 0,
+        };
+      }
     }
   }
 
@@ -419,11 +598,7 @@ export class GatewayBudgetService {
         select: { userId: true },
       });
       if (!membership) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "principalUserId is not a member of this organization — PRINCIPAL budgets must scope a user inside the budget's org.",
-        });
+        throw new GatewayScopeOrgMismatchError("user");
       }
     }
 
@@ -439,11 +614,7 @@ export class GatewayBudgetService {
         select: { id: true },
       });
       if (!team) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "teamId does not belong to this organization — TEAM budgets must scope a team inside the budget's org.",
-        });
+        throw new GatewayScopeOrgMismatchError("team");
       }
     }
     if (input.scope.kind === "PROJECT") {
@@ -455,11 +626,71 @@ export class GatewayBudgetService {
         select: { id: true },
       });
       if (!proj) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "projectId does not belong to this organization — PROJECT budgets must scope a project inside the budget's org.",
-        });
+        throw new GatewayScopeOrgMismatchError("project");
+      }
+    }
+    // Cross-org + product-managed guard for VIRTUAL_KEY budgets. The scope id
+    // is request-supplied, so without the org check a caller could budget
+    // another tenant's key; and a product-managed VK (purpose != USER — the
+    // Langy VK) is not the customer's to constrain: a $0.01 BLOCK budget on it
+    // would deny every Langy turn, the same "customer breaks a product-managed
+    // credential" class the by-id mutation guards already close. Not-found
+    // rather than forbidden, so the response never confirms the id exists.
+    if (input.scope.kind === "VIRTUAL_KEY") {
+      const vk = await this.prisma.virtualKey.findFirst({
+        where: {
+          id: input.scope.virtualKeyId,
+          organizationId: input.organizationId,
+        },
+        select: { purpose: true },
+      });
+      if (vk?.purpose !== "USER") {
+        throw new VirtualKeyNotFoundError();
+      }
+    }
+
+    if (input.scope.kind === "GROUP") {
+      // A GROUP budget is one enforcement bucket per member, and per-member
+      // buckets only exist on the ClickHouse spend path. Without it,
+      // `check()` falls back to the single PG `spentUsd` figure per budget
+      // row, which would enforce each member against the whole
+      // group's combined spend: a different control than the one the
+      // admin asked for. Refuse rather than create a cap that cannot mean
+      // what it says. Detection matches `check()`'s own CH-vs-PG pick:
+      // the presence of the ClickHouse repo this service was built with.
+      // Spec: specs/ai-gateway/gateway-budget-targeting.feature.
+      if (!this.chRepo) {
+        throw new GatewayGroupBudgetUnsupportedError();
+      }
+      // Cross-org guard, mirroring the TEAM / PROJECT / PRINCIPAL guards:
+      // the scope id is request-supplied, so without this a caller could
+      // put a per-member budget on another tenant's group.
+      const group = await this.prisma.group.findFirst({
+        where: {
+          id: input.scope.groupId,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!group) {
+        throw new GatewayScopeOrgMismatchError("group");
+      }
+    }
+
+    // Provider-filtered budgets reference a ModelProvider row. The id is
+    // request-supplied, so pin it to the budget's own organization: a
+    // cross-org id would create a filter that can never match this org's
+    // dispatches and silently count nothing.
+    if (input.providerKey) {
+      const provider = await this.prisma.modelProvider.findFirst({
+        where: {
+          id: input.providerKey,
+          organizationId: input.organizationId,
+        },
+        select: { id: true },
+      });
+      if (!provider) {
+        throw new GatewayScopeOrgMismatchError("model provider");
       }
     }
 
@@ -478,6 +709,7 @@ export class GatewayBudgetService {
           limitUsd: new Prisma.Decimal(input.limitUsd.toString()),
           onBreach: input.onBreach ?? "BLOCK",
           timezone: input.timezone ?? null,
+          providerKey: input.providerKey ?? null,
           resetsAt,
           currentPeriodStartedAt: new Date(),
           createdById: input.actorUserId,
@@ -512,7 +744,7 @@ export class GatewayBudgetService {
 
   async update(input: UpdateBudgetInput): Promise<GatewayBudget> {
     const existing = await this.get(input.id, input.organizationId);
-    if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+    if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
 
     return this.prisma.$transaction(async (tx) => {
@@ -559,7 +791,7 @@ export class GatewayBudgetService {
 
   async archive(input: ArchiveBudgetInput): Promise<GatewayBudget> {
     const existing = await this.get(input.id, input.organizationId);
-    if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
+    if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
 
     return this.prisma.$transaction(async (tx) => {
@@ -599,26 +831,18 @@ export class GatewayBudgetService {
   async check(input: BudgetCheckInput): Promise<BudgetCheckResult> {
     const projected = new Prisma.Decimal(input.projectedCostUsd.toString());
 
-    const ors: Prisma.GatewayBudgetWhereInput[] = [
-      { scopeType: "ORGANIZATION", scopeId: input.organizationId },
-      { scopeType: "VIRTUAL_KEY", scopeId: input.virtualKeyId },
-    ];
-    if (input.teamId) {
-      ors.push({ scopeType: "TEAM", scopeId: input.teamId });
-    }
-    if (input.projectId) {
-      ors.push({ scopeType: "PROJECT", scopeId: input.projectId });
-    }
-    if (input.principalUserId) {
-      ors.push({ scopeType: "PRINCIPAL", scopeId: input.principalUserId });
-    }
-    const applicable = await this.prisma.gatewayBudget.findMany({
-      where: {
+    // Same resolver the bundle and the trace fold use, so what enforces
+    // here is exactly what the key was told applies to it.
+    const resolved = (
+      await resolveApplicableBudgets(this.prisma, {
         organizationId: input.organizationId,
-        archivedAt: null,
-        OR: ors,
-      },
-    });
+        teamId: input.teamId,
+        projectId: input.projectId,
+        virtualKeyId: input.virtualKeyId,
+        principalUserId: input.principalUserId,
+      })
+    ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));
+    const applicable = resolved.map((r) => r.budget);
 
     // Prefer ClickHouse spend (trace-fold ledger) when the repo is wired,
     // fall back to the PG `spentUsd` column for deploys without CH. The
@@ -641,7 +865,13 @@ export class GatewayBudgetService {
           if (tenantIds.length === 0) return new Map<string, string>();
           const spends = await this.chRepo!.getSpendForBudgetsAcrossTenants(
             tenantIds,
-            applicable,
+            resolved.map((r) => ({
+              budgetId: r.budget.id,
+              scope: r.budget.scopeType,
+              scopeId: r.bucketScopeId,
+              window: r.budget.window,
+              match: "exact" as const,
+            })),
           );
           return new Map(spends.map((s) => [s.budgetId, s.spentUsd] as const));
         })()
@@ -720,17 +950,14 @@ function scopeIdForScope(scope: BudgetScope): string {
       return scope.virtualKeyId;
     case "PRINCIPAL":
       return scope.principalUserId;
+    case "GROUP":
+      return scope.groupId;
   }
 }
 
 function scopeKindToEnum(
   kind: BudgetScope["kind"],
-):
-  | "ORGANIZATION"
-  | "TEAM"
-  | "PROJECT"
-  | "VIRTUAL_KEY"
-  | "PRINCIPAL" {
+): "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL" | "GROUP" {
   return kind;
 }
 

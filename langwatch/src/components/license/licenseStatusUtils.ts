@@ -12,7 +12,7 @@ export type LicenseStatusWithMetadata = Extract<
  * Returns false for corrupted or missing licenses.
  */
 export function hasLicenseMetadata(
-  status: Extract<LicenseStatus, { hasLicense: true }>
+  status: Extract<LicenseStatus, { hasLicense: true }>,
 ): status is LicenseStatusWithMetadata {
   return "plan" in status;
 }
@@ -22,7 +22,7 @@ export function hasLicenseMetadata(
  * Corrupted licenses have hasLicense: true but cannot be read.
  */
 export function isCorruptedLicense(
-  status: Extract<LicenseStatus, { hasLicense: true }>
+  status: Extract<LicenseStatus, { hasLicense: true }>,
 ): boolean {
   return "corrupted" in status && status.corrupted === true;
 }
@@ -39,9 +39,7 @@ export function isCorruptedLicense(
  * - Corrupted license (no metadata)
  * - Invalid license with future expiresAt (signature issues, not expired)
  */
-export function isLicenseExpired(
-  status: LicenseStatus | undefined
-): boolean {
+export function isLicenseExpired(status: LicenseStatus | undefined): boolean {
   if (!status) return false;
   if (!status.hasLicense) return false;
 

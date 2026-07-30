@@ -108,7 +108,7 @@ interface ViewState {
   columnOrder: string[];
   draftState: Map<string, DraftLensState>;
 
-  selectLens: (id: string) => void;
+  selectLens: (id: string, opts?: { persist?: boolean }) => void;
   setSort: (sort: SortConfig) => void;
   setGrouping: (mode: GroupingMode) => void;
   toggleColumn: (columnId: string) => void;
@@ -154,6 +154,42 @@ export function setLensSyncBridge(bridge: LensSyncBridge | null): void {
 
 const DISMISSED_BUILTINS_KEY = "langwatch:traces-v2:dismissed-builtins:v1";
 const DRAFTS_KEY = "langwatch:traces-v2:drafts:v1";
+// Last-used lens id. Deliberately NOT project-scoped: built-in lens ids
+// (all-traces / simplified / conversations / …) are identical across every
+// project, so a single global key restores the user's preferred view
+// cross-project. A custom lens id only exists in its own project, so on a
+// different project it simply won't be found and the store falls back to
+// the default — the desired behaviour. The lens is otherwise URL-fragment
+// driven (`useURLSync`); this key is the fallback the fragment reader
+// consults when a bare URL carries no lens, so returning to a lensless URL
+// restores the last-used view instead of snapping back to All.
+export const ACTIVE_LENS_KEY = "langwatch:traces-v2:active-lens:v1";
+
+/**
+ * The last-used lens id from the global cross-project key, or `null` when it
+ * is unset, on the server, or when storage is unavailable.
+ */
+export function getPersistedActiveLensId(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(ACTIVE_LENS_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Records the last-used lens id in the global cross-project key. A no-op on the
+ * server or when storage is full/disabled, so callers never need to guard.
+ */
+function persistActiveLensId(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ACTIVE_LENS_KEY, id);
+  } catch {
+    // storage may be full / disabled
+  }
+}
 
 const DEFAULT_SORT: SortConfig = { columnId: "time", direction: "desc" };
 
@@ -544,25 +580,68 @@ function clearDraftFor(
 }
 
 /**
- * Push a lens's saved filter into the filter store without surfacing a
- * parse error if the saved text is corrupt (falls back to empty). Imperative
- * one-way write — viewStore never subscribes to filterStore.
+ * Push a lens's saved filter into the filter store. Imperative one-way write —
+ * viewStore never subscribes to filterStore.
+ *
+ * Corrupt saved text does not surface a parse error to the user, but that
+ * fallback belongs to `setFilterFromLens`, which returns an empty AST when
+ * `safeParseAndSerialize` reports a parse error. It does not throw, so there is
+ * nothing here to catch: a `try`/`catch` around this call would only swallow a
+ * real, unexpected failure to install the lens's filter — leaving the user on
+ * the previous lens's filter with no indication anything went wrong.
  */
 function applyFilterTextFromLens(text: string): void {
-  try {
-    useFilterStore.getState().setFilterFromLens(text);
-  } catch {
-    // filterStore unavailable (e.g. SSR boot) — safe to skip.
+  useFilterStore.getState().setFilterFromLens(text);
+}
+
+/**
+ * Drop the trace list's keyset cursors whenever the sort that minted them
+ * changes.
+ *
+ * The list is keyset-paged: a cursor carries the `sortValue` of the last row
+ * of the previous batch, and the server compares it against whatever the
+ * CURRENT sort expression is. So a cursor minted while sorting by Cost
+ * (`sortValue: 0.0042`) carried into a time-ordered query becomes
+ * `toUnixTimestamp64Milli(OccurredAt) < 0.0042` — a batch that matches
+ * nothing. `totalHits` is computed without the cursor and keeps reporting the
+ * full count, and `Pagination` derives its row range from the page number
+ * rather than from the rows that came back, so the empty state never shows:
+ * the user is left staring at a blank table still captioned with the whole
+ * count and a live-looking range ("… traces · showing 101–101" on page 3),
+ * and switching back doesn't recover because the stale cursor is still in the
+ * store. Direction flips the comparison operator, so it invalidates cursors
+ * for the same reason.
+ *
+ * Imperative one-way write — viewStore never subscribes to filterStore.
+ */
+function dropKeysetCursorsIfSortChanged({
+  previous,
+  next,
+}: {
+  previous: SortConfig;
+  next: SortConfig;
+}): void {
+  if (
+    previous.columnId === next.columnId &&
+    previous.direction === next.direction
+  ) {
+    return;
   }
+  useFilterStore.getState().resetPagination();
 }
 
 const initialDismissedBuiltIns = loadDismissedBuiltInIds();
 const initialLenses: LensConfig[] = builtInLenses.filter(
   (l) => !initialDismissedBuiltIns.has(l.id),
 );
+const persistedActiveLensId = getPersistedActiveLensId();
 const initialActiveLensId =
-  initialLenses.find((l) => l.id === "all-traces")?.id ??
-  initialLenses[0]?.id ??
+  // Restore the persisted lens when it's already known (a built-in, present
+  // at init). Custom lenses hydrate later and are restored in setUserLenses.
+  (persistedActiveLensId &&
+    initialLenses.find((l) => l.id === persistedActiveLensId)?.id) ||
+  initialLenses.find((l) => l.id === "all-traces")?.id ||
+  initialLenses[0]?.id ||
   "all-traces";
 const initialDrafts = loadDrafts();
 const initialActiveLens = initialLenses.find(
@@ -582,10 +661,16 @@ export const useViewStore = create<ViewState>((set, get) => ({
     defaultColumnOrder,
   draftState: initialDrafts,
 
-  selectLens: (id) => {
+  selectLens: (id, opts) => {
     set((s) => {
       const lens = s.allLenses.find((l) => l.id === id);
       if (!lens) return s;
+      // Remember the choice as the last-used lens (cross-navigation, and
+      // cross-project for built-ins). `useURLSync` passes persist:false when
+      // it's only *applying* a lens (e.g. falling back to the default because
+      // a bare URL carries none), so that path never clobbers the stored
+      // preference.
+      if (opts?.persist !== false) persistActiveLensId(id);
       const draft = s.draftState.get(id);
       // Apply the lens's filter (or its draft override) to filterStore via
       // the silent setter — `applyQueryText` would loop back through
@@ -607,39 +692,67 @@ export const useViewStore = create<ViewState>((set, get) => ({
   // tracking those drafts too. Built-in lenses can't be saved into
   // localStorage (the menu's Save item stays disabled), but the user can
   // duplicate to keep the changes.
-  setSort: (sort) =>
+  //
+  // Pagination invalidation: a new sort is reachable from many actions, and
+  // the cursors it invalidates are dropped on two different axes.
+  //
+  // `setSort` (here) and `setGrouping` (below) install a sort WITHOUT touching
+  // the filter, so they are the only paths that call
+  // `dropKeysetCursorsIfSortChanged` explicitly — the guard lives here rather
+  // than at the UI call sites because a new sort is reachable both by clicking
+  // a header AND by switching grouping, and the grouping path is the one that
+  // shipped without it.
+  //
+  // Every OTHER path that installs a sort — `selectLens`, `createLens` (with
+  // overrides), `revertLens`, `duplicateLens`, `deleteLens` and
+  // `setUserLenses` — is applying a lens, and so also calls
+  // `applyFilterTextFromLens`. That resets `page`/`pageCursors` inside
+  // `setFilterFromLens`, which is why those paths are safe today. That safety
+  // is INCIDENTAL: they are covered on the filter axis, not the sort axis. If
+  // `setFilterFromLens` ever stops resetting pagination, or a lens-applying
+  // path stops pushing the lens's filter text, every one of them starts
+  // carrying stale cursors into a new sort — add the explicit guard there
+  // rather than assuming the side effect still holds.
+  setSort: (sort) => {
+    dropKeysetCursorsIfSortChanged({ previous: get().sort, next: sort });
     set((s) => ({
       sort,
       draftState: setDraft(s.draftState, s.activeLensId, { sort }),
-    })),
+    }));
+  },
 
-  setGrouping: (mode) =>
-    set((s) => {
-      // Each grouping mode renders a different RowKind with its own column
-      // registry — e.g. flat knows `time/trace/service`, group knows
-      // `group/count/duration`. Without reconciling, the old columnOrder
-      // is carried over and the renderer silently drops every id the new
-      // registry doesn't recognise, leaving the user with a table missing
-      // its group-label column (or any meaningful headers at all).
-      //
-      // reconcileColumns drops invalid ids (keeping eval:* for the trace
-      // capability) and falls back to the capability's defaults when nothing
-      // survives — matching what LensConfigDialog does when the user picks a
-      // new grouping in the rich editor.
-      const capability = LENS_CAPABILITIES[mode];
-      const columns = reconcileColumns({ ids: s.columnOrder, capability });
-      const sort = reconcileSort(s.sort, capability);
-      return {
+  setGrouping: (mode) => {
+    // Each grouping mode renders a different RowKind with its own column
+    // registry — e.g. flat knows `time/trace/service`, group knows
+    // `group/count/duration`. Without reconciling, the old columnOrder
+    // is carried over and the renderer silently drops every id the new
+    // registry doesn't recognise, leaving the user with a table missing
+    // its group-label column (or any meaningful headers at all).
+    //
+    // reconcileColumns drops invalid ids (keeping eval:* for the trace
+    // capability) and falls back to the capability's defaults when nothing
+    // survives — matching what LensConfigDialog does when the user picks a
+    // new grouping in the rich editor.
+    const s = get();
+    const capability = LENS_CAPABILITIES[mode];
+    const columns = reconcileColumns({ ids: s.columnOrder, capability });
+    const sort = reconcileSort(s.sort, capability);
+    // reconcileSort can swap the sort column out from under the table without
+    // the user ever touching a header: a grouped RowKind can't order by
+    // `time` (nor `spans`/`ttft`/`size`), so those all land on `count`. That
+    // is a sort change like any other, and the cursors have to go with it.
+    dropKeysetCursorsIfSortChanged({ previous: s.sort, next: sort });
+    set({
+      grouping: mode,
+      columnOrder: columns,
+      sort,
+      draftState: setDraft(s.draftState, s.activeLensId, {
         grouping: mode,
-        columnOrder: columns,
+        columns,
         sort,
-        draftState: setDraft(s.draftState, s.activeLensId, {
-          grouping: mode,
-          columns,
-          sort,
-        }),
-      };
-    }),
+      }),
+    });
+  },
 
   toggleColumn: (columnId) =>
     set((s) => {
@@ -849,6 +962,35 @@ export const useViewStore = create<ViewState>((set, get) => ({
       const builtIns = s.allLenses.filter((l) => l.isBuiltIn);
       const userLenses = lenses.map((l) => ({ ...l, isBuiltIn: false }));
       const allLenses = [...builtIns, ...userLenses];
+
+      // The persisted last-used lens may be a CUSTOM lens that only becomes
+      // available once its project's lenses hydrate (possibly across several
+      // partial payloads). Restore it whenever we're still on the default
+      // lens — no one-shot latch, so a late/partial first payload can't
+      // permanently block the restore. The `activeLensId === "all-traces"`
+      // guard is self-limiting: once restored (or once the user picks
+      // anything), the active lens is no longer the default, so subsequent
+      // hydrations skip and an explicit choice is never clobbered.
+      const persisted = getPersistedActiveLensId();
+      if (
+        s.activeLensId === "all-traces" &&
+        persisted &&
+        persisted !== s.activeLensId
+      ) {
+        const target = allLenses.find((l) => l.id === persisted);
+        if (target) {
+          const draft = s.draftState.get(persisted);
+          applyFilterTextFromLens(draft?.filter ?? target.filterText);
+          return {
+            allLenses,
+            activeLensId: persisted,
+            sort: draft?.sort ?? target.sort,
+            grouping: draft?.grouping ?? target.grouping,
+            columnOrder: draft?.columns ?? target.columns,
+          };
+        }
+      }
+
       // Mirror to localStorage so a refresh has instant data before
       // the tRPC query resolves — keeps the lens strip from flashing
       // empty between mount and hydration.

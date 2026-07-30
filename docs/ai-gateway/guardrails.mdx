@@ -58,7 +58,7 @@ Decisions:
   The channel is closed immediately after; subsequent upstream chunks are discarded. Same wire shape as a provider-failure terminator, distinguishable by `error.code` (`stream_chunk_blocked` vs `provider_error`). See [Streaming → Mid-stream error shapes](/ai-gateway/streaming#terminal-error-shapes).
 - `modify`, **not implemented in v1.** Chunk-level content rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events have different shapes). For v1, "redact on stream" = block and let the client retry without the offending input. A future iter may add provider-aware chunk rewriting once a real customer asks.
 
-Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, or the upstream guardrail errors, the gateway **fails open**: the chunk passes through with an OTel warning (the WARN log carries the reason) and a bump to `gateway_guardrail_verdicts_total{direction="stream_chunk",verdict="fail_open"}`. This is an explicit contract decision: blocking the user's stream on a slow policy service is worse than occasional pass-through, but the metric makes slow/flaky services visible before they become reliability problems.
+Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, or the upstream guardrail errors, the gateway **fails open**: the chunk passes through with an OTel warning (the WARN log carries the reason). This is an explicit contract decision: blocking the user's stream on a slow policy service is worse than occasional pass-through. Note that this path swallows the error internally, so no `fail_open` verdict is counted for it; the WARN log and the `langwatch.guardrail.stream_chunk_fail_open` span attribute are the signals for slow or flaky evaluators on stream chunks.
 
 Use cases: real-time PII termination (credit card numbers, emails, phone numbers) where the correct behaviour on detection is "stop sending and the user retries." For best-effort redaction that doesn't interrupt the stream, use `post` on the reassembled response instead.
 
@@ -68,7 +68,7 @@ The VK create/edit drawer has three direction sections, **Pre-request**, **Post-
 
 Each direction section also has a **Default-block on evaluator failure** toggle. Off (default) = fail closed (matches `guardrails.request_fail_open: false`, `response_fail_open: false`). On = fail open; the gateway WARN-logs the evaluator failure and proceeds. The helper copy cites the concrete enforcement shapes so you know what the toggle actually does:
 
-- Pre: blocks return `403 guardrail_blocked` with a zero-cost debit.
+- Pre: blocks return `403 guardrail_blocked` with zero cost recorded on the span.
 - Post: non-stream blocks replace the response with 403; stream responses flag only (the bytes are already out).
 - Stream chunk: blocks emit a byte-locked terminal SSE error with `code=stream_chunk_blocked`; the 50 ms per-chunk budget fails OPEN by contract regardless of the toggle (stream-chunk fail-open is a performance invariant, not a policy choice).
 
@@ -99,7 +99,7 @@ A VK can have multiple guardrails in each direction; the gateway runs them in pa
 
 **Modify decisions.** When more than one guardrail in the same direction returns `modify`, the dispatcher applies them sequentially in `config.guardrails[direction]` array order (the order you set on the VK). Each `modify` rewrites the payload and the next `modify` sees the rewritten version. Modifies do NOT chain across directions: `request` modifies are applied before dispatch, `response` modifies are applied after the upstream response returns.
 
-**Stream chunks.** `stream_chunk` guardrails currently run in `block`-only mode in v1: a `modify` verdict on a stream chunk is accepted by the contract but the dispatcher rewrites are not yet wired (tracked alongside the metric-emission gap below, same hot-path). Use `request`/`response` `modify` for now if you need payload rewrites; `stream_chunk` is best used for `block` (e.g. cut a stream the moment a regex match appears on the way out).
+**Stream chunks.** `stream_chunk` guardrails currently run in `block`-only mode in v1: a `modify` verdict on a stream chunk is accepted by the contract but the dispatcher rewrites are not yet wired. Use `request`/`response` `modify` for now if you need payload rewrites; `stream_chunk` is best used for `block` (e.g. cut a stream the moment a regex match appears on the way out).
 
 ## Observability
 
@@ -108,7 +108,9 @@ A VK can have multiple guardrails in each direction; the gateway runs them in pa
 - `direction`, `request` | `response` | `stream_chunk`
 - `verdict`, `allow` | `block` | `modify` | `fail_open`
 
-<Info>**v1 wiring caveat**: in the Go data plane, only the `stream_chunk` direction currently emits this metric from the dispatcher hot path. The `request` and `response` directions run the guardrails correctly (block, modify logic works), but the dispatcher doesn't yet call `Metrics.RecordGuardrailVerdict` at those sites. Tracked as a v1 follow-up (finding #17); operators who need per-direction allow-rate dashboards today can proxy from `gateway_http_requests_total{status="403"}` which flips on every block verdict regardless of direction.</Info>
+`fail_open` is emitted on all three directions, whenever the control-plane guardrail call fails and the gateway lets the traffic through unchecked. The `request` and `response` directions do so only when the virtual key opts into fail-open; the default is fail closed and the request is refused instead. The `stream_chunk` direction always fails open by design, so a slow policy service never stalls a stream a user is already reading, which means a `direction="stream_chunk", verdict="fail_open"` series is the one to watch: it is the only signal that chunk-level policy stopped being enforced. The `langwatch.guardrail.stream_chunk_fail_open` span attribute carries the reason for an individual bypass, which the counter deliberately does not, since the reason is unbounded text.
+
+<Info>`gateway_http_requests_total{status="403"}` is a useful cross-check: it flips on every block verdict regardless of direction, so a divergence between it and `sum(rate(gateway_guardrail_verdicts_total{verdict="block"}[5m]))` points at a direction that is blocking without being counted.</Info>
 
 **Span attributes**: the gateway declares `langwatch.guardrail.verdict` as a canonical span attribute for the aggregate verdict, but it is not yet emitted from the dispatcher in v1. Per-guardrail decision detail is visible by clicking through to the evaluator's run in the LangWatch Messages view, the evaluator's own trace carries the policies triggered + reasoning.
 

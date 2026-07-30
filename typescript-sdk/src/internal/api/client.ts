@@ -8,8 +8,9 @@ import {
   LANGWATCH_SDK_VERSION,
 } from "../constants";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { buildAuthHeaders } from "./auth";
-import { domainErrorFrom } from "./errors";
+import { handledErrorFrom } from "./errors";
 
 /**
  * Turns a NAMED failure into a typed throw, once, for every call that goes
@@ -17,7 +18,7 @@ import { domainErrorFrom } from "./errors";
  *
  * This lives in the transport rather than in each service because it is a
  * property of the WIRE, not of any one resource: the platform answers a declined
- * request with a `DomainError` — a `kind`, a status, a `meta` bag — and that is
+ * request with a `HandledError` — a `kind`, a status, a `meta` bag — and that is
  * true of `/api/traces` and `/api/prompts` alike. Reading it here means no
  * service has to remember to, and a service added tomorrow gets it for free.
  *
@@ -29,7 +30,7 @@ import { domainErrorFrom } from "./errors";
  * strict superset of the old behaviour: it only ever ADDS a type where there was
  * a string.
  */
-const domainErrorMiddleware: Middleware = {
+const handledErrorMiddleware: Middleware = {
   async onResponse({ request, response }) {
     if (response.ok) return;
 
@@ -47,7 +48,7 @@ const domainErrorMiddleware: Middleware = {
       return;
     }
 
-    const domainError = domainErrorFrom({
+    const handledError = handledErrorFrom({
       body,
       status: response.status,
       // The platform's own sentence is the message; there is no operation to
@@ -56,7 +57,7 @@ const domainErrorMiddleware: Middleware = {
       message: undefined,
     });
 
-    if (domainError) throw domainError;
+    if (handledError) throw handledError;
   },
 };
 
@@ -72,7 +73,12 @@ const domainErrorMiddleware: Middleware = {
  * @returns A new LangWatch API client.
  */
 export const createLangWatchApiClient = (
-  apiKey: string = process.env.LANGWATCH_API_KEY ?? "",
+  // The request-scoped key (the CLI resolver's output) wins over the global
+  // env: in the daemon the resolved device-session key lives ONLY in the
+  // async-scoped store, never in the shared process.env, so concurrent
+  // requests can't read each other's credential. A plain SDK embed sets no
+  // scope and falls back to the environment unchanged.
+  apiKey: string = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "",
   endpoint: string = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT,
   projectId: string | undefined = process.env.LANGWATCH_PROJECT_ID,
 ) => {
@@ -89,7 +95,7 @@ export const createLangWatchApiClient = (
     },
   });
 
-  client.use(domainErrorMiddleware);
+  client.use(handledErrorMiddleware);
 
   return client;
 };

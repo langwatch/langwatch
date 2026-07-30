@@ -1,6 +1,6 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import type { ModelMessage } from "ai";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PromptService } from "../../../prompt-config/prompt.service";
 import { PromptConfigAdapter } from "../prompt-config.adapter";
 

@@ -45,8 +45,15 @@ Feature: Pending counter conservation across job lifecycle
   @integration @counter @block
   Scenario: Counter tracks restage-and-block as a new pending job
     Given a dispatched job (counter was decremented at dispatch)
-    When RESTAGE_AND_BLOCK re-stages with a new ID and blocks the group
+    When RESTAGE_AND_BLOCK re-stages the job and blocks the group
     Then the counter is incremented (job re-enters :jobs ZSET)
+
+  @integration @counter @redelivery
+  Scenario: Counter is conserved when the same staged-job id is re-sent
+    Given a staged job whose id derives from the event id (INCR at stage)
+    When at-least-once delivery re-sends the same event and it stages again
+    Then the :jobs ZSET still holds one member for that id
+    And the counter is not incremented a second time
 
   @integration @counter @invariant
   Scenario: Counter equals sum of all :jobs ZSET cardinalities

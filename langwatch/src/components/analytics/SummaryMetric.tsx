@@ -1,9 +1,7 @@
 import {
   Box,
   Heading,
-  HStack,
   Skeleton,
-  Spacer,
   type SystemStyleObject,
   Text,
   VStack,

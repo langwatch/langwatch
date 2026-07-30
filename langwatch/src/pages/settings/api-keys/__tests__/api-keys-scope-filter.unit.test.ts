@@ -5,9 +5,9 @@
  * rendering any React components: shared paths, no parallel implementations.
  */
 
-import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
+import { describe, expect, it } from "vitest";
 
 const LANGWATCH_ROOT = path.resolve(__dirname, "../../../../../");
 
@@ -46,8 +46,7 @@ describe("given the scope-filter feature is implemented", () => {
       const files = fs.readdirSync(settingsDir);
       const scopeFilterFiles = files.filter(
         (f) =>
-          f.toLowerCase().includes("scopefilter") &&
-          f !== "ScopeFilter.tsx",
+          f.toLowerCase().includes("scopefilter") && f !== "ScopeFilter.tsx",
       );
       expect(scopeFilterFiles).toHaveLength(0);
     });

@@ -25,7 +25,7 @@ describe("LocalPromptsService", () => {
 
   describe("get", () => {
     describe("when prompt has direct file path in config", () => {
-      it("should return prompt from the file", async () => {
+      it("returns prompt from the file", async () => {
         const filePath = "custom-path/my-prompt.prompt.yaml";
 
         mockFileManager.loadPromptsConfig.mockReturnValue({
@@ -51,7 +51,7 @@ describe("LocalPromptsService", () => {
     });
 
     describe("when config has version reference", () => {
-      it("should return prompt from lock file materialized path", async () => {
+      it("returns prompt from lock file materialized path", async () => {
         mockFileManager.loadPromptsConfig.mockReturnValue({
           prompts: {
             [handle]: "1.2.3",
@@ -87,7 +87,7 @@ describe("LocalPromptsService", () => {
     });
 
     describe("when config has 'latest' reference", () => {
-      it("should return prompt from lock file materialized path", async () => {
+      it("returns prompt from lock file materialized path", async () => {
         mockFileManager.loadPromptsConfig.mockReturnValue({
           prompts: {
             [handle]: "latest",
@@ -123,7 +123,7 @@ describe("LocalPromptsService", () => {
     });
 
     describe("when prompt is not referenced in config", () => {
-      it("should return null", async () => {
+      it("returns null", async () => {
         mockFileManager.loadPromptsConfig.mockReturnValue({ prompts: {} });
 
         const result = await service.get(handle);
@@ -153,7 +153,7 @@ describe("LocalPromptsService", () => {
         result = await service.get(handle);
       });
 
-      it("should return null", async () => {
+      it("returns null", async () => {
         expect(result).toBeNull();
       });
     });
@@ -185,7 +185,7 @@ describe("LocalPromptsService", () => {
         result = await service.get(handle);
       });
 
-      it("should return null", async () => {
+      it("returns null", async () => {
         expect(result).toBeNull();
       });
     });

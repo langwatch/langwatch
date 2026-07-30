@@ -11,14 +11,21 @@
  * exactly the code that ran before daemon mode existed.
  */
 
+import { runWithCredentialHolder } from "@/internal/credentialContext";
 import { execViaDaemon, requestStop } from "./client";
 import {
   collectForwardedEnv,
   evaluateEligibility,
   isAutoSpawnEnabled,
+  isDaemonDisabledByConfig,
   resolveColorLevel,
+  stdinCarriesData,
 } from "./eligibility";
-import { isSocketPathUsable, resolveBuildId, resolveIdentity } from "./identity";
+import {
+  isDaemonSocketPathUsable,
+  resolveBuildId,
+  resolveIdentity,
+} from "./identity";
 import { spawnDaemon } from "./spawn";
 import { recordMissAndDecideToSpawn } from "./spawn-hint";
 
@@ -43,9 +50,14 @@ export async function runCli(argv: string[]): Promise<void> {
   const eligibility = evaluateEligibility({
     args,
     env: process.env,
+    daemonDisabledByConfig: isDaemonDisabledByConfig(process.env),
     stdoutIsTty: Boolean(process.stdout.isTTY),
     stderrIsTty: Boolean(process.stderr.isTTY),
     stdinIsTty: Boolean(process.stdin.isTTY),
+    // The caller's fd 0 is the one stdio stream that carries DATA rather than a
+    // destination, and it is the one the daemon cannot be handed: it is spawned
+    // with `stdio: "ignore"`. See `stdinCarriesData`.
+    stdinCarriesData: stdinCarriesData(),
     platform: process.platform,
   });
 
@@ -56,7 +68,13 @@ export async function runCli(argv: string[]): Promise<void> {
   }
 
   const identity = resolveIdentity(process.env);
-  if (!isSocketPathUsable(identity.socketPath)) {
+  // The budget a DAEMON needs, not just the one this client needs to dial: a
+  // daemon binds a pid-scoped staging name in the same directory and publishes
+  // it under the shared one, so a shared path that fits while the staging path
+  // does not is a path no daemon can ever be started on. Asking the narrower
+  // question here left the client spawning a daemon every two misses, each
+  // dying at `listen()`, forever.
+  if (!isDaemonSocketPathUsable(identity.socketPath)) {
     debugLog("in-process (socket path too long for this platform)");
     await runInProcess(argv);
     return;
@@ -72,6 +90,10 @@ export async function runCli(argv: string[]): Promise<void> {
     cwd: process.cwd(),
     env,
     colorLevel: resolveColorLevel(env),
+    // Which of the two bin names (`lw`, `langwatch`) this caller typed. One
+    // daemon serves both, so without carrying it the help and every commander
+    // error would be titled with whichever bin happened to spawn the daemon.
+    bin: argv[1],
   });
 
   if (outcome.served) {
@@ -113,5 +135,15 @@ export async function runCli(argv: string[]): Promise<void> {
  */
 async function runInProcess(argv: string[]): Promise<void> {
   const { buildProgram } = await import("../program.js");
-  buildProgram().parse(argv);
+  // parseAsync + await: a rejected action promise (e.g. an invalid --jq
+  // expression surfacing from printResult outside a command's try/catch)
+  // must become this call's rejection — a clean exit — not an unhandled
+  // rejection with a raw stack.
+  //
+  // Wrapped in a credential holder so the resolved key lands in a
+  // request-scoped store rather than the global env, matching the daemon path
+  // (internal/credentialContext.ts). For a cold CLI this is the one command
+  // in the process, but keeping the wrapper here means both paths behave
+  // identically and the resolver never has to touch process.env for the key.
+  await runWithCredentialHolder(() => buildProgram().parseAsync(argv));
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 vi.mock("ora", () => ({
@@ -68,16 +68,19 @@ describe("listSecretsCommand()", () => {
     );
   });
 
-  it("outputs JSON when format is json", async () => {
+  it("returns the raw secret list as the machine payload", async () => {
+    const secrets = [makeSecret()];
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => [makeSecret()],
+      json: async () => secrets,
     });
 
-    await listSecretsCommand({ format: "json" });
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining("MY_API_KEY")
-    );
+    const result = await listSecretsCommand();
+
+    // The command no longer decides the format — it hands the payload to the
+    // output port, which renders json/yaml/agents/--jq from this one value.
+    expect(result?.data).toEqual(secrets);
+    expect(console.log).not.toHaveBeenCalled();
   });
 
   it("exits on API error", async () => {

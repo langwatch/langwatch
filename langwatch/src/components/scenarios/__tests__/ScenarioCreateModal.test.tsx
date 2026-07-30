@@ -1,15 +1,16 @@
 /**
  * @vitest-environment jsdom
  */
-import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  fireEvent,
   render,
   screen,
-  within,
-  fireEvent,
   waitFor,
+  within,
 } from "@testing-library/react";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioCreateModal } from "../ScenarioCreateModal";
 
 // Mock useOrganizationTeamProject — use vi.fn so per-test overrides are possible
@@ -178,19 +179,19 @@ describe("<ScenarioCreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("presents Langy as an editable drafting step while keeping manual setup", () => {
+    it("presents AI drafting as an editable step while keeping manual setup", () => {
       render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
         wrapper: Wrapper,
       });
 
       const dialog = getDialogContent();
-      expect(within(dialog).getByText("with Langy")).toBeInTheDocument();
+      expect(within(dialog).getByText("with AI")).toBeInTheDocument();
       expect(
         within(dialog).getByText("What should this simulation prove?"),
       ).toBeInTheDocument();
-      expect(within(dialog).getByText("Draft with Langy")).toBeInTheDocument();
+      expect(within(dialog).getByText("Draft with AI")).toBeInTheDocument();
       // The manual path is a first-class peer of the assistant, offered as a
-      // toggle right beside "With Langy" — not a buried "set up manually" link.
+      // toggle right beside "With AI" — not a buried "set up manually" link.
       expect(
         within(dialog).getByRole("button", { name: "Build it myself" }),
       ).toBeInTheDocument();

@@ -33,7 +33,7 @@ import {
   DEFAULT_HIDDEN_COLUMNS,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
-import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
+import { ComparisonCharts } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
 import { getRunDisplayName } from "./getRunDisplayName";
 import { isRunFinished } from "./isRunFinished";
@@ -159,7 +159,6 @@ export function BatchEvaluationResults({
   }, [isFinished, finishedAt]);
 
   // Reset finishedAt when selected run changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: its on purpose
   useEffect(() => {
     setFinishedAt(null);
   }, [selectedRunId]);
@@ -315,7 +314,6 @@ export function BatchEvaluationResults({
   const stableRunColorMap = useMemo(() => {
     const colorMap: Record<string, string> = {};
     runIds.forEach((runId, idx) => {
-      // biome-ignore lint/style/noNonNullAssertion: its safe
       colorMap[runId] = RUN_COLORS[idx % RUN_COLORS.length]!;
     });
     return colorMap;
@@ -369,7 +367,7 @@ export function BatchEvaluationResults({
   const [chartsVisible, setChartsVisible] = useState(defaultChartsVisible);
 
   // Update charts visibility when charts become available/unavailable
-  // biome-ignore lint/correctness/useExhaustiveDependencies: we don't want to re-render when canShowCharts changes
+  // We don't want to re-render when canShowCharts changes.
   useEffect(() => {
     if (canShowCharts && !chartsVisible) {
       setChartsVisible(true);

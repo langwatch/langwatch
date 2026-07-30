@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useMemo } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Custom hook for managing selected prompt ID in URL query parameters

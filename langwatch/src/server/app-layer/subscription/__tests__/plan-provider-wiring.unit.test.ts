@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { PlanProviderService, type PlanProvider } from "../plan-provider";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { PlanProviderService } from "../plan-provider";
 
 describe("PlanProvider wiring patterns", () => {
   describe("when wiring SaaS adapter", () => {
@@ -22,7 +22,10 @@ describe("PlanProvider wiring patterns", () => {
       });
 
       expect(result).toBe(FREE_PLAN);
-      expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith("org_1", user);
+      expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith(
+        "org_1",
+        user,
+      );
     });
 
     it("forwards impersonator to SaaS provider", async () => {
@@ -41,7 +44,10 @@ describe("PlanProvider wiring patterns", () => {
       };
       await planProvider.getActivePlan({ organizationId: "org_1", user });
 
-      expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith("org_1", user);
+      expect(mockSaasProvider.getActivePlan).toHaveBeenCalledWith(
+        "org_1",
+        user,
+      );
     });
   });
 
@@ -96,7 +102,7 @@ describe("PlanProvider wiring patterns", () => {
       });
 
       await expect(
-        planProvider.getActivePlan({ organizationId: "org_1" })
+        planProvider.getActivePlan({ organizationId: "org_1" }),
       ).rejects.toBe(error);
     });
 
@@ -109,7 +115,7 @@ describe("PlanProvider wiring patterns", () => {
       });
 
       await expect(
-        planProvider.getActivePlan({ organizationId: "org_1" })
+        planProvider.getActivePlan({ organizationId: "org_1" }),
       ).rejects.toBe(error);
     });
   });

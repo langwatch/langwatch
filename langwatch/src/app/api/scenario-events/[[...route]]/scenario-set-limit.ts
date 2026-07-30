@@ -31,7 +31,10 @@ export async function checkScenarioSetLimitForRunStarted(
   }
 
   // Internal suite runs use a known set ID — not subject to external set limits
-  if (scenarioSetId.startsWith("__internal__") && scenarioSetId.endsWith("__suite")) {
+  if (
+    scenarioSetId.startsWith("__internal__") &&
+    scenarioSetId.endsWith("__suite")
+  ) {
     return;
   }
 

@@ -18,6 +18,8 @@ helm install langwatch ./langwatch \
 ```
 
 See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup instructions.
+
+Running on AWS? Langy's sandboxed runtime needs one extra step on EKS: see [enabling Langy on EKS](/self-hosting/langy/setup#eks).
 </Tip>
 
 <Note>
@@ -44,6 +46,10 @@ graph LR
 ```
 
 See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
+
+<Note>
+Running [Langy](/langy/overview), the automated AI engineer? It ships as an optional, gVisor-sandboxed agent pod in the same umbrella chart, off by default. See [Self-hosting Langy](/self-hosting/langy/overview).
+</Note>
 
 ## Deployment Models
 

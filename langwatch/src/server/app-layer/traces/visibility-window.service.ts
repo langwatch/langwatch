@@ -5,6 +5,7 @@ import type {
   SpanInputOutput,
   Trace,
 } from "~/server/tracer/types";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -55,7 +56,9 @@ const teaserOfSpanIO = (
   const teaserAsRaw = (): SpanInputOutput => ({
     type: "raw",
     value: teaserOf(
-      typeof io.value === "string" ? io.value : JSON.stringify(io.value ?? null),
+      typeof io.value === "string"
+        ? io.value
+        : JSON.stringify(io.value ?? null),
     ),
   });
   switch (io.type) {
@@ -76,9 +79,7 @@ const teaserOfSpanIO = (
                 ? message.content
                 : // Rich content (ChatRichContent[]): recursively tease every
                   // string field — text parts, tool-call args, tool results.
-                  (deepTeaseStrings(
-                    message.content,
-                  ) as typeof message.content),
+                  (deepTeaseStrings(message.content) as typeof message.content),
         })),
       };
     case "list":
@@ -137,7 +138,9 @@ const teaserOfParams = (
  */
 export const redactTraceContent = (trace: Trace): Trace => ({
   ...trace,
-  input: trace.input ? { ...trace.input, value: teaserOf(trace.input.value) } : trace.input,
+  input: trace.input
+    ? { ...trace.input, value: teaserOf(trace.input.value) }
+    : trace.input,
   output: trace.output
     ? { ...trace.output, value: teaserOf(trace.output.value) }
     : trace.output,

@@ -37,6 +37,11 @@ export const runDataSchema = z.object({
   scenarioId: scenarioIdSchema,
   batchRunId: batchRunIdSchema,
   scenarioRunId: scenarioRunIdSchema,
+  // The scenario set this run belongs to. Optional: only the ClickHouse
+  // repository populates it today (used to group/filter runs by suite);
+  // older/other producers of ScenarioRunData omit it. It does not shape the
+  // run's platformUrl — the drawer link is run-id only.
+  scenarioSetId: z.string().optional(),
   name: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   metadata: z
@@ -102,6 +107,16 @@ export const archiveResponseSchema = z.object({
 });
 
 /**
+ * Browser-tab handoff response schema
+ * Returned by POST /api/scenario-events/browser-tab. `delivered` tells the SDK
+ * whether a live simulations tab took the run, so it can skip opening one.
+ */
+export const browserTabHandoffResponseSchema = z.object({
+  delivered: z.boolean(),
+  url: z.string(),
+});
+
+/**
  * Consolidated response schemas object
  * Maps response types to their corresponding Zod schemas for validation
  */
@@ -113,4 +128,5 @@ export const responseSchemas = {
   batches: batchesSchema,
   runData: runDataSchema,
   archive: archiveResponseSchema,
+  browserTabHandoff: browserTabHandoffResponseSchema,
 };

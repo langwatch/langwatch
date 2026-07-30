@@ -21,6 +21,7 @@
  */
 import type { Readable } from "node:stream";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
+import { AzureDatasetStorage } from "./azure-dataset-storage";
 import type { ChunkOffset, DatasetChunk } from "./dataset-chunking";
 import { LocalDatasetStorage } from "./local-dataset-storage";
 import { S3DatasetStorage } from "./s3-dataset-storage";
@@ -152,10 +153,13 @@ export interface DatasetStorage {
 
 /**
  * Select the dataset storage backend for a project via the shared storage
- * destination resolver (the same BYOC → global-S3 → local-FS precedence every
- * byte-writing path uses). `kind: "s3"` → `S3DatasetStorage`; `kind: "file"`
- * → `LocalDatasetStorage`. The resolver — not `env.DATASET_STORAGE_LOCAL` — is
- * the single source of truth for where a project's bytes live.
+ * destination resolver (the same BYOC → azure toggle → global-S3 → local-FS
+ * precedence every byte-writing path uses). `kind: "s3"` → `S3DatasetStorage`;
+ * `kind: "azure"` → `AzureDatasetStorage`; `kind: "file"` → `LocalDatasetStorage`.
+ * The resolver — not `env.DATASET_STORAGE_LOCAL` — is the single source of
+ * truth for where a project's bytes live, so the azure backend (AC37, issue
+ * #4133) covers datasets automatically once STORED_OBJECTS_BACKEND=azure is
+ * configured: no separate dataset-specific toggle.
  */
 export const getDatasetStorage = async (
   projectId: string,
@@ -163,9 +167,10 @@ export const getDatasetStorage = async (
   const destination = await resolveProjectStorageDestination(projectId);
   // The Local impl needs the resolver-provided `root` (the single source of
   // truth for the local FS path, honoring LANGWATCH_LOCAL_STORAGE_PATH + the
-  // canonical default); the S3 impl resolves its own bucket/credentials per
-  // project and needs nothing here.
-  return destination.kind === "s3"
-    ? new S3DatasetStorage()
-    : new LocalDatasetStorage(destination.root);
+  // canonical default); the S3 / Azure impls resolve their own
+  // bucket/credentials (or account/container) per project and need nothing
+  // here.
+  if (destination.kind === "s3") return new S3DatasetStorage();
+  if (destination.kind === "azure") return new AzureDatasetStorage();
+  return new LocalDatasetStorage(destination.root);
 };

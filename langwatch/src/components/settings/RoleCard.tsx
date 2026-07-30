@@ -114,7 +114,13 @@ export function RoleCard({
         </VStack>
       </Card.Header>
       <Card.Body paddingTop={0} flex={1} display="flex" flexDirection="column">
-        <VStack align="start" gap={2} flex={1} width="full" justifyContent="space-between">
+        <VStack
+          align="start"
+          gap={2}
+          flex={1}
+          width="full"
+          justifyContent="space-between"
+        >
           <Text fontSize="sm" color="fg.muted">
             {description}
           </Text>

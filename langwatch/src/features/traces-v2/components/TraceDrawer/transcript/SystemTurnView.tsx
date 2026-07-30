@@ -1,8 +1,8 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import { RenderedMarkdown } from "../markdownView";
-import { TurnCollapseChevron } from "./TurnCollapseChevron";
 import { asMarkdownBody } from "./parsing";
 import { RoleChip } from "./RoleChip";
+import { TurnCollapseChevron } from "./TurnCollapseChevron";
 import type { ContentBlock } from "./types";
 
 export function SystemTurnView({

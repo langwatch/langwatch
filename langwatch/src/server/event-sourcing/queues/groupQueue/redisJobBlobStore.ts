@@ -15,8 +15,8 @@ import type { JobBlobStore } from "./jobEnvelope";
  * the dispatcher's `get`, so the DEFAULT TTL is set to comfortably outlive the
  * longest plausible staged residence (7 days, see
  * {@link GQ1_BLOB_BACKSTOP_TTL_SECONDS}). GQ2 callers pass their own shorter
- * backstop per call: a refcounted blob reclaims eagerly on the last release,
- * so its TTL only has to cover genuine orphans, not staged residence.
+ * backstop per call: a leased blob refreshes at stage/dispatch touch points
+ * and reclaims lazily when those renewals stop.
  */
 export class RedisJobBlobStore implements JobBlobStore {
   private readonly redis: IORedis | Cluster;

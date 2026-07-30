@@ -1,10 +1,11 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import {
   commandValidationError,
   reportCommandError,
 } from "../../utils/errorOutput";
+import type { CommandResult } from "../../utils/output";
 import { createDatasetService } from "./service-factory";
 import { handleDatasetCommandError } from "./error-handler";
 
@@ -14,9 +15,9 @@ import { handleDatasetCommandError } from "./error-handler";
 export const recordsUpdateCommand = async (
   slugOrId: string,
   recordId: string,
-  options: { json: string; format?: string },
-): Promise<void> => {
-  checkApiKey();
+  options: { json: string },
+): Promise<CommandResult | void> => {
+  await resolveCredentials();
 
   let entry: Record<string, unknown>;
   try {
@@ -30,7 +31,6 @@ export const recordsUpdateCommand = async (
       error: commandValidationError(
         error instanceof Error ? error.message : "Invalid JSON input",
       ),
-      format: options.format,
     });
     process.exit(1);
   }
@@ -43,9 +43,13 @@ export const recordsUpdateCommand = async (
 
     spinner.succeed(`Record updated: ${chalk.cyan(record.id)}`);
 
-    if (options.format === "json") {
-      console.log(JSON.stringify(record, null, 2));
-    }
+    return {
+      data: record,
+      table: () => {
+        // Nothing further to print: the spinner line above was the whole
+        // human output before the migration, and stays so.
+      },
+    };
   } catch (error) {
     handleDatasetCommandError({ spinner, error, context: "update record" });
   }

@@ -55,6 +55,49 @@ Feature: AI Gateway — prompt-cache token telemetry and cache-aware cost
     And the input-token count is the full prompt
 
   # ==========================================================================
+  # Making caching happen: provider defaults, no configuration required
+  # ==========================================================================
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: Anthropic-bound requests get a prompt-cache breakpoint by default
+    Given a request routed to an Anthropic model with no cache rules configured
+    And the client sent no cache markers of its own
+    When the gateway forwards the request
+    Then the forwarded request carries a cache breakpoint covering the prompt prefix
+    And an immediate follow-up in the same conversation is served from the provider's cache
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A client's own cache markers are never overridden by the default
+    Given a request that already carries a cache marker the provider will honor
+    When the gateway forwards the request
+    Then the body is forwarded with the client's markers untouched
+    And no additional breakpoint is injected
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: Markers the translated lane cannot forward do not block caching
+    Given an OpenAI-dialect request whose per-message cache markers are dropped in translation
+    When the gateway forwards the request to an Anthropic model
+    Then the request still gets the default prompt-cache breakpoint
+    And the follow-up is served from the provider's cache
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: Providers that cache automatically are left alone
+    Given a request routed to a provider that caches long prompts on its own
+    When the gateway forwards the request
+    Then the body is forwarded unchanged
+
+  # ==========================================================================
+  # Codex lane: the bundled-account lane reports its cached share too
+  # ==========================================================================
+
+  @bdd @gateway @cache-telemetry @unit
+  Scenario: A codex-lane response's cached prompt share is captured
+    Given a codex-backed request whose response reports part of the prompt as cached
+    When the gateway completes the request
+    Then the span records the number of tokens read from the cache
+    And the fresh input-token count excludes the cached share
+
+  # ==========================================================================
   # Cost: cache reads priced cheap, not as fresh input
   # ==========================================================================
 

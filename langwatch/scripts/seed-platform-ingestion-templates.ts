@@ -15,9 +15,9 @@
  * Lane-B's /me Trace Ingest tile-grid renders. Ops can run this on
  * each release to pick up platform-team edits.
  */
-import { seedPlatformIngestionTemplates } from "../ee/governance/services/platformIngestionTemplates.seeds";
 
 import { prisma } from "~/server/db";
+import { seedPlatformIngestionTemplates } from "../ee/governance/services/platformIngestionTemplates.seeds";
 
 async function main() {
   const result = await seedPlatformIngestionTemplates(prisma);

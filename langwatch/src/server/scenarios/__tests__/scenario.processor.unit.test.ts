@@ -4,13 +4,45 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExecutionJobData } from "../execution/execution-pool";
 import {
   buildOtelResourceAttributes,
   handleCancelledJobResult,
   handleFailedJobResult,
   type ProcessorDependencies,
+  parseChildProcessResult,
 } from "../scenario.processor";
-import type { ExecutionJobData } from "../execution/execution-pool";
+
+describe("parseChildProcessResult", () => {
+  it("extracts the result line from stdout mixed with pino logs", () => {
+    const stdout = [
+      '{"level":30,"time":1,"msg":"spawning"}',
+      '{"level":50,"time":2,"err":"boom","msg":"scenario execution failed"}',
+      '{"success":false,"error":"self-signed certificate in certificate chain"}',
+    ].join("\n");
+    expect(parseChildProcessResult(stdout)).toEqual({
+      success: false,
+      error: "self-signed certificate in certificate chain",
+    });
+  });
+
+  it("returns the last result line and its reasoning on success", () => {
+    const stdout =
+      '{"level":30,"msg":"hi"}\n{"success":true,"reasoning":"looks good"}\n';
+    expect(parseChildProcessResult(stdout)).toEqual({
+      success: true,
+      reasoning: "looks good",
+    });
+  });
+
+  it("returns null when no result line is present", () => {
+    expect(
+      parseChildProcessResult('{"level":30,"msg":"only logs"}'),
+    ).toBeNull();
+    expect(parseChildProcessResult("")).toBeNull();
+    expect(parseChildProcessResult("not json at all")).toBeNull();
+  });
+});
 
 describe("buildOtelResourceAttributes", () => {
   it("always includes langwatch.origin.source=platform", () => {
@@ -58,7 +90,9 @@ describe("handleCancelledJobResult", () => {
   beforeEach(() => {
     mockDeps = {
       scenarioLookup: {
-        getById: vi.fn().mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
+        getById: vi
+          .fn()
+          .mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
       },
       failureEmitter: {
         ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined),
@@ -69,15 +103,17 @@ describe("handleCancelledJobResult", () => {
   it("passes cancelled: true to failure emitter", async () => {
     await handleCancelledJobResult(baseJobData, "Job was cancelled", mockDeps);
 
-    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
-      expect.objectContaining({ cancelled: true }),
-    );
+    expect(
+      mockDeps.failureEmitter.ensureFailureEventsEmitted,
+    ).toHaveBeenCalledWith(expect.objectContaining({ cancelled: true }));
   });
 
   it("includes scenario name and description from lookup", async () => {
     await handleCancelledJobResult(baseJobData, "Job was cancelled", mockDeps);
 
-    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
+    expect(
+      mockDeps.failureEmitter.ensureFailureEventsEmitted,
+    ).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "Test Scenario",
         description: "A test",
@@ -88,7 +124,9 @@ describe("handleCancelledJobResult", () => {
   it("defaults error message to 'Cancelled by user' when none provided", async () => {
     await handleCancelledJobResult(baseJobData, undefined, mockDeps);
 
-    expect(mockDeps.failureEmitter.ensureFailureEventsEmitted).toHaveBeenCalledWith(
+    expect(
+      mockDeps.failureEmitter.ensureFailureEventsEmitted,
+    ).toHaveBeenCalledWith(
       expect.objectContaining({ error: "Cancelled by user" }),
     );
   });
@@ -108,7 +146,9 @@ describe("handleFailedJobResult", () => {
   beforeEach(() => {
     mockDeps = {
       scenarioLookup: {
-        getById: vi.fn().mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
+        getById: vi
+          .fn()
+          .mockResolvedValue({ name: "Test Scenario", situation: "A test" }),
       },
       failureEmitter: {
         ensureFailureEventsEmitted: vi.fn().mockResolvedValue(undefined),
@@ -119,7 +159,11 @@ describe("handleFailedJobResult", () => {
   it("does not pass cancelled flag to failure emitter", async () => {
     await handleFailedJobResult(baseJobData, "Child process exited", mockDeps);
 
-    const params = (mockDeps.failureEmitter.ensureFailureEventsEmitted as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const params = (
+      mockDeps.failureEmitter.ensureFailureEventsEmitted as ReturnType<
+        typeof vi.fn
+      >
+    ).mock.calls[0]?.[0];
     expect(params.cancelled).toBeUndefined();
   });
 });

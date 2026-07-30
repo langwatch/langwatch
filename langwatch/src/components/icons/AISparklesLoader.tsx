@@ -1,4 +1,3 @@
-import React from "react";
 import { getRawColorValue } from "../ui/color-mode";
 
 interface AISparklesLoaderProps {

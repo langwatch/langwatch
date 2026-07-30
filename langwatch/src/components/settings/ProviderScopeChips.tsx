@@ -70,11 +70,12 @@ export function ProviderScopeChips({
   principal?: { name?: string | null; email?: string | null };
   size?: "sm" | "xs";
 }) {
-  const entries: ScopeEntry[] = scopes && scopes.length > 0
-    ? scopes
-    : fallbackScopeType
-      ? [{ scopeType: fallbackScopeType, scopeId: "" }]
-      : [];
+  const entries: ScopeEntry[] =
+    scopes && scopes.length > 0
+      ? scopes
+      : fallbackScopeType
+        ? [{ scopeType: fallbackScopeType, scopeId: "" }]
+        : [];
   const iconSize = size === "xs" ? 10 : 12;
   const principalLabel =
     principal?.name?.trim() || principal?.email?.trim() || undefined;

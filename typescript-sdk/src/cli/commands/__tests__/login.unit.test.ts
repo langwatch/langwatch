@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The two login-flow entry points are the seam: project login goes through
@@ -28,6 +31,28 @@ const saveConfig = vi.fn();
 vi.mock("@/cli/utils/governance/config", () => ({
   loadConfig: () => loadConfig(),
   saveConfig: (...args: unknown[]) => saveConfig(...args),
+  isLoggedIn: (cfg: { access_token?: string } | undefined) =>
+    !!cfg?.access_token,
+}));
+
+// The slug path's server boundary: POST /api/auth/cli/project-key.
+const fetchProjectKeyBySlug = vi.fn();
+vi.mock("@/cli/utils/governance/session-api", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/cli/utils/governance/session-api")
+  >("@/cli/utils/governance/session-api");
+  return {
+    SessionApiError: actual.SessionApiError,
+    fetchPersonalProject: vi.fn(),
+    fetchProjectKeyBySlug: (...args: unknown[]) =>
+      fetchProjectKeyBySlug(...args),
+  };
+});
+
+// Keep the notice's name-cache seeding away from the real filesystem.
+vi.mock("@/cli/utils/identityNotice", () => ({
+  rememberProjectName: vi.fn(),
+  maybePrintIdentityNotice: vi.fn(async () => undefined),
 }));
 
 import { loginCommand } from "../login";
@@ -73,24 +98,104 @@ describe("loginCommand", () => {
     beforeEach(() => setTTY(false));
 
     describe("when the command is invoked with no flags", () => {
-      it("defaults to project login, never the AI-tools device session", async () => {
-        await loginCommand({});
+      /** @scenario `langwatch login` (no flags, NON-TTY) defaults to project login, never AI-tools */
+      it("keeps the project-login default but fails fast instead of polling a browser", async () => {
+        await expect(loginCommand({})).rejects.toThrow("process.exit(1)");
 
-        expect(runUnifiedLoginFlow).toHaveBeenCalledTimes(1);
-        expect(runUnifiedLoginFlow).toHaveBeenCalledWith(
-          expect.objectContaining({ kind: "project_api_key" }),
-        );
+        // Fail fast means NEITHER flow starts: no device session, and no
+        // browser device-code poll that would block a headless caller.
+        expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
         expect(runDeviceFlowLogin).not.toHaveBeenCalled();
       });
 
       it("prints the project-login default and names both escape hatches", async () => {
         const logSpy = console.log as unknown as ReturnType<typeof vi.fn>;
-        await loginCommand({});
+        await expect(loginCommand({})).rejects.toThrow("process.exit(1)");
 
         const printed = logSpy.mock.calls.flat().join("\n");
         expect(printed).toContain("project login");
         expect(printed).toContain("--device");
         expect(printed).toContain("--project");
+      });
+    });
+  });
+
+  describe("given the --project flag in a non-TTY context", () => {
+    beforeEach(() => setTTY(false));
+
+    /** @scenario headless `langwatch login --project` fails fast instead of waiting on a browser */
+    it("fails fast with every non-interactive path forward, never starting the poll", async () => {
+      const errorSpy = console.error as unknown as ReturnType<typeof vi.fn>;
+
+      await expect(loginCommand({ project: true })).rejects.toThrow(
+        "process.exit(1)",
+      );
+
+      expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
+      const printed = errorSpy.mock.calls.flat().join("\n");
+      expect(printed).toContain("langwatch login --project <slug>");
+      expect(printed).toContain("langwatch login --api-key <key>");
+      expect(printed).toContain("LANGWATCH_API_KEY");
+    });
+  });
+
+  describe("given a --project <slug> value", () => {
+    describe("when a device session exists", () => {
+      beforeEach(() => {
+        setTTY(false);
+        loadConfig.mockReturnValue({
+          control_plane_url: "https://app.langwatch.ai",
+          access_token: "lw_at_x",
+        } as never);
+        fetchProjectKeyBySlug.mockResolvedValue({
+          api_key: "sk-lw-project",
+          project: { id: "p1", slug: "checkout", name: "Checkout" },
+        });
+      });
+
+      /** @scenario `langwatch login --project <slug>` resolves the key through the device session, no browser */
+      it("resolves the key through the session, writes .env, never opens a browser", async () => {
+        // The slug path writes LANGWATCH_API_KEY into $CWD/.env; run it in a
+        // scratch directory so the repo's own .env is never touched.
+        const cwd = process.cwd();
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-login-"));
+        process.chdir(dir);
+        try {
+          await loginCommand({ project: "checkout" });
+
+          expect(fetchProjectKeyBySlug).toHaveBeenCalledWith(
+            expect.objectContaining({ access_token: "lw_at_x" }),
+            "checkout",
+          );
+          expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
+          expect(promptsMock).not.toHaveBeenCalled();
+          expect(fs.readFileSync(path.join(dir, ".env"), "utf8")).toContain(
+            "LANGWATCH_API_KEY=sk-lw-project",
+          );
+        } finally {
+          process.chdir(cwd);
+          fs.rmSync(dir, { recursive: true, force: true });
+        }
+      });
+    });
+
+    describe("when no device session exists", () => {
+      /** @scenario `--project <slug>` without a device session fails with actionable guidance */
+      it("exits 1 and points at a browser-able login or --api-key", async () => {
+        setTTY(false);
+        loadConfig.mockReturnValue({
+          control_plane_url: "https://app.langwatch.ai",
+        });
+        const errorSpy = console.error as unknown as ReturnType<typeof vi.fn>;
+
+        await expect(loginCommand({ project: "checkout" })).rejects.toThrow(
+          "process.exit(1)",
+        );
+
+        expect(fetchProjectKeyBySlug).not.toHaveBeenCalled();
+        const printed = errorSpy.mock.calls.flat().join("\n");
+        expect(printed).toContain("langwatch login");
+        expect(printed).toContain("--api-key");
       });
     });
   });

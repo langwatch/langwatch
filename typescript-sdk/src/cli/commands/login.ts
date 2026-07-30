@@ -3,14 +3,20 @@ import * as path from "path";
 import chalk from "chalk";
 import prompts from "prompts";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { rememberProjectName } from "@/cli/utils/identityNotice";
 import {
   runDeviceFlowLogin,
   runUnifiedLoginFlow,
 } from "@/cli/utils/governance/login-flow";
 import {
+  isLoggedIn,
   loadConfig,
   saveConfig,
 } from "@/cli/utils/governance/config";
+import {
+  fetchProjectKeyBySlug,
+  SessionApiError,
+} from "@/cli/utils/governance/session-api";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
@@ -36,7 +42,7 @@ function printAgentHintBanner(): void {
   );
   console.log(
     chalk.gray(
-      "  --project                  project SDK key into .env via browser (SDK, evals, prompts)",
+      "  --project [slug]           project SDK key into .env; with a slug, no browser (uses your device login)",
     ),
   );
   console.log(
@@ -96,11 +102,96 @@ const updateEnvFile = (
   return { created: false, updated: found, path: envPath };
 };
 
+/**
+ * Headless guidance for project login. A browser device-code poll can wait
+ * up to ten minutes for an approval that can never happen in a VM or CI,
+ * which reads as a hang to an agent, so a non-TTY `--project` (and the
+ * non-TTY no-flags default that routes here) fails fast and names every
+ * non-interactive path instead.
+ * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ */
+const failFastHeadlessProjectLogin = (): never => {
+  console.error(
+    chalk.red("Error: project login needs a browser, and this terminal has no TTY."),
+  );
+  console.error(chalk.gray("Non-interactive options:"));
+  console.error(
+    chalk.cyan("  langwatch login --project <slug>") +
+      chalk.gray("   uses your existing device login, no browser"),
+  );
+  console.error(
+    chalk.cyan("  langwatch login --api-key <key>") +
+      chalk.gray("    writes a key you already have to .env"),
+  );
+  console.error(
+    chalk.cyan("  export LANGWATCH_API_KEY=<key>") +
+      chalk.gray("     or put it in .env yourself"),
+  );
+  console.error(
+    chalk.gray(
+      "In a terminal with a browser, `langwatch login --project` picks the project interactively.",
+    ),
+  );
+  process.exit(1);
+};
+
+/**
+ * Non-interactive project login: `langwatch login --project <slug>` trades
+ * the device session for the named project's EXISTING API key over
+ * POST /api/auth/cli/project-key (write access enforced server-side) and
+ * writes it to $CWD/.env. No browser, no prompts, works headless.
+ */
+const loginToProjectBySlug = async (slug: string): Promise<void> => {
+  const cfg = loadConfig();
+  if (!isLoggedIn(cfg)) {
+    console.error(
+      chalk.red("Error: `--project <slug>` needs a device login to authenticate you."),
+    );
+    console.error(
+      chalk.gray("Run ") +
+        chalk.cyan("langwatch login") +
+        chalk.gray(" in a terminal with a browser first, or use ") +
+        chalk.cyan("langwatch login --api-key <key>"),
+    );
+    process.exit(1);
+  }
+  try {
+    const result = await fetchProjectKeyBySlug(cfg, slug);
+    rememberProjectName(result.api_key, result.project.name);
+    const envResult = updateEnvFile(result.api_key);
+    console.log(
+      chalk.green(`✓ API key for project ${chalk.bold(result.project.name)} saved to .env`),
+    );
+    if (envResult.created) {
+      console.log(chalk.gray(`  • Created .env file at ${envResult.path}`));
+    } else if (envResult.updated) {
+      console.log(chalk.gray(`  • Updated existing API key in ${envResult.path}`));
+    } else {
+      console.log(chalk.gray(`  • Added API key to ${envResult.path}`));
+    }
+    console.log(chalk.gray(`  Project: ${result.project.name} (${result.project.slug})`));
+    console.log(chalk.gray(`  Dashboard: ${cfg.control_plane_url}`));
+  } catch (error) {
+    if (error instanceof SessionApiError) {
+      console.error(chalk.red(`Error: ${error.message}`));
+      if (error.code === "project_not_found") {
+        console.error(
+          chalk.gray(
+            "Check the slug in the dashboard URL, or run `langwatch login --project` in a browser-able terminal to pick from a list.",
+          ),
+        );
+      }
+      process.exit(1);
+    }
+    throw error;
+  }
+};
+
 export const loginCommand = async (
   options?: {
     apiKey?: string;
     device?: boolean;
-    project?: boolean;
+    project?: boolean | string;
     browser?: string;
     endpoint?: string;
     token?: string;
@@ -156,13 +247,20 @@ export const loginCommand = async (
       return;
     }
 
-    // --project: force PROJECT login (mint a project SDK key via the browser,
-    // write it to $CWD/.env). Symmetric to --device, and the explicit form of
-    // what a non-TTY context already defaults to. Use this when you want a
-    // real project's key for the SDK / `langwatch eval` / prompts rather than
-    // a personal device session. No "where"/"how" prompts; the project is
-    // picked in the browser.
+    // --project: force PROJECT login (a project SDK key into $CWD/.env).
+    // Symmetric to --device. With a slug, the key is resolved through the
+    // device session with no browser at all, which is the headless/agent
+    // path. Without a slug, the project is picked in the browser, so a
+    // terminal with no TTY fails fast instead of blocking on an approval
+    // that cannot happen.
+    if (typeof options?.project === "string") {
+      await loginToProjectBySlug(options.project);
+      return;
+    }
     if (options?.project) {
+      if (!process.stdin.isTTY) {
+        failFastHeadlessProjectLogin();
+      }
       await runUnifiedLoginFlow({
         kind: "project_api_key",
         browser: options.browser,
@@ -209,11 +307,7 @@ export const loginCommand = async (
         ),
       );
       console.log();
-      await runUnifiedLoginFlow({
-        kind: "project_api_key",
-        browser: options?.browser,
-      });
-      return;
+      failFastHeadlessProjectLogin();
     }
 
     // Always-on agent-hint banner — fake-TTY agents see this BEFORE the

@@ -1,10 +1,11 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import type { PrismaClient } from "@prisma/client";
 import {
   type AgentComponentConfig,
   type AgentCopyRow,
-  type AgentType,
   AgentRepository,
-  type CreateAgentInput,
+  type AgentType,
 } from "./agent.repository";
 import { AgentNotFoundError } from "./errors";
 
@@ -86,7 +87,12 @@ export class AgentService {
       createdAt: Date;
       updatedAt: Date;
     }>;
-    pagination: { page: number; limit: number; total: number; totalPages: number };
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+    };
   }> {
     const { data, total } = await this.repository.findAllPaginated(input);
 
@@ -362,9 +368,7 @@ export class AgentService {
     });
 
     const userIds = [
-      ...new Set(
-        logs.map((l) => l.userId).filter((id): id is string => !!id),
-      ),
+      ...new Set(logs.map((l) => l.userId).filter((id): id is string => !!id)),
     ];
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },

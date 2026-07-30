@@ -5,8 +5,9 @@
  * transport boundary — the tRPC client and the onTurnStream subscription are
  * mocked so only the transport's own decisions are under test.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { Unsubscribable } from "@trpc/server/observable";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createLangyChatTransport,
   type LangyChatTransportDeps,
@@ -92,18 +93,24 @@ describe("createLangyChatTransport", () => {
       });
     });
 
-    it("mints exactly one stable request id for each logical send", async () => {
+    it("mints a fresh idempotency key for each logical send", async () => {
       const { transport } = makeTransport({ conversationId: null });
 
       await transport.sendMessages(options());
-      const firstInput = mutation.mock.calls[0]![1] as { requestId: string };
-      expect(firstInput.requestId).toMatch(
+      const firstInput = mutation.mock.calls[0]![1] as {
+        idempotencyKey: string;
+      };
+      expect(firstInput.idempotencyKey).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
       );
 
+      // A second send is a NEW logical send — even with identical content it
+      // must mint a new key, so re-sending the same text starts a new turn.
       await transport.sendMessages(options());
-      const secondInput = mutation.mock.calls[1]![1] as { requestId: string };
-      expect(secondInput.requestId).not.toBe(firstInput.requestId);
+      const secondInput = mutation.mock.calls[1]![1] as {
+        idempotencyKey: string;
+      };
+      expect(secondInput.idempotencyKey).not.toBe(firstInput.idempotencyKey);
     });
   });
 
@@ -192,7 +199,7 @@ describe("createLangyChatTransport", () => {
       const { onData } = streamHandlers();
 
       // The manager's cold-window placeholder, then the first real output (plan).
-      onData({ type: "status", status: "Setting up a fresh workspace…" });
+      onData({ type: "status", status: "Waking Langy up…" });
       onData({
         type: "plan",
         items: [{ content: "Find the slow traces", status: "in_progress" }],
@@ -235,6 +242,106 @@ describe("createLangyChatTransport", () => {
         type: "status",
         status: "",
       });
+    });
+  });
+
+  describe("given the live stream terminates", () => {
+    function handlers() {
+      return subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onError: (err: unknown) => void;
+        onComplete: () => void;
+      };
+    }
+
+    it("reports reason 'end' for the genuine end-of-turn frame", async () => {
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled });
+      await transport.sendMessages(options());
+
+      handlers().onData({ type: "end" });
+
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
+    });
+
+    it("reports reason 'error' for an error frame", async () => {
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled });
+      await transport.sendMessages(options());
+
+      handlers().onData({ type: "error", error: "it broke" });
+
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({
+        reason: "error",
+      });
+    });
+
+    it("reports reason 'closed' for a silent subscription completion", async () => {
+      // A quiet worker's stream closing is NOT the answer finishing — the
+      // caller must keep trusting the durable fold, so the reason says so.
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled });
+      await transport.sendMessages(options());
+
+      handlers().onComplete();
+
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({
+        reason: "closed",
+      });
+    });
+
+    it("settles exactly once even when the close races the end frame", async () => {
+      const onTurnSettled = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled });
+      await transport.sendMessages(options());
+
+      handlers().onData({ type: "end" });
+      handlers().onComplete();
+
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
+    });
+  });
+
+  describe("given the live stream carries a navigate instruction", () => {
+    function streamHandlers() {
+      const opts = subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onComplete: () => void;
+      };
+      return opts;
+    }
+
+    it("forwards it to onNavigate as a bare passthrough, not a message chunk", async () => {
+      const onNavigate = vi.fn();
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onNavigate, onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      onData({
+        type: "navigate",
+        href: "/demo/simulations/set_1/batch_1?openRun=run_1",
+      });
+
+      expect(onNavigate).toHaveBeenCalledWith({
+        type: "navigate",
+        href: "/demo/simulations/set_1/batch_1?openRun=run_1",
+      });
+      // Not routed through onSignal (it's not a status-line concern) and not
+      // enqueued as a text/tool chunk either — a stream reader with no
+      // onNavigate wired must not silently error.
+      expect(onSignal).not.toHaveBeenCalled();
+    });
+
+    it("does not throw when no onNavigate dep is wired", async () => {
+      const { transport } = makeTransport({ conversationId: null }, {});
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      expect(() => onData({ type: "navigate", href: "/demo/x" })).not.toThrow();
     });
   });
 

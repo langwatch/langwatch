@@ -1,6 +1,5 @@
+import { langyMessagePartSchema } from "@langwatch/langy";
 import type { PrismaClient } from "@prisma/client";
-
-import { langyMessagePartSchema } from "~/server/event-sourcing/pipelines/langy-conversation-processing";
 import type {
   LangyMessageRepository,
   LangyMessageRow,

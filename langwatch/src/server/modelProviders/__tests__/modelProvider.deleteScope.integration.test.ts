@@ -65,7 +65,11 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       otherOrgId = otherOrg.id;
 
       const team = await prisma.team.create({
-        data: { name: `Del Team ${ns}`, slug: `--del-team-${ns}`, organizationId: orgId },
+        data: {
+          name: `Del Team ${ns}`,
+          slug: `--del-team-${ns}`,
+          organizationId: orgId,
+        },
       });
       teamId = team.id;
 
@@ -115,11 +119,18 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       otherProjectId = otherProject.id;
 
       const orgAdmin = await prisma.user.create({
-        data: { name: "Del Org Admin", email: `del-org-admin-${ns}@example.com` },
+        data: {
+          name: "Del Org Admin",
+          email: `del-org-admin-${ns}@example.com`,
+        },
       });
       orgAdminUserId = orgAdmin.id;
       await prisma.organizationUser.create({
-        data: { userId: orgAdmin.id, organizationId: orgId, role: OrganizationUserRole.ADMIN },
+        data: {
+          userId: orgAdmin.id,
+          organizationId: orgId,
+          role: OrganizationUserRole.ADMIN,
+        },
       });
       await prisma.roleBinding.create({
         data: {
@@ -133,15 +144,21 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     });
 
     afterAll(async () => {
-      const projectIds = [projectAId, siblingProjectId, otherProjectId].filter(Boolean);
+      const projectIds = [projectAId, siblingProjectId, otherProjectId].filter(
+        Boolean,
+      );
       await prisma.modelProvider
         .deleteMany({ where: { organizationId: { in: [orgId, otherOrgId] } } })
         .catch(() => {});
-      await prisma.roleBinding.deleteMany({ where: { organizationId: orgId } }).catch(() => {});
+      await prisma.roleBinding
+        .deleteMany({ where: { organizationId: orgId } })
+        .catch(() => {});
       await prisma.organizationUser
         .deleteMany({ where: { organizationId: { in: [orgId, otherOrgId] } } })
         .catch(() => {});
-      await prisma.project.deleteMany({ where: { id: { in: projectIds } } }).catch(() => {});
+      await prisma.project
+        .deleteMany({ where: { id: { in: projectIds } } })
+        .catch(() => {});
       await prisma.team
         .deleteMany({ where: { id: { in: [teamId, otherTeamId] } } })
         .catch(() => {});
@@ -158,7 +175,6 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Delete an organization-scoped provider from a project settings view */
         it("removes the row and its scope grants instead of 404ing", async () => {
           const created = await repo().create({
-            projectId: projectAId,
             name: `OpenAI Org ${ns}`,
             provider: "openai",
             enabled: true,
@@ -171,7 +187,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
           const scopes = await prisma.modelProviderScope.findMany({
             where: { modelProviderId: created.id },
@@ -186,7 +204,6 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Delete a provider scoped only to a sibling project in the same org */
         it("removes the row", async () => {
           const created = await repo().create({
-            projectId: siblingProjectId,
             name: `OpenAI Sibling ${ns}`,
             provider: "anthropic",
             enabled: true,
@@ -199,7 +216,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
         });
       });
@@ -210,7 +229,6 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Deleting a provider from a different organization is not found */
         it("rejects as NOT_FOUND and leaves the row intact", async () => {
           const created = await repo().create({
-            projectId: otherProjectId,
             name: `OpenAI Other ${ns}`,
             provider: "openai",
             enabled: true,
@@ -225,7 +243,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ),
           ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).not.toBeNull();
         });
       });
@@ -236,7 +256,6 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         /** @scenario Deleting a provider removes its stored credentials */
         it("leaves no row with that provider id", async () => {
           const created = await repo().create({
-            projectId: projectAId,
             name: `OpenAI Keyed ${ns}`,
             provider: "groq",
             enabled: true,
@@ -249,7 +268,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
         });
       });

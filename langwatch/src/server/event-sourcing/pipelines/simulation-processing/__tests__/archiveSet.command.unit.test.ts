@@ -10,11 +10,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ArchiveSetCommand } from "../commands";
 import type { TenantId } from "../../../domain/tenantId";
+import { ArchiveSetCommand } from "../commands";
 import {
-  simulationSetArchivedEventDataSchema,
   type SimulationProcessingEvent,
+  simulationSetArchivedEventDataSchema,
 } from "../schemas/events";
 import { isSimulationSetArchivedEvent } from "../schemas/typeGuards";
 
@@ -33,11 +33,7 @@ function makeArchiveSetCommand(overrides?: {
       tenantId,
       occurredAt: overrides?.occurredAt ?? 1700000000000,
       scenarioSetId: overrides?.scenarioSetId ?? "set-1",
-      scenarioRunIds: overrides?.scenarioRunIds ?? [
-        "run-1",
-        "run-2",
-        "run-3",
-      ],
+      scenarioRunIds: overrides?.scenarioRunIds ?? ["run-1", "run-2", "run-3"],
     },
   };
 }
@@ -68,7 +64,9 @@ describe("ArchiveSetCommand (lw#3636)", () => {
       /** @scenario ArchiveSetCommand idempotency key collapses retries on the same set */
       it("collapses both invocations to the same idempotency key", async () => {
         const handler = new ArchiveSetCommand();
-        const a = await handler.handle(makeArchiveSetCommand({ occurredAt: 1 }));
+        const a = await handler.handle(
+          makeArchiveSetCommand({ occurredAt: 1 }),
+        );
         const b = await handler.handle(
           makeArchiveSetCommand({
             occurredAt: 2,

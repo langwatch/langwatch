@@ -10,13 +10,17 @@ import { COMMAND_TYPES } from "../../domain/commandType";
 import { EVENT_TYPES } from "../../domain/eventType";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event, Projection } from "../../domain/types";
-import type { FoldProjectionDefinition, FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type {
-  EventSourcedQueueProcessor,
-} from "../../queues";
-import type { JobRegistryEntry } from "../../services/queues/queueManager";
+  FoldProjectionDefinition,
+  FoldProjectionStore,
+} from "../../projections/foldProjection.types";
+import type {
+  AppendStore,
+  MapProjectionDefinition,
+} from "../../projections/mapProjection.types";
+import type { EventSourcedQueueProcessor } from "../../queues";
 import { createTestEvent } from "../../services/__tests__/testHelpers";
+import type { JobRegistryEntry } from "../../services/queues/queueManager";
 import type { EventStore } from "../../stores/eventStore.types";
 import { definePipeline } from "../staticBuilder";
 
@@ -27,6 +31,7 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
   const mockStore = {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvents: vi.fn().mockResolvedValue([]),
+    getEventsOccurredSince: vi.fn().mockResolvedValue([]),
     getEventsUpTo: vi
       .fn()
       .mockImplementation(
@@ -298,5 +303,10 @@ export function createMinimalPipelineDefinition() {
       .build();
   };
 
-  return { eventStore, globalQueue, globalJobRegistry, buildPipelineWithHandler };
+  return {
+    eventStore,
+    globalQueue,
+    globalJobRegistry,
+    buildPipelineWithHandler,
+  };
 }

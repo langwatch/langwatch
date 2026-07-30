@@ -1,14 +1,14 @@
 import { Box, HStack, Image, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef } from "react";
 import { Settings } from "react-feather";
-import { Bubble } from "~/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble";
 import { getDisplayRoleVisuals } from "~/features/traces-v2/components/TraceDrawer/scenarioRoles";
+import { Bubble } from "~/features/traces-v2/components/TraceTable/registry/addons/conversation/Bubble";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { coerceContentToArray } from "~/server/stored-objects/coerce-content-to-array";
-import { visitContentPart } from "~/server/stored-objects/visit-content-part";
+import { visitContentPart } from "~/shared/content-parts/visit-content-part";
+import type { MediaPartData } from "~/shared/traces/mediaParts";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
-import type { MediaPartData } from "./MediaPart";
 import { MediaPart } from "./MediaPart";
 import { RunTurnSeparator } from "./RunTurnSeparator";
 import { useSequentialAudioPlayback } from "./useSequentialAudioPlayback";
@@ -103,155 +103,155 @@ export function ScenarioMessageRenderer({
   });
 
   const renderItem = (item: DisplayItem) => {
-        switch (item.kind) {
-          case "text": {
-            // Scenario role mapping shared with the Traces V2 drawer: the
-            // agent under test renders as the conversation's "user" side
-            // (left/blue), the simulated user as the "assistant" side
-            // (right/purple, flask icon).
-            const visuals = getDisplayRoleVisuals(
-              item.role === "assistant" ? "assistant" : "user",
-              { isScenario: true },
-            );
-            const RoleIcon = visuals.Icon;
-            return (
-              <VStack
-                key={item.id}
-                align={alignForRole(item.role)}
-                data-align={alignForRole(item.role)}
-                gap={1}
-                width="100%"
-              >
-                <Bubble
-                  side={visuals.displayRole === "user" ? "left" : "right"}
-                  tone={visuals.displayRole}
-                  label={visuals.bubbleLabel}
-                  icon={<RoleIcon />}
-                  text={item.content}
-                  size={smallerView ? "compact" : "regular"}
-                  maxChars={smallerView ? 320 : 800}
-                />
-              </VStack>
-            );
-          }
+    switch (item.kind) {
+      case "text": {
+        // Scenario role mapping shared with the Traces V2 drawer: the
+        // agent under test renders as the conversation's "user" side
+        // (left/blue), the simulated user as the "assistant" side
+        // (right/purple, flask icon).
+        const visuals = getDisplayRoleVisuals(
+          item.role === "assistant" ? "assistant" : "user",
+          { isScenario: true },
+        );
+        const RoleIcon = visuals.Icon;
+        return (
+          <VStack
+            key={item.id}
+            align={alignForRole(item.role)}
+            data-align={alignForRole(item.role)}
+            gap={1}
+            width="100%"
+          >
+            <Bubble
+              side={visuals.displayRole === "user" ? "left" : "right"}
+              tone={visuals.displayRole}
+              label={visuals.bubbleLabel}
+              icon={<RoleIcon />}
+              text={item.content}
+              size={smallerView ? "compact" : "regular"}
+              maxChars={smallerView ? 320 : 800}
+            />
+          </VStack>
+        );
+      }
 
-          case "image":
-            return (
-              <VStack
-                key={item.id}
-                align={alignForRole(item.role)}
-                data-align={alignForRole(item.role)}
-              >
-                <Image src={item.src} maxH="200px" borderRadius="md" />
-              </VStack>
-            );
+      case "image":
+        return (
+          <VStack
+            key={item.id}
+            align={alignForRole(item.role)}
+            data-align={alignForRole(item.role)}
+          >
+            <Image src={item.src} maxH="200px" borderRadius="md" />
+          </VStack>
+        );
 
-          case "media": {
-            // Audio/video players stretch to the container width; attachment
-            // chips hug the message side like a bubble would (user sent it →
-            // right, agent → left). Mirrored into data-media-align because
-            // jsdom cannot read the compiled flex styles.
-            const innerAlign =
-              item.part.type === "binary"
-                ? alignForRole(item.role)
-                : ("stretch" as const);
-            return (
-              <VStack
-                key={item.id}
-                align={alignForRole(item.role)}
-                data-align={alignForRole(item.role)}
-                width="100%"
-              >
-                <VStack
-                  align={innerAlign}
-                  data-media-align={innerAlign}
-                  gap={1}
-                  width={{ base: "100%", md: "min(420px, 95%)" }}
+      case "media": {
+        // Audio/video players stretch to the container width; attachment
+        // chips hug the message side like a bubble would (user sent it →
+        // right, agent → left). Mirrored into data-media-align because
+        // jsdom cannot read the compiled flex styles.
+        const innerAlign =
+          item.part.type === "binary"
+            ? alignForRole(item.role)
+            : ("stretch" as const);
+        return (
+          <VStack
+            key={item.id}
+            align={alignForRole(item.role)}
+            data-align={alignForRole(item.role)}
+            width="100%"
+          >
+            <VStack
+              align={innerAlign}
+              data-media-align={innerAlign}
+              gap={1}
+              width={{ base: "100%", md: "min(420px, 95%)" }}
+            >
+              <MediaPart
+                part={item.part}
+                projectId={projectId}
+                audioPlayback={
+                  item.part.type === "audio"
+                    ? getAudioProps(item.id)
+                    : undefined
+                }
+              />
+              {item.transcript && (
+                <Text
+                  fontSize="xs"
+                  color="fg.muted"
+                  fontStyle="italic"
+                  paddingX={2}
+                  textAlign={textAlignForRole(item.role)}
                 >
-                  <MediaPart
-                    part={item.part}
-                    projectId={projectId}
-                    audioPlayback={
-                      item.part.type === "audio"
-                        ? getAudioProps(item.id)
-                        : undefined
-                    }
-                  />
-                  {item.transcript && (
-                    <Text
-                      fontSize="xs"
-                      color="fg.muted"
-                      fontStyle="italic"
-                      paddingX={2}
-                      textAlign={textAlignForRole(item.role)}
-                    >
-                      {item.transcript}
-                    </Text>
-                  )}
-                </VStack>
-              </VStack>
-            );
-          }
+                  {item.transcript}
+                </Text>
+              )}
+            </VStack>
+          </VStack>
+        );
+      }
 
-          case "tool_call":
-            return (
-              <VStack key={item.id} align="flex-start" gap={1.5} width="100%">
-                <HStack gap={1.5} color="orange.fg">
-                  <Settings size={12} />
-                  <Text
-                    textStyle="2xs"
-                    fontWeight="600"
-                    textTransform="uppercase"
-                    letterSpacing="0.06em"
-                  >
-                    {item.name}
-                  </Text>
-                </HStack>
-                <Box
-                  w="full"
-                  maxW="85%"
-                  bg="bg.muted/60"
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="lg"
-                  padding={3}
-                >
-                  <RenderInputOutput value={item.arguments as string} />
-                </Box>
-              </VStack>
-            );
+      case "tool_call":
+        return (
+          <VStack key={item.id} align="flex-start" gap={1.5} width="100%">
+            <HStack gap={1.5} color="orange.fg">
+              <Settings size={12} />
+              <Text
+                textStyle="2xs"
+                fontWeight="600"
+                textTransform="uppercase"
+                letterSpacing="0.06em"
+              >
+                {item.name}
+              </Text>
+            </HStack>
+            <Box
+              w="full"
+              maxW="85%"
+              bg="bg.muted/60"
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="lg"
+              padding={3}
+            >
+              <RenderInputOutput value={item.arguments as string} />
+            </Box>
+          </VStack>
+        );
 
-          case "tool_result":
-            return (
-              <VStack key={item.id} align="flex-start" gap={1.5} width="100%">
-                <HStack gap={1.5} color="fg.muted">
-                  <Settings size={12} />
-                  <Text
-                    textStyle="2xs"
-                    fontWeight="600"
-                    textTransform="uppercase"
-                    letterSpacing="0.06em"
-                  >
-                    Tool result
-                  </Text>
-                </HStack>
-                <Box
-                  w="full"
-                  maxW="85%"
-                  bg="bg.muted/60"
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="lg"
-                  padding={3}
-                >
-                  <RenderInputOutput value={item.result as string} />
-                </Box>
-              </VStack>
-            );
+      case "tool_result":
+        return (
+          <VStack key={item.id} align="flex-start" gap={1.5} width="100%">
+            <HStack gap={1.5} color="fg.muted">
+              <Settings size={12} />
+              <Text
+                textStyle="2xs"
+                fontWeight="600"
+                textTransform="uppercase"
+                letterSpacing="0.06em"
+              >
+                Tool result
+              </Text>
+            </HStack>
+            <Box
+              w="full"
+              maxW="85%"
+              bg="bg.muted/60"
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="lg"
+              padding={3}
+            >
+              <RenderInputOutput value={item.result as string} />
+            </Box>
+          </VStack>
+        );
 
-          default:
-            return null;
-        }
+      default:
+        return null;
+    }
   };
 
   return (

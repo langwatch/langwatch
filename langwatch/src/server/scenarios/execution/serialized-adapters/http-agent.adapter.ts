@@ -5,10 +5,10 @@
  * database access. Designed to run in isolated worker threads.
  */
 
-import type { AgentInput } from "@langwatch/scenario";
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import type { Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
+import type { AgentInput } from "@langwatch/scenario";
+import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
@@ -77,9 +77,9 @@ function redactHeaders(
  * Pick the upstream request id (first match wins). Different upstreams use
  * different header conventions — surface whichever the target chose.
  */
-function pickUpstreamRequestId(
-  headers: { get(name: string): string | null },
-): string | undefined {
+function pickUpstreamRequestId(headers: {
+  get(name: string): string | null;
+}): string | undefined {
   return (
     headers.get("x-request-id") ??
     headers.get("x-amzn-requestid") ??

@@ -1,9 +1,9 @@
 import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { createLogger } from "@langwatch/observability";
+import { normalizePresidioMarkers } from "@langwatch/redaction";
 import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
-import { normalizePresidioMarkers } from "../../data-privacy/redaction/markers";
 import type { BatchEvaluationResult } from "../../evaluations/evaluators";
 import {
   evaluationDurationHistogram,
@@ -184,7 +184,9 @@ const dlpCheck = async (
  * code unit) indices for `text`. When the text has no surrogate pairs the two
  * indexing schemes coincide, so the identity function is returned.
  */
-const codepointToCodeUnitConverter = (text: string): ((cp: number) => number) => {
+const codepointToCodeUnitConverter = (
+  text: string,
+): ((cp: number) => number) => {
   if (!/[\uD800-\uDFFF]/.test(text)) {
     return (cp) => cp;
   }

@@ -52,7 +52,9 @@ describe("LegacyTracesDeprecationBanner", () => {
       const user = userEvent.setup();
       renderBanner(<LegacyTracesDeprecationBanner />);
 
-      expect(screen.getByText("This view is going away soon")).toBeInTheDocument();
+      expect(
+        screen.getByText("This view is going away soon"),
+      ).toBeInTheDocument();
 
       await user.click(
         screen.getByRole("button", { name: /open trace explorer/i }),
@@ -70,7 +72,9 @@ describe("LegacyTracesDeprecationBanner", () => {
         <LegacyTracesDeprecationBanner variant="compact" traceId="trace-xyz" />,
       );
 
-      expect(screen.getByText("This view is going away soon")).toBeInTheDocument();
+      expect(
+        screen.getByText("This view is going away soon"),
+      ).toBeInTheDocument();
 
       await user.click(
         screen.getByRole("button", { name: /open trace explorer/i }),

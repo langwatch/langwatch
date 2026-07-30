@@ -17,6 +17,7 @@ A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every g
 | `project` | All gateway traffic in this project. |
 | `virtual_key` | This specific VK. |
 | `principal` | This user or service account across any VK they use. |
+| `group` | Each member of the group individually (see below). |
 
 A request is evaluated against **every** budget whose scope applies. For example, a request made by user Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against:
 
@@ -25,13 +26,30 @@ A request is evaluated against **every** budget whose scope applies. For example
 - Project `demo`'s budgets (all windows).
 - VK `prod-key`'s budgets (all windows).
 - Alice's principal budgets (all windows).
+- Per-member budgets of every group Alice belongs to (all windows).
+
+### Group budgets are per member
+
+A `group` budget targets one of your [Groups](/ai-gateway/rbac) (the same entity SCIM provisions) and gives **each member their own allowance**, not one shared pot: a $10/day budget on group `engineering` caps Alice at $10 and Bob at $10, and Bob's spend never counts against Alice. One budget row covers every member, and someone joining the group is covered on their key's next configuration resolve without anyone editing budgets.
+
+Two consequences worth knowing:
+
+- Group budgets only apply to keys with a person behind them (a personal VK, or any VK with a principal). A shared service key has no member to charge the per-member allowance to, so group budgets do not constrain it; cap shared keys with `project`, `team`, or `virtual_key` budgets instead.
+- Group budgets require the ClickHouse spend ledger, because per-member enforcement needs each member's spend told apart. On self-hosted deploys reading budget spend from Postgres only, creating a group budget is refused with `group_budget_requires_clickhouse` rather than silently capping every member at the group's combined spend.
+
+### Provider-filtered budgets
+
+Any budget, on any scope, can additionally be filtered to a **single provider**: "OpenAI $200/month for this team" is one budget with a provider filter, not a new kind of scope. With a filter set:
+
+- Only requests dispatched to that provider debit the budget. Every ledger debit stamps the provider that actually served the request, so two budgets on the same target with different filters never share spend.
+- On breach, the filtered provider is removed from the request's candidate chain the way an unavailable provider would be. If the key can fall back, another provider serves the request and the caller sees nothing but a slower first token. Only when the exclusions leave the chain empty (for example on a key with routing set to no fallback) is the request blocked, with a `402` naming the budget in `error.meta.budget_id` and the provider in `error.meta.budget_provider`.
 
 If **any** budget hard-blocks, the request is rejected. If **any** warn-threshold is breached, a warning header is added. Hard-block wins over warn.
 
 ## Windows
 
 - `minute`, `hour`, `day`, `week`, `month`, `total`.
-- Calendar-aligned: `month` resets on day 1 of the next month in the org's default timezone (UTC unless the org overrides). `week` starts Monday in ISO-8601.
+- Calendar-aligned and computed in **UTC**: `day` resets at 00:00 UTC, `week` starts Monday 00:00 UTC (ISO-8601), `month` resets on day 1 at 00:00 UTC. The `timezone` column exists on the API for forward compatibility but enforcement does not honor it yet, so the UI states UTC and offers no timezone choice.
 - `total` never resets, useful for one-off grant-style budgets.
 
 ## on_breach
@@ -46,13 +64,18 @@ If **any** budget hard-blocks, the request is rejected. If **any** warn-threshol
 | Field | Example |
 |---|---|
 | Name | `eng-team-monthly` |
-| Scope | `team` |
+| Applies to | `organization`, `group`, `team`, `project`, `member`, or `virtual key` |
 | Target | `platform` team |
+| Provider | `All providers` (default), or a single provider to filter to |
 | Window | `month` |
 | Limit (USD) | `5000` |
 | on_breach | `warn` at 80%, `block` at 100% (see "Multiple tiers" below) |
 
 Save. The budget is in force immediately; the next request counts against it.
+
+<Frame caption="The budget drawer targets any dimension, with the provider filter as an orthogonal choice.">
+  ![New budget drawer](/images/ai-gateway/budget-create-drawer.png)
+</Frame>
 
 ## Multiple tiers on the same scope
 
@@ -81,34 +104,29 @@ The ClickHouse path is the primary read when CH is enabled (SaaS and any self-ho
 
 ## Pre-request check
 
-Before dispatching to the provider, the gateway runs a **two-tier precheck** designed to keep the hot path free while avoiding stale-snapshot races as budgets approach their caps:
+Before dispatching to the provider, the gateway runs a **purely local precheck**. There is no control-plane round trip on the hot path.
 
-### Tier 1: cached snapshot (always)
+The gateway evaluates the VK's in-memory budget snapshot, which arrives baked into the cached bundle and is refreshed via the `/changes` long-poll. For each applicable scope it compares `spent_usd` against `limit_usd`:
 
-The gateway checks the VK's in-memory budget snapshot (refreshed via the `/changes` long-poll on every debit). If the snapshot already shows a hard-breach, the request is rejected immediately with `402 budget_exceeded`, saving the provider spend and the wall-clock round-trip entirely. This costs ~0 μs: it's an in-process map lookup.
+- `on_breach: block` and nothing remaining → reject with `402 budget_exceeded`, saving the provider spend and the wall-clock round-trip entirely.
+- `on_breach: warn` and at or over 90% used → allow, flagged as a warn verdict.
+- Otherwise → allow.
 
-### Tier 2: live reconciliation (near-limit only)
-
-If any scope applicable to the request has `spent_usd / limit_usd >= 0.90`, the gateway makes a signed `POST /api/internal/gateway/budget/check` call to the control plane with ONLY those hot scopes. The control plane returns the real-time `spent_usd` from the authoritative ledger, and the gateway re-evaluates. Timeout is 200 ms; if the call fails, tier 1's decision is used (fail-open).
-
-This closes the **stale-snapshot race** where two gateway nodes each see a cached `spent=$24.90 / limit=$25.00` and both admit a $0.50 request, producing $25.80 in actual spend against a $25 cap. With tier 2 active on the near-limit 10% band, the control plane sees both requests and rejects the second based on the live ledger.
-
-Cold scopes (under 90%) skip the live call entirely, no latency tax on the common case.
+This costs ~0 μs: it's an in-process map lookup.
 
 ```
-request → tier 1 (always, ~0μs) → pass?
-                                → breach? → 402 (saved provider spend)
-
-tier 1 pass, any scope ≥ 90%? → tier 2 (live, ~5-50ms via HMAC-signed POST)
-                              → live spent says breach? → 402
-                              → live says OK? → dispatch
-                              → timeout / 5xx? → dispatch (fail-open)
+request → precheck against cached snapshot (always, ~0μs)
+            → hard breach on a block scope? → 402 (saved provider spend)
+            → otherwise                     → dispatch
 ```
 
-Gateway env knobs:
+Rejections are counted by `gateway_budget_blocks_total{scope}`, the single gateway-side signal that enforcement fired.
 
-- `LW_GATEWAY_BUDGET_LIVE_THRESHOLD`, default `0.9` (90%). Lower it for stricter enforcement at some latency cost.
-- `LW_GATEWAY_BUDGET_LIVE_TIMEOUT`, Go duration string, default `200ms`. Accepts `200ms`, `500ms`, `1s`, etc.
+### The stale-snapshot trade-off
+
+Because the check is local and the snapshot lags the ledger by one `/changes` refresh, two replicas can each see `spent=$24.90 / limit=$25.00` and both admit a $0.50 request, producing $25.80 against a $25 cap. This is a deliberate trade: a control-plane call on every near-limit request would put the gateway's availability and latency at the mercy of the control plane, and the overshoot is bounded by one refresh interval of traffic.
+
+Precheck is permissive by design. A stale or missing snapshot allows requests through rather than rejecting them, so a control-plane outage degrades enforcement accuracy, never availability. Spend reconciles once the ledger catches up.
 
 ## What "USD cost" means
 
@@ -117,6 +135,10 @@ Token × unit-price lookup, computed per provider using their published pricing.
 Cache reads, writes are priced **separately** per provider, Anthropic cache reads are ~10% of regular input tokens, Anthropic cache writes are 125%. The gateway respects these. See [Caching Passthrough](/ai-gateway/caching-passthrough).
 
 ## Viewing budget spend (UI)
+
+<Frame caption="The budgets list: one row per budget across every dimension, each with its utilization bar and reset.">
+  ![Budgets list](/images/ai-gateway/budgets-page.png)
+</Frame>
 
 The **/gateway/budgets** list shows every budget with a utilization bar, hard cap, and remaining amount:
 
@@ -133,7 +155,15 @@ Clicking a row opens **/gateway/budgets/[id]**: a detail page mirroring the VK d
 - **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
 - **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact), Amount (smart-decimals, e.g. `$0.0183`, not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
 
-Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down.
+<Frame caption="A breached budget's detail page: full utilization, the enforcement mode, and the debits that consumed it.">
+  ![Breached budget detail](/images/ai-gateway/budget-breached-detail.png)
+</Frame>
+
+Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down. The **This month** preset covers the same UTC month-to-date window the keys list's spend column reports, which is where that column's click-through lands.
+
+<Frame caption="Usage on the This month preset, filtered to one key: the same window and the same figures as the spend column that linked here.">
+  ![Usage this month](/images/ai-gateway/usage-this-month.png)
+</Frame>
 
 Programmatic equivalent:
 

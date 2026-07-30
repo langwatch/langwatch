@@ -124,7 +124,7 @@ dirty** (`Hygiene.Dirty`, `hygiene.go:54-60`) — never delete uncommitted work.
 ## Phased implementation
 
 - **Phase 0 — spec + ADR.** There is NO thuishaven ADR/spec yet (the
-  `dev/haven.mk:1` "ADR-048" ref is a stale/colliding number). Write
+  `dev/haven.mk` no longer cites an ADR number). Write
   `specs/setup/haven-try-pr.feature` (style per
   `specs/setup/quickstart-entry-point.feature`) and the first thuishaven ADR,
   cross-linking ADR-004's worktree-isolation amendments.

@@ -1,28 +1,28 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { register } from "prom-client";
+import { beforeEach, describe, expect, it } from "vitest";
 
 // Import all new metric functions to verify they exist and are callable
 import {
   incrementEsCommandTotal,
-  observeEsCommandDuration,
-  incrementEsFoldProjectionTotal,
-  observeEsFoldProjectionDuration,
-  incrementEsMapProjectionTotal,
-  observeEsMapProjectionDuration,
-  incrementEsProjectionTotal,
-  observeEsProjectionDuration,
-  incrementEsReactorTotal,
-  observeEsReactorDuration,
-  incrementEsSubscriberTotal,
-  observeEsSubscriberDuration,
-  incrementEsProcessManagerTotal,
-  observeEsProcessManagerDuration,
-  incrementEsProcessOutboxTotal,
-  observeEsProcessOutboxDuration,
+  incrementEsFoldCacheRedisError,
   incrementEsFoldCacheTotal,
+  incrementEsFoldProjectionTotal,
+  incrementEsMapProjectionTotal,
+  incrementEsProcessManagerTotal,
+  incrementEsProcessOutboxTotal,
+  incrementEsProjectionTotal,
+  incrementEsReactorTotal,
+  incrementEsSubscriberTotal,
+  observeEsCommandDuration,
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
-  incrementEsFoldCacheRedisError,
+  observeEsFoldProjectionDuration,
+  observeEsMapProjectionDuration,
+  observeEsProcessManagerDuration,
+  observeEsProcessOutboxDuration,
+  observeEsProjectionDuration,
+  observeEsReactorDuration,
+  observeEsSubscriberDuration,
   withMetrics,
 } from "../metrics";
 
@@ -115,6 +115,18 @@ describe("ES pipeline metrics", () => {
     it("registers es_fold_cache_redis_error_total counter", () => {
       const metric = register.getSingleMetric(
         "es_fold_cache_redis_error_total",
+      );
+      expect(metric).toBeDefined();
+    });
+
+    /**
+     * Pinned by name: a rename or accidental removal would break the redelivery
+     * dashboard silently, and this counter is the only signal that separates a
+     * fold failure that left durable state behind from one that did not.
+     */
+    it("registers es_fold_post_store_failure_total counter", () => {
+      const metric = register.getSingleMetric(
+        "es_fold_post_store_failure_total",
       );
       expect(metric).toBeDefined();
     });

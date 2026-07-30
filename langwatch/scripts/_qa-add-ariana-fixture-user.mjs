@@ -104,5 +104,7 @@ if (!roleBinding) {
 }
 
 console.log(`done — ${EMAIL} is now a member of ${TEAM_NAME}`);
-console.log(`fixture replay: principal lookup will resolve user.email → User.id=${userId}`);
+console.log(
+  `fixture replay: principal lookup will resolve user.email → User.id=${userId}`,
+);
 await prisma.$disconnect();

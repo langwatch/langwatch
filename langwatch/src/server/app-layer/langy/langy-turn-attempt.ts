@@ -7,7 +7,7 @@ const logger = createLogger("langwatch:langy:turn-attempt");
 export interface LangyTurnAttemptIdentity {
   projectId: string;
   userId: string;
-  requestId: string;
+  idempotencyKey: string;
   conversationId: string;
   turnId: string;
   claimToken: string;
@@ -62,7 +62,10 @@ export class LangyTurnAttempt {
     }
     if (this.mintedApiKeyId) {
       cleanups.push(
-        this.deps.revokeSessionKey({ apiKeyId: this.mintedApiKeyId }),
+        this.deps.revokeSessionKey({
+          apiKeyId: this.mintedApiKeyId,
+          projectId: this.identity.projectId,
+        }),
       );
     }
     const results = await Promise.allSettled(cleanups);

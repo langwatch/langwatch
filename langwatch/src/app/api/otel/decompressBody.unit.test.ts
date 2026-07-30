@@ -1,6 +1,8 @@
 import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";
+
 // NextRequest is just the standard web Request
 const NextRequest = Request;
+
 import { describe, expect, it } from "vitest";
 import { readBody } from "./decompressBody";
 
@@ -83,7 +85,9 @@ describe("readBody", () => {
 
   describe("when Content-Encoding is br", () => {
     it("decompresses the body", async () => {
-      const compressed = new Uint8Array(brotliCompressSync(Buffer.from(payload)));
+      const compressed = new Uint8Array(
+        brotliCompressSync(Buffer.from(payload)),
+      );
 
       const req = new NextRequest("http://localhost/api/otel/v1/traces", {
         method: "POST",

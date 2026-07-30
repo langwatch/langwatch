@@ -18,9 +18,9 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   Templates are NOT for the platform's coding assistants:
     The coding assistants the platform manages directly (claude_code, codex,
     cursor, gemini, opencode) are set up by the `langwatch <tool>` command and
-    LangWatch converts their OTLP model-call logs into canonical gen_ai spans
-    at ingest (see claude-code-log-conversion.feature). The platform owns their
-    whole setup + canonicalisation, so they are simply NOT seeded as ingestion
+    LangWatch canonicalises their telemetry at ingest (see
+    specs/trace-processing/coding-agent-session.feature). The platform owns
+    their whole setup + canonicalisation, so they are simply NOT seeded as ingestion
     templates — they are coding-assistant tiles on the AiToolsPortal. There is
     no feature flag and no filter: the platform-template seed just does not
     include coding assistants, so they never exist as template rows to begin
@@ -37,9 +37,10 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     And user "jane@acme.com" has a personal project "personal-jane"
     And the platform's coding assistants (claude_code, codex, cursor, gemini, opencode)
         are set up by `langwatch <tool>` and are NOT ingestion templates
-    And the platform ships these IngestionTemplate rows with organizationId IS NULL:
-      | slug          | sourceType    | credentialSchema | scope    |
-      | claude_cowork | claude_cowork | NULL             | platform |
+    And the platform ships NO built-in templates
+        (claude-cowork is retired: it no longer appears in any org's
+        catalog, even where an earlier release had offered it, and tools
+        already connected through it keep ingesting uninterrupted)
     And the platform-template seed does NOT include any coding-assistant slug
         (claude_code / codex / cursor / gemini / opencode are never seeded)
     And a client-side **discovery card** "raw_otlp_advanced" renders alongside the
@@ -56,17 +57,24 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
 
   @bdd @ingestion-templates @catalog @user-visibility
   Scenario: User sees only non-coding-assistant templates on /me Trace Ingest
+    Given org "acme" has authored a template "Acme router"
     When jane navigates to "/me" and scrolls to the "Trace Ingest" section
-    Then she sees a tile-grid with exactly these items:
-      | tile slug         | label                   | source                      |
-      | claude_cowork     | "Connect Claude cowork" | api.ingestionTemplates.list |
-      | raw_otlp_advanced | "Raw OTLP (advanced)"   | client-side discovery card  |
-    And the install tile is sourced from `api.ingestionTemplates.list`
-    And the raw_otlp_advanced card is rendered client-side (no server query)
+    Then she sees a tile-grid with exactly these tiles:
+      | tile              | label                 |
+      | acme-router       | "Acme router"         |
+      | raw_otlp_advanced | "Raw OTLP (advanced)" |
     And NO tile is shown for claude_code, codex, cursor, gemini, or opencode
         (those are coding-assistant tiles on the AiToolsPortal, not ingestion templates)
     And the raw_otlp_advanced card is visually distinct from the install tiles
         (e.g. dashed border + subtle background per Lane-B Iter 2)
+
+  @bdd @ingestion-templates @catalog @empty-catalog
+  Scenario: Trace Ingest section is hidden when the org has no templates
+    Given org "acme" has not authored any templates
+    When jane navigates to "/me"
+    Then no "Trace Ingest" section renders: no heading, no grid, and no
+        raw_otlp_advanced card
+    And the personal OTLP endpoint stays reachable via /me/configure
 
   @bdd @ingestion-templates @catalog @coding-assistant-not-a-template
   Scenario: A platform coding assistant never appears as an ingestion template
@@ -80,8 +88,9 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
 
   @bdd @ingestion-templates @catalog @copy-disambiguation
   Scenario: Catalog copy distinguishes auto-shape vs raw OTLP
-    When jane opens the install drawer for the claude_cowork tile
-    Then the drawer headline reads "Connect Claude cowork — auto-shaped"
+    Given org "acme" has authored a template "Acme router"
+    When jane opens the install drawer for the acme-router tile
+    Then the drawer headline reads "Connect Acme router, auto-shaped"
     And the subcopy contains "Traces normalized into gen_ai.* canonical. Cost/tokens/model populated automatically."
     But when she opens the raw_otlp_advanced card
     Then the headline reads "Bring your own OTLP — raw shape"
@@ -97,7 +106,8 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   Scenario: Platform-published templates (organizationId IS NULL) are visible to every org
     Given org "beta-corp" has not authored any IngestionTemplate rows
     When user "lisa@beta-corp.com" navigates to her /me Trace Ingest
-    Then she sees the same non-coding-assistant tiles as jane (claude_cowork + raw_otlp_advanced)
+    Then she sees any templates the platform has published for every org
+    And since the platform currently ships none, her Trace Ingest section is hidden
 
   @bdd @ingestion-templates @catalog @cross-org-isolation
   Scenario: Org-authored templates (organizationId NOT NULL) are scoped to that org only
@@ -120,8 +130,9 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
     # Existing P7-B6 ToolCatalogEditor surface (AiToolEntry catalog) gets a
     # second tab here. No new admin route v1.
     Then she sees the platform-default IngestionTemplate rows listed
-        (claude_cowork only — raw_otlp_advanced is a client-side card and does
-        NOT appear in the admin templates table)
+        (currently none: the platform ships no default rows, so only
+        org-authored templates appear; raw_otlp_advanced is a client-side
+        card and does NOT appear in the admin templates table)
     And she does NOT see rows for claude_code, codex, cursor, gemini, or opencode
         (they were never seeded as templates, so there is nothing to filter)
     And each template row has a "View OTTL" affordance opening a read-only modal
@@ -137,9 +148,11 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   Scenario: The platform-template seed produces no coding-assistant rows
     When the platform IngestionTemplate seed runs
     Then no seeded row has a slug of claude_code, codex, cursor, gemini, or opencode
-    And claude_cowork is the only platform coding-tool template seeded
-    # No flag, no filter constant: the coding assistants are absent from the seed
-    # input itself, so the /me grid and the admin list never have a row to drop.
+    And no platform template rows are seeded at all
+    # claude_cowork's retirement and archival on existing installs is covered
+    # by default-catalog.feature. No flag, no filter constant: the coding
+    # assistants are absent from the seed input itself, so the /me grid and
+    # the admin list never have a row to drop.
 
   # No-leak invariant: persona-aware-chrome layout component branches on
   # route shape to hide IngestionTemplate catalog under /[project]. No

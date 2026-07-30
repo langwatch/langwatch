@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Logger } from "@langwatch/observability";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { computeNextRunAt } from "../nextRunAt";
 import { SchedulerRegistry } from "../scheduler.registry";
 import { SchedulerService } from "../scheduler.service";
@@ -45,7 +45,9 @@ function makeLogger(): { logger: Logger; error: ReturnType<typeof vi.fn> } {
   return { logger, error };
 }
 
-function makeJob(overrides: Partial<ScheduledJobRecord> = {}): ScheduledJobRecord {
+function makeJob(
+  overrides: Partial<ScheduledJobRecord> = {},
+): ScheduledJobRecord {
   return {
     id: "job-1",
     projectId: "project-1",
@@ -150,7 +152,16 @@ async function runOneFire({
   return { settleClaim, handlerCalls: wrapped.mock.calls.length };
 }
 
+beforeEach(() => {
+  // The lease-and-retry policy schedules from wall clock when a slot's next
+  // cron instant has already passed, so these tests only hold while "now" is
+  // between SLOT and NEXT_CRON. Pin Date (and only Date — the loop needs
+  // real timers) instead of trusting the calendar.
+  vi.useFakeTimers({ now: SLOT.getTime() + 30_000, toFake: ["Date"] });
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   captureException.mockClear();
 });
 
@@ -181,7 +192,9 @@ describe("SchedulerService lease-and-retry (ADR-044 P1)", () => {
         // Retried, NOT abandoned: the calendar did NOT jump to the next cron
         // instant — it re-armed a near-future backoff instead.
         expect(settle.nextRunAt.getTime()).not.toBe(NEXT_CRON.getTime());
-        expect(settle.nextRunAt.getTime()).toBeLessThan(Date.now() + 5 * 60_000);
+        expect(settle.nextRunAt.getTime()).toBeLessThan(
+          Date.now() + 5 * 60_000,
+        );
         expect(settle.nextRunAt.getTime()).toBeGreaterThan(Date.now() - 1_000);
 
         // lastSlot NOT advanced past the slot → the slot is still "undelivered".

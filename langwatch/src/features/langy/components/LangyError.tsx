@@ -1,5 +1,6 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { AlertCircle, RotateCcw } from "lucide-react";
+import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { AlertCircle, ChevronRight, RotateCcw } from "lucide-react";
+import { useState } from "react";
 import { LangyCard } from "~/features/asaplangy";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
 import type {
@@ -110,6 +111,7 @@ export function LangyError({
         meta={presentation.meta}
         reasons={presentation.reasons}
         traceId={presentation.traceId}
+        code={presentation.code}
       />
     </LangyCard>
   );
@@ -137,15 +139,24 @@ function ErrorDetails({
   meta,
   reasons,
   traceId,
+  code,
 }: {
   meta?: Record<string, unknown>;
   reasons?: LangySerializedReason[];
   traceId?: string;
+  code?: string;
 }) {
   const [devMode] = useLangyDevMode();
   const hasMeta = devMode && meta && Object.keys(meta).length > 0;
   const hasReasons = devMode && reasons && reasons.length > 0;
-  if (!traceId && !hasMeta && !hasReasons) return null;
+  // Developer mode REVEALS a control; it does not dump payloads at you. Every
+  // other dev-mode surface (the tool cards' raw JSON) is click-to-open, and this
+  // one used to spill meta + reasons the moment the mode was on — so an error
+  // card grew a wall of mono text before anyone asked to see it. The trace id
+  // stays visible: it is one short line and it is the thing you quote.
+  const [open, setOpen] = useState(false);
+  const hasDetail = !!hasMeta || !!hasReasons;
+  if (!traceId && !code && !hasDetail) return null;
 
   return (
     <VStack
@@ -156,12 +167,50 @@ function ErrorDetails({
       borderTopStyle="solid"
       borderTopColor="border.muted"
     >
+      {code ? (
+        // Always visible, not dev-gated. On a generic card this is the only
+        // thing that distinguishes "your local ClickHouse is down" from a real
+        // bug — and it is the string support will ask for first.
+        <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
+          {code}
+        </Text>
+      ) : null}
       {traceId ? (
         <Text textStyle="2xs" color="fg.subtle" fontFamily="mono">
           id: {traceId}
         </Text>
       ) : null}
-      {hasMeta ? (
+      {hasDetail ? (
+        <chakra.button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          alignSelf="flex-start"
+          display="inline-flex"
+          alignItems="center"
+          gap={1}
+          paddingX={0}
+          paddingY={0.5}
+          borderWidth={0}
+          background="transparent"
+          color="fg.subtle"
+          cursor="pointer"
+          textStyle="2xs"
+          fontWeight="500"
+          _hover={{ color: "fg.muted" }}
+        >
+          <Box
+            display="grid"
+            placeItems="center"
+            transition="transform 160ms ease"
+            transform={open ? "rotate(90deg)" : undefined}
+          >
+            <ChevronRight size={11} />
+          </Box>
+          {open ? "Hide details" : "Details"}
+        </chakra.button>
+      ) : null}
+      {open && hasMeta ? (
         <VStack align="stretch" gap={0}>
           {Object.entries(meta!).map(([key, val]) => (
             <Text key={key} textStyle="2xs" color="fg.subtle" fontFamily="mono">
@@ -170,7 +219,7 @@ function ErrorDetails({
           ))}
         </VStack>
       ) : null}
-      {hasReasons ? (
+      {open && hasReasons ? (
         <VStack align="stretch" gap={0}>
           <Text textStyle="2xs" color="fg.subtle" fontWeight="600">
             Reasons

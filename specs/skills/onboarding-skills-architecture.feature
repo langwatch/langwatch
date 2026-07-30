@@ -83,12 +83,12 @@ Feature: Skills-based onboarding architecture
   # Cross-cutting skills
   # ──────────────────────────────────────────────────
 
-  @platform @analytics
-  Scenario: Skill catalog includes "analytics" for performance insights
-    Given a skill exists at skills/analytics/SKILL.md
-    Then the skill name is "analytics"
-    And the description mentions analyzing agent performance
-    And the skill uses `langwatch analytics query`, `langwatch trace search`, and `langwatch trace get` CLI commands
+  @platform @agent-performance
+  Scenario: Skill catalog includes "agent-performance" for production insights
+    Given a skill exists at skills/agent-performance/SKILL.md
+    Then the skill name is "agent-performance"
+    And the description mentions diagnosing the agent's production behavior
+    And the skill uses `langwatch analytics query`, `langwatch trace export`, `langwatch trace search`, and `langwatch trace get` CLI commands
     And the skill never references MCP tools
     And the skill works for both devs and PMs
 

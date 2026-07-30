@@ -12,11 +12,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  expandSetIdFilter,
+  getOnPlatformSetId,
+  INTERNAL_SET_PREFIX,
   isInternalSetId,
   isOnPlatformSet,
-  getOnPlatformSetId,
-  expandSetIdFilter,
-  INTERNAL_SET_PREFIX,
   ON_PLATFORM_SET_SUFFIX,
 } from "../internal-set-id";
 
@@ -92,7 +92,9 @@ describe("internal-set-id utilities", () => {
     describe("given a user-created set ending in on-platform suffix", () => {
       describe("when isOnPlatformSet is called", () => {
         it("returns false because it lacks the internal prefix", () => {
-          expect(isOnPlatformSet("user-set__on-platform-scenarios")).toBe(false);
+          expect(isOnPlatformSet("user-set__on-platform-scenarios")).toBe(
+            false,
+          );
         });
       });
     });
@@ -157,9 +159,9 @@ describe("internal-set-id utilities", () => {
       });
 
       it("returns only that value for internal sets", () => {
-        expect(expandSetIdFilter("__internal__proj_1__on-platform-scenarios")).toEqual([
-          "__internal__proj_1__on-platform-scenarios",
-        ]);
+        expect(
+          expandSetIdFilter("__internal__proj_1__on-platform-scenarios"),
+        ).toEqual(["__internal__proj_1__on-platform-scenarios"]);
       });
     });
 

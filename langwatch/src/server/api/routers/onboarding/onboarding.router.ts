@@ -1,18 +1,19 @@
+import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
 import {
   fireIntegrationMethodNurturing,
   mapProductSelectionToIntegrationMethod,
 } from "~/../ee/billing/nurturing/hooks/productInterest";
+import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
+import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
-
-import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 
 /**
  * Router for handling onboarding-related operations.
@@ -61,10 +62,60 @@ export const onboardingRouter = createTRPCRouter({
           });
         }
 
+        // Every new org gets the standard AI tool catalog at creation, for
+        // every intent: the /me portal must render tiles on its very first
+        // load instead of the "no tools yet" empty state.
+        //
+        // Non-fatal by design, same contract as the personal-workspace
+        // ensure below: a failure here must not cost the user the
+        // organization they just created, and the aiTools.list read path
+        // lazily provisions the same set on first portal load anyway.
+        try {
+          await AiToolEntryService.create(ctx.prisma).ensureDefaultCatalog({
+            organizationId: orgResult.organization.id,
+          });
+        } catch (error) {
+          captureException(toError(error), {
+            extra: {
+              origin: "onboarding.initializeOrganization.ensureDefaultCatalog",
+              organizationId: orgResult.organization.id,
+            },
+          });
+        }
+
+        // Governance-intent signups get their personal workspace here rather
+        // than waiting for the first CLI login. That is where their usage
+        // lands, so provisioning it now is what makes /me show something the
+        // moment onboarding finishes instead of an empty shell whose contents
+        // depend on a command the user has not run yet.
+        //
+        // Non-fatal by design, matching organization.acceptInvite: a failure
+        // here must not cost the user the organization they just created, and
+        // `user.personalContext` backfills lazily on the next session.
+        if (input.primaryIntent === "AGENT_GOVERNANCE") {
+          try {
+            const personalWorkspaceService = new PersonalWorkspaceService(
+              ctx.prisma,
+            );
+            await personalWorkspaceService.ensure({
+              userId: ctx.session.user.id,
+              organizationId: orgResult.organization.id,
+              displayName: ctx.session.user.name,
+              displayEmail: ctx.session.user.email,
+            });
+          } catch (error) {
+            captureException(toError(error), {
+              extra: {
+                origin: "onboarding.initializeOrganization",
+                organizationId: orgResult.organization.id,
+              },
+            });
+          }
+        }
+
         // Create project under the organization. Governance-intent signups
-        // skip it (ADR-038 v6): their users live on /me (personal workspaces
-        // are provisioned lazily at CLI login) and a project is only created
-        // when the org later flips to LLMOps in settings.
+        // skip it (ADR-038 v6): their users live on /me and a project is only
+        // created when the org later flips to LLMOps in settings.
         let projectSlug: string | null = null;
         if (input.primaryIntent !== "AGENT_GOVERNANCE") {
           const projectName = input.projectName ?? orgResult.team.name;
@@ -126,9 +177,7 @@ export const onboardingRouter = createTRPCRouter({
           projectSlug,
         };
       } catch (error) {
-        captureException(
-          toError(error),
-        );
+        captureException(toError(error));
         throw error;
       }
     }),
@@ -153,7 +202,9 @@ export const onboardingRouter = createTRPCRouter({
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      const traitValue = mapProductSelectionToIntegrationMethod(input.integrationMethod);
+      const traitValue = mapProductSelectionToIntegrationMethod(
+        input.integrationMethod,
+      );
 
       fireIntegrationMethodNurturing({
         userId: ctx.session.user.id,

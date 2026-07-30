@@ -18,13 +18,13 @@
  * @see app-layer/langyagent/app/app.go (the error frames the manager emits)
  */
 
-import { trace } from "@opentelemetry/api";
 import {
   HandledError,
   type SerializedHandledError,
 } from "@langwatch/handled-error";
-import { remediation } from "../../error-remediation";
+import { trace } from "@opentelemetry/api";
 import { LangyModelNotConfiguredError } from "~/server/app-layer/langy/errors";
+import { remediation } from "../../error-remediation";
 
 /** How long we give the manager to answer one turn before we give up. */
 export const AGENT_CHAT_TIMEOUT_MS = 120_000;
@@ -269,7 +269,7 @@ export class LangyWorkerRestartingError extends HandledError {
  */
 /** Walk a HandledError chain (the error + its reasons, depth-first) for a kind. */
 function domainErrorChainHas(error: Error, code: string): boolean {
-  if (!(error instanceof HandledError)) return false;
+  if (!HandledError.isHandled(error)) return false;
   if (error.code === code) return true;
   return error.reasons.some((r) => domainErrorChainHas(r, code));
 }
@@ -420,7 +420,7 @@ function unhandledShape(): SerializedHandledError {
  * that — falls through to `unknown`.
  */
 export function classifyLangyTurnError(error: unknown): SerializedHandledError {
-  if (error instanceof HandledError) return error.serialize();
+  if (HandledError.isHandled(error)) return error.serialize();
   // fetch/AbortSignal failures arrive as DOMException/TypeError, never as ours.
   if (isTimeout(error)) {
     return new LangyTurnTimeoutError(AGENT_CHAT_TIMEOUT_MS).serialize();

@@ -41,9 +41,7 @@ export function filterTree(
     return null;
   }
 
-  const result = nodes
-    .map(prune)
-    .filter((n): n is PipelineNode => n !== null);
+  const result = nodes.map(prune).filter((n): n is PipelineNode => n !== null);
   return result.length > 0 ? result : null;
 }
 
@@ -53,12 +51,20 @@ export function isOverdue(ms: number | null): boolean {
   return Date.now() - ms > 5 * 60 * 1000;
 }
 
-export function matchesStatusFilter(g: GroupInfo, filter: StatusFilter): boolean {
+export function matchesStatusFilter(
+  g: GroupInfo,
+  filter: StatusFilter,
+): boolean {
   switch (filter) {
-    case "all": return true;
-    case "ok": return !g.isBlocked && !g.isStaleBlock;
-    case "blocked": return g.isBlocked && !g.isStaleBlock;
-    case "stale": return g.isStaleBlock;
-    case "active": return g.hasActiveJob && !g.isBlocked;
+    case "all":
+      return true;
+    case "ok":
+      return !g.isBlocked && !g.isStaleBlock;
+    case "blocked":
+      return g.isBlocked && !g.isStaleBlock;
+    case "stale":
+      return g.isStaleBlock;
+    case "active":
+      return g.hasActiveJob && !g.isBlocked;
   }
 }

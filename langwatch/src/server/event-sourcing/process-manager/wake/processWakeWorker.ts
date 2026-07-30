@@ -1,5 +1,7 @@
 import type { Logger } from "@langwatch/observability";
 
+import { observeEsProcessWakeLag } from "~/server/metrics";
+
 import { toSafeFailureDiagnostic } from "../failureDiagnostic";
 import type { HandleResult } from "../processManagerService";
 import type { DueWake, ProcessStore } from "../stores/processStore.types";
@@ -94,7 +96,7 @@ export class ProcessWakeWorker {
     // Do not overlap scans: due rows only leave the scan set when a commit
     // moves nextWakeAt, so a slow scan re-finding the same wakes is wasted
     // work the revision fence would reject anyway.
-    if (this.inFlight) return;
+    if (this.inFlight !== null) return;
     const scan = this.runScan();
     this.inFlight = scan;
     void scan.finally(() => {
@@ -133,6 +135,13 @@ export class ProcessWakeWorker {
     }
     try {
       const now = this.now();
+      // Scheduled-instant → handling delay (ADR-054): the substrate's
+      // direct "is the scheduler stalling" signal. Observed before the
+      // evolution so a failing handler still records how late we were.
+      observeEsProcessWakeLag({
+        processName: wake.ref.processName,
+        lagMs: now - wake.wakeAt,
+      });
       const result = await manager.handleWake({ wake, now });
       if (result.outcome === "committed") {
         if (result.insertedMessageKeys.length > 0) this.notifyOutbox?.();

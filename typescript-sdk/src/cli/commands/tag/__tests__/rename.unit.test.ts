@@ -6,7 +6,7 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 import { tagRenameCommand } from "../rename";
@@ -45,7 +45,8 @@ describe("tagRenameCommand", () => {
     it("prints confirmation message", async () => {
       mockRenameTag.mockResolvedValue(undefined);
 
-      await tagRenameCommand("canary", "beta");
+      const result = await tagRenameCommand("canary", "beta");
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Renamed tag: canary -> beta"));
     });

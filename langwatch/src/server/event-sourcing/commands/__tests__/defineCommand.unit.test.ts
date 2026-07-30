@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { defineCommand } from "../defineCommand";
 import type { TenantId } from "../../domain/tenantId";
+import { defineCommand } from "../defineCommand";
 
 const testEventDataSchema = z.object({
   batchRunId: z.string(),

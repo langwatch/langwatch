@@ -14,7 +14,35 @@ import { emptyStateMetrics } from "./emptyStateMetrics";
 import { LangyMark } from "./LangyMark";
 
 /** Structural, so a lucide icon and a react-feather one can sit in one list. */
-type SuggestionIcon = ComponentType<{ size?: string | number }>;
+export type SuggestionIcon = ComponentType<{ size?: string | number }>;
+
+/**
+ * What a project must already have for an ask to be able to succeed.
+ *
+ * Ordered by how much of the product the reader has reached, because that is
+ * exactly what governs which asks are honest to offer them: "compare my last
+ * two runs" is a dead end until there are two runs.
+ */
+export type SuggestionRequirement =
+  | "nothing"
+  | "traces"
+  | "evaluations"
+  | "experiments";
+
+export interface LangySuggestion {
+  icon: SuggestionIcon;
+  label: string;
+  prompt: string;
+  /** Absent means it works from a standing start. */
+  requires?: SuggestionRequirement;
+  /**
+   * Offer this ask only UNTIL the project has the named thing. Setup asks are
+   * promises about a gap — "onboard your agent" to a project that already has
+   * traces is the product not knowing its own customer — so once the gap
+   * closes, the ask is withdrawn rather than topped up.
+   */
+  until?: SuggestionRequirement;
+}
 
 /**
  * The suggested actions double as onboarding: each one names a different thing
@@ -25,23 +53,36 @@ type SuggestionIcon = ComponentType<{ size?: string | number }>;
  * EVERY ROW MUST BE A THING LANGY CAN ACTUALLY DO. A suggestion that reliably
  * fails is worse than no suggestion — it is the product lying on its own home
  * screen. See the GitHub row for what that constraint cost.
+ *
+ * Exported because the home page's lit block offers a few of these as its
+ * capability row. It reads THIS array rather than keeping a parallel copy, so
+ * home can never promise an ask the panel does not offer.
+ *
+ * The `requires` field is what lets BOTH surfaces offer a DIFFERENT few to a
+ * project that has nothing than to one that has months of runs: the panel's
+ * own list is selected by the same `selectLangySuggestions` the home page
+ * uses (see logic/langyHomeSuggestions.ts), so a project with no traces is
+ * offered ways to get set up rather than four asks that can only dead-end.
  */
-const SUGGESTIONS: { icon: SuggestionIcon; label: string; prompt: string }[] = [
+export const SUGGESTIONS: LangySuggestion[] = [
   {
     icon: ScanSearch,
     label: "Find failing traces",
     prompt:
       "Find recent traces that are failing their evaluations and tell me why.",
+    requires: "evaluations",
   },
   {
     icon: ShieldCheck,
     label: "Set up an evaluator",
     prompt: "Suggest an evaluator for my agent and set it up.",
+    requires: "traces",
   },
   {
     icon: GitCompare,
     label: "Compare two runs",
     prompt: "Compare my last two experiment runs and summarise what changed.",
+    requires: "experiments",
   },
   {
     // The GitHub glyph, not a generic pull-request icon — this row is the only
@@ -54,57 +95,82 @@ const SUGGESTIONS: { icon: SuggestionIcon; label: string; prompt: string }[] = [
     // app-layer/langyagent/skills/github/SKILL.md: clone → branch → edit →
     // commit → push → `gh pr create`). It stops there, and so does this copy.
     // Opening an ISSUE and VALIDATING a fix are NOT capabilities today — there
-    // is no `gh issue create` anywhere in the skill, `githubPrLinks` extracts
-    // pull-request URLs only (and has a test asserting it ignores issue URLs),
-    // the progress vocabulary ends at `opened`, and the rate limiter is scoped
-    // to PR permits. Offering either would be a suggestion that reliably fails.
+    // is no `gh issue create` anywhere in the skill, the progress vocabulary
+    // ends at `opened`, and the rate limiter is scoped to PR permits. Offering
+    // either would be a suggestion that reliably fails.
     icon: GitHub,
     label: "Investigate an issue and open a PR",
     prompt:
       "Investigate a problem in my agent using my traces, then open a GitHub PR that fixes it.",
+    requires: "traces",
   },
 ];
 
 /**
- * The opening line rotates: mostly it just asks, but now and then it's a little
- * warmer or cheekier. Kept dry, never cutesy — Langy is a competent teammate
- * having a good day, not a mascot. A fresh one is picked each time the empty
- * state mounts (every new/opened-empty conversation).
+ * What to offer a project that has no data yet.
+ *
+ * The four above all start from traces, evaluations or experiment runs, so on
+ * an empty project every one of them is a dead end — exactly the "suggestion
+ * that reliably fails" the note above rules out. These ask Langy to help set
+ * the project up instead, which it can do from a standing start, and they live
+ * beside their siblings so the same constraint governs both lists.
  */
-const GREETINGS = [
-  "How can I help?",
-  "What are we digging into?",
-  "Where should we look first?",
-  "What's misbehaving today?",
-  "Point me at something.",
-  "What can I take off your plate?",
-  "Let's find the gremlin.",
-  "Got a hunch? Let's chase it.",
-  "What are we shipping today?",
-  "I read the logs so you don't have to.",
-  "Show me where it hurts.",
-  "What's the story with your traces?",
-  "What's on your mind?",
-  "Ready when you are.",
-  "Let's make something pass.",
-  "What are we fixing?",
-  "What would make today easier?",
-  "Let's ask the ghost in the machine.",
-  "Let's save you an entire afternoon.",
-  "Hallucination-free since 1969.",
-  "Follow the white rabbit.",
-  // A Rickroll for the trace-reading crowd: the cadence echoes "You know the
-  // rules and so do I" — logs standing in for rules.
-  "You've read the logs, and so have I.",
-  "I've read everything. Ask away.",
+export const SETUP_SUGGESTIONS: LangySuggestion[] = [
+  {
+    icon: ScanSearch,
+    label: "Onboard your agent",
+    prompt:
+      "Help me onboard my agent and send its first trace to this project.",
+    // The first trace arriving is exactly what makes this ask obsolete.
+    until: "traces",
+  },
+  {
+    icon: ShieldCheck,
+    label: "Choose what to measure",
+    prompt:
+      "What should I measure about my agent, and which evaluators would you start with?",
+    until: "evaluations",
+  },
+  {
+    icon: GitCompare,
+    label: "Show me around",
+    prompt: "What can you do for me on this project, and where should I start?",
+  },
 ];
+
+/**
+ * The opening line, of which there are three.
+ *
+ * There were twenty-three. A rotation that wide stops reading as personality
+ * and starts reading as a slot machine: nobody sees the same panel twice, so no
+ * line ever becomes Langy's, and the weakest of them set the tone as often as
+ * the best. Three lines get remembered.
+ *
+ * They deliberately do three different jobs, and the split is the point: the
+ * first INTRODUCES him and is the joke, the second says what he is actually
+ * FOR and is not, the third ASKS for something. Rotating registers rather than
+ * lines is what stops a second reading landing as the same gag twice.
+ *
+ * Kept dry, never cutesy: Langy is a competent teammate having a good day, not
+ * a mascot. A fresh one is picked each time the empty state mounts.
+ */
+const GREETINGS = ["Hey, I'm Langy!"];
 
 export function EmptyState({
   onPick,
+  suggestions,
   variant = "floating",
   panelWidth = 432,
 }: {
   onPick: (prompt: string) => void;
+  /**
+   * The asks this project can actually act on, picked by the panel via
+   * `selectLangySuggestions` from the project's reach — the same selection the
+   * home page runs, so the two surfaces can never disagree about what is
+   * honest to offer. Empty while the reach is still unknown: a row that
+   * appears and is then withdrawn is worse than a beat of nothing.
+   */
+  suggestions: LangySuggestion[];
   variant?: "floating" | "sidebar";
   /**
    * The panel's real rendered width. The floating card ranges ~340–432px with
@@ -122,6 +188,10 @@ export function EmptyState({
   );
   return (
     <VStack
+      // The invitation belongs to a genuinely new chat. Named so the restore
+      // path can pin that it is NOT what a loading conversation shows, without
+      // the assertion resting on which greeting was picked.
+      data-testid="langy-empty-state"
       align="stretch"
       gap={0}
       // `flex="1"` fills the docked sidebar's flex column so `justify="center"`
@@ -150,7 +220,7 @@ export function EmptyState({
         marginBottom={`${metrics.heroMarginBottom}px`}
       >
         {/* The LangWatch mark, in the brand gradient — and the ONLY place it
-            appears inside the panel (the launcher is the other). Bare, no tile:
+            appears inside the panel (the minimised peek is the other). Bare, no tile:
             the orange chip that used to box it in was old-brand chrome, a
             saturated block competing with the display line right under it. It
             shrinks with the card but never below 34px, the smallest size at
@@ -170,24 +240,52 @@ export function EmptyState({
         >
           {greeting}
         </Text>
+        {/* An invitation, then the two keys worth knowing.
+            "Ask in plain language" was an instruction nobody needs — anyone
+            looking at a text box already knows they can type in it — and it
+            spent the one line under the hero saying so. The line now gets out
+            of the way, and the space goes to the two things a first-time
+            reader could not have guessed. */}
         <Text
           textStyle="sm"
           color="fg.muted"
           lineHeight="1.5"
           textAlign="center"
-          // `balance` evens the two lines instead of orphaning "of these." on a
-          // row of its own; the cap keeps the measure from running the full
-          // column so it stays a tight caption under the hero.
           textWrap="balance"
           maxWidth={`${metrics.subtitleMaxWidth}px`}
           marginTop={2}
         >
-          Ask in plain language, or start with one of these.
+          {/* "One of these" only when there are rows to point at — while the
+              project's reach is unknown the list below is empty on purpose. */}
+          {suggestions.length > 0
+            ? "Just type away, or start with one of these."
+            : "Just type away."}
+        </Text>
+        <Text
+          textStyle="xs"
+          // Quieter and lighter than the line above: this is a reference the
+          // eye should find when it goes looking, not a second invitation
+          // competing with the first.
+          fontWeight="400"
+          color="fg.subtle"
+          textAlign="center"
+          marginTop={1.5}
+        >
+          <chakra.span fontFamily="mono" color="fg.muted">
+            /
+          </chakra.span>{" "}
+          for skills{"  ·  "}
+          <chakra.span fontFamily="mono" color="fg.muted">
+            #
+          </chakra.span>{" "}
+          to add context
         </Text>
       </VStack>
 
-      <VStack align="stretch" gap={0.5}>
-        {sidebar ? (
+      {/* Cards need air between them in a way bare rows did not — at the old
+          2px they would read as one segmented control. */}
+      <VStack align="stretch" gap={1.5}>
+        {sidebar && suggestions.length > 0 ? (
           <Text
             textStyle="2xs"
             fontWeight="600"
@@ -200,7 +298,7 @@ export function EmptyState({
             Suggested
           </Text>
         ) : null}
-        {SUGGESTIONS.map(({ icon, label, prompt }) => (
+        {suggestions.map(({ icon, label, prompt }) => (
           <SuggestionRow
             key={label}
             icon={icon}
@@ -243,15 +341,39 @@ function SuggestionRow({
       textAlign="left"
       paddingX={`${paddingX}px`}
       paddingY={`${paddingY}px`}
-      borderRadius="10px"
-      background="transparent"
+      borderRadius="12px"
+      // A resting SHAPE, not a bare row. These sat as plain text on the
+      // panel's gradient with nothing but a hover fill to say they could be
+      // pressed — so until the pointer happened to cross one, the four best
+      // starting points in the product looked like a list of headings. The
+      // hairline and the glass give each one an edge at rest; the warm border
+      // on hover is the only colour they take, so the mark stays the panel's
+      // one saturated thing.
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      background="bg.panel/60"
+      backdropFilter="blur(8px)"
       color="fg"
       cursor="pointer"
-      transition="background 130ms ease"
-      _hover={{ background: "bg.subtle" }}
+      transition="background 130ms ease, border-color 130ms ease, transform 130ms ease"
+      _hover={{
+        background: "bg.panel/85",
+        borderColor: "orange.emphasized",
+        transform: "translateY(-1px)",
+      }}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "orange.emphasized",
+        outlineOffset: "2px",
+      }}
       css={{
         "&:hover .chev": { opacity: 1, transform: "translateX(0)" },
         "&:hover .row-icon": { color: "var(--chakra-colors-fg)" },
+        "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+        "@media (prefers-reduced-motion: reduce):hover": {
+          transform: "none",
+        },
       }}
     >
       {/* Neutral, not orange. Four saturated icons stacked down the empty state

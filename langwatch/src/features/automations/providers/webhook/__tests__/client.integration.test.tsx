@@ -10,6 +10,16 @@
  * and ../../email/__tests__/client.integration.test.tsx).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import {
+  WEBHOOK_HEADER_VALUE_KEPT,
+  type WebhookActionParams,
+} from "@langwatch/automations/providers/webhook";
+import {
+  DEFAULT_ALERT_WEBHOOK_BODY_TEMPLATE,
+  DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE,
+  DEFAULT_WEBHOOK_BODY_TEMPLATE,
+} from "@langwatch/automations/templating/defaults";
 import {
   cleanup,
   fireEvent,
@@ -20,16 +30,6 @@ import {
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigFormCtx } from "~/features/automations/providers/types";
-import {
-  DEFAULT_ALERT_WEBHOOK_BODY_TEMPLATE,
-  DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE,
-  DEFAULT_WEBHOOK_BODY_TEMPLATE,
-} from "@langwatch/automations/templating/defaults";
-import {
-  WEBHOOK_HEADER_VALUE_KEPT,
-  type WebhookActionParams,
-} from "@langwatch/automations/providers/webhook";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
 
 vi.mock("@monaco-editor/react", () => ({ default: () => null }));
 /** The Liquid editor is Monaco-bound and cannot mount in jsdom. Stub just that
@@ -52,8 +52,8 @@ vi.mock(
   },
 );
 
-import webhookClient, { type WebhookSlice } from "../client";
 import type { WebhookPreview } from "@langwatch/automations/providers/webhook";
+import webhookClient, { type WebhookSlice } from "../client";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -96,7 +96,10 @@ function Harness({
 const renderForm = ({
   ctx = makeCtx(),
   initial,
-}: { ctx?: ConfigFormCtx<WebhookPreview>; initial?: WebhookSlice } = {}) =>
+}: {
+  ctx?: ConfigFormCtx<WebhookPreview>;
+  initial?: WebhookSlice;
+} = {}) =>
   render(<Harness ctx={ctx} initial={initial} />, { wrapper: Wrapper });
 
 describe("WebhookConfigForm URL validation", () => {
@@ -247,9 +250,7 @@ describe("webhookClient kept-header sentinel round-trip", () => {
 });
 
 function bodyTextbox() {
-  return within(screen.getByTestId("webhook-body-editor")).getByRole(
-    "textbox",
-  );
+  return within(screen.getByTestId("webhook-body-editor")).getByRole("textbox");
 }
 
 describe("webhookClient JSON-body default resolution", () => {

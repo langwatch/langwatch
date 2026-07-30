@@ -1,5 +1,5 @@
 // Package frames is the worker's OUTPUT frame producer
-// (LANGY_WORKER_REDESIGN_PLAN §0/§0a) — the Go counterpart to the TS relay's
+// — the Go counterpart to the TS relay's
 // langyRelayFrame union. The worker emits one typed frame per stream line; each
 // frame is JSON-marshalled, then signed with the per-conversation runToken
 // (frameauth) so the relay can verify it.
@@ -244,7 +244,7 @@ func Error(message, code string) (Frame, error) {
 // that read only those.
 func ErrorFromHerr(e herr.E) (Frame, error) {
 	body := herr.Body(e)
-	return marshal(errorFrame{Type: "error", Error: body.Message, Code: body.Type, Herr: &body})
+	return marshal(errorFrame{Type: "error", Error: body.Message, Code: body.Code, Herr: &body})
 }
 
 type handoffFrame struct {

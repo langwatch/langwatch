@@ -1,4 +1,4 @@
-import { RoleBindingScopeType, type PrismaClient } from "@prisma/client";
+import { type PrismaClient, RoleBindingScopeType } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type {
   RoleBindingForSynthesis,
@@ -16,13 +16,10 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
     orgIds: string[];
     userId: string;
   }): Promise<RoleBindingForSynthesis[]> {
-    return this.prisma.roleBinding.findMany({
+    const bindings = await this.prisma.roleBinding.findMany({
       where: {
         organizationId: { in: orgIds },
-        OR: [
-          { userId },
-          { group: { members: { some: { userId } } } },
-        ],
+        OR: [{ userId }, { group: { members: { some: { userId } } } }],
         scopeType: {
           in: [
             RoleBindingScopeType.TEAM,
@@ -48,8 +45,15 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
             updatedAt: true,
           },
         },
+        group: { select: { organizationId: true } },
       },
     });
+
+    return bindings.filter(
+      (binding) =>
+        !binding.group ||
+        binding.group.organizationId === binding.organizationId,
+    );
   }
 
   async listTeamScopedUserBindingsByTeamIds({
@@ -72,6 +76,7 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: { in: teamIds },
         userId: { not: null },
+        user: { orgMemberships: { some: { organizationId } } },
       },
       include: { user: true, customRole: true },
     });
@@ -106,7 +111,10 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
   }): Promise<void> {
     if (scopeType === RoleBindingScopeType.ORGANIZATION) {
       if (scopeId !== organizationId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid org scope" });
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid org scope",
+        });
       }
       return;
     }
@@ -116,7 +124,10 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
         where: { id: scopeId, organizationId },
       });
       if (!team) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Team not found in this org" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Team not found in this org",
+        });
       }
       return;
     }
@@ -127,7 +138,10 @@ export class PrismaRoleBindingRepository implements RoleBindingRepository {
         include: { team: { select: { organizationId: true } } },
       });
       if (!project || project.team.organizationId !== organizationId) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Project not found in this org" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found in this org",
+        });
       }
     }
   }

@@ -11,15 +11,34 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// PruneOptions selects what a Prune run is allowed to reclaim.
+//
+// The database flag is separate from ShouldAct because the two categories carry
+// very different consequences. Build artefacts are regenerable, so reclaiming
+// them unattended is safe. A worktree's ClickHouse and Postgres databases are
+// not: dropping them destroys seeded state that only a `haven db reset` can
+// rebuild. Only a caller that has shown the user exactly which databases are in
+// scope — the interactive picker — may set ShouldReclaimDatabases.
+type PruneOptions struct {
+	// ShouldAct removes things; false is a dry run that only reports.
+	ShouldAct bool
+	// ShouldReclaimDatabases additionally drops each safe worktree's slug-cached
+	// ClickHouse + Postgres databases. Never set this on an unattended path.
+	ShouldReclaimDatabases bool
+}
+
 // Prune reclaims regenerable local-dev disk (node_modules + build caches) from
 // worktrees that are safe to touch — neither up nor dirty. It is dry-run by
-// default; only shouldAct=true removes anything. It never deletes a worktree, only its
+// default; only opts.ShouldAct removes anything. It never deletes a worktree, only its
 // artefacts, and it always skips a worktree that is running or has uncommitted
-// changes. A safe worktree's slug-cached ClickHouse + Postgres databases are also
-// dropped (the protected main database, lw_main, is always kept) — unlike the disk
-// artefacts these are not regenerable, so the same up/dirty and slug guards apply.
+// changes. When opts.ShouldReclaimDatabases is set, a safe worktree's slug-cached
+// ClickHouse + Postgres databases are also dropped (the protected main database,
+// lw_main, is always kept) — unlike the disk artefacts these are not regenerable,
+// so the same up/dirty and slug guards apply, and the caller must have confirmed
+// them explicitly.
 // It also prunes orphaned git worktree admin entries (always safe).
-func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct bool) error {
+func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, opts PruneOptions) error {
+	shouldAct := opts.ShouldAct
 	if o.hyg == nil {
 		return fmt.Errorf("hygiene adapter not wired")
 	}
@@ -41,20 +60,22 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 	// candidate worktree: a stopped server (common at prune time) is surfaced
 	// instead of silently skipped, and N worktrees no longer pay N×2 server calls.
 	var chDBs, pgDBs []string
-	if o.ch != nil && o.cfg.ShouldManageClickHouse {
-		if dbs, err := o.ch.Databases(ctx); err == nil {
-			chDBs = dbs
-		} else {
-			o.log.Warn("prune: clickhouse database listing failed", zapErr(err))
-			fmt.Println("  database reclaim skipped — clickhouse unreachable")
+	if opts.ShouldReclaimDatabases {
+		if o.ch != nil && o.cfg.ShouldManageClickHouse {
+			if dbs, err := o.ch.Databases(ctx); err == nil {
+				chDBs = dbs
+			} else {
+				o.log.Warn("prune: clickhouse database listing failed", zapErr(err))
+				fmt.Println("  database reclaim skipped — clickhouse unreachable")
+			}
 		}
-	}
-	if o.pg != nil && o.cfg.ShouldManagePostgres {
-		if dbs, err := o.pg.Databases(ctx); err == nil {
-			pgDBs = dbs
-		} else {
-			o.log.Warn("prune: postgres database listing failed", zapErr(err))
-			fmt.Println("  database reclaim skipped — postgres unreachable")
+		if o.pg != nil && o.cfg.ShouldManagePostgres {
+			if dbs, err := o.pg.Databases(ctx); err == nil {
+				pgDBs = dbs
+			} else {
+				o.log.Warn("prune: postgres database listing failed", zapErr(err))
+				fmt.Println("  database reclaim skipped — postgres unreachable")
+			}
 		}
 	}
 
@@ -85,7 +106,10 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 				}
 			}
 		}
-		dropped := o.pruneDatabases(ctx, wt.Dir, shouldAct, chDBs, pgDBs)
+		var dropped []string
+		if opts.ShouldReclaimDatabases {
+			dropped = o.pruneDatabases(ctx, wt.Dir, shouldAct, chDBs, pgDBs)
+		}
 		if len(hits) == 0 && len(dropped) == 0 {
 			continue
 		}
@@ -99,7 +123,7 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 			if shouldAct {
 				verb = "reclaimed    "
 			}
-			fmt.Printf("  %s %-30s %8s  %v\n", verb, filepath.Base(wt.Dir), humanBytes(wtBytes), hits)
+			fmt.Printf("  %s %-30s %8s  %v\n", verb, filepath.Base(wt.Dir), domain.HumanBytes(wtBytes), hits)
 		}
 		if len(dropped) > 0 {
 			dbVerb := "would drop database"
@@ -114,9 +138,9 @@ func (o *Orchestrator) Prune(ctx context.Context, repoRoot string, shouldAct boo
 
 	fmt.Printf("\n%d worktree(s) with reclaimable disk, %d skipped (up/dirty).\n", reclaimed, skipped)
 	if shouldAct {
-		fmt.Printf("Reclaimed ~%s.\n", humanBytes(total))
+		fmt.Printf("Reclaimed ~%s.\n", domain.HumanBytes(total))
 	} else {
-		fmt.Printf("Would reclaim ~%s. Re-run with --yes to act.\n", humanBytes(total))
+		fmt.Printf("Would reclaim ~%s. Re-run with --yes to act.\n", domain.HumanBytes(total))
 	}
 	return nil
 }
@@ -192,16 +216,3 @@ func (o *Orchestrator) liveWorktreeDirs() map[string]bool {
 }
 
 func zapErr(err error) zap.Field { return zap.Error(err) }
-
-func humanBytes(b int64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%dB", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f%cB", float64(b)/float64(div), "KMGTPE"[exp])
-}

@@ -2,56 +2,45 @@
 
 CodeRabbit configuration ancillary files. The root config is `/.coderabbit.yaml`.
 
-## `ast-grep/rules/`
+## The ast-grep ruleset moved to `/.ast-grep/`
 
-Deterministic syntactic rules (issue #3754 AC3). Each `.yml` is one rule;
-CodeRabbit auto-loads everything in this directory via `reviews.tools.ast-grep.rule_dirs`.
+It used to live here as `ast-grep/`. That framing was the problem: filed under
+the review bot, nothing ever executed it against real code — only CodeRabbit
+did, once per PR, as a comment. CI validated that the rules matched their
+fixtures and stopped there.
 
-`language: TypeScript` does not match `.tsx` files in ast-grep's parser
-dispatch, so rules that apply to both file types are split into `_ts` /
-`_tsx` siblings.
+The rules are a linter, so they now sit at `/.ast-grep/`, next to `/.semgrep/`,
+and run as an ordinary gate (`make lint-rules`, plus a blocking CI job).
+CodeRabbit still loads them via `reviews.tools.ast-grep.rule_dirs` — it is one
+consumer of the ruleset, not its owner. See `/.ast-grep/README.md`.
 
-| Rule | Forbids | Scope |
-|---|---|---|
-| `no-explicit-any.yml` + `no-explicit-any-tsx.yml` | `: any`, `as any` (predefined_type kind with regex `^any$`) | `langwatch/src/**/*.{ts,tsx}` |
-| `no-inline-dynamic-import.yml` + `-tsx.yml` | Inline `import(...)` outside `routes.tsx` / `pages/**` | `langwatch/src/**/*.{ts,tsx}` |
-| `no-form-watch-in-child.yml` | `$form.watch()` inside a child component receiving `form` as prop | `langwatch/src/components/**/*.tsx` |
-| `no-export-star-shim.yml` + `-tsx.yml` | `export * from "..."`. Inline-disable with `// ast-grep-ignore: no-export-star-shim-{ts,tsx}` | `langwatch/src/**/*.{ts,tsx}` |
-| `no-localhost-fallback.yml` + `-tsx.yml` | `?? "http://localhost..."` and template-literal variants | `langwatch/src/**/*.{ts,tsx}` |
-| `no-form-disable-on-isvalid.yml` | `disabled={!form.formState.isValid}` / `disabled={!isValid}` on submit buttons — pre-disable is silent. See `dev/docs/design/guidelines.md` § 6. | `langwatch/src/**/*.tsx` |
+## What belongs in CodeRabbit, and what does not
 
-All rules `severity: warning` for sprint 1 (phased rollout — promote to
-`error` per-rule once baseline is verifiably clean).
+The division that keeps review comments worth reading:
 
-## Testing — every rule is proven by a fixture
+| Kind of rule | Home |
+|---|---|
+| Expressible as Biome config | `langwatch/biome.json` |
+| Expressible as a syntactic pattern | `/.ast-grep/rules/` |
+| Expressible as a semantic pattern | `/.semgrep/langwatch.yml` |
+| Genuinely needs judgement | `path_instructions` in `/.coderabbit.yaml` |
 
-`sgconfig.yml` + `rule-tests/` make `ast-grep test` prove each rule actually
-matches real code. This harness exists because #3754 shipped a **dead** rule
-(`no-form-watch-in-child` fired on nothing); "looks right" is not enough.
+A rule in more than one home gets reported twice — once deterministically and
+once probabilistically — which is how a review thread fills up with mechanics
+and trains people to skim it. **When a rule moves into a linter, delete it from
+`path_instructions`.**
 
-```bash
-# from .coderabbit/ast-grep/ :
-ast-grep test -c sgconfig.yml -t rule-tests       # all rules must pass
-ast-grep test -c sgconfig.yml -t rule-tests -U    # regenerate snapshots after a rule edit
-```
-
-Each `rule-tests/<id>-test.yml` lists `valid:` (must NOT match) and `invalid:`
-(MUST match) snippets; `rule-tests/__snapshots__/` pins the exact matches.
-`/.github/workflows/coderabbit-config-check.yml` runs this on every PR touching
-the config (pinned ast-grep + `semgrep --validate` + a semgrep match check), so
-a dead or malformed rule fails CI.
-
-**Adding a rule:** drop the `.yml` in `rules/` (matching the
-[ast-grep rule schema](https://ast-grep.github.io/guide/rule-config.html), unique
-id, split `_ts` / `_tsx` if it applies to both), add a `rule-tests/<id>-test.yml`
-with ≥1 `valid` + ≥1 `invalid` snippet, run `ast-grep test … -U` to record the
-snapshot, and commit all of it. No fixture = the rule is unproven.
+Across a 50-PR sample of contributor PRs, 23% of CodeRabbit's findings were
+deterministic house rules it had been handed via `path_instructions` and
+`knowledge_base.code_guidelines`. Those belong in the three rows above this one.
 
 ## Related
 
-- `/.coderabbit.yaml` — root config; references this directory.
+- `/.ast-grep/` — the syntactic ruleset (and its fixtures).
 - `/.semgrep/langwatch.yml` — semantic patterns (PII regex, ClickHouse
   TenantId enforcement, heavy-column dedup anti-pattern).
+- `/.github/workflows/coderabbit-config-check.yml` — proves the rulesets parse
+  and still match their fixtures (pinned ast-grep + `semgrep --validate`).
 - `/.github/workflows/deployment-impact-check.yml` — AC5 deployment-surface
   guard (moved out of CodeRabbit because `path_instructions` can't see PR
   descriptions).

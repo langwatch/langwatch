@@ -18,8 +18,6 @@ const SECRET = "integration-internal-secret";
 const CRON_ROUTES: { method: "GET" | "POST"; path: string }[] = [
   { method: "POST", path: "/api/cron/old_lambdas_cleanup" },
   { method: "GET", path: "/api/cron/old_lambdas_cleanup" },
-  { method: "POST", path: "/api/cron/schedule_topic_clustering" },
-  { method: "GET", path: "/api/cron/schedule_topic_clustering" },
   { method: "GET", path: "/api/cron/trace_analytics" },
   { method: "POST", path: "/api/cron/seed_demo" },
   { method: "GET", path: "/api/cron/seed_demo" },
@@ -38,25 +36,29 @@ describe("internal/service route authentication", () => {
 
   describe("when a cron route is called without credentials", () => {
     /** @scenario "A destructive cron route rejects callers without the secret" */
-    it.each(CRON_ROUTES)(
-      "rejects $method $path with no Authorization header",
-      async ({ method, path }) => {
-        const res = await cronApp.request(path, { method });
-        expect(res.status).toBe(401);
-      },
-    );
+    it.each(
+      CRON_ROUTES,
+    )("rejects $method $path with no Authorization header", async ({
+      method,
+      path,
+    }) => {
+      const res = await cronApp.request(path, { method });
+      expect(res.status).toBe(401);
+    });
   });
 
   describe("when a cron route is called with the wrong secret", () => {
-    it.each(CRON_ROUTES)(
-      "rejects $method $path with a mismatched bearer token",
-      async ({ method, path }) => {
-        const res = await cronApp.request(path, {
-          method,
-          headers: { authorization: "Bearer wrong" },
-        });
-        expect(res.status).toBe(401);
-      },
-    );
+    it.each(
+      CRON_ROUTES,
+    )("rejects $method $path with a mismatched bearer token", async ({
+      method,
+      path,
+    }) => {
+      const res = await cronApp.request(path, {
+        method,
+        headers: { authorization: "Bearer wrong" },
+      });
+      expect(res.status).toBe(401);
+    });
   });
 });

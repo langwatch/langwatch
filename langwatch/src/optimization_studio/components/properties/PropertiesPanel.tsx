@@ -10,7 +10,6 @@ import type { Component, ComponentType } from "../../types/dsl";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { AgentPropertiesPanel } from "./AgentPropertiesPanel";
-import { BasePropertiesPanel } from "./BasePropertiesPanel";
 import { CodePropertiesPanel } from "./CodePropertiesPanel";
 import { CustomPropertiesPanel } from "./CustomPropertiesPanel";
 import { EndPropertiesPanel } from "./EndPropertiesPanel";
@@ -23,17 +22,14 @@ import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertie
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
 
 export function PropertiesPanel() {
-  const {
-    selectedNode,
-    propertiesExpanded,
-    setPropertiesExpanded,
-  } = useWorkflowStore(
-    useShallow((state) => ({
-      selectedNode: state.nodes.find((n) => n.selected),
-      propertiesExpanded: state.propertiesExpanded,
-      setPropertiesExpanded: state.setPropertiesExpanded,
-    })),
-  );
+  const { selectedNode, propertiesExpanded, setPropertiesExpanded } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        selectedNode: state.nodes.find((n) => n.selected),
+        propertiesExpanded: state.propertiesExpanded,
+        setPropertiesExpanded: state.setPropertiesExpanded,
+      })),
+    );
 
   const ComponentPropertiesPanelMap: Record<
     ComponentType,

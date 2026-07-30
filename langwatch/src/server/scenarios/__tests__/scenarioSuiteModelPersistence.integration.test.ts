@@ -14,8 +14,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "../../db";
-import { ScenarioService } from "../scenario.service";
 import { SuiteRepository } from "../../suites/suite.repository";
+import { ScenarioService } from "../scenario.service";
 
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 
@@ -33,7 +33,11 @@ describe.skipIf(isTestcontainersOnly)(
       });
       organizationId = org.id;
       const team = await prisma.team.create({
-        data: { name: `Models Team ${ns}`, slug: `--models-team-${ns}`, organizationId },
+        data: {
+          name: `Models Team ${ns}`,
+          slug: `--models-team-${ns}`,
+          organizationId,
+        },
       });
       teamId = team.id;
       const project = await prisma.project.create({
@@ -50,11 +54,19 @@ describe.skipIf(isTestcontainersOnly)(
     });
 
     afterAll(async () => {
-      await prisma.scenario.deleteMany({ where: { projectId } }).catch(() => {});
-      await prisma.simulationSuite.deleteMany({ where: { projectId } }).catch(() => {});
-      await prisma.project.deleteMany({ where: { id: projectId } }).catch(() => {});
+      await prisma.scenario
+        .deleteMany({ where: { projectId } })
+        .catch(() => {});
+      await prisma.simulationSuite
+        .deleteMany({ where: { projectId } })
+        .catch(() => {});
+      await prisma.project
+        .deleteMany({ where: { id: projectId } })
+        .catch(() => {});
       await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-      await prisma.organization.deleteMany({ where: { id: organizationId } }).catch(() => {});
+      await prisma.organization
+        .deleteMany({ where: { id: organizationId } })
+        .catch(() => {});
     });
 
     describe("given a scenario", () => {

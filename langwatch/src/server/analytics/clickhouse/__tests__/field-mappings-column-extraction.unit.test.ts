@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  extractReferencedSpanColumns,
   extractReferencedEvaluationColumns,
+  extractReferencedSpanColumns,
   extractReferencedTraceColumns,
 } from "../field-mappings";
 
@@ -14,9 +14,7 @@ describe("extractReferencedSpanColumns", () => {
     });
 
     it("extracts StatusCode", () => {
-      const result = extractReferencedSpanColumns([
-        "ss.StatusCode = 'ERROR'",
-      ]);
+      const result = extractReferencedSpanColumns(["ss.StatusCode = 'ERROR'"]);
       expect(result).toContain("StatusCode");
       expect(result.size).toBe(1);
     });
@@ -88,7 +86,7 @@ describe("extractReferencedSpanColumns", () => {
   describe("when expression uses quoted Events columns", () => {
     it('extracts "Events.Name" from quoted reference', () => {
       const result = extractReferencedSpanColumns([
-        'arrayExists(x -> x = \'chat\', "Events.Name")',
+        "arrayExists(x -> x = 'chat', \"Events.Name\")",
       ]);
       expect(result).toContain('"Events.Name"');
     });
@@ -132,9 +130,7 @@ describe("extractReferencedEvaluationColumns", () => {
 
   describe("when expression references no known columns", () => {
     it("returns an empty set", () => {
-      const result = extractReferencedEvaluationColumns([
-        "ts.TotalCost > 0",
-      ]);
+      const result = extractReferencedEvaluationColumns(["ts.TotalCost > 0"]);
       expect(result.size).toBe(0);
     });
   });
@@ -221,7 +217,7 @@ describe("extractReferencedTraceColumns", () => {
 
     it('does not match trace Attributes inside quoted "Events.Attributes"', () => {
       const result = extractReferencedTraceColumns([
-        'mapContains(ss."Events.Attributes", \'x\')',
+        "mapContains(ss.\"Events.Attributes\", 'x')",
       ]);
       expect(result).not.toContain("Attributes");
     });

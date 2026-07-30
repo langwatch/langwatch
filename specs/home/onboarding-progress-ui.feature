@@ -97,10 +97,10 @@ Feature: Onboarding Progress UI
     Then I should be navigated to the simulations page
 
   @unimplemented
-  Scenario: Clicking setupEvaluation step navigates to evaluations page
+  Scenario: Clicking setupEvaluation step navigates to online evaluations
     Given the current step is "setupEvaluation"
     When I click the action for "Set up evaluation"
-    Then I should be navigated to the evaluations page
+    Then I should be navigated to the online evaluations page
 
   @unimplemented
   Scenario: Clicking createDataset step navigates to datasets page

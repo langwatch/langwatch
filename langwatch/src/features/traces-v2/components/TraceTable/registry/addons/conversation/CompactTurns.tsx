@@ -17,7 +17,6 @@ import { useOpenTraceDrawer } from "../../../../../hooks/useOpenTraceDrawer";
 import { useTimeFormatStore } from "../../../../../stores/timeFormatStore";
 import type { TraceListItem } from "../../../../../types/trace";
 import {
-  abbreviateModel,
   formatCost,
   formatDuration,
   formatISOTimestamp,
@@ -237,7 +236,7 @@ function turnCellContent({
     case "model":
       return (
         <MonoCell truncate whiteSpace={undefined}>
-          {trace.models[0] ? abbreviateModel(trace.models[0]) : dash}
+          {trace.models[0] ? trace.models[0] : dash}
         </MonoCell>
       );
     case "service":

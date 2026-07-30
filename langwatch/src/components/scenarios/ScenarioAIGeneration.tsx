@@ -15,11 +15,6 @@ import { createLogger } from "@langwatch/observability";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import {
-  LangyMark,
-  LangyMarkGradientDefs,
-} from "~/features/langy/components/LangyMark";
-import "~/features/langy/langyTheme.css";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -200,11 +195,8 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
         classified.cta === "configure" ||
         classified.cta === "configure-and-retry";
       toaster.create({
-        title: "Generation failed",
-        description:
-          classified.tier === "unknown"
-            ? classified.rawMessage
-            : classified.copy,
+        title: classified.title,
+        description: classified.copy,
         type: "error",
         duration: TOAST_DURATION_MS,
         action: needsConfiguration
@@ -285,8 +277,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     }
 
     return (
-      <Card.Root className="langy-root" overflow="hidden">
-        <LangyMarkGradientDefs />
+      <Card.Root overflow="hidden">
         <Card.Body>
           <VStack align="stretch" gap={3}>
             <HStack gap={3}>
@@ -300,11 +291,11 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                 borderColor="border"
                 borderRadius="10px"
               >
-                <LangyMark size={22} />
+                <Sparkles size={18} />
               </Box>
               <Box>
                 <Text fontWeight="semibold" fontSize="sm">
-                  {hasHistory ? "Refine with Langy" : "Draft with Langy"}
+                  {hasHistory ? "Refine with AI" : "Draft with AI"}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
                   {hasHistory
@@ -317,17 +308,17 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             <Text fontSize="xs" color="fg.muted">
               {hasHistory
                 ? "Ask for harder edge cases, clearer criteria, or a different persona."
-                : "Describe the behavior you care about and Langy will draft the situation and criteria."}
+                : "Describe the behavior you care about and AI will draft the situation and criteria."}
             </Text>
 
             <Button
               colorPalette="orange"
               size="sm"
               onClick={() => setViewMode("input")}
-              aria-label="Generate with AI using Langy"
+              aria-label="Generate with AI"
             >
               <Sparkles size={14} />
-              {hasHistory ? "Refine the draft" : "Open Langy"}
+              {hasHistory ? "Refine the draft" : "Start a draft"}
             </Button>
 
             <ResolvedModelCaption model={resolvedDefault.data?.model} />
@@ -339,8 +330,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
   // "Input" view - AI generation interface
   return (
-    <Card.Root className="langy-root" overflow="hidden">
-      <LangyMarkGradientDefs />
+    <Card.Root overflow="hidden">
       <Card.Body>
         <VStack align="stretch" gap={3}>
           <HStack justify="space-between">
@@ -355,11 +345,11 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                 borderColor="border"
                 borderRadius="10px"
               >
-                <LangyMark size={22} />
+                <Sparkles size={18} />
               </Box>
               <Box>
                 <Text fontWeight="semibold" fontSize="sm">
-                  Langy
+                  AI draft
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
                   {hasHistory ? "Refine this draft" : "Draft this scenario"}
@@ -378,7 +368,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
           <Text fontSize="xs" color="fg.muted">
             {hasHistory
-              ? "Tell Langy what should change. The form stays editable."
+              ? "Describe what should change. The form stays editable."
               : "Describe what your agent does and the behavior you want to test."}
           </Text>
 
@@ -480,12 +470,12 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             {status === "generating" ? (
               <>
                 <Spinner size="sm" />
-                Langy is drafting…
+                Drafting…
               </>
             ) : (
               <>
                 <Sparkles size={14} />
-                {hasHistory ? "Refine with Langy" : "Draft with Langy"}
+                {hasHistory ? "Refine with AI" : "Draft with AI"}
               </>
             )}
           </Button>

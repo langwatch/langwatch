@@ -1,7 +1,6 @@
 import {
   Badge,
   Button,
-  Card,
   createListCollection,
   Field,
   Heading,
@@ -46,6 +45,7 @@ type OrganizationFormData = {
   s3SecretAccessKey: string;
   s3Bucket: string;
   presenceEnabled: boolean;
+  traceSharingEnabled: boolean;
   supportContact: string;
   primaryIntent: "" | OrganizationIntent;
 };
@@ -104,8 +104,8 @@ function SettingsForm({
   const { hasPermission } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const { openDrawer } = useDrawer();
-  // ADR-038 ships dark: the Primary use setting only exists where the
-  // governance surface it routes to is reachable.
+  // ADR-038: the Primary use setting only exists where the governance
+  // surface it routes to is reachable (flag on, which is the default).
   const { enabled: governanceEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     { organizationId: organization.id },
@@ -117,6 +117,7 @@ function SettingsForm({
     s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
+    traceSharingEnabled: organization.traceSharingEnabled,
     supportContact:
       (organization as { supportContact?: string | null }).supportContact ?? "",
     primaryIntent: organization.primaryIntent ?? "",
@@ -127,8 +128,7 @@ function SettingsForm({
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
   const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
-  const [showCreateProjectDialog, setShowCreateProjectDialog] =
-    useState(false);
+  const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData,
@@ -147,6 +147,7 @@ function SettingsForm({
         s3SecretAccessKey: data.s3SecretAccessKey,
         s3Bucket: data.s3Bucket,
         presenceEnabled: data.presenceEnabled,
+        traceSharingEnabled: data.traceSharingEnabled,
         supportContact: data.supportContact.trim() || null,
         primaryIntent: data.primaryIntent === "" ? null : data.primaryIntent,
       },
@@ -186,8 +187,7 @@ function SettingsForm({
         onError: () => {
           toaster.create({
             title: "Failed to update organization",
-            description:
-              "Your changes could not be saved. Please try again.",
+            description: "Your changes could not be saved. Please try again.",
             type: "error",
             meta: {
               closable: true,
@@ -253,12 +253,7 @@ function SettingsForm({
                   label="Project ID"
                   helper="Use this ID when authenticating with API Keys"
                 >
-                  <Input
-                    width="full"
-                    disabled
-                    type="text"
-                    value={project.id}
-                  />
+                  <Input width="full" disabled type="text" value={project.id} />
                 </HorizontalFormControl>
               )}
 
@@ -291,68 +286,68 @@ function SettingsForm({
               </HorizontalFormControl>
 
               {governanceEnabled && (
-              <HorizontalFormControl
-                label="Primary use"
-                helper={
-                  <VStack align="start" gap={1}>
-                    <Text>
-                      What this organization mainly uses LangWatch for. Decides
-                      where everyone lands when opening the app: coding-agent
-                      tracking opens the personal usage page, LLM apps open the
-                      project home. &quot;Not set&quot; keeps the current
-                      behavior.
-                    </Text>
-                    {!hasPermission("organization:manage") && (
-                      <AdminOnlyBadge />
-                    )}
-                  </VStack>
-                }
-              >
-                {hasPermission("organization:manage") ? (
-                  <Controller
-                    control={control}
-                    name="primaryIntent"
-                    render={({ field }) => (
-                      <Select.Root
-                        collection={primaryUseCollection}
-                        value={[field.value]}
-                        width="full"
-                        onValueChange={(d) =>
-                          field.onChange(
-                            (d.value[0] ?? "") as "" | OrganizationIntent,
-                          )
-                        }
-                      >
-                        <Select.Trigger
-                          background="bg"
-                          aria-label="Primary use"
-                        >
-                          <Select.ValueText />
-                        </Select.Trigger>
-                        <Select.Content>
-                          {primaryUseCollection.items.map((item) => (
-                            <Select.Item key={item.value} item={item}>
-                              {item.label}
-                            </Select.Item>
-                          ))}
-                        </Select.Content>
-                      </Select.Root>
-                    )}
-                  />
-                ) : (
-                  <Text>
-                    {organization.primaryIntent ? (
-                      primaryUseCollection.items.find(
-                        (item) => item.value === organization.primaryIntent,
-                      )?.label
-                    ) : (
-                      <Text as="span" color="fg.subtle">
-                        Not set
+                <HorizontalFormControl
+                  label="Primary use"
+                  helper={
+                    <VStack align="start" gap={1}>
+                      <Text>
+                        What this organization mainly uses LangWatch for.
+                        Decides where everyone lands when opening the app:
+                        coding-agent tracking opens the personal usage page, LLM
+                        apps open the project home. &quot;Not set&quot; keeps
+                        the current behavior.
                       </Text>
-                    )}
-                  </Text>
-                )}
-              </HorizontalFormControl>
+                      {!hasPermission("organization:manage") && (
+                        <AdminOnlyBadge />
+                      )}
+                    </VStack>
+                  }
+                >
+                  {hasPermission("organization:manage") ? (
+                    <Controller
+                      control={control}
+                      name="primaryIntent"
+                      render={({ field }) => (
+                        <Select.Root
+                          collection={primaryUseCollection}
+                          value={[field.value]}
+                          width="full"
+                          onValueChange={(d) =>
+                            field.onChange(
+                              (d.value[0] ?? "") as "" | OrganizationIntent,
+                            )
+                          }
+                        >
+                          <Select.Trigger
+                            background="bg"
+                            aria-label="Primary use"
+                          >
+                            <Select.ValueText />
+                          </Select.Trigger>
+                          <Select.Content>
+                            {primaryUseCollection.items.map((item) => (
+                              <Select.Item key={item.value} item={item}>
+                                {item.label}
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+                      )}
+                    />
+                  ) : (
+                    <Text>
+                      {organization.primaryIntent ? (
+                        primaryUseCollection.items.find(
+                          (item) => item.value === organization.primaryIntent,
+                        )?.label
+                      ) : (
+                        <Text as="span" color="fg.subtle">
+                          Not set
+                        </Text>
+                      )}
+                    </Text>
+                  )}
+                </HorizontalFormControl>
               )}
 
               <HorizontalFormControl
@@ -374,6 +369,34 @@ function SettingsForm({
                 <Controller
                   control={control}
                   name="presenceEnabled"
+                  render={({ field }) => (
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={({ checked }) => field.onChange(checked)}
+                      disabled={!hasPermission("organization:manage")}
+                    />
+                  )}
+                />
+              </HorizontalFormControl>
+
+              <HorizontalFormControl
+                label="Trace Sharing"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      Lets members create share links to traces. Disable to turn
+                      sharing off across every project in this organization and
+                      revoke all existing links.
+                    </Text>
+                    {!hasPermission("organization:manage") && (
+                      <AdminOnlyBadge />
+                    )}
+                  </VStack>
+                }
+              >
+                <Controller
+                  control={control}
+                  name="traceSharingEnabled"
                   render={({ field }) => (
                     <Switch
                       checked={field.value}
@@ -458,8 +481,8 @@ function SettingsForm({
           <Dialog.Body>
             <Text>
               Your changes are saved. Monitoring LLM apps happens inside a
-              project, and this organization doesn&apos;t have one yet —
-              create your first project so everyone has somewhere to land.
+              project, and this organization doesn&apos;t have one yet — create
+              your first project so everyone has somewhere to land.
             </Text>
           </Dialog.Body>
           <Dialog.Footer>
@@ -477,9 +500,8 @@ function SettingsForm({
                   openDrawer("createProject", {
                     navigateOnCreate: true,
                     organizationId: organization.id,
-                    defaultTeamId: organization.teams.find(
-                      (t) => !t.isPersonal,
-                    )?.id,
+                    defaultTeamId: organization.teams.find((t) => !t.isPersonal)
+                      ?.id,
                   });
                 }}
               >
@@ -636,8 +658,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         onError: () => {
           toaster.create({
             title: "Failed to update project",
-            description:
-              "Your changes could not be saved. Please try again.",
+            description: "Your changes could not be saved. Please try again.",
             type: "error",
             meta: {
               closable: true,
@@ -729,9 +750,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                     ? "Disabled at the organization level - turn it on there first."
                     : "Disable to turn presence off for this project only."}
                 </Text>
-                {!userIsAdmin && (
-                  <AdminOnlyBadge />
-                )}
+                {!userIsAdmin && <AdminOnlyBadge />}
               </VStack>
             }
             invalid={!!formState.errors.presenceEnabled}
@@ -757,10 +776,13 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             label="Trace Sharing"
             helper={
               <VStack align="start" gap={1}>
-                <Text>Allow users to share traces with public links</Text>
-                {!userIsAdmin && (
-                  <AdminOnlyBadge />
-                )}
+                <Text>
+                  Allow users to share traces with public links.{" "}
+                  {!organization?.traceSharingEnabled
+                    ? "Disabled at the organization level - turn it on there first."
+                    : "Disable to turn sharing off for this project only."}
+                </Text>
+                {!userIsAdmin && <AdminOnlyBadge />}
               </VStack>
             }
             invalid={!!formState.errors.traceSharingEnabled}
@@ -770,11 +792,15 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               name="traceSharingEnabled"
               render={({ field }) => (
                 <Switch
-                  checked={field.value}
+                  checked={
+                    field.value && (organization?.traceSharingEnabled ?? true)
+                  }
                   onCheckedChange={({ checked }) =>
                     handleTraceSharingChange(checked)
                   }
-                  disabled={!userIsAdmin}
+                  disabled={
+                    !userIsAdmin || !(organization?.traceSharingEnabled ?? true)
+                  }
                 />
               )}
             />

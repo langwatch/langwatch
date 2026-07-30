@@ -2,8 +2,8 @@ import {
   Button,
   createListCollection,
   Field,
-  HStack,
   Heading,
+  HStack,
   Input,
   Spacer,
   Text,
@@ -11,6 +11,11 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useMemo } from "react";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
+import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -43,17 +48,18 @@ export function EditProjectDrawer({
     { enabled: !!organization },
   );
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isDirty },
-    control,
-  } = useForm<EditProjectFormData>({
+  const form = useForm<EditProjectFormData>({
     defaultValues: {
       name: projectName ?? "",
       teamId: currentTeamId ?? "",
     },
   });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isDirty },
+    control,
+  } = form;
 
   const updateProject = api.project.update.useMutation();
 
@@ -95,18 +101,28 @@ export function EditProjectDrawer({
             });
             closeDrawer();
           },
-          onError: (e) => {
-            toaster.create({
-              title: e.message,
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
+          onError: (error) => {
+            if (
+              applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })
+            )
+              return;
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't update the project",
             });
           },
         },
       );
     },
-    [updateProject, projectId, projectName, currentTeamId, queryClient, closeDrawer],
+    [
+      updateProject,
+      projectId,
+      projectName,
+      currentTeamId,
+      queryClient,
+      closeDrawer,
+      form,
+    ],
   );
 
   return (
@@ -126,9 +142,11 @@ export function EditProjectDrawer({
         <Drawer.Body>
           <form onSubmit={handleSubmit(onSubmit)}>
             <VStack align="stretch" gap={6}>
+              <FormServerError form={form} />
+
               <Text fontSize="sm" color="fg.muted">
-                Update the project name or move it to a different team.
-                Moving a project changes which team members inherit access.
+                Update the project name or move it to a different team. Moving a
+                project changes which team members inherit access.
               </Text>
 
               <Field.Root invalid={!!errors.name}>
@@ -145,7 +163,7 @@ export function EditProjectDrawer({
                 )}
               </Field.Root>
 
-              <Field.Root>
+              <Field.Root invalid={!!errors.teamId}>
                 <Field.Label>Team</Field.Label>
                 <Controller
                   control={control}
@@ -180,6 +198,9 @@ export function EditProjectDrawer({
                     </Select.Root>
                   )}
                 />
+                {errors.teamId && (
+                  <Field.ErrorText>{errors.teamId.message}</Field.ErrorText>
+                )}
               </Field.Root>
 
               <HStack width="full">

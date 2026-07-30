@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getOriginColor, getOriginLabel, originColors } from "../originColors";
+import { getOriginColor, getOriginLabel } from "../originColors";
 
 describe("originColors", () => {
   describe("getOriginColor", () => {

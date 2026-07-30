@@ -6,7 +6,7 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  checkApiKey: vi.fn(),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
 }));
 
 import { tagCreateCommand } from "../create";
@@ -45,7 +45,8 @@ describe("tagCreateCommand", () => {
     it("prints confirmation message", async () => {
       mockCreateTag.mockResolvedValue({ name: "canary", createdAt: new Date().toISOString() });
 
-      await tagCreateCommand("canary");
+      const result = await tagCreateCommand("canary");
+      result?.table();
 
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining("Created tag: canary"));
     });

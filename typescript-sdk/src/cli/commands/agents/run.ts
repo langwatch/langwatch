@@ -1,17 +1,24 @@
+import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+/**
+ * Returns the run's response rather than printing it: the output port renders
+ * it in whatever format the caller asked for (utils/output.ts). Both execution
+ * paths (direct HTTP agent, workflow-linked agent) return their own result.
+ */
 export const runAgentCommand = async (
   id: string,
-  options: { input?: string; format?: string },
-): Promise<void> => {
-  checkApiKey();
+  options: { input?: string },
+): Promise<CommandResult | void> => {
+  await resolveCredentials();
 
   const service = new AgentsApiService();
 
@@ -62,21 +69,22 @@ export const runAgentCommand = async (
       const result = await response.json() as Record<string, unknown>;
       runSpinner.succeed(`HTTP agent responded (${response.status})`);
 
-      if (options.format === "json") {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log();
-        console.log(chalk.bold("  Response:"));
-        console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
-        console.log();
-      }
+      return {
+        data: result,
+        table: () => {
+          console.log();
+          console.log(chalk.bold("  Response:"));
+          console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
+          console.log();
+        },
+      };
     } catch (error) {
-      failSpinner({ spinner: runSpinner, error, action: "call HTTP agent", format: options?.format });
+      failSpinner({ spinner: runSpinner, error, action: "call HTTP agent" });
       process.exit(1);
     }
   } else {
     // For signature/code/workflow agents, try to run via the workflow API
-    const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+    const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
     // Check if agent has a linked workflow
@@ -106,29 +114,30 @@ export const runAgentCommand = async (
 
       if (!response.ok) {
         const message = await formatFetchError(response);
-        runSpinner.fail(`Agent execution failed: ${message}`);
+        failSpinner({ spinner: runSpinner, error: new Error(message), action: "run agent" });
         process.exit(1);
       }
 
       const result = await response.json() as Record<string, unknown>;
       runSpinner.succeed(`Agent "${agent.name}" executed successfully`);
 
-      if (options.format === "json") {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log();
-        if (result.output !== undefined) {
-          console.log(chalk.bold("  Output:"));
-          const output = typeof result.output === "string"
-            ? result.output
-            : JSON.stringify(result.output, null, 2);
-          console.log(`    ${output.split("\n").join("\n    ")}`);
-        } else {
-          console.log(chalk.bold("  Result:"));
-          console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
-        }
-        console.log();
-      }
+      return {
+        data: result,
+        table: () => {
+          console.log();
+          if (result.output !== undefined) {
+            console.log(chalk.bold("  Output:"));
+            const output = typeof result.output === "string"
+              ? result.output
+              : JSON.stringify(result.output, null, 2);
+            console.log(`    ${output.split("\n").join("\n    ")}`);
+          } else {
+            console.log(chalk.bold("  Result:"));
+            console.log(`    ${JSON.stringify(result, null, 2).split("\n").join("\n    ")}`);
+          }
+          console.log();
+        },
+      };
     } catch (error) {
       failSpinner({
         spinner: runSpinner,

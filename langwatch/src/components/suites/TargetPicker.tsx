@@ -5,12 +5,19 @@
  * list with type indicators, and a footer with count + select all/clear buttons.
  */
 
-import { Box, Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { AlertTriangle, Plus, X } from "lucide-react";
 import type { SuiteTarget } from "~/server/suites/types";
-import { Tooltip } from "../ui/tooltip";
 import { Checkbox } from "../ui/checkbox";
 import { SearchInput } from "../ui/SearchInput";
+import { Tooltip } from "../ui/tooltip";
 
 interface AvailableTarget {
   name: string;
@@ -159,11 +166,16 @@ export function TargetPicker({
           <HStack gap={2}>
             <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
             <Text fontSize="xs" color="orange.fg">
-              {archivedTargets.length} archived target{archivedTargets.length > 1 ? "s" : ""} linked:
+              {archivedTargets.length} archived target
+              {archivedTargets.length > 1 ? "s" : ""} linked:
             </Text>
           </HStack>
           {archivedTargets.map((target) => (
-            <HStack key={`${target.type}-${target.referenceId}`} gap={2} paddingLeft={5}>
+            <HStack
+              key={`${target.type}-${target.referenceId}`}
+              gap={2}
+              paddingLeft={5}
+            >
               <Text fontSize="sm" color="fg.muted" flex={1} fontStyle="italic">
                 {target.name}
               </Text>

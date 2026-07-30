@@ -8,14 +8,17 @@ import {
 } from "../platformIngestionTemplates.seeds";
 
 /**
- * Regression guard for specs/ai-gateway/governance/ingestion-templates-catalog.feature
- * scenario "The platform-template seed produces no coding-assistant rows".
+ * Regression guard for
+ * specs/ai-gateway/governance/ingestion-templates-catalog.feature
+ * scenario "The platform-template seed produces no coding-assistant rows"
+ * and specs/ai-governance/personal-portal/default-catalog.feature
+ * scenario "The platform default template set ships no claude-cowork".
  *
- * The platform's coding assistants are owned by `langwatch <tool>` + the
- * receiver log-to-span conversion, so they are NOT seeded as ingestion
- * templates. There is no flag and no filter: they are simply absent from
- * the seed input. Any rows a previous seed created are archived via the
- * retired-slugs list so dev DBs converge to the v1 catalog.
+ * The platform ships NO default ingestion templates. The coding
+ * assistants are owned by `langwatch <tool>` + the receiver log-to-span
+ * conversion, and claude_cowork is retired from the default set. Any
+ * rows a previous seed created are archived via the retired-slugs list
+ * so dev DBs and production converge to the locked (empty) catalog.
  */
 const CODING_ASSISTANT_SLUGS = [
   "claude_code",
@@ -26,10 +29,10 @@ const CODING_ASSISTANT_SLUGS = [
 ] as const;
 
 describe("PLATFORM_INGESTION_TEMPLATES", () => {
-  describe("given the v1 platform seed input", () => {
-    it("seeds claude_cowork as the only platform coding-tool template", () => {
-      const slugs = PLATFORM_INGESTION_TEMPLATES.map((t) => t.slug);
-      expect(slugs).toEqual(["claude_cowork"]);
+  describe("when the platform seed input is inspected", () => {
+    /** @scenario The platform-template seed produces no coding-assistant rows */
+    it("ships no default template rows at all", () => {
+      expect(PLATFORM_INGESTION_TEMPLATES).toEqual([]);
     });
 
     /** @scenario The platform-template seed produces no coding-assistant rows */
@@ -41,11 +44,16 @@ describe("PLATFORM_INGESTION_TEMPLATES", () => {
     });
   });
 
-  describe("given a dev DB that may hold rows from an earlier seed run", () => {
+  describe("when a dev DB still holds rows from an earlier seed run", () => {
     it("retires every coding-assistant slug so stale rows get archived", () => {
       for (const codingSlug of CODING_ASSISTANT_SLUGS) {
         expect(RETIRED_PLATFORM_TEMPLATE_SLUGS).toContain(codingSlug);
       }
+    });
+
+    /** @scenario The platform default template set ships no claude-cowork */
+    it("retires claude_cowork so existing platform rows get archived", () => {
+      expect(RETIRED_PLATFORM_TEMPLATE_SLUGS).toContain("claude_cowork");
     });
   });
 });

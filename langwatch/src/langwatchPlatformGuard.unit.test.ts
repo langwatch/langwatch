@@ -12,7 +12,9 @@ describe("assertPlatformHasNoLangwatchApiKey", () => {
   describe("given LANGWATCH_API_KEY is set", () => {
     it("refuses to boot", () => {
       expect(() =>
-        assertPlatformHasNoLangwatchApiKey({ LANGWATCH_API_KEY: "sk-lw-real-key" }),
+        assertPlatformHasNoLangwatchApiKey({
+          LANGWATCH_API_KEY: "sk-lw-real-key",
+        }),
       ).toThrow(/must not be set on a langwatch platform/);
     });
   });

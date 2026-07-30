@@ -7,6 +7,10 @@ Feature: Model Provider List Management
   # "Default Model" badge, "Add Model Provider" menu). Need a JSDOM render of
   # `ModelProviderList` + project-default badge logic. Aspirational pending the
   # list-page harness; scope-aware listing is covered by repository tests.
+  #
+  # The Background below assumes a project exists. The same page before the
+  # organization has one lives in
+  # specs/model-providers/providers-without-a-project.feature.
 
   Background:
     Given I am logged in

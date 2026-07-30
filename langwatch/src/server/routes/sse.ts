@@ -17,7 +17,9 @@ import superjson from "superjson";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 
 // Lazy-load appRouter — same reason as trpc.ts (circular dependency avoidance)
-let _appRouter: Awaited<typeof import("~/server/api/root")>["appRouter"] | null = null;
+let _appRouter:
+  | Awaited<typeof import("~/server/api/root")>["appRouter"]
+  | null = null;
 async function getAppRouter() {
   if (!_appRouter) {
     const mod = await import("~/server/api/root");
@@ -26,10 +28,10 @@ async function getAppRouter() {
   return _appRouter;
 }
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { createInnerTRPCContext } from "~/server/api/trpc";
-import { HandledError } from "@langwatch/handled-error";
 import { getServerAuthSession } from "~/server/auth";
 
 const logger = createLogger("langwatch:sse");
@@ -46,8 +48,11 @@ export function sseErrorFrame(err: unknown): Record<string, unknown> {
   if (handled) {
     return {
       type: "error",
-      message: handled.message,
-      domainError: handled.serialize(),
+      // The code, never the handled error's own message — that is server copy
+      // and can name internal configuration (ADR-045). The client keys its
+      // presentation off `error.code` via the explainers.
+      message: handled.code,
+      error: handled.serialize(),
     };
   }
   if (err instanceof TRPCError && err.code !== "INTERNAL_SERVER_ERROR") {
@@ -59,19 +64,9 @@ export function sseErrorFrame(err: unknown): Record<string, unknown> {
 /** The HandledError behind a stream failure, if there is one. */
 function handledCauseOf(err: unknown): HandledError | undefined {
   const candidate = err instanceof TRPCError ? err.cause : err;
-  if (candidate instanceof HandledError) return candidate;
-  // A bundler can load a second copy of the package — duck-type like the
-  // Hono error handler does (see error-handler.ts).
-  if (
-    candidate &&
-    typeof candidate === "object" &&
-    "code" in candidate &&
-    "httpStatus" in candidate &&
-    typeof (candidate as { serialize?: unknown }).serialize === "function"
-  ) {
-    return candidate as HandledError;
-  }
-  return undefined;
+  // isHandled also matches an instance from a second copy of the package,
+  // which bare `instanceof` misses — see its brand check.
+  return HandledError.isHandled(candidate) ? candidate : undefined;
 }
 
 /**
@@ -79,7 +74,11 @@ function handledCauseOf(err: unknown): HandledError | undefined {
  * loggers: customer-fault handled errors warn (spike-watched), platform /
  * provider and unhandled errors log at error.
  */
-function logSseError(err: unknown, logData: Record<string, unknown>, msg: string) {
+function logSseError(
+  err: unknown,
+  logData: Record<string, unknown>,
+  msg: string,
+) {
   const handled = handledCauseOf(err);
   const level = handled && handled.fault === "customer" ? "warn" : "error";
   logger[level](
@@ -127,170 +126,184 @@ function buildReqShim(req: Request): any {
   } as any;
 }
 
-secured.access(
-  handlerManagedAuth("user session validated in-handler via getServerAuthSession"),
-).get("/sse/*", async (c) => {
-  const raw = c.req.raw;
-  const url = new URL(raw.url);
+secured
+  .access(
+    handlerManagedAuth(
+      "user session validated in-handler via getServerAuthSession",
+    ),
+  )
+  .get("/sse/*", async (c) => {
+    const raw = c.req.raw;
+    const url = new URL(raw.url);
 
-  // Extract the procedure path from the URL.
-  // The URL path is /api/sse/traces.onTraceUpdate or /api/sse/traces/onTraceUpdate.
-  // We strip the /api/sse/ prefix and join remaining segments with ".".
-  const pathAfterSse = url.pathname.replace(/^\/api\/sse\/?/, "");
-  const path = pathAfterSse.replace(/\//g, ".");
+    // Extract the procedure path from the URL.
+    // The URL path is /api/sse/traces.onTraceUpdate or /api/sse/traces/onTraceUpdate.
+    // We strip the /api/sse/ prefix and join remaining segments with ".".
+    const pathAfterSse = url.pathname.replace(/^\/api\/sse\/?/, "");
+    const path = pathAfterSse.replace(/\//g, ".");
 
-  if (!path) {
-    return c.json({ message: "Missing trpc path" }, 400);
-  }
+    if (!path) {
+      return c.json({ message: "Missing trpc path" }, 400);
+    }
 
-  // Parse input from query params
-  const inputParam = url.searchParams.get("input") ?? undefined;
-  const input = inputParam ? superjson.parse(inputParam) : undefined;
+    // Parse input from query params
+    const inputParam = url.searchParams.get("input") ?? undefined;
+    const input = inputParam ? superjson.parse(inputParam) : undefined;
 
-  // Build context
-  const reqShim = buildReqShim(raw);
-  const session = await getServerAuthSession({
-    req: raw as unknown as Parameters<typeof getServerAuthSession>[0]["req"],
-  });
-  const ctx = createInnerTRPCContext({
-    req: reqShim,
-    res: undefined,
-    session,
-    permissionChecked: false,
-    publiclyShared: false,
-  });
+    // Build context
+    const reqShim = buildReqShim(raw);
+    const session = await getServerAuthSession({
+      req: raw as unknown as Parameters<typeof getServerAuthSession>[0]["req"],
+    });
+    const ctx = createInnerTRPCContext({
+      req: reqShim,
+      res: undefined,
+      session,
+      permissionChecked: false,
+      publiclyShared: false,
+      // Subscriptions await an event that may never come; without this they stay
+      // suspended after the browser is gone, holding their emitter listener and
+      // skipping their own cleanup. Closing the stream cannot interrupt a
+      // pending `await` from the outside, so the signal has to reach the
+      // procedure itself.
+      signal: raw.signal,
+    });
 
-  // Create caller and resolve the procedure
-  const router = await getAppRouter();
-  const caller = router.createCaller(ctx);
-  const procedure = path
-    .split(".")
-    .reduce<any>((obj, key) => obj?.[key], caller);
+    // Create caller and resolve the procedure
+    const router = await getAppRouter();
+    const caller = router.createCaller(ctx);
+    const procedure = path
+      .split(".")
+      .reduce<any>((obj, key) => obj?.[key], caller);
 
-  if (typeof procedure !== "function") {
-    return c.json({ message: "Procedure not found" }, 404);
-  }
+    if (typeof procedure !== "function") {
+      return c.json({ message: "Procedure not found" }, 404);
+    }
 
-  // Set SSE headers
-  c.header("Content-Type", "text/event-stream; charset=utf-8");
-  c.header("Cache-Control", "no-cache, no-transform");
-  c.header("Connection", "keep-alive");
-  c.header("X-Accel-Buffering", "no");
+    // Set SSE headers
+    c.header("Content-Type", "text/event-stream; charset=utf-8");
+    c.header("Cache-Control", "no-cache, no-transform");
+    c.header("Connection", "keep-alive");
+    c.header("X-Accel-Buffering", "no");
 
-  const body = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-      let ended = false;
-      let unsubscribe: (() => void) | null = null;
+    const body = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        let ended = false;
+        let unsubscribe: (() => void) | null = null;
 
-      const write = (text: string) => {
-        if (ended) return;
-        try {
-          controller.enqueue(encoder.encode(text));
-        } catch {
-          // Stream already closed
-          end();
-        }
-      };
+        const write = (text: string) => {
+          if (ended) return;
+          try {
+            controller.enqueue(encoder.encode(text));
+          } catch {
+            // Stream already closed
+            end();
+          }
+        };
 
-      const writeData = (value: unknown) => {
-        if (ended) return;
-        const payload = superjson.stringify(value);
-        for (const line of payload.split(/\r?\n/)) {
-          write(`data: ${line}\n`);
-        }
-        write("\n");
-      };
+        const writeData = (value: unknown) => {
+          if (ended) return;
+          const payload = superjson.stringify(value);
+          for (const line of payload.split(/\r?\n/)) {
+            write(`data: ${line}\n`);
+          }
+          write("\n");
+        };
 
-      const end = () => {
-        if (ended) return;
-        ended = true;
-        clearInterval(ping);
-        try {
-          unsubscribe?.();
-        } catch {
-          // Ignore cleanup errors
-        }
-        unsubscribe = null;
-        try {
-          controller.close();
-        } catch {
-          // Stream already closed
-        }
-      };
+        const end = () => {
+          if (ended) return;
+          ended = true;
+          clearInterval(ping);
+          try {
+            unsubscribe?.();
+          } catch {
+            // Ignore cleanup errors
+          }
+          unsubscribe = null;
+          try {
+            controller.close();
+          } catch {
+            // Stream already closed
+          }
+        };
 
-      // Keep-alive ping every 25 seconds
-      const ping = setInterval(() => {
-        if (ended) {
-          end();
-        } else {
-          write(": ping\n\n");
-        }
-      }, 25_000);
+        // Keep-alive ping every 25 seconds
+        const ping = setInterval(() => {
+          if (ended) {
+            end();
+          } else {
+            write(": ping\n\n");
+          }
+        }, 25_000);
 
-      // Send connected event
-      writeData({ type: "connected" });
+        // Send connected event
+        writeData({ type: "connected" });
 
-      // Call the procedure and handle the result
-      (async () => {
-        try {
-          const result = await procedure(input);
+        // Call the procedure and handle the result. Deliberately fire-and-forget:
+        // the stream stays open while this runs, and the catch below is the only
+        // place a rejection can surface.
+        void (async () => {
+          try {
+            const result = await procedure(input);
 
-          // AsyncIterable
-          if (result && typeof result[Symbol.asyncIterator] === "function") {
-            for await (const data of result as AsyncIterable<unknown>) {
-              if (ended) break;
-              writeData(data);
+            // AsyncIterable
+            if (result && typeof result[Symbol.asyncIterator] === "function") {
+              for await (const data of result as AsyncIterable<unknown>) {
+                if (ended) break;
+                writeData(data);
+              }
+              writeData({ type: "complete" });
+              end();
+              return;
             }
+
+            // Observable-like (tRPC subscriptions)
+            if (result && typeof (result as any).subscribe === "function") {
+              const sub = (result as any).subscribe({
+                next: (data: unknown) => writeData(data),
+                complete: () => {
+                  writeData({ type: "complete" });
+                  end();
+                },
+                error: (err: unknown) => {
+                  logSseError(err, { err, path }, "SSE observable error");
+                  writeData(sseErrorFrame(err));
+                  end();
+                },
+              });
+
+              if (typeof sub === "function") unsubscribe = sub;
+              else if (sub && typeof sub.unsubscribe === "function")
+                unsubscribe = () => sub.unsubscribe();
+
+              return; // Keep connection open for observable
+            }
+
+            // Non-streaming result
+            writeData(result);
             writeData({ type: "complete" });
             end();
-            return;
+          } catch (error) {
+            // No `input` here: it is the raw request payload, which may carry
+            // PII — same contract as the observable error path above.
+            logSseError(error, { error, path }, "SSE handler error");
+            writeData(sseErrorFrame(error));
+            end();
           }
+        })();
 
-          // Observable-like (tRPC subscriptions)
-          if (result && typeof (result as any).subscribe === "function") {
-            const sub = (result as any).subscribe({
-              next: (data: unknown) => writeData(data),
-              complete: () => {
-                writeData({ type: "complete" });
-                end();
-              },
-              error: (err: unknown) => {
-                logSseError(err, { err, path }, "SSE observable error");
-                writeData(sseErrorFrame(err));
-                end();
-              },
-            });
-
-            if (typeof sub === "function") unsubscribe = sub;
-            else if (sub && typeof sub.unsubscribe === "function")
-              unsubscribe = () => sub.unsubscribe();
-
-            return; // Keep connection open for observable
-          }
-
-          // Non-streaming result
-          writeData(result);
-          writeData({ type: "complete" });
+        // Handle client disconnect via AbortSignal on the request
+        raw.signal?.addEventListener("abort", () => {
           end();
-        } catch (error) {
-          logSseError(error, { error, path, input }, "SSE handler error");
-          writeData(sseErrorFrame(error));
-          end();
-        }
-      })();
+        });
+      },
+    });
 
-      // Handle client disconnect via AbortSignal on the request
-      raw.signal?.addEventListener("abort", () => {
-        end();
-      });
-    },
+    return new Response(body, {
+      status: 200,
+      headers: c.res.headers,
+    });
   });
-
-  return new Response(body, {
-    status: 200,
-    headers: c.res.headers,
-  });
-});
 
 export const app = secured.hono;

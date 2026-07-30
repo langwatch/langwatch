@@ -16,7 +16,6 @@ import type {
   TraceListItem,
 } from "../../../../../types/trace";
 import {
-  abbreviateModel,
   formatDuration,
   SPAN_TYPE_COLORS,
 } from "../../../../../utils/formatters";
@@ -258,16 +257,12 @@ const PeekSpanRow: React.FC<{
         >
           {icon}
         </Text>
-        <Text
-          textStyle="2xs"
-          color={isError ? "red.fg" : "fg"}
-          truncate
-        >
+        <Text textStyle="2xs" color={isError ? "red.fg" : "fg"} truncate>
           {span.name}
         </Text>
         {span.model && (
           <Text textStyle="2xs" color="fg.subtle" truncate flexShrink={1}>
-            {abbreviateModel(span.model)}
+            {span.model}
           </Text>
         )}
       </HStack>

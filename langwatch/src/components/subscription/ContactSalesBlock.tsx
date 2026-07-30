@@ -1,18 +1,11 @@
 /**
  * Contact Sales Block - CTA for enterprise or higher-tier needs
  */
-import {
-  Button,
-  Card,
-  Flex,
-  HStack,
-  SimpleGrid,
-  Text,
-} from "@chakra-ui/react";
+import { Button, Card, Flex, HStack, SimpleGrid, Text } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { Link } from "~/components/ui/link";
-import { ENTERPRISE_PLAN_FEATURES } from "./billing-plans";
 import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
+import { ENTERPRISE_PLAN_FEATURES } from "./billing-plans";
 
 export function ContactSalesBlock() {
   return (
@@ -42,11 +35,7 @@ export function ContactSalesBlock() {
         </SimpleGrid>
         <Flex justifyContent="flex-end" marginTop={6}>
           <Button asChild variant="outline" size="sm" colorPalette="orange">
-            <Link
-              href={CONTACT_SALES_URL}
-              isExternal
-              fontWeight="semibold"
-            >
+            <Link href={CONTACT_SALES_URL} isExternal fontWeight="semibold">
               Contact Sales
             </Link>
           </Button>

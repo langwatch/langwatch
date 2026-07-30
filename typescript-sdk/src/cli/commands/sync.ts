@@ -6,7 +6,7 @@ import {
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
-import { checkApiKey } from "../utils/apiKey";
+import { resolveCredentials } from "../utils/apiKey";
 import { pullPrompts } from "./pull";
 import { pushPrompts } from "./push";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
@@ -18,7 +18,7 @@ export const syncCommand = async (): Promise<void> => {
 
   try {
     // Check API key before doing anything else
-    checkApiKey();
+    await resolveCredentials();
 
     // Get prompts API service
     const promptsApiService = new PromptsApiService();

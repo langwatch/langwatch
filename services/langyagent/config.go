@@ -34,6 +34,7 @@ package langyagent
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -81,7 +82,7 @@ type Config struct {
 	// deadline can never eat the drain budget out from under the kill.
 	ShutdownDrainBudgetMS int64 `env:"LANGY_SHUTDOWN_DRAIN_BUDGET_MS" validate:"gte=0"`
 
-	// Egress enforcement (ADR-043). These configure the per-worker egress
+	// Egress enforcement (ADR-076). These configure the per-worker egress
 	// forward proxy the manager spawns for each worker (see adapters/egress).
 	//
 	// EgressFqdnFloor is the operator-owned always-allowed set (github /
@@ -102,6 +103,22 @@ type Config struct {
 	// EgressSNICrossCheck peeks the TLS ClientHello SNI as an anti-fronting
 	// cross-check of the CONNECT authority. Default ON.
 	EgressSNICrossCheck bool `env:"LANGY_EGRESS_SNI_CROSSCHECK"`
+
+	// MirrorTraceEndpoint + MirrorTraceKey address the operator-designated
+	// mirror project — the mirror lane (ADR-061): a SECONDARY EXPORTER for the
+	// turn's gen_ai trace data (the worker's model/tool spans), so the
+	// operator can watch real Langy turns with LangWatch's own trace tools
+	// (on LangWatch's SaaS the destination is its production Langy project).
+	// When set, the relay's second export ALSO posts a copy of each worker
+	// trace batch to <endpoint>/api/otel/v1/traces, authenticated with the key
+	// as a Bearer token. PRODUCT configuration, deliberately not OTEL_*: that
+	// namespace configures LangWatch's own telemetry only (pkg/config/otel.go),
+	// and the mirror is a product destination holding a project API key. Unset
+	// (the default) leaves the mirror lane dormant. The key is a static
+	// project API key held by this Go manager only — never by a TS platform
+	// process (the platform self-ingest guard is untouched).
+	MirrorTraceEndpoint string `env:"LANGY_MIRROR_TRACE_ENDPOINT"`
+	MirrorTraceKey      string `env:"LANGY_MIRROR_TRACE_KEY"`
 
 	// WorkspaceRoot is the directory the manager materializes the embedded skills
 	// tree into at boot (workerpool.New → internal/assets.MaterializeSkills), and
@@ -171,7 +188,7 @@ func defaultConfig() Config {
 		OpenCodeBinaryPath:        "opencode",
 		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
 		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
-		// ADR-043 rung 1a + SNI cross-check are the always-safe rungs; both
+		// ADR-076 rung 1a + SNI cross-check are the always-safe rungs; both
 		// default ON. Unset env leaves these defaults (Hydrate skips empty env),
 		// so an install that configures nothing still requires TLS and cross-
 		// checks SNI. EgressEnforceFloor defaults OFF (zero value) — the floor
@@ -196,7 +213,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	// Derive the listen address from PORT (kept as its own env var). Set after
 	// Hydrate so PORT always wins over any stray SERVER_ADDR.
 	cfg.Server.Addr = fmt.Sprintf(":%d", cfg.Port)
-	if err := cfg.OTel.Resolve(cfg.Environment); err != nil {
+	if err := cfg.OTel.Resolve(); err != nil {
 		return Config{}, err
 	}
 	if err := cfg.Log.Validate(); err != nil {
@@ -216,6 +233,20 @@ func LoadConfig(ctx context.Context) (Config, error) {
 			cfg.Environment,
 		)
 	}
+	// The mirror lane (ADR-061) is configured whole or not at all: an endpoint
+	// without a key would POST unauthenticated into a 401 forever, and a key
+	// without an endpoint is a credential mounted for nothing. Both are config
+	// mistakes best caught at boot, not discovered on a silent dashboard.
+	if (cfg.MirrorTraceEndpoint == "") != (cfg.MirrorTraceKey == "") {
+		return Config{}, fmt.Errorf(
+			"LANGY_MIRROR_TRACE_ENDPOINT and LANGY_MIRROR_TRACE_KEY must be set together (or both left unset for no mirror)",
+		)
+	}
+	if cfg.MirrorTraceEndpoint != "" {
+		if err := validateMirrorEndpoint(cfg.MirrorTraceEndpoint); err != nil {
+			return Config{}, err
+		}
+	}
 	// ADR-048 deadline math: the handoff budget plus the drain budget must fit
 	// strictly inside the graceful shutdown window, so the worker-authored
 	// checkpoint AND the process-group kill that follows both complete before the
@@ -230,6 +261,20 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		)
 	}
 	return cfg, nil
+}
+
+// validateMirrorEndpoint rejects a mirror endpoint that could never receive a
+// POST: not a URL, or not http/https. Caught at boot for the same reason the
+// OTel config fails closed there — a broken destination is invisible from
+// inside the running service.
+func validateMirrorEndpoint(endpoint string) error {
+	u, err := url.Parse(endpoint)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf(
+			"LANGY_MIRROR_TRACE_ENDPOINT must be an http(s) base URL, got %q", endpoint,
+		)
+	}
+	return nil
 }
 
 // environmentPermitsUnsafeDev reports whether env is a local-like environment in

@@ -5,14 +5,14 @@
  * - Built-in evaluators (from AVAILABLE_EVALUATORS)
  * - Workflow evaluators (from workflow DSL)
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+
 import type { Evaluator, PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import type { EvaluatorRepository } from "../evaluator.repository";
 import {
   EvaluatorService,
   STANDARD_EVALUATOR_OUTPUT_FIELDS,
-  type EvaluatorField,
 } from "../evaluator.service";
-import type { EvaluatorRepository } from "../evaluator.repository";
 
 // Mock AVAILABLE_EVALUATORS
 vi.mock("~/server/evaluations/evaluators", () => ({
@@ -295,33 +295,35 @@ describe("EvaluatorService", () => {
 
   describe("field computation for workflow evaluators", () => {
     it("computes fields from workflow entry node outputs", async () => {
+      const findFirst = vi.fn().mockResolvedValue({
+        id: "wf-1",
+        currentVersion: {
+          dsl: {
+            nodes: [
+              {
+                id: "entry",
+                type: "entry",
+                data: {
+                  outputs: [
+                    { identifier: "question", type: "str" },
+                    { identifier: "context", type: "str" },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
       const mockPrisma = {
         workflow: {
-          findUnique: vi.fn().mockResolvedValue({
-            id: "wf-1",
-            currentVersion: {
-              dsl: {
-                nodes: [
-                  {
-                    id: "entry",
-                    type: "entry",
-                    data: {
-                      outputs: [
-                        { identifier: "question", type: "str" },
-                        { identifier: "context", type: "str" },
-                      ],
-                    },
-                  },
-                ],
-              },
-            },
-          }),
+          findFirst,
         },
       } as unknown as PrismaClient;
 
       const mockRepository = {
         findById: vi.fn().mockResolvedValue({
           id: "eval-wf",
+          projectId: "proj-1",
           type: "workflow",
           workflowId: "wf-1",
           config: {},
@@ -340,12 +342,20 @@ describe("EvaluatorService", () => {
         { identifier: "question", type: "str" },
         { identifier: "context", type: "str" },
       ]);
+      expect(findFirst).toHaveBeenCalledWith({
+        where: {
+          id: "wf-1",
+          projectId: "proj-1",
+          archivedAt: null,
+        },
+        include: { currentVersion: true },
+      });
     });
 
     it("returns empty fields for workflow without DSL", async () => {
       const mockPrisma = {
         workflow: {
-          findUnique: vi.fn().mockResolvedValue({
+          findFirst: vi.fn().mockResolvedValue({
             id: "wf-2",
             currentVersion: null,
           }),
@@ -355,6 +365,7 @@ describe("EvaluatorService", () => {
       const mockRepository = {
         findById: vi.fn().mockResolvedValue({
           id: "eval-wf-2",
+          projectId: "proj-1",
           type: "workflow",
           workflowId: "wf-2",
           config: {},
@@ -374,13 +385,14 @@ describe("EvaluatorService", () => {
     it("returns empty fields for non-existent workflow", async () => {
       const mockPrisma = {
         workflow: {
-          findUnique: vi.fn().mockResolvedValue(null),
+          findFirst: vi.fn().mockResolvedValue(null),
         },
       } as unknown as PrismaClient;
 
       const mockRepository = {
         findById: vi.fn().mockResolvedValue({
           id: "eval-wf-3",
+          projectId: "proj-1",
           type: "workflow",
           workflowId: "non-existent-wf",
           config: {},
