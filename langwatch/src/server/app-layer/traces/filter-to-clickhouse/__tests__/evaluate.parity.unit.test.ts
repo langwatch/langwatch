@@ -845,6 +845,54 @@ describe("queryNeeds", () => {
   });
 });
 
+describe("the in-memory free-text narrowing", () => {
+  // Dispatch passes `spans: null` (confirmSettledMatch), so the mirror answers
+  // free text from the summary alone. These two pin both directions of that.
+
+  /** @scenario A trigger's in-memory re-check cannot see span names */
+  it("misses a span-name-only match while the SQL side finds it", () => {
+    // Nothing in the summary mentions codex; only an unloaded span would.
+    const trace = makeTrace({
+      traceName: "checkout flow",
+      computedInput: "summarise the quarterly report",
+      computedOutput: "here is the summary",
+    });
+    expect(trace.spans).toBeUndefined();
+    expect(evaluateQueryInMemory("codex", trace)).toBe(false);
+
+    // The same filter compiled for ClickHouse does reach span names, which is
+    // the asymmetry the spec records.
+    const compiled = translateFilterToClickHouse("codex", "tenant-1", {
+      from: 0,
+      to: 1,
+    });
+    expect(compiled!.sql).toContain("FROM stored_spans");
+    expect(compiled!.sql).toContain("SpanName ILIKE");
+
+    // Loading the spans closes the gap with no change to the evaluator.
+    expect(
+      evaluateQueryInMemory("codex", {
+        ...trace,
+        spans: [{ name: "Codex.Exec", statusCode: 1, attributes: {} }],
+      }),
+    ).toBe(true);
+  });
+
+  /** @scenario The in-memory re-check still matches on the trace name */
+  it("still matches on the trace name, which travels with the fold state", () => {
+    expect(
+      evaluateQueryInMemory(
+        "codex",
+        makeTrace({
+          traceName: "codex exec",
+          computedInput: "run the migration script",
+          computedOutput: "migration finished",
+        }),
+      ),
+    ).toBe(true);
+  });
+});
+
 describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
     return translateFilterToClickHouse(query, "tenant-1", {
