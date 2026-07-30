@@ -121,6 +121,20 @@ const ALL_WORKLOADS = [
   "cronjobs.jobs.topicClustering.enabled=true",
 ];
 
+/**
+ * A ServiceAccount the chart creates AND annotates with the Entra client id.
+ * The chart refuses workloadIdentity with `create=true` and no client-id: an
+ * account the admission webhook cannot bind an identity to is the same runtime
+ * failure as a pod with no label, one layer down. Token-mode tests therefore
+ * supply both, exactly as a real install must.
+ */
+const IDENTITY_SERVICE_ACCOUNT = [
+  "--set",
+  "global.serviceAccount.create=true",
+  "--set",
+  String.raw`global.serviceAccount.annotations.azure\.workload\.identity/client-id=00000000-1111-2222-3333-444444444444`,
+];
+
 describeHelm("Helm ServiceAccount surface for cloud identity", () => {
   describe("given an install that does not opt in", () => {
     /** @scenario "Installs that do not use Azure render exactly as they did before" */
@@ -137,11 +151,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
   describe("given the service account is enabled with an identity annotation", () => {
     /** @scenario "The chart binds every storage-touching workload to one federated service account" */
     it("names the same account on the app and the workers, and not on cron pods", () => {
-      const out = render([
-        ...ALL_WORKLOADS,
-        "--set",
-        "global.serviceAccount.create=true",
-      ]);
+      const out = render([...ALL_WORKLOADS, ...IDENTITY_SERVICE_ACCOUNT]);
 
       const named = out.match(/serviceAccountName: t$/gm) ?? [];
       // App and workers only. Cron pods curl the app over HTTP and never
@@ -160,8 +170,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     it("carries the identity client-id annotation on the rendered account", () => {
       const out = render([
         ...ALL_WORKLOADS,
-        "--set",
-        "global.serviceAccount.create=true",
+        ...IDENTITY_SERVICE_ACCOUNT,
         "--set",
         String.raw`global.serviceAccount.annotations.azure\.workload\.identity/client-id=00000000-1111-2222-3333-444444444444`,
       ]);
@@ -196,8 +205,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
         "--set",
         "app.storedObjects.localFilesystem.enabled=false",
         ...ALL_WORKLOADS,
-        "--set",
-        "global.serviceAccount.create=true",
+        ...IDENTITY_SERVICE_ACCOUNT,
       ]);
 
       // The label must exist SOMEWHERE, or the negative assertions below are
@@ -219,11 +227,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
     /** @scenario "The chart leaves token projection to the platform webhook" */
     it("does not hand-mount a projected identity token volume", () => {
-      const out = render([
-        ...ALL_WORKLOADS,
-        "--set",
-        "global.serviceAccount.create=true",
-      ]);
+      const out = render([...ALL_WORKLOADS, ...IDENTITY_SERVICE_ACCOUNT]);
 
       // The platform webhook injects its own projected volume; a second one
       // from the chart would collide with it. Asserted against the rendered
@@ -260,8 +264,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
         ...AZURE,
         "--set",
         "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-        "--set",
-        "global.serviceAccount.create=true",
+        ...IDENTITY_SERVICE_ACCOUNT,
       ]);
 
       expect(out).toContain("name: AZURE_BLOB_AUTH_MODE");
@@ -276,8 +279,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
         ...ALL_WORKLOADS,
         "--set",
         "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-        "--set",
-        "global.serviceAccount.create=true",
+        ...IDENTITY_SERVICE_ACCOUNT,
       ]);
 
       // One per pod template: app, workers, cronjob. A count short means a
@@ -296,8 +298,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
           ...AZURE,
           "--set",
           "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
-          "--set",
-          "global.serviceAccount.create=true",
+          ...IDENTITY_SERVICE_ACCOUNT,
           "--set",
           "app.dataplane.providers.azureBlob.accountKey.value=leftover",
         ]),
@@ -375,6 +376,127 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     });
   });
 
+  describe("given workloadIdentity with a service account the chart creates", () => {
+    const WORKLOAD_IDENTITY = [
+      ...ALL_WORKLOADS,
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=azureBlob",
+      "--set",
+      "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set",
+      "app.dataplane.providers.azureBlob.container.value=cont",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
+    ];
+
+    /** @scenario "The chart refuses a created service account with no identity annotation" */
+    it("refuses to render when the account carries no client-id annotation", () => {
+      expect(
+        renderExpectingFailure([
+          ...WORKLOAD_IDENTITY,
+          "--set",
+          "global.serviceAccount.create=true",
+        ]),
+      ).toMatch(/azure\.workload\.identity\/client-id/);
+    });
+
+    /** @scenario "The chart refuses a created service account with no identity annotation" */
+    it("renders once the client-id annotation is supplied", () => {
+      const out = render([...WORKLOAD_IDENTITY, ...IDENTITY_SERVICE_ACCOUNT]);
+
+      expect(out).toContain('azure.workload.identity/use: "true"');
+    });
+
+    /**
+     * A pre-existing account lives outside the chart, so its annotations
+     * cannot be inspected — that prerequisite is documented rather than
+     * enforced, and rendering must not be blocked on it.
+     */
+    /** @scenario "The chart refuses a created service account with no identity annotation" */
+    it("still renders when the operator names a pre-existing account instead", () => {
+      const out = render([
+        ...WORKLOAD_IDENTITY,
+        "--set",
+        "global.serviceAccount.name=external-identity",
+      ]);
+
+      expect(out).toContain("serviceAccountName: external-identity");
+    });
+  });
+
+  describe("given a token mode whose blob endpoint comes from a Secret", () => {
+    const SECRET_ENDPOINT = [
+      ...ALL_WORKLOADS,
+      ...IDENTITY_SERVICE_ACCOUNT,
+      "--set",
+      "app.dataplane.enabled=true",
+      "--set",
+      "app.dataplane.provider=azureBlob",
+      "--set",
+      "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+      "--set",
+      "app.dataplane.providers.azureBlob.accountName.value=acct",
+      "--set",
+      "app.dataplane.providers.azureBlob.container.value=cont",
+      "--set",
+      "app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name=azure-endpoint",
+      "--set",
+      "app.dataplane.providers.azureBlob.endpoint.secretKeyRef.key=url",
+      "--set",
+      "app.storedObjects.localFilesystem.enabled=false",
+    ];
+
+    /**
+     * Helm cannot read the Secret, so the hostname is unknowable at render
+     * time. Assuming "public cloud" is the one guess that fails silently: the
+     * deploy succeeds and the first storage call is refused for asking the
+     * wrong issuer for a token.
+     */
+    /** @scenario "The chart refuses a secret-supplied endpoint with no identity authority" */
+    it("refuses to render without an identity authority", () => {
+      expect(renderExpectingFailure(SECRET_ENDPOINT)).toMatch(
+        /supplied through a Secret/,
+      );
+    });
+
+    /** @scenario "The chart refuses a secret-supplied endpoint with no identity authority" */
+    it("renders once an authority host is configured alongside it", () => {
+      const out = render([
+        ...SECRET_ENDPOINT,
+        "--set",
+        "app.dataplane.providers.azureBlob.authorityHost.value=https://login.microsoftonline.us",
+      ]);
+
+      expect(out).toContain("name: AZURE_BLOB_AUTHORITY_HOST");
+    });
+
+    /** @scenario "A sovereign-cloud endpoint without a matching authority is refused" */
+    it("leaves a public-cloud install alone, which sets no endpoint at all", () => {
+      const out = render([
+        ...ALL_WORKLOADS,
+        ...IDENTITY_SERVICE_ACCOUNT,
+        "--set",
+        "app.dataplane.enabled=true",
+        "--set",
+        "app.dataplane.provider=azureBlob",
+        "--set",
+        "app.dataplane.providers.azureBlob.authMode=workloadIdentity",
+        "--set",
+        "app.dataplane.providers.azureBlob.accountName.value=acct",
+        "--set",
+        "app.dataplane.providers.azureBlob.container.value=cont",
+        "--set",
+        "app.storedObjects.localFilesystem.enabled=false",
+      ]);
+
+      expect(out).toContain('azure.workload.identity/use: "true"');
+    });
+  });
+
   describe("given the azureBlob provider under shared-key auth", () => {
     /** @scenario "The chart still demands an account key under shared-key auth" */
     it("fails with an error naming the missing accountKey", () => {
@@ -429,8 +551,7 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
 
     const MIGRATION = [
       ...MIGRATION_WITHOUT_SERVICE_ACCOUNT,
-      "--set",
-      "global.serviceAccount.create=true",
+      ...IDENTITY_SERVICE_ACCOUNT,
     ];
 
     /** @scenario "Historical Azure objects stay readable after moving writes to S3" */
