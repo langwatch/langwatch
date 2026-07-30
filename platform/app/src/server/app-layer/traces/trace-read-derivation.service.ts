@@ -1,10 +1,10 @@
+import type { NormalizedSpan } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import {
   deriveScenarioRoleMetricsFromSpans,
   type ScenarioRoleMetrics,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/scenario-role-metrics.derivation";
-import { SpanCostService } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/span-cost.service";
-import type { DerivedTraceEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/trace-events.derivation";
-import type { NormalizedSpan } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
+} from "~/server/app-layer/traces/scenario-role-metrics.derivation";
+import { SpanCostService } from "~/server/app-layer/traces/span-cost.service";
+import type { DerivedTraceEvent } from "~/server/app-layer/traces/trace-event";
 
 /** Minimal span reader this service needs (satisfied by SpanStorageService). */
 export interface NormalizedSpanReader {

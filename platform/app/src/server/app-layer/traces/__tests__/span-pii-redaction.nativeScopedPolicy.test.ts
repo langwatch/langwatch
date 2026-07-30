@@ -6,10 +6,7 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
-import type {
-  OtlpKeyValue,
-  OtlpSpan,
-} from "../../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
+import type { OtlpKeyValue, OtlpSpan } from "../ingest/otlp";
 import {
   type BatchClearPIIFunction,
   type DataPrivacyResolver,

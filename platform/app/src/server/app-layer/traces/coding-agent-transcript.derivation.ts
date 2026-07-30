@@ -1,12 +1,12 @@
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
-import type { CodingAgent } from "~/server/event-sourcing.old/pipelines/coding-agent-processing/agents/_types";
+import type { CodingAgent } from "~/server/event-sourcing/coding-agent-processing/agents/_types";
 import {
   detectCodingAgent,
   normalizeEventName,
   parseMcpToolName,
   resolveConversationKey,
   resolveToolName,
-} from "~/server/event-sourcing.old/pipelines/coding-agent-processing/services/coding-agent-normalization";
+} from "~/server/event-sourcing/coding-agent-processing/coding-agent-normalization";
 import { isReplyTextPart } from "./canonicalisation/extractors/_parts";
 
 /**

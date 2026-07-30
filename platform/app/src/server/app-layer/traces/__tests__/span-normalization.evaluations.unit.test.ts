@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { OtlpSpan } from "../../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import { CanonicalizeSpanAttributesService } from "../canonicalisation/canonicalizeSpanAttributesService";
 import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
+import type { OtlpSpan } from "../ingest/otlp";
 import { SpanNormalizationPipelineService } from "../span-normalization.service";
 
 const service = new SpanNormalizationPipelineService(

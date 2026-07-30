@@ -1,9 +1,8 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
+import type { TraceAnalyticsRollupRow } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
-import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
@@ -79,7 +78,7 @@ export class TraceAnalyticsRollupClickHouseRepository
     row: TraceAnalyticsRollupRow,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): Promise<void> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: row.tenantId },
       "TraceAnalyticsRollupClickHouseRepository.insertRow",
     );
@@ -111,7 +110,7 @@ export class TraceAnalyticsRollupClickHouseRepository
     if (rows.length === 0) return;
 
     for (const row of rows) {
-      EventUtils.validateTenantId(
+      validateTenantId(
         { tenantId: row.tenantId },
         "TraceAnalyticsRollupClickHouseRepository.insertRows",
       );

@@ -2,28 +2,22 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
+import {
+  canonicalizeLogRequest,
+  type PreparedCanonicalLogRecord,
+} from "~/server/event-sourcing/log-processing/canonicalize";
+import type { LogRedactionService } from "~/server/event-sourcing/log-processing/redaction";
+import type { CanonicalLogRecord } from "~/server/event-sourcing/log-processing/schema";
+import {
+  type LogContribution,
+  piiRedactionLevelSchema,
+} from "~/server/event-sourcing/trace-processing/schema";
 import type { DeepPartial } from "~/utils/types";
-import {
-  type LogRedactionService,
-  prepareCanonicalLogRecords,
-} from "../../event-sourcing.old/pipelines/log-processing/canonicalLog";
-import type {
-  CanonicalLogRecord,
-  LogTraceContribution,
-} from "../../event-sourcing.old/pipelines/log-processing/schemas/logRecord";
-import {
-  extractIOFromLogRecord,
-  liftCanonicalAttributesFromLogRecord,
-  NON_BILLABLE_ATTR,
-} from "../../event-sourcing.old/pipelines/trace-processing/projections/services";
-import { piiRedactionLevelSchema } from "../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
-import type { LogRecordReceivedEventData } from "../../event-sourcing.old/pipelines/trace-processing/schemas/events";
-import { IO_PREVIEW_BYTES, utf8Preview } from "./lean-for-projection";
 import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface LogRequestCollectionDeps {
   recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
-  recordLogContributions: (data: LogTraceContribution[]) => Promise<void>;
+  recordLogContributions: (data: LogContribution[]) => Promise<void>;
   piiRedactionService?: LogRedactionService;
 }
 
@@ -95,7 +89,7 @@ export class LogRequestCollectionService {
         },
       },
       async (span): Promise<LogRequestCollectionResult> => {
-        const preparation = await prepareCanonicalLogRecords({
+        const preparation = await canonicalizeLogRequest({
           tenantId,
           organizationId,
           request: logRequest,
@@ -142,7 +136,7 @@ export class LogRequestCollectionService {
           }
         }
 
-        const contributions: LogTraceContribution[] = [];
+        const contributions: LogContribution[] = [];
         if (acceptedLogRecords > 0) {
           for (const prepared of preparation.accepted) {
             const { record } = prepared;
@@ -213,13 +207,16 @@ export class LogRequestCollectionService {
   }
 }
 
+/**
+ * Attribute lifting and IO extraction are the trace fold's job, so the
+ * contribution carries the normalized record and nothing derived from it.
+ */
 function makeTraceContribution(
-  prepared: Awaited<
-    ReturnType<typeof prepareCanonicalLogRecords>
-  >["accepted"][number],
-): LogTraceContribution {
+  prepared: PreparedCanonicalLogRecord,
+): LogContribution {
   const { record, normalized } = prepared;
-  const legacyView: LogRecordReceivedEventData = {
+  return {
+    recordId: record.recordId,
     traceId: record.correlationTraceId,
     spanId: record.correlationSpanId,
     timeUnixMs: record.timeUnixMs,
@@ -231,45 +228,5 @@ function makeTraceContribution(
     scopeName: normalized.scopeName,
     scopeVersion: normalized.scopeVersion,
     piiRedactionLevel: record.piiRedactionLevel,
-  };
-  const lifted = liftCanonicalAttributesFromLogRecord(legacyView);
-  const liftedAttributes: LogTraceContribution["liftedAttributes"] = {};
-  for (const [key, value] of Object.entries(lifted)) {
-    if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
-    ) {
-      liftedAttributes[key] = value;
-    }
-  }
-  const io = extractIOFromLogRecord(legacyView);
-  const input =
-    io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
-  const output =
-    io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
-  if (input !== io.input || output !== io.output) {
-    liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
-  }
-  return {
-    tenantId: record.tenantId,
-    recordId: record.recordId,
-    traceId: record.correlationTraceId,
-    spanId: record.correlationSpanId,
-    timeUnixMs: record.timeUnixMs,
-    severityNumber: record.severityNumber,
-    severityText: record.severityText,
-    providerKind: record.providerKind,
-    scopeName: record.scopeName,
-    correlationSource: record.correlationSource as Exclude<
-      typeof record.correlationSource,
-      "none"
-    >,
-    input,
-    output,
-    liftedAttributes,
-    nonBillable: normalized.resourceAttributes[NON_BILLABLE_ATTR] === "true",
-    piiRedactionLevel: record.piiRedactionLevel,
-    occurredAt: record.acceptedAt,
   };
 }

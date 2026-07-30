@@ -107,7 +107,7 @@ const spanAttributeSchema = z.object({
 /**
  * Parsed EventPayload structure (ADR-022: full event as stored by the command worker).
  *
- * EventPayload IS event.data (stored as `event.data ?? {}` by eventToRecord).
+ * EventPayload IS event.data — the legacy writer stored `event.data ?? {}`.
  * The span write shape from recordSpanCommand is `{ span, resource, instrumentationScope }`
  * with the span at the TOP level — there is NO outer `data` wrapper. Log-record events
  * instead carry the (full) log body at the top-level `body`, which `leanForProjection`

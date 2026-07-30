@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedSpan } from "../../../event-sourcing.old/pipelines/trace-processing/schemas/spans";
+import type { NormalizedSpan } from "../ingest/normalizedSpan";
 import {
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "../../../event-sourcing.old/pipelines/trace-processing/schemas/spans";
+} from "../ingest/normalizedSpan";
 import { IO_PREVIEW_BYTES, structuredIoPreview } from "../lean-for-projection";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 

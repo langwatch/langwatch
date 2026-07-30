@@ -47,6 +47,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { LoggedEvent } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import {
   AGGREGATE_TYPE,
   assertOverThreshold,
@@ -57,24 +58,23 @@ import {
 } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "~/server/app-layer/traces/ingest/constants";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
+import {
   EVENTREF_ATTR_PREFIX,
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { Event } from "~/server/event-sourcing.old";
-import {
-  LOG_RECORD_RECEIVED_EVENT_TYPE,
-  LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
-import {
-  type NormalizedSpan,
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
 import {
   resolveOffloadedTraces,
   type WarnLogger,
@@ -93,7 +93,7 @@ const hasTestcontainers = !!(
 );
 
 /**
- * Builds a SpanReceived domain Event whose `langwatch.input` carries `value`.
+ * Builds a SpanReceived domain event whose `langwatch.input` carries `value`.
  * `event.id` is the EventId that `leanForProjection` embeds in the eventref and
  * that the read path JOINs on, so the SAME `eventId` must be used for the row.
  */
@@ -109,7 +109,7 @@ function makeSpanReceivedEvent({
   spanId: string;
   eventId: string;
   inputValue: string;
-}): Event {
+}): LoggedEvent {
   const now = Date.now();
   return {
     id: eventId,
@@ -149,11 +149,11 @@ function makeSpanReceivedEvent({
       resource: { attributes: [] },
       instrumentationScope: { name: "test" },
     },
-  } as unknown as Event;
+  } as unknown as LoggedEvent;
 }
 
 /**
- * Builds a LogRecordReceived domain Event whose top-level `body` carries
+ * Builds a LogRecordReceived domain event whose top-level `body` carries
  * `value`. `leanForProjection` leans the body and tags an eventref with
  * `field: "body"`, resolved by the `field === "body"` branch in getFromEventLog.
  */
@@ -167,7 +167,7 @@ function makeLogRecordReceivedEvent({
   traceId: string;
   eventId: string;
   bodyValue: string;
-}): Event {
+}): LoggedEvent {
   const now = Date.now();
   return {
     id: eventId,
@@ -182,7 +182,7 @@ function makeLogRecordReceivedEvent({
       body: bodyValue,
       attributes: {},
     },
-  } as unknown as Event;
+  } as unknown as LoggedEvent;
 }
 
 /** Builds a NormalizedSpan carrying the supplied (leaned) attribute map. */

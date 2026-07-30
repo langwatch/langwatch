@@ -1,6 +1,75 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
-import type { TraceAnalyticsRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+/**
+ * One `trace_analytics` row, field-per-column so the ClickHouse repository's
+ * record literal stays a 1:1 mapping. `updatedAtMs` is the LWW dedup key;
+ * `version` is only the schema snapshot the row was written under.
+ */
+export interface TraceAnalyticsRow {
+  tenantId: string;
+  traceId: string;
+  version: string;
+  /**
+   * The trace's STORAGE ANCHOR → the `OccurredAt` column: partition key, lead
+   * sort key and TTL anchor at once. The first business time observed for the
+   * trace, frozen; the running minimum of span starts is `earliestSpanStartMs`.
+   */
+  occurredAtMs: number;
+  /**
+   * Earliest start across the trace's non-synthetic spans, 0 while none has
+   * been folded. `totalDurationMs` is measured from it. Its own column because
+   * `OccurredAt` no longer carries it, and without one a read-back would decode
+   * "no span yet" onto a trace that has spans.
+   */
+  earliestSpanStartMs: number;
+  createdAtMs: number;
+  updatedAtMs: number;
+
+  // Hoisted dimensions (typed root-level columns).
+  traceName: string;
+  topicId: string | null;
+  subTopicId: string | null;
+  userId: string | null;
+  conversationId: string | null;
+  customerId: string | null;
+  origin: string;
+  models: string[];
+  labels: string[];
+
+  // Metric scalars.
+  totalCost: number | null;
+  nonBilledCost: number | null;
+  totalDurationMs: number;
+  timeToFirstTokenMs: number | null;
+  tokensPerSecond: number | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  reasoningTokens: number | null;
+  hasError: boolean;
+  hasAnnotation: boolean | null;
+
+  /** Post-`trimAttributesForAnalytics`. */
+  attributes: Record<string, string>;
+
+  // Read-back state: not analytics columns, but what lets a fold decode the row
+  // without replaying `event_log`. The hoisted dimensions above double as
+  // read-back sources for the attribute map; these carry what the slim row
+  // otherwise dropped.
+  /** Spans seen — the processed-span cap AND the persistable-signal gate. */
+  spanCount: number;
+  /** The id set behind `hasAnnotation`; the row keeps only the boolean. */
+  annotationIds: string[];
+  /** Canonical root span start (0 = none yet); the trace-name precedence gate. */
+  rootSpanStartTimeMs: number;
+  traceNameFromFallback: boolean;
+  rootMetadataFromFallback: boolean;
+  /** A user rename latched the name against later span-derived clobbering. */
+  traceNameUserOverridden: boolean;
+  /** The fold's out-of-order checkpoint, distinct from `occurredAtMs`. */
+  lastEventOccurredAt: number;
+}
 
 /**
  * Repository for the slim trace_analytics table (ADR-034 Phase 2). Owns the

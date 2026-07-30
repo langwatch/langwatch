@@ -5,10 +5,13 @@ import {
 } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import type {
-  PIIRedactionLevel,
-  RecordSpanCommandData,
-} from "../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
+import type { PIIRedactionLevel } from "~/server/event-sourcing/trace-processing/schema";
+import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
+import {
+  convertUnixNanoToUnixMs,
+  normalizeOtlpId,
+  normalizeOtlpUnixNano,
+} from "./ingest/normalization";
 import {
   instrumentationScopeSchema,
   type OtlpInstrumentationScope,
@@ -16,9 +19,8 @@ import {
   type OtlpSpan,
   resourceSchema,
   spanSchema,
-} from "../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
-import { TraceRequestUtils } from "../../event-sourcing.old/pipelines/trace-processing/utils/traceRequest.utils";
-import { shouldFilterCodingAgentSpan } from "./coding-agent-span-filter";
+} from "./ingest/otlp";
+import type { RecordSpanCommandData } from "./ingest/recordSpanCommand";
 import type { SpanDedupService } from "./span-dedupe.service";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -55,15 +57,15 @@ type NormalizedIdSpan = OtlpSpan & { traceId: string; spanId: string };
 function normalizeSpanIds(span: OtlpSpan): NormalizedIdSpan {
   return {
     ...span,
-    traceId: TraceRequestUtils.normalizeOtlpId(span.traceId),
-    spanId: TraceRequestUtils.normalizeOtlpId(span.spanId),
+    traceId: normalizeOtlpId(span.traceId),
+    spanId: normalizeOtlpId(span.spanId),
     parentSpanId: span.parentSpanId
-      ? TraceRequestUtils.normalizeOtlpId(span.parentSpanId)
+      ? normalizeOtlpId(span.parentSpanId)
       : span.parentSpanId,
     links: span.links.map((link) => ({
       ...link,
-      traceId: TraceRequestUtils.normalizeOtlpId(link.traceId),
-      spanId: TraceRequestUtils.normalizeOtlpId(link.spanId),
+      traceId: normalizeOtlpId(link.traceId),
+      spanId: normalizeOtlpId(link.spanId),
     })),
   };
 }
@@ -330,10 +332,8 @@ export class TraceRequestCollectionService {
       };
     }
 
-    const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-      TraceRequestUtils.normalizeOtlpUnixNano(
-        spanParseResult.data.startTimeUnixNano,
-      ),
+    const startTimeUnixMs = convertUnixNanoToUnixMs(
+      normalizeOtlpUnixNano(spanParseResult.data.startTimeUnixNano),
     );
     const now = Date.now();
 

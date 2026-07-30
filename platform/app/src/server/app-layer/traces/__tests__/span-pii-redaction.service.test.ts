@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PIIRedactionLevel } from "~/server/event-sourcing/trace-processing/schema";
 import type { PIICheckOptions } from "~/server/tracer/collector/piiCheck";
-import type { PIIRedactionLevel } from "../../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
-import type {
-  OtlpKeyValue,
-  OtlpResource,
-  OtlpSpan,
-} from "../../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
+import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "../ingest/otlp";
 import {
   type BatchClearPIIFunction,
   DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH,

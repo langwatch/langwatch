@@ -1,3 +1,4 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
@@ -5,19 +6,17 @@ import {
   type WindowFragment,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import type { WithDateWrites } from "~/server/clickhouse/types";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { DerivedTraceEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/services/trace-events.derivation";
 import {
   type NormalizedAttributes,
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/spans";
-import { SecurityError } from "~/server/event-sourcing.old/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
+import type { DerivedTraceEvent } from "~/server/app-layer/traces/trace-event";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { WithDateWrites } from "~/server/clickhouse/types";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { SpanInsertData } from "../types";
@@ -799,7 +798,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertSpan(span: SpanInsertData): Promise<void> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: span.tenantId },
       "SpanStorageClickHouseRepository.insertSpan",
     );
@@ -831,7 +830,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     if (spans.length === 0) return;
 
     for (const span of spans) {
-      EventUtils.validateTenantId(
+      validateTenantId(
         { tenantId: span.tenantId },
         "SpanStorageClickHouseRepository.insertSpans",
       );
@@ -884,7 +883,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     limit?: number;
   } & OccurredAtHint): Promise<Span[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getSpansByTraceId",
     );
@@ -948,7 +947,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     limit?: number;
   } & OccurredAtHint): Promise<NormalizedSpan[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getNormalizedSpansByTraceId",
     );
@@ -1014,7 +1013,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     spanId: string;
   } & OccurredAtHint): Promise<Span | null> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getSpanByIds",
     );
@@ -1077,7 +1076,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     spanId,
     occurredAtMs,
   }: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findNormalizedSpanById",
     );
@@ -1166,7 +1165,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId: string;
     traceId: string;
   } & OccurredAtHint): Promise<SpanResourceInfo[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanResourcesByTraceId",
     );
@@ -1353,7 +1352,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId: string;
     traceId: string;
   } & OccurredAtHint): Promise<DerivedTraceEvent[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getTraceEventsByTraceId",
     );
@@ -1434,7 +1433,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId: string;
     traceId: string;
   } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getEventsByTraceId",
     );
@@ -1507,7 +1506,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     spanId: string;
   } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getSpanEvents",
     );
@@ -1586,7 +1585,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId: string;
     traceId: string;
   } & OccurredAtHint): Promise<SpanSummaryRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.getSpanSummaryByTraceId",
     );
@@ -1626,7 +1625,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId: string;
     traceId: string;
   } & OccurredAtHint): Promise<SpanLangwatchSignalsRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findLangwatchSignalsByTraceId",
     );
@@ -1706,7 +1705,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     limit: number;
     offset: number;
   } & OccurredAtHint): Promise<{ spans: Span[]; total: number }> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpansPaginated",
     );
@@ -1783,7 +1782,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     sinceStartTimeMs: number;
   } & OccurredAtHint): Promise<Span[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpansSince",
     );
@@ -1827,7 +1826,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     limit: number;
     cursor?: SpanSummaryPageCursor;
   } & OccurredAtHint): Promise<SpanSummaryPage> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanSummariesPage",
     );
@@ -1951,7 +1950,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId: string;
     sinceUpdatedAtMs: number;
   } & OccurredAtHint): Promise<SpanSummaryRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findSpanSummariesSince",
     );
@@ -2001,7 +2000,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findModelUsageStats",
     );
@@ -2054,7 +2053,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     perModelLimit: number;
     limit: number;
   }): Promise<ModelSpanSampleRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SpanStorageClickHouseRepository.findRecentSpansByModels",
     );

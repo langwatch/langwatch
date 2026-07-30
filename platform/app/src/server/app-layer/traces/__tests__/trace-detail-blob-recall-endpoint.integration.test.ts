@@ -23,6 +23,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { LoggedEvent } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import {
   AGGREGATE_TYPE,
   assertOverThreshold,
@@ -32,17 +33,16 @@ import {
   UNIQUE_TAIL,
 } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "~/server/app-layer/traces/ingest/constants";
+import {
   EVENTREF_ATTR_PREFIX,
   IO_PREVIEW_BYTES,
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import type { Event } from "~/server/event-sourcing.old";
-import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
 import type { Span, Trace } from "~/server/tracer/types";
 import { openProtections } from "~/server/traces/__tests__/open-protections";
 import { TraceService } from "~/server/traces/trace.service";
@@ -80,7 +80,7 @@ const IO_FIELDS = ["langwatch.input", "langwatch.output"] as const;
 type IoField = (typeof IO_FIELDS)[number];
 
 /**
- * Builds a SpanReceived domain Event whose IO field (`langwatch.input` or
+ * Builds a SpanReceived domain event whose IO field (`langwatch.input` or
  * `langwatch.output`) carries `value`. `event.id` is the EventId that
  * `leanForProjection` embeds in the eventref and that the read path JOINs on, so
  * the SAME `eventId` must be used for the event_log row.
@@ -105,7 +105,7 @@ function makeSpanReceivedEvent({
   eventId: string;
   ioField: IoField;
   ioValue: string;
-}): Event {
+}): LoggedEvent {
   const now = Date.now();
   return {
     id: eventId,
@@ -142,7 +142,7 @@ function makeSpanReceivedEvent({
       resource: { attributes: [] },
       instrumentationScope: { name: "test" },
     },
-  } as unknown as Event;
+  } as unknown as LoggedEvent;
 }
 
 /**

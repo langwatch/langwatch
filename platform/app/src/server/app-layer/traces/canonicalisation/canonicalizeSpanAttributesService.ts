@@ -1,8 +1,8 @@
+import { parseJsonStringValues } from "../ingest/normalization";
 import type {
   NormalizedAttributes,
   NormalizedEvent,
-} from "../../../event-sourcing.old/pipelines/trace-processing/schemas/spans";
-import { parseJsonStringValues } from "../../../event-sourcing.old/pipelines/trace-processing/utils/traceRequest.utils";
+} from "../ingest/normalizedSpan";
 import {
   ClaudeCodeExtractor,
   CodexExtractor,

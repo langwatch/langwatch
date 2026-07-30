@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Event } from "~/server/event-sourcing.old";
-import { createTenantId } from "~/server/event-sourcing.old";
+import type { LoggedEvent } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "~/server/app-layer/traces/ingest/attributeCap";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,
@@ -19,8 +19,7 @@ import {
   LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "~/server/event-sourcing.old/pipelines/trace-processing/utils/capOversizedAttributes";
+} from "~/server/app-layer/traces/ingest/constants";
 import {
   EVENTREF_ATTR_PREFIX,
   IO_ATTR_KEYS,
@@ -37,7 +36,7 @@ const BASE_EVENT_FIELDS = {
   id: "evt-001",
   aggregateId: "trace-aaa",
   aggregateType: "trace" as const,
-  tenantId: createTenantId("tenant-001"),
+  tenantId: "tenant-001",
   createdAt: 1700000000000,
   occurredAt: 1700000000000,
 };
@@ -52,7 +51,7 @@ function makeSpanReceivedEvent({
   attributes,
 }: {
   attributes: Record<string, string>;
-}): Event {
+}): LoggedEvent {
   return {
     ...BASE_EVENT_FIELDS,
     type: SPAN_RECEIVED_EVENT_TYPE,
@@ -101,7 +100,7 @@ function makeSpanReceivedEventWithRawAttrs({
       };
     };
   }>;
-}): Event {
+}): LoggedEvent {
   return {
     ...BASE_EVENT_FIELDS,
     type: SPAN_RECEIVED_EVENT_TYPE,
@@ -131,7 +130,7 @@ function makeSpanReceivedEventWithRawAttrs({
   };
 }
 
-function makeLogRecordReceivedEvent({ body }: { body: string }): Event {
+function makeLogRecordReceivedEvent({ body }: { body: string }): LoggedEvent {
   return {
     ...BASE_EVENT_FIELDS,
     type: LOG_RECORD_RECEIVED_EVENT_TYPE,
@@ -152,7 +151,7 @@ function makeLogRecordReceivedEvent({ body }: { body: string }): Event {
   };
 }
 
-function makeAnnotationAddedEvent(): Event {
+function makeAnnotationAddedEvent(): LoggedEvent {
   return {
     ...BASE_EVENT_FIELDS,
     type: ANNOTATION_ADDED_EVENT_TYPE,
@@ -165,7 +164,7 @@ function makeAnnotationAddedEvent(): Event {
 }
 
 /** Extract span attributes as a Record from a SpanReceived event returned by leanForProjection. */
-function extractSpanAttributes(event: Event): Record<string, string> {
+function extractSpanAttributes(event: LoggedEvent): Record<string, string> {
   const data = event.data as {
     span: {
       attributes?: Array<{ key: string; value: { stringValue?: string } }>;
@@ -181,7 +180,7 @@ function extractSpanAttributes(event: Event): Record<string, string> {
 }
 
 /** Extract log body from a LogRecordReceived event returned by leanForProjection. */
-function extractLogBody(event: Event): string {
+function extractLogBody(event: LoggedEvent): string {
   const data = event.data as { body: string };
   return data.body;
 }
@@ -694,7 +693,7 @@ describe("given a SpanReceived event where all attributes are under both thresho
  * Builds a SpanReceived event with no span-top-level oversized attributes but
  * with a >256KB value in `span.events[0].attributes[0]`. No IO attrs involved.
  */
-function makeSpanReceivedEventWithOversizedEventAttr(): Event {
+function makeSpanReceivedEventWithOversizedEventAttr(): LoggedEvent {
   const oversizedValue = "e".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1024);
   return {
     ...BASE_EVENT_FIELDS,
@@ -733,14 +732,14 @@ function makeSpanReceivedEventWithOversizedEventAttr(): Event {
       piiRedactionLevel: "DISABLED",
     },
     metadata: { spanId: "bbbbbbbbbbbbbbbb", traceId: "aaaaaaaaaaaaaaaa" },
-  } as unknown as Event;
+  } as unknown as LoggedEvent;
 }
 
 /**
  * Builds a SpanReceived event with no span-top-level or event/link oversized
  * attributes but with a >256KB value in the resource attributes. No IO attrs.
  */
-function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
+function makeSpanReceivedEventWithOversizedResourceAttr(): LoggedEvent {
   const oversizedValue = "r".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1024);
   return {
     ...BASE_EVENT_FIELDS,
@@ -773,7 +772,7 @@ function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
       piiRedactionLevel: "DISABLED",
     },
     metadata: { spanId: "bbbbbbbbbbbbbbbb", traceId: "aaaaaaaaaaaaaaaa" },
-  } as unknown as Event;
+  } as unknown as LoggedEvent;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,11 +1,11 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { NormalizedSpan } from "../../event-sourcing.old/pipelines/trace-processing/schemas/spans";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
   extractLastUserMessageText,
   extractMessageContentText,
 } from "./canonicalisation/extractors/_messages";
+import type { NormalizedSpan } from "./ingest/normalizedSpan";
 
 /**
  * Service for extracting input/output text from spans using tree traversal

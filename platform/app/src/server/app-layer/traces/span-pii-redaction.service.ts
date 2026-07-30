@@ -32,15 +32,15 @@ const STRICT_ONLY_PII_ENTITIES: readonly string[] =
   );
 
 import { createLogger } from "@langwatch/observability";
+import type { PIIRedactionLevel } from "~/server/event-sourcing/trace-processing/schema";
 import { featureFlagService } from "~/server/featureFlag";
-import type { PIIRedactionLevel } from "../../event-sourcing.old/pipelines/trace-processing/schemas/commands";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import type {
   OtlpAnyValue,
   OtlpKeyValue,
   OtlpResource,
   OtlpSpan,
-} from "../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
-import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+} from "./ingest/otlp";
 
 /**
  * Maximum attribute value length (in characters) for PII redaction.

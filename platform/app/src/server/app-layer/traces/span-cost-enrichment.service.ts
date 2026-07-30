@@ -4,8 +4,8 @@ import {
   type MaybeStoredLLMModelCost,
 } from "~/server/modelProviders/llmModelCost";
 import { matchModelCostWithFallbacks } from "~/server/tracer/collector/cost";
-import type { OtlpSpan } from "../../event-sourcing.old/pipelines/trace-processing/schemas/otlp";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+import type { OtlpSpan } from "./ingest/otlp";
 import { extractModelName } from "./utils/spanModel";
 
 /**

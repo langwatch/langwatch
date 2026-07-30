@@ -1,10 +1,10 @@
+import { validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
 } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,
@@ -39,7 +39,7 @@ export class LogRecordStorageClickHouseRepository
     occurredAtMs?: number,
     limit: number = TRACE_LOG_READ_CAP,
   ): Promise<StoredLogRecordRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "LogRecordStorageClickHouseRepository.getLogsByTraceId",
     );

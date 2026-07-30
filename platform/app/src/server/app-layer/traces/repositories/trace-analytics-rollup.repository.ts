@@ -1,4 +1,32 @@
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
+/** One span's contribution to a `trace_analytics_rollup` minute bucket. */
+export interface TraceAnalyticsRollupRow {
+  tenantId: string;
+  /** Minute bucket of the span's `startTimeUnixMs` (`toStartOfMinute`). */
+  bucketStart: Date;
+  /**
+   * Response model > request model > ''. A SORT key, not a group-by target: the
+   * rollup attributes each span's cost to that span's own model, whereas the
+   * slim table attributes a trace's whole cost to every model it used.
+   */
+  model: string;
+  /** `langwatch.span.type` ('' when absent). */
+  spanType: string;
+  /** Always 1 (one row per span). */
+  spanCount: number;
+  /** 1 on the root span, 0 on the rest, so `sum(TraceCount)` is the bucket's traces. */
+  traceCount: number;
+  errorCount: number;
+  costSum: number;
+  /** Bundled-portion cost (USD). */
+  nonBilledCostSum: number;
+  /** The root carries the trace's wall-clock duration; others carry 0. */
+  durationSum: number;
+  promptTokensSum: number;
+  completionTokensSum: number;
+  cacheReadTokensSum: number;
+  cacheWriteTokensSum: number;
+  reasoningTokensSum: number;
+}
 
 /**
  * Per-span insert into `trace_analytics_rollup` (ADR-034 Phase 1).

@@ -16,7 +16,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { TraceAnalyticsRow } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import type { TraceAnalyticsRow } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import {
   startTestContainers,
   stopTestContainers,

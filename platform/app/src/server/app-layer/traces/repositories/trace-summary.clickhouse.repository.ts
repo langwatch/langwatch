@@ -1,10 +1,10 @@
+import { validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
+import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/app-layer/traces/ingest/constants";
+import { generateDeterministicTraceSummaryId } from "~/server/app-layer/traces/ingest/spanRecordId";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/constants";
-import { IdUtils } from "~/server/event-sourcing.old/pipelines/trace-processing/utils/id.utils";
-import { EventUtils } from "~/server/event-sourcing.old/utils/event.utils";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
@@ -55,16 +55,13 @@ export class TraceSummaryClickHouseRepository
     tenantId: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): Promise<void> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "TraceSummaryClickHouseRepository.upsert",
-    );
+    validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
 
-    const projectionId = IdUtils.generateDeterministicTraceSummaryIdFromData(
+    const projectionId = generateDeterministicTraceSummaryId({
       tenantId,
-      data.traceId,
-      data.occurredAt,
-    );
+      traceId: data.traceId,
+      startTimeUnixMs: data.occurredAt,
+    });
 
     try {
       const client = await this.resolveClient(tenantId);
@@ -111,12 +108,11 @@ export class TraceSummaryClickHouseRepository
       const client = await this.resolveClient(tenantId);
       const records = entries.map(
         ({ data, tenantId: tid, retentionDays: rd }) => {
-          const projectionId =
-            IdUtils.generateDeterministicTraceSummaryIdFromData(
-              tid,
-              data.traceId,
-              data.occurredAt,
-            );
+          const projectionId = generateDeterministicTraceSummaryId({
+            tenantId: tid,
+            traceId: data.traceId,
+            startTimeUnixMs: data.occurredAt,
+          });
           return this.toClickHouseRecord(
             data,
             tid,
@@ -167,7 +163,7 @@ export class TraceSummaryClickHouseRepository
     traceId: string,
     options?: FindByTraceIdOptions,
   ): Promise<{ state: TraceSummaryData; version: string } | null> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "TraceSummaryClickHouseRepository.findByTraceIdWithVersion",
     );

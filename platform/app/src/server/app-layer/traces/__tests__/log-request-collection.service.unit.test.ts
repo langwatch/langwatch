@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type {
-  CanonicalLogRecord,
-  LogTraceContribution,
-} from "~/server/event-sourcing.old/pipelines/log-processing/schemas/logRecord";
-import { IO_PREVIEW_BYTES } from "../lean-for-projection";
+import type { CanonicalLogRecord } from "~/server/event-sourcing/log-processing/schema";
+import type { LogContribution } from "~/server/event-sourcing/trace-processing/schema";
 import {
   type LogRequestCollectionResult,
   LogRequestCollectionService,
@@ -24,17 +21,15 @@ function makeService(args?: {
   contributionFails?: boolean;
 }) {
   const records: CanonicalLogRecord[] = [];
-  const contributions: LogTraceContribution[] = [];
+  const contributions: LogContribution[] = [];
   const recordLogRecords = vi.fn(async (batch: CanonicalLogRecord[]) => {
     if (args?.storageFails) throw new Error("storage unavailable");
     records.push(...batch);
   });
-  const recordLogContributions = vi.fn(
-    async (batch: LogTraceContribution[]) => {
-      if (args?.contributionFails) throw new Error("trace unavailable");
-      contributions.push(...batch);
-    },
-  );
+  const recordLogContributions = vi.fn(async (batch: LogContribution[]) => {
+    if (args?.contributionFails) throw new Error("trace unavailable");
+    contributions.push(...batch);
+  });
   const service = new LogRequestCollectionService({
     recordLogRecords,
     recordLogContributions,
@@ -114,13 +109,12 @@ describe("LogRequestCollectionService", () => {
     expect(contributions).toHaveLength(1);
     expect(contributions[0]).toMatchObject({
       recordId: records[0]!.recordId,
-      input: "hello",
-      nonBillable: true,
-      occurredAt: records[0]!.acceptedAt,
+      traceId: records[0]!.correlationTraceId,
+      spanId: records[0]!.correlationSpanId,
+      body: "claude_code.user_prompt",
+      scopeName: "com.anthropic.claude_code.events",
     });
-    expect(JSON.stringify(contributions[0]).length).toBeLessThan(
-      records[0]!.canonicalSizeBytes,
-    );
+    expect(contributions[0]!.attributes).toMatchObject({ prompt: "hello" });
   });
 
   it("keeps a correlated log accepted when its trace contribution cannot be queued", async () => {
@@ -138,25 +132,6 @@ describe("LogRequestCollectionService", () => {
     const collected = expectCollected(result);
     expect(collected.acceptedLogRecords).toBe(1);
     expect(collected.rejectedLogRecords).toBe(0);
-  });
-
-  it("bounds duplicated trace I/O while retaining the full canonical log", async () => {
-    const request = logRequest();
-    const prompt = "é".repeat(IO_PREVIEW_BYTES);
-    request.resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
-      (attribute: { key: string }) => attribute.key === "prompt",
-    ).value.stringValue = prompt;
-    const { service, records, contributions } = makeService();
-
-    await service.handleOtlpLogRequest({ ...args, logRequest: request });
-
-    expect(records[0]!.canonicalPayload).toContain(prompt);
-    expect(
-      Buffer.byteLength(contributions[0]!.input!, "utf8"),
-    ).toBeLessThanOrEqual(IO_PREVIEW_BYTES + 3);
-    expect(
-      contributions[0]!.liftedAttributes["langwatch.reserved.log_io_truncated"],
-    ).toBe(true);
   });
 
   describe("when the canonical batch cannot be persisted", () => {

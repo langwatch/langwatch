@@ -16,7 +16,7 @@
  * - gen_ai.output.messages (from gen_ai.choice events)
  */
 
-import type { NormalizedEvent } from "../../../../event-sourcing.old/pipelines/trace-processing/schemas/spans";
+import type { NormalizedEvent } from "../../ingest/normalizedSpan";
 import { ATTR_KEYS } from "./_constants";
 import { extractOutputMessages, recordValueType } from "./_extraction";
 import { safeJsonParse } from "./_guards";
