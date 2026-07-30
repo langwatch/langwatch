@@ -40,6 +40,9 @@ class Code:
                 "audience": secrets.AUTH0_AUDIENCE,  # noqa: F821
             },
             timeout=10,
+            # A 307/308 redirect would re-send the POST body, credential
+            # included, to wherever the response points. Never follow one.
+            allow_redirects=False,
         )
         # raise_for_status embeds the URL and status code, never the request
         # body — so a rejected credential fails loudly without leaking it.

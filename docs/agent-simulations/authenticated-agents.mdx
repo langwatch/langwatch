@@ -56,6 +56,9 @@ class Code:
                 "audience": secrets.AUTH0_AUDIENCE,
             },
             timeout=10,
+            # A 307/308 redirect would re-send the POST body, credential
+            # included, to wherever the response points. Never follow one.
+            allow_redirects=False,
         )
         token_response.raise_for_status()
         access_token = token_response.json()["access_token"]
