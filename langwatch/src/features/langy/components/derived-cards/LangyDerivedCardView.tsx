@@ -234,10 +234,14 @@ function bindHints({
   for (const hint of hints) {
     if (hint.type === "explore") {
       // The same normalization the explorer handoff already applies to the
-      // CLI's own searches: only a query that survives it earns a link.
+      // CLI's own searches: only a query that survives it earns a link. An
+      // origin counts too — a model authoring `{ origin: "evaluation" }` is
+      // a real, narrowed hint (`origin` is a named field in the query
+      // language it's told about), not an empty one.
       const search = readTraceSearchQuery(hint.query);
       if (
         search.query === undefined &&
+        !search.origins?.length &&
         search.startDate === undefined &&
         search.endDate === undefined
       ) {

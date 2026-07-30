@@ -11,6 +11,7 @@
  * hasn't changed, however much the query string moved underneath it.
  */
 import { useCallback, useEffect, useRef } from "react";
+import { useLocation } from "react-router";
 import type { TimeRange } from "../stores/filterStore";
 import { useFilterStore } from "../stores/filterStore";
 import type { LensConfig } from "../stores/viewStore";
@@ -406,6 +407,42 @@ export function useURLSync(): void {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [applyFromFragment]);
+
+  // Re-apply when an IN-APP navigation lands on this page's own fragment —
+  // a deep link such as Langy's "View in Trace Explorer" button, built with
+  // `router.push(href)` to the same route this page is already showing.
+  //
+  // That case falls through every other trigger above: the mount effect only
+  // ever fires once, and `router.push` goes through React Router's history,
+  // not the browser's — it never dispatches `popstate` (only real back/forward
+  // does). So the fragment changed and NOTHING here read it, and 150ms later
+  // the write effect below overwrote it anyway with the state the store still
+  // held, since the store was never told. The link looked like it did nothing.
+  //
+  // `useLocation()` is the one thing that DOES observe this: React Router
+  // updates it for every navigation it performs, including a same-route,
+  // fragment-only `push`. Read fully via `applyFromFragment` (not applied
+  // here directly) so this goes through the exact same target-resolution and
+  // "already in sync" guard the mount and popstate paths use — a location
+  // change that denotes the state the store already holds (e.g. the trace
+  // drawer's own query-string-only navigation) is still a no-op.
+  //
+  // Gated on the hash ACTUALLY changing, not just this effect running: every
+  // effect fires once on mount regardless of its deps, and firing here too
+  // would call `applyFromFragment` a second time back-to-back with the mount
+  // effect — with `isFirstApply` now (wrongly) false. That's not a harmless
+  // repeat: a bare URL's "say nothing about the window" is only a no-op on
+  // the FIRST apply (see `resolveTimeRange`); a second, spurious "not-first"
+  // apply of the exact same bare URL reads as a real return-with-no-opinion
+  // and snaps a time range the user had already chosen back to the default.
+  const location = useLocation();
+  const lastAppliedHash = useRef(location.hash);
+  useEffect(() => {
+    if (!hasAppliedFragment.current) return;
+    if (location.hash === lastAppliedHash.current) return;
+    lastAppliedHash.current = location.hash;
+    applyFromFragment();
+  }, [location.hash, applyFromFragment]);
 
   // Coalesce URL writes on a 150ms timer. `replaceState` itself is cheap,
   // but `computeOverrides`/`buildFragment` allocate per char, and effect

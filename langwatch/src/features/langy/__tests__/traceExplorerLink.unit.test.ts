@@ -6,6 +6,7 @@ import { parse } from "~/server/app-layer/traces/query-language/parse";
 import {
   asFreeTextTerm,
   buildAutomationHref,
+  buildExplorerQuery,
   buildTraceExplorerHref,
   parseTraceSearchCommand,
   readTraceSearchQuery,
@@ -75,6 +76,31 @@ describe("parseTraceSearchCommand", () => {
         expect(parseTraceSearchCommand("langwatch trace search")).toEqual({});
       });
     });
+
+    describe("when it carries an origin filter", () => {
+      it("recovers a single origin", () => {
+        expect(
+          parseTraceSearchCommand("langwatch trace search --origin evaluation")
+            .origins,
+        ).toEqual(["evaluation"]);
+      });
+
+      it("splits a comma-separated list, the way the CLI itself splits it", () => {
+        expect(
+          parseTraceSearchCommand(
+            "langwatch trace search --origin evaluation,simulation",
+          ).origins,
+        ).toEqual(["evaluation", "simulation"]);
+      });
+
+      it("trims whitespace around each value", () => {
+        expect(
+          parseTraceSearchCommand(
+            "langwatch trace search --origin 'evaluation, simulation'",
+          ).origins,
+        ).toEqual(["evaluation", "simulation"]);
+      });
+    });
   });
 });
 
@@ -103,6 +129,18 @@ describe("readTraceSearchQuery", () => {
           startDate: 1750000000000,
           endDate: 1750086400000,
         });
+      });
+
+      it("reads a single origin as a one-item list", () => {
+        expect(
+          readTraceSearchQuery({ query: "errors", origin: "evaluation" }),
+        ).toEqual({ query: "errors", origins: ["evaluation"] });
+      });
+
+      it("reads an already-structured list of origins", () => {
+        expect(
+          readTraceSearchQuery({ origins: ["evaluation", "simulation"] }),
+        ).toEqual({ origins: ["evaluation", "simulation"] });
       });
     });
   });
@@ -137,6 +175,75 @@ describe("asFreeTextTerm", () => {
         expect(tag.field.type).toBe("ImplicitField");
         expect(tag.expression.value).toBe("checkout failed");
       });
+    });
+  });
+});
+
+describe("buildExplorerQuery", () => {
+  describe("given a search with only free text", () => {
+    it("returns the quoted free-text term", () => {
+      expect(buildExplorerQuery({ query: "checkout failed" })).toBe(
+        '"checkout failed"',
+      );
+    });
+  });
+
+  describe("given a search narrowed to one origin", () => {
+    it("adds an origin filter", () => {
+      expect(buildExplorerQuery({ origins: ["evaluation"] })).toBe(
+        "origin:evaluation",
+      );
+    });
+  });
+
+  describe("given a search narrowed to several origins", () => {
+    it("ORs them, so a trace from any one of them matches", () => {
+      expect(
+        buildExplorerQuery({ origins: ["evaluation", "simulation"] }),
+      ).toBe("(origin:evaluation OR origin:simulation)");
+    });
+
+    it("parses as a real OR group, not two field filters ANDed together", () => {
+      const ast = parse(
+        buildExplorerQuery({ origins: ["evaluation", "simulation"] })!,
+      ) as unknown as {
+        type: string;
+        expression: { type: string; operator: { operator: string } };
+      };
+      expect(ast.type).toBe("ParenthesizedExpression");
+      expect(ast.expression.type).toBe("LogicalExpression");
+      expect(ast.expression.operator.operator).toBe("OR");
+    });
+  });
+
+  describe("given a search with both free text and an origin filter", () => {
+    it("ANDs the origin filter onto the free text", () => {
+      expect(
+        buildExplorerQuery({ query: "timeout", origins: ["gateway"] }),
+      ).toBe('"timeout" AND origin:gateway');
+    });
+
+    it("parses as an AND, so a trace must match both", () => {
+      const ast = parse(
+        buildExplorerQuery({ query: "timeout", origins: ["gateway"] })!,
+      );
+      expect(ast.type).toBe("LogicalExpression");
+      const node = ast as unknown as { operator: { operator: string } };
+      expect(node.operator.operator).toBe("AND");
+    });
+  });
+
+  describe("given an origin value the query language would otherwise misparse", () => {
+    it("quotes it the way the Explorer's own filter sidebar quotes a facet value", () => {
+      expect(buildExplorerQuery({ origins: ["my origin"] })).toBe(
+        'origin:"my origin"',
+      );
+    });
+  });
+
+  describe("given a search that narrowed nothing", () => {
+    it("returns null rather than an empty filter", () => {
+      expect(buildExplorerQuery({})).toBeNull();
     });
   });
 });
@@ -185,7 +292,7 @@ describe("buildTraceExplorerHref", () => {
     });
 
     describe("when only part of the window is known", () => {
-      it("omits the range rather than half-applying it", () => {
+      it("omits the absolute range rather than half-applying it", () => {
         const params = fragmentParams(
           buildTraceExplorerHref({
             projectSlug: "acme",
@@ -198,11 +305,34 @@ describe("buildTraceExplorerHref", () => {
       });
     });
 
-    describe("when the agent ran no query at all", () => {
-      it("links to the plain explorer without inventing a filter", () => {
-        expect(
-          buildTraceExplorerHref({ projectSlug: "acme", search: {} }),
-        ).toBe("/acme/traces#all-traces");
+    describe("when the agent named no window at all", () => {
+      // The CLI itself defaults to the last 24h rather than searching all
+      // time (`cli/commands/traces/search.ts`), so a search that named no
+      // window still covered one. This is the fix for the bug where the link
+      // instead fell through to the Explorer's own 30d default — a search's
+      // card would say "4 traces, no errors" while the Explorer, having
+      // silently widened the window, showed a completely different set.
+      it("carries the CLI's own default window as a rolling preset", () => {
+        const params = fragmentParams(
+          buildTraceExplorerHref({
+            projectSlug: "acme",
+            search: { query: "x" },
+          })!,
+        );
+
+        expect(params.get("preset")).toBe("24h");
+        expect(params.get("from")).toBeNull();
+        expect(params.get("to")).toBeNull();
+      });
+
+      it("does the same even without a query, so a bare search isn't widened either", () => {
+        const href = buildTraceExplorerHref({
+          projectSlug: "acme",
+          search: {},
+        })!;
+
+        expect(fragmentParams(href).get("preset")).toBe("24h");
+        expect(fragmentParams(href).get("q")).toBeNull();
       });
     });
   });
@@ -302,6 +432,23 @@ describe("buildAutomationHref", () => {
         expect(fragmentParams(href).get("q")).toBe('"checkout failed"');
         expect(fragmentParams(href).get("from")).toBe("1750000000000");
         expect(fragmentParams(href).get("to")).toBe("1750086400000");
+      });
+    });
+  });
+
+  describe("given a search narrowed only by origin, no free text", () => {
+    describe("when a link is requested", () => {
+      it("still has a subject to alert on", () => {
+        const params = searchParams(
+          buildAutomationHref({
+            projectSlug: "acme",
+            search: { origins: ["evaluation"] },
+          })!,
+        );
+
+        expect(params.get("drawer.initialFilterQuery")).toBe(
+          "origin:evaluation",
+        );
       });
     });
   });

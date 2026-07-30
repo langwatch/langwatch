@@ -15,12 +15,20 @@
  * specs/traces-v2/search.feature (time range selector).
  */
 import { act, renderHook } from "@testing-library/react";
+// `useURLSync` reads React Router's own `useLocation()` now (see the
+// push-driven-navigation effect), which throws outside a Router context.
+// `BrowserRouter`, not `MemoryRouter`, so it reads the SAME `window.location`
+// this file drives directly via `window.history`/`popstate`.
+import { BrowserRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { INITIAL_TIME_RANGE, useFilterStore } from "../../stores/filterStore";
 import { ACTIVE_LENS_KEY, useViewStore } from "../../stores/viewStore";
 import { getPresetById } from "../../utils/timeRangePresets";
 import { useURLSync } from "../useURLSync";
+
+const renderURLSync = () =>
+  renderHook(() => useURLSync(), { wrapper: BrowserRouter });
 
 const CURSOR_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
 const CURSOR_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
@@ -93,7 +101,7 @@ describe("useURLSync time range on arrival", () => {
         window.history.replaceState(null, "", "/");
         selectPreset("24h");
 
-        renderHook(() => useURLSync());
+        renderURLSync();
 
         expect(useFilterStore.getState().timeRange.presetId).toBe("24h");
       });
@@ -115,7 +123,7 @@ describe("useURLSync time range across browser history navigation", () => {
         const { from, to } = computePreset("24h");
         const body = `#all-traces?from=${from}&to=${to}`;
 
-        renderHook(() => useURLSync());
+        renderURLSync();
         act(() => {
           pinAbsoluteWindow({ from, to });
           window.history.replaceState(null, "", `/${body}`);
@@ -139,7 +147,7 @@ describe("useURLSync time range across browser history navigation", () => {
       it("restores the preset that entry denotes", () => {
         const { from, to } = computePreset("24h");
 
-        renderHook(() => useURLSync());
+        renderURLSync();
         act(() => {
           pinAbsoluteWindow({ from, to });
           window.history.replaceState(
