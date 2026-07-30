@@ -1,9 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import {
-  type RunHistoryViewEntry,
-  TOPIC_CLUSTERING_PROCESS_NAME,
-} from "~/server/event-sourcing/topic-clustering-processing";
+import type { RunHistoryViewEntry } from "~/server/event-sourcing/topic-clustering-processing";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/topic-clustering-processing/process";
 
 import { parseRunHistoryRuns } from "./topic-clustering-run-history-projection.prisma.repository";
 

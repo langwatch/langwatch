@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
 
-import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/topic-clustering-processing";
+import { TOPIC_CLUSTERING_PROCESS_NAME } from "~/server/event-sourcing/topic-clustering-processing/process";
 import {
   type BackfillDeps,
   seedClusteringSchedules,
