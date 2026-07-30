@@ -1,23 +1,13 @@
 export { ensureJsonSafe, JsonSafetyError, type JsonValue } from "./json";
 export {
-  OutboxDispatcherService,
-  ProcessOutboxWorker,
   type DispatchableMessage,
   type DispatchReport,
   type IntentHandler,
+  OutboxDispatcherService,
   type OutboxDispatcherServiceOptions,
+  ProcessOutboxWorker,
   type ProcessOutboxWorkerOptions,
 } from "./outbox";
-export {
-  ProcessManagerService,
-  type HandleResult,
-  type ProcessManagerServiceOptions,
-} from "./processManagerService";
-export {
-  ProcessWakeWorker,
-  type ProcessWakeWorkerOptions,
-  type WakeHandlerPort,
-} from "./wake/processWakeWorker";
 export type {
   Evolution,
   ProcessDefinition,
@@ -26,6 +16,17 @@ export type {
   ProcessIntent,
   ProcessRef,
 } from "./processManager.types";
+export {
+  type HandleResult,
+  ProcessManagerService,
+  type ProcessManagerServiceOptions,
+} from "./processManagerService";
+export {
+  type GeneratedProcessArtifacts,
+  ProcessRuntime,
+} from "./processRuntime";
+export { InMemoryProcessStore } from "./stores/inMemoryProcessStore";
+export { PrismaProcessStore } from "./stores/prismaProcessStore";
 export type {
   CommitResult,
   DueWake,
@@ -38,9 +39,8 @@ export type {
   ProcessCommit,
   ProcessStore,
 } from "./stores/processStore.types";
-export { InMemoryProcessStore } from "./stores/inMemoryProcessStore";
-export { PrismaProcessStore } from "./stores/prismaProcessStore";
 export {
-  ProcessRuntime,
-  type GeneratedProcessArtifacts,
-} from "./processRuntime";
+  ProcessWakeWorker,
+  type ProcessWakeWorkerOptions,
+  type WakeHandlerPort,
+} from "./wake/processWakeWorker";

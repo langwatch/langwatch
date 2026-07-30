@@ -59,12 +59,12 @@
  *   - specs/ai-gateway/governance/receiver-shapes.feature
  *     (receiver returns 202 under load)
  */
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { nanoid } from "nanoid";
 
-import { prisma } from "~/server/db";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { PROJECT_KIND } from "@ee/governance/services/governanceProject.service";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { prisma } from "~/server/db";
 
 import { app as ingestApp } from "../ingestionRoutes";
 
@@ -131,7 +131,9 @@ async function deleteSeededOrg(seed: SeededOrg | null): Promise<void> {
   await prisma.organization
     .delete({ where: { id: seed.organizationId } })
     .catch(() => undefined);
-  await prisma.user.delete({ where: { id: seed.userId } }).catch(() => undefined);
+  await prisma.user
+    .delete({ where: { id: seed.userId } })
+    .catch(() => undefined);
 }
 
 function buildOtlpJsonBody(spanName = "volume-canary"): ArrayBuffer {
@@ -266,7 +268,10 @@ vi.mock("~/server/app-layer/app", async () => {
 
 function percentile(sortedAscMs: number[], p: number): number {
   if (sortedAscMs.length === 0) return 0;
-  const idx = Math.min(sortedAscMs.length - 1, Math.floor(sortedAscMs.length * p));
+  const idx = Math.min(
+    sortedAscMs.length - 1,
+    Math.floor(sortedAscMs.length * p),
+  );
   return sortedAscMs[idx]!;
 }
 

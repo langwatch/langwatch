@@ -14,10 +14,10 @@ export function useScenarioSelection() {
   const onRowSelectionChange: OnChangeFn<RowSelectionState> = useCallback(
     (updater) => {
       setRowSelection((prev) =>
-        typeof updater === "function" ? updater(prev) : updater
+        typeof updater === "function" ? updater(prev) : updater,
       );
     },
-    []
+    [],
   );
 
   const toggle = useCallback((id: string) => {
@@ -48,7 +48,7 @@ export function useScenarioSelection() {
 
   const selectedIds = useMemo(
     () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
-    [rowSelection]
+    [rowSelection],
   );
 
   const selectionCount = selectedIds.length;

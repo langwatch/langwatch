@@ -1,13 +1,17 @@
 import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Code, Globe, Plus, Workflow } from "lucide-react";
+import {
+  BookText,
+  ChevronDown,
+  Code,
+  Globe,
+  Plus,
+  Workflow,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
-import {
-  isAgentTarget,
-  useFilteredAgents,
-} from "./useFilteredScenarioTargets";
+import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
   type: "prompt" | "http" | "code" | "workflow";
@@ -54,7 +58,10 @@ export function TargetSelector({
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
         setSearchValue("");
       }

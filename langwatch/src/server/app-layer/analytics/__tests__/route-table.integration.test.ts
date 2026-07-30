@@ -112,6 +112,7 @@ function makeSlimRow(
     rootMetadataFromFallback: false,
     traceNameUserOverridden: false,
     lastEventOccurredAt: bucketMs,
+    earliestSpanStartMs: bucketMs,
     attributes: {},
     ...overrides,
   };

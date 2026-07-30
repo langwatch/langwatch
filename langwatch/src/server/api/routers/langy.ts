@@ -1,9 +1,16 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { on } from "node:events";
-import { TRPCError } from "@trpc/server";
+import { ValidationError } from "@langwatch/handled-error";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import {
+  LangyConversationNotFoundError,
+  LangyRateLimitedError,
+} from "~/server/app-layer/langy/errors";
 import { AGENT_CHAT_TIMEOUT_MS } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import type {
   ConversationDetail,
@@ -19,31 +26,23 @@ import {
   createLangyTokenBuffer,
   type LangyStreamEntry,
 } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
-import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
-
+import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import type { Session } from "~/server/auth";
-import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
 import { connection } from "~/server/redis";
 import { checkProjectPermission, type Permission } from "../rbac";
 import {
-  enforceLangyAccess,
-  refuseDemoProject,
-} from "./langyAccessMiddleware";
-import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
   type LangyConversationListItemDto,
   type LangyMessageDto,
-  langyConversationDetailSchema,
   langyConversationListCursorSchema,
-  langyConversationListItemSchema,
   langyConversationStatusSchema,
   langyMessageRoleSchema,
-  langyMessageSchema,
 } from "./langy.schemas";
+import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 
 const logger = createLogger("langwatch:langy:router");
 
@@ -52,8 +51,7 @@ const logger = createLogger("langwatch:langy:router");
  *
  * Mirrors `tracesV2` for reads: a SLIM `list` reading only the Postgres
  * conversation projection (no content), a separate on-demand `messages` read
- * for the heavy Postgres message history, a `newCount` the panel polls only
- * when the freshness SSE is disconnected, and a single `onConversationUpdate`
+ * for the heavy Postgres message history, and a single `onConversationUpdate`
  * subscription that pushes a lightweight per-conversation signal (never row
  * data). It also owns the turn-start mutations (`createConversation` /
  * `continueConversation`) and the conversation commands (rename/fork/delete):
@@ -111,10 +109,12 @@ const langyTurnProcedure = langyCreateProcedure.use(
       projectId: (input as { projectId: string }).projectId,
     });
     if (!rl.allowed) {
-      throw new TRPCError({
-        code: "TOO_MANY_REQUESTS",
-        message: "Too many messages. Please slow down.",
-      });
+      // Typed, not a bare TRPCError: ADR-045 names rate-limited as a handled
+      // condition, and only a handled error puts `data.error` on the wire. A
+      // raw TRPCError arrives with `data.error === null`, so the client's
+      // explainer cannot tell it from an internal crash and renders the generic
+      // "something went wrong" — telling a merely-throttled user Langy is broken.
+      throw new LangyRateLimitedError();
     }
     return next();
   },
@@ -333,10 +333,10 @@ async function acceptTurn({
   // object schemas, not the ZodEffects a refine produces.
   const idempotencyKey = input.idempotencyKey ?? input.requestId;
   if (!idempotencyKey) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "idempotencyKey is required.",
-    });
+    const message = "idempotencyKey is required.";
+    // `meta.message` is the channel that survives serialize() (ADR-045) — the
+    // HandledError's own `message` is not put on the wire.
+    throw new ValidationError(message, { meta: { message } });
   }
   return getApp().langy.turns.startConversationTurn({
     projectId: input.projectId,
@@ -599,7 +599,14 @@ export const langyRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         title: input.title,
       });
-      if (!detail) throw new TRPCError({ code: "NOT_FOUND" });
+      // Belt-and-braces for the declared `ConversationDetail | null`: the
+      // service ALREADY throws this same typed error for both "no such
+      // conversation" and "not yours" (deliberately indistinguishable), so in
+      // practice this branch is unreachable. It stays because the return type
+      // permits null and a silent `undefined` detail would be worse than a
+      // redundant throw.
+      if (!detail)
+        throw new LangyConversationNotFoundError(input.conversationId);
       return toDetailDto(detail);
     }),
 
@@ -649,7 +656,8 @@ export const langyRouter = createTRPCRouter({
    * `LangyConversationNotOwnedError` for someone else's conversation.
    */
   continueConversation: langyTurnProcedure
-    .input(z.object({
+    .input(
+      z.object({
         conversationId: z.string().min(1),
         ...langyTurnInputShape,
       }),
@@ -670,7 +678,7 @@ export const langyRouter = createTRPCRouter({
     ),
 
   /**
-   * Stop an in-flight turn FOR REAL (ADR-058). The browser's `useChat` stop only
+   * Stop an in-flight turn FOR REAL (ADR-078). The browser's `useChat` stop only
    * aborts its own subscription and lets the worker keep burning tokens; this
    * records the durable stopped terminal (the confirmation the client waits on),
    * ends the live stream, and best-effort asks the worker to abandon the run.
@@ -716,23 +724,6 @@ export const langyRouter = createTRPCRouter({
       return { modelsAllowed };
     },
   ),
-
-  /**
-   * Count of conversations touched since a timestamp — the "N new" pill. The
-   * client only polls this when the freshness SSE is disconnected (adaptive
-   * backoff), mirroring `tracesV2.newCount`. The count derivation lives in the
-   * service (`countSince`), not here — transport only shapes input/output.
-   */
-  newCount: langyReadProcedure
-    .input(z.object({ since: z.number() }))
-    .query(async ({ input, ctx }): Promise<{ count: number }> => {
-      const count = await getApp().langy.conversations.countSince({
-        projectId: input.projectId,
-        userId: ctx.session.user.id,
-        since: input.since,
-      });
-      return { count };
-    }),
 
   /**
    * In-agent feedback capture ("How's Langy doing?" / thumbs).
@@ -925,7 +916,11 @@ export const langyRouter = createTRPCRouter({
           { projectId, conversationId, turnId, userId },
           "denied a langy turn-stream attach",
         );
-        throw new TRPCError({ code: "NOT_FOUND", message: "Turn not found." });
+        // Deliberately the same answer for "no such turn" and "not yours", so
+        // this cannot probe another user's conversation — but typed, so the
+        // client gets a coded payload instead of an untyped 404 it must render
+        // as an unknown failure.
+        throw new LangyConversationNotFoundError(conversationId);
       }
       // No Redis ⇒ no live buffer; the client falls back to the Postgres
       // conversation/message query.
@@ -984,7 +979,7 @@ export const langyRouter = createTRPCRouter({
             // minutes, so a rejection would sit unhandled until then — and Node's
             // default --unhandled-rejections=throw would take the process down
             // first. A failed watcher just means no synthesized terminal.
-            .catch(() => {});
+            .catch(() => undefined);
 
           try {
             for await (const { entry } of buffer.follow({

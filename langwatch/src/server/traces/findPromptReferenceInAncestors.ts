@@ -1,6 +1,6 @@
 import {
-  parsePromptReference,
   type PromptReference,
+  parsePromptReference,
 } from "./parsePromptReference";
 
 /**

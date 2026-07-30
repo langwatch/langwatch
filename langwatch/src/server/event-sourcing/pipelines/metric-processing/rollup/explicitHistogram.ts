@@ -2,7 +2,7 @@ import type {
   CanonicalMetricDataPoint,
   MetricRollupRow,
 } from "../schemas/metricDataPoint";
-import { extendExtrema, resetOrGap, type BucketEntry } from "./row";
+import { type BucketEntry, extendExtrema, resetOrGap } from "./row";
 import { bigint, previousPoint, startsNewSequence } from "./sequence";
 
 function commonExplicitBounds(points: CanonicalMetricDataPoint[]): number[] {
@@ -60,7 +60,7 @@ function usablePredecessor({
 }): CanonicalMetricDataPoint | undefined {
   if (point.aggregationTemporality !== "cumulative") return undefined;
   const previous = previousPoint(all, index);
-  if (!previous || previous.metricKind !== "histogram") return undefined;
+  if (previous?.metricKind !== "histogram") return undefined;
   return startsNewSequence(previous, point) ? undefined : previous;
 }
 
@@ -94,7 +94,10 @@ function differenceHistogramPoint({
 }): { counts: bigint[]; count: bigint; sum: number | null } | null {
   const previous = usablePredecessor({ point, all, index });
   if (!previous) return null;
-  const previousCounts = coarsenExplicit({ point: previous, targetBounds: bounds });
+  const previousCounts = coarsenExplicit({
+    point: previous,
+    targetBounds: bounds,
+  });
   const currentCounts = coarsenExplicit({ point, targetBounds: bounds });
   const deltaCounts = currentCounts.map(
     (value, i) => value - previousCounts[i]!,
@@ -142,7 +145,11 @@ export function buildHistogramRow({
     if (point.aggregationTemporality === "cumulative") {
       const delta = differenceHistogramPoint({ point, index, all, bounds });
       if (!delta) {
-        resetOrGap({ row, previous: previousPoint(all, index), current: point });
+        resetOrGap({
+          row,
+          previous: previousPoint(all, index),
+          current: point,
+        });
         usesWholePoint = true;
       } else {
         coarsenedCounts = delta.counts;

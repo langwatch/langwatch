@@ -66,7 +66,10 @@ export function registerHover(
         return {
           contents: [
             { value: `**${input.identifier}** *(node input)*` },
-            { value: "```python\n" + `${input.identifier}: ${input.type}\n` + "```" },
+            {
+              value:
+                "```python\n" + `${input.identifier}: ${input.type}\n` + "```",
+            },
             { value: "Wired in the Inputs section of the properties panel." },
           ],
         };
@@ -80,7 +83,9 @@ export function registerHover(
             { value: `**${output.identifier}** *(node output)*` },
             {
               value:
-                "```python\n" + `${output.identifier}: ${output.type}\n` + "```",
+                "```python\n" +
+                `${output.identifier}: ${output.type}\n` +
+                "```",
             },
             {
               value:

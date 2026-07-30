@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 describe("setupObservability Integration - Tracer Functionality", () => {
-  it("should create spans with correct attributes", async () => {
+  it("creates spans with correct attributes", async () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: "test-key" }, debug: { logger } });
     const tracer = trace.getTracer("default");
@@ -28,7 +28,7 @@ describe("setupObservability Integration - Tracer Functionality", () => {
     expect(span).toBeDefined();
   });
 
-  it("should handle active spans correctly if available", async () => {
+  it("handles active spans correctly if available", async () => {
     const logger = createMockLogger();
     setupObservability({ langwatch: { apiKey: "test-key" }, debug: { logger } });
     const tracer = trace.getTracer("default");

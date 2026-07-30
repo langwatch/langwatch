@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkflowAgentData } from "../../types";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
@@ -267,8 +267,8 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const inputsRecord = callBody.payload.inputs[0];
-      expect(inputsRecord["query"]).toBe("Hello");
-      expect(inputsRecord["context"]).toBe("");
+      expect(inputsRecord.query).toBe("Hello");
+      expect(inputsRecord.context).toBe("");
     });
 
     it("uses the last user message when multiple turns exist", async () => {
@@ -289,7 +289,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
       await adapter.call(multiMessageInput);
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
-      expect(callBody.payload.inputs[0]["input"]).toBe("Second message");
+      expect(callBody.payload.inputs[0].input).toBe("Second message");
     });
   });
 
@@ -317,8 +317,8 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const inputsRecord = callBody.payload.inputs[0];
-      expect(inputsRecord["query"]).toBe("Hello");
-      expect(inputsRecord["context"]).toBe("Search the knowledge base");
+      expect(inputsRecord.query).toBe("Hello");
+      expect(inputsRecord.context).toBe("Search the knowledge base");
     });
 
     it("maps conversation history when the scenario source is messages", async () => {
@@ -343,9 +343,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const inputsRecord = callBody.payload.inputs[0];
-      expect(inputsRecord["history"]).toBe(
-        JSON.stringify(defaultInput.messages),
-      );
+      expect(inputsRecord.history).toBe(JSON.stringify(defaultInput.messages));
     });
 
     it("ignores mappings for inputs that do not exist on the agent", async () => {
@@ -367,8 +365,8 @@ describe("SerializedWorkflowAgentAdapter", () => {
 
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const inputsRecord = callBody.payload.inputs[0];
-      expect(inputsRecord["query"]).toBe("Hello");
-      expect(inputsRecord["deleted_field"]).toBeUndefined();
+      expect(inputsRecord.query).toBe("Hello");
+      expect(inputsRecord.deleted_field).toBeUndefined();
     });
   });
 

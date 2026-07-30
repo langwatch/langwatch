@@ -28,12 +28,7 @@
  * Until it is, this is the lever. See ADR-058.
  */
 
-import type {
-  Attributes,
-  Context,
-  Link,
-  SpanKind,
-} from "@opentelemetry/api";
+import type { Attributes, Context, Link, SpanKind } from "@opentelemetry/api";
 import {
   ParentBasedSampler,
   type Sampler,

@@ -9,14 +9,11 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useState } from "react";
-import Head from "~/utils/compat/next-head";
-
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { Tooltip } from "~/components/ui/tooltip";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
+import { ConnectYourAgentButton } from "~/components/me/ConnectYourAgentButton";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
 import {
@@ -25,6 +22,9 @@ import {
 } from "~/components/me/PersonalTracesEmptyState";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
+import { Tooltip } from "~/components/ui/tooltip";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import Head from "~/utils/compat/next-head";
 
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
 // gateway formatter so values like $0.000165 don't render as $0.00.
@@ -125,6 +125,9 @@ function MyUsagePage() {
             </Text>
           </VStack>
           <Spacer />
+          {/* Renders only once the personal project has traces: exploration
+              of usage that exists, not another setup entry point. */}
+          <ConnectYourAgentButton projectId={personalProjectId} />
         </HStack>
 
         {budget.status === "exceeded" && (
@@ -240,7 +243,11 @@ function MyUsagePage() {
                   );
                 })}
               </HStack>
-              <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
+              <HStack
+                justifyContent="space-between"
+                fontSize="xs"
+                color="fg.muted"
+              >
                 <Text>{spendByDay[0]?.day}</Text>
                 <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
               </HStack>
@@ -309,15 +316,8 @@ function MyUsagePage() {
                         )}
                       </Box>
                     </Tooltip>
-                    <VStack
-                      gap={0}
-                      align="end"
-                      minWidth="90px"
-                      fontSize="sm"
-                    >
-                      {showBilled && (
-                        <Text>{fmtUsd(tool.billedUsd)}</Text>
-                      )}
+                    <VStack gap={0} align="end" minWidth="90px" fontSize="sm">
+                      {showBilled && <Text>{fmtUsd(tool.billedUsd)}</Text>}
                       {showTheoretical && tool.usd - tool.billedUsd > 1e-6 && (
                         <Text color="fg.subtle" fontSize="xs">
                           {fmtUsd(tool.usd - tool.billedUsd)} bundled
@@ -373,7 +373,12 @@ function SummaryCard({
       padding={4}
       backgroundColor="bg.subtle"
     >
-      <Text fontSize="xs" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
+      <Text
+        fontSize="xs"
+        color="fg.muted"
+        textTransform="uppercase"
+        letterSpacing="wider"
+      >
         {title}
       </Text>
       <Text
@@ -384,7 +389,11 @@ function SummaryCard({
       >
         {value}
       </Text>
-      <Text fontSize="sm" color={tone === "red" ? "red.500" : "fg.muted"} marginTop={1}>
+      <Text
+        fontSize="sm"
+        color={tone === "red" ? "red.500" : "fg.muted"}
+        marginTop={1}
+      >
         {subline}
       </Text>
     </Box>
@@ -454,7 +463,12 @@ function BudgetBanner({
   const colors =
     tone === "red"
       ? { bg: "red.50", border: "red.200", title: "red.700", text: "red.700" }
-      : { bg: "yellow.50", border: "yellow.200", title: "yellow.800", text: "yellow.800" };
+      : {
+          bg: "yellow.50",
+          border: "yellow.200",
+          title: "yellow.800",
+          text: "yellow.800",
+        };
 
   return (
     <Box
@@ -541,7 +555,12 @@ function LegendChip({
       _hover={{ opacity: active ? 0.8 : 0.65 }}
       title={active ? `Hide ${label}` : `Show ${label}`}
     >
-      <Box width="10px" height="10px" borderRadius="sm" backgroundColor={color} />
+      <Box
+        width="10px"
+        height="10px"
+        borderRadius="sm"
+        backgroundColor={color}
+      />
       <Text
         color="fg.muted"
         textDecoration={active ? undefined : "line-through"}

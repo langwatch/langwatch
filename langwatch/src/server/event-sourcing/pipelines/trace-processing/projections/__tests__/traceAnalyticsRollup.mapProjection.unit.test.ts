@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { TraceAnalyticsRollupMapProjection } from "../traceAnalyticsRollup.mapProjection";
 import type { TraceAnalyticsRollupRow } from "../traceAnalyticsRollup.mapProjection";
+import { TraceAnalyticsRollupMapProjection } from "../traceAnalyticsRollup.mapProjection";
 import {
   createSpanReceivedEvent,
   type TestSpanReceivedEventOptions,
@@ -41,7 +41,9 @@ describe("TraceAnalyticsRollupMapProjection.mapTraceSpanReceived", () => {
 
   describe("given a span carrying only a request model", () => {
     it("falls back to the request model", () => {
-      const row = mapRow({ attributes: { "gen_ai.request.model": "claude-3" } });
+      const row = mapRow({
+        attributes: { "gen_ai.request.model": "claude-3" },
+      });
       expect(row.model).toBe("claude-3");
     });
   });

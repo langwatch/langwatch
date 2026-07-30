@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { createHash } from "crypto";
-import type { Cluster } from "ioredis";
 import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 
 const logger = createLogger("langwatch:shared-trace-cache");
 

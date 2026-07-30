@@ -11,41 +11,42 @@ import {
 } from "../../../projections/abstractFoldProjection";
 import type { StateProjectionStore } from "../../../projections/stateProjection.types";
 import type {
+  LangyAgentRespondedEvent,
   LangyAgentResponseFailedEvent,
   LangyAgentTurnAcceptedEvent,
-  LangyAgentRespondedEvent,
   LangyConversationArchivedEvent,
-  LangyMessageRecordedEvent,
   LangyConversationForkedEvent,
-  LangyConversationStartedEvent,
   LangyConversationHandoffConsumedEvent,
   LangyConversationHandoffPendingEvent,
   LangyConversationMetadataUpdatedEvent,
+  LangyConversationStartedEvent,
   LangyConversationTitleGeneratedEvent,
   LangyMessageImportedEvent,
+  LangyMessageRecordedEvent,
   LangyToolCallFailedEvent,
   LangyToolCallInitiatedEvent,
   LangyToolCallSucceededEvent,
 } from "../schemas/events";
 import {
+  LangyAgentRespondedEventSchema,
   LangyAgentResponseFailedEventSchema,
   LangyAgentTurnAcceptedEventSchema,
-  LangyAgentRespondedEventSchema,
   LangyConversationArchivedEventSchema,
-  LangyMessageRecordedEventSchema,
   LangyConversationForkedEventSchema,
-  LangyConversationStartedEventSchema,
   LangyConversationHandoffConsumedEventSchema,
   LangyConversationHandoffPendingEventSchema,
   LangyConversationMetadataUpdatedEventSchema,
+  LangyConversationStartedEventSchema,
   LangyConversationTitleGeneratedEventSchema,
   LangyMessageImportedEventSchema,
+  LangyMessageRecordedEventSchema,
   LangyToolCallFailedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
 } from "../schemas/events";
 
-export interface LangyConversationState extends Projection<LangyConversationStateData> {
+export interface LangyConversationState
+  extends Projection<LangyConversationStateData> {
   data: LangyConversationStateData;
 }
 

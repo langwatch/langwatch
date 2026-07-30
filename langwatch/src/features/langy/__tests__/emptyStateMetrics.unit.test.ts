@@ -19,9 +19,9 @@ describe("emptyStateMetrics", () => {
         expect(emptyStateMetrics({ variant: "floating", width: 340 })).toEqual(
           emptyStateMetrics({ variant: "floating", width: 200 }),
         );
-        expect(emptyStateMetrics({ variant: "floating", width: 340 }).markSize).toBe(
-          42,
-        );
+        expect(
+          emptyStateMetrics({ variant: "floating", width: 340 }).markSize,
+        ).toBe(42);
       });
     });
 
@@ -34,7 +34,9 @@ describe("emptyStateMetrics", () => {
         expect(roomy.heroMarginBottom).toBe(34);
         expect(roomy.rowPaddingY).toBe(13);
         // 432 and 416 both clamp to the same roomy anchor.
-        expect(roomy).toEqual(emptyStateMetrics({ variant: "floating", width: 416 }));
+        expect(roomy).toEqual(
+          emptyStateMetrics({ variant: "floating", width: 416 }),
+        );
       });
     });
 
@@ -65,7 +67,8 @@ describe("emptyStateMetrics", () => {
         // The panel resolver never yields a real width below 340, but the parent
         // seeds 432 on the server; an accidental NaN must not collapse the hero.
         expect(
-          emptyStateMetrics({ variant: "floating", width: Number.NaN }).markSize,
+          emptyStateMetrics({ variant: "floating", width: Number.NaN })
+            .markSize,
         ).toBe(51);
       });
     });

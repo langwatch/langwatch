@@ -1,16 +1,16 @@
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { GitPullRequest, Sparkles } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
-import { QuietHeadline } from "./QuietHeadline";
-import { useRouter } from "~/utils/compat/next-router";
 import { LangyPanelSurface } from "~/features/asaplangy";
+import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
+import { useRouter } from "~/utils/compat/next-router";
 import type {
   BriefingData,
   BriefingReceipt,
   BriefingSeverity,
   ScenarioBar,
 } from "../types";
+import { QuietHeadline } from "./QuietHeadline";
 
 /**
  * Langy's briefing — the first thing the returning user's eye lands on.
@@ -304,7 +304,8 @@ export function LangyBriefing({
             render only when their handlers do — without Langy the sheet
             closes on the status figures (or the session link) instead of a
             row of buttons that would open a panel that never mounts. */}
-        {onAsk || (onAskSubmit && data.suggestions?.length) ||
+        {onAsk ||
+        (onAskSubmit && data.suggestions?.length) ||
         data.sessionHref ? (
           <HStack
             justify="space-between"

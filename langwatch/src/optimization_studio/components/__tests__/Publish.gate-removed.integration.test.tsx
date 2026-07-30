@@ -10,8 +10,9 @@
  *
  * See specs/studio/publish-not-gated.feature.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -141,12 +142,8 @@ vi.mock("../AddModelProviderKey", () => ({
 vi.mock("~/components/ui/menu", () => ({
   Menu: {
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Trigger: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
-    Content: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
+    Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Item: ({
       children,
       onClick,
@@ -261,7 +258,8 @@ describe("given the studio Publish menu is rendered", () => {
     /** @scenario Publish.tsx does not query plan.canPublish to gate the menu */
     it("does not redirect to plan management or fire subscription tracking when Publish is clicked", () => {
       renderPublish();
-      const publishButton = screen.getByText(/Publish workflow/i)
+      const publishButton = screen
+        .getByText(/Publish workflow/i)
         .closest("button");
       expect(publishButton).not.toBeNull();
       fireEvent.click(publishButton!);

@@ -17,21 +17,19 @@ import { Currency, PricingModel } from "@prisma/client";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
-import { useRouter } from "~/utils/compat/next-router";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   BackofficeTable,
-  EmptyCell,
   dateInputToISO,
+  EmptyCell,
   formatDate,
 } from "../BackofficeTable";
-import {
-  useAdminList,
-  useAdminUpdate,
-} from "../useAdminResource";
+import { useAdminList, useAdminUpdate } from "../useAdminResource";
 
 /**
  * Read-facing Organization shape — intentionally does NOT include
@@ -133,9 +131,7 @@ export default function OrganizationsView() {
                 <Table.Cell>{org.slug}</Table.Cell>
                 <Table.Cell>{org.pricingModel}</Table.Cell>
                 <Table.Cell>{org.currency}</Table.Cell>
-                <Table.Cell>
-                  {org.ssoDomain ?? <EmptyCell />}
-                </Table.Cell>
+                <Table.Cell>{org.ssoDomain ?? <EmptyCell />}</Table.Cell>
                 <Table.Cell>{formatDate(org.createdAt)}</Table.Cell>
                 <Table.Cell textAlign="right">
                   <Box
@@ -149,10 +145,7 @@ export default function OrganizationsView() {
                         <MoreVertical size={16} />
                       </Menu.Trigger>
                       <Menu.Content>
-                        <Menu.Item
-                          value="edit"
-                          onClick={() => setEditing(org)}
-                        >
+                        <Menu.Item value="edit" onClick={() => setEditing(org)}>
                           <Pencil size={16} />
                           Edit
                         </Menu.Item>
@@ -313,12 +306,9 @@ function OrganizationEditDrawer({
           onClose();
         },
         onError: (err) =>
-          toaster.create({
-            title: "Update failed",
-            description: err.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
+          showErrorToast({
+            error: err,
+            fallbackTitle: "Couldn't update the organization",
           }),
       },
     );
@@ -392,9 +382,7 @@ function OrganizationEditDrawer({
                 <Field.Label>Stripe customer ID</Field.Label>
                 <Input
                   value={form.stripeCustomerId}
-                  onChange={(e) =>
-                    setField("stripeCustomerId", e.target.value)
-                  }
+                  onChange={(e) => setField("stripeCustomerId", e.target.value)}
                 />
               </Field.Root>
               <Field.Root>
@@ -431,8 +419,8 @@ function OrganizationEditDrawer({
                   placeholder="e.g. acme.com"
                 />
                 <Field.HelperText>
-                  Lowercased server-side. Users with this email domain can
-                  sign in via SSO.
+                  Lowercased server-side. Users with this email domain can sign
+                  in via SSO.
                 </Field.HelperText>
               </Field.Root>
               <Field.Root>
@@ -459,9 +447,7 @@ function OrganizationEditDrawer({
                 <Input
                   type="date"
                   value={form.licenseExpiresAt}
-                  onChange={(e) =>
-                    setField("licenseExpiresAt", e.target.value)
-                  }
+                  onChange={(e) => setField("licenseExpiresAt", e.target.value)}
                 />
               </Field.Root>
 

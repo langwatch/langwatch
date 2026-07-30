@@ -1,36 +1,5 @@
-import { createLogger } from "@langwatch/observability";
-import { TriggerAction } from "@prisma/client";
-import { createHash } from "crypto";
-import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
 import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
-import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
 import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import type { DatasetRecordEntry } from "~/server/datasets/types";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
-import {
-  sendRenderedTriggerEmail,
-  sendTriggerEmail,
-} from "~/server/mailer/triggerEmail";
-import type { Trace } from "~/server/tracer/types";
-import {
-  deliverWebhook,
-  type WebhookDeliveryRecorder,
-} from "~/server/app-layer/automations/delivery/deliverWebhook";
-import {
-  DispatchError,
-  isDispatchError,
-} from "~/server/event-sourcing/queues/dispatchError";
-import {
-  sendRenderedSlackMessage,
-  sendSlackWebhook,
-} from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
 import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
@@ -38,6 +7,37 @@ import {
   buildTemplateContext,
   type TemplateMatchInput,
 } from "@langwatch/automations/templating/templateContext";
+import { createLogger } from "@langwatch/observability";
+import { TriggerAction } from "@prisma/client";
+import { createHash } from "crypto";
+import {
+  deliverWebhook,
+  type WebhookDeliveryRecorder,
+} from "~/server/app-layer/automations/delivery/deliverWebhook";
+import {
+  sendRenderedSlackMessage,
+  sendSlackWebhook,
+} from "~/server/app-layer/automations/delivery/sendSlackWebhook";
+import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
+import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
+import { decryptWebhookHeaders } from "~/server/app-layer/automations/providers/webhook/server";
+import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { DatasetRecordEntry } from "~/server/datasets/types";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import type { IntentExecutor } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import {
+  DispatchError,
+  isDispatchError,
+} from "~/server/event-sourcing/queues/dispatchError";
+import {
+  sendRenderedTriggerEmail,
+  sendTriggerEmail,
+} from "~/server/mailer/triggerEmail";
+import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 import {

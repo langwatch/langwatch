@@ -11,7 +11,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioPicker, type ScenarioPickerProps } from "../ScenarioPicker";
 
 vi.mock("../ui/checkbox", () => ({
-  Checkbox: ({ checked, onCheckedChange, children }: { checked: boolean; onCheckedChange?: (details: { checked: boolean }) => void; children: React.ReactNode }) => (
+  Checkbox: ({
+    checked,
+    onCheckedChange,
+    children,
+  }: {
+    checked: boolean;
+    onCheckedChange?: (details: { checked: boolean }) => void;
+    children: React.ReactNode;
+  }) => (
     <label>
       <input
         type="checkbox"
@@ -121,7 +129,9 @@ describe("<ScenarioPicker />", () => {
   describe("given a single archived scenario", () => {
     describe("when the picker renders", () => {
       it("uses singular text for the warning", () => {
-        renderPicker({ archivedIds: [{ id: "scen_old_1", name: "scen_old_1" }] });
+        renderPicker({
+          archivedIds: [{ id: "scen_old_1", name: "scen_old_1" }],
+        });
 
         expect(
           screen.getByText("1 archived scenario linked:"),

@@ -5,9 +5,9 @@ import {
   HARD_TIER_SUSTAIN_MINUTES,
   INSUFFICIENT_DATA_RECHECK_SECONDS,
   MIN_BASELINE_RATE,
+  percentile,
   SURFACE_TIER_MULTIPLIER,
   SURFACE_TIER_SUSTAIN_MINUTES,
-  percentile,
 } from "../anomalyDetector";
 import type { Anomaly } from "../anomalyState";
 import { TenantRateTracker } from "../tenantRateTracker";
@@ -50,8 +50,9 @@ function makeFakes() {
       }),
       get: vi
         .fn()
-        .mockImplementation(async (tid: string, kind: string) =>
-          stored.get(`${kind}:${tid}`) ?? null,
+        .mockImplementation(
+          async (tid: string, kind: string) =>
+            stored.get(`${kind}:${tid}`) ?? null,
         ),
       list: vi.fn().mockResolvedValue([]),
     } as any,

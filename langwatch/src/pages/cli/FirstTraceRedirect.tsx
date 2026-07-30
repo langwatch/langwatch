@@ -17,10 +17,10 @@
 import { HStack, Icon, Spinner, Text } from "@chakra-ui/react";
 import { CheckCircle2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSession } from "~/utils/auth-client";
-import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useSession } from "~/utils/auth-client";
+import { useRouter } from "~/utils/compat/next-router";
 import { findPersonalProject } from "~/utils/personalProject";
 
 export const FIRST_TRACE_POLL_INTERVAL_MS = 3_000;
@@ -100,8 +100,7 @@ function useFirstTraceWatch(): FirstTraceWatchState {
     redirectToOnboarding: false,
   });
   const personalProject = useMemo(
-    () =>
-      findPersonalProject({ organizations, userId: session?.user?.id }),
+    () => findPersonalProject({ organizations, userId: session?.user?.id }),
     [organizations, session?.user?.id],
   );
 

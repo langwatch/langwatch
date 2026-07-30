@@ -51,25 +51,22 @@ describe("Scenario set limit enforcement", () => {
       name?: string;
     },
   ): Promise<{ status: number; body: Record<string, unknown> }> {
-    const response = await fetch(
-      `${LANGWATCH_ENDPOINT}/api/scenario-events`,
-      {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: "SCENARIO_RUN_STARTED",
-          timestamp: Date.now(),
-          scenarioId: opts.scenarioId,
-          scenarioRunId: opts.scenarioRunId,
-          batchRunId: opts.batchRunId,
-          scenarioSetId,
-          metadata: { name: opts.name ?? `Stress test ${scenarioSetId}` },
-        }),
+    const response = await fetch(`${LANGWATCH_ENDPOINT}/api/scenario-events`, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": apiKey,
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        type: "SCENARIO_RUN_STARTED",
+        timestamp: Date.now(),
+        scenarioId: opts.scenarioId,
+        scenarioRunId: opts.scenarioRunId,
+        batchRunId: opts.batchRunId,
+        scenarioSetId,
+        metadata: { name: opts.name ?? `Stress test ${scenarioSetId}` },
+      }),
+    });
 
     const body = (await response.json()) as Record<string, unknown>;
     return { status: response.status, body };
@@ -83,25 +80,22 @@ describe("Scenario set limit enforcement", () => {
       batchRunId: string;
     },
   ): Promise<{ status: number; body: Record<string, unknown> }> {
-    const response = await fetch(
-      `${LANGWATCH_ENDPOINT}/api/scenario-events`,
-      {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: "SCENARIO_MESSAGE_SNAPSHOT",
-          timestamp: Date.now(),
-          scenarioId: opts.scenarioId,
-          scenarioRunId: opts.scenarioRunId,
-          batchRunId: opts.batchRunId,
-          scenarioSetId,
-          messages: [{ role: "user", content: "hello from stress test" }],
-        }),
+    const response = await fetch(`${LANGWATCH_ENDPOINT}/api/scenario-events`, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": apiKey,
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify({
+        type: "SCENARIO_MESSAGE_SNAPSHOT",
+        timestamp: Date.now(),
+        scenarioId: opts.scenarioId,
+        scenarioRunId: opts.scenarioRunId,
+        batchRunId: opts.batchRunId,
+        scenarioSetId,
+        messages: [{ role: "user", content: "hello from stress test" }],
+      }),
+    });
 
     const body = (await response.json()) as Record<string, unknown>;
     return { status: response.status, body };
@@ -139,11 +133,16 @@ describe("Scenario set limit enforcement", () => {
           expect(body).toHaveProperty("limitType", "scenarioSets");
           break;
         } else {
-          expect.fail(`Unexpected status ${status} on set ${i}: ${JSON.stringify(body)}`);
+          expect.fail(
+            `Unexpected status ${status} on set ${i}: ${JSON.stringify(body)}`,
+          );
         }
       }
 
-      expect(blockedSetId, "should have hit the limit within 20 attempts").toBeDefined();
+      expect(
+        blockedSetId,
+        "should have hit the limit within 20 attempts",
+      ).toBeDefined();
     });
 
     it("R6: 403 response body has the structured error shape", async () => {

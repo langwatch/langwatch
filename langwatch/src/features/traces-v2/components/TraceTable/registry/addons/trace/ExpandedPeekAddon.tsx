@@ -262,7 +262,7 @@ const PeekSpanRow: React.FC<{
         </Text>
         {span.model && (
           <Text textStyle="2xs" color="fg.subtle" truncate flexShrink={1}>
-            {(span.model)}
+            {span.model}
           </Text>
         )}
       </HStack>

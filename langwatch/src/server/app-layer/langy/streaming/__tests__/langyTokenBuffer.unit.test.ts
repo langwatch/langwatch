@@ -13,7 +13,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LANGY_STREAMING } from "../langy.streaming.constants";
-import { LangyTokenBuffer, type LangyStreamRedis } from "../langyTokenBuffer";
+import { type LangyStreamRedis, LangyTokenBuffer } from "../langyTokenBuffer";
 
 interface RecordedEntry {
   type: string;

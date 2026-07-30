@@ -1,6 +1,6 @@
 import { HStack, Spacer, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";

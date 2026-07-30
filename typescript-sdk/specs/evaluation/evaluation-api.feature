@@ -20,21 +20,27 @@ Feature: Evaluation API
     Then the callback is called for each item with index and span
     And each iteration creates a trace span
 
-  @e2e
+  # Unverified: that a metric logged in the loop actually reaches LangWatch.
+  @e2e @unimplemented
   Scenario: Log custom metrics during evaluation
     Given I am inside an evaluation loop
     When I call evaluation.log with metric "accuracy" and score 0.95
     Then the metric is sent to LangWatch
     And it appears in the experiment results
 
-  @e2e
+  # Unverified: running an evaluator from inside the loop, and its result being
+  # logged to the experiment without an explicit call. The standalone evaluator
+  # API is a different surface and does not cover this.
+  @e2e @unimplemented
   Scenario: Run built-in evaluator
     Given I am inside an evaluation loop
     When I call evaluation.run with "langevals/exact_match"
     Then the evaluator is called via the API
     And the result is logged automatically
 
-  @e2e
+  # Unverified: that both targets land in the experiment. The comparison step is
+  # not observable from the SDK.
+  @e2e @unimplemented
   Scenario: Compare multiple targets with manual target specification
     Given I am inside an evaluation loop
     When I log metrics for target "gpt4" with metadata
@@ -42,7 +48,10 @@ Feature: Evaluation API
     Then both targets appear in the experiment
     And I can compare them in the UI
 
-  @e2e
+  # Only latency capture is verified. Unverified: that sequential targets get
+  # SEPARATE spans, and that a metric logged inside a block is attributed to
+  # that block's target. The parallel scenario below does verify separation.
+  @e2e @unimplemented
   Scenario: Compare multiple targets with withTarget() wrapper
     Given I have initialized an evaluation
     And I have a dataset with 2 items
@@ -64,7 +73,9 @@ Feature: Evaluation API
     And latency is captured automatically from span duration
     And metrics logged inside withTarget() are associated with that target
 
-  @e2e
+  # Unverified: that the target is inferred from the surrounding block. Nothing
+  # observes the inferred value, only that the code ran.
+  @e2e @unimplemented
   Scenario: Automatic target context inference in nested calls
     Given I am inside a withTarget() block for "gpt-4"
     When I call evaluation.log("latency", { index, score: 100 }) without specifying target
@@ -94,7 +105,9 @@ Feature: Evaluation API
 
   # Integration: Edge cases and error handling
 
-  @integration
+  # Unverified: that the batch arrives as ONE request. Nothing counts requests,
+  # so a request per metric would look identical.
+  @integration @unimplemented
   Scenario: Evaluation sends batched results
     Given I have initialized an evaluation
     When I log 5 metrics in quick succession
@@ -116,14 +129,19 @@ Feature: Evaluation API
     Then an error is thrown
     And the message explains the conflict
 
-  @integration
+  # Not implemented: the batch payload carries only `created_at` / `finished_at`
+  # timestamps. There is no `stopped_at` anywhere in the SDK and no failed-run
+  # marking, so there is nothing to bind.
+  @integration @unimplemented
   Scenario: Graceful shutdown on error
     Given I am in the middle of an evaluation loop
     When an error occurs in my code
     Then the SDK sends a stopped_at timestamp
     And the experiment is marked as failed
 
-  @integration
+  # Not implemented: sending results is fire-and-forget. A failed send is logged
+  # and dropped, with no retry or backoff, so results can be lost silently.
+  @integration @unimplemented
   Scenario: Retry on network failure
     Given the API returns a temporary error
     When the SDK tries to send results
@@ -132,7 +150,9 @@ Feature: Evaluation API
 
   # Unit: Pure logic / isolated class behavior
 
-  @unit
+  # Unverified: how a nested item is actually serialised for the API. Accepting
+  # a nested shape is validated; the resulting encoding is not.
+  @unit @unimplemented
   Scenario: Dataset item serialization
     Given I have a dataset item with nested objects
     When it is serialized for the API
@@ -146,7 +166,9 @@ Feature: Evaluation API
     Then the trace_id is extracted from the span context
     And included in the logged result
 
-  @unit
+  # Unverified: that concurrent blocks keep their targets separate. Running them
+  # concurrently without error is not the same as observing the attribution.
+  @unit @unimplemented
   Scenario: Target context isolation with AsyncLocalStorage
     Given I have two concurrent withTarget() executions
     When target "gpt-4" is executing simultaneously with target "claude-3"

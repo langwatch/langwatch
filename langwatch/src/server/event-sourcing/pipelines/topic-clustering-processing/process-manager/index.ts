@@ -6,16 +6,9 @@ export {
   INITIAL_TOPIC_CLUSTERING_STATE,
   nextDailySlot,
   TOPIC_CLUSTERING_STALE_RUN_MS,
-  topicClusteringWake,
   type TopicClusteringIntents,
+  topicClusteringWake,
 } from "./topicClustering.process";
-export {
-  TOPIC_CLUSTERING_PROCESS_INTENT_TYPES,
-  TOPIC_CLUSTERING_PROCESS_NAME,
-  topicClusteringRunIntentSchema,
-  type TopicClusteringProcessState,
-  type TopicClusteringRunIntent,
-} from "./topicClusteringProcess.types";
 export {
   createTopicClusteringRunHandler,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
@@ -25,3 +18,10 @@ export {
   type TopicClusteringOutcomeCommands,
   type TopicClusteringRunPort,
 } from "./topicClusteringIntentHandlers";
+export {
+  TOPIC_CLUSTERING_PROCESS_INTENT_TYPES,
+  TOPIC_CLUSTERING_PROCESS_NAME,
+  type TopicClusteringProcessState,
+  type TopicClusteringRunIntent,
+  topicClusteringRunIntentSchema,
+} from "./topicClusteringProcess.types";

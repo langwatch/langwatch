@@ -41,7 +41,6 @@ import {
   ComponentExecutionButton,
   getNodeDisplayName,
   isExecutableComponent,
-  NodeSectionTitle,
 } from "../nodes/Nodes";
 
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";

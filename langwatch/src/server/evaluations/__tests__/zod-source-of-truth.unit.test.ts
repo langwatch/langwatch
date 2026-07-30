@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   AVAILABLE_EVALUATORS,
-  evaluatorTypesSchema,
   evaluatorsSchema,
+  evaluatorTypesSchema,
 } from "~/server/evaluations/evaluators.generated";
 import {
   chatRichContentSchema,
@@ -106,9 +106,11 @@ describe("given Zod schemas are the single source of truth", () => {
       });
       expect(parsed.settings.rules[0]?.value).toBe("artificial intelligence");
 
-      const invalid = evaluatorsSchema.shape["langevals/llm_boolean"].safeParse({
-        settings: { max_tokens: "lots" },
-      });
+      const invalid = evaluatorsSchema.shape["langevals/llm_boolean"].safeParse(
+        {
+          settings: { max_tokens: "lots" },
+        },
+      );
       expect(invalid.success).toBe(false);
     });
 

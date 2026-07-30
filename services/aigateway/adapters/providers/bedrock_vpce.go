@@ -626,37 +626,50 @@ type bedrockStreamIterator struct {
 }
 
 func (it *bedrockStreamIterator) Next(ctx context.Context) bool {
-	if it.done {
+	resp, ok := it.nextTyped(ctx)
+	if !ok {
 		return false
+	}
+	data, _ := sonic.Marshal(resp)
+	it.current = data
+	return true
+}
+
+// nextTyped pulls the next mappable Bedrock event as a typed chat chunk. The
+// translated /v1/messages VPCE lane consumes this seam directly, feeding the
+// chunks through the chat-to-Responses conversion instead of the OpenAI wire
+// shape Next serializes.
+func (it *bedrockStreamIterator) nextTyped(ctx context.Context) (*bfschemas.BifrostChatResponse, bool) {
+	if it.done {
+		return nil, false
 	}
 	for {
 		select {
 		case <-ctx.Done():
 			it.err = ctx.Err()
 			it.done = true
-			return false
+			return nil, false
 		case event, ok := <-it.stream.Events():
 			if !ok {
 				if err := it.stream.Err(); err != nil {
 					it.err = fmt.Errorf("bedrock stream error: %w", err)
 				}
 				it.done = true
-				return false
+				return nil, false
 			}
 			chunk, emit := it.mapEvent(event)
 			if !emit {
 				continue
 			}
-			it.current = chunk
-			return true
+			return chunk, true
 		}
 	}
 }
 
-// mapEvent maps a single Bedrock stream event to an OpenAI-shaped chunk. The
+// mapEvent maps a single Bedrock stream event to a typed chat chunk. The
 // second return reports whether the event produced a chunk worth emitting
 // (metadata/start events that carry no delta are absorbed silently).
-func (it *bedrockStreamIterator) mapEvent(event brtypes.ConverseStreamOutput) ([]byte, bool) {
+func (it *bedrockStreamIterator) mapEvent(event brtypes.ConverseStreamOutput) (*bfschemas.BifrostChatResponse, bool) {
 	switch e := event.(type) {
 	case *brtypes.ConverseStreamOutputMemberContentBlockStart:
 		// Tool-use blocks announce id+name here; text content has no start
@@ -730,32 +743,32 @@ func (it *bedrockStreamIterator) assignToolIndex(blockIdx *int32) uint16 {
 	return v
 }
 
-func (it *bedrockStreamIterator) chunkWithText(text string) []byte {
-	return it.marshalChunk(&bfschemas.ChatStreamResponseChoiceDelta{Content: &text}, nil, nil)
+func (it *bedrockStreamIterator) chunkWithText(text string) *bfschemas.BifrostChatResponse {
+	return it.buildChunk(&bfschemas.ChatStreamResponseChoiceDelta{Content: &text}, nil, nil)
 }
 
-func (it *bedrockStreamIterator) chunkWithToolCall(call bfschemas.ChatAssistantMessageToolCall) []byte {
-	return it.marshalChunk(&bfschemas.ChatStreamResponseChoiceDelta{
+func (it *bedrockStreamIterator) chunkWithToolCall(call bfschemas.ChatAssistantMessageToolCall) *bfschemas.BifrostChatResponse {
+	return it.buildChunk(&bfschemas.ChatStreamResponseChoiceDelta{
 		ToolCalls: []bfschemas.ChatAssistantMessageToolCall{call},
 	}, nil, nil)
 }
 
-func (it *bedrockStreamIterator) chunkWithFinish(finish string) []byte {
-	return it.marshalChunk(&bfschemas.ChatStreamResponseChoiceDelta{}, &finish, nil)
+func (it *bedrockStreamIterator) chunkWithFinish(finish string) *bfschemas.BifrostChatResponse {
+	return it.buildChunk(&bfschemas.ChatStreamResponseChoiceDelta{}, &finish, nil)
 }
 
-func (it *bedrockStreamIterator) usageChunk() []byte {
-	return it.marshalChunk(&bfschemas.ChatStreamResponseChoiceDelta{}, nil, bedrockLLMUsage(usagePtr(it.usage)))
+func (it *bedrockStreamIterator) usageChunk() *bfschemas.BifrostChatResponse {
+	return it.buildChunk(&bfschemas.ChatStreamResponseChoiceDelta{}, nil, bedrockLLMUsage(usagePtr(it.usage)))
 }
 
-// marshalChunk builds and serializes a chat.completion.chunk carrying the given
-// delta + optional finish reason + optional usage, matching the bifrost
-// streaming wire shape.
-func (it *bedrockStreamIterator) marshalChunk(
+// buildChunk assembles a chat.completion.chunk carrying the given delta +
+// optional finish reason + optional usage, matching the bifrost streaming
+// shape. Next serializes it; the typed VPCE messages lane consumes it as-is.
+func (it *bedrockStreamIterator) buildChunk(
 	delta *bfschemas.ChatStreamResponseChoiceDelta,
 	finish *string,
 	usage *bfschemas.BifrostLLMUsage,
-) []byte {
+) *bfschemas.BifrostChatResponse {
 	resp := &bfschemas.BifrostChatResponse{
 		Object:  "chat.completion.chunk",
 		Model:   it.model,
@@ -771,8 +784,7 @@ func (it *bedrockStreamIterator) marshalChunk(
 		},
 		Usage: usage,
 	}
-	data, _ := sonic.Marshal(resp)
-	return data
+	return resp
 }
 
 func (it *bedrockStreamIterator) Chunk() []byte       { return it.current }

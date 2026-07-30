@@ -17,7 +17,9 @@ interface RegistryEntry {
   mode: "chat" | "embedding";
 }
 
-const registry = llmModels as unknown as { models: Record<string, RegistryEntry> };
+const registry = llmModels as unknown as {
+  models: Record<string, RegistryEntry>;
+};
 
 const FLAGSHIP_PATTERN = /^([a-z0-9_-]+)\/([a-z]+)-(\d+)\.(\d+)$/;
 

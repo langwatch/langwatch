@@ -59,9 +59,7 @@ describe("Langy tool activity raw payload", () => {
       expect(container.textContent).not.toContain('"tool"');
       expect(container.textContent).not.toContain("output-available");
 
-      await user.click(
-        screen.getByRole("button", { name: "Show raw data" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Show raw data" }));
 
       expect(container.textContent).toContain('"tool": "skill"');
       expect(container.textContent).toContain("output-available");

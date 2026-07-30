@@ -1,13 +1,13 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { trackEventOnce } from "~/utils/tracking";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
@@ -133,12 +133,16 @@ export const WelcomeScreen: React.FC = () => {
 
           window.location.href = `/onboarding/product?${params.toString()}`;
         },
-        onError: () => {
-          toaster.create({
-            title: "Failed to proceed with onboarding",
-            description: "Please try again or contact support",
-            type: "error",
-            meta: { closable: true },
+        // Through the registry, not a hardcoded sentence. This threw the
+        // error away and told everyone to "try again or contact support" —
+        // advice that cannot resolve a plan limit, an address already in use,
+        // or a name that fails validation, which are the failures this call
+        // actually has. Signing up is the worst possible place to be told
+        // nothing.
+        onError: (error) => {
+          showErrorToast({
+            error,
+            fallbackTitle: "Couldn't finish setting up your organization",
           });
         },
       },
@@ -176,7 +180,14 @@ export const WelcomeScreen: React.FC = () => {
         showBackButton={false}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
-          <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">
+          <Box
+            position="relative"
+            overflow="hidden"
+            py="1"
+            px="2"
+            my="-1"
+            mx="-2"
+          >
             <AnimatePresence
               mode="popLayout"
               custom={direction}
@@ -244,7 +255,10 @@ export const WelcomeScreen: React.FC = () => {
             </AnimatePresence>
           </Box>
 
-          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+          <motion.div
+            layout
+            transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+          >
             <OnboardingNavigation
               currentScreenIndex={currentScreenIndex}
               onPrev={navigation.prevScreen}
@@ -259,7 +273,10 @@ export const WelcomeScreen: React.FC = () => {
             />
           </motion.div>
 
-          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+          <motion.div
+            layout
+            transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+          >
             <HStack justify="center" gap={1.5}>
               {flow.visibleScreens.map((_, idx) => (
                 <Box

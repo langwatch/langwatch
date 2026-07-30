@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Box,
@@ -15,11 +14,13 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "~/components/ui/checkbox";
-import { api } from "~/utils/api";
+import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
-import { toaster } from "~/components/ui/toaster";
+import { api } from "~/utils/api";
 import { TenantSelector } from "./TenantSelector";
 
 export function BulkReplayWizard({
@@ -104,13 +105,8 @@ export function BulkReplayWizard({
       });
       onReplayStarted();
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to start replay",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't start the replay" }),
   });
 
   const [dryRunResult, setDryRunResult] = useState<{
@@ -129,13 +125,8 @@ export function BulkReplayWizard({
         type: "info",
       });
     },
-    onError: (error) => {
-      toaster.create({
-        title: "Dry run failed",
-        description: error.message,
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't complete the dry run" }),
   });
 
   function toggleProjection(name: string) {
@@ -187,10 +178,7 @@ export function BulkReplayWizard({
     );
   }
 
-  if (
-    projectionsQuery.data &&
-    projectionsQuery.data.projections.length === 0
-  ) {
+  if (projectionsQuery.data && projectionsQuery.data.projections.length === 0) {
     return (
       <Center paddingY={20}>
         <EmptyState.Root>
@@ -314,11 +302,7 @@ export function BulkReplayWizard({
                 <Text textStyle="sm" fontWeight="medium">
                   3. Select projections to replay
                 </Text>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={selectAllRelevant}
-                >
+                <Button variant="ghost" size="xs" onClick={selectAllRelevant}>
                   Select all with data
                 </Button>
               </HStack>
@@ -390,9 +374,7 @@ export function BulkReplayWizard({
                           </Text>
                         </Table.Cell>
                         <Table.Cell textAlign="end">
-                          <Text fontWeight="medium">
-                            {proj.aggregateCount}
-                          </Text>
+                          <Text fontWeight="medium">{proj.aggregateCount}</Text>
                         </Table.Cell>
                         <Table.Cell>
                           <Text textStyle="xs" color="fg.muted">
@@ -419,9 +401,7 @@ export function BulkReplayWizard({
                   </Stat.Root>
                   <Stat.Root>
                     <Stat.Label>Projections</Stat.Label>
-                    <Stat.ValueText>
-                      {selectedProjections.size}
-                    </Stat.ValueText>
+                    <Stat.ValueText>{selectedProjections.size}</Stat.ValueText>
                   </Stat.Root>
                   <Stat.Root>
                     <Stat.Label>Tenants</Stat.Label>
@@ -434,11 +414,7 @@ export function BulkReplayWizard({
                 {hasAccess && (
                   <VStack align="stretch" gap={3}>
                     <Box>
-                      <Text
-                        textStyle="xs"
-                        color="fg.muted"
-                        marginBottom={1}
-                      >
+                      <Text textStyle="xs" color="fg.muted" marginBottom={1}>
                         Description (for audit log)
                       </Text>
                       <Textarea
@@ -492,11 +468,7 @@ export function BulkReplayWizard({
                             Dry Run Result
                           </Text>
                           <Text textStyle="sm">{dryRunResult.message}</Text>
-                          <Text
-                            textStyle="xs"
-                            color="fg.muted"
-                            marginTop={1}
-                          >
+                          <Text textStyle="xs" color="fg.muted" marginTop={1}>
                             Projections:{" "}
                             {dryRunResult.projectionNames.join(", ")} | Sample
                             size: {dryRunResult.sampleSize}

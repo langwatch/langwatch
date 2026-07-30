@@ -1,6 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { Field } from "../types/dsl";
 import { camelCaseToSnakeCase } from "../../utils/stringCasing";
+import type { Field } from "../types/dsl";
 
 /**
  * Validates a node name for rename operations.
@@ -137,8 +137,7 @@ export const getMappingSurfaceInputs = (
       fieldEdges.length > 0 &&
       fieldEdges.some((edge: Edge) => !evaluatorIds.has(edge.target));
 
-    const evaluatorOnly =
-      fieldEdges.length > 0 && !hasNonEvaluatorTarget;
+    const evaluatorOnly = fieldEdges.length > 0 && !hasNonEvaluatorTarget;
 
     return {
       identifier,

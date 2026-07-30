@@ -1,28 +1,28 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { register } from "prom-client";
+import { beforeEach, describe, expect, it } from "vitest";
 
 // Import all new metric functions to verify they exist and are callable
 import {
   incrementEsCommandTotal,
-  observeEsCommandDuration,
-  incrementEsFoldProjectionTotal,
-  observeEsFoldProjectionDuration,
-  incrementEsMapProjectionTotal,
-  observeEsMapProjectionDuration,
-  incrementEsProjectionTotal,
-  observeEsProjectionDuration,
-  incrementEsReactorTotal,
-  observeEsReactorDuration,
-  incrementEsSubscriberTotal,
-  observeEsSubscriberDuration,
-  incrementEsProcessManagerTotal,
-  observeEsProcessManagerDuration,
-  incrementEsProcessOutboxTotal,
-  observeEsProcessOutboxDuration,
+  incrementEsFoldCacheRedisError,
   incrementEsFoldCacheTotal,
+  incrementEsFoldProjectionTotal,
+  incrementEsMapProjectionTotal,
+  incrementEsProcessManagerTotal,
+  incrementEsProcessOutboxTotal,
+  incrementEsProjectionTotal,
+  incrementEsReactorTotal,
+  incrementEsSubscriberTotal,
+  observeEsCommandDuration,
   observeEsFoldCacheGetDuration,
   observeEsFoldCacheStoreDuration,
-  incrementEsFoldCacheRedisError,
+  observeEsFoldProjectionDuration,
+  observeEsMapProjectionDuration,
+  observeEsProcessManagerDuration,
+  observeEsProcessOutboxDuration,
+  observeEsProjectionDuration,
+  observeEsReactorDuration,
+  observeEsSubscriberDuration,
   withMetrics,
 } from "../metrics";
 

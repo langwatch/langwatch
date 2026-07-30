@@ -1,9 +1,9 @@
 const DEFAULT_DATASET_NAME = "Draft Dataset";
 
 import {
-  LATEST_SPEC_VERSION,
   type End,
   type Entry,
+  LATEST_SPEC_VERSION,
   type Signature,
   type Workflow,
 } from "../types/dsl";

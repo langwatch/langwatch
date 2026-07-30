@@ -43,9 +43,7 @@ const availableTeams = [{ id: TEAM_ID, name: "developers" }];
 const availableProjects = [
   { id: PROJECT_ID, name: "Doc Chat · developers", teamId: TEAM_ID },
 ];
-const projectScope = [
-  { scopeType: "PROJECT" as const, scopeId: PROJECT_ID },
-];
+const projectScope = [{ scopeType: "PROJECT" as const, scopeId: PROJECT_ID }];
 
 const orgProvider: OrgModelProvider = {
   id: "mp-org-anthropic",

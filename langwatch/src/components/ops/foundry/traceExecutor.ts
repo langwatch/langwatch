@@ -1,5 +1,10 @@
-import type { Tracer, Context } from "@opentelemetry/api";
-import { context, trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
+import type { Context, Tracer } from "@opentelemetry/api";
+import {
+  context,
+  ROOT_CONTEXT,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
 import { createFoundryProvider } from "./otelBrowser";
 import type { SpanConfig, TraceConfig } from "./types";
 
@@ -88,11 +93,6 @@ export function getFoundryExecutor(opts: ExecutorOpts): FoundryExecutor {
  * clean slate between cases; production code rarely needs it (the
  * page-hide hook handles real teardown).
  */
-async function closeAllFoundryExecutors(): Promise<void> {
-  const all = [...executorCache.values()];
-  executorCache.clear();
-  await Promise.all(all.map((e) => e.close()));
-}
 
 /**
  * Build a fresh provider-backed executor. Prefer `getFoundryExecutor`
@@ -169,7 +169,7 @@ function buildSpan(
     context: typeof import("@opentelemetry/api").context;
     trace: typeof import("@opentelemetry/api").trace;
     SpanStatusCode: typeof import("@opentelemetry/api").SpanStatusCode;
-  }
+  },
 ): string {
   const startTimeMs = baseTime + config.offsetMs;
   const endTimeMs = startTimeMs + config.durationMs;
@@ -177,7 +177,7 @@ function buildSpan(
   const span = tracer.startSpan(
     config.name,
     { startTime: new Date(startTimeMs) },
-    parentContext
+    parentContext,
   );
 
   span.setAttribute("langwatch.span.type", config.type);
@@ -203,7 +203,10 @@ function buildSpan(
       span.setAttribute("langwatch.thread.id", traceConfig.metadata.threadId);
     }
     if (traceConfig.metadata.customerId) {
-      span.setAttribute("langwatch.customer.id", traceConfig.metadata.customerId);
+      span.setAttribute(
+        "langwatch.customer.id",
+        traceConfig.metadata.customerId,
+      );
     }
     if (traceConfig.metadata.labels?.length) {
       span.setAttribute("langwatch.labels", traceConfig.metadata.labels);
@@ -298,7 +301,10 @@ function buildSpan(
   }
 
   if (config.rag?.contexts.length) {
-    span.setAttribute("langwatch.rag.contexts", JSON.stringify(config.rag.contexts));
+    span.setAttribute(
+      "langwatch.rag.contexts",
+      JSON.stringify(config.rag.contexts),
+    );
   }
 
   if (config.prompt) {
@@ -334,12 +340,15 @@ function buildSpan(
       // The pin the developer set on the call site. The projection
       // records this verbatim into `SelectedPromptId`; when it differs
       // from the resolved runtime id the drawer flags drift.
-      span.setAttribute("langwatch.prompt.selected.id", config.prompt.selectedId);
+      span.setAttribute(
+        "langwatch.prompt.selected.id",
+        config.prompt.selectedId,
+      );
     }
     if (config.prompt.variables) {
       span.setAttribute(
         "langwatch.prompt.variables",
-        JSON.stringify(config.prompt.variables)
+        JSON.stringify(config.prompt.variables),
       );
     }
   }

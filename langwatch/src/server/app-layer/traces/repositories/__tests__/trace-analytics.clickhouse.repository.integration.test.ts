@@ -73,6 +73,10 @@ function traceRow(over: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
     rootMetadataFromFallback: false,
     traceNameUserOverridden: true,
     lastEventOccurredAt: baseMs + 50,
+    // Span timing baseline (migration 00061), deliberately EARLIER than the
+    // anchor in OccurredAt: a late earlier-starting span moved the baseline
+    // while the anchor stayed frozen. The two must not swap in the round-trip.
+    earliestSpanStartMs: baseMs - 250,
     ...over,
   };
 }
@@ -93,12 +97,14 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("trace_analytics round-trip (migrations 00039 + 00056)", () => {
+describe("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => {
   describe("given a fully populated slim row", () => {
     it("reads back every read-back column so the fold recovers its state", async () => {
       const row = traceRow({ traceId: `${tag}-rt` });
-      // upsertBatch waits for the async insert (wait_for_async_insert: 1) so the
-      // row is durably queryable; the single upsert is fire-and-forget by design.
+      // Both write paths carry `wait_for_async_insert: 1`, so the row is
+      // durably queryable once this resolves — the wait is a correctness
+      // requirement for the next delivery's read-back, not a batch-only
+      // nicety. The batch path is used here only because it is the store's.
       await repo.upsertBatch([{ row, retentionDays: 30 }]);
 
       const read = await repo.findByTraceIdWithApplied({
@@ -117,15 +123,15 @@ describe("trace_analytics round-trip (migrations 00039 + 00056)", () => {
       expect(read!.row.attributes["metadata.team"]).toBe("platform");
       // Read-back columns (00056) — exact integer / array / bool round-trip.
       expect(read!.row.spanCount).toBe(7);
-      expect(read!.row.annotationIds).toEqual([
-        `${tag}-ann-a`,
-        `${tag}-ann-b`,
-      ]);
+      expect(read!.row.annotationIds).toEqual([`${tag}-ann-a`, `${tag}-ann-b`]);
       expect(read!.row.rootSpanStartTimeMs).toBe(baseMs - 5);
       expect(read!.row.traceNameUserOverridden).toBe(true);
       expect(read!.row.traceNameFromFallback).toBe(false);
       expect(read!.row.rootMetadataFromFallback).toBe(false);
       expect(read!.row.lastEventOccurredAt).toBe(baseMs + 50);
+      // Span timing baseline (00061) — its own column, exact as a UInt64, and
+      // NOT confused with the anchor the partition column carries.
+      expect(read!.row.earliestSpanStartMs).toBe(baseMs - 250);
       // Partition/timestamp column is populated (DateTime64 exactness is
       // machine-timezone dependent, so only assert it is present + sane).
       expect(read!.row.occurredAtMs).toBeGreaterThan(0);
@@ -140,7 +146,12 @@ describe("trace_analytics round-trip (migrations 00039 + 00056)", () => {
       // (the repo stamps UpdatedAt from row.updatedAtMs, not now()).
       await repo.upsertBatch([
         {
-          row: { ...row, totalCost: 2, spanCount: 9, updatedAtMs: baseMs + 1000 },
+          row: {
+            ...row,
+            totalCost: 2,
+            spanCount: 9,
+            updatedAtMs: baseMs + 1000,
+          },
           retentionDays: 30,
         },
       ]);
@@ -206,6 +217,10 @@ describe("trace_analytics round-trip (migrations 00039 + 00056)", () => {
       expect(read!.row.rootSpanStartTimeMs).toBe(0);
       expect(read!.row.traceNameFromFallback).toBe(false);
       expect(read!.row.lastEventOccurredAt).toBe(0);
+      // Same for the 00061 column: the DEFAULT is what a row written before it
+      // means, and reading it must not throw the way an Array without a DEFAULT
+      // did in the 2026-07-28 incident (migration 00057).
+      expect(read!.row.earliestSpanStartMs).toBe(0);
       expect(read!.appliedEventIds).toEqual([]);
     });
   });

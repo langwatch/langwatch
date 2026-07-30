@@ -10,8 +10,14 @@ import {
 import type { Command, CommandHandler } from "../../commands/command";
 import type { TenantId } from "../../domain/tenantId";
 import type { Projection } from "../../domain/types";
-import type { FoldProjectionDefinition, FoldProjectionStore } from "../../projections/foldProjection.types";
-import type { AppendStore, MapProjectionDefinition } from "../../projections/mapProjection.types";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionStore,
+} from "../../projections/foldProjection.types";
+import type {
+  AppendStore,
+  MapProjectionDefinition,
+} from "../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 import { getTestClickHouseClient } from "./testContainers";
 
@@ -61,10 +67,9 @@ export interface TestProjection extends Projection<TestProjectionData> {
   data: TestProjectionData;
 }
 
-export class TestCommandHandler implements CommandHandler<
-  Command<TestCommandPayload>,
-  any
-> {
+export class TestCommandHandler
+  implements CommandHandler<Command<TestCommandPayload>, any>
+{
   static readonly schema = defineCommandSchema(
     TEST_COMMAND_TYPE as any,
     testCommandPayloadSchema,
@@ -108,8 +113,13 @@ export interface TestEventHandlerRecord {
 /**
  * AppendStore that writes mapped records to a ClickHouse table.
  */
-class TestEventHandlerAppendStore implements AppendStore<TestEventHandlerRecord> {
-  async append(record: TestEventHandlerRecord, _context: ProjectionStoreContext): Promise<void> {
+class TestEventHandlerAppendStore
+  implements AppendStore<TestEventHandlerRecord>
+{
+  async append(
+    record: TestEventHandlerRecord,
+    _context: ProjectionStoreContext,
+  ): Promise<void> {
     const clickHouseClient = getTestClickHouseClient();
     if (!clickHouseClient) {
       throw new Error("ClickHouse client not available");
@@ -153,7 +163,10 @@ class TestEventHandlerAppendStore implements AppendStore<TestEventHandlerRecord>
 /**
  * Test map projection that transforms events into records for ClickHouse storage.
  */
-export const testMapProjection: MapProjectionDefinition<TestEventHandlerRecord, TestEvent> = {
+export const testMapProjection: MapProjectionDefinition<
+  TestEventHandlerRecord,
+  TestEvent
+> = {
   name: "testHandler",
   eventTypes: [TEST_EVENT_TYPE],
   map(event: TestEvent): TestEventHandlerRecord {
@@ -172,15 +185,23 @@ export const testMapProjection: MapProjectionDefinition<TestEventHandlerRecord, 
 /**
  * In-memory fold projection store for tests.
  */
-class TestFoldProjectionStore implements FoldProjectionStore<TestProjectionData> {
+class TestFoldProjectionStore
+  implements FoldProjectionStore<TestProjectionData>
+{
   private data = new Map<string, TestProjectionData>();
 
-  async get(_aggregateId: string, context: ProjectionStoreContext): Promise<TestProjectionData | null> {
+  async get(
+    _aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<TestProjectionData | null> {
     const key = `${context.tenantId}:${context.aggregateId}`;
     return this.data.get(key) ?? null;
   }
 
-  async store(state: TestProjectionData, context: ProjectionStoreContext): Promise<void> {
+  async store(
+    state: TestProjectionData,
+    context: ProjectionStoreContext,
+  ): Promise<void> {
     const key = `${context.tenantId}:${context.aggregateId}`;
     this.data.set(key, state);
   }
@@ -189,7 +210,10 @@ class TestFoldProjectionStore implements FoldProjectionStore<TestProjectionData>
 /**
  * Test fold projection that aggregates events into accumulated state.
  */
-export const testFoldProjection: FoldProjectionDefinition<TestProjectionData, TestEvent> = {
+export const testFoldProjection: FoldProjectionDefinition<
+  TestProjectionData,
+  TestEvent
+> = {
   name: "testProjection",
   version: "2025-01-01",
   LastEventOccurredAtKey: "LastEventOccurredAt",

@@ -80,7 +80,7 @@ export const scimCreateUserRequestSchema = z
           primary: z.boolean().optional(),
           value: z.string(),
           type: z.string().optional(),
-        })
+        }),
       )
       .optional(),
     active: z.boolean().optional(),
@@ -118,7 +118,9 @@ export const scimCreateGroupRequestSchema = z.object({
   members: z.array(scimGroupMemberSchema).optional(),
 });
 
-export type ScimCreateGroupRequest = z.infer<typeof scimCreateGroupRequestSchema>;
+export type ScimCreateGroupRequest = z.infer<
+  typeof scimCreateGroupRequestSchema
+>;
 
 export const scimReplaceGroupRequestSchema = z.object({
   schemas: z.array(z.string()),
@@ -126,7 +128,9 @@ export const scimReplaceGroupRequestSchema = z.object({
   members: z.array(scimGroupMemberSchema).optional(),
 });
 
-export type ScimReplaceGroupRequest = z.infer<typeof scimReplaceGroupRequestSchema>;
+export type ScimReplaceGroupRequest = z.infer<
+  typeof scimReplaceGroupRequestSchema
+>;
 
 /**
  * Type guard that checks whether a value is a SCIM 2.0 Error response.

@@ -81,11 +81,7 @@ export const DialogContent = React.forwardRef<
         />
       )}
       <ChakraDialog.Positioner {...positionerProps}>
-        <ChakraDialog.Content
-          ref={ref}
-          {...rest}
-          asChild={false}
-        >
+        <ChakraDialog.Content ref={ref} {...rest} asChild={false}>
           {safeChildren}
         </ChakraDialog.Content>
       </ChakraDialog.Positioner>

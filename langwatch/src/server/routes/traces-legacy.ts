@@ -43,17 +43,18 @@ const secured = createServiceApp({ basePath: "/api" });
 /**
  * Authenticates via the unified API-key + legacy-key path and enforces the given
  * permission ceiling. Returns either `{ project, markUsed }` or
- * `{ error, status }`. `markUsed` is fire-and-forget and a no-op for legacy
- * keys — callers invoke it after a successful response.
+ * `{ error, status, body }`, where `body` is what the route answers with —
+ * a bare sentence for an unauthenticated call, and the full handled payload
+ * (code, permission, tips) for a permission denial. `markUsed` is
+ * fire-and-forget and a no-op for legacy keys — callers invoke it after a
+ * successful response.
  */
 async function authenticateRequest(c: Context, permission: Permission) {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
-      status: 401 as const,
-    };
+    const message =
+      "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   const resolved = await tokenResolver.resolve({
@@ -61,14 +62,19 @@ async function authenticateRequest(c: Context, permission: Permission) {
     projectId: credentials.projectId,
   });
   if (!resolved) {
-    return { error: "Invalid auth token.", status: 401 as const };
+    const message = "Invalid auth token.";
+    return { error: message, status: 401 as const, body: { message } };
   }
 
   try {
     await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+    return {
+      error: denial.message,
+      status: denial.status,
+      body: denial.body,
+    };
   }
 
   const markUsed = () => {
@@ -84,7 +90,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
 secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
   const auth = await authenticateRequest(c, "traces:view");
   if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
+    return c.json(auth.body, auth.status);
   }
   const { project, markUsed } = auth;
 
@@ -160,7 +166,7 @@ secured
   .post("/trace/:id/share", async (c) => {
     const auth = await authenticateRequest(c, "traces:share");
     if ("error" in auth) {
-      return c.json({ message: auth.error }, auth.status);
+      return c.json(auth.body, auth.status);
     }
     const { project, markUsed } = auth;
 
@@ -182,7 +188,7 @@ secured
   .post("/trace/:id/unshare", async (c) => {
     const auth = await authenticateRequest(c, "traces:share");
     if ("error" in auth) {
-      return c.json({ message: auth.error }, auth.status);
+      return c.json(auth.body, auth.status);
     }
     const { project, markUsed } = auth;
 
@@ -228,7 +234,7 @@ secured
   .post("/trace/search", async (c) => {
     const auth = await authenticateRequest(c, "traces:view");
     if ("error" in auth) {
-      return c.json({ message: auth.error }, auth.status);
+      return c.json(auth.body, auth.status);
     }
     const { project, markUsed } = auth;
 
@@ -322,7 +328,7 @@ secured
   .get("/thread/:id", async (c) => {
     const auth = await authenticateRequest(c, "traces:view");
     if ("error" in auth) {
-      return c.json({ message: auth.error }, auth.status);
+      return c.json(auth.body, auth.status);
     }
     const { project, markUsed } = auth;
 

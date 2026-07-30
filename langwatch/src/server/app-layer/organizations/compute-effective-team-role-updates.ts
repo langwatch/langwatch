@@ -1,5 +1,5 @@
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
-import { type TeamRoleValue } from "~/utils/memberRoleConstraints";
+import type { TeamRoleValue } from "~/utils/memberRoleConstraints";
 
 export const LITE_MEMBER_VIEWER_ONLY_ERROR =
   "Lite Member users can only have Viewer team role";

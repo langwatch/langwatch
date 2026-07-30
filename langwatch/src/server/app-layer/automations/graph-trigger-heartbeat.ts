@@ -25,11 +25,11 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import {
   type AnalyticsMetricSource,
   getMetricSource,
 } from "~/server/app-layer/analytics/routing/field-availability";
+import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";

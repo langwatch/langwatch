@@ -1,15 +1,15 @@
+import { LangyConversationNotFoundError } from "./errors";
+import type { LangyConversationRepository } from "./repositories/langy-conversation.repository";
 import type {
   LangyMessageRepository,
   LangyMessageRow,
 } from "./repositories/langy-message.repository";
-import type { LangyConversationRepository } from "./repositories/langy-conversation.repository";
-import { LangyConversationNotFoundError } from "./errors";
 
 export type {
   LangyMessageRepository,
   LangyMessageRow,
+  MessageRole,
 } from "./repositories/langy-message.repository";
-export type { MessageRole } from "./repositories/langy-message.repository";
 
 export interface LangyMessageRecord {
   id: string;

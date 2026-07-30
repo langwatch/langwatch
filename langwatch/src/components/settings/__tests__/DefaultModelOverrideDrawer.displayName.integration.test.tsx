@@ -174,7 +174,9 @@ const PROVIDER_ROW = {
   name: "Custom",
   provider: PROVIDER,
   enabled: true,
-  customModels: [{ modelId: MODEL_ID, displayName: DISPLAY_NAME, mode: "chat" as const }],
+  customModels: [
+    { modelId: MODEL_ID, displayName: DISPLAY_NAME, mode: "chat" as const },
+  ],
   customEmbeddingsModels: [],
 };
 

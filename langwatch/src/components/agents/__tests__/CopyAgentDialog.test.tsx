@@ -6,7 +6,15 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { CopyAgentDialog } from "../CopyAgentDialog";
 
 const SOURCE_PROJECT_ID = "test-project-id";
@@ -35,8 +43,11 @@ const MOCK_ORGANIZATIONS = [
   },
 ];
 
-let copyMutateArgs: { agentId: string; projectId: string; sourceProjectId: string } | null =
-  null;
+let copyMutateArgs: {
+  agentId: string;
+  projectId: string;
+  sourceProjectId: string;
+} | null = null;
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
@@ -147,10 +158,9 @@ describe("CopyAgentDialog", () => {
   it("Cancel button calls onClose", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    render(
-      <CopyAgentDialog {...defaultProps} onClose={onClose} />,
-      { wrapper: Wrapper },
-    );
+    render(<CopyAgentDialog {...defaultProps} onClose={onClose} />, {
+      wrapper: Wrapper,
+    });
     await user.click(screen.getByRole("button", { name: /cancel/i }));
     expect(onClose).toHaveBeenCalled();
   });

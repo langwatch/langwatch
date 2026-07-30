@@ -17,17 +17,19 @@ describe("navigation active state during the evaluation route migration", () => 
 
   /** @scenario Preserve existing project access during the navigation migration */
   it("keeps live evaluation routes active under Online Evaluations", () => {
-    expect(
-      isOnlineEvaluationsActivePath("/[project]/online-evaluations"),
-    ).toBe(true);
-    expect(
-      isOnlineEvaluationsActivePath("/[project]/evaluations/new"),
-    ).toBe(true);
+    expect(isOnlineEvaluationsActivePath("/[project]/online-evaluations")).toBe(
+      true,
+    );
+    expect(isOnlineEvaluationsActivePath("/[project]/evaluations/new")).toBe(
+      true,
+    );
     expect(
       isOnlineEvaluationsActivePath("/[project]/evaluations/edit/monitor-1"),
     ).toBe(true);
     expect(
-      isOnlineEvaluationsActivePath("/[project]/evaluations/wizard/experiment-1"),
+      isOnlineEvaluationsActivePath(
+        "/[project]/evaluations/wizard/experiment-1",
+      ),
     ).toBe(false);
   });
 });

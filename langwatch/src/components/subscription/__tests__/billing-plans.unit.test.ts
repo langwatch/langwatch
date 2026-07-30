@@ -4,8 +4,9 @@
  * Verifies that getGrowthFeatures() and getGrowthPlanFeatures() produce
  * the correct per-100K events pricing line for each supported currency.
  */
-import { describe, expect, it } from "vitest";
+
 import { Currency } from "@prisma/client";
+import { describe, expect, it } from "vitest";
 import { getGrowthFeatures, getGrowthPlanFeatures } from "../billing-plans";
 
 describe("getGrowthFeatures()", () => {

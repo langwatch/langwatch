@@ -24,7 +24,7 @@ describe("validateWorkflowAgentMappings", () => {
             { identifier: "context", type: "str" },
           ],
           scenarioMappings: undefined,
-        })
+        }),
       ).toThrow(TRPCError);
     });
 
@@ -37,7 +37,7 @@ describe("validateWorkflowAgentMappings", () => {
             { identifier: "context", type: "str" },
           ],
           scenarioMappings: undefined,
-        })
+        }),
       ).toThrow("agent-abc");
     });
 
@@ -50,7 +50,7 @@ describe("validateWorkflowAgentMappings", () => {
             { identifier: "context", type: "str" },
           ],
           scenarioMappings: undefined,
-        })
+        }),
       ).toThrow("2 inputs");
     });
 
@@ -63,7 +63,7 @@ describe("validateWorkflowAgentMappings", () => {
             { identifier: "context", type: "str" },
           ],
           scenarioMappings: undefined,
-        })
+        }),
       ).toThrow("agent editor");
     });
 
@@ -94,7 +94,7 @@ describe("validateWorkflowAgentMappings", () => {
             { identifier: "ctx", type: "str" },
           ],
           scenarioMappings: {},
-        })
+        }),
       ).toThrow(TRPCError);
     });
   });
@@ -107,7 +107,7 @@ describe("validateWorkflowAgentMappings", () => {
           agentId: "agent-single",
           inputs: [{ identifier: "input", type: "str" }],
           scenarioMappings: undefined,
-        })
+        }),
       ).not.toThrow();
     });
   });
@@ -125,7 +125,7 @@ describe("validateWorkflowAgentMappings", () => {
             query: { type: "source", sourceId: "scenario", path: ["input"] },
             context: { type: "value", value: "static context" },
           },
-        })
+        }),
       ).not.toThrow();
     });
   });
@@ -137,7 +137,7 @@ describe("validateWorkflowAgentMappings", () => {
           agentId: "agent-empty",
           inputs: [],
           scenarioMappings: undefined,
-        })
+        }),
       ).not.toThrow();
     });
   });

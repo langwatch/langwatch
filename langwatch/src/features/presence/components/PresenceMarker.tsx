@@ -119,7 +119,8 @@ function PresenceChip({
       flexShrink={0}
       style={{ animationDelay: `${enterDelayMs}ms` }}
       css={{
-        animation: "presenceMarkerPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
+        animation:
+          "presenceMarkerPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
         "@keyframes presenceMarkerPop": {
           "0%": { transform: "scale(0.4)", opacity: 0 },
           "100%": { transform: "scale(1)", opacity: 1 },
@@ -183,7 +184,7 @@ function PresenceChip({
 function computeInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   const first = parts[0]?.[0] ?? "";
-  const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
+  const second = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
   return (first + second).toUpperCase() || "?";
 }
 

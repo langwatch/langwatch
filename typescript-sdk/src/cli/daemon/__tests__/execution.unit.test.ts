@@ -54,7 +54,7 @@ describe("ExecutionContext", () => {
 
       context.finalize(1);
       // This is what an enclosing `catch (e) { console.error(e) }` would emit
-      // after checkApiKey() called process.exit(1). A real process would
+      // after resolveCredentials() called process.exit(1). A real process would
       // already be dead and would print none of it.
       context.write("stderr", Buffer.from("Error: process.exit(1)\n"));
 

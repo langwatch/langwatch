@@ -19,9 +19,9 @@
  * and stored data drifts.
  */
 import {
+  type CliResultDigest,
   cliResultDigestSchema,
   extractDigest,
-  type CliResultDigest,
 } from "@langwatch/langy";
 import { parseLangwatchCommand } from "~/server/app-layer/langy/execution/langwatchCommand";
 
@@ -69,7 +69,11 @@ export function commandOfToolCall({
   if (command) {
     const parsed = parseLangwatchCommand(command);
     if (parsed) {
-      return { resource: parsed.resource, verb: parsed.verb, query: parsed.args };
+      return {
+        resource: parsed.resource,
+        verb: parsed.verb,
+        query: parsed.args,
+      };
     }
   }
 

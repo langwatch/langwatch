@@ -21,6 +21,7 @@ import {
   usePapaParse,
 } from "react-papaparse";
 import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
+import { describeError, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -278,14 +279,9 @@ export function DatasetUploadProcessing({
       await retryDatasetNormalize({ projectId, datasetId });
       await datasetQuery.refetch();
     } catch (error) {
-      toaster.create({
-        title: "Could not retry",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Please try again in a moment.",
-        type: "error",
-        meta: { closable: true },
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't prepare your dataset",
       });
     } finally {
       setIsRetrying(false);
@@ -634,15 +630,20 @@ export function UploadCSVForm({
         return;
       }
       // A same-origin local-FS failure (e.g. StorageNotWritable) is a real,
-      // actionable server error — surface it verbatim, no fallback parse.
+      // actionable server error — report it to the user, no fallback parse.
       logger.error({ error }, "Direct dataset upload failed");
       // System error → top alert; clear any file-level error so the two never
       // render the shared `upload-error` testid at once.
       setSizeError(null);
+      // The upload goes through our API, so this is a server error like any
+      // other: since #5984 its message is the code slug, and `describeError`
+      // is the string-slot reader for exactly this case (`uploadError` is
+      // typed `string`, so an alert component can't be rendered here).
       setUploadError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong uploading your file. Please try again.",
+        describeError({
+          error,
+          fallbackTitle: "Something went wrong uploading your file",
+        }),
       );
       setIsUploading(false);
     }

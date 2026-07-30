@@ -33,7 +33,10 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
         });
       }
     } catch (error) {
-      logger.error({ error, projectId: project.id }, "Plan limit notification failed");
+      logger.error(
+        { error, projectId: project.id },
+        "Plan limit notification failed",
+      );
     }
 
     logger.info(

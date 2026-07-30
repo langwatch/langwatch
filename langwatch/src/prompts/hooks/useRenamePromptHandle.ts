@@ -1,10 +1,16 @@
+import { createLogger } from "@langwatch/observability";
 import { useCallback } from "react";
 
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
+
+const logger = createLogger(
+  "langwatch:prompt-configs:use-rename-prompt-handle",
+);
 
 type UseRenamePromptHandleOptions = {
   promptId: string;
@@ -37,10 +43,12 @@ export const useRenamePromptHandle = ({
 
   const renameHandle = useCallback(() => {
     if (!promptId) {
+      // A local precondition, not a server failure.
       toaster.create({
-        title: "Error changing prompt handle",
-        description: "Prompt ID is required",
+        title: "Couldn't change the prompt handle",
+        description: "Save this prompt before renaming its handle.",
         type: "error",
+        meta: { closable: true },
       });
       return;
     }
@@ -56,11 +64,12 @@ export const useRenamePromptHandle = ({
     };
 
     const handleError = (error: Error) => {
-      console.error(error);
-      toaster.create({
-        title: "Error changing prompt handle",
-        description: error.message,
-        type: "error",
+      // The toast shows the registry's copy for the code, so the raw error
+      // reaches no surface — this is its only local diagnostic.
+      logger.error({ error }, "Failed to change prompt handle");
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't change the prompt handle",
       });
     };
 

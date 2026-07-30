@@ -25,8 +25,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 
 import {
-  PersonalVirtualKeyService,
   NoEligibleProvidersError,
+  PersonalVirtualKeyService,
 } from "../personalVirtualKey.service";
 
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
@@ -56,7 +56,11 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         data: { id: orgId, name: `FB ${suffix}`, slug: `fb-${suffix}` },
       });
       await prisma.user.create({
-        data: { id: userId, email: `fb-${suffix}@example.com`, name: "FB User" },
+        data: {
+          id: userId,
+          email: `fb-${suffix}@example.com`,
+          name: "FB User",
+        },
       });
       await prisma.organizationUser.create({
         data: { organizationId: orgId, userId, role: "MEMBER" },

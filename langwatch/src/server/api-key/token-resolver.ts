@@ -1,8 +1,7 @@
 import type { PrismaClient, Project } from "@prisma/client";
 import { RoleBindingScopeType } from "@prisma/client";
-
-import { API_KEY_PREFIX, getTokenType } from "./api-key-token.utils";
 import { ApiKeyService } from "./api-key.service";
+import { API_KEY_PREFIX, getTokenType } from "./api-key-token.utils";
 
 /**
  * The result of resolving a token. Contains enough context to set up the

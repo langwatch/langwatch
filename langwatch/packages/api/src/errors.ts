@@ -161,8 +161,8 @@ function formatError({
 
   // 3. Error with `status` property (e.g. Hono HTTPException)
   const errObj = err as Record<string, unknown>;
-  if (err instanceof Error && typeof errObj["status"] === "number") {
-    const status = errObj["status"] as ContentfulStatusCode;
+  if (err instanceof Error && typeof errObj.status === "number") {
+    const status = errObj.status as ContentfulStatusCode;
     return finalizeErrorResponse({
       status,
       isVersioned,
@@ -236,7 +236,8 @@ export function createErrorHandler(): (
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
-    const effective = err instanceof ZodError ? validationErrorFromZod(err) : err;
+    const effective =
+      err instanceof ZodError ? validationErrorFromZod(err) : err;
     const { status, body } = formatError({ err: effective, isVersioned });
 
     const resolved: ResolvedError = {
@@ -252,4 +253,4 @@ export function createErrorHandler(): (
   };
 }
 
-export { formatError, validationErrorFromZod, SchemaFailure };
+export { formatError, SchemaFailure, validationErrorFromZod };

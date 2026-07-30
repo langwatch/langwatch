@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { LicenseEnforcementService } from "../license-enforcement.service";
-import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
-import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../errors";
+import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
+import { LicenseEnforcementService } from "../license-enforcement.service";
 import type { LimitType } from "../types";
 
 /**
@@ -143,35 +143,88 @@ describe("LicenseEnforcementService", () => {
         repoMethod: keyof ILicenseEnforcementRepository;
         planField: keyof PlanInfo;
       }> = [
-        { type: "workflows", repoMethod: "getWorkflowCount", planField: "maxWorkflows" },
-        { type: "prompts", repoMethod: "getPromptCount", planField: "maxPrompts" },
-        { type: "evaluators", repoMethod: "getEvaluatorCount", planField: "maxEvaluators" },
-        { type: "scenarios", repoMethod: "getActiveScenarioCount", planField: "maxScenarios" },
-        { type: "projects", repoMethod: "getProjectCount", planField: "maxProjects" },
-        { type: "members", repoMethod: "getMemberCount", planField: "maxMembers" },
+        {
+          type: "workflows",
+          repoMethod: "getWorkflowCount",
+          planField: "maxWorkflows",
+        },
+        {
+          type: "prompts",
+          repoMethod: "getPromptCount",
+          planField: "maxPrompts",
+        },
+        {
+          type: "evaluators",
+          repoMethod: "getEvaluatorCount",
+          planField: "maxEvaluators",
+        },
+        {
+          type: "scenarios",
+          repoMethod: "getActiveScenarioCount",
+          planField: "maxScenarios",
+        },
+        {
+          type: "projects",
+          repoMethod: "getProjectCount",
+          planField: "maxProjects",
+        },
+        {
+          type: "members",
+          repoMethod: "getMemberCount",
+          planField: "maxMembers",
+        },
         { type: "teams", repoMethod: "getTeamCount", planField: "maxTeams" },
-        { type: "membersLite", repoMethod: "getMembersLiteCount", planField: "maxMembersLite" },
+        {
+          type: "membersLite",
+          repoMethod: "getMembersLiteCount",
+          planField: "maxMembersLite",
+        },
         { type: "agents", repoMethod: "getAgentCount", planField: "maxAgents" },
-        { type: "experiments", repoMethod: "getExperimentCount", planField: "maxExperiments" },
-        { type: "onlineEvaluations", repoMethod: "getOnlineEvaluationCount", planField: "maxOnlineEvaluations" },
-        { type: "datasets", repoMethod: "getDatasetCount", planField: "maxDatasets" },
-        { type: "dashboards", repoMethod: "getDashboardCount", planField: "maxDashboards" },
-        { type: "customGraphs", repoMethod: "getCustomGraphCount", planField: "maxCustomGraphs" },
-        { type: "automations", repoMethod: "getAutomationCount", planField: "maxAutomations" },
+        {
+          type: "experiments",
+          repoMethod: "getExperimentCount",
+          planField: "maxExperiments",
+        },
+        {
+          type: "onlineEvaluations",
+          repoMethod: "getOnlineEvaluationCount",
+          planField: "maxOnlineEvaluations",
+        },
+        {
+          type: "datasets",
+          repoMethod: "getDatasetCount",
+          planField: "maxDatasets",
+        },
+        {
+          type: "dashboards",
+          repoMethod: "getDashboardCount",
+          planField: "maxDashboards",
+        },
+        {
+          type: "customGraphs",
+          repoMethod: "getCustomGraphCount",
+          planField: "maxCustomGraphs",
+        },
+        {
+          type: "automations",
+          repoMethod: "getAutomationCount",
+          planField: "maxAutomations",
+        },
       ];
 
-      it.each(limitTypeTests)(
-        "checks $type limit using $repoMethod",
-        async ({ type, repoMethod, planField }) => {
-          vi.mocked(mockRepository[repoMethod]).mockResolvedValue(1);
+      it.each(limitTypeTests)("checks $type limit using $repoMethod", async ({
+        type,
+        repoMethod,
+        planField,
+      }) => {
+        vi.mocked(mockRepository[repoMethod]).mockResolvedValue(1);
 
-          const result = await service.checkLimit("org-123", type);
+        const result = await service.checkLimit("org-123", type);
 
-          expect(mockRepository[repoMethod]).toHaveBeenCalledWith("org-123");
-          expect(result.limitType).toBe(type);
-          expect(result.max).toBe(basePlan[planField]);
-        }
-      );
+        expect(mockRepository[repoMethod]).toHaveBeenCalledWith("org-123");
+        expect(result.limitType).toBe(type);
+        expect(result.max).toBe(basePlan[planField]);
+      });
     });
   });
 
@@ -181,7 +234,7 @@ describe("LicenseEnforcementService", () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(2);
 
       await expect(
-        service.enforceLimit("org-123", "workflows")
+        service.enforceLimit("org-123", "workflows"),
       ).resolves.toBeUndefined();
     });
 
@@ -189,9 +242,9 @@ describe("LicenseEnforcementService", () => {
     it("throws LimitExceededError when limit is reached", async () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(3);
 
-      await expect(service.enforceLimit("org-123", "workflows")).rejects.toThrow(
-        LimitExceededError
-      );
+      await expect(
+        service.enforceLimit("org-123", "workflows"),
+      ).rejects.toThrow(LimitExceededError);
     });
 
     /** @scenario Blocks prompt creation when at limit */
@@ -229,7 +282,7 @@ describe("LicenseEnforcementService", () => {
       vi.mocked(mockRepository.getWorkflowCount).mockResolvedValue(1000);
 
       await expect(
-        service.enforceLimit("org-123", "workflows")
+        service.enforceLimit("org-123", "workflows"),
       ).resolves.toBeUndefined();
     });
   });
@@ -260,7 +313,7 @@ describe("LicenseEnforcementService", () => {
         service.enforceLimitByOrganization({
           organizationId: "org-123",
           limitType: "teams",
-        })
+        }),
       ).rejects.toThrow(/maximum number of teams/);
     });
 
@@ -272,7 +325,7 @@ describe("LicenseEnforcementService", () => {
         service.enforceLimitByOrganization({
           organizationId: "org-123",
           limitType: "projects",
-        })
+        }),
       ).resolves.toBeUndefined();
     });
 
@@ -284,7 +337,7 @@ describe("LicenseEnforcementService", () => {
         service.enforceLimitByOrganization({
           organizationId: "org-123",
           limitType: "projects",
-        })
+        }),
       ).rejects.toThrow(LimitExceededError);
     });
 
@@ -295,7 +348,7 @@ describe("LicenseEnforcementService", () => {
         service.enforceLimitByOrganization({
           organizationId: "org-123",
           limitType: "workflows",
-        })
+        }),
       ).resolves.toBeUndefined();
     });
   });

@@ -15,13 +15,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { DeepPartial } from "react-hook-form";
-
+import type { PromptConfigFormValues } from "~/prompts/types";
 import {
   clearStoreInstances,
   getStoreForTesting,
   type TabData,
 } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
-import type { PromptConfigFormValues } from "~/prompts/types";
 import { ExperimentFromPlaygroundButton } from "../ExperimentFromPlaygroundButton";
 
 // Mock localStorage
@@ -106,8 +105,12 @@ vi.mock("~/utils/api", () => ({
       const mockTrpc = {
         prompts: {
           getByIdOrHandle: (
-            params: { idOrHandle: string; projectId: string; versionId?: string },
-            _options: unknown
+            params: {
+              idOrHandle: string;
+              projectId: string;
+              versionId?: string;
+            },
+            _options: unknown,
           ) => ({
             queryKey: ["prompts", params.idOrHandle],
             queryFn: () => mockSavedPrompts[params.idOrHandle] ?? null,
@@ -126,10 +129,10 @@ vi.mock("~/utils/api", () => ({
     },
     experiments: {
       saveEvaluationsV3: {
-        useMutation: (callbacks?: { onSuccess?: (data: { slug: string }) => void }) => ({
-          mutate: (
-            params: NonNullable<typeof saveExperimentMutateCall>
-          ) => {
+        useMutation: (callbacks?: {
+          onSuccess?: (data: { slug: string }) => void;
+        }) => ({
+          mutate: (params: NonNullable<typeof saveExperimentMutateCall>) => {
             saveExperimentMutateCall = params;
             callbacks?.onSuccess?.({ slug: "test-slug-123" });
           },
@@ -158,7 +161,7 @@ const createTabData = (
     handle: string;
     versionId: string;
     currentValues: DeepPartial<PromptConfigFormValues>;
-  }>
+  }>,
 ): TabData => ({
   chat: {
     initialMessagesFromSpanData: [],
@@ -214,7 +217,9 @@ describe("ExperimentFromPlaygroundButton", () => {
 
   describe("button visibility", () => {
     it("renders Experiment button with Flask icon", () => {
-      store.getState().addTab({ data: createTabData({ title: "Test Prompt" }) });
+      store
+        .getState()
+        .addTab({ data: createTabData({ title: "Test Prompt" }) });
 
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
 
@@ -243,7 +248,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/create new experiment with this prompt/i)
+          screen.getByText(/create new experiment with this prompt/i),
         ).toBeInTheDocument();
       });
     });
@@ -263,7 +268,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/create new experiment with these prompts/i)
+          screen.getByText(/create new experiment with these prompts/i),
         ).toBeInTheDocument();
       });
     });
@@ -284,7 +289,7 @@ describe("ExperimentFromPlaygroundButton", () => {
       // After split, we have 2 tabs (original + duplicated)
       await waitFor(() => {
         expect(
-          screen.getByText(/create new experiment with these prompts/i)
+          screen.getByText(/create new experiment with these prompts/i),
         ).toBeInTheDocument();
       });
     });
@@ -311,7 +316,9 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /create/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -347,7 +354,9 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /create/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -360,7 +369,9 @@ describe("ExperimentFromPlaygroundButton", () => {
         expect(targets?.[0]?.type).toBe("prompt");
         // Unsaved prompt MUST have localPromptConfig
         expect(targets?.[0]?.localPromptConfig).toBeDefined();
-        expect(targets?.[0]?.localPromptConfig?.llm.model).toBe("openai/gpt-4o");
+        expect(targets?.[0]?.localPromptConfig?.llm.model).toBe(
+          "openai/gpt-4o",
+        );
         expect(targets?.[0]?.localPromptConfig?.messages).toHaveLength(1);
       });
     });
@@ -400,7 +411,9 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /create/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -421,21 +434,27 @@ describe("ExperimentFromPlaygroundButton", () => {
     it("navigates to experiment workbench after creation", async () => {
       const user = userEvent.setup();
       store.getState().addTab({
-        data: createTabData({ title: "Prompt", configId: "p1", versionId: "v1" }),
+        data: createTabData({
+          title: "Prompt",
+          configId: "p1",
+          versionId: "v1",
+        }),
       });
 
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /create/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
 
       await waitFor(() => {
         expect(mockRouterPush).toHaveBeenCalledWith(
-          "/test-project/experiments/workbench/test-slug-123"
+          "/test-project/experiments/workbench/test-slug-123",
         );
       });
     });
@@ -443,21 +462,27 @@ describe("ExperimentFromPlaygroundButton", () => {
     it("closes dialog after creation", async () => {
       const user = userEvent.setup();
       store.getState().addTab({
-        data: createTabData({ title: "Prompt", configId: "p1", versionId: "v1" }),
+        data: createTabData({
+          title: "Prompt",
+          configId: "p1",
+          versionId: "v1",
+        }),
       });
 
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /create/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
 
       await waitFor(() => {
         expect(
-          screen.queryByText(/create new experiment/i)
+          screen.queryByText(/create new experiment/i),
         ).not.toBeInTheDocument();
       });
     });
@@ -479,7 +504,9 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /create/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /create/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /create/i }));
@@ -499,7 +526,7 @@ describe("ExperimentFromPlaygroundButton", () => {
         expect(datasetMappings).toBeDefined();
 
         // "input" field should be mapped to "input" column
-        expect(datasetMappings?.["input"]).toEqual({
+        expect(datasetMappings?.input).toEqual({
           type: "source",
           source: "dataset",
           sourceId: "test-data",
@@ -520,14 +547,16 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /cancel/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /cancel/i }));
 
       await waitFor(() => {
         expect(
-          screen.queryByText(/create new experiment/i)
+          screen.queryByText(/create new experiment/i),
         ).not.toBeInTheDocument();
       });
     });
@@ -542,7 +571,9 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /cancel/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /cancel/i }));

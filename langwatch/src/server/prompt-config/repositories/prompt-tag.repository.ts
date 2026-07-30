@@ -149,7 +149,10 @@ export class PromptTagRepository {
         where: { id: tag.id },
       });
 
-      logger.info({ organizationId, name }, "Custom prompt tag deleted by name");
+      logger.info(
+        { organizationId, name },
+        "Custom prompt tag deleted by name",
+      );
     });
   }
 
@@ -180,7 +183,10 @@ export class PromptTagRepository {
         data: { name: newName },
       });
 
-      logger.info({ organizationId, oldName, newName }, "Custom prompt tag renamed");
+      logger.info(
+        { organizationId, oldName, newName },
+        "Custom prompt tag renamed",
+      );
 
       return updated;
     });
@@ -220,7 +226,11 @@ export class PromptTagRepository {
   /**
    * Seeds default tags (production, staging) for a new org.
    */
-  async seedForOrg({ organizationId }: { organizationId: string }): Promise<void> {
+  async seedForOrg({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
     await this.prisma.promptTag.createMany({
       data: SEEDED_TAGS.map((tag) => ({
         id: `ptag_${nanoid()}`,

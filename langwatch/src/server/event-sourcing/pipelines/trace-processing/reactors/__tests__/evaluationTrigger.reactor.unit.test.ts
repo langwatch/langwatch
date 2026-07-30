@@ -568,7 +568,7 @@ describe("evaluationTrigger relevance check", () => {
     state: TraceSummaryData,
   ): boolean => {
     const reactor = createEvaluationTriggerReactor(createDeps());
-    // biome-ignore lint/style/noNonNullAssertion: the reactor always declares one.
+    // The reactor always declares one.
     return reactor.shouldReact!(event, createContext(state));
   };
 

@@ -43,11 +43,13 @@ type BlobCleanupIntents = {
  * the commit that persists this evolution is what fences racing workers. The
  * sweep itself is an intent, so it runs behind the outbox lease instead.
  */
-export const blobCleanupWake: WakeHandler<BlobCleanupState, BlobCleanupIntents> =
-  (_state, ctx) => ({
-    state: { lastSweepAt: ctx.at },
-    intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
-  });
+export const blobCleanupWake: WakeHandler<
+  BlobCleanupState,
+  BlobCleanupIntents
+> = (_state, ctx) => ({
+  state: { lastSweepAt: ctx.at },
+  intents: [ctx.intents.sweep(`sweep:${ctx.at}`, { scheduledFor: ctx.at })],
+});
 
 export function runBlobCleanup(deps: BlobCleanupDeps) {
   return async (): Promise<void> => {

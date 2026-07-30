@@ -23,13 +23,9 @@ export function validateWorkflowAgentMappings({
   agentId,
   inputs,
   scenarioMappings,
-}: Pick<
-  WorkflowAgentData,
-  "agentId" | "inputs" | "scenarioMappings"
->): void {
+}: Pick<WorkflowAgentData, "agentId" | "inputs" | "scenarioMappings">): void {
   const hasMappings =
-    scenarioMappings !== undefined &&
-    Object.keys(scenarioMappings).length > 0;
+    scenarioMappings !== undefined && Object.keys(scenarioMappings).length > 0;
 
   if (hasMappings) return;
 

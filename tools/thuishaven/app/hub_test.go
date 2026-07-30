@@ -20,6 +20,7 @@ type fakeStore struct {
 	removed    []string
 	slugCache  map[string]string
 	dbActivity map[string]time.Time
+	selection  map[string]domain.Selection
 	touched    []string
 }
 
@@ -60,7 +61,21 @@ func (f *fakeStore) DBActivity() map[string]time.Time {
 	}
 	return m
 }
-func (f *fakeStore) RemoveDBActivity(slug string)         { delete(f.dbActivity, slug) }
+func (f *fakeStore) RemoveDBActivity(slug string) { delete(f.dbActivity, slug) }
+func (f *fakeStore) ReadSelection(worktreeDir string) (domain.Selection, bool) {
+	if f.selection == nil {
+		return domain.Selection{}, false
+	}
+	sel, ok := f.selection[worktreeDir]
+	return sel, ok
+}
+func (f *fakeStore) WriteSelection(worktreeDir string, sel domain.Selection) error {
+	if f.selection == nil {
+		f.selection = map[string]domain.Selection{}
+	}
+	f.selection[worktreeDir] = sel
+	return nil
+}
 func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }
 func (f *fakeStore) Daemon() (DaemonInfo, bool)           { return DaemonInfo{}, false }
 func (f *fakeStore) ClearDaemon()                         {}
@@ -69,6 +84,7 @@ type fakeSystem struct {
 	alive           map[int]bool
 	terminated      []int
 	groupTerminated []int
+	groupKilled     []int
 	pidsByPort      map[int][]int
 	now             time.Time
 }
@@ -84,7 +100,13 @@ func (f *fakeSystem) Terminate(pid int) {
 		f.alive[pid] = false
 	}
 }
-func (f *fakeSystem) TerminateGroup(pid int)                       { f.groupTerminated = append(f.groupTerminated, pid) }
+func (f *fakeSystem) TerminateGroup(pid int) { f.groupTerminated = append(f.groupTerminated, pid) }
+func (f *fakeSystem) KillGroup(pid int) {
+	f.groupKilled = append(f.groupKilled, pid)
+	if f.alive != nil {
+		f.alive[pid] = false
+	}
+}
 func (f *fakeSystem) PIDsOnPort(port int) []int                    { return f.pidsByPort[port] }
 func (f *fakeSystem) SpawnDetached([]string, string, string) error { return nil }
 func (f *fakeSystem) Now() time.Time                               { return f.now }
@@ -101,6 +123,8 @@ func (f *fakeProxy) Installed() bool                    { return true }
 func (f *fakeProxy) EnsureReady() error                 { return nil }
 func (f *fakeProxy) Endpoint() (string, int)            { return "https", 443 }
 func (f *fakeProxy) CACertPath() string                 { return "" }
+func (f *fakeProxy) Shutdown() error                    { return nil }
+func (f *fakeProxy) Install() error                     { return nil }
 
 type fakeDBServer struct {
 	databases []string

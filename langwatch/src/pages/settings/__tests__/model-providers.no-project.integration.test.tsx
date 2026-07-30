@@ -311,7 +311,9 @@ describe("given the Model Providers settings page", () => {
     it("offers the same add action from the empty state itself", () => {
       renderPage();
 
-      const emptyStateAdd = screen.getByTestId("empty-state-add-model-provider");
+      const emptyStateAdd = screen.getByTestId(
+        "empty-state-add-model-provider",
+      );
 
       expect(emptyStateAdd.hasAttribute("disabled")).toBe(false);
     });
@@ -331,7 +333,9 @@ describe("given the Model Providers settings page", () => {
 
         expect(table.getByText("OpenAI")).toBeTruthy();
         expect(
-          screen.getByTestId("provider-scope-chips").getAttribute("data-scopes"),
+          screen
+            .getByTestId("provider-scope-chips")
+            .getAttribute("data-scopes"),
         ).toBe("ORGANIZATION:ACME");
       });
 

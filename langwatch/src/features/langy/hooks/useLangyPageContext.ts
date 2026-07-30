@@ -192,7 +192,12 @@ function routeChips(pathname: string): LangyContextChip[] {
       // new" as context would be a chip that resolves to nothing.
       if (RESOURCELESS_TAILS.has(ref)) return [];
       return [
-        { id: `${spec.kind}:${ref}`, kind: spec.kind, label: `${spec.noun} ${ref}`, ref },
+        {
+          id: `${spec.kind}:${ref}`,
+          kind: spec.kind,
+          label: `${spec.noun} ${ref}`,
+          ref,
+        },
       ];
     }
   }

@@ -3,7 +3,7 @@
  * These helpers are used across multiple test files to enable parallel execution.
  */
 
-import { spawn, type ChildProcess } from "child_process";
+import { type ChildProcess, spawn } from "child_process";
 import * as http from "http";
 import * as path from "path";
 import type {
@@ -130,7 +130,7 @@ export function buildTestChildProcessEnv(
 export async function spawnChildProcessDirectly(
   jobData: ChildProcessJobData,
   env: Record<string, string>,
-  timeoutMs = 45000
+  timeoutMs = 45000,
 ): Promise<{
   result: ScenarioExecutionResult;
   stderr: string;
@@ -139,7 +139,7 @@ export async function spawnChildProcessDirectly(
   return new Promise((resolve) => {
     const childPath = path.resolve(
       process.cwd(),
-      "src/server/scenarios/execution/scenario-child-process.ts"
+      "src/server/scenarios/execution/scenario-child-process.ts",
     );
 
     const child: ChildProcess = spawn("pnpm", ["exec", "tsx", childPath], {
@@ -175,7 +175,10 @@ export async function spawnChildProcessDirectly(
         resolve({ result, stderr, exitCode: code });
       } catch {
         resolve({
-          result: { success: false, error: `Failed to parse output: ${stdout}` },
+          result: {
+            success: false,
+            error: `Failed to parse output: ${stdout}`,
+          },
           stderr,
           exitCode: code,
         });
@@ -201,7 +204,7 @@ export async function spawnChildProcessDirectly(
  * Creates minimal test job data for child process.
  */
 export function createTestJobData(
-  overrides: Partial<ChildProcessJobData> = {}
+  overrides: Partial<ChildProcessJobData> = {},
 ): ChildProcessJobData {
   return {
     context: {

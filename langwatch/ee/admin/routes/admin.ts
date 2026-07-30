@@ -9,35 +9,101 @@
  *   - POST|DELETE /api/admin/impersonate
  *   - POST        /api/admin/:resource   (ra-data-simple-prisma)
  */
+
+import { HandledError, ValidationError } from "@langwatch/handled-error";
+import { PlanTypes, type Prisma, SubscriptionStatus } from "@prisma/client";
 import {
   defaultHandler,
-  getListHandler,
-  getOneHandler,
   type GetListRequest,
   type GetOneRequest,
+  getListHandler,
+  getOneHandler,
 } from "ra-data-simple-prisma";
-import { PlanTypes, Prisma, SubscriptionStatus } from "@prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { auth as betterAuth } from "~/server/better-auth";
-import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import { auditLog } from "~/server/auditLog";
+import { getServerAuthSession } from "~/server/auth";
+import { auth as betterAuth } from "~/server/better-auth";
+import { prisma } from "~/server/db";
 import { UserService } from "~/server/users/user.service";
-import { HandledError } from "@langwatch/handled-error";
-import { isAdmin } from "../isAdmin";
 import {
-  ORGANIZATION_SAFE_SELECT,
-  PROJECT_SAFE_SELECT,
-} from "../safeSelects";
-import {
-  USER_BACKOFFICE_INCLUDE,
   mapUserToBackofficeRow,
+  USER_BACKOFFICE_INCLUDE,
   type UserWithBackofficeIncludes,
 } from "../backoffice/userVisibility";
 import { ImpersonationService } from "../impersonation.service";
+import { isAdmin } from "../isAdmin";
+import { ORGANIZATION_SAFE_SELECT, PROJECT_SAFE_SELECT } from "../safeSelects";
 
 const secured = createServiceApp({ basePath: "/api" });
-const adminAuth = handlerManagedAuth("super-admin session validated in-handler via isAdmin");
+const adminAuth = handlerManagedAuth(
+  "super-admin session validated in-handler via isAdmin",
+);
+
+/**
+ * The answer to "you are not an admin", which deliberately says nothing more.
+ *
+ * A 404 rather than a 403 so the admin surface doesn't confirm its own
+ * existence to whoever is probing it, and the generic `not_found` code rather
+ * than something naming the backoffice, for the same reason. It goes through
+ * the handled channel anyway so the response carries a trace id — an operator
+ * whose session quietly stopped being an admin has something to quote.
+ *
+ * The identifying fields are the part that has to stay out. `NotFoundError`
+ * builds `"<resource> not found: <id>"` and puts the id in `meta`, so the
+ * earlier spelling answered `{ error: "not_found", message: "Route not found:
+ * /api/admin", id: "/api/admin" }` — byte-for-byte distinguishable from the
+ * framework's own 404 for a path that was never registered, which told a
+ * prober the route exists and they merely lack the session for it. Only the
+ * code and the trace id are carried now.
+ */
+function adminSurfaceHidden(): HandledError {
+  return new AdminSurfaceHiddenError();
+}
+
+class AdminSurfaceHiddenError extends HandledError {
+  declare readonly code: "not_found";
+
+  constructor() {
+    super("not_found", "Not found", { httpStatus: 404, fault: "customer" });
+    this.name = "AdminSurfaceHiddenError";
+  }
+}
+
+/**
+ * The caller has an app session but no live auth session behind it.
+ *
+ * Known cause, and the customer can act on it — sign in again — which is
+ * exactly what the registry's `unauthorized` copy says. Not a 500.
+ */
+class AdminSessionExpiredError extends HandledError {
+  constructor() {
+    super("unauthorized", "No active auth session for this admin request", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "AdminSessionExpiredError";
+  }
+}
+
+/**
+ * The request body is not a JSON object, so nothing was validated.
+ *
+ * A different failure from `ValidationError`'s 422: that one means we read the
+ * document and disagreed with it. This one means there was no document, which
+ * is a 400 and a code the client can recognise rather than the bare
+ * `{ message: "Bad request" }` this route used to answer with.
+ */
+class AdminMalformedBodyError extends HandledError {
+  declare readonly code: "malformed_request";
+
+  constructor() {
+    super("malformed_request", "Admin request body must be a JSON object", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "AdminMalformedBodyError";
+  }
+}
 
 const ALLOWED_RESOURCES = new Set([
   "user",
@@ -55,18 +121,22 @@ const ALLOWED_RESOURCES = new Set([
 // Both verbs share the same admin guard + BetterAuth session lookup, so we
 // route them through a single helper and let the service do the real work.
 // The service throws `HandledError` subclasses for business-rule rejections;
-// the helper below maps those to HTTP status codes, keeping the route
-// thin and leaving the rules in one testable place.
+// they travel untouched to `createServiceApp`'s `onError`, which is the one
+// place that serialises them — code, meta, tips, docs link and trace id.
 
-secured.access(adminAuth).post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
-secured.access(adminAuth).delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
+secured
+  .access(adminAuth)
+  .post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
+secured
+  .access(adminAuth)
+  .delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
 
 async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   const user = session?.user.impersonator ?? session?.user;
 
   if (!session || !user || !isAdmin(user)) {
-    return c.json({ message: "Not Found" }, 404);
+    throw adminSurfaceHidden();
   }
 
   const rawHeaders = new Headers();
@@ -77,7 +147,7 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
     headers: rawHeaders,
   });
   if (!rawBetterAuth) {
-    return c.json({ message: "Unauthorized" }, 401);
+    throw new AdminSessionExpiredError();
   }
   const sessionId = rawBetterAuth.session.id;
 
@@ -92,55 +162,103 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
     return c.json({ message: "Impersonation ended" });
   }
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
+  const body = await readJsonBody(c);
 
-  const { userIdToImpersonate, reason } = body;
+  // `readJsonBody` guarantees an object, not the shape of one — a caller can
+  // still send `{ reason: 12 }`. Both fields are required strings downstream,
+  // so anything else is reported as missing rather than handed on.
+  const userIdToImpersonate = asNonEmptyString(body.userIdToImpersonate);
+  const reason = asNonEmptyString(body.reason);
   if (!userIdToImpersonate || !reason) {
-    return c.json({ message: "Missing required fields" }, 400);
+    const missing = [
+      ...(userIdToImpersonate ? [] : ["userIdToImpersonate"]),
+      ...(reason ? [] : ["reason"]),
+    ];
+    throw new ValidationError("Impersonation request is missing fields", {
+      // `fieldErrors` is the validation_error contract the client reads —
+      // `applyHandledErrorToForm` puts each one on its own input.
+      meta: {
+        fieldErrors: Object.fromEntries(
+          missing.map((field) => [field, ["This is required."]]),
+        ),
+      },
+    });
   }
 
-  try {
-    await service.start({
-      sessionId,
-      impersonatorUserId: user.id,
-      userIdToImpersonate,
-      reason,
-      req: c.req.raw,
-    });
-  } catch (err) {
-    // Handled errors carry client-safe copy: narrow with isHandled, then return
-    // { message, httpStatus }; anything else re-throws to the global handler.
-    // isHandled is an instanceof check, reliable here since the error is thrown
-    // and caught in the same server module graph. See handled-error.ts's doc
-    // comment for when the serialisable `code` discriminant is needed instead.
-    if (HandledError.isHandled(err)) {
-      return c.json({ message: err.message }, err.httpStatus as any);
-    }
-    throw err;
-  }
+  // No catch: a `HandledError` from the service reaches `onError` unchanged,
+  // which serialises the whole payload. Catching it here to re-emit
+  // `{ message }` threw away the code, the meta and the trace id — leaving
+  // the client with a sentence it is not allowed to render.
+  await service.start({
+    sessionId,
+    impersonatorUserId: user.id,
+    userIdToImpersonate,
+    reason,
+    req: c.req.raw,
+  });
 
   return c.json({ message: "Impersonation started" });
 }
+
+/**
+ * The request body as an object, or a handled 400.
+ *
+ * Both admin routes parse a body the same way, and both used to answer an
+ * unparseable one with a bare `{ message: "Bad request" }` — no code, so the
+ * client had nothing to recognise and fell back to "we've been notified"
+ * about a malformed request that will never repair itself.
+ *
+ * Catching the parse failure is not enough to keep that promise. `null`, `5`
+ * and `[]` are all valid JSON, so they came back as "the body" and the callers
+ * went straight on to destructure them or assign a property onto a primitive —
+ * a `TypeError` escaping as an unhandled 500 for precisely the malformed
+ * request this helper exists to name. Anything that is not a non-array object
+ * is rejected here instead.
+ */
+async function readJsonBody(c: any): Promise<Record<string, unknown>> {
+  let parsed: unknown;
+  try {
+    parsed = await c.req.json();
+  } catch {
+    throw new AdminMalformedBodyError();
+  }
+
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new AdminMalformedBodyError();
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+/** A caller-supplied field that is only usable when it is a non-empty string. */
+function asNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+/**
+ * The `ra-data-simple-prisma` request this route forwards.
+ *
+ * `readJsonBody` promises an object and nothing more, which is the honest type
+ * for arbitrary JSON. The handler below works against react-admin's request
+ * envelope, so it names that shape once here rather than casting at a dozen
+ * property reads. Every field stays optional: this is what the caller *sent*,
+ * not what has been validated.
+ */
+type AdminDataRequest = Record<string, any> & {
+  resource?: unknown;
+  method?: unknown;
+  params?: { filter?: { query?: string }; id?: unknown; data?: unknown };
+};
 
 // ---------- POST /api/admin/:resource ----------
 secured.access(adminAuth).post("/admin/:resource", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   const user = session?.user.impersonator ?? session?.user;
   if (!session || !user || !isAdmin(user)) {
-    return c.json({ message: "Not Found" }, 404);
+    throw adminSurfaceHidden();
   }
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
+  const body = (await readJsonBody(c)) as AdminDataRequest;
 
   // The request body carries resource + method inside it, but the
   // URL also has the resource param. We use the body's resource field
@@ -149,8 +267,21 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
     body.resource = c.req.param("resource");
   }
 
-  if (!ALLOWED_RESOURCES.has(body.resource)) {
-    return c.json({ message: "Unknown resource" }, 400);
+  if (
+    typeof body.resource !== "string" ||
+    !ALLOWED_RESOURCES.has(body.resource)
+  ) {
+    // The rejected value is caller-supplied and unbounded, so it is not echoed
+    // back into the message. `fieldErrors.resource` already says exactly what
+    // is wrong, and the value the caller sent is the one thing they do not
+    // need told back to them.
+    throw new ValidationError("Unknown admin resource", {
+      meta: {
+        fieldErrors: {
+          resource: ["This isn't a resource the admin API serves."],
+        },
+      },
+    });
   }
 
   if (body.resource === "organizations") body.resource = "organization";

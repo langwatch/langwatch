@@ -81,7 +81,10 @@ export function EvaluatorMappingsSection({
     if (level === "thread") {
       return getThreadAvailableSources() as AvailableSource[];
     }
-    return getTraceAvailableSources(spanNames, metadataKeys) as AvailableSource[];
+    return getTraceAvailableSources(
+      spanNames,
+      metadataKeys,
+    ) as AvailableSource[];
   }, [providedSources, level, spanNames, metadataKeys]);
 
   // Local state for mappings - source of truth for UI

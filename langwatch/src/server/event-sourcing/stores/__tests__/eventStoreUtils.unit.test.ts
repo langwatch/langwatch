@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { AggregateType } from "../../domain/aggregateType";
-import type { Event } from "../../domain/types";
-import { createTenantId } from "../../domain/tenantId";
 import { EVENT_TYPES } from "../../domain/eventType";
+import { createTenantId } from "../../domain/tenantId";
+import type { Event } from "../../domain/types";
 import {
   deduplicateEvents,
   eventToRecord,

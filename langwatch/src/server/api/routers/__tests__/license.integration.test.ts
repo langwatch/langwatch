@@ -4,6 +4,13 @@
  * Integration tests for License tRPC endpoints.
  * Tests the router layer including permissions and error handling.
  */
+
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
+import { nanoid } from "nanoid";
 import {
   afterAll,
   afterEach,
@@ -13,34 +20,41 @@ import {
   it,
   vi,
 } from "vitest";
-import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
-import { LicenseHandler } from "../../../../../ee/licensing";
-import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
+import {
+  ENTERPRISE_TEMPLATE,
+  LicenseHandler,
+  parseLicenseKey,
+  verifySignature,
+} from "../../../../../ee/licensing";
+import {
+  TEST_PRIVATE_KEY,
+  TEST_PUBLIC_KEY,
+} from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
 import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
-  VALID_LICENSE_KEY,
+  ENTERPRISE_LICENSE_KEY,
   EXPIRED_LICENSE_KEY,
   GARBAGE_DATA,
-  ENTERPRISE_LICENSE_KEY,
+  VALID_LICENSE_KEY,
 } from "../../../../../ee/licensing/__tests__/fixtures/testLicenses";
-import { TEST_PUBLIC_KEY, TEST_PRIVATE_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
-import { parseLicenseKey, verifySignature, PRO_TEMPLATE, ENTERPRISE_TEMPLATE } from "../../../../../ee/licensing";
-import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { nanoid } from "nanoid";
+import { prisma } from "../../../db";
+import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 // Mock getLicenseHandler to use test public key
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../../subscriptionHandler")>();
+  const original =
+    await importOriginal<typeof import("../../../subscriptionHandler")>();
   return {
     ...original,
-    getLicenseHandler: () => new LicenseHandler({
-      prisma,
-      publicKey: TEST_PUBLIC_KEY,
-      repository: new LicenseEnforcementRepository(prisma),
-    }),
+    getLicenseHandler: () =>
+      new LicenseHandler({
+        prisma,
+        publicKey: TEST_PUBLIC_KEY,
+        repository: new LicenseEnforcementRepository(prisma),
+      }),
   };
 });
 
@@ -179,7 +193,10 @@ describe("License Router Integration", () => {
     await prisma.user.deleteMany({
       where: {
         email: {
-          in: ["license-router-admin@test.com", "license-router-member@test.com"],
+          in: [
+            "license-router-admin@test.com",
+            "license-router-member@test.com",
+          ],
         },
       },
     });
@@ -237,13 +254,15 @@ describe("License Router Integration", () => {
     it("throws UNAUTHORIZED for non-existent organization", async () => {
       // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(
-        adminCaller.license.getStatus({ organizationId: "non-existent-org-id" })
+        adminCaller.license.getStatus({
+          organizationId: "non-existent-org-id",
+        }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     it("throws error for empty organizationId", async () => {
       await expect(
-        adminCaller.license.getStatus({ organizationId: "" })
+        adminCaller.license.getStatus({ organizationId: "" }),
       ).rejects.toThrow();
     });
   });
@@ -261,7 +280,9 @@ describe("License Router Integration", () => {
 
       expect(result.success).toBe(true);
       expect(result.planInfo?.type).toBe(ENTERPRISE_LICENSE.plan.type);
-      expect(result.planInfo?.maxMembers).toBe(ENTERPRISE_LICENSE.plan.maxMembers);
+      expect(result.planInfo?.maxMembers).toBe(
+        ENTERPRISE_LICENSE.plan.maxMembers,
+      );
 
       // Verify stored in database
       const org = await prisma.organization.findUnique({
@@ -276,7 +297,7 @@ describe("License Router Integration", () => {
         adminCaller.license.upload({
           organizationId,
           licenseKey: GARBAGE_DATA,
-        })
+        }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
@@ -285,7 +306,7 @@ describe("License Router Integration", () => {
         adminCaller.license.upload({
           organizationId,
           licenseKey: EXPIRED_LICENSE_KEY,
-        })
+        }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
@@ -294,7 +315,7 @@ describe("License Router Integration", () => {
         adminCaller.license.upload({
           organizationId,
           licenseKey: "",
-        })
+        }),
       ).rejects.toThrow();
     });
 
@@ -304,7 +325,7 @@ describe("License Router Integration", () => {
         memberCaller.license.upload({
           organizationId,
           licenseKey: VALID_LICENSE_KEY,
-        })
+        }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
@@ -314,11 +335,10 @@ describe("License Router Integration", () => {
         adminCaller.license.upload({
           organizationId: "non-existent-org-id",
           licenseKey: VALID_LICENSE_KEY,
-        })
+        }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
-
 
   // ==========================================================================
   // remove Tests
@@ -359,14 +379,14 @@ describe("License Router Integration", () => {
     it("throws UNAUTHORIZED when member tries to remove", async () => {
       // Member has organization:view but not organization:manage, so permission check throws UNAUTHORIZED
       await expect(
-        memberCaller.license.remove({ organizationId })
+        memberCaller.license.remove({ organizationId }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
     it("throws UNAUTHORIZED for non-existent organization", async () => {
       // User is not a member of non-existent org, so permission check fails before NOT_FOUND can be thrown
       await expect(
-        adminCaller.license.remove({ organizationId: "non-existent-org-id" })
+        adminCaller.license.remove({ organizationId: "non-existent-org-id" }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
@@ -490,7 +510,7 @@ describe("License Router Integration", () => {
         adminCaller.license.generate({
           ...getValidInput(),
           expiresAt: new Date("2020-01-01"),
-        })
+        }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
@@ -499,7 +519,7 @@ describe("License Router Integration", () => {
         adminCaller.license.generate({
           ...getValidInput(),
           organizationName: "",
-        })
+        }),
       ).rejects.toThrow();
     });
 
@@ -508,7 +528,7 @@ describe("License Router Integration", () => {
         adminCaller.license.generate({
           ...getValidInput(),
           email: "not-an-email",
-        })
+        }),
       ).rejects.toThrow();
     });
 
@@ -520,7 +540,7 @@ describe("License Router Integration", () => {
             ...getValidInput().plan,
             maxMembers: -5,
           },
-        })
+        }),
       ).rejects.toThrow();
     });
 
@@ -545,7 +565,7 @@ describe("License Router Integration", () => {
 
     it("throws UNAUTHORIZED when member tries to generate", async () => {
       await expect(
-        memberCaller.license.generate(getValidInput())
+        memberCaller.license.generate(getValidInput()),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });

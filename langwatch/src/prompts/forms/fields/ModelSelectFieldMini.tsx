@@ -1,7 +1,7 @@
 import {
   Box,
-  HStack,
   Popover as ChakraPopover,
+  HStack,
   Skeleton,
 } from "@chakra-ui/react";
 import React, { useCallback, useState } from "react";

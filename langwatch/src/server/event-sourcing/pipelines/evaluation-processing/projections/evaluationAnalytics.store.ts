@@ -119,8 +119,11 @@ export class EvaluationAnalyticsStore
    * aggregate is rewritten, and for the population as a whole once retention has
    * aged the pre-00056 rows out.
    *
-   * `context.readWindow` is passed through verbatim; on a windowed miss the
-   * EXECUTOR retries without the window, so a row outside it is still found.
+   * `context.readWindow` is passed through verbatim; on an ABSENT windowed miss
+   * the EXECUTOR retries without the window, so a row outside it is still
+   * found. A row FOUND and refused by the version gate is reported as
+   * `miss: "undecodable"` and deliberately not retried — a wider scope finds
+   * the same row and refuses it again.
    */
   async getWithApplied(
     aggregateId: string,
@@ -128,19 +131,23 @@ export class EvaluationAnalyticsStore
   ): Promise<{
     state: EvaluationAnalyticsData | null;
     appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
   }> {
     const found = await this.repo.findByEvaluationIdWithApplied({
       tenantId: String(context.tenantId),
       evaluationId: aggregateId,
       window: context.readWindow,
     });
-    if (!found) return { state: null, appliedEventIds: [] };
+    if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
     // Stale schema snapshot: the read-back columns did not exist when this row
-    // was written, so decoding it would fabricate state. Answer exactly as for
-    // "no row" — the watermark is dropped too, because a watermark without the
-    // state it belongs to would suppress the very events the re-fold needs.
+    // was written, so decoding it would fabricate state. Answer as for "no row"
+    // — the watermark is dropped too, because a watermark without the state it
+    // belongs to would suppress the very events the re-fold needs — but report
+    // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
+    // executor must not answer with an unwindowed re-read that can only find
+    // the same row again.
     if (found.row.version !== EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST) {
-      return { state: null, appliedEventIds: [] };
+      return { state: null, appliedEventIds: [], miss: "undecodable" };
     }
     return {
       state: evaluationAnalyticsStateFromRow(found.row),

@@ -41,7 +41,12 @@ export function ConversationSkeleton({
   const gap = dense ? "12px" : "16px";
 
   return (
-    <VStack align="stretch" gap={gap} aria-hidden data-testid="langy-conversation-skeleton">
+    <VStack
+      align="stretch"
+      gap={gap}
+      aria-hidden
+      data-testid="langy-conversation-skeleton"
+    >
       {Array.from({ length: count }, (_, index) => {
         const isQuestion = index % 2 === 0;
         return isQuestion ? (

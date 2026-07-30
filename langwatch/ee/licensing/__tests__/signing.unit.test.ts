@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  signLicense,
-  encodeLicenseKey,
-  generateLicenseId,
-} from "../signing";
+import { encodeLicenseKey, generateLicenseId, signLicense } from "../signing";
+import type { LicenseData } from "../types";
 import { parseLicenseKey, verifySignature } from "../validation";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./fixtures/testKeys";
-import type { LicenseData } from "../types";
 
-const createTestLicenseData = (overrides: Partial<LicenseData> = {}): LicenseData => ({
+const createTestLicenseData = (
+  overrides: Partial<LicenseData> = {},
+): LicenseData => ({
   licenseId: "test-lic-001",
   version: 1,
   organizationName: "Test Org",

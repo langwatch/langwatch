@@ -1,14 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  tokenizeLiquidTemplate,
-  type LiquidToken,
-} from "../liquidTokenizer";
+import { tokenizeLiquidTemplate } from "../liquidTokenizer";
 
 describe("tokenizeLiquidTemplate()", () => {
   describe("when text contains if/endif tags", () => {
     it("identifies if and endif as liquid-tag tokens with plain-text between", () => {
       const tokens = tokenizeLiquidTemplate(
-        "{% if tone == 'formal' %}Dear user{% endif %}"
+        "{% if tone == 'formal' %}Dear user{% endif %}",
       );
 
       expect(tokens).toEqual([
@@ -22,7 +19,7 @@ describe("tokenizeLiquidTemplate()", () => {
   describe("when text contains for/endfor tags and variable expressions", () => {
     it("identifies for/endfor as liquid-tag and variable expressions as variable", () => {
       const tokens = tokenizeLiquidTemplate(
-        "{% for item in items %}{{ item }}{% endfor %}"
+        "{% for item in items %}{{ item }}{% endfor %}",
       );
 
       expect(tokens).toEqual([
@@ -36,7 +33,7 @@ describe("tokenizeLiquidTemplate()", () => {
   describe("when text contains assign tags", () => {
     it("identifies assign as liquid-tag", () => {
       const tokens = tokenizeLiquidTemplate(
-        "{% assign greeting = 'Hello' %}{{ greeting }}"
+        "{% assign greeting = 'Hello' %}{{ greeting }}",
       );
 
       expect(tokens).toEqual([
@@ -59,7 +56,7 @@ describe("tokenizeLiquidTemplate()", () => {
   describe("when text contains elsif and else tags", () => {
     it("identifies elsif and else as liquid-tag tokens", () => {
       const tokens = tokenizeLiquidTemplate(
-        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}"
+        "{% if x %}A{% elsif y %}B{% else %}C{% endif %}",
       );
 
       expect(tokens).toEqual([
@@ -77,7 +74,7 @@ describe("tokenizeLiquidTemplate()", () => {
   describe("when text contains mixed content", () => {
     it("tokenizes plain text, liquid tags, and variables correctly", () => {
       const tokens = tokenizeLiquidTemplate(
-        "Hello {% if formal %}Sir{% endif %}, {{ name | capitalize }}"
+        "Hello {% if formal %}Sir{% endif %}, {{ name | capitalize }}",
       );
 
       expect(tokens).toEqual([
@@ -95,9 +92,7 @@ describe("tokenizeLiquidTemplate()", () => {
     it("treats unclosed tags as plain text", () => {
       const tokens = tokenizeLiquidTemplate("{% if x");
 
-      expect(tokens).toEqual([
-        { type: "plain-text", value: "{% if x" },
-      ]);
+      expect(tokens).toEqual([{ type: "plain-text", value: "{% if x" }]);
     });
   });
 
@@ -111,18 +106,14 @@ describe("tokenizeLiquidTemplate()", () => {
   describe("when text has no liquid syntax", () => {
     it("returns a single plain-text token", () => {
       const tokens = tokenizeLiquidTemplate("Hello world");
-      expect(tokens).toEqual([
-        { type: "plain-text", value: "Hello world" },
-      ]);
+      expect(tokens).toEqual([{ type: "plain-text", value: "Hello world" }]);
     });
   });
 
   describe("when text has unclosed variable expression", () => {
     it("treats unclosed variable expression as plain text", () => {
       const tokens = tokenizeLiquidTemplate("{{ name");
-      expect(tokens).toEqual([
-        { type: "plain-text", value: "{{ name" },
-      ]);
+      expect(tokens).toEqual([{ type: "plain-text", value: "{{ name" }]);
     });
   });
 });

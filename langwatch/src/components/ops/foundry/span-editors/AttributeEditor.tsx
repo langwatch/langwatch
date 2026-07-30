@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Flex, Text, Input, Button } from "@chakra-ui/react";
+import { Button, Flex, Input, Text } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 
 export function AttributeEditor({
   attributes,
@@ -30,7 +30,15 @@ export function AttributeEditor({
     <Flex direction="column" gap={1} mt={1}>
       {entries.map(([key, value]) => (
         <Flex key={key} align="center" gap={2}>
-          <Text fontSize="xs" color="fg.subtle" w="140px" flexShrink={0} truncate>{key}</Text>
+          <Text
+            fontSize="xs"
+            color="fg.subtle"
+            w="140px"
+            flexShrink={0}
+            truncate
+          >
+            {key}
+          </Text>
           <Input
             size="sm"
             flex={1}
@@ -38,8 +46,17 @@ export function AttributeEditor({
             value={String(value)}
             onChange={(e) => updateValue(key, e.target.value)}
           />
-          <Button size="xs" variant="ghost" color="fg.muted" _hover={{ color: "red.400" }}
-            onClick={() => { const next = { ...attributes }; delete next[key]; onChange(next); }}>
+          <Button
+            size="xs"
+            variant="ghost"
+            color="fg.muted"
+            _hover={{ color: "red.400" }}
+            onClick={() => {
+              const next = { ...attributes };
+              delete next[key];
+              onChange(next);
+            }}
+          >
             <Trash2 size={12} />
           </Button>
         </Flex>
@@ -55,7 +72,12 @@ export function AttributeEditor({
           onKeyDown={(e) => e.key === "Enter" && addAttribute()}
           placeholder="attribute.key"
         />
-        <Button size="xs" variant="outline" onClick={addAttribute} disabled={!newKey}>
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={addAttribute}
+          disabled={!newKey}
+        >
           <Plus size={12} /> Add
         </Button>
       </Flex>

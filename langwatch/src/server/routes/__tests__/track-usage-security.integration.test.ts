@@ -134,7 +134,11 @@ describe("POST /api/track_usage", () => {
       // status, so a 400 here would silently and permanently drop that
       // instance's telemetry with no operator-visible symptom.
       const res = await request({
-        body: { event: "daily_usage_stats", instance_id: "legacy-sender__org_1", totalTraces: 1 },
+        body: {
+          event: "daily_usage_stats",
+          instance_id: "legacy-sender__org_1",
+          totalTraces: 1,
+        },
       });
 
       expect(res.status).toBe(200);

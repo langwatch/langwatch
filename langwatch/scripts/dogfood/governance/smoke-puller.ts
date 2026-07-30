@@ -20,15 +20,14 @@
  *
  * Exit code: 0 = OCSF rows landed + cursor drained; 1 = anything else.
  */
-import http from "http";
-import { randomBytes } from "crypto";
-import type { AddressInfo } from "net";
 
 import { createClient } from "@clickhouse/client";
-
-import { prisma } from "../../../src/server/db";
-import { runIngestionPull } from "../../../ee/governance/services/pullers/pullerWorker";
+import { randomBytes } from "crypto";
+import http from "http";
+import type { AddressInfo } from "net";
 import { ensureHiddenGovernanceProject } from "../../../ee/governance/services/governanceProject.service";
+import { runIngestionPull } from "../../../ee/governance/services/pullers/pullerWorker";
+import { prisma } from "../../../src/server/db";
 
 const CLICKHOUSE_URL =
   process.env.CLICKHOUSE_URL ??

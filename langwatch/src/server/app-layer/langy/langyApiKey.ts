@@ -1,15 +1,14 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
-import type { Session } from "~/server/auth";
+import { getLangWatchTracer } from "langwatch";
 import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
-import { getLangWatchTracer } from "langwatch";
+import type { Session } from "~/server/auth";
 import { getLangySessionKeysCounter } from "~/server/metrics";
 
 const logger = createLogger("langwatch:langy:api-key");
 const tracer = getLangWatchTracer("langwatch.langy.api-key");
-
 
 // The full surface the Langy assistant could ever exercise — the CANDIDATE
 // set. `mintLangySessionApiKey` (the per-chat key) grants only the INTERSECTION

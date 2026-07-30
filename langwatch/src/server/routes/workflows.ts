@@ -8,7 +8,6 @@
  * Both were already Hono apps in App Router route.ts files.
  */
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
-import { validator as zValidator } from "~/server/api/validation";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
 import { streamSSE } from "hono/streaming";
@@ -27,12 +26,12 @@ import {
 } from "~/optimization_studio/types/events";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { getServerAuthSession } from "~/server/auth";
 import { DatasetNotReadyError } from "~/server/datasets/errors";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:workflows");
 

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { blocked, classify, isPublicAddress, type Category } from "./index";
+import { blocked, type Category, classify, isPublicAddress } from "./index";
 
 /**
  * The corpus is the single source of truth shared with the Go pkg/ssrf tests.
@@ -15,7 +15,9 @@ function repoRoot(): string {
     if (existsSync(join(dir, "go.mod"))) return dir;
     dir = dirname(dir);
   }
-  throw new Error("could not locate repo root (no go.mod found while walking up)");
+  throw new Error(
+    "could not locate repo root (no go.mod found while walking up)",
+  );
 }
 
 interface AddressVector {
@@ -24,7 +26,13 @@ interface AddressVector {
   note: string;
 }
 
-const corpusPath = join(repoRoot(), "pkg", "ssrf", "testdata", "address_vectors.json");
+const corpusPath = join(
+  repoRoot(),
+  "pkg",
+  "ssrf",
+  "testdata",
+  "address_vectors.json",
+);
 const vectors = (
   JSON.parse(readFileSync(corpusPath, "utf8")) as { vectors: AddressVector[] }
 ).vectors;

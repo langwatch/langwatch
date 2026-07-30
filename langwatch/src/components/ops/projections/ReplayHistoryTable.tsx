@@ -1,10 +1,10 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { Badge, Card, HStack, Status, Table, Text } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
-import { api } from "~/utils/api";
 import { formatDuration } from "~/components/ops/shared/formatters";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
 import type { ReplayHistoryEntry } from "~/server/app-layer/ops/repositories/replay.repository";
+import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 export function ReplayHistoryTable() {
   const router = useRouter();
@@ -24,14 +24,22 @@ export function ReplayHistoryTable() {
           </Text>
         </HStack>
         <Table.ScrollArea>
-          <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
+          <Table.Root
+            size="sm"
+            variant="line"
+            css={{ "& tr:last-child td": { borderBottom: "none" } }}
+          >
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Status</Table.ColumnHeader>
                 <Table.ColumnHeader>Description</Table.ColumnHeader>
                 <Table.ColumnHeader>Projections</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">Duration</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">Aggregates</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">
+                  Duration
+                </Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="end">
+                  Aggregates
+                </Table.ColumnHeader>
                 <Table.ColumnHeader textAlign="end">Events</Table.ColumnHeader>
                 <Table.ColumnHeader>When</Table.ColumnHeader>
                 <Table.ColumnHeader width="40px" />
@@ -103,10 +111,7 @@ export function ReplayHistoryTable() {
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
-                      <ArrowRight
-                        size={12}
-                        style={{ opacity: 0.5 }}
-                      />
+                      <ArrowRight size={12} style={{ opacity: 0.5 }} />
                     </Table.Cell>
                   </Table.Row>
                 );

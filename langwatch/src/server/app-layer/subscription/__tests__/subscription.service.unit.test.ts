@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { SubscriptionService } from "../subscription.service";
+import type { EESubscriptionService } from "../../../../../ee/billing/services/subscription.service";
 import {
   NullSubscriptionRepository,
   type SubscriptionRepository,
 } from "../subscription.repository";
-import type { EESubscriptionService } from "../../../../../ee/billing/services/subscription.service";
+import type { SubscriptionService } from "../subscription.service";
 
 // --------------------------------------------------------------------------
 // Type-level conformance checks (compile-time only, no runtime cost)

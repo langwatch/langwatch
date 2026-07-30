@@ -225,9 +225,8 @@ describe.skipIf(isTestcontainersOnly)(
       const workflow = dispatched.body.payload.workflow;
 
       const signature = workflow.nodes.find((n) => n.type === "signature");
-      const llmValue = signature?.data.parameters?.find(
-        (p) => p.type === "llm",
-      )?.value as LLMConfig;
+      const llmValue = signature?.data.parameters?.find((p) => p.type === "llm")
+        ?.value as LLMConfig;
       expect(llmValue.model).toBe("openai/gpt-5-mini");
       expect(llmValue.max_tokens).toBe(256);
       expect("default_llm" in workflow).toBe(false);

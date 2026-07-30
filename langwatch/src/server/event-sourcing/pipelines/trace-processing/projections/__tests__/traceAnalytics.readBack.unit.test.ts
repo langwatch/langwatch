@@ -1,15 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
+import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   projectAnalyticsStateToRow,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
   traceAnalyticsStateFromRow,
 } from "../traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "../traceAnalytics.store";
+import { createSpanReceivedEvent } from "./fixtures/trace-summary-test.fixtures";
 
 /**
  * Read-back round-trip for the slim trace fold (ADR-066). `fromRow` is the
@@ -42,6 +47,11 @@ function committedState(): TraceAnalyticsData {
     subTopicId: "sub-1",
     traceName: "My Trace",
     models: ["gpt-5-mini", "claude-fable-5"],
+    // Deliberately LATER than `occurredAt`: the anchor froze on the first span
+    // this trace folded, and an earlier-starting span then arrived and pulled
+    // the timing baseline back. Keeping the two apart in the fixture is what
+    // makes a decoder that reads one out of the other's column fail here.
+    storageAnchorMs: BASE_MS + 250,
     occurredAt: BASE_MS,
     totalDurationMs: 4200,
     totalCost: 0.42,
@@ -79,6 +89,17 @@ describe("traceAnalytics read-back (fromRow)", () => {
     const state = committedState();
     const row = project(state);
     const decoded = traceAnalyticsStateFromRow(row);
+
+    it("keeps the storage anchor and the span timing baseline apart", () => {
+      // The anchor rides in OccurredAt (partition + sort key + TTL) and the
+      // baseline in its own column (migration 00061). Decoding either from the
+      // other's column is the defect this split exists to stop: it would either
+      // move a committed row's partition or restart the trace's duration.
+      expect(decoded.storageAnchorMs).toBe(BASE_MS + 250);
+      expect(decoded.occurredAt).toBe(BASE_MS);
+      expect(row.occurredAtMs).toBe(BASE_MS + 250);
+      expect(row.earliestSpanStartMs).toBe(BASE_MS);
+    });
 
     it("recovers the fold bookkeeping the trimmed row would otherwise drop", () => {
       expect(decoded.spanCount).toBe(7);
@@ -132,6 +153,8 @@ describe("traceAnalytics read-back (fromRow)", () => {
         rootMetadataFromFallback: false,
         traceNameUserOverridden: false,
         lastEventOccurredAt: 0,
+        // And, on a row written before migration 00061, no span timing baseline.
+        earliestSpanStartMs: 0,
       };
 
       const decoded = traceAnalyticsStateFromRow(legacyRow);
@@ -147,6 +170,14 @@ describe("traceAnalytics read-back (fromRow)", () => {
       expect(decoded.annotationIds).toEqual([]);
       expect(decoded.spanCount).toBe(0);
       expect(decoded.LastEventOccurredAt).toBe(0);
+      // 0 reads back as "no span has seeded the timing baseline". On a row this
+      // old that default is indistinguishable from the truth, and nothing else
+      // on the row carries the baseline — which is why the VERSION gate refuses
+      // the stamp outright. Note this is a property of the STAMP, not of the
+      // zero: the pre-split stamp decodes a baseline of 0 quite happily, because
+      // there OccurredAt still carries the real value (see the pre-split
+      // describe below).
+      expect(decoded.occurredAt).toBe(0);
     });
   });
 });
@@ -168,6 +199,7 @@ describe("TraceAnalyticsStore read-back version gate", () => {
   }
 
   describe("given a row stamped with the current projection version", () => {
+    /** @scenario a stored state written under the fold's current shape is read straight back */
     it("reads the state and the durable watermark back", async () => {
       const { store } = storeOver(project(committedState()));
 
@@ -182,11 +214,105 @@ describe("TraceAnalyticsStore read-back version gate", () => {
     });
   });
 
+  describe("given a row stamped with the version just before the anchor split", () => {
+    // The one older stamp that is decoded rather than refused. On a pre-split
+    // row `OccurredAt` is `min(span start)` — at once a valid anchor (it is
+    // what the row is already partitioned and TTL'd on) and the correct span
+    // timing baseline (it is what the new column was split out to carry).
+    //
+    // The alternative — refusing it — would rebuild the entire population, and
+    // a rebuild re-derives the anchor, so the change whose premise is "an
+    // anchor is written once" would open by moving every one of them.
+    const preSplitRow = (over: Partial<TraceAnalyticsRow> = {}) =>
+      ({
+        ...project(committedState()),
+        version: TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
+        // The column this shape does not have. Its ClickHouse DEFAULT is 0, so
+        // that is what a real pre-split row decodes as.
+        earliestSpanStartMs: 0,
+        occurredAtMs: BASE_MS + 250,
+        ...over,
+      }) satisfies TraceAnalyticsRow;
+
+    it("decodes it instead of reporting a miss", async () => {
+      const { store } = storeOver(preSplitRow());
+
+      const { state, appliedEventIds, miss } = await store.getWithApplied(
+        "trace-rb",
+        context,
+      );
+
+      expect(miss).toBeUndefined();
+      expect(state).not.toBeNull();
+      // The watermark survives too — the row was trusted, so redelivery dedup
+      // keeps working across the transition.
+      expect(appliedEventIds).toEqual(["evt-1", "evt-2"]);
+    });
+
+    /** @scenario "A trace recorded before the upgrade keeps its place in the timeline" */
+    it("takes the timing baseline from the anchor's column, because there they are the same value", () => {
+      const state = traceAnalyticsStateFromRow(preSplitRow());
+
+      // Both read off OccurredAt: pre-split, that column WAS min(span start).
+      expect(state.storageAnchorMs).toBe(BASE_MS + 250);
+      expect(state.occurredAt).toBe(BASE_MS + 250);
+    });
+
+    /** @scenario "A trace recorded before the upgrade keeps its place in the timeline" */
+    it("keeps the anchor exactly where the row was already stored", () => {
+      // The point of decoding rather than refolding: re-projecting the decoded
+      // state must reproduce the same partition column, so the row is rewritten
+      // onto its own sort key rather than a second one.
+      const rewritten = project(traceAnalyticsStateFromRow(preSplitRow()));
+
+      expect(rewritten.occurredAtMs).toBe(BASE_MS + 250);
+    });
+
+    it("leaves a log-only pre-split row free to anchor on its next signal", () => {
+      // The 196952 row this whole change exists to rescue. It carries 0, which
+      // is right twice over — no span was ever folded, and an unusable anchor
+      // is what lets the next contribution freeze a real one.
+      const state = traceAnalyticsStateFromRow(
+        preSplitRow({ occurredAtMs: 0 }),
+      );
+
+      expect(state.storageAnchorMs).toBe(0);
+      expect(state.occurredAt).toBe(0);
+
+      const anchored = projection.apply(state, {
+        id: "evt-late-log",
+        type: "lw.obs.trace.log_record_received",
+        tenantId: TENANT,
+        aggregateId: "trace-rb",
+        occurredAt: BASE_MS + 9_000,
+        data: {
+          traceId: "trace-rb",
+          spanId: "ffffffffffffff01",
+          timeUnixMs: BASE_MS + 9_000,
+          severityNumber: 9,
+          severityText: "INFO",
+          body: "api_request",
+          attributes: {},
+          resourceAttributes: {},
+          scopeName: "com.anthropic.claude_code",
+          scopeVersion: null,
+          piiRedactionLevel: "DISABLED",
+        },
+      } as unknown as TraceProcessingEvent);
+
+      expect(anchored.storageAnchorMs).toBe(BASE_MS + 9_000);
+      // …and the timing baseline stays untouched: no span has been folded.
+      expect(anchored.occurredAt).toBe(0);
+    });
+  });
+
   describe("given a row stamped with an older projection version", () => {
     // Such a row predates the read-back columns, so every one of them decodes
     // as a ClickHouse default indistinguishable from a real value — spanCount 0
-    // would re-add committed cost past the span cap, and a false
-    // traceNameUserOverridden would let a late span overwrite a user's rename.
+    // would re-add committed cost past the span cap, a false
+    // traceNameUserOverridden would let a late span overwrite a user's rename,
+    // and a zero span timing baseline (migration 00061) would restart the
+    // trace's duration from whichever span arrived next.
     const staleRow = (): TraceAnalyticsRow => ({
       ...project(committedState()),
       version: "2026-06-20",
@@ -195,12 +321,14 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       rootSpanStartTimeMs: 0,
       traceNameUserOverridden: false,
       lastEventOccurredAt: 0,
+      earliestSpanStartMs: 0,
     });
 
+    /** @scenario a stored state written under an older shape is rebuilt rather than trusted */
     it("reports a store miss so the fold refolds instead of trusting it", async () => {
       const { store } = storeOver(staleRow());
 
-      const { state, appliedEventIds } = await store.getWithApplied(
+      const { state, appliedEventIds, miss } = await store.getWithApplied(
         "trace-rb",
         context,
       );
@@ -209,12 +337,194 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       // The watermark goes with the state: keeping it would suppress the very
       // events the re-fold needs to see.
       expect(appliedEventIds).toEqual([]);
+      // Asserted on the REAL store, not a mock. The executor skips its
+      // unwindowed re-read on `undecodable`, and until this was pinned here the
+      // only test naming the value fabricated it from a `vi.fn()` — so deleting
+      // the discriminator from this store left the suite green while the
+      // executor silently went back to an unpruned scan per event.
+      expect(miss).toBe("undecodable");
+    });
+
+    it("tells an absent row apart from a refused one", async () => {
+      // The two miss kinds mean opposite things to an operator: `absent` says
+      // "widen readWindow.widthMs", `undecodable` says "a stale shape is being
+      // rebuilt". Reporting a version rejection as `absent` spent the
+      // window-fallback signal on a schema condition.
+      const store = new TraceAnalyticsStore({
+        findByTraceIdWithApplied: vi.fn().mockResolvedValue(null),
+      } as unknown as ConstructorParameters<typeof TraceAnalyticsStore>[0]);
+
+      const { state, miss } = await store.getWithApplied("trace-rb", context);
+
+      expect(state).toBeNull();
+      expect(miss).toBe("absent");
     });
 
     it("misses through get() too, so both read paths agree", async () => {
       const { store } = storeOver(staleRow());
 
       expect(await store.get("trace-rb", context)).toBeNull();
+    });
+  });
+
+  describe("given a trace a person deliberately renamed", () => {
+    const renameEvent = {
+      id: "evt-rename",
+      type: "lw.obs.trace.trace_name_changed",
+      tenantId: TENANT,
+      aggregateId: "trace-rb",
+      aggregateType: "trace",
+      occurredAt: BASE_MS,
+      createdAt: BASE_MS,
+      metadata: {},
+      data: { traceId: "trace-rb", newName: "Renamed by a human" },
+    } as unknown as TraceProcessingEvent;
+
+    /**
+     * The kind of late contribution that names a trace when nothing else has:
+     * a parented span, which the fallback path would otherwise claim the name
+     * from because this trace has no real root.
+     */
+    const lateNamingSpan = () =>
+      createSpanReceivedEvent({
+        eventId: "evt-child",
+        tenantId: TENANT,
+        traceId: "trace-rb",
+        spanId: "cccc000000000001",
+        parentSpanId: "cccc00000000000f",
+        name: "llm-call",
+        occurredAt: BASE_MS + 1000,
+      });
+
+    const renamed = () =>
+      projection.apply(
+        { ...projection.init(), traceId: "trace-rb" },
+        renameEvent,
+      );
+
+    describe("when a late span that would otherwise supply a name arrives", () => {
+      /** @scenario a user-visible name survives a late unrelated contribution */
+      it("keeps the person's name across the recovery", () => {
+        const recovered = traceAnalyticsStateFromRow(project(renamed()));
+
+        expect(projection.apply(recovered, lateNamingSpan()).traceName).toBe(
+          "Renamed by a human",
+        );
+      });
+    });
+
+    describe("when its committed row predates the fold recording that a person set the name", () => {
+      /** @scenario a user-visible name survives a late unrelated contribution */
+      it("refuses the row, so the rename is rebuilt rather than overwritten", async () => {
+        const olderShape: TraceAnalyticsRow = {
+          ...project(renamed()),
+          version: "2026-06-20",
+          // Indistinguishable from "nobody ever renamed it".
+          traceNameUserOverridden: false,
+        };
+
+        // Read back, that row's own decoding lets the late span take the name.
+        expect(
+          projection.apply(
+            traceAnalyticsStateFromRow(olderShape),
+            lateNamingSpan(),
+          ).traceName,
+        ).toBe("llm-call");
+
+        // Which is why the store never hands it to the fold at all.
+        const { store } = storeOver(olderShape);
+        expect(await store.get("trace-rb", context)).toBeNull();
+      });
+    });
+  });
+});
+
+/**
+ * A trace whose only signal is a classification carries nothing the analytics
+ * row can hold, so the store writes no row for it. ADR-066 makes that safe
+ * rather than lossy: no row is a MISS, and the fold's `refoldOnStoreMiss`
+ * rebuilds the classification from `event_log` when a real event finally lands.
+ */
+describe("TraceAnalyticsStore dimension-only signal", () => {
+  const TRACE_ID = "aaaa0000000000000000000000000001";
+  const context: ProjectionStoreContext = {
+    aggregateId: TRACE_ID,
+    tenantId: createTenantId(TENANT),
+  };
+
+  const topicEvent = {
+    id: "evt-topic",
+    type: "lw.obs.trace.topic_assigned",
+    tenantId: TENANT,
+    aggregateId: TRACE_ID,
+    aggregateType: "trace",
+    occurredAt: BASE_MS,
+    createdAt: BASE_MS,
+    metadata: {},
+    data: {
+      topicId: "topic-1",
+      topicName: "Support",
+      subtopicId: null,
+      subtopicName: null,
+      isIncremental: false,
+    },
+  } as unknown as TraceProcessingEvent;
+
+  const spanEvent: TraceProcessingEvent = createSpanReceivedEvent({
+    eventId: "evt-span",
+    tenantId: TENANT,
+    traceId: TRACE_ID,
+    spanId: "bbbb000000000001",
+    parentSpanId: null,
+    name: "agent-run",
+    occurredAt: BASE_MS + 1000,
+  });
+
+  /** A repository that answers reads from whatever the store actually wrote. */
+  function recordingRepo() {
+    const rows: TraceAnalyticsRow[] = [];
+    // Cast through `unknown` like the other partial stubs here: this answers
+    // only the two members the store exercises, so annotating it as a complete
+    // `TraceAnalyticsRepository` would claim members it does not implement.
+    const repo = {
+      upsert: async (row: TraceAnalyticsRow) => {
+        rows.push(row);
+      },
+      findByTraceIdWithApplied: async () => {
+        const row = rows[rows.length - 1];
+        return row ? { row, appliedEventIds: [] } : null;
+      },
+    } as unknown as TraceAnalyticsRepository;
+    return { repo, rows };
+  }
+
+  describe("given a trace whose only signal so far is an assigned topic", () => {
+    describe("when its cached state is lost and a later span arrives", () => {
+      /** @scenario a signal with nothing else to store is not lost to a cold cache */
+      it("rebuilds the classification from the event log instead of losing it", async () => {
+        const { repo, rows } = recordingRepo();
+        const fold = new TraceAnalyticsFoldProjection({
+          store: new TraceAnalyticsStore(repo),
+        });
+        // The real loader is bounded at the delivered event; a fake that always
+        // returned the whole history would fold the span before it arrived.
+        fold.eventLoaderUpTo = async ({ upToEvent }) =>
+          [topicEvent, spanEvent].filter(
+            (event) => event.occurredAt <= upToEvent.occurredAt,
+          );
+        const executor = new FoldProjectionExecutor();
+
+        await executor.execute(fold, topicEvent, context);
+
+        // Nothing worth committing yet, so nothing was written — the topic
+        // lives only in the cache the next delivery is assumed to have lost.
+        expect(rows).toEqual([]);
+
+        const resumed = await executor.execute(fold, spanEvent, context);
+
+        expect(resumed.topicId).toBe("topic-1");
+        expect(resumed.spanCount).toBe(1);
+      });
     });
   });
 });

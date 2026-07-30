@@ -15,6 +15,8 @@ If no feature file exists for your task, create one before writing code.
 
 **For frontend work, read the UX docs first.** Before any non-trivial frontend change (anything beyond a specific, targeted tweak the user spelled out), read the relevant pattern docs under `dev/docs/best_practices/` so you extend existing patterns instead of reinventing them. The UI ones: `react.md`, `drawers.md`, `row-actions-overflow-menu.md`, `selection-action-bar.md`, `scope-selector-and-badges.md`. If the surface you are building has no doc yet, write one as part of the change.
 
+**Error paths are part of the feature, not an afterthought.** Any code that can fail — a route, a service method, a mutation, a form submit — ships its failure modes deliberately: read `dev/docs/best_practices/error-handling.md` and [ADR-045](dev/docs/adr/045-domain-errors-handled-boundary.md). The rule in one line: throw a `HandledError` **only** when we know the cause *and* the caller can act on it; everything else stays a plain `Error` and correctly degrades to a generic "unknown" plus a trace id. When you add a feature, name its expected failures in the spec alongside the golden path, and give each one a stable `code`, customer-safe `message`, correct `fault`, remediation copy, and an entry in the client presentation registry (`langwatch/src/features/errors/logic/presentation.ts`) — that registry, keyed by `code`, is where the words a customer actually reads live. "Unknown error" reaching a user for a failure we could have named is a bug in the feature, not a gap in the error system. **A failure scenario in a spec enforces nothing until it is tagged and bound.** `check-feature-parity.ts` only counts scenarios carrying `@unit`, `@integration`, `@e2e` or `@regression` (and skips `@unimplemented`), so an untagged `.feature` file reports `0/0 scenarios bound` / `✓ all bound` and reads green while binding nothing at all. Every scenario you write for an error path needs a binding tag **and** a `@scenario "<title>"` annotation on the test that covers it, or it is vacuously bound.
+
 ## Development Environment
 
 `make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `langwatch/.env` is the source of truth for everything else.
@@ -68,11 +70,11 @@ Hostname routing is **opt-in** — `pnpm dev` uses the plain `PORT`+offset schem
 `pnpm dev:haven` (or `make haven up`) routes through haven.
 
 ```bash
-make haven setup        # one-time: install/verify portless (443, trusted CA)
+pnpm dev:haven          # == make haven up (bootstraps portless itself on first run)
 make haven install      # optional: go install so plain `haven ...` works everywhere
-pnpm dev:haven          # == make haven up (registers hostnames, supervises the stack)
-make haven list         # which worktree runs what (all stacks)
-make haven doctor       # proxy / daemon / observability health
+make haven status       # every stack, service health, shared servers — one shot
+haven up +langy         # add a service to this worktree's stack, sticky
+haven logs nlp -t       # tail one service's logs from any terminal
 ```
 
 Open `https://langwatch.localhost` for the cross-worktree dashboard;
@@ -80,7 +82,7 @@ Open `https://langwatch.localhost` for the cross-worktree dashboard;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
 resolved config lands in `langwatch/.env.portless` (loaded last with
 `override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
-`HAVEN_AGENT=1`) for plain, token-free output; `haven list --json` is
+`HAVEN_AGENT=1`) for plain, token-free output; `haven status --json` is
 machine-readable. See `tools/thuishaven/README.md`.
 
 ```bash
@@ -110,7 +112,7 @@ See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 **Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
 
-**Two processes vs one (workers).** By default `pnpm dev` runs the app and the background workers as two Node processes (a separate `workers` lane under `concurrently`), matching prod's separate app/worker deployments. To run them as a **single process** locally, use `pnpm dev:single` (or `WORKERS_IN_PROCESS=1 pnpm dev`): the app boots with the `"all"` process role and hosts the worker stack in-process via `startWorkers()`, saving the RAM of a second Node process. **Under haven the default is a single process:** `pnpm dev:haven` hosts the workers in the app child (no separate `workers` lane) to save the RAM of a second Node process — the sensible default when a laptop juggles several worktrees. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. Opt back into a standalone `workers` lane with `pnpm dev:workers:haven` (or `WORKERS_IN_PROCESS=0 pnpm dev:haven`); `pnpm dev:single:haven` is the explicit single-process form, now equivalent to the `dev:haven` default. This is dev-only — `NODE_ENV=production` ignores the flag. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
+**Two processes vs one (workers).** By default `pnpm dev` runs the app and the background workers as two Node processes (a separate `workers` lane under `concurrently`), matching prod's separate app/worker deployments. To run them as a **single process** locally, use `pnpm dev:single` (or `WORKERS_IN_PROCESS=1 pnpm dev`): the app boots with the `"all"` process role and hosts the worker stack in-process via `startWorkers()`, saving the RAM of a second Node process. **Under haven the default is a single process:** `pnpm dev:haven` hosts the workers in the app child (no separate `workers` lane) to save the RAM of a second Node process — the sensible default when a laptop juggles several worktrees. Workers keep their `langwatch:workers` logger name, so their lines stay identifiable without a lane of their own. Opt into a standalone `workers` lane with `haven up +workers` (sticky, per worktree; `pnpm dev:workers:haven` wraps it). This is dev-only — `NODE_ENV=production` ignores the flag. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
 
 ### AI Gateway (Go, services/aigateway/)
 
@@ -119,7 +121,9 @@ virtual-key traffic, fans out to providers via Bifrost, and reports usage back t
 the control plane. `pnpm dev` auto-starts it alongside vite + api when the Go
 toolchain is on PATH; the process appears as `gateway` in the concurrent output
 and reuses an existing listener on :5563 if another worktree already booted one.
-Set `LANGWATCH_SKIP_AIGATEWAY=1` to opt out (e.g. TS-only contributors). To run
+Set `LANGWATCH_SKIP_AIGATEWAY=1` to opt out (e.g. TS-only contributors) — that
+variable is for plain `pnpm dev`; under haven the equivalent is `haven up
+-gateway`, which sticks (`haven up` refuses the variable and says so). To run
 the gateway standalone:
 
 ```bash
@@ -143,7 +147,9 @@ is on PATH; the process appears as `nlpgo` in the concurrent output. It binds th
 port the app dials via `LANGWATCH_NLP_SERVICE` (default `:5561`, otherwise PORT+1)
 and reuses an existing listener if another worktree already booted one. When
 `LANGWATCH_NLP_SERVICE` points at an external host, no local engine is started.
-Set `LANGWATCH_SKIP_NLP=1` to opt out. To run it standalone:
+Set `LANGWATCH_SKIP_NLP=1` to opt out — that variable is for plain `pnpm dev`;
+under haven the equivalent is `haven up -nlp`, which sticks (`haven up` refuses
+the variable and says so). To run it standalone:
 
 ```bash
 make service svc=nlpgo       # run once
@@ -161,7 +167,7 @@ pnpm test:integration # Integration tests
 pnpm test:e2e         # E2E tests
 ```
 
-When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven doctor` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
+When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping the giant `langwatch/server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). `pnpm dev` still tees to `langwatch/server.log`; grep it as the fallback when the stack is down.
 
 ## Structure
 
@@ -181,6 +187,7 @@ specs/               # BDD feature specs
 - `dev/docs/CODING_STANDARDS.md` - clean code, SOLID + CUPID principles
 - `dev/docs/TESTING_PHILOSOPHY.md` - test hierarchy, BDD workflow
 - `dev/docs/best_practices/` - language/framework conventions
+- `dev/docs/best_practices/error-handling.md` - handled vs unhandled errors, and how they reach the user
 - `dev/docs/adr/` - Architecture Decision Records
 
 ## General
@@ -221,6 +228,16 @@ specs/               # BDD feature specs
 | Returning JSX from hooks | Hooks return state and callbacks, never JSX. If a hook needs to "render" something (dialog, tooltip), return props/state and let the consumer render the component explicitly. Use `.ts` for hooks, `.tsx` for components |
 | Using `form.watch()` in child components that receive `form` as a prop | Use `useWatch({ control: form.control, name: "field" })` instead — `form.watch()` doesn't trigger re-renders in child components (especially inside `useFieldArray` items). Only the form owner component should use `form.watch()` |
 | Relying solely on `gh pr checks` to assess CI status | Use `gh run list --branch <branch>` to see all workflow runs — `gh pr checks` deduplicates by check name and can mask failing runs behind passing ones from earlier commits |
+| Toasting a raw `error.message` from a mutation `onError` | Since #5984 the wire message for a handled error **is the code slug** — `description: error.message` shows the customer `validation_error`. Read the handled payload (`readHandledError`) and render copy from the code-keyed registry. See `dev/docs/best_practices/error-handling.md` |
+| Letting a knowable failure surface as a generic "unknown error" | If we can name the cause and the caller can act on it, it gets a `HandledError` with a stable `code`. Reserve "unknown" for genuinely unanticipated failures — that path is intentional, not a fallback for laziness |
+| Inventing a `HandledError` to wrap an infra failure (`new HandledError("database_error", pgError.message)`) | Throw the plain `Error`. It degrades to "unknown" at the boundary and gets logged with the trace id. Dressing internals up as handled leaks them and promises the caller an action they don't have |
+| A `HandledError` subclass with a 5xx status and no explicit `fault` | `fault` defaults to `"customer"`, so an unannotated 5xx logs a real incident as routine noise. Set `platform` or `provider` explicitly on every 5xx subclass |
+| Writing a `HandledError` message that names an env var, a hostname or an internal service | `message` must be **customer-safe** — nothing on a handled error is sensitive, and the REST boundary ships it in the response body. Internals go in the log line, not the message. It is still not the app's UI copy: what the customer reads comes from the client presentation registry keyed by `code` (tRPC replaces the wire message with the code, #5984) |
+| Adding a new error code without customer-facing copy | Two guards, and only one is the type system: the presentation registry is exhaustive over the *enumerated* codes (`APP_ERROR_CODES` + the generated Go/node ones), so a missing entry for a listed code fails `pnpm typecheck` — but a brand-new app code you haven't listed yet is caught by `features/errors/logic/__tests__/codes.unit.test.ts`. Add the code to `logic/codes.ts` (sorted) and write its `presentation.ts` entry in the same change |
+| Stuffing debug context into `meta` | `meta` is a client contract, not a scratchpad — only fields a UI or agent actually reads. If nothing renders it, log it instead. Name the consumer before adding a field |
+| Surfacing server validation errors as a toast | Map `meta.fieldErrors` onto the offending form fields so the user sees the rejection where they're looking, and make it visually clear the submit was rejected |
+| Hand-rolling `c.json({ error: "..." }, { status })` in a Hono route | Throw a `HandledError` — `createServiceApp`'s `onError` serialises it. A generic string response bypasses the whole contract |
+| Asserting on error message prose in tests | Assert on `code` — the message is copy and will change. Use `code` equality rather than `instanceof` anywhere the error may have crossed a process, worker, or serialisation boundary |
 | Hono routes calling repositories directly | Routes must go through a service layer — never instantiate or import from repositories. Business logic (validation, guards) belongs in the service, not the route |
 | Using `list` or `get` for repository methods | Repositories use `findAll`/`findById`. Services use `getAll`/`getById`. Routes call services only |
 | Setting up a Monitor / sleep that *can* take more than 5 minutes | Anthropic's prompt cache TTL is 5min, so any wait that crosses it forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). Cap each poll cycle at **4.5 min (270s)** — re-check, then re-arm. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user |

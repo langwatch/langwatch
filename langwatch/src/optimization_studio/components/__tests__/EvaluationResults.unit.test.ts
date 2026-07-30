@@ -41,5 +41,4 @@ describe("isExperimentQueryEnabled()", () => {
       expect(result).toBe(false);
     });
   });
-
 });

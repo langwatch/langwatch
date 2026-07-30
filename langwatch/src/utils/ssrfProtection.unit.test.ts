@@ -1,12 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import dns from "dns/promises";
 import { Agent, fetch as undiciFetch } from "undici";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  createSSRFValidator,
   createSSRFSafeFetchConfig,
+  createSSRFValidator,
   fetchWithResolvedIp,
-  type SSRFUnresolvedResult,
   type SSRFResolvedResult,
+  type SSRFUnresolvedResult,
 } from "./ssrfProtection";
 
 vi.mock("dns/promises", () => ({
@@ -85,9 +85,9 @@ describe("createSSRFValidator()", () => {
     /** @scenario Cloud metadata endpoints are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle> */
     it("blocks cloud metadata endpoints", async () => {
       await expect(
-        validate("http://169.254.169.254/latest/meta-data/")
+        validate("http://169.254.169.254/latest/meta-data/"),
       ).rejects.toThrow(
-        "Access to cloud metadata endpoints is not allowed for security reasons"
+        "Access to cloud metadata endpoints is not allowed for security reasons",
       );
     });
 
@@ -96,9 +96,9 @@ describe("createSSRFValidator()", () => {
       stubDnsResolve(["52.94.76.1"]);
 
       await expect(
-        validate("https://s3.amazonaws.com/my-bucket")
+        validate("https://s3.amazonaws.com/my-bucket"),
       ).rejects.toThrow(
-        "Access to cloud provider internal domains is not allowed for security reasons"
+        "Access to cloud provider internal domains is not allowed for security reasons",
       );
     });
   });
@@ -115,19 +115,15 @@ describe("createSSRFValidator()", () => {
       stubDnsResolve(["192.168.1.100"]);
 
       await expect(
-        validate("https://my-internal-agent:8443/chat")
-      ).rejects.toThrow(
-        /not allowed for security reasons/
-      );
+        validate("https://my-internal-agent:8443/chat"),
+      ).rejects.toThrow(/not allowed for security reasons/);
     });
 
     /** @scenario <impl> blocks private IP literals when BLOCK_LOCAL_HTTP_CALLS is "true" */
     /** @scenario Private IP literals are blocked when BLOCK_LOCAL_HTTP_CALLS is "true" */
     it("blocks a private IP literal like 10.0.0.5", async () => {
-      await expect(
-        validate("https://10.0.0.5:8443/chat")
-      ).rejects.toThrow(
-        "Access to private or localhost IP addresses is not allowed for security reasons"
+      await expect(validate("https://10.0.0.5:8443/chat")).rejects.toThrow(
+        "Access to private or localhost IP addresses is not allowed for security reasons",
       );
     });
 
@@ -135,9 +131,9 @@ describe("createSSRFValidator()", () => {
     /** @scenario Cloud metadata endpoints are blocked even when BLOCK_LOCAL_HTTP_CALLS is <toggle> */
     it("blocks cloud metadata endpoints", async () => {
       await expect(
-        validate("http://169.254.169.254/latest/meta-data/")
+        validate("http://169.254.169.254/latest/meta-data/"),
       ).rejects.toThrow(
-        "Access to cloud metadata endpoints is not allowed for security reasons"
+        "Access to cloud metadata endpoints is not allowed for security reasons",
       );
     });
 
@@ -146,22 +142,22 @@ describe("createSSRFValidator()", () => {
       stubDnsResolve(["52.94.76.1"]);
 
       await expect(
-        validate("https://s3.amazonaws.com/my-bucket")
+        validate("https://s3.amazonaws.com/my-bucket"),
       ).rejects.toThrow(
-        "Access to cloud provider internal domains is not allowed for security reasons"
+        "Access to cloud provider internal domains is not allowed for security reasons",
       );
     });
 
     it("blocks non-http/https schemes like ftp:", async () => {
-      await expect(
-        validate("ftp://example.com/file.png")
-      ).rejects.toThrow(/Unsupported protocol: ftp:/);
+      await expect(validate("ftp://example.com/file.png")).rejects.toThrow(
+        /Unsupported protocol: ftp:/,
+      );
     });
 
     it("blocks non-http/https schemes like javascript:", async () => {
-      await expect(
-        validate("javascript:alert(1)")
-      ).rejects.toThrow(/Unsupported protocol: javascript:/);
+      await expect(validate("javascript:alert(1)")).rejects.toThrow(
+        /Unsupported protocol: javascript:/,
+      );
     });
   });
 
@@ -196,7 +192,7 @@ describe("createSSRFValidator()", () => {
       });
 
       await expect(
-        validate("http://169.254.169.254/latest/meta-data/")
+        validate("http://169.254.169.254/latest/meta-data/"),
       ).rejects.toThrow("cloud metadata endpoints");
     });
 

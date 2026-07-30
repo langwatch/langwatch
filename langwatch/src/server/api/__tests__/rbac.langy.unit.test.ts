@@ -10,10 +10,7 @@
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
-import {
-  organizationRoleHasPermission,
-  teamRoleHasPermission,
-} from "../rbac";
+import { organizationRoleHasPermission, teamRoleHasPermission } from "../rbac";
 
 const WRITE_PERMISSIONS = [
   "langy:create",
@@ -27,14 +24,15 @@ describe("Langy permissions", () => {
     // keeps Langy scarce — `release_langy_enabled` is — so the line is drawn
     // at "can this person act on the project", not at read-vs-write.
     /** @scenario "Below member, Langy is not granted at all" */
-    it.each(["langy:view", ...WRITE_PERMISSIONS, "langy:manage"] as const)(
-      "does not hold %s",
-      (permission) => {
-        expect(teamRoleHasPermission(TeamUserRole.VIEWER, permission)).toBe(
-          false,
-        );
-      },
-    );
+    it.each([
+      "langy:view",
+      ...WRITE_PERMISSIONS,
+      "langy:manage",
+    ] as const)("does not hold %s", (permission) => {
+      expect(teamRoleHasPermission(TeamUserRole.VIEWER, permission)).toBe(
+        false,
+      );
+    });
   });
 
   describe("given a project MEMBER", () => {
@@ -81,14 +79,14 @@ describe("Langy permissions", () => {
       ).toBe(true);
     });
 
-    it.each([OrganizationUserRole.MEMBER, OrganizationUserRole.EXTERNAL])(
-      "is not available to an organization %s",
-      (role) => {
-        // EXTERNAL is the lite-member tier; before Langy had its own
-        // permission family, membership alone let it enumerate the org's
-        // private repositories through langyGithub.listRepos.
-        expect(organizationRoleHasPermission(role, "langy:manage")).toBe(false);
-      },
-    );
+    it.each([
+      OrganizationUserRole.MEMBER,
+      OrganizationUserRole.EXTERNAL,
+    ])("is not available to an organization %s", (role) => {
+      // EXTERNAL is the lite-member tier; before Langy had its own
+      // permission family, membership alone let it enumerate the org's
+      // private repositories through langyGithub.listRepos.
+      expect(organizationRoleHasPermission(role, "langy:manage")).toBe(false);
+    });
   });
 });

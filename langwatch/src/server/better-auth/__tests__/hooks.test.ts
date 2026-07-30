@@ -270,7 +270,11 @@ describe("beforeAccountCreate", () => {
       await expect(
         beforeAccountCreate({
           prisma,
-          account: { userId: "user_1", providerId: "google", accountId: "sub-1" },
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
         }),
       ).rejects.toThrow("USER_DEACTIVATED");
     });

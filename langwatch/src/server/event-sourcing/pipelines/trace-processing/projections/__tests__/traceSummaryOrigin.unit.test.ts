@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary() langwatch.origin hoisting", () => {
   beforeEach(() => {
@@ -28,7 +31,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -84,7 +90,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: childSpan,
+      });
       state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
@@ -114,7 +123,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: childSpan,
+      });
       state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
@@ -153,7 +165,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: rootSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: rootSpan,
+      });
       state = applySpanToSummary({ state, span: evalChildSpan });
 
       expect(state.attributes["langwatch.origin"]).toBe("playground");
@@ -191,7 +206,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
@@ -218,7 +236,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: rootSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: rootSpan,
+      });
       state = applySpanToSummary({ state, span: childSpan });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
@@ -235,7 +256,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("workflow");
       expect(state.attributes["metadata.platform"]).toBeUndefined();
@@ -251,7 +275,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["metadata.platform"]).toBe("my-custom-platform");
     });
@@ -267,7 +294,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
       const labels = JSON.parse(
@@ -287,7 +317,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.labels"]).toBeUndefined();
     });
@@ -303,7 +336,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["metadata.environment"]).toBe("production");
       expect(state.attributes["langwatch.origin"]).toBe("workflow");
@@ -318,7 +354,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -332,7 +371,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
@@ -347,7 +389,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("workflow");
     });
@@ -362,7 +407,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
@@ -378,7 +426,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
@@ -393,7 +444,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -410,7 +464,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -422,7 +479,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
@@ -438,7 +498,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("application");
     });
@@ -452,7 +515,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
@@ -467,7 +533,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("evaluation");
     });
@@ -482,7 +551,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBe("simulation");
     });
@@ -494,7 +566,10 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
     });
@@ -525,7 +600,10 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
@@ -541,7 +619,10 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
     });
@@ -567,7 +648,10 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         },
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: childSpan,
+      });
       state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
@@ -581,7 +665,10 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         spanAttributes: {},
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["langwatch.origin.source"]).toBeUndefined();
     });
@@ -605,7 +692,10 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         spanAttributes: {},
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: childSpan,
+      });
       state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
@@ -634,7 +724,10 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         spanAttributes: {},
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: childSpan,
+      });
       // SDK heuristic no longer fires on child spans — origin stays unset
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
 
@@ -669,7 +762,10 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         },
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: childSpan,
+      });
       expect(state.attributes["langwatch.origin"]).toBeUndefined();
 
       state = applySpanToSummary({ state, span: platformSpan });
@@ -699,7 +795,10 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
         },
       });
 
-      let state = applySpanToSummary({ state: createInitState(), span: rootSpan });
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: rootSpan,
+      });
       expect(state.attributes["langwatch.origin"]).toBe("application");
 
       state = applySpanToSummary({ state, span: platformSpan });

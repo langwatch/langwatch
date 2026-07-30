@@ -1,5 +1,5 @@
-import { HStack, Text, chakra } from "@chakra-ui/react";
-import React from "react";
+import { chakra, HStack, Text } from "@chakra-ui/react";
+import type React from "react";
 
 interface ImpersonationBannerProps {
   user: {

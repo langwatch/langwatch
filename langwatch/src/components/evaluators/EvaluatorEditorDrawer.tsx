@@ -5,8 +5,8 @@ import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
 
 import {
-  type EvaluatorEditorDrawerProps,
   EvaluatorEditorBody,
+  type EvaluatorEditorDrawerProps,
   EvaluatorEditorFooter,
   EvaluatorEditorHeading,
   useEvaluatorEditorController,

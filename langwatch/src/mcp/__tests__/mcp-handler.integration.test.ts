@@ -17,8 +17,8 @@ import {
   describe,
   expect,
   it,
-  vi,
   type MockInstance,
+  vi,
 } from "vitest";
 import type { McpHandler } from "../handler";
 
@@ -239,9 +239,9 @@ async function sendRequest({
   if (
     path === "/mcp" &&
     (method === "POST" || method === "GET") &&
-    !fetchHeaders["accept"]
+    !fetchHeaders.accept
   ) {
-    fetchHeaders["accept"] = "text/event-stream, application/json";
+    fetchHeaders.accept = "text/event-stream, application/json";
   }
 
   const res = await fetch(url, {
@@ -541,138 +541,138 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       handler.clearRateLimiters();
     });
 
-  describe("when the token exchange omits redirect_uri", () => {
-    /** @scenario Token exchange is rejected when redirect_uri is missing */
-    it("returns 400 with invalid_request error", async () => {
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&client_id=${TEST_CLIENT_ID}`,
+    describe("when the token exchange omits redirect_uri", () => {
+      /** @scenario Token exchange is rejected when redirect_uri is missing */
+      it("returns 400 with invalid_request error", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&client_id=${TEST_CLIENT_ID}`,
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_request");
+        expect(body.error_description).toContain("redirect_uri is required");
       });
-
-      expect(res.status).toBe(400);
-      const body = await res.json();
-      expect(body.error).toBe("invalid_request");
-      expect(body.error_description).toContain("redirect_uri is required");
     });
-  });
 
-  describe("when the token exchange omits client_id", () => {
-    /** @scenario Token exchange is rejected when client_id is missing */
-    it("returns 400 with invalid_request error", async () => {
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&redirect_uri=${TEST_REDIRECT_URI}`,
+    describe("when the token exchange omits client_id", () => {
+      /** @scenario Token exchange is rejected when client_id is missing */
+      it("returns 400 with invalid_request error", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=authorization_code&code=${randomUUID()}&code_verifier=some-verifier&redirect_uri=${TEST_REDIRECT_URI}`,
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_request");
+        expect(body.error_description).toContain("client_id is required");
       });
-
-      expect(res.status).toBe(400);
-      const body = await res.json();
-      expect(body.error).toBe("invalid_request");
-      expect(body.error_description).toContain("client_id is required");
     });
-  });
 
-  describe("when the token exchange presents a different redirect_uri than the one bound at authorize", () => {
-    /** @scenario Token exchange is rejected when redirect_uri does not match the authorization request */
-    it("returns 400 with invalid_grant and never issues a token", async () => {
-      const code = randomUUID();
-      const { codeVerifier, codeChallenge } = createPkceChallenge();
-      mockAuthCodeInRedis({ code, codeChallenge });
+    describe("when the token exchange presents a different redirect_uri than the one bound at authorize", () => {
+      /** @scenario Token exchange is rejected when redirect_uri does not match the authorization request */
+      it("returns 400 with invalid_grant and never issues a token", async () => {
+        const code = randomUUID();
+        const { codeVerifier, codeChallenge } = createPkceChallenge();
+        mockAuthCodeInRedis({ code, codeChallenge });
 
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=https://attacker.invalid/callback&client_id=${TEST_CLIENT_ID}`,
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=https://attacker.invalid/callback&client_id=${TEST_CLIENT_ID}`,
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_grant");
+        expect(body.error_description).toContain("redirect_uri");
+        expect(body.access_token).toBeUndefined();
       });
-
-      expect(res.status).toBe(400);
-      const body = await res.json();
-      expect(body.error).toBe("invalid_grant");
-      expect(body.error_description).toContain("redirect_uri");
-      expect(body.access_token).toBeUndefined();
     });
-  });
 
-  describe("when the token exchange presents a different client_id than the one bound at authorize", () => {
-    /** @scenario Token exchange is rejected when client_id does not match the authorization request */
-    it("returns 400 with invalid_grant and never issues a token", async () => {
-      const code = randomUUID();
-      const { codeVerifier, codeChallenge } = createPkceChallenge();
-      mockAuthCodeInRedis({ code, codeChallenge });
+    describe("when the token exchange presents a different client_id than the one bound at authorize", () => {
+      /** @scenario Token exchange is rejected when client_id does not match the authorization request */
+      it("returns 400 with invalid_grant and never issues a token", async () => {
+        const code = randomUUID();
+        const { codeVerifier, codeChallenge } = createPkceChallenge();
+        mockAuthCodeInRedis({ code, codeChallenge });
 
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=mcp_someone_elses_client`,
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: `grant_type=authorization_code&code=${code}&code_verifier=${codeVerifier}&redirect_uri=${TEST_REDIRECT_URI}&client_id=mcp_someone_elses_client`,
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_grant");
+        expect(body.error_description).toContain("client_id");
+        expect(body.access_token).toBeUndefined();
       });
-
-      expect(res.status).toBe(400);
-      const body = await res.json();
-      expect(body.error).toBe("invalid_grant");
-      expect(body.error_description).toContain("client_id");
-      expect(body.access_token).toBeUndefined();
     });
-  });
 
-  // --- Security: dynamic client registration persistence (RFC 7591) ---
+    // --- Security: dynamic client registration persistence (RFC 7591) ---
 
-  describe("when a new OAuth client registers", () => {
-    /** @scenario Dynamic client registration persists the redirect_uris binding */
-    it("persists the client_id -> redirect_uris binding to Redis", async () => {
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const res = await fetch(`http://127.0.0.1:${port}/oauth/register`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          client_name: "test-client",
-          redirect_uris: ["https://registered.example/callback"],
-        }),
+    describe("when a new OAuth client registers", () => {
+      /** @scenario Dynamic client registration persists the redirect_uris binding */
+      it("persists the client_id -> redirect_uris binding to Redis", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/register`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            client_name: "test-client",
+            redirect_uris: ["https://registered.example/callback"],
+          }),
+        });
+
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.client_id).toMatch(/^mcp_/);
+
+        // The whole point: this registration must be durably retrievable by
+        // /mcp/authorize later, not just echoed back in this response.
+        expect(mockRedis.set).toHaveBeenCalledWith(
+          `mcp:oauth:client:${body.client_id}`,
+          JSON.stringify({
+            redirectUris: ["https://registered.example/callback"],
+            clientName: "test-client",
+          }),
+          "EX",
+          expect.any(Number),
+        );
       });
-
-      expect(res.status).toBe(201);
-      const body = await res.json();
-      expect(body.client_id).toMatch(/^mcp_/);
-
-      // The whole point: this registration must be durably retrievable by
-      // /mcp/authorize later, not just echoed back in this response.
-      expect(mockRedis.set).toHaveBeenCalledWith(
-        `mcp:oauth:client:${body.client_id}`,
-        JSON.stringify({
-          redirectUris: ["https://registered.example/callback"],
-          clientName: "test-client",
-        }),
-        "EX",
-        expect.any(Number),
-      );
     });
-  });
 
-  describe("when OAuth client registration is missing redirect_uris", () => {
-    /** @scenario Dynamic client registration rejects a request with no redirect_uris */
-    it("returns 400 with invalid_client_metadata", async () => {
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const res = await fetch(`http://127.0.0.1:${port}/oauth/register`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ client_name: "test-client" }),
+    describe("when OAuth client registration is missing redirect_uris", () => {
+      /** @scenario Dynamic client registration rejects a request with no redirect_uris */
+      it("returns 400 with invalid_client_metadata", async () => {
+        const addr = server.address();
+        const port = typeof addr === "object" && addr ? addr.port : 0;
+        const res = await fetch(`http://127.0.0.1:${port}/oauth/register`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ client_name: "test-client" }),
+        });
+
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toBe("invalid_client_metadata");
       });
-
-      expect(res.status).toBe(400);
-      const body = await res.json();
-      expect(body.error).toBe("invalid_client_metadata");
     });
-  });
   }); // end "OAuth security: redirect_uri/client_id binding + registration"
 
   // --- Bearer Token DB Validation ---
@@ -1042,10 +1042,13 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       // from the main app (~/server/db, ~/server/redis, etc.)
       const fs = await import("node:fs");
       const path = await import("node:path");
-      const mcpServerDir = path.resolve(__dirname, "../../../../mcp-server/src");
+      const mcpServerDir = path.resolve(
+        __dirname,
+        "../../../../mcp-server/src",
+      );
       const createMcpServerSrc = fs.readFileSync(
         path.join(mcpServerDir, "create-mcp-server.ts"),
-        "utf-8"
+        "utf-8",
       );
       // Should not import from the main app
       expect(createMcpServerSrc).not.toContain("~/server/");
@@ -1330,7 +1333,9 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
           method: "tools/call",
           params: {
             name: "fetch_langwatch_docs",
-            arguments: { url: "https://langwatch.ai/docs/integration/overview.md" },
+            arguments: {
+              url: "https://langwatch.ai/docs/integration/overview.md",
+            },
           },
         },
         headers: {
@@ -1389,9 +1394,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       // Parse SSE stream to get the endpoint event with session URL
       const sseBody = sseChunks.join("");
-      const endpointMatch = sseBody.match(
-        /event:\s*endpoint\ndata:\s*(.+)/,
-      );
+      const endpointMatch = sseBody.match(/event:\s*endpoint\ndata:\s*(.+)/);
       expect(endpointMatch).toBeTruthy();
 
       const messagesPath = endpointMatch![1]!.trim();

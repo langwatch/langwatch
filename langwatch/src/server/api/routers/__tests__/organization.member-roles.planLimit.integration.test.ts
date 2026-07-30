@@ -19,16 +19,16 @@ import {
   it,
   vi,
 } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import {
+  type PlanProvider,
+  PlanProviderService,
+} from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
+import { LICENSE_LIMIT_ERRORS } from "../../../license-enforcement/license-limit-guard";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "~/server/app-layer/presets";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
-import {
-  PlanProviderService,
-  type PlanProvider,
-} from "~/server/app-layer/subscription/plan-provider";
-import { LICENSE_LIMIT_ERRORS } from "../../../license-enforcement/license-limit-guard";
 
 // Skip when running with testcontainers only (no PostgreSQL)
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;

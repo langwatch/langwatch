@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -21,7 +21,7 @@ export const setModelProviderCommand = async (
   provider: string,
   options: { enabled?: boolean; apiKey?: string; defaultModel?: string },
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new ModelProvidersApiService();
   const spinner = createSpinner(`Configuring model provider "${provider}"...`).start();

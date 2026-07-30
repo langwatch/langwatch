@@ -370,8 +370,75 @@ function fallbackNamedTrace(): readonly FoldEvent[] {
   ];
 }
 
+/**
+ * The Path-B shape: a Claude Code / Codex trace whose first signals are LOG
+ * RECORDS, with a span turning up only later (or, for most such traces, never).
+ *
+ * This is the sequence the storage anchor exists for (ADR-071 step 3). It puts
+ * two fields under the equivalence property that the span-led sequences cannot:
+ * the anchor `OccurredAt` carries — which for this trace is a log's time, and
+ * must come back frozen rather than re-derived from whatever folds next — and
+ * the span timing baseline in `EarliestSpanStartMs`, which is 0 across the whole
+ * log-only prefix and must NOT be confused with the anchor on the way back.
+ */
+function logLedTrace(): readonly FoldEvent[] {
+  const logRecord = (index: number, occurredAt: number): FoldEvent =>
+    traceEvent({
+      id: `evt-ll-log-${index}`,
+      type: "lw.obs.trace.log_record_received",
+      occurredAt,
+      data: {
+        traceId: TRACE_ID,
+        spanId: `ffff00000000000${index}`,
+        timeUnixMs: occurredAt,
+        severityNumber: 9,
+        severityText: "INFO",
+        body: "api_request",
+        attributes: {},
+        resourceAttributes: {},
+        scopeName: "com.anthropic.claude_code",
+        scopeVersion: null,
+        piiRedactionLevel: "DISABLED",
+      },
+    });
+
+  return [
+    logRecord(1, BASE_MS + 1000),
+    logRecord(2, BASE_MS + 1500),
+    traceEvent({
+      id: "evt-ll-topic",
+      type: "lw.obs.trace.topic_assigned",
+      occurredAt: BASE_MS + 1800,
+      data: {
+        topicId: "topic-3",
+        topicName: "Coding",
+        subtopicId: null,
+        subtopicName: null,
+        isIncremental: false,
+      },
+    }),
+    logRecord(3, BASE_MS + 2000),
+    // A span finally arrives, and starts BEFORE every log — so the timing
+    // baseline lands earlier than the anchor, which stays put.
+    spanEvent({
+      eventId: "evt-ll-span",
+      spanId: "ffff0000000000ff",
+      parentSpanId: null,
+      name: "agent-run",
+      startMs: BASE_MS + 200,
+      endMs: BASE_MS + 2500,
+      attributes: {
+        "langwatch.span.type": "agent",
+        "gen_ai.usage.output_tokens": 40,
+      },
+    }),
+    logRecord(4, BASE_MS + 3000),
+  ];
+}
+
 const LIFECYCLE = renamedBeforeRootTrace();
 const FALLBACK_LIFECYCLE = fallbackNamedTrace();
+const LOG_LED_LIFECYCLE = logLedTrace();
 
 /**
  * The two orderings differ in which name-resolution latch is load-bearing — the
@@ -387,6 +454,10 @@ const SEQUENCES = [
   {
     name: "a trace left fallback-named until its root span arrived",
     events: FALLBACK_LIFECYCLE,
+  },
+  {
+    name: "a trace whose first signals are log records, with a span arriving late",
+    events: LOG_LED_LIFECYCLE,
   },
 ];
 
@@ -408,22 +479,64 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
   });
 
   describe.each(SEQUENCES)("given $name", ({ events }) => {
-    describe.each(splitPointsOf(events))(
-      "when the fold is interrupted after event %i and resumed from the committed row",
-      (splitAt) => {
-        const before = events.slice(0, splitAt);
-        const after = events.slice(splitAt);
+    describe.each(
+      splitPointsOf(events),
+    )("when the fold is interrupted after event %i and resumed from the committed row", (splitAt) => {
+      const before = events.slice(0, splitAt);
+      const after = events.slice(splitAt);
 
-        it("reaches the same row as the fold that never lost its state", () => {
-          const committed = foldAll(before, projection.init());
+      /** @scenario a fold whose stored row is a slimmed analytics summary still recovers its working state */
+      it("reaches the same row as the fold that never lost its state", () => {
+        const committed = foldAll(before, projection.init());
 
-          const uninterrupted = foldAll(after, committed);
-          const resumed = foldAll(after, roundTrip(committed));
+        const uninterrupted = foldAll(after, committed);
+        const resumed = foldAll(after, roundTrip(committed));
 
-          expect(project(resumed)).toEqual(project(uninterrupted));
-        });
-      },
+        expect(project(resumed)).toEqual(project(uninterrupted));
+      });
+    });
+  });
+
+  /**
+   * The storage anchor and the span timing baseline, called out by name.
+   *
+   * The property above already compares every column, so this adds no coverage
+   * — it adds a NAME. These two fields are one column apart and mean opposite
+   * things (a frozen storage address vs. a value that moves as earlier spans
+   * land), so a decoder that swaps them fails a test that says which is which,
+   * instead of one that says "some column differs".
+   */
+  describe("given the log-led trace interrupted before its span arrives", () => {
+    const splitAt = LOG_LED_LIFECYCLE.length - 2;
+    const committed = foldAll(
+      LOG_LED_LIFECYCLE.slice(0, splitAt),
+      projection.init(),
     );
+    const rest = LOG_LED_LIFECYCLE.slice(splitAt);
+
+    /** @scenario "A log-led trace resumed from its committed row keeps its anchor and its timing" */
+    it("resumes with the anchor its first log froze", () => {
+      const uninterrupted = foldAll(rest, committed);
+      const resumed = foldAll(rest, roundTrip(committed));
+
+      expect(resumed.storageAnchorMs).toBe(uninterrupted.storageAnchorMs);
+      expect(project(resumed).occurredAtMs).toBe(
+        project(committed).occurredAtMs,
+      );
+    });
+
+    /** @scenario "A log-led trace resumed from its committed row keeps its anchor and its timing" */
+    it("resumes with the same timing baseline the late span sets", () => {
+      const uninterrupted = foldAll(rest, committed);
+      const resumed = foldAll(rest, roundTrip(committed));
+
+      // The span in the tail starts BEFORE every log, so this is also the case
+      // where the baseline ends up earlier than the anchor — decoding one from
+      // the other's column would be visible here.
+      expect(resumed.occurredAt).toBe(uninterrupted.occurredAt);
+      expect(resumed.occurredAt).toBeLessThan(resumed.storageAnchorMs);
+      expect(resumed.totalDurationMs).toBe(uninterrupted.totalDurationMs);
+    });
   });
 
   describe("given the fallback-named trace folded without interruption", () => {
@@ -482,8 +595,10 @@ describe("traceAnalytics fold-equivalence across the read-back boundary", () => 
    * the OLD 256-char boundary (~300 chars of JSON): it is the case that used to
    * fail, so it stays here as the regression guard. It does NOT exercise the
    * 4096-char metadata cap — past that, truncation still breaks the JSON and
-   * resets the union, and the durable fix is a typed column with an element cap
-   * as `AnnotationIds` has.
+   * resets the union, and the durable fix is a typed column with an element
+   * cap. Nothing on this row is that today: `AnnotationIds` is an uncapped
+   * `Array(String)` the fold appends to without bound, so it is a second
+   * instance of the debt rather than the pattern to follow.
    */
   describe("given a trace whose accumulated prompt ids outgrow the attribute cap", () => {
     const promptSpans = Array.from({ length: 9 }, (_, index) =>
@@ -620,6 +735,7 @@ const TRACE_STATE_DISPOSITION = {
   subTopicId: "restored",
   traceName: "restored",
   models: "restored",
+  storageAnchorMs: "restored",
   occurredAt: "restored",
   totalDurationMs: "restored",
   totalCost: "restored",
@@ -648,13 +764,13 @@ describe("traceAnalytics read-back field coverage", () => {
     const state = foldAll(FALLBACK_LIFECYCLE.slice(0, 3), projection.init());
     const decoded = roundTrip(state);
 
-    it.each(["traceNameFromFallback", "rootMetadataFromFallback"] as const)(
-      "restores %s while it is still set",
-      (field) => {
-        expect(state[field]).toBe(true);
-        expect(decoded[field]).toBe(true);
-      },
-    );
+    it.each([
+      "traceNameFromFallback",
+      "rootMetadataFromFallback",
+    ] as const)("restores %s while it is still set", (field) => {
+      expect(state[field]).toBe(true);
+      expect(decoded[field]).toBe(true);
+    });
   });
 
   describe("given a state folded from the full event sequence", () => {
@@ -692,12 +808,12 @@ describe("traceAnalytics read-back field coverage", () => {
       });
 
       it("carries the read-modify-write accumulators back untouched", () => {
-        expect(
-          decoded.attributes["langwatch.reserved.cache_read_tokens"],
-        ).toBe("750");
-        expect(
-          decoded.attributes["langwatch.reserved.log_record_count"],
-        ).toBe("1");
+        expect(decoded.attributes["langwatch.reserved.cache_read_tokens"]).toBe(
+          "750",
+        );
+        expect(decoded.attributes["langwatch.reserved.log_record_count"]).toBe(
+          "1",
+        );
       });
 
       it("hands back the capped metadata value, not the original", () => {

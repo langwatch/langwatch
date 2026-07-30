@@ -180,7 +180,10 @@ describe("billingMeterDispatchReactor", () => {
         getDispatch: () => mockDispatch,
       });
 
-      await reactor.handle(makeEvent("orphan-proj"), makeContext("orphan-proj"));
+      await reactor.handle(
+        makeEvent("orphan-proj"),
+        makeContext("orphan-proj"),
+      );
 
       expect(mockLoggerWarn).toHaveBeenCalledWith(
         { projectId: "orphan-proj" },
@@ -196,7 +199,9 @@ describe("billingMeterDispatchReactor", () => {
         team: { organizationId: "org-1" },
       });
 
-      const mockDispatch = vi.fn().mockRejectedValue(new Error("command dispatch failed"));
+      const mockDispatch = vi
+        .fn()
+        .mockRejectedValue(new Error("command dispatch failed"));
 
       const { createBillingMeterDispatchReactor } = await import(
         "../billingMeterDispatch.reactor"

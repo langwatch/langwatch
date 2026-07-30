@@ -1,17 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
-
-import { StateAccumulator } from "../replayExecutor";
-import { StateProjectionExecutor } from "../../projections/stateProjectionExecutor";
+import { describe, expect, it, vi } from "vitest";
+import type { ResolvedRetention } from "../../../data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
+import { createTenantId } from "../../domain/tenantId";
+import type { Event } from "../../domain/types";
+import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
   StoredProjection,
 } from "../../projections/stateProjection.types";
-import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
-import { createTenantId } from "../../domain/tenantId";
-import type { Event } from "../../domain/types";
-import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
-import type { ResolvedRetention } from "../../../data-retention/retentionPolicy.schema";
+import { StateProjectionExecutor } from "../../projections/stateProjectionExecutor";
+import { StateAccumulator } from "../replayExecutor";
 
 interface CounterState {
   count: number;

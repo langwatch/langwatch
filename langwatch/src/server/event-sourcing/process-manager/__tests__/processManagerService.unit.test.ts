@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { JsonSafetyError } from "../json";
-import { ProcessManagerService } from "../processManagerService";
 import type { ProcessDefinition, ProcessRef } from "../processManager.types";
+import { ProcessManagerService } from "../processManagerService";
 import { InMemoryProcessStore } from "../stores/inMemoryProcessStore";
 import {
   CONVERSATION_ID,
   LIVENESS_MS,
+  type PilotState,
   pilotDefinition,
   pilotEvent,
   pilotRef,
   RETRY_WINDOW_MS,
   T0,
-  type PilotState,
 } from "./helpers/pilotProcess.fixture";
 
 describe("ProcessManagerService", () => {

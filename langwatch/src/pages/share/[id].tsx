@@ -1,5 +1,17 @@
-import { Alert, Box, Center, Spinner, Text } from "@chakra-ui/react";
+import {
+  Alert,
+  Box,
+  Button,
+  Center,
+  Separator,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Link2Off } from "lucide-react";
 import { useMemo } from "react";
+import { Link } from "~/components/ui/link";
+import { HandledErrorState } from "~/features/errors";
 import { TraceDrawerContent } from "~/features/traces-v2/components/TraceDrawer/TraceDrawerContent";
 import {
   SharedTraceProvider,
@@ -38,7 +50,10 @@ function SharedTraceView() {
   if (!trace) {
     return (
       <Center flex={1} padding={8}>
-        <Text color="fg.muted">This trace could not be loaded.</Text>
+        <Text color="fg.muted">
+          This shared trace didn&apos;t load. Refresh the page, or ask whoever
+          shared it for a new link.
+        </Text>
       </Center>
     );
   }
@@ -82,6 +97,42 @@ function SharedTraceView() {
   );
 }
 
+/**
+ * The way forward from a dead share link.
+ *
+ * This is the only screen in the product whose visitor is, by definition, not
+ * a customer — someone was shown a trace and the link had already gone. They
+ * arrived curious and the page has nothing for them, which is a poor use of
+ * the one visit we get. So under the explanation there is an invitation:
+ * what this thing is, and a way in.
+ *
+ * Deliberately quiet — a separator, one line, one primary action and a
+ * sign-in link for people who already have an account and simply weren't
+ * signed in. It sits BELOW the error, never in place of it: the first job of
+ * the page is still to say what happened.
+ */
+function SharePageSignUpInvitation() {
+  return (
+    <VStack gap={3} width="full" paddingTop={2}>
+      <Separator />
+      <Text fontSize="14px" color="fg.muted" maxWidth="420px">
+        LangWatch shows you what your AI agents actually did — every call, its
+        cost, and where it went wrong.
+      </Text>
+      <VStack gap={2}>
+        <Link href="/auth/signup">
+          <Button colorPalette="orange">Create a free account</Button>
+        </Link>
+        <Link href="/auth/signin">
+          <Text fontSize="13px" color="fg.muted" textDecoration="underline">
+            Already have an account?
+          </Text>
+        </Link>
+      </VStack>
+    </VStack>
+  );
+}
+
 export default function SharePage() {
   const router = useRouter();
   const token = typeof router.query.id === "string" ? router.query.id : "";
@@ -105,14 +156,27 @@ export default function SharePage() {
   );
 
   if (shared.isError) {
+    // The one surface whose reader has no account, no navigation and no other
+    // support channel — so it gets the full state, not a flattened sentence:
+    // the registry's remediation, the docs link and the error id they can quote
+    // back. Every code reachable here (`share_link_not_found` / `_forbidden` /
+    // `_expired` / `_exhausted`, `share_read_rate_limited`) is written for a
+    // recipient who did nothing wrong, and none of them discloses whether a
+    // trace exists or who owns it — the server collapses those cases into one
+    // code on purpose (see app-layer/share/errors.ts).
+    //
+    // And it is the only screen in the product whose visitor is, by
+    // definition, not a customer yet. A dead link is a bad first impression on
+    // its own; a dead link with nothing beyond it wastes the only visit we get.
+    // So the way forward from here is an invitation, not just an apology.
     return (
-      <Center height="100vh" padding={8}>
-        <Text color="fg.muted">
-          {shared.error instanceof Error
-            ? shared.error.message
-            : "This share link is not available."}
-        </Text>
-      </Center>
+      <HandledErrorState
+        error={shared.error}
+        fallbackTitle="This share link isn't available"
+        icon={<Link2Off size={44} strokeWidth={1.5} />}
+      >
+        <SharePageSignUpInvitation />
+      </HandledErrorState>
     );
   }
 

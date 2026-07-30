@@ -15,7 +15,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeysSection } from "../ApiKeysSection";
@@ -70,7 +76,9 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
-      orgMembers: { useQuery: () => ({ data: [{ id: "u-1" }], isLoading: false }) },
+      orgMembers: {
+        useQuery: () => ({ data: [{ id: "u-1" }], isLoading: false }),
+      },
       create: {
         useMutation: () => ({
           mutate: vi.fn(),
@@ -160,7 +168,12 @@ vi.mock("~/components/ui/toaster", () => ({
 function makeKey(
   id: string,
   name: string,
-  roleBindings: Array<{ scopeType: string; scopeId: string; role?: string; scopeName?: string }>,
+  roleBindings: Array<{
+    scopeType: string;
+    scopeId: string;
+    role?: string;
+    scopeName?: string;
+  }>,
 ) {
   return {
     id,
@@ -380,7 +393,9 @@ describe("<ApiKeysSection /> scope filter", () => {
           expect(screen.getByText("Project Alpha Key")).toBeInTheDocument();
           // sibling team and its project are hidden
           expect(screen.queryByText("Team Blue Key")).not.toBeInTheDocument();
-          expect(screen.queryByText("Project Beta Key")).not.toBeInTheDocument();
+          expect(
+            screen.queryByText("Project Beta Key"),
+          ).not.toBeInTheDocument();
         });
       });
     });
@@ -417,9 +432,7 @@ describe("<ApiKeysSection /> scope filter", () => {
             screen.queryByText("Project Beta Key"),
           ).not.toBeInTheDocument();
           // unrelated team is hidden
-          expect(
-            screen.queryByText("Team Blue Key"),
-          ).not.toBeInTheDocument();
+          expect(screen.queryByText("Team Blue Key")).not.toBeInTheDocument();
         });
       });
     });
@@ -485,9 +498,7 @@ describe("<ApiKeysSection /> scope filter", () => {
           // PROJ_ALPHA_KEY has proj-1 binding only.
           // Filtering to proj-2 means: org parents + team-2 + proj-2 are visible.
           // proj-1 binding doesn't match any of those → no keys visible.
-          expect(
-            screen.getByText(/no keys match/i),
-          ).toBeInTheDocument();
+          expect(screen.getByText(/no keys match/i)).toBeInTheDocument();
         });
 
         // No "Show all" reset link — user must use the dropdown to reset

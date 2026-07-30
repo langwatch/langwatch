@@ -69,13 +69,3 @@ export const LANGY_LIVENESS = {
    */
   HEARTBEAT_GRACE_MS: 30_000,
 } as const;
-
-export const LANGY_WORKER = {
-  /**
-   * How many manager `/chat` calls one control-plane worker makes concurrently.
-   * This is NOT the hard capacity gate — that stays the manager's
-   * `ErrMaxWorkers` → "at-capacity". This only bounds in-flight bridging work
-   * per control-plane worker (ADR-044 part 1).
-   */
-  CONCURRENCY: 8,
-} as const;

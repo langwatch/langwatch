@@ -57,5 +57,7 @@ export function getOriginColor(origin: string): {
  */
 export function getOriginLabel(origin: string): string {
   if (!origin) return "";
-  return ORIGIN_LABELS[origin] ?? origin.charAt(0).toUpperCase() + origin.slice(1);
+  return (
+    ORIGIN_LABELS[origin] ?? origin.charAt(0).toUpperCase() + origin.slice(1)
+  );
 }

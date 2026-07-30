@@ -1,6 +1,6 @@
+import { HandledError } from "@langwatch/handled-error";
 import { APICallError, RetryError } from "ai";
 import { describe, expect, it } from "vitest";
-import { HandledError } from "@langwatch/handled-error";
 import { isAbortLikeError, nlpgoHandledErrorFrom } from "../goHandledError";
 
 /** The exact envelope nlpgo returned for an unroutable provider prefix. */
@@ -100,9 +100,9 @@ describe("isAbortLikeError()", () => {
   it("matches a DOMException abort by name (the AbortSignal.timeout reason shape)", () => {
     // A DOMException is NOT instanceof Error in this runtime — the exact quirk
     // the helper matches on `name` to guard against.
-    expect(isAbortLikeError(new DOMException("timed out", "TimeoutError"))).toBe(
-      true,
-    );
+    expect(
+      isAbortLikeError(new DOMException("timed out", "TimeoutError")),
+    ).toBe(true);
     expect(isAbortLikeError(new DOMException("aborted", "AbortError"))).toBe(
       true,
     );

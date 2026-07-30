@@ -1,9 +1,10 @@
 /** @vitest-environment node */
+
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import { describe, expect, it, vi } from "vitest";
 import type { TenantId } from "../../../domain/tenantId";
 import { orderEvents } from "../../../projections/stateProjectionExecutor";
 import { AcceptAgentTurnCommand } from "../commands";
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 
 const TENANT = "project-1";
 const CONVERSATION = "conv-1";

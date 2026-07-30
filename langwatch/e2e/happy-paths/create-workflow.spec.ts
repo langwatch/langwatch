@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
 
 test.use({
   storageState: "./e2e/auth.json",
@@ -8,7 +8,7 @@ test.use({
 
 test.setTimeout(120000);
 
-export const createWorkflow = async (page: Page) => {
+const createWorkflow = async (page: Page) => {
   await page.goto("http://localhost:5560/fyes-lT_hZ2");
   await page.getByRole("link", { name: "Workflows" }).click();
   await page.getByTestId("active-create-new-workflow-button").click();

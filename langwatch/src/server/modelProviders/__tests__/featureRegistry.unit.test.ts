@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   allFeatures,
   assertUniqueFeatureKeys,
+  type FeatureDescriptor,
   featureByKey,
   featuresByRole,
-  type FeatureDescriptor,
 } from "../featureRegistry";
 
 describe("feature registry", () => {

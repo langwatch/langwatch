@@ -33,7 +33,7 @@ export function getSafeColumnName(
 
   // Generate a unique name by trying different suffixes
   let candidate = columnName;
-  let suffix = "_";
+  const suffix = "_";
   let counter = 0;
 
   while (isReservedColumnName(candidate) || existingNames.has(candidate)) {

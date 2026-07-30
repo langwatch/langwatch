@@ -8,10 +8,11 @@
  * handler cannot kill the loop — by EXECUTING the code path, not asserting on
  * strings.
  */
+
+import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { createLogger } from "@langwatch/observability";
 import { getTestProject } from "~/utils/testUtils";
 import { PrismaScheduledJobRepository } from "../scheduled-job.repository";
 import { SchedulerRegistry } from "../scheduler.registry";

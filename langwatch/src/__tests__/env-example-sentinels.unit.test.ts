@@ -57,7 +57,10 @@ describe("langwatch/.env.example", () => {
     /** @scenario .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER */
     it("declares a non-empty sentinel value for LW_VIRTUAL_KEY_PEPPER", () => {
       const value = getSentinelValue("LW_VIRTUAL_KEY_PEPPER");
-      expect(value, "LW_VIRTUAL_KEY_PEPPER must have a sentinel value").not.toBeNull();
+      expect(
+        value,
+        "LW_VIRTUAL_KEY_PEPPER must have a sentinel value",
+      ).not.toBeNull();
       expect(
         value!.length,
         "LW_VIRTUAL_KEY_PEPPER sentinel must be non-empty",
@@ -67,7 +70,10 @@ describe("langwatch/.env.example", () => {
     /** @scenario .env.example ships a sentinel placeholder for LW_GATEWAY_INTERNAL_SECRET */
     it("declares a non-empty sentinel value for LW_GATEWAY_INTERNAL_SECRET", () => {
       const value = getSentinelValue("LW_GATEWAY_INTERNAL_SECRET");
-      expect(value, "LW_GATEWAY_INTERNAL_SECRET must have a sentinel value").not.toBeNull();
+      expect(
+        value,
+        "LW_GATEWAY_INTERNAL_SECRET must have a sentinel value",
+      ).not.toBeNull();
       expect(
         value!.length,
         "LW_GATEWAY_INTERNAL_SECRET sentinel must be non-empty",
@@ -77,7 +83,10 @@ describe("langwatch/.env.example", () => {
     /** @scenario .env.example ships a sentinel placeholder for LW_GATEWAY_JWT_SECRET */
     it("declares a non-empty sentinel value for LW_GATEWAY_JWT_SECRET", () => {
       const value = getSentinelValue("LW_GATEWAY_JWT_SECRET");
-      expect(value, "LW_GATEWAY_JWT_SECRET must have a sentinel value").not.toBeNull();
+      expect(
+        value,
+        "LW_GATEWAY_JWT_SECRET must have a sentinel value",
+      ).not.toBeNull();
       expect(
         value!.length,
         "LW_GATEWAY_JWT_SECRET sentinel must be non-empty",

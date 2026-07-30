@@ -3,10 +3,10 @@ import { ArrowUpRight, Crown } from "lucide-react";
 import { LangyCard } from "~/features/asaplangy";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePlanManagementUrl } from "~/hooks/usePlanManagementUrl";
-import { trackEvent } from "~/utils/tracking";
 import { useRouter } from "~/utils/compat/next-router";
-import { useLangyStore } from "../stores/langyStore";
+import { trackEvent } from "~/utils/tracking";
 import type { LangyToolErrorPresentation } from "../logic/langyToolFailure";
+import { useLangyStore } from "../stores/langyStore";
 
 /**
  * A step that couldn't run because the plan ran out — and the way to change it.

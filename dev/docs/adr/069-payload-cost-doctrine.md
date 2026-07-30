@@ -6,6 +6,8 @@
 
 **Shipping with this ADR (phase 1):** enqueue-time filtering on the event-subscriber contract, adopted by the coding-agent span-facts subscriber — the deferred ADR-066 scope-table item ("move the coding-agent-name gate before enqueue"), shipped. The enqueue-time *projection* that would also lift the derived slice at the seam is deliberately deferred to phase 2 (see Sequencing for why the seam is the wrong place for it). Phases 2–4 are sequenced follow-ups (below), not built here.
 
+**Also shipped, out of phase order:** the seam grew a second hook, `stage`, and the coding-agent span-facts subscriber now travels as a claim-check rather than carrying the matched span whole — the claim-check half of phase 2, landed early. It arrived stacked onto this ADR's PR rather than after it, so the Sequencing section below does not read in shipping order on its own. **Read the 2026-07 amendment at the end before treating anything in phase 2 as unbuilt**; it states precisely which half shipped and which did not.
+
 **Builds on:** [ADR-066](./066-projection-clickhouse-cached-store.md) — the same economics, one plane over. ADR-066 took `event_log` off the per-item hot path; this ADR takes bulk payloads off the per-item *scheduling* plane. Its scope table already named this ADR's phase 1 and deferred it.
 
 **Sibling doctrine:** [ADR-068](./068-windowed-clickhouse-reads.md) — 068's discipline is *measure before you limit*: a fallback cannot be rate-limited while it is invisible. This ADR is the memory-plane statement of the same discipline: a scheduler cannot budget a cost that is not declared. Both replace "hope, then get killed" with "see, then bound".
@@ -241,7 +243,11 @@ in-flight and retry stages (invariant 2), and the grant pool behind it (phase 3)
 statement of what is left. A future phase-2 implementer should read this as "the
 reference mechanism exists and has one adopter", not as "phase 2 is underway".
 
-Two consequences worth naming rather than discovering:
+Three consequences worth naming rather than discovering:
+
+- **A build that predates the type drops the reference silently.** `span_referenced` is a new event type, so a pre-#6117 worker draining a job staged by a new one fails its `span_received` type check, returns, and **completes the job**. No throw, no drop counter, no log — the span facts for that event are simply gone. The version gate does not help: it protects a build that already knows the type against a *future* version, not a build that has never heard of it. #6117 was written to be deployed consumer-first for exactly this reason, and then merged stacked onto #6111, so both halves shipped in one commit and the protection was lost. **Any future adopter of `stage` must ship the consumer half at least one release ahead of the producer half** — the one-release consumer-first deploy is the mechanism, and it only works if the two halves ship apart.
+
+  **Decided (2026-07-28): this adopter is NOT retrofitted with a producer flag.** For the hosted fleet the window has already passed — #6111/#6117 are merged and deployed. The exposure that remains is a **self-hosted upgrade crossing the #6117 boundary in one step**, where coding-agent span facts landing on a not-yet-restarted worker are lost silently. Accepted, and recorded here so it is not rediscovered.
 
 - **Span-facts delivery is now store-dependent.** The subscriber was previously
   self-contained: everything it needed was in the job. It now depends on the

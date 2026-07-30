@@ -2,23 +2,23 @@ import type { Cluster, Redis as IORedis } from "ioredis";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import {
+  BLOB_OPERATOR_DELETE_LUA,
+  type BlobDeleteOutcome,
+} from "~/server/event-sourcing/queues/groupQueue/blobDeleteLua";
+import {
   blobHolderSetKey,
   blobLeaseSetKey,
   redisBlobKey,
   redisBlobKeyPrefix,
 } from "~/server/event-sourcing/queues/groupQueue/blobKeys";
 import {
-  BLOB_OPERATOR_DELETE_LUA,
-  type BlobDeleteOutcome,
-} from "~/server/event-sourcing/queues/groupQueue/blobDeleteLua";
+  BlobSweeper,
+  type BlobSweepReport,
+} from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
 import {
   BLOB_SWEEP_LUA,
   type BlobSweepOutcome,
 } from "~/server/event-sourcing/queues/groupQueue/blobSweepLua";
-import {
-  type BlobSweepReport,
-  BlobSweeper,
-} from "~/server/event-sourcing/queues/groupQueue/blobSweeper";
 import {
   CachedLuaScript,
   isNoScriptResult,
@@ -187,7 +187,9 @@ export class BlobStoreRedisRepository implements BlobStoreRepository {
     return {
       facts: await this.describe(queueName, keys.slice(0, pageSize)),
       nextCursor:
-        Object.keys(nextCursors).length > 0 ? JSON.stringify(nextCursors) : null,
+        Object.keys(nextCursors).length > 0
+          ? JSON.stringify(nextCursors)
+          : null,
     };
   }
 

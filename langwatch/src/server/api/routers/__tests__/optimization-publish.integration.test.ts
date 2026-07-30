@@ -19,7 +19,7 @@ async function waitForEvaluator(
   workflowId: string,
   projectId: string,
   maxAttempts = 3,
-  delayMs = 50
+  delayMs = 50,
 ) {
   for (let i = 0; i < maxAttempts; i++) {
     const evaluator = await prisma.evaluator.findFirst({

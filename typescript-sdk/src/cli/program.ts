@@ -71,14 +71,30 @@ const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boole
   return pushCommandImpl(options);
 };
 
-export function buildProgram(): Command {
+/**
+ * The name to title usage, help and commander errors with.
+ *
+ * The package ships two bin names for the same bundle (see package.json): `lw`
+ * (the advertised name) and `langwatch` (the long-standing alias). Whichever
+ * one was invoked is the one the caller must be shown.
+ *
+ * `bin` is the CALLER's `process.argv[1]`, which is only distinct from this
+ * process's when the program is built inside the daemon — one daemon serves
+ * both bins (`resolveBuildId` stats the same symlink target either way), so its
+ * own argv[1] is whichever bin happened to spawn it and is a coin flip for
+ * everybody else. Absent, this falls back to the running process's argv, which
+ * is correct for every in-process invocation.
+ */
+function resolveProgramName(bin: string | undefined): string {
+  const invoked = (bin ?? process.argv[1] ?? "").split(/[\\/]/).pop();
+  return invoked === "lw" ? "lw" : "langwatch";
+}
+
+export function buildProgram({ bin }: { bin?: string } = {}): Command {
   const program = new Command();
 
   program
-    // The package ships two bin names for the same bundle (see package.json):
-    // `lw` (the advertised name) and `langwatch` (the long-standing alias).
-    // Reflect whichever one was invoked in usage/help lines.
-    .name(process.argv[1]?.split(/[\\/]/).pop() === "lw" ? "lw" : "langwatch")
+    .name(resolveProgramName(bin))
     .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, suites, and more")
     .version(__CLI_VERSION__, "-v, --version", "Display the current version")
     .enablePositionalOptions()
@@ -122,29 +138,35 @@ export function buildProgram(): Command {
   // Top-level commands
   const loginCmd = program
     .command("login")
-    .description(
-      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). For CI/agents pass --device, --project, --api-key, or --token to skip prompts.",
+    // The summary is what the top-level `langwatch --help` listing shows;
+    // the description is what `langwatch login --help` itself opens with,
+    // where pointing at `login --help` would be circular.
+    .summary(
+      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK). Check login --help for more options.",
     )
-    .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key) — writes to .env")
+    .description(
+      "Login to LangWatch. With no flags, asks where (cloud vs self-hosted) and how (AI tools vs project SDK).",
+    )
+    .option("--api-key <key>", "Set API key non-interactively (CI/agents that already have a project API key), writes to .env")
     .option("--endpoint <url>", "Override the LangWatch control-plane URL for this login (self-hosted instances)")
     .option(
       "--device",
       "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
     )
     .option(
-      "--project",
-      "Force project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). The implicit default in non-TTY contexts.",
+      "--project [slug]",
+      "Project login: mint a project SDK key via the browser and write it to .env (for the SDK, `langwatch eval`, prompts). Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
     )
     .option(
       "--token <token>",
-      "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard) — writes to ~/.langwatch/config.json",
+      "Set device-session token non-interactively (CI/agents that already have a pre-minted token from the dashboard), writes to ~/.langwatch/config.json",
     )
     .option(
       "--browser <name>",
       "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
     );
 
-  loginCmd.action(async (options: { apiKey?: string; device?: boolean; project?: boolean; browser?: string; endpoint?: string; token?: string }) => {
+  loginCmd.action(async (options: { apiKey?: string; device?: boolean; project?: boolean | string; browser?: string; endpoint?: string; token?: string }) => {
     try {
       await loginCommand(options);
     } catch (error) {

@@ -56,7 +56,9 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when localFilesystem.enabled is combined with multi-replica", () => {
     /** @scenario "Single-replica helm install can opt into a PVC-backed local-FS storage path" */
     it("renders a PVC bound to LANGWATCH_LOCAL_STORAGE_PATH and refuses multi-replica", () => {
-      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
+      const pvc = readRepoFile(
+        "charts/langwatch/templates/app/stored-objects-pvc.yaml",
+      );
       const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
       // PVC template is gated on the "local-FS is the active backend" helper
@@ -69,7 +71,9 @@ describe("Helm chart deployment surface for stored-objects", () => {
 
       // The helper itself is the single source of truth for the active-backend
       // condition: localFilesystem.enabled AND NOT dataplane.enabled.
-      expect(helpers).toContain(".Values.app.storedObjects.localFilesystem.enabled");
+      expect(helpers).toContain(
+        ".Values.app.storedObjects.localFilesystem.enabled",
+      );
       expect(helpers).toContain("not .Values.app.dataplane.enabled");
 
       // The validation block rejects localFilesystem + replicaCount > 1
@@ -82,7 +86,9 @@ describe("Helm chart deployment surface for stored-objects", () => {
   describe("when dataplane is enabled alongside localFilesystem default-on", () => {
     /** @scenario "Multi-replica install with dataplane on does NOT create the local-FS PVC, even when localFilesystem.enabled defaults to true" */
     it("PVC and volume mount only render when dataplane is OFF", () => {
-      const pvc = readRepoFile("charts/langwatch/templates/app/stored-objects-pvc.yaml");
+      const pvc = readRepoFile(
+        "charts/langwatch/templates/app/stored-objects-pvc.yaml",
+      );
       const deployment = readRepoFile(
         "charts/langwatch/templates/app/deployment.yaml",
       );
@@ -91,12 +97,15 @@ describe("Helm chart deployment surface for stored-objects", () => {
       // "localFilesystemIsActive" helper so multi-replica + dataplane.enabled
       // does NOT mount a single-attach RWO PVC into multiple pods.
       expect(pvc).toContain("langwatch.storedObjects.localFilesystemIsActive");
-      expect(deployment).toContain("langwatch.storedObjects.localFilesystemIsActive");
+      expect(deployment).toContain(
+        "langwatch.storedObjects.localFilesystemIsActive",
+      );
 
       // Anti-regression: neither template gates only on the raw enabled toggle
       // (the bug Sergio caught — dataplane=true + localFS=true would still mount).
       const rawToggleRefsInPvc = (
-        pvc.match(/\.Values\.app\.storedObjects\.localFilesystem\.enabled/g) || []
+        pvc.match(/\.Values\.app\.storedObjects\.localFilesystem\.enabled/g) ||
+        []
       ).length;
       expect(rawToggleRefsInPvc).toBe(0);
     });
@@ -129,9 +138,14 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
       // `secretKeyRef:` sibling, mirroring the awsS3 provider's shape.
       for (const field of ["accountName", "accountKey", "container"]) {
         const fieldBlock = values.match(
-          new RegExp(`${field}:\\s*\\n\\s*value:[^\\n]*\\n(?:[^\\n]*\\n)?\\s*secretKeyRef:`),
+          new RegExp(
+            `${field}:\\s*\\n\\s*value:[^\\n]*\\n(?:[^\\n]*\\n)?\\s*secretKeyRef:`,
+          ),
         );
-        expect(fieldBlock, `expected ${field} to declare value + secretKeyRef`).not.toBeNull();
+        expect(
+          fieldBlock,
+          `expected ${field} to declare value + secretKeyRef`,
+        ).not.toBeNull();
       }
     });
   });
@@ -141,7 +155,9 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
     it("emits STORED_OBJECTS_BACKEND=azure and the AZURE_BLOB_* env vars on the deployment", () => {
       const helpers = readRepoFile("charts/langwatch/templates/_helpers.tpl");
 
-      expect(helpers).toMatch(/eq \.Values\.app\.dataplane\.provider "azureBlob"/);
+      expect(helpers).toMatch(
+        /eq \.Values\.app\.dataplane\.provider "azureBlob"/,
+      );
       expect(helpers).toContain("STORED_OBJECTS_BACKEND");
       expect(helpers).toMatch(/value:\s*"azure"/);
       expect(helpers).toContain("AZURE_BLOB_ACCOUNT_NAME");
@@ -196,7 +212,7 @@ describe("Helm chart exposes an Azure Blob dataplane provider (AC37, issue #4133
       // localFilesystemIsActive — the single source of truth both the PVC and
       // the deployment volume mount gate on — is provider-agnostic too.
       expect(helpers).toContain(
-        'if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled)',
+        "if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled)",
       );
       expect(helpers).toMatch(/S3\/Azure is the\s*\n?\s*active backend/);
     });
@@ -207,14 +223,18 @@ describe("Self-hosting docs cover the stored-objects deployment surface", () => 
   describe("when the environment-variables doc is loaded", () => {
     /** @scenario "Self-hosting docs describe stored-objects (scenario media, datasets, ...) externalization, the LANGWATCH_LOCAL_STORAGE_PATH env, and the shared dataplane bucket" */
     it("documents LANGWATCH_LOCAL_STORAGE_PATH and the shared dataplane bucket", () => {
-      const doc = readRepoFile("docs/self-hosting/configuration/environment-variables.mdx");
+      const doc = readRepoFile(
+        "docs/self-hosting/configuration/environment-variables.mdx",
+      );
 
       // The env var operators need to set for local-FS dev/single-pod use
       expect(doc).toContain("LANGWATCH_LOCAL_STORAGE_PATH");
 
       // The dataplane bucket is shared between datasets and stored-objects;
       // missing this explainer was a documented confusion point in review.
-      expect(doc).toMatch(/dataplane.*shared|shared.*datasets.*stored-objects|stored-objects.*datasets/i);
+      expect(doc).toMatch(
+        /dataplane.*shared|shared.*datasets.*stored-objects|stored-objects.*datasets/i,
+      );
 
       // Multi-pod operators MUST NOT rely on local-FS — call this out.
       expect(doc).toMatch(/multi.?pod|multiple pods/i);
@@ -232,7 +252,9 @@ describe("Self-hosting docs cover the stored-objects deployment surface", () => 
       // The label was reframed during PR #4058 review from "scenario media"
       // to "externalized byte content" so the docs accurately name S3 as
       // the general file-storage layer.
-      expect(overview).toMatch(/App\s*-->\s*\|"externalized byte content[^"]*"\|\s*S3/);
+      expect(overview).toMatch(
+        /App\s*-->\s*\|"externalized byte content[^"]*"\|\s*S3/,
+      );
     });
   });
 });
@@ -247,7 +269,9 @@ describe(".env.example carries the local storage path config", () => {
       // The default that maps to the LocalFilesystemDriver fallback in
       // stored-objects.service.ts — keeping these in sync matters because
       // a `make quickstart` user with no .env override gets the same path.
-      expect(example).toMatch(/LANGWATCH_LOCAL_STORAGE_PATH=\/var\/lib\/langwatch\/objects/);
+      expect(example).toMatch(
+        /LANGWATCH_LOCAL_STORAGE_PATH=\/var\/lib\/langwatch\/objects/,
+      );
       // The multi-pod warning must be co-located with the var so a
       // production operator copying .env.example sees the caveat.
       expect(example).toMatch(/multi-pod|Multi-pod/);
@@ -274,7 +298,9 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
   describe("when the self-hosting environment-variables doc is loaded", () => {
     /** @scenario ".env.example and self-hosting docs describe the Azure stored-objects backend" */
     it("documents the Azure stored-objects block with the explicit-toggle rationale", () => {
-      const doc = readRepoFile("docs/self-hosting/configuration/environment-variables.mdx");
+      const doc = readRepoFile(
+        "docs/self-hosting/configuration/environment-variables.mdx",
+      );
 
       expect(doc).toContain("STORED_OBJECTS_BACKEND");
       expect(doc).toContain("AZURE_BLOB_ACCOUNT_NAME");
@@ -294,19 +320,29 @@ describe("Route handlers delegate to the service and never touch the repository 
         "langwatch/src/app/api/scenario-events/[[...route]]/app.ts",
       );
 
-      expect(route).toContain('from "~/server/stored-objects/stored-objects-factory"');
+      expect(route).toContain(
+        'from "~/server/stored-objects/stored-objects-factory"',
+      );
       // Direct repository import would be a layering violation
-      expect(route).not.toContain('from "~/server/stored-objects/stored-objects.repository"');
+      expect(route).not.toContain(
+        'from "~/server/stored-objects/stored-objects.repository"',
+      );
     });
   });
 
   describe("when /api/files/:id route imports are inspected", () => {
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
-      const route = readRepoFile("langwatch/src/app/api/files/[[...route]]/app.ts");
+      const route = readRepoFile(
+        "langwatch/src/app/api/files/[[...route]]/app.ts",
+      );
 
-      expect(route).toContain('from "~/server/stored-objects/stored-objects-factory"');
-      expect(route).not.toContain('from "~/server/stored-objects/stored-objects.repository"');
+      expect(route).toContain(
+        'from "~/server/stored-objects/stored-objects-factory"',
+      );
+      expect(route).not.toContain(
+        'from "~/server/stored-objects/stored-objects.repository"',
+      );
     });
   });
 });
@@ -366,7 +402,9 @@ describe("Stored objects migration is idempotent at the SQL level", () => {
       // Schema name must NOT be hardcoded — Prisma reads schema from the
       // connection string, not the DDL. A qualified name would skew when
       // CLICKHOUSE_DATABASE is overridden in CI / multi-env deployments.
-      expect(migration).not.toMatch(/CREATE TABLE IF NOT EXISTS\s+\$\{?CLICKHOUSE_DATABASE/);
+      expect(migration).not.toMatch(
+        /CREATE TABLE IF NOT EXISTS\s+\$\{?CLICKHOUSE_DATABASE/,
+      );
     });
   });
 });

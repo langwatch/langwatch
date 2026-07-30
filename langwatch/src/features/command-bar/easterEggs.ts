@@ -1,5 +1,5 @@
-import { Sparkles, RotateCw } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { RotateCw, Sparkles } from "lucide-react";
 
 export interface EasterEgg {
   id: string;
@@ -45,7 +45,7 @@ export function findEasterEgg(query: string): EasterEgg | null {
   const lower = query.toLowerCase().trim();
   return (
     easterEggs.find((egg) =>
-      egg.triggers.some((t) => t.toLowerCase() === lower)
+      egg.triggers.some((t) => t.toLowerCase() === lower),
     ) ?? null
   );
 }

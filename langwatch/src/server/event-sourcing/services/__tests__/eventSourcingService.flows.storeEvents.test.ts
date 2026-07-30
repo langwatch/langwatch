@@ -64,7 +64,8 @@ describe("EventSourcingService - Store Events Flow", () => {
       };
 
       // Create a map projection that throws to trigger the error logging path
-      const failingMapDef = createMockMapProjectionDefinition("failing-handler");
+      const failingMapDef =
+        createMockMapProjectionDefinition("failing-handler");
       (failingMapDef.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
         throw new Error("Projection dispatch failed");
       });

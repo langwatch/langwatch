@@ -1,11 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
-
+import type { CustomModelEntry } from "../modelProviders/customModel.schema";
 import { ModelProviderService } from "../modelProviders/modelProvider.service";
 import {
   filterUnsupportedSamplingParams,
   resolveSupportedParameters,
 } from "../modelProviders/resolveSupportedParameters";
-import type { CustomModelEntry } from "../modelProviders/customModel.schema";
 
 type LLMLike = {
   model?: string;

@@ -43,9 +43,30 @@ export interface OttlValidationError {
   message: string;
 }
 
+/**
+ * Why the check didn't run. Both are infrastructure states, not verdicts on
+ * the admin's statements.
+ */
+export type OttlValidationDeferredReason =
+  /** No `LW_GATEWAY_INTERNAL_URL` / secret — the dev fast-path. */
+  | "gateway_unconfigured"
+  /** Gateway is up but this build doesn't ship `/internal/validate-ottl`. */
+  | "endpoint_unavailable";
+
+/**
+ * Three outcomes, not two.
+ *
+ * `deferred` is the one that was missing. The two soft-fallback paths below
+ * (gateway unreachable, endpoint 404) used to return `{ ok: true }`, which is
+ * indistinguishable from a real pass — so the editor painted a green "valid"
+ * dot on every line for statements nothing had looked at, on the two most
+ * common failure paths. The discriminant is `status` rather than a boolean
+ * precisely so no caller can spell "we didn't look" as truthy.
+ */
 export type OttlValidationResult =
-  | { ok: true }
-  | { ok: false; errors: OttlValidationError[] };
+  | { status: "valid" }
+  | { status: "invalid"; errors: OttlValidationError[] }
+  | { status: "deferred"; reason: OttlValidationDeferredReason };
 
 export type OttlEncoding = "proto" | "json";
 
@@ -179,13 +200,14 @@ async function postSigned(path: string, body: unknown): Promise<Response> {
 }
 
 /**
- * Validate a list of OTTL statements server-side. When the gateway
- * isn't reachable (dev fast-path before `make service svc=aigateway`),
- * returns `{ ok: true }` so the admin composer doesn't block on
- * infrastructure that's only required at runtime. Real syntax errors
- * surface only after the gateway service is up, but the tradeoff is
- * worth it — the alternative is a busted-looking editor any time the
- * gateway is down.
+ * Validate a list of OTTL statements server-side.
+ *
+ * When the gateway isn't reachable (dev fast-path before
+ * `make service svc=aigateway`) or is up without the endpoint, the check does
+ * not run and the result is `deferred` — never `valid`. The composer still
+ * doesn't block on infrastructure that's only required at runtime, but it can
+ * no longer tell the admin their statements passed a check that never
+ * happened. Real syntax errors still surface only once the gateway is up.
  */
 export async function validateOttlStatements(
   statements: string[],
@@ -195,24 +217,22 @@ export async function validateOttlStatements(
     res = await postSigned("/internal/validate-ottl", { statements });
   } catch (err) {
     if (err instanceof OttlGatewayUnavailableError) {
-      return { ok: true };
+      return { status: "deferred", reason: "gateway_unconfigured" };
     }
     throw err;
   }
   if (res.status === 404) {
     // Gateway up, but binary doesn't yet ship the endpoint (Sergey's
-    // pkg/ottl integration not deployed to this stack). Treat as
-    // "validation deferred" rather than "all statements invalid".
-    return { ok: true };
+    // pkg/ottl integration not deployed to this stack). Deferred, which is
+    // neither "all statements invalid" nor "all statements fine".
+    return { status: "deferred", reason: "endpoint_unavailable" };
   }
   if (!res.ok) {
-    throw new Error(
-      `OTTL validate failed: ${res.status} ${await res.text()}`,
-    );
+    throw new Error(`OTTL validate failed: ${res.status} ${await res.text()}`);
   }
   const raw = (await res.json()) as RawValidateResponse;
-  if (raw.ok) return { ok: true };
-  return { ok: false, errors: normaliseErrors(raw) };
+  if (raw.ok) return { status: "valid" };
+  return { status: "invalid", errors: normaliseErrors(raw) };
 }
 
 /**
@@ -243,9 +263,7 @@ export async function transformOttlPayload(input: {
     statements: input.statements,
   });
   if (!res.ok) {
-    throw new Error(
-      `OTTL transform failed: ${res.status} ${await res.text()}`,
-    );
+    throw new Error(`OTTL transform failed: ${res.status} ${await res.text()}`);
   }
   const raw = (await res.json()) as RawTransformResponse;
   if (raw.ok) {

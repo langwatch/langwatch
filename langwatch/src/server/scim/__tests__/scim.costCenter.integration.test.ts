@@ -7,17 +7,15 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { ScimService } from "../scim.service";
-import { SCIM_ENTERPRISE_USER_SCHEMA } from "../scim.types";
-import type { ScimCreateUserRequest, ScimPatchRequest } from "../scim.types";
-
-import { prisma } from "../../db";
 import { DepartmentService } from "../../../../ee/governance/services/department/department.service";
+import { prisma } from "../../db";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
+import { ScimService } from "../scim.service";
+import type { ScimCreateUserRequest, ScimPatchRequest } from "../scim.types";
+import { SCIM_ENTERPRISE_USER_SCHEMA } from "../scim.types";
 
 const CORE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User";
 const PATCH_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
@@ -64,7 +62,9 @@ describe("ScimService department auto-assignment", () => {
   afterAll(async () => {
     await prisma.department.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.organizationUser.deleteMany({
+      where: { organizationId: ORG_ID },
+    });
     await prisma.user.deleteMany({ where: { email: { contains: ns } } });
     await prisma.organization.deleteMany({ where: { id: ORG_ID } });
     await stopTestContainers();

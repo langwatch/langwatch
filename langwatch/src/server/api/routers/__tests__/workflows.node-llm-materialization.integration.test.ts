@@ -26,8 +26,11 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
   };
 });
 
-import type { LLMConfig, Workflow } from "../../../../optimization_studio/types/dsl";
 import { blankTemplate } from "../../../../optimization_studio/templates/blank";
+import type {
+  LLMConfig,
+  Workflow,
+} from "../../../../optimization_studio/types/dsl";
 import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -56,8 +59,9 @@ describe.skipIf(isTestcontainersOnly)(
       });
       const dsl = workflow.latestVersion?.dsl as unknown as Workflow;
       const signature = dsl.nodes.find((n) => n.type === "signature");
-      return signature?.data.parameters?.find((p) => p.type === "llm")
-        ?.value as LLMConfig | undefined;
+      return signature?.data.parameters?.find((p) => p.type === "llm")?.value as
+        | LLMConfig
+        | undefined;
     };
 
     const createFromBlankTemplate = async (dslOverrides?: object) => {
@@ -190,9 +194,9 @@ describe.skipIf(isTestcontainersOnly)(
         where: { id: workflow.id, projectId },
         include: { latestVersion: true },
       });
-      expect(
-        "default_llm" in (stored.latestVersion?.dsl as object),
-      ).toBe(false);
+      expect("default_llm" in (stored.latestVersion?.dsl as object)).toBe(
+        false,
+      );
     });
 
     /** @scenario An explicit node-owned model is never rewritten */

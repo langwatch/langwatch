@@ -26,9 +26,7 @@ vi.mock("~/server/metrics", () => ({
 
 import { googleDLPClearPII } from "./piiCheck";
 
-function mockFindings(
-  ranges: { start: number; end: number }[],
-): void {
+function mockFindings(ranges: { start: number; end: number }[]): void {
   inspectContentMock.mockResolvedValue([
     {
       result: {

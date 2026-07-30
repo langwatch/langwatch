@@ -1,4 +1,4 @@
-import { Box, chakra, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import type { IconType } from "react-icons";
 import {
   LuArrowUpRight,

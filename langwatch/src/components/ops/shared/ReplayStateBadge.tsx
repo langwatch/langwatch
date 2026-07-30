@@ -17,11 +17,7 @@ export function replayStateColor(
   }
 }
 
-export function ReplayStateBadge({
-  state,
-}: {
-  state: string;
-}) {
+export function ReplayStateBadge({ state }: { state: string }) {
   return (
     <Badge size="sm" variant="subtle" colorPalette={replayStateColor(state)}>
       {state}

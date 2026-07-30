@@ -162,9 +162,13 @@ export class CodingAgentSessionStore
    *
    * `context.readWindow` — computed by the executor from the fold's declared
    * `options.readWindow` — prunes the read to a window of partitions around the
-   * event being folded; it is passed through verbatim. On a windowed miss the
-   * EXECUTOR retries without the window, so a row outside it is still found;
-   * this store neither widens the window nor implements a fallback itself.
+   * event being folded; it is passed through verbatim. On an ABSENT windowed
+   * miss the EXECUTOR retries without the window, so a row outside it is still
+   * found; this store neither widens the window nor implements a fallback
+   * itself. A row that was FOUND and refused by the version gate is reported as
+   * `miss: "undecodable"`, and the executor deliberately does not retry it — a
+   * wider scope only finds the same row and refuses it again, so the retry was
+   * an unpruned scan per event per stale aggregate that could never succeed.
    */
   async getWithApplied(
     aggregateId: string,
@@ -172,19 +176,23 @@ export class CodingAgentSessionStore
   ): Promise<{
     state: CodingAgentSessionState | null;
     appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
   }> {
     const found = await this.repo.findBySessionIdWithApplied({
       tenantId: String(context.tenantId),
       sessionId: aggregateId,
       window: context.readWindow,
     });
-    if (!found) return { state: null, appliedEventIds: [] };
+    if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
     // Stale schema snapshot: the read-back columns did not exist when this row
-    // was written, so decoding it would fabricate state. Answer exactly as for
-    // "no row" — the watermark is dropped too, because a watermark without the
-    // state it belongs to would suppress the very events the re-fold needs.
+    // was written, so decoding it would fabricate state. Answer as for "no row"
+    // — the watermark is dropped too, because a watermark without the state it
+    // belongs to would suppress the very events the re-fold needs — but report
+    // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
+    // executor must not answer with an unwindowed re-read that can only find
+    // the same row again.
     if (!carriesReadBackColumns(found.row)) {
-      return { state: null, appliedEventIds: [] };
+      return { state: null, appliedEventIds: [], miss: "undecodable" };
     }
     return {
       state: codingAgentSessionStateFromRow(found.row),

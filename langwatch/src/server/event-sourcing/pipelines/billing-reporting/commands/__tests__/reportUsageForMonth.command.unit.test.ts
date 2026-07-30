@@ -73,15 +73,21 @@ vi.mock("@langwatch/observability", () => ({
 // Disable the org-level TtlCache so tests don't share cached org data across runs
 vi.mock("~/server/utils/ttlCache", () => ({
   TtlCache: class {
-    async get() { return undefined; }
-    async set() { return; }
-    async delete() { return; }
+    async get() {
+      return undefined;
+    }
+    async set() {
+      return;
+    }
+    async delete() {
+      return;
+    }
   },
 }));
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
   withScope: vi.fn((cb: (scope: Record<string, unknown>) => void) => {
     cb({ setTag: vi.fn(), setExtra: vi.fn() });
   }),
@@ -368,7 +374,9 @@ describe("ReportUsageForMonthCommand", () => {
         { reported: false, error: "meter_event_invalid" },
       ]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
-      mockBillingCheckpoints.clearPendingAndIncrementFailures.mockResolvedValue(undefined);
+      mockBillingCheckpoints.clearPendingAndIncrementFailures.mockResolvedValue(
+        undefined,
+      );
       const handler = await createHandler();
 
       const result = await handler.handle(makeCommand());
@@ -380,7 +388,9 @@ describe("ReportUsageForMonthCommand", () => {
       expect(mockSelfDispatch).not.toHaveBeenCalled();
 
       // pendingReportedTotal cleared, consecutiveFailures incremented
-      expect(mockBillingCheckpoints.clearPendingAndIncrementFailures).toHaveBeenCalledWith({
+      expect(
+        mockBillingCheckpoints.clearPendingAndIncrementFailures,
+      ).toHaveBeenCalledWith({
         organizationId: "org-1",
         billingMonth: "2026-02",
         consecutiveFailures: 1,

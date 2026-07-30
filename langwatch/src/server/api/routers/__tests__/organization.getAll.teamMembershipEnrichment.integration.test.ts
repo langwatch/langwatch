@@ -14,22 +14,23 @@
  * Exercises `organization.getAll` which should enrich team.members via
  * `enrichTeamWithRoleBindings` in `organization.service.ts`.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
+
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { createTestApp } from "../../../app-layer/presets";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";
-import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
+import { createTestApp } from "../../../app-layer/presets";
 import { traced } from "../../../app-layer/tracing";
+import { prisma } from "../../../db";
+import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 describe("organization.getAll — team membership enrichment via RoleBinding", () => {
   const testNamespace = `getall-enrich-${nanoid(8)}`;
@@ -133,7 +134,11 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
     // Cleanup is best-effort: if beforeAll threw partway through, some of these
     // IDs may be undefined, so wrap each call to avoid masking the real failure.
     const safeDelete = async (fn: () => Promise<unknown>) => {
-      try { await fn(); } catch { /* noop */ }
+      try {
+        await fn();
+      } catch {
+        /* noop */
+      }
     };
 
     // Email-based cleanup first — doesn't rely on any other ID.
@@ -143,10 +148,18 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
       }),
     );
     if (organizationId) {
-      await safeDelete(() => prisma.roleBinding.deleteMany({ where: { organizationId } }));
-      await safeDelete(() => prisma.organizationUser.deleteMany({ where: { organizationId } }));
-      await safeDelete(() => prisma.team.deleteMany({ where: { organizationId } }));
-      await safeDelete(() => prisma.organization.deleteMany({ where: { id: organizationId } }));
+      await safeDelete(() =>
+        prisma.roleBinding.deleteMany({ where: { organizationId } }),
+      );
+      await safeDelete(() =>
+        prisma.organizationUser.deleteMany({ where: { organizationId } }),
+      );
+      await safeDelete(() =>
+        prisma.team.deleteMany({ where: { organizationId } }),
+      );
+      await safeDelete(() =>
+        prisma.organization.deleteMany({ where: { id: organizationId } }),
+      );
     }
     if (teamId) {
       await safeDelete(() => prisma.teamUser.deleteMany({ where: { teamId } }));

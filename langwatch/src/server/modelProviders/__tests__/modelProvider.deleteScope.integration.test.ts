@@ -65,7 +65,11 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       otherOrgId = otherOrg.id;
 
       const team = await prisma.team.create({
-        data: { name: `Del Team ${ns}`, slug: `--del-team-${ns}`, organizationId: orgId },
+        data: {
+          name: `Del Team ${ns}`,
+          slug: `--del-team-${ns}`,
+          organizationId: orgId,
+        },
       });
       teamId = team.id;
 
@@ -115,11 +119,18 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       otherProjectId = otherProject.id;
 
       const orgAdmin = await prisma.user.create({
-        data: { name: "Del Org Admin", email: `del-org-admin-${ns}@example.com` },
+        data: {
+          name: "Del Org Admin",
+          email: `del-org-admin-${ns}@example.com`,
+        },
       });
       orgAdminUserId = orgAdmin.id;
       await prisma.organizationUser.create({
-        data: { userId: orgAdmin.id, organizationId: orgId, role: OrganizationUserRole.ADMIN },
+        data: {
+          userId: orgAdmin.id,
+          organizationId: orgId,
+          role: OrganizationUserRole.ADMIN,
+        },
       });
       await prisma.roleBinding.create({
         data: {
@@ -133,15 +144,21 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     });
 
     afterAll(async () => {
-      const projectIds = [projectAId, siblingProjectId, otherProjectId].filter(Boolean);
+      const projectIds = [projectAId, siblingProjectId, otherProjectId].filter(
+        Boolean,
+      );
       await prisma.modelProvider
         .deleteMany({ where: { organizationId: { in: [orgId, otherOrgId] } } })
         .catch(() => {});
-      await prisma.roleBinding.deleteMany({ where: { organizationId: orgId } }).catch(() => {});
+      await prisma.roleBinding
+        .deleteMany({ where: { organizationId: orgId } })
+        .catch(() => {});
       await prisma.organizationUser
         .deleteMany({ where: { organizationId: { in: [orgId, otherOrgId] } } })
         .catch(() => {});
-      await prisma.project.deleteMany({ where: { id: { in: projectIds } } }).catch(() => {});
+      await prisma.project
+        .deleteMany({ where: { id: { in: projectIds } } })
+        .catch(() => {});
       await prisma.team
         .deleteMany({ where: { id: { in: [teamId, otherTeamId] } } })
         .catch(() => {});
@@ -170,7 +187,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
           const scopes = await prisma.modelProviderScope.findMany({
             where: { modelProviderId: created.id },
@@ -197,7 +216,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
         });
       });
@@ -222,7 +243,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ),
           ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).not.toBeNull();
         });
       });
@@ -245,7 +268,9 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
             ctxFor(orgAdminUserId),
           );
 
-          const row = await prisma.modelProvider.findUnique({ where: { id: created.id } });
+          const row = await prisma.modelProvider.findUnique({
+            where: { id: created.id },
+          });
           expect(row).toBeNull();
         });
       });

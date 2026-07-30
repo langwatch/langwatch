@@ -136,7 +136,10 @@ describe("mintInstallationToken", () => {
       const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(
-          JSON.stringify({ token: "ghs_1", expires_at: "2030-01-01T00:00:00Z" }),
+          JSON.stringify({
+            token: "ghs_1",
+            expires_at: "2030-01-01T00:00:00Z",
+          }),
           { status: 201, headers: { "Content-Type": "application/json" } },
         );
       });
@@ -158,7 +161,10 @@ describe("mintInstallationToken", () => {
       const svc = new LangyGithubAppTokenService("app-1", privateKey, redis);
       const fetchMock = vi.fn<typeof fetch>(async () => {
         return new Response(
-          JSON.stringify({ token: "ghs_x", expires_at: "2030-01-01T00:00:00Z" }),
+          JSON.stringify({
+            token: "ghs_x",
+            expires_at: "2030-01-01T00:00:00Z",
+          }),
           { status: 201, headers: { "Content-Type": "application/json" } },
         );
       });

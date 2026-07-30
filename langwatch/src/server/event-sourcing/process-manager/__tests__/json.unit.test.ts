@@ -57,9 +57,7 @@ describe("ensureJsonSafe", () => {
       class Thing {
         x = 1;
       }
-      expect(() => ensureJsonSafe({ a: new Thing() })).toThrow(
-        JsonSafetyError,
-      );
+      expect(() => ensureJsonSafe({ a: new Thing() })).toThrow(JsonSafetyError);
     });
   });
 

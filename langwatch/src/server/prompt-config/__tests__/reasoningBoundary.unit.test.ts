@@ -12,9 +12,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
+  LITELLM_PARAMETER_TRANSLATION,
   mapReasoningToProvider,
   normalizeReasoningFromProviderFields,
-  LITELLM_PARAMETER_TRANSLATION,
 } from "../reasoningBoundary";
 
 // Mock the model registry
@@ -62,15 +62,19 @@ vi.mock("../../../utils/modelProviderHelpers", () => ({
 describe("reasoningBoundary", () => {
   describe("LITELLM_PARAMETER_TRANSLATION", () => {
     it("maps effort to reasoning_effort", () => {
-      expect(LITELLM_PARAMETER_TRANSLATION["effort"]).toBe("reasoning_effort");
+      expect(LITELLM_PARAMETER_TRANSLATION.effort).toBe("reasoning_effort");
     });
 
     it("maps thinkingLevel to reasoning_effort", () => {
-      expect(LITELLM_PARAMETER_TRANSLATION["thinkingLevel"]).toBe("reasoning_effort");
+      expect(LITELLM_PARAMETER_TRANSLATION.thinkingLevel).toBe(
+        "reasoning_effort",
+      );
     });
 
     it("maps reasoning_effort to reasoning_effort (passthrough)", () => {
-      expect(LITELLM_PARAMETER_TRANSLATION["reasoning_effort"]).toBe("reasoning_effort");
+      expect(LITELLM_PARAMETER_TRANSLATION.reasoning_effort).toBe(
+        "reasoning_effort",
+      );
     });
   });
 
@@ -103,12 +107,18 @@ describe("reasoningBoundary", () => {
       });
 
       it("maps reasoning to reasoning_effort for Gemini 2.5 models", () => {
-        const result = mapReasoningToProvider("gemini/gemini-2.5-pro", "medium");
+        const result = mapReasoningToProvider(
+          "gemini/gemini-2.5-pro",
+          "medium",
+        );
         expect(result).toEqual({ reasoning_effort: "medium" });
       });
 
       it("maps reasoning to reasoning_effort for Anthropic Claude Opus 4.5", () => {
-        const result = mapReasoningToProvider("anthropic/claude-opus-4.5", "high");
+        const result = mapReasoningToProvider(
+          "anthropic/claude-opus-4.5",
+          "high",
+        );
         expect(result).toEqual({ reasoning_effort: "high" });
       });
 

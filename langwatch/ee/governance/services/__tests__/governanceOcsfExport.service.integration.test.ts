@@ -22,7 +22,7 @@
  *
  * Spec: specs/ai-gateway/governance/siem-export.feature
  */
-import { type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -89,15 +89,15 @@ afterAll(async () => {
     })
     .catch(() => {});
   await prisma.project
-    .deleteMany({ where: { teamId: { in: [] }, slug: `governance-${organizationId}` } })
+    .deleteMany({
+      where: { teamId: { in: [] }, slug: `governance-${organizationId}` },
+    })
     .catch(() => {});
   // Direct project delete by id (within team-scoped multi-tenancy).
   await prisma.project
     .deleteMany({ where: { team: { organizationId } } })
     .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
+  await prisma.team.deleteMany({ where: { organizationId } }).catch(() => {});
   await prisma.organization
     .deleteMany({ where: { slug: `--ocsf-ver-${ns}` } })
     .catch(() => {});
@@ -141,7 +141,9 @@ describe("OCSF schema-version forward-compat", () => {
         query_params: { tenantId: govProjectId, eventId },
         format: "JSONEachRow",
       });
-      const rows = (await result.json()) as Array<{ OcsfSchemaVersion: string }>;
+      const rows = (await result.json()) as Array<{
+        OcsfSchemaVersion: string;
+      }>;
       expect(rows).toHaveLength(1);
       expect(rows[0]?.OcsfSchemaVersion).toBe(OCSF_SCHEMA_VERSION);
       expect(OCSF_SCHEMA_VERSION).toBe("1.1.0");
@@ -219,13 +221,14 @@ describe("OCSF schema-version forward-compat", () => {
       // the field. (Pure type-narrowing — no runtime work needed
       // beyond the import.)
       const _service = GovernanceOcsfExportService.create(prisma);
-      type ExportRow = ReturnType<
-        typeof GovernanceOcsfExportService.prototype.list
-      > extends Promise<infer P>
-        ? P extends { events: Array<infer E> }
-          ? E
-          : never
-        : never;
+      type ExportRow =
+        ReturnType<
+          typeof GovernanceOcsfExportService.prototype.list
+        > extends Promise<infer P>
+          ? P extends { events: Array<infer E> }
+            ? E
+            : never
+          : never;
       const _typeCheck: ExportRow extends { ocsfSchemaVersion: string }
         ? true
         : false = true;
@@ -283,7 +286,9 @@ describe("OCSF schema-version forward-compat", () => {
         query_params: { tenantId: govProjectId, eventId },
         format: "JSONEachRow",
       });
-      const rows = (await result.json()) as Array<{ OcsfSchemaVersion: string }>;
+      const rows = (await result.json()) as Array<{
+        OcsfSchemaVersion: string;
+      }>;
       expect(rows).toHaveLength(1);
       expect(rows[0]?.OcsfSchemaVersion).toBe("1.1.0");
     });

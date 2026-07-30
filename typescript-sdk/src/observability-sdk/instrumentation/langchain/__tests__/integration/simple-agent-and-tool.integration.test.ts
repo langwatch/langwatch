@@ -59,7 +59,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     spanExporter.reset();
   });
 
-  it("should trace a simple LLM question/response interaction", { timeout: 30_000 }, async () => {
+  it("traces a simple LLM question/response interaction", { timeout: 30_000 }, async () => {
     const tracer = getLangWatchTracer("langchain-integration-test");
 
     await tracer.withActiveSpan(
@@ -103,7 +103,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     expect(llmAttrKeys.some((k) => k.startsWith("llm."))).toBe(false);
   });
 
-  it("should trace tool calling and agent execution", { timeout: 30_000 }, async () => {
+  it("traces tool calling and agent execution", { timeout: 30_000 }, async () => {
     const date = new Date().toISOString();
     const tools = [
       new DynamicStructuredTool({
@@ -170,7 +170,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     expect(toolSpans.length).toBeGreaterThan(0);
   });
 
-  it("should handle multiple consecutive LLM calls with context grouping", { timeout: 30_000 }, async () => {
+  it("handles multiple consecutive LLM calls with context grouping", { timeout: 30_000 }, async () => {
     const tracer = getLangWatchTracer("langchain-integration-test");
 
     await tracer.withActiveSpan(
@@ -216,7 +216,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     expect(traceIds.size).toBe(1);
   });
 
-  it("should properly handle LLM errors and record exceptions", async () => {
+  it("properly handles LLM errors and record exceptions", async () => {
     const tracer = getLangWatchTracer("langchain-integration-test");
 
     await tracer.withActiveSpan(
@@ -250,7 +250,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
   });
 
   describe("Span Naming Integration Tests", () => {
-    it("should name LLM spans with provider and model information", async () => {
+    it("names LLM spans with provider and model information", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
       await tracer.withActiveSpan(
@@ -286,7 +286,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(1);
     });
 
-    it("should name tool spans with tool name and input preview", { timeout: 30_000 }, async () => {
+    it("names tool spans with tool name and input preview", { timeout: 30_000 }, async () => {
       const date = new Date().toISOString();
       const tools = [
         new DynamicStructuredTool({
@@ -352,7 +352,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       expect(toolSpan?.attributes["langwatch.span.type"]).toBe("tool");
     });
 
-    it("should name agent spans as components", { timeout: 30_000 }, async () => {
+    it("names agent spans as components", { timeout: 30_000 }, async () => {
       const tools = [
         new DynamicStructuredTool({
           name: "search",
@@ -416,7 +416,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       );
     });
 
-    it("should name chain spans with proper fallback naming", async () => {
+    it("names chain spans with proper fallback naming", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
       await tracer.withActiveSpan(
@@ -460,7 +460,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       expect(chainSpan?.name).toBe("ChatPromptTemplate");
     });
 
-    it("should handle custom operation names from metadata", async () => {
+    it("handles custom operation names from metadata", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
       await tracer.withActiveSpan(
@@ -498,7 +498,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       expect(llmSpan?.name).toBe("Custom LLM Call");
     });
 
-    it("should verify no deprecated LLM prefix in span names", async () => {
+    it("verifies no deprecated LLM prefix in span names", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
       await tracer.withActiveSpan(
@@ -533,7 +533,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       });
     });
 
-    it("should verify GenAI attributes are set correctly", async () => {
+    it("verifies GenAI attributes are set correctly", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
       await tracer.withActiveSpan(
@@ -574,7 +574,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
       expect(deprecatedKeys.length).toBe(0);
     });
 
-    it("should verify span hierarchy and parent-child relationships", async () => {
+    it("verifies span hierarchy and parent-child relationships", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
       await tracer.withActiveSpan(

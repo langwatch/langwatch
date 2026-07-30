@@ -3,12 +3,11 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import type {
-	DeduplicationConfig,
-	EventSourcedQueueDefinition,
-	EventSourcedQueueProcessor,
-	QueueSendOptions,
+  DeduplicationConfig,
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
+  QueueSendOptions,
 } from "../queues";
-
 
 interface QueuedJob<Payload> {
   payload: Payload;
@@ -35,7 +34,8 @@ interface QueuedJob<Payload> {
  */
 export class EventSourcedQueueProcessorMemory<
   Payload extends Record<string, unknown>,
-> implements EventSourcedQueueProcessor<Payload> {
+> implements EventSourcedQueueProcessor<Payload>
+{
   private readonly logger = createLogger("langwatch:event-sourcing:queue");
   private readonly tracer: ReturnType<typeof getLangWatchTracer>;
   private readonly queueName: string;
@@ -83,7 +83,10 @@ export class EventSourcedQueueProcessorMemory<
     return `${this.queueName}:${payloadId}`;
   }
 
-  async send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void> {
+  async send(
+    payload: Payload,
+    options?: QueueSendOptions<Payload>,
+  ): Promise<void> {
     // Memory implementation allows sends after close since it has no persistent state
     // This is different from BullMQ which should reject sends after shutdown
 
@@ -135,7 +138,10 @@ export class EventSourcedQueueProcessorMemory<
     });
   }
 
-  async sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void> {
+  async sendBatch(
+    payloads: Payload[],
+    options?: QueueSendOptions<Payload>,
+  ): Promise<void> {
     await Promise.all(payloads.map((payload) => this.send(payload, options)));
   }
 
@@ -184,7 +190,7 @@ export class EventSourcedQueueProcessorMemory<
       "queue.job_id": job.jobId ?? "unknown",
     };
 
-    let customAttributes: Record<string, string | number | boolean> = {};
+    const customAttributes: Record<string, string | number | boolean> = {};
     if (this.spanAttributes) {
       try {
         const attributes = this.spanAttributes(job.payload);

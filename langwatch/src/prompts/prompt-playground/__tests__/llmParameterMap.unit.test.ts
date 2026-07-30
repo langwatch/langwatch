@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { LLM_PARAMETER_MAP } from "../llmParameterMap";
 
 describe("LLM_PARAMETER_MAP", () => {
@@ -31,9 +31,7 @@ describe("LLM_PARAMETER_MAP", () => {
     });
 
     it("includes reasoning as a string parameter", () => {
-      const entry = LLM_PARAMETER_MAP.find(
-        (p) => p.formField === "reasoning",
-      );
+      const entry = LLM_PARAMETER_MAP.find((p) => p.formField === "reasoning");
       expect(entry).toBeDefined();
       expect(entry!.coercion).toBe("string");
     });

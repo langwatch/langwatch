@@ -1,5 +1,5 @@
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { LangyAnalyticsEventRepository } from "~/server/app-layer/langy/repositories/langy-analytics-event.repository";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type {
   AppendStore,
   BulkAppendContext,

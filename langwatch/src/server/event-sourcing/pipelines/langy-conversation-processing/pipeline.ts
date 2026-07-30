@@ -1,17 +1,21 @@
+import type {
+  LangyConversationStateData,
+  LangyConversationTurnData,
+  LangyMessageProjectionRecord,
+} from "@langwatch/langy";
+import type { LangyEffectPorts } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
+import {
+  LANGY_CONVERSATION_PROCESS_NAME,
+  langyConversationProcess,
+} from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
 import { definePipeline } from "../../";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import {
-  langyConversationProcess,
-  LANGY_CONVERSATION_PROCESS_NAME,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
-import type { LangyEffectPorts } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
-import {
+  AcceptAgentTurnCommand,
   ArchiveConversationCommand,
   ConsumeTurnHandoffCommand,
-  RecordMessageCommand,
-  AcceptAgentTurnCommand,
   CreateConversationCommand,
   FailAgentResponseCommand,
   FailToolCallCommand,
@@ -20,23 +24,19 @@ import {
   ImportMessageCommand,
   InitiateToolCallCommand,
   RecordAgentResponseCommand,
+  RecordMessageCommand,
   RecordTurnHandoffCommand,
   SucceedToolCallCommand,
   UpdateConversationMetadataCommand,
   UpdatePlanCommand,
 } from "./commands";
-import { LangyMessageOperationalMapProjection } from "./projections/langyMessageOperational.mapProjection";
 import {
-  type LangyAnalyticsEventProjectionRecord,
   LangyAnalyticsEventMapProjection,
+  type LangyAnalyticsEventProjectionRecord,
 } from "./projections/langyAnalyticsEvent.mapProjection";
 import { LangyConversationStateFoldProjection } from "./projections/langyConversationState.foldProjection";
-import type {
-  LangyConversationStateData,
-  LangyConversationTurnData,
-  LangyMessageProjectionRecord,
-} from "@langwatch/langy";
 import { LangyConversationTurnFoldProjection } from "./projections/langyConversationTurn.foldProjection";
+import { LangyMessageOperationalMapProjection } from "./projections/langyMessageOperational.mapProjection";
 import type { LangyConversationProcessingEvent } from "./schemas/events";
 
 export interface LangyConversationProcessingPipelineDeps {
@@ -146,7 +146,10 @@ export function createLangyConversationProcessingPipeline(
     .withCommand("failAgentResponse", FailAgentResponseCommand)
     .withCommand("recordAgentResponse", RecordAgentResponseCommand)
     .withCommand("archiveConversation", ArchiveConversationCommand)
-    .withCommand("updateConversationMetadata", UpdateConversationMetadataCommand)
+    .withCommand(
+      "updateConversationMetadata",
+      UpdateConversationMetadataCommand,
+    )
     .withCommand("recordTurnHandoff", RecordTurnHandoffCommand)
     .withCommand("consumeTurnHandoff", ConsumeTurnHandoffCommand)
     .withCommand("generateConversationTitle", GenerateConversationTitleCommand)

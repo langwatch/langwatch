@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import { api } from "~/utils/api";
 import type { Span } from "~/server/tracer/types";
+import { api } from "~/utils/api";
 
 const PAGE_SIZE = 200;
 const BACKFILL_DELAY_MS = 200;
@@ -23,7 +23,10 @@ type SpanTreeAction =
   | { type: "CLEAR_NEW_FLAGS" }
   | { type: "SET_TOTAL"; total: number };
 
-function spanTreeReducer(state: SpanTreeState, action: SpanTreeAction): SpanTreeState {
+function spanTreeReducer(
+  state: SpanTreeState,
+  action: SpanTreeAction,
+): SpanTreeState {
   switch (action.type) {
     case "INITIAL_LOAD": {
       const spans = new Map<string, Span>();
@@ -165,7 +168,16 @@ export function useSpanTreeLoader({
         backfillTimerRef.current = null;
       }
     };
-  }, [state.phase, state.nextOffset, state.total, enabled, projectId, traceId, occurredAtMs, utils]);
+  }, [
+    state.phase,
+    state.nextOffset,
+    state.total,
+    enabled,
+    projectId,
+    traceId,
+    occurredAtMs,
+    utils,
+  ]);
 
   // Delta fetch callback for SSE events
   const onSpanStored = useCallback(async () => {

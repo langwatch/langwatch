@@ -15,16 +15,19 @@
  * the rules (the scenario library, the legacy /suites URLs, and the old
  * per-run URL that now opens a drawer).
  */
-import { useRouter } from "~/utils/compat/next-router";
+
 import { useEffect } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import SimulationsPage from "~/components/suites/SimulationsPage";
 import { resolveSimulationsRedirect } from "~/components/suites/useSuiteRouting";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useRouter } from "~/utils/compat/next-router";
 
 function SimulationsRoutePage() {
   const router = useRouter();
-  const pathSegments = Array.isArray(router.query.path) ? router.query.path : [];
+  const pathSegments = Array.isArray(router.query.path)
+    ? router.query.path
+    : [];
   const projectSlug = router.query.project as string | undefined;
 
   const redirect =

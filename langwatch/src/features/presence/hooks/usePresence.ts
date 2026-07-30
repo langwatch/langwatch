@@ -173,6 +173,4 @@ export function usePresence({
       leave();
     };
   }, [active, projectId, sessionId]);
-
 }
-

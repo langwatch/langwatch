@@ -1,13 +1,13 @@
-import { Box, Flex, Text, Tabs, Grid, GridItem } from "@chakra-ui/react";
-import { SpanTreePanel } from "./SpanTreePanel";
-import { SpanEditorPanel } from "./SpanEditorPanel";
+import { Box, Flex, Grid, GridItem, Tabs, Text } from "@chakra-ui/react";
 import { ConnectionSettings } from "./ConnectionSettings";
 import { ExecutionControls } from "./ExecutionControls";
+import { SpanEditorPanel } from "./SpanEditorPanel";
+import { SpanTreePanel } from "./SpanTreePanel";
 import { TraceSettings } from "./TraceSettings";
-import { WaterfallView } from "./views/WaterfallView";
+import { useTraceStore } from "./traceStore";
 import { GraphView } from "./views/GraphView";
 import { JsonView } from "./views/JsonView";
-import { useTraceStore } from "./traceStore";
+import { WaterfallView } from "./views/WaterfallView";
 
 export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
   const selectedSpanId = useTraceStore((s) => s.selectedSpanId);
@@ -21,11 +21,7 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
       overflow="hidden"
     >
       {/* Left sidebar — fixed width, scrolls independently */}
-      <GridItem
-        overflow="auto"
-        borderRight="1px solid"
-        borderColor="border"
-      >
+      <GridItem overflow="auto" borderRight="1px solid" borderColor="border">
         <Flex direction="column" minH="full">
           <ConnectionSettings compact={compact} />
           <Box borderTop="1px solid" borderColor="border">
@@ -57,17 +53,51 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
           // until first opened, then kept mounted.
           lazyMount
         >
-          <Tabs.List borderBottom="1px solid" borderColor="border" px={3} gap={0} flexShrink={0}>
-            <Tabs.Trigger value="editor" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
+          <Tabs.List
+            borderBottom="1px solid"
+            borderColor="border"
+            px={3}
+            gap={0}
+            flexShrink={0}
+          >
+            <Tabs.Trigger
+              value="editor"
+              fontSize="xs"
+              px={3}
+              py={1.5}
+              color="fg.muted"
+              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+            >
               Editor
             </Tabs.Trigger>
-            <Tabs.Trigger value="waterfall" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
+            <Tabs.Trigger
+              value="waterfall"
+              fontSize="xs"
+              px={3}
+              py={1.5}
+              color="fg.muted"
+              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+            >
               Waterfall
             </Tabs.Trigger>
-            <Tabs.Trigger value="graph" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
+            <Tabs.Trigger
+              value="graph"
+              fontSize="xs"
+              px={3}
+              py={1.5}
+              color="fg.muted"
+              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+            >
               Graph
             </Tabs.Trigger>
-            <Tabs.Trigger value="json" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
+            <Tabs.Trigger
+              value="json"
+              fontSize="xs"
+              px={3}
+              py={1.5}
+              color="fg.muted"
+              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+            >
               JSON
             </Tabs.Trigger>
           </Tabs.List>
@@ -77,10 +107,17 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
               {selectedSpanId ? (
                 <SpanEditorPanel />
               ) : (
-                <Flex h="300px" align="center" justify="center" color="fg.muted">
+                <Flex
+                  h="300px"
+                  align="center"
+                  justify="center"
+                  color="fg.muted"
+                >
                   <Box textAlign="center">
                     <Text fontSize="md">Select a span to edit</Text>
-                    <Text fontSize="sm" mt={1}>Or add a new span from the tree</Text>
+                    <Text fontSize="sm" mt={1}>
+                      Or add a new span from the tree
+                    </Text>
                   </Box>
                 </Flex>
               )}

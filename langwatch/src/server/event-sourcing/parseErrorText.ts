@@ -46,8 +46,9 @@ export const safeParseErrText = (err: unknown): string => {
   // single-quoted token is one character — kept because it is the most useful
   // byte in the message and one character is not a secret.
   const cut = raw.search(/["[{]/);
-  const head = (cut === -1 ? raw : raw.slice(0, cut)).trim().replace(/[,\s]+$/, "");
+  const head = (cut === -1 ? raw : raw.slice(0, cut))
+    .trim()
+    .replace(/[,\s]+$/, "");
   const name = err instanceof Error ? err.name : "Error";
   return head ? `${name}: ${head}` : name;
 };
-

@@ -1,25 +1,27 @@
+import annotationQueueShared from "@langwatch/automations/providers/annotationQueue";
+import datasetShared from "@langwatch/automations/providers/dataset";
+import emailShared, {
+  type EmailPreview,
+} from "@langwatch/automations/providers/email";
+import slackShared, {
+  type SlackPreview,
+} from "@langwatch/automations/providers/slack";
+import webhookShared, {
+  type WebhookPreview,
+} from "@langwatch/automations/providers/webhook";
 import { TriggerAction } from "@prisma/client";
 import annotationQueueClient, {
   type AnnotationQueueSlice,
 } from "./annotationQueue/client";
-import annotationQueueShared from "@langwatch/automations/providers/annotationQueue";
 import datasetClient, { type DatasetSlice } from "./dataset/client";
-import datasetShared from "@langwatch/automations/providers/dataset";
 import emailClient, { type EmailSlice } from "./email/client";
-import emailShared, { type EmailPreview } from "@langwatch/automations/providers/email";
 import slackClient, { type SlackSlice } from "./slack/client";
-import slackShared, { type SlackPreview } from "@langwatch/automations/providers/slack";
-import webhookClient, {
-  type WebhookSlice,
-} from "./webhook/client";
-import webhookShared, {
-  type WebhookPreview,
-} from "@langwatch/automations/providers/webhook";
 import {
   type ClientEntry,
   isNotifyEntry,
   type NotifyClientEntry,
 } from "./types";
+import webhookClient, { type WebhookSlice } from "./webhook/client";
 
 /** Per-action slice type — adding a new action means adding one entry. */
 export interface SliceFor {

@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
+import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
+import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
 import {
   InMemoryProcessStore,
   OutboxDispatcherService,
   ProcessManagerService,
 } from "~/server/event-sourcing/process-manager";
-import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
-import { buildIntentHandlers, buildProcessDefinition } from "~/server/event-sourcing/process-manager/processRuntime";
-import { topicClusteringPM } from "~/server/event-sourcing/pipelines/topic-clustering-processing/pipeline";
-import type { TopicClusteringProcessingEvent } from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/events";
+import {
+  buildIntentHandlers,
+  buildProcessDefinition,
+} from "~/server/event-sourcing/process-manager/processRuntime";
 
 import { buildProcessEventView } from "../topicClustering.process";
 import type { TopicClusteringOutcomeCommands } from "../topicClusteringIntentHandlers";
@@ -114,7 +116,10 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
       });
       expect(wake).toBeDefined();
 
-      const result = await manager.handleWake({ wake: wake!, now: wake!.wakeAt });
+      const result = await manager.handleWake({
+        wake: wake!,
+        now: wake!.wakeAt,
+      });
       expect(result.outcome).toBe("committed");
 
       const messages = await store.findMessagesByRef({ ref: REF });
@@ -153,7 +158,10 @@ describe("topic clustering process flow (store + manager + dispatcher)", () => {
       });
       const messagesBefore = await store.findMessagesByRef({ ref: REF });
 
-      const result = await manager.handleWake({ wake: wake!, now: wake!.wakeAt });
+      const result = await manager.handleWake({
+        wake: wake!,
+        now: wake!.wakeAt,
+      });
 
       expect(result.outcome).toBe("staleWake");
       const messagesAfter = await store.findMessagesByRef({ ref: REF });

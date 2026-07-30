@@ -1,8 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
-import {
-  selectPeersMatching,
-  usePresenceStore,
-} from "../stores/presenceStore";
+import { selectPeersMatching, usePresenceStore } from "../stores/presenceStore";
 import { PresenceMarker } from "./PresenceMarker";
 
 interface SectionPresenceDotProps {

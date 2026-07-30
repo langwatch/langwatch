@@ -3,7 +3,7 @@ import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { CodePreview } from "~/features/onboarding/components/sections/observability/CodePreview";
 import { CLOUD_ENDPOINT } from "~/features/onboarding/components/sections/shared/build-mcp-config";
 import { InlineCopyButton } from "~/features/onboarding/components/sections/shared/InlineCopyButton";
@@ -136,15 +136,8 @@ export function ApiKeyIntegrationInfoCard({
         onSuccess: (result) => {
           onTokenGenerated(result.token);
         },
-        onError: (error) => {
-          toaster.create({
-            title: "Failed to create token",
-            description: error.message,
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-        },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
       },
     );
   };

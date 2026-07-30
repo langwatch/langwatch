@@ -35,6 +35,8 @@
  * Spec: specs/ai-gateway/governance/architecture-invariants.feature
  *       (cross-org isolation + receiver→dashboard round-trip)
  */
+
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -42,18 +44,14 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
-
-import { prisma } from "~/server/db";
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { appRouter } from "~/server/api/root";
+import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
-
-import { appRouter } from "~/server/api/root";
-import { createInnerTRPCContext } from "~/server/api/trpc";
+import { prisma } from "~/server/db";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 
 import { app as ingestApp } from "../ingestionRoutes";
 
@@ -189,9 +187,7 @@ async function deleteSeededOrg(seed: SeededOrg | null): Promise<void> {
   await prisma.organization
     .delete({ where: { id: seed.organizationId } })
     .catch(() => {});
-  await prisma.user
-    .delete({ where: { id: seed.adminUserId } })
-    .catch(() => {});
+  await prisma.user.delete({ where: { id: seed.adminUserId } }).catch(() => {});
 }
 
 function buildOtlpJsonBody(): ArrayBuffer {
@@ -326,6 +322,8 @@ describe("end-to-end customer dogfood smoke (Phase 5 cross-lane)", () => {
       callerFor(orgB!.adminUserId).ingestionSources.list({
         organizationId: orgA!.organizationId,
       }),
-    ).rejects.toMatchObject({ code: expect.stringMatching(/FORBIDDEN|UNAUTHORIZED/) });
+    ).rejects.toMatchObject({
+      code: expect.stringMatching(/FORBIDDEN|UNAUTHORIZED/),
+    });
   });
 });

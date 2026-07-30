@@ -27,13 +27,6 @@ export const CARD = {
     "radial-gradient(130% 120% at 96% 0%, color-mix(in srgb, var(--chakra-colors-orange-solid) 6%, transparent), transparent 54%)",
 } as const;
 
-/** Inner sub-panels (a receipt list, the judge line, the PR row). */
-export const INSET = {
-  radius: "10px",
-  border: "border.muted",
-  bg: "bg.panel",
-} as const;
-
 /** Status colour, by whether a value needs the reader. */
 export const DOT = {
   good: "green.solid",
@@ -249,17 +242,7 @@ export const CARD_TAXONOMY = {
  *
  * AI_ACCENT_P3 is the amber in P3 (≈ #ED8926 → color(display-p3 0.89 0.53 0.17)).
  */
-export const AI_ACCENT_SRGB = "#ED8926" as const;
 export const AI_ACCENT_P3 = "color(display-p3 0.929 0.537 0.149)" as const;
-
-/**
- * The lead card's warm corner wash, in both gamuts. `srgb` is byte-for-byte the
- * existing `CARD.accentWash`; `p3` swaps the amber stop for its wider-gamut form.
- */
-export const ACCENT_WASH = {
-  srgb: CARD.accentWash,
-  p3: "radial-gradient(130% 120% at 96% 0%, color(display-p3 0.929 0.537 0.149 / 0.06), transparent 54%)",
-} as const;
 
 /**
  * Emotion fallback-value pair: `[fallback, enhanced]`. Emotion emits both

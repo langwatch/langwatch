@@ -306,9 +306,7 @@ export class StoredObjectsRepository {
                 GROUP BY project_id, id
               )
           `,
-          query_params: purpose
-            ? { projectId, purpose }
-            : { projectId },
+          query_params: purpose ? { projectId, purpose } : { projectId },
           format: "JSONEachRow",
         });
 
@@ -317,7 +315,8 @@ export class StoredObjectsRepository {
           object_count: string | number | null;
         }>();
         const raw = rows[0];
-        const totalBytes = raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
+        const totalBytes =
+          raw?.total_bytes != null ? Number(raw.total_bytes) : 0;
         const objectCount =
           raw?.object_count != null ? Number(raw.object_count) : 0;
         span.setAttribute("stored_objects.total_bytes", totalBytes);

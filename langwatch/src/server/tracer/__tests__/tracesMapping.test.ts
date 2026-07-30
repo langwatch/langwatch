@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { formatSpansDigest } from "../spanToReadableSpan";
 import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
@@ -6,14 +7,13 @@ import {
   extractTracesFields,
   getThreadAvailableSources,
   getTraceAvailableSources,
-  mapTraceToDatasetEntry,
   mappingStateSchema,
+  mapTraceToDatasetEntry,
   SPAN_SUBFIELDS,
   THREAD_MAPPINGS,
   TRACE_MAPPINGS,
   tryAndConvertTo,
 } from "../tracesMapping";
-import { formatSpansDigest } from "../spanToReadableSpan";
 
 describe("SPAN_SUBFIELDS", () => {
   it("contains * (full span object) as first option", () => {
@@ -191,7 +191,7 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
       expect.arrayContaining([
         expect.objectContaining({ name: "openai/gpt-4" }),
         expect.objectContaining({ name: "my-custom-span" }),
-      ])
+      ]),
     );
   });
 
@@ -199,11 +199,13 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
     const result = TRACE_MAPPINGS.spans.mapping(
       mockTrace as any,
       "openai/gpt-4",
-      ""
+      "",
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toEqual(expect.objectContaining({ name: "openai/gpt-4" }));
+    expect(result[0]).toEqual(
+      expect.objectContaining({ name: "openai/gpt-4" }),
+    );
   });
 
   it("returns input field from all spans when key is * and subkey is input", () => {
@@ -226,7 +228,7 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
         name: "openai/gpt-4",
         input: { type: "text", value: "Hello" },
         output: { type: "text", value: "Hi there" },
-      })
+      }),
     );
   });
 
@@ -234,7 +236,7 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
     const result = TRACE_MAPPINGS.spans.mapping(
       mockTrace as any,
       "openai/gpt-4",
-      "output"
+      "output",
     );
 
     expect(result).toHaveLength(1);
@@ -246,7 +248,7 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
     const result = TRACE_MAPPINGS.spans.mapping(
       mockTrace as any,
       "my-custom-span",
-      "*"
+      "*",
     );
 
     expect(result).toHaveLength(1);
@@ -255,7 +257,7 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
         name: "my-custom-span",
         input: { type: "text", value: "Input 2" },
         output: { type: "text", value: "Output 2" },
-      })
+      }),
     );
   });
 });
@@ -267,9 +269,24 @@ describe("mapTraceToDatasetEntry span expansion", () => {
     trace_id: "trace-1",
     timestamps: { started_at: Date.now() },
     spans: [
-      { span_id: "s1", name: "a", type: "span", input: { type: "text", value: "1" } },
-      { span_id: "s2", name: "b", type: "span", input: { type: "text", value: "2" } },
-      { span_id: "s3", name: "c", type: "span", input: { type: "text", value: "3" } },
+      {
+        span_id: "s1",
+        name: "a",
+        type: "span",
+        input: { type: "text", value: "1" },
+      },
+      {
+        span_id: "s2",
+        name: "b",
+        type: "span",
+        input: { type: "text", value: "2" },
+      },
+      {
+        span_id: "s3",
+        name: "c",
+        type: "span",
+        input: { type: "text", value: "3" },
+      },
     ],
   };
   const spansMapping = {
@@ -344,7 +361,7 @@ describe("TRACE_MAPPINGS.metadata.mapping", () => {
   it("returns undefined for non-existent key", () => {
     const result = TRACE_MAPPINGS.metadata.mapping(
       mockTrace as any,
-      "non_existent"
+      "non_existent",
     );
 
     expect(result).toBeUndefined();
@@ -577,9 +594,7 @@ describe("getTraceAvailableSources", () => {
   it("does not include threads in trace-level sources", () => {
     const sources = getTraceAvailableSources([], []);
     const traceSource = sources[0]!;
-    const threadsField = traceSource.fields.find(
-      (f) => f.name === "threads",
-    );
+    const threadsField = traceSource.fields.find((f) => f.name === "threads");
 
     expect(threadsField).toBeUndefined();
   });
@@ -623,15 +638,10 @@ describe("TRACE_MAPPINGS.threads", () => {
         metadata: { thread_id: "other-thread" },
       });
 
-      const result = TRACE_MAPPINGS.threads.mapping(
-        trace1 as any,
-        "",
-        "",
-        {
-          allTraces: [trace1, trace2, unrelatedTrace] as any[],
-          selectedFields: ["thread_id"],
-        },
-      );
+      const result = TRACE_MAPPINGS.threads.mapping(trace1 as any, "", "", {
+        allTraces: [trace1, trace2, unrelatedTrace] as any[],
+        selectedFields: ["thread_id"],
+      });
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({ thread_id: "thread-abc" });
@@ -645,15 +655,10 @@ describe("TRACE_MAPPINGS.threads", () => {
         input: { type: "text", value: "Second" },
       });
 
-      const result = TRACE_MAPPINGS.threads.mapping(
-        trace1 as any,
-        "",
-        "",
-        {
-          allTraces: [trace1, trace2] as any[],
-          selectedFields: ["input", "output"],
-        },
-      );
+      const result = TRACE_MAPPINGS.threads.mapping(trace1 as any, "", "", {
+        allTraces: [trace1, trace2] as any[],
+        selectedFields: ["input", "output"],
+      });
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({ input: "Hello", output: "World" });
@@ -665,12 +670,10 @@ describe("TRACE_MAPPINGS.threads", () => {
     it("returns an empty array", () => {
       const trace = makeTrace();
 
-      const result = TRACE_MAPPINGS.threads.mapping(
-        trace as any,
-        "",
-        "",
-        { allTraces: undefined, selectedFields: ["thread_id"] },
-      );
+      const result = TRACE_MAPPINGS.threads.mapping(trace as any, "", "", {
+        allTraces: undefined,
+        selectedFields: ["thread_id"],
+      });
 
       expect(result).toEqual([]);
     });
@@ -680,12 +683,10 @@ describe("TRACE_MAPPINGS.threads", () => {
     it("returns an empty array", () => {
       const trace = makeTrace({ metadata: {} });
 
-      const result = TRACE_MAPPINGS.threads.mapping(
-        trace as any,
-        "",
-        "",
-        { allTraces: [trace] as any[], selectedFields: ["thread_id"] },
-      );
+      const result = TRACE_MAPPINGS.threads.mapping(trace as any, "", "", {
+        allTraces: [trace] as any[],
+        selectedFields: ["thread_id"],
+      });
 
       expect(result).toEqual([]);
     });
@@ -891,9 +892,9 @@ describe("tryAndConvertTo", () => {
   describe("when given an OTel typed-object wrapper", () => {
     it("returns the bare value when the wrapper type is 'text'", () => {
       // Bug: currently returns '{"type":"text","value":"stockout"}' instead of "stockout"
-      expect(tryAndConvertTo({ type: "text", value: "stockout" }, "string")).toBe(
-        "stockout",
-      );
+      expect(
+        tryAndConvertTo({ type: "text", value: "stockout" }, "string"),
+      ).toBe("stockout");
     });
 
     it("returns the bare value stringified when the wrapper type is 'json' and value is a number", () => {

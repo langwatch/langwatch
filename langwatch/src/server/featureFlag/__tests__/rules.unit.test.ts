@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   evaluateRules,
+  type FeatureFlagRules,
   parseRules,
   resolveEffectiveForListing,
-  type FeatureFlagRules,
 } from "../rules";
 
 describe("evaluateRules", () => {
@@ -75,7 +75,9 @@ describe("evaluateRules", () => {
       // and turn into a global on-switch.
       const rules: FeatureFlagRules = [
         {
-          match: { percentageRollout: 10 } as unknown as FeatureFlagRules[number]["match"],
+          match: {
+            percentageRollout: 10,
+          } as unknown as FeatureFlagRules[number]["match"],
           enabled: true,
         },
       ];

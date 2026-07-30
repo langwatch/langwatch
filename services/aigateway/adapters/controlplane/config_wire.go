@@ -19,7 +19,14 @@ type configWire struct {
 	Fallback         fallbackWire       `json:"fallback"`
 	ModelAliases     map[string]string  `json:"model_aliases"`
 	ModelsAllowed    []string           `json:"models_allowed"`
-	RateLimits       rateLimitsWire     `json:"rate_limits"`
+	// ProvidersAllowed is the key's explicit ModelProvider allowlist. null
+	// on the wire means every provider the key reaches through its scope
+	// graph, including future ones; a list is never empty (the control
+	// plane normalises [] back to null on read).
+	ProvidersAllowed []string `json:"providers_allowed"`
+	// RoutingMode is none | fallback_all | policy (contract §4.2).
+	RoutingMode string         `json:"routing_mode"`
+	RateLimits  rateLimitsWire `json:"rate_limits"`
 	// Guardrails is the flat per-project catalog every VK in the project
 	// may reference; GuardrailAttachments is this VK's opt-in tuples
 	// (control-plane materialiser config.materialiser.ts, bug-7 step vd).
@@ -100,9 +107,19 @@ type policyRuleSetWire struct {
 }
 
 type budgetWire struct {
-	ID            string `json:"id"`
-	Scope         string `json:"scope"`
-	ScopeID       string `json:"scope_id"`
+	ID    string `json:"id"`
+	Scope string `json:"scope"`
+	// ScopeID is the enforcement bucket, not always the raw target: GROUP
+	// budgets arrive as "<groupId>:<userId>" (one bucket per member) and
+	// provider-filtered budgets suffix "|provider:<mpId>". Computed by the
+	// control plane's budgetResolution.service.ts; carried verbatim.
+	ScopeID string `json:"scope_id"`
+	// PrincipalID names the member a GROUP bucket belongs to. Absent for
+	// every other scope.
+	PrincipalID string `json:"principal_id"`
+	// ProviderKey is the ModelProvider row id the budget is filtered to.
+	// null on the wire (= counts every dispatch) decodes to "".
+	ProviderKey   string `json:"provider_key"`
 	Window        string `json:"window"`
 	LimitMicroUSD int64  `json:"limit_micro_usd"`
 	SpentMicroUSD int64  `json:"spent_micro_usd"`
@@ -150,11 +167,21 @@ func (w *configWire) toDomain() domain.BundleConfig {
 		VKDisplayPrefix:  w.DisplayPrefix,
 		VKTags:           w.VKTags,
 		AllowedModels:    w.ModelsAllowed,
+		ProvidersAllowed: w.ProvidersAllowed,
+		RoutingMode:      w.RoutingMode,
 		Fallback: domain.FallbackConfig{
 			MaxAttempts: w.Fallback.MaxAttempts,
 			On:          w.Fallback.On,
 		},
 		Guardrails: buildGuardrails(w.Guardrails, w.GuardrailAttachments),
+	}
+
+	// No-fallback keys get exactly one dispatch attempt. The control plane
+	// already pins max_attempts to 1 when routing_mode is none; re-pinning at
+	// decode means a drifted or hand-crafted bundle cannot quietly re-arm
+	// fallback on a key whose owner chose not to have it.
+	if w.RoutingMode == domain.RoutingModeNone {
+		cfg.Fallback.MaxAttempts = 1
 	}
 
 	if w.RateLimits.RPM != nil {
@@ -172,9 +199,14 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	}
 
 	cfg.Budget.Scopes = make([]domain.BudgetScope, len(w.Budgets))
-	for i, b := range w.Budgets {
+	for i := range w.Budgets {
+		b := &w.Budgets[i]
 		cfg.Budget.Scopes[i] = domain.BudgetScope{
+			ID:            b.ID,
 			Scope:         b.Scope,
+			ScopeID:       b.ScopeID,
+			PrincipalID:   b.PrincipalID,
+			ProviderKey:   b.ProviderKey,
 			Window:        b.Window,
 			LimitMicroUSD: b.LimitMicroUSD,
 			SpentMicroUSD: b.SpentMicroUSD,

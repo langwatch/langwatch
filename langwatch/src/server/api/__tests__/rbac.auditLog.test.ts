@@ -1,15 +1,15 @@
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
+  getValidActionsForResource,
+  orderedResources,
+} from "../../../utils/permissionsConfig";
+import {
   canView,
   getOrganizationRolePermissions,
   Resources,
   teamRoleHasPermission,
 } from "../rbac";
-import {
-  getValidActionsForResource,
-  orderedResources,
-} from "../../../utils/permissionsConfig";
 
 // Companion to rbac.secrets.test.ts — covers the auditLog:view permission
 // added by the gateway audit consolidation. Verifies the perm is granted
@@ -26,33 +26,33 @@ describe("AuditLog resource in RBAC", () => {
 
   describe("given the ADMIN team role", () => {
     it("includes auditLog:view permission", () => {
-      expect(
-        teamRoleHasPermission(TeamUserRole.ADMIN, "auditLog:view"),
-      ).toBe(true);
+      expect(teamRoleHasPermission(TeamUserRole.ADMIN, "auditLog:view")).toBe(
+        true,
+      );
     });
   });
 
   describe("given the MEMBER team role", () => {
     it("includes auditLog:view permission", () => {
-      expect(
-        teamRoleHasPermission(TeamUserRole.MEMBER, "auditLog:view"),
-      ).toBe(true);
+      expect(teamRoleHasPermission(TeamUserRole.MEMBER, "auditLog:view")).toBe(
+        true,
+      );
     });
   });
 
   describe("given the VIEWER team role", () => {
     it("includes auditLog:view permission", () => {
-      expect(
-        teamRoleHasPermission(TeamUserRole.VIEWER, "auditLog:view"),
-      ).toBe(true);
+      expect(teamRoleHasPermission(TeamUserRole.VIEWER, "auditLog:view")).toBe(
+        true,
+      );
     });
   });
 
   describe("given the CUSTOM fallback team role", () => {
     it("includes auditLog:view permission", () => {
-      expect(
-        teamRoleHasPermission(TeamUserRole.CUSTOM, "auditLog:view"),
-      ).toBe(true);
+      expect(teamRoleHasPermission(TeamUserRole.CUSTOM, "auditLog:view")).toBe(
+        true,
+      );
     });
   });
 

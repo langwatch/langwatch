@@ -31,6 +31,7 @@ import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -47,7 +48,6 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  * Spec: specs/ai-gateway/governance/admin-oversight.feature
  */
 
-type Source = RouterOutputs["ingestionSources"]["list"][number];
 type SourceHealth =
   RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
@@ -470,13 +470,11 @@ function SessionPolicySection({ organizationId }: { organizationId: string }) {
       void utils.sessionPolicy.get.invalidate({ organizationId });
       toaster.create({ title: "Session policy saved", type: "success" });
     },
-    onError: (err) => {
-      toaster.create({
-        title: "Failed to save",
-        description: err.message,
-        type: "error",
-      });
-    },
+    onError: (err) =>
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't save the session policy",
+      }),
   });
 
   const persisted = policyQuery.data?.maxSessionDurationDays ?? 0;

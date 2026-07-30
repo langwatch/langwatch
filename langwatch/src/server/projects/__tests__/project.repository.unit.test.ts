@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { ProjectRepository } from "../project.repository";
 import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { ProjectRepository } from "../project.repository";
 
 function makeMockPrisma(findUniqueResult: unknown = null) {
   return {
@@ -20,7 +20,9 @@ describe("ProjectRepository", () => {
         });
         const repository = new ProjectRepository(prisma);
 
-        const result = await repository.getOrganizationId({ projectId: "proj_1" });
+        const result = await repository.getOrganizationId({
+          projectId: "proj_1",
+        });
 
         expect(result).toBe("org_1");
       });
@@ -31,7 +33,9 @@ describe("ProjectRepository", () => {
         const prisma = makeMockPrisma(null);
         const repository = new ProjectRepository(prisma);
 
-        const result = await repository.getOrganizationId({ projectId: "proj_missing" });
+        const result = await repository.getOrganizationId({
+          projectId: "proj_missing",
+        });
 
         expect(result).toBeNull();
       });
@@ -45,7 +49,9 @@ describe("ProjectRepository", () => {
         });
         const repository = new ProjectRepository(prisma);
 
-        const result = await repository.getOrganizationId({ projectId: "proj_1" });
+        const result = await repository.getOrganizationId({
+          projectId: "proj_1",
+        });
 
         expect(result).toBeNull();
       });

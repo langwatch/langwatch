@@ -1,11 +1,15 @@
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import type { DeepPartial } from "~/utils/types";
 import { buildPoint, type PreparedMetricPoint } from "./canonical/buildPoint";
-import { candidatePointCount, METRIC_KIND_DATA_KEY, metricKind } from "./canonical/kinds";
 import {
-  redactTypedAttributes,
+  candidatePointCount,
+  METRIC_KIND_DATA_KEY,
+  metricKind,
+} from "./canonical/kinds";
+import {
   type PiiRedactionLevel,
   type RedactionService,
+  redactTypedAttributes,
 } from "./canonical/redaction";
 import { isRecord, type UnknownRecord } from "./canonical/serialization";
 

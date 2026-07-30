@@ -1,5 +1,5 @@
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const TEST_TABLE = "test_rmt_ttl_retention";
 
@@ -9,7 +9,8 @@ describe("ReplacingMergeTree + TTL retention compatibility", () => {
 
   beforeAll(async () => {
     const connectionUrl =
-      process.env.CLICKHOUSE_URL ?? "http://default:langwatch@localhost:8123/langwatch";
+      process.env.CLICKHOUSE_URL ??
+      "http://default:langwatch@localhost:8123/langwatch";
     const url = new URL(connectionUrl);
     database = url.pathname.replace("/", "") || "langwatch";
     client = createClient({ url: connectionUrl });

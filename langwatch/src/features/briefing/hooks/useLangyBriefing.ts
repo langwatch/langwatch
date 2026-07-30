@@ -11,8 +11,8 @@ import { api } from "~/utils/api";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { formatMoney } from "~/utils/formatMoney";
 import {
-  buildAttentionInbox,
   type AttentionInboxSignals,
+  buildAttentionInbox,
   type CountedSignal,
 } from "../attentionInbox";
 import { getBriefingMock, useBriefingMock } from "../mocks/briefingMocks";
@@ -607,8 +607,7 @@ export function useLangyBriefing(): LangyBriefingResult {
           maximumFractionDigits: 1,
         }).format(tokens),
         tone: "vanity",
-        delta:
-          pctDelta(tokens, previousTokens) ?? devMockDelta("Total tokens"),
+        delta: pctDelta(tokens, previousTokens) ?? devMockDelta("Total tokens"),
         deltaTone: "neutral",
       });
     }
@@ -655,9 +654,7 @@ export function useLangyBriefing(): LangyBriefingResult {
         ...(hasScenarios && totals.failed > 0
           ? [`Why are ${totals.failed} scenarios failing?`]
           : []),
-        ...(cost !== undefined && cost > 0
-          ? ["Where is my cost going?"]
-          : []),
+        ...(cost !== undefined && cost > 0 ? ["Where is my cost going?"] : []),
       ].slice(0, 3),
       sessionHref: hasScenarios && slug ? `/${slug}/simulations` : undefined,
     };

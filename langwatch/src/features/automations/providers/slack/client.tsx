@@ -15,6 +15,17 @@ import {
   useListCollection,
   VStack,
 } from "@chakra-ui/react";
+import {
+  SLACK_BOT_TOKEN_KEPT,
+  type SlackActionParams,
+  type SlackDeliveryMethod,
+  type SlackPreview,
+  type SlackTemplateType,
+  slackDeliveryMethodOf,
+} from "@langwatch/automations/providers/slack";
+import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
+import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
 import { ExternalLink } from "lucide-react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";
@@ -30,8 +41,7 @@ import {
   LiquidEditor,
   TemplateDisclosure,
 } from "~/features/automations/editors/templateAuthoring";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
-import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
+import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
 import { TestFireButton } from "../TestFireButton";
 import type {
@@ -39,15 +49,6 @@ import type {
   NotifyClientDef,
   SummaryIdentity,
 } from "../types";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import {
-  SLACK_BOT_TOKEN_KEPT,
-  slackDeliveryMethodOf,
-  type SlackActionParams,
-  type SlackDeliveryMethod,
-  type SlackPreview,
-  type SlackTemplateType,
-} from "@langwatch/automations/providers/slack";
 import {
   findTemplateOptionBySource,
   pickDefaultSlackBlockKitTemplateId,
@@ -260,6 +261,17 @@ function channelOption(channel: {
 }
 
 /**
+ * Terminates a sentence so another can follow it.
+ *
+ * `describeError` only ends in a full stop when the code has body copy to add
+ * — a bare title ("Couldn't load channels") comes back unpunctuated — and the
+ * hint below always glues the "you can still type it" affordance on the end.
+ */
+function endWithStop(sentence: string): string {
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
+/**
  * Channel field: a typeable combobox. Manual entry always works (type a name or
  * paste an ID); once a token is present the channel list is fetched
  * AUTOMATICALLY and drops in as filterable suggestions. Picking a suggestion
@@ -391,9 +403,7 @@ function SlackChannelField({
   const canLoad =
     typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
   const returnedError =
-    list.data?.error && list.data.error !== "no_token"
-      ? list.data.error
-      : null;
+    list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
   // A listing can succeed and still be short of the workspace. Saying nothing
   // is the worst option: the author scrolls a list that looks complete, doesn't
   // find their channel, and concludes the integration is broken.
@@ -414,7 +424,12 @@ function SlackChannelField({
     ? `${gapHints.join(" ")} Type the channel name or paste its ID above to use one that isn't shown.`
     : null;
   const hint = list.isError
-    ? `Couldn't load channels: ${list.error?.message ?? "request failed"}. You can still type the channel above.`
+    ? `${endWithStop(
+        describeError({
+          error: list.error,
+          fallbackTitle: "Couldn't load channels",
+        }),
+      )} You can still type the channel above.`
     : returnedError === "missing_scope"
       ? "Add the channels:read permission to your Slack app and reinstall it to pick from a list — you can still type the channel above."
       : returnedError
@@ -769,7 +784,9 @@ function SlackConfigForm({
                   // reset effect above sees a consistent pair and leaves it
                   // alone.
                   ctx.setNotificationCadence(
-                    option.cadenceFit === "digest" ? "5min_digest" : "immediate",
+                    option.cadenceFit === "digest"
+                      ? "5min_digest"
+                      : "immediate",
                   );
                   onChange({
                     ...slice,
@@ -937,8 +954,8 @@ function SlackBotFields({
             <List.Root as="ol" gap={1} paddingLeft={4}>
               <List.Item>
                 <Text textStyle="xs" color="fg.muted">
-                  Create the app with &ldquo;From a manifest&rdquo; and paste the
-                  copied manifest — it sets the permissions for you.
+                  Create the app with &ldquo;From a manifest&rdquo; and paste
+                  the copied manifest — it sets the permissions for you.
                 </Text>
               </List.Item>
               <List.Item>

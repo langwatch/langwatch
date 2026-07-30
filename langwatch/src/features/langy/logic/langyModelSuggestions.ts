@@ -41,7 +41,11 @@ export const SUGGESTED_MODEL_LIMIT = 5;
  * The groups a representative is drawn from, in the order they are offered.
  * `multimodal` and `custom` are absent on purpose — see the module doc.
  */
-const REPRESENTED_GROUPS: LangyModelGroup[] = ["quick", "balanced", "reasoning"];
+const REPRESENTED_GROUPS: LangyModelGroup[] = [
+  "quick",
+  "balanced",
+  "reasoning",
+];
 
 /** The minimum a model must expose for the split to reason about it. */
 export interface SplittableModel {

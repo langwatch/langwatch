@@ -10,7 +10,7 @@ import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ObjectNotFoundError } from "../errors";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
@@ -100,7 +100,11 @@ describe("when put writes a temporary file first", () => {
       sha256: "atomicsha256",
     });
 
-    await driver.put(uri, Buffer.from("atomic bytes"), "application/octet-stream");
+    await driver.put(
+      uri,
+      Buffer.from("atomic bytes"),
+      "application/octet-stream",
+    );
 
     const dir = path.join(tmpDir, "proj-atomic");
     const entries = await fs.readdir(dir);

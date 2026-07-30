@@ -130,9 +130,8 @@ export class LangyGithubInstallationsService {
       // Best-effort: cache the selected repo list so settings can show it
       // without a live call. A failure here must not fail the install.
       try {
-        repositories = await this.appTokens.listInstallationRepositories(
-          installationId,
-        );
+        repositories =
+          await this.appTokens.listInstallationRepositories(installationId);
       } catch (error) {
         logger.warn(
           { error, installationId },
@@ -213,9 +212,8 @@ export class LangyGithubInstallationsService {
           const details = await this.appTokens.getInstallation(installationId);
           let repositories: LangyGithubRepositoryRef[] | null = null;
           if (details.repositorySelection === "selected") {
-            repositories = await this.appTokens.listInstallationRepositories(
-              installationId,
-            );
+            repositories =
+              await this.appTokens.listInstallationRepositories(installationId);
           }
           await this.repo.setRepositories({
             installationId,
@@ -240,9 +238,8 @@ export class LangyGithubInstallationsService {
   async listRepositoriesForOrganization(
     organizationId: string,
   ): Promise<GithubRepository[]> {
-    const installations = await this.repo.findAllForOrganization(
-      organizationId,
-    );
+    const installations =
+      await this.repo.findAllForOrganization(organizationId);
     const seen = new Set<string>();
     const out: GithubRepository[] = [];
     for (const inst of installations) {
@@ -269,7 +266,7 @@ export class LangyGithubInstallationsService {
   /**
    * Mint the per-turn installation token Langy hands the worker.
    *
-   * Repo resolution (LANGY_GITHUB_AUTH_PLAN.md §7.2 — agent-infers, control
+   * Repo resolution (agent-infers, control
    * plane validates): when the turn carries an explicit `repositoryFullName`,
    * find the installation that can reach it and scope the token to ONLY that
    * repo. Otherwise scope to the installation's full repository set (still
@@ -290,9 +287,8 @@ export class LangyGithubInstallationsService {
     repositoryFullName?: string;
   }): Promise<LangyGithubTurnToken | null> {
     if (!this.configured) return null;
-    const installations = await this.repo.findAllForOrganization(
-      organizationId,
-    );
+    const installations =
+      await this.repo.findAllForOrganization(organizationId);
     const usable = installations.filter((i) => !i.suspendedAt);
     if (usable.length === 0) return null;
 

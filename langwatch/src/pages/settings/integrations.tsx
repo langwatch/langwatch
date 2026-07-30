@@ -154,7 +154,12 @@ function InstallationRow({
         }`;
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+    <Box
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      padding={3}
+    >
       <HStack justify="space-between" gap={3}>
         <VStack align="stretch" gap={0}>
           <HStack gap={2}>
@@ -172,8 +177,7 @@ function InstallationRow({
           </Text>
           {uninstallStarted ? (
             <Text fontSize="xs" color="fg.muted">
-              Finish uninstalling on GitHub — this updates once GitHub
-              confirms.
+              Finish uninstalling on GitHub — this updates once GitHub confirms.
             </Text>
           ) : null}
         </VStack>

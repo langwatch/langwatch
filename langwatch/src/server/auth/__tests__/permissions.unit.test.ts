@@ -8,8 +8,8 @@ vi.mock("~/server/api/rbac", () => ({
     resolveProjectPermissionMock(...args),
 }));
 
-import { requireProjectPermission } from "../permissions";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import { requireProjectPermission } from "../permissions";
 
 const prisma = {} as any;
 
@@ -37,7 +37,15 @@ describe("requireProjectPermission", () => {
   });
 
   describe("when the user is not a member", () => {
-    it("throws", async () => {
+    /**
+     * A denial is knowable and the caller can act on it — ask an admin for the
+     * permission `meta` names — so it is a handled error, not the bare `Error`
+     * it used to be. Asserted on `code` and `meta`, never on the sentence: a
+     * route once told a 403 from a 500 by comparing that sentence word for
+     * word, which is exactly what this shape exists to stop.
+     */
+    /** @scenario "A project permission denial names itself" */
+    it("refuses with a code, the customer's fault, and the permission", async () => {
       resolveProjectPermissionMock.mockResolvedValueOnce({
         permitted: false,
         organizationRole: null,
@@ -50,7 +58,12 @@ describe("requireProjectPermission", () => {
           permission: "traces:view",
           prisma,
         }),
-      ).rejects.toThrow("You do not have permission to access this project resource");
+      ).rejects.toMatchObject({
+        code: "project_permission_denied",
+        httpStatus: 403,
+        fault: "customer",
+        meta: { permission: "traces:view" },
+      });
     });
   });
 
@@ -68,7 +81,7 @@ describe("requireProjectPermission", () => {
           permission: "project:delete",
           prisma,
         }),
-      ).rejects.toThrow("You do not have permission to access this project resource");
+      ).rejects.toMatchObject({ code: "project_permission_denied" });
     });
   });
 

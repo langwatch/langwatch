@@ -35,11 +35,14 @@ export function useSignalFocusedHomeVisibility(): {
   show: boolean;
   isResolving: boolean;
 } {
-  const { project, organization, isLoading: contextLoading } =
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    });
+  const {
+    project,
+    organization,
+    isLoading: contextLoading,
+  } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
   const { enabled, isLoading: flagLoading } = useFeatureFlag(
     SIGNAL_FOCUSED_HOME_FLAG,
     {

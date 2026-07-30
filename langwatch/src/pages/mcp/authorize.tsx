@@ -8,15 +8,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useState } from "react";
-import { toaster } from "../../components/ui/toaster";
+import { useSession } from "~/utils/auth-client";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   DashboardLayout,
   ProjectSelector,
 } from "../../components/DashboardLayout";
+import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useSession } from "~/utils/auth-client";
 
 export default function McpAuthorize() {
   const router = useRouter();
@@ -45,7 +45,9 @@ export default function McpAuthorize() {
         if (value) params.set(key, value);
       }
       const callbackUrl = `/mcp/authorize?${params.toString()}`;
-      void router.replace(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+      void router.replace(
+        `/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`,
+      );
     }
   }, [session, status]);
 

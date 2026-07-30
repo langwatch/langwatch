@@ -135,7 +135,13 @@ function Wire({ kind }: { kind: WireKind }) {
           p="1.5"
         >
           <HStack gap="1.5" align="start">
-            <Box h="5" w="5" bg="bg.emphasized" borderRadius="xs" flexShrink={0} />
+            <Box
+              h="5"
+              w="5"
+              bg="bg.emphasized"
+              borderRadius="xs"
+              flexShrink={0}
+            />
             <Stack gap="1" flex="1">
               <Box h="2.5" bg="fg" borderRadius="xs" w="70%" />
               <Box h="1.5" bg="fg.muted" borderRadius="xs" w="50%" />
@@ -193,7 +199,9 @@ function WireStack({ rows }: { rows: WireKind[] }) {
 }
 
 export function TraceAlertCompactWireframe() {
-  return <WireStack rows={["header", "context", "quote", "quote", "context"]} />;
+  return (
+    <WireStack rows={["header", "context", "quote", "quote", "context"]} />
+  );
 }
 
 export function TraceAlertOneLinerWireframe() {
@@ -285,9 +293,7 @@ export function GraphAlertOneLinerWireframe() {
 }
 
 export function GraphAlertResolvedWireframe() {
-  return (
-    <WireStack rows={["alertSuccess", "section", "fields", "context"]} />
-  );
+  return <WireStack rows={["alertSuccess", "section", "fields", "context"]} />;
 }
 
 export function GraphAlertNoDataWireframe() {

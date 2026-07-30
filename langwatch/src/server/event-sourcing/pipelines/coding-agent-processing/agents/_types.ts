@@ -130,9 +130,14 @@ export interface CodingAgentDefinition {
 
   /**
    * True when the agent's telemetry is events-only (no spans): the session
-   * fold then folds model calls and tool runs from its LOG events. This is
-   * the double-count gate — an agent with this flag must never also emit
-   * the equivalent spans into the pipeline.
+   * fold then folds model calls and tool runs from its LOG events.
+   *
+   * This is the double-count gate, and it is ENFORCED on both sides —
+   * `applyLogToCodingAgentSession` folds those facts only for a logs-only
+   * agent, and `applySpanToCodingAgentSession` skips them only for one. It
+   * cannot be a rule about what an agent is allowed to emit: an agent with
+   * this flag may still export the equivalent spans (Cowork does, behind its
+   * beta trace-export flag), and the pipeline accepts them for their identity.
    */
   logsOnly?: boolean;
 }

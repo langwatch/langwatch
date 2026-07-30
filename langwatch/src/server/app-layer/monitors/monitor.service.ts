@@ -14,11 +14,16 @@ export class MonitorService {
     return new MonitorService(new PrismaMonitorRepository(prisma));
   }
 
-  async getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]> {
+  async getEnabledOnMessageMonitors(
+    projectId: string,
+  ): Promise<MonitorSummary[]> {
     return this.repo.getEnabledOnMessageMonitors(projectId);
   }
 
-  async getMonitorById(params: { projectId: string; monitorId: string }): Promise<MonitorWithEvaluator | null> {
+  async getMonitorById(params: {
+    projectId: string;
+    monitorId: string;
+  }): Promise<MonitorWithEvaluator | null> {
     return this.repo.getMonitorById(params);
   }
 

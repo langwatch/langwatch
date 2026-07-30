@@ -1878,6 +1878,7 @@ Errors (like successes) always carry:
 | `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed or used an unknown mode. |
 | `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
+| `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
 | `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
@@ -2748,6 +2749,7 @@ A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every g
 | `project` | All gateway traffic in this project. |
 | `virtual_key` | This specific VK. |
 | `principal` | This user or service account across any VK they use. |
+| `group` | Each member of the group individually (see below). |
 
 A request is evaluated against **every** budget whose scope applies. For example, a request made by user Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against:
 
@@ -2756,13 +2758,30 @@ A request is evaluated against **every** budget whose scope applies. For example
 - Project `demo`'s budgets (all windows).
 - VK `prod-key`'s budgets (all windows).
 - Alice's principal budgets (all windows).
+- Per-member budgets of every group Alice belongs to (all windows).
+
+### Group budgets are per member
+
+A `group` budget targets one of your [Groups](/ai-gateway/rbac) (the same entity SCIM provisions) and gives **each member their own allowance**, not one shared pot: a $10/day budget on group `engineering` caps Alice at $10 and Bob at $10, and Bob's spend never counts against Alice. One budget row covers every member, and someone joining the group is covered on their key's next configuration resolve without anyone editing budgets.
+
+Two consequences worth knowing:
+
+- Group budgets only apply to keys with a person behind them (a personal VK, or any VK with a principal). A shared service key has no member to charge the per-member allowance to, so group budgets do not constrain it; cap shared keys with `project`, `team`, or `virtual_key` budgets instead.
+- Group budgets require the ClickHouse spend ledger, because per-member enforcement needs each member's spend told apart. On self-hosted deploys reading budget spend from Postgres only, creating a group budget is refused with `group_budget_requires_clickhouse` rather than silently capping every member at the group's combined spend.
+
+### Provider-filtered budgets
+
+Any budget, on any scope, can additionally be filtered to a **single provider**: "OpenAI $200/month for this team" is one budget with a provider filter, not a new kind of scope. With a filter set:
+
+- Only requests dispatched to that provider debit the budget. Every ledger debit stamps the provider that actually served the request, so two budgets on the same target with different filters never share spend.
+- On breach, the filtered provider is removed from the request's candidate chain the way an unavailable provider would be. If the key can fall back, another provider serves the request and the caller sees nothing but a slower first token. Only when the exclusions leave the chain empty (for example on a key with routing set to no fallback) is the request blocked, with a `402` naming the budget in `error.meta.budget_id` and the provider in `error.meta.budget_provider`.
 
 If **any** budget hard-blocks, the request is rejected. If **any** warn-threshold is breached, a warning header is added. Hard-block wins over warn.
 
 ## Windows
 
 - `minute`, `hour`, `day`, `week`, `month`, `total`.
-- Calendar-aligned: `month` resets on day 1 of the next month in the org's default timezone (UTC unless the org overrides). `week` starts Monday in ISO-8601.
+- Calendar-aligned and computed in **UTC**: `day` resets at 00:00 UTC, `week` starts Monday 00:00 UTC (ISO-8601), `month` resets on day 1 at 00:00 UTC. The `timezone` column exists on the API for forward compatibility but enforcement does not honor it yet, so the UI states UTC and offers no timezone choice.
 - `total` never resets, useful for one-off grant-style budgets.
 
 ## on_breach
@@ -2777,13 +2796,18 @@ If **any** budget hard-blocks, the request is rejected. If **any** warn-threshol
 | Field | Example |
 |---|---|
 | Name | `eng-team-monthly` |
-| Scope | `team` |
+| Applies to | `organization`, `group`, `team`, `project`, `member`, or `virtual key` |
 | Target | `platform` team |
+| Provider | `All providers` (default), or a single provider to filter to |
 | Window | `month` |
 | Limit (USD) | `5000` |
 | on_breach | `warn` at 80%, `block` at 100% (see "Multiple tiers" below) |
 
 Save. The budget is in force immediately; the next request counts against it.
+
+<Frame caption="The budget drawer targets any dimension, with the provider filter as an orthogonal choice.">
+  ![New budget drawer](/images/ai-gateway/budget-create-drawer.png)
+</Frame>
 
 ## Multiple tiers on the same scope
 
@@ -2844,6 +2868,10 @@ Cache reads, writes are priced **separately** per provider, Anthropic cache read
 
 ## Viewing budget spend (UI)
 
+<Frame caption="The budgets list: one row per budget across every dimension, each with its utilization bar and reset.">
+  ![Budgets list](/images/ai-gateway/budgets-page.png)
+</Frame>
+
 The **/gateway/budgets** list shows every budget with a utilization bar, hard cap, and remaining amount:
 
 - **Spent/Limit column** carries a colored progress bar and a matching %-badge (green ≤ 50%, orange 50-80%, red ≥ 80%/100%) so scanning "which budgets are hot" is a one-glance read.
@@ -2859,7 +2887,15 @@ Clicking a row opens **/gateway/budgets/[id]**: a detail page mirroring the VK d
 - **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
 - **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact), Amount (smart-decimals, e.g. `$0.0183`, not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
 
-Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down.
+<Frame caption="A breached budget's detail page: full utilization, the enforcement mode, and the debits that consumed it.">
+  ![Breached budget detail](/images/ai-gateway/budget-breached-detail.png)
+</Frame>
+
+Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down. The **This month** preset covers the same UTC month-to-date window the keys list's spend column reports, which is where that column's click-through lands.
+
+<Frame caption="Usage on the This month preset, filtered to one key: the same window and the same figures as the spend column that linked here.">
+  ![Usage this month](/images/ai-gateway/usage-this-month.png)
+</Frame>
 
 Programmatic equivalent:
 
@@ -8189,7 +8225,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 - **Per-request guardrails**: invoke your LangWatch evaluators inline on the request, response, or each streaming chunk. Decisions: `allow`, `block`, `modify` (redact).
 - **Tool, MCP, URL policy**: block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
 - **Caching passthrough**: Anthropic `cache_control` markers are forwarded byte-for-byte by default (protecting your 90% cache discount). Override per-request with `X-LangWatch-Cache: respect|force|disable`.
-- **Automatic fallback**: per-virtual-key fallback chain (e.g. OpenAI → Anthropic → Bedrock) triggers on 5xx, timeout, 429, or circuit-breaker-open. 400/401 client errors never trigger fallback.
+- **Fallback, when the key asks for it**: per-virtual-key routing is an explicit choice. New keys default to no fallback (a provider failure surfaces to the caller); a key set to fall back walks its eligible chain (e.g. OpenAI → Anthropic → Bedrock) on 5xx, timeout, 429, or circuit-breaker-open. 400/401 client errors never trigger fallback.
 - **Per-tenant observability**: every request emits a LangWatch trace to the owning project with `langwatch.virtual_key_id`, `langwatch.project_id`, `langwatch.principal_id`, `langwatch.cost_usd`, cache-hit token breakdown, and status. Shared multi-tenant gateway, per-tenant trace routing.
 - **Coding-CLI integrations**: preserves the tool-call streaming deltas that Claude Code and Codex depend on. Documented setup for the major coding assistants in [CLI Integrations](/ai-gateway/cli/overview).
 - **Self-hostable**: ships as a Helm chart alongside the LangWatch app. Horizontally scales, serves traffic during control-plane outages (with bootstrap mode).
@@ -12393,23 +12429,57 @@ Server-side, the secret is stored as `hex(hmac_sha256(server_pepper, secret))`. 
 
 ## Creating a VK
 
-Under **AI Gateway → Virtual Keys** click **New virtual key** and fill:
+Under **AI Gateway → Virtual Keys** click **New virtual key**. The drawer walks four decisions, top to bottom: where the key lives, what it may spend, which providers it may reach, and whether it fails over.
 
-| Field | Meaning |
-|---|---|
-| Name | Human label. Used in the UI and in `langwatch.vk.name` trace attribute. |
-| Environment | `live` (default) or `test`. Reflected in the key prefix. |
-| Scopes | One or more rows selecting where the VK is valid (ORGANIZATION / TEAM / PROJECT). The picker shows every scope the caller holds `virtualKeys:manage` on. Cross-scope VKs (e.g. TEAM "platform" AND TEAM "data-sci") require manage on every named scope. |
-| Routing policy | Optional. If unset, the VK falls back to the org's default policy, ordered by `fallbackPriorityGlobal` then `createdAt` across every ModelProvider visible in the VK's scope cascade. Pin a specific policy to override the default fallback order. |
-| Models allowed | Optional allowlist. Blank = "any model the eligible ModelProviders support." |
-| Model aliases | Map of client-friendly names → `provider/model`. E.g. `gpt-4o: azure/my-deployment`. |
-| Cache policy | `respect` (default), `force`, or `disable`. |
-| Guardrails | Attach existing LangWatch evaluators as `pre`, `post`, `stream_chunk` hooks, the drawer has a dedicated picker section listing every project evaluator with `executionMode = AS_GUARDRAIL`. Fail-open toggles on pre and post directions surface the concrete `403`, 50 ms, terminal-SSE enforcement shape so operators know what the toggle actually does. See [Guardrails → Attaching guardrails to a VK](/ai-gateway/guardrails#attaching-guardrails-to-a-vk). |
-| Blocked patterns | Regex allow/deny for tool names, MCP servers, URLs. |
-| Initial budget | Optionally attach a budget on creation. Budgets can always be added later. |
-| Personal (principal) | Optional. Mark the VK as personal by setting `principalUserId`. Personal VKs cascade budgets through the principal first. The CLI device-flow self-mints a personal VK at ORG scope without requiring an explicit `virtualKeys:manage` grant. |
+<Frame caption="The create drawer: ownership with the trace destination stated inline, the budget field with the budgets the draft already inherits, provider access and routing below.">
+  ![New virtual key drawer](/images/ai-gateway/vk-create-drawer.png)
+</Frame>
 
-Click **Create**. The full secret is revealed inline with a **Copy** button and a **I've saved it, close** confirmation that must be checked before dismissing. After dismiss, the secret is gone for good.
+### Ownership
+
+Who can see and manage the key, and where its traces and costs land:
+
+- **Project** (default): the key belongs to one project, and the drawer states the consequence inline: "Traces and costs land in `<project>`".
+- **Personal**: your own key. Traces and costs land in your personal workspace, and your per-member and principal budgets apply to it.
+- **Team** / **Organization** (for roles that can create shared keys): shared keys valid across the team or the whole org. A shared key still needs one project for its traces and costs to land in, and the drawer requires that choice before it lets you create the key: spend that lands nowhere could not be capped by any budget. The destination is stored as the key's `trace_project_id`, not as a scope: it decides where traces land and nothing else, so administering that project grants no visibility into the key and no right to change it. The drawer always requires the choice; the API additionally accepts omission, in which case traces land in the org's governance project, and refuses creation only when no destination resolves at all.
+
+Ownership decides which budgets the key inherits and which providers it can reach; changing it re-resolves both live in the drawer.
+
+### Budget
+
+A dollar amount and a period (`per day`, `per week`, `per month`). Leave it empty for no cap on the key itself. The annotation states exactly what a filled budget does, for example "Max $30/day, resets 00:00 UTC" (resets are computed in UTC; see [Budgets → Windows](/ai-gateway/budgets#windows)).
+
+Creating the key with a budget creates both in one transaction, so the key never exists without the cap its creator asked for. Clearing the field later, or revoking the key, archives the budget instead of deleting it: its ledger stays as the audit trail of what the key cost.
+
+Under the field, **Inherited budgets** lists every budget that already constrains the draft key, each with its limit, period, and current spend. A provider-filtered budget is badged with which provider it counts ("OpenAI only") and a per-member group budget is badged "per member". The list is resolved by the same code the gateway enforces from, so it cannot promise a constraint that will not apply or miss one that will. Group budgets appear only when the draft key carries a principal, the person behind the key; personal ownership is the usual way a draft gains one, but any key with a principal qualifies. A shared service key has no member to charge a per-member allowance to.
+
+### Provider access
+
+A checkbox list of every provider the key's ownership can reach, each with a chip naming where the provider is configured.
+
+- **All providers** (default) persists as the absence of a list: providers added to the key's scope later become reachable **without editing the key**. This is what keeps a long-lived key current.
+- An explicit selection stays exactly as picked: a provider added later is not reachable until someone edits the key. At least one provider must stay selected.
+- Expanding a provider row shows its models; checking models restricts the key to exactly those. The restriction is per **vendor**, not per provider row: two providers of the same vendor (say, two Anthropic accounts) share one model list, and the drawer mirrors a change made under either row in both. A per-row restriction for same-vendor providers is not supported yet.
+
+<Frame caption="Provider access with a model accordion expanded: every provider carries a chip naming where it is configured, and the routing decision sits directly below.">
+  ![Provider access section](/images/ai-gateway/vk-provider-access.png)
+</Frame>
+
+### Routing
+
+What happens when the provider serving a request fails:
+
+- **Default: no fallback** (new keys): the error surfaces to the caller. No silent retry on a different vendor.
+- **Fall back to all eligible providers**: the request retries on the next eligible provider, ordered by `fallbackPriorityGlobal` then `createdAt`. Keys created before routing became an explicit choice keep this behavior.
+- **A routing policy**: pins an explicit ordered provider list.
+
+Click **Create**. The full secret is revealed exactly once with a **Copy** button and a confirmation checkbox that must be checked before dismissing. After dismiss, the secret is gone for good.
+
+The keys list shows a **Spent this month** column for every key, read from the same cost data the Usage tab reports. Clicking it opens Usage on its **This month** preset, pre-filtered to that key: the same UTC month-to-date window the column is computed over, so the number you click and the page you land on agree.
+
+<Frame caption="Spent this month on the keys list. The figures come from the cost path, so uncapped keys report real spend too.">
+  ![Spend column](/images/ai-gateway/vk-spend-column.png)
+</Frame>
 
 ## VK detail page
 
@@ -12463,7 +12533,7 @@ Trace attribution on every request:
 
 - `langwatch.virtual_key_id`
 - `langwatch.organization_id` (always present)
-- `langwatch.project_id` — resolution order: (a) the VK's unique PROJECT-scope row, if it has exactly one; otherwise (b) the org's `internal_governance` project, where TEAM- and ORG-scoped VK spans land so all governance traffic surfaces in one filter view. If neither exists (older self-hosted deployments without governance), the attribute is omitted rather than 500ing the bundle.
+- `langwatch.project_id`, resolution order: (a) the VK's unique PROJECT-scope row, if it has exactly one; otherwise (b) the org's `internal_governance` project, where TEAM- and ORG-scoped VK spans land so all governance traffic surfaces in one filter view. The create drawer requires org- and team-owned keys to pick their trace project explicitly (spend that lands nowhere could not be capped by any budget); the governance fallback remains for API callers and pre-existing keys.
 - `langwatch.team_id` (present when the VK has a TEAM scope, or a unique team containing the resolved project)
 - `langwatch.principal_id` (present when `principalUserId` is set on the VK)
 
@@ -14353,6 +14423,61 @@ Every underlying query is tenant-isolated: a department rollup for your org cont
 - **Assign people:** [Members & invites](/ai-governance/members-and-invites).
 - **Understand access vs accounting:** [Roles & permissions](/ai-governance/roles-and-permissions).
 - **Provision via SCIM:** [Workspaces & access](/ai-governance/workspaces).
+
+---
+
+# FILE: ./ai-governance/explore-your-usage-with-your-own-agent.mdx
+
+---
+title: Explore your usage with your own agent
+description: Point Claude Code or any coding agent at your own LangWatch usage. One device login, one pasted prompt, and the agent answers where your tokens went.
+sidebarTitle: Explore usage with your agent
+---
+
+Once your sessions land on LangWatch (see [Track your Claude Code usage](/ai-governance/track-your-claude-code-usage)), the same CLI that captured them can read them back. That means your own coding agent can answer questions about your usage: no API key to paste, no dashboard clicking, just the `langwatch` CLI it already has.
+
+## One-time setup
+
+```bash
+npm install -g langwatch
+langwatch login
+```
+
+`langwatch login` opens a browser sign-in. Approve it once and the CLI works with your personal account from then on: when no API key is set (no `--api-key` flag, no `LANGWATCH_API_KEY` in the environment or `.env`), every command falls back to your device login and resolves your personal project by itself. `langwatch whoami` shows who you are logged in as.
+
+## The prompt
+
+Paste this into Claude Code (or Cursor, Codex, or any coding agent with shell access):
+
+```text
+Explore my LangWatch usage and tell me where my tokens and money went.
+
+The `langwatch` CLI works with my device login: no API key and no env vars needed. If a command says I am not logged in, have me run `langwatch login` once, then continue. `langwatch whoami` prints who I am logged in as.
+
+Read my usage with these commands (add `-o json` for machine-readable output):
+- `langwatch trace search --limit 50` lists my recent sessions with cost and token totals (`-q <text>`, `--start-date` / `--end-date` to narrow)
+- `langwatch trace get <traceId>` shows one session's full tree: models, per-span tokens, cache reads vs writes, tool calls
+- `langwatch analytics query -m total-cost --group-by metadata.model` aggregates spend over time (other presets: trace-count, user-count; raw metric paths with `-a sum|avg|p95`)
+- `langwatch trace export -f jsonl` dumps a whole window of traces when you want to crunch numbers yourself
+
+Start with the last 7 days: total spend, the most expensive sessions and what made them expensive (context size, cache misses, subagents, retries), and which models consumed the most. Then answer my follow-up questions about my own usage from the same data.
+```
+
+The same prompt is one click away in the app: on `/me`, once your account has traces, **Connect your agent** offers **Explore via your coding agent**, which copies it to your clipboard.
+
+## Questions your agent can answer
+
+Once the prompt is in, ask in plain language. Some that pay for themselves:
+
+- Where did my tokens go this week?
+- Which sessions were the most expensive?
+- What share of my usage ran above 150k context, and what should I do about it? (The usual fixes: `/compact` mid-task, `/clear` between tasks.)
+- How much usage came from sessions active 8+ hours, or from 4+ sessions running in parallel?
+- Which subagents consumed the most, and would a cheaper model fit the simple ones?
+- Which skills did I use the most?
+- How much of my usage came from MCP tool results staying in context?
+
+The agent reads the same traces you see on `/me` and `/traces`, so every answer can cite the sessions behind it.
 
 ---
 
@@ -17675,6 +17800,10 @@ You can read every prompt the agent issued, including the long system prompt and
 
 - **Path 1**: the gateway enforces it. Requests fail with `budget_exceeded` once you cross.
 - **Path 2**: alerts at 80% and 100%. Claude Code calls keep flowing; Anthropic does not let the receiver gate them.
+
+### Ask your own agent where your tokens went
+
+The same CLI that captured your sessions can read them back, authenticated by your device login, with no API key to configure (an explicit `LANGWATCH_API_KEY` still wins when you set one). Paste one prompt into Claude Code and it answers which sessions were the most expensive, what ran above 150k context, which subagents consumed the most, and more. See [Explore your usage with your own agent](/ai-governance/explore-your-usage-with-your-own-agent).
 
 ### Have the agent improve itself off its own traces
 
@@ -51143,7 +51272,7 @@ It omits `fsGroup`, since sharing it would reopen the cross-worker file boundary
 
 gVisor's kernel implements **no netfilter**. `iptables` and `nftables` fail in every mode under gVisor, so the usual way to control a container's outbound traffic (an `iptables` OWNER-match DROP or a REDIRECT to a local proxy) is not available here.
 
-That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-043) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
+That is why Langy enforces egress at the application layer instead: a per-worker CONNECT proxy (ADR-076) that the worker's `HTTPS_PROXY` points at. It checks TLS, checks the destination against the allow-list, and cross-checks the TLS SNI against the CONNECT authority to block domain fronting.
 
 The earlier `iptables`-based rule and its `NET_ADMIN` capability were removed because they are dead under gVisor.
 
@@ -54331,7 +54460,7 @@ Make sure `privateExcept` and `privateExceptV6` include any non-RFC1918 service 
 
 ## The L7 egress adapter
 
-When egress is on, each worker's outbound traffic is forced through a per-worker CONNECT proxy (ADR-043, Draft) that applies, in order:
+When egress is on, each worker's outbound traffic is forced through a per-worker CONNECT proxy (ADR-076) that applies, in order:
 
 | Control | Env var | Default | Effect |
 |---|---|---|---|

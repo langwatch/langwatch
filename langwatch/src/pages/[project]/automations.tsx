@@ -47,9 +47,9 @@ import {
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
+import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { automationContextChip } from "~/features/langy/logic/langyContextChips";
-import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -579,43 +579,45 @@ function AutomationsPage() {
                                   name: trigger.name,
                                 })}
                               >
-                              <Table.Row {...sharedRowProps(trigger)}>
-                                <Table.Cell fontWeight="medium">
-                                  {trigger.name}
-                                </Table.Cell>
-                                <Table.Cell maxWidth="260px">
-                                  <AlertSubjectCell
-                                    graphName={
-                                      trigger.customGraph?.name ?? null
-                                    }
-                                    graph={graphJsonById.get(
-                                      trigger.customGraphId ?? "",
-                                    )}
-                                    seriesName={actionParams.seriesName}
-                                  />
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <AlertRuleCell actionParams={actionParams} />
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {actionItems(trigger.action, actionParams)}
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <LastFiredCell
-                                    trigger={trigger}
-                                    stats={stats}
-                                  />
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <FiringStatus
-                                    firing={!!stats?.currentlyFiring}
-                                  />
-                                </Table.Cell>
-                                {activeCell(trigger)}
-                                <Table.Cell>
-                                  {rowActionsMenu(trigger)}
-                                </Table.Cell>
-                              </Table.Row>
+                                <Table.Row {...sharedRowProps(trigger)}>
+                                  <Table.Cell fontWeight="medium">
+                                    {trigger.name}
+                                  </Table.Cell>
+                                  <Table.Cell maxWidth="260px">
+                                    <AlertSubjectCell
+                                      graphName={
+                                        trigger.customGraph?.name ?? null
+                                      }
+                                      graph={graphJsonById.get(
+                                        trigger.customGraphId ?? "",
+                                      )}
+                                      seriesName={actionParams.seriesName}
+                                    />
+                                  </Table.Cell>
+                                  <Table.Cell whiteSpace="nowrap">
+                                    <AlertRuleCell
+                                      actionParams={actionParams}
+                                    />
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    {actionItems(trigger.action, actionParams)}
+                                  </Table.Cell>
+                                  <Table.Cell whiteSpace="nowrap">
+                                    <LastFiredCell
+                                      trigger={trigger}
+                                      stats={stats}
+                                    />
+                                  </Table.Cell>
+                                  <Table.Cell whiteSpace="nowrap">
+                                    <FiringStatus
+                                      firing={!!stats?.currentlyFiring}
+                                    />
+                                  </Table.Cell>
+                                  {activeCell(trigger)}
+                                  <Table.Cell>
+                                    {rowActionsMenu(trigger)}
+                                  </Table.Cell>
+                                </Table.Row>
                               </LangyContextTarget>
                             );
                           })}
@@ -779,49 +781,51 @@ function AutomationsPage() {
                                   name: trigger.name,
                                 })}
                               >
-                              <Table.Row
-                                data-trigger-id={trigger.id}
-                                cursor="pointer"
-                                _hover={{ bg: "bg.muted" }}
-                                onClick={() =>
-                                  openDrawer("automation", {
-                                    automationId: trigger.id,
-                                  })
-                                }
-                              >
-                                <Table.Cell fontWeight="medium">
-                                  {trigger.name}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <ReportSubjectCell
-                                    actionParams={actionParams}
-                                    graphNameById={graphNameById}
+                                <Table.Row
+                                  data-trigger-id={trigger.id}
+                                  cursor="pointer"
+                                  _hover={{ bg: "bg.muted" }}
+                                  onClick={() =>
+                                    openDrawer("automation", {
+                                      automationId: trigger.id,
+                                    })
+                                  }
+                                >
+                                  <Table.Cell fontWeight="medium">
+                                    {trigger.name}
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    <ReportSubjectCell
+                                      actionParams={actionParams}
+                                      graphNameById={graphNameById}
+                                    />
+                                  </Table.Cell>
+                                  <Table.Cell whiteSpace="nowrap">
+                                    <Text textStyle="sm">
+                                      {schedule?.cron
+                                        ? describeSchedule(
+                                            schedule.cron,
+                                            schedule.timezone ?? "UTC",
+                                          )
+                                        : "Not set"}
+                                    </Text>
+                                  </Table.Cell>
+                                  <ReportRunCells
+                                    schedule={scheduleByTriggerId.get(
+                                      trigger.id,
+                                    )}
+                                    loading={reportSchedules.isLoading}
                                   />
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <Text textStyle="sm">
-                                    {schedule?.cron
-                                      ? describeSchedule(
-                                          schedule.cron,
-                                          schedule.timezone ?? "UTC",
-                                        )
-                                      : "Not set"}
-                                  </Text>
-                                </Table.Cell>
-                                <ReportRunCells
-                                  schedule={scheduleByTriggerId.get(trigger.id)}
-                                  loading={reportSchedules.isLoading}
-                                />
-                                <Table.Cell>
-                                  {trigger.action === "SEND_SLACK_MESSAGE"
-                                    ? "Slack"
-                                    : "Email"}
-                                </Table.Cell>
-                                {activeCell(trigger)}
-                                <Table.Cell>
-                                  {rowActionsMenu(trigger)}
-                                </Table.Cell>
-                              </Table.Row>
+                                  <Table.Cell>
+                                    {trigger.action === "SEND_SLACK_MESSAGE"
+                                      ? "Slack"
+                                      : "Email"}
+                                  </Table.Cell>
+                                  {activeCell(trigger)}
+                                  <Table.Cell>
+                                    {rowActionsMenu(trigger)}
+                                  </Table.Cell>
+                                </Table.Row>
                               </LangyContextTarget>
                             );
                           })}
@@ -890,68 +894,68 @@ function AutomationsPage() {
                                   name: trigger.name,
                                 })}
                               >
-                              <Table.Row {...sharedRowProps(trigger)}>
-                                <Table.Cell fontWeight="medium">
-                                  {trigger.name}
-                                </Table.Cell>
-                                <Table.Cell maxWidth="360px">
-                                  <VStack gap={2} align="stretch">
-                                    {applyChecks(
-                                      trigger.checks?.filter(
-                                        (check): check is Monitor => !!check,
-                                      ) ?? [],
-                                    )}
-
-                                    {trigger.filterQuery ? (
-                                      // ADR-043: a trace-subject automation shows
-                                      // its search query.
-                                      <Code
-                                        size="sm"
-                                        variant="surface"
-                                        whiteSpace="pre-wrap"
-                                        wordBreak="break-word"
-                                      >
-                                        {trigger.filterQuery}
-                                      </Code>
-                                    ) : trigger.filters &&
-                                      typeof trigger.filters === "string" &&
-                                      trigger.filters !== "{}" ? (
-                                      <FilterDisplay
-                                        filters={trigger.filters}
-                                        hasBorder={true}
-                                      />
-                                    ) : null}
-                                  </VStack>
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <VStack align="start" gap={0}>
-                                    <Text textStyle="sm" fontWeight="medium">
-                                      {triggerActionName(trigger.action)}
-                                    </Text>
-                                    <Box textStyle="xs" color="fg.muted">
-                                      {actionItems(
-                                        trigger.action,
-                                        actionParams,
+                                <Table.Row {...sharedRowProps(trigger)}>
+                                  <Table.Cell fontWeight="medium">
+                                    {trigger.name}
+                                  </Table.Cell>
+                                  <Table.Cell maxWidth="360px">
+                                    <VStack gap={2} align="stretch">
+                                      {applyChecks(
+                                        trigger.checks?.filter(
+                                          (check): check is Monitor => !!check,
+                                        ) ?? [],
                                       )}
-                                    </Box>
-                                  </VStack>
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <LastFiredCell
-                                    trigger={trigger}
-                                    stats={stats}
-                                  />
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <Text as="span" color="fg.muted">
-                                    {stats?.recentFireCount ?? 0}
-                                  </Text>
-                                </Table.Cell>
-                                {activeCell(trigger)}
-                                <Table.Cell>
-                                  {rowActionsMenu(trigger)}
-                                </Table.Cell>
-                              </Table.Row>
+
+                                      {trigger.filterQuery ? (
+                                        // ADR-043: a trace-subject automation shows
+                                        // its search query.
+                                        <Code
+                                          size="sm"
+                                          variant="surface"
+                                          whiteSpace="pre-wrap"
+                                          wordBreak="break-word"
+                                        >
+                                          {trigger.filterQuery}
+                                        </Code>
+                                      ) : trigger.filters &&
+                                        typeof trigger.filters === "string" &&
+                                        trigger.filters !== "{}" ? (
+                                        <FilterDisplay
+                                          filters={trigger.filters}
+                                          hasBorder={true}
+                                        />
+                                      ) : null}
+                                    </VStack>
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    <VStack align="start" gap={0}>
+                                      <Text textStyle="sm" fontWeight="medium">
+                                        {triggerActionName(trigger.action)}
+                                      </Text>
+                                      <Box textStyle="xs" color="fg.muted">
+                                        {actionItems(
+                                          trigger.action,
+                                          actionParams,
+                                        )}
+                                      </Box>
+                                    </VStack>
+                                  </Table.Cell>
+                                  <Table.Cell whiteSpace="nowrap">
+                                    <LastFiredCell
+                                      trigger={trigger}
+                                      stats={stats}
+                                    />
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    <Text as="span" color="fg.muted">
+                                      {stats?.recentFireCount ?? 0}
+                                    </Text>
+                                  </Table.Cell>
+                                  {activeCell(trigger)}
+                                  <Table.Cell>
+                                    {rowActionsMenu(trigger)}
+                                  </Table.Cell>
+                                </Table.Row>
                               </LangyContextTarget>
                             );
                           })}

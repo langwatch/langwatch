@@ -1,13 +1,15 @@
 # Plan: Langy egress enforcement (PR4 of 4)
 
-- **ADR:** `dev/docs/adr/043-langy-egress-enforcement.md`
+> **Superseded — implemented.** The design of record is
+> `dev/docs/adr/076-langy-egress-enforcement.md` (Accepted, implemented); the
+> adapter, policy, throttle and SNI cross-check ship in
+> `services/langyagent/adapters/egress/`. This file is kept as the historical
+> plan, so the file paths and "not yet built" framing below describe the
+> intent at design time, not the shipped code.
+
+- **ADR:** `dev/docs/adr/076-langy-egress-enforcement.md`
 - **Spec:** `specs/langy/langy-egress-enforcement.feature`
 - **Branch (design):** `design/langy-pr4` (this doc + ADR + spec; docs-only)
-- **Implementation branch (later):** `feat/langy-egress-enforcement`
-- **BLOCKED ON PR3** — the egress instrumentation seam (PR1) and the monitor-only
-  telemetry (PR3) must be merged and have observed real traffic first. Every rung
-  below is defined relative to what PR3's monitoring proved legitimate. Do not
-  implement until PR3 lands.
 
 ## Goal
 
@@ -149,7 +151,7 @@ Docs:
 
 - [ ] `docs/langy-github-app.md §4` — update the existing L3/L4-FQDN note to
       point at the egress adapter as the primary FQDN enforcement point and
-      ADR-043 as the design; keep the Cilium option, add the netns fallback.
+      ADR-076 as the design; keep the Cilium option, add the netns fallback.
 
 ## Safe rollout order (monitor → throttle → block)
 

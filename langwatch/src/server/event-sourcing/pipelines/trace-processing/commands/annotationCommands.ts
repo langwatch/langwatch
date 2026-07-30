@@ -1,20 +1,20 @@
 import { defineCommand } from "../../../commands/defineCommand";
 import {
+  ADD_ANNOTATION_COMMAND_TYPE,
+  ANNOTATION_ADDED_EVENT_TYPE,
+  ANNOTATION_ADDED_EVENT_VERSION_LATEST,
+  ANNOTATION_REMOVED_EVENT_TYPE,
+  ANNOTATION_REMOVED_EVENT_VERSION_LATEST,
+  ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
+  ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST,
+  BULK_SYNC_ANNOTATIONS_COMMAND_TYPE,
+  REMOVE_ANNOTATION_COMMAND_TYPE,
+} from "../schemas/constants";
+import {
   annotationAddedEventDataSchema,
   annotationRemovedEventDataSchema,
   annotationsBulkSyncedEventDataSchema,
 } from "../schemas/events";
-import {
-  ADD_ANNOTATION_COMMAND_TYPE,
-  ANNOTATION_ADDED_EVENT_TYPE,
-  ANNOTATION_ADDED_EVENT_VERSION_LATEST,
-  REMOVE_ANNOTATION_COMMAND_TYPE,
-  ANNOTATION_REMOVED_EVENT_TYPE,
-  ANNOTATION_REMOVED_EVENT_VERSION_LATEST,
-  BULK_SYNC_ANNOTATIONS_COMMAND_TYPE,
-  ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
-  ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST,
-} from "../schemas/constants";
 
 export const AddAnnotationCommand = defineCommand({
   commandType: ADD_ANNOTATION_COMMAND_TYPE,
@@ -23,12 +23,14 @@ export const AddAnnotationCommand = defineCommand({
   aggregateType: "trace",
   schema: annotationAddedEventDataSchema,
   aggregateId: (d) => d.traceId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
   spanAttributes: (d) => ({
     "payload.trace.id": d.traceId,
     "payload.annotation.id": d.annotationId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.traceId}:add_annotation:${d.annotationId}`,
 });
 
 export const RemoveAnnotationCommand = defineCommand({
@@ -38,12 +40,14 @@ export const RemoveAnnotationCommand = defineCommand({
   aggregateType: "trace",
   schema: annotationRemovedEventDataSchema,
   aggregateId: (d) => d.traceId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
+  idempotencyKey: (d) =>
+    `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
   spanAttributes: (d) => ({
     "payload.trace.id": d.traceId,
     "payload.annotation.id": d.annotationId,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.traceId}:remove_annotation:${d.annotationId}`,
 });
 
 export const BulkSyncAnnotationsCommand = defineCommand({

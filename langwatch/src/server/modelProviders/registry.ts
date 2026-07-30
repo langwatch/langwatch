@@ -539,12 +539,11 @@ export function hasVariantSuffix(modelId: string): boolean {
 export const allLitellmModels: Record<
   string,
   { mode: "chat" | "embedding" | "audio" }
-> =
-  Object.fromEntries(
-    Object.entries(llmModels.models)
-      .filter(([id]) => !hasVariantSuffix(id))
-      .map(([id, model]) => [id, { mode: model.mode }]),
-  );
+> = Object.fromEntries(
+  Object.entries(llmModels.models)
+    .filter(([id]) => !hasVariantSuffix(id))
+    .map(([id, model]) => [id, { mode: model.mode }]),
+);
 
 // ============================================================================
 // Utility Functions

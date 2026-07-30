@@ -2,19 +2,18 @@ import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service"
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
 import {
   fireIntegrationMethodNurturing,
   mapProductSelectionToIntegrationMethod,
 } from "~/../ee/billing/nurturing/hooks/productInterest";
+import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
+import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
-
-import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 
 /**
  * Router for handling onboarding-related operations.
@@ -178,9 +177,7 @@ export const onboardingRouter = createTRPCRouter({
           projectSlug,
         };
       } catch (error) {
-        captureException(
-          toError(error),
-        );
+        captureException(toError(error));
         throw error;
       }
     }),
@@ -205,7 +202,9 @@ export const onboardingRouter = createTRPCRouter({
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      const traitValue = mapProductSelectionToIntegrationMethod(input.integrationMethod);
+      const traitValue = mapProductSelectionToIntegrationMethod(
+        input.integrationMethod,
+      );
 
       fireIntegrationMethodNurturing({
         userId: ctx.session.user.id,

@@ -375,6 +375,68 @@ test_overlay_stacking() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: workers liveness probe
+#
+# The worker probes must target the UNAUTHENTICATED /healthz path and carry no
+# credentials. Probing /metrics instead crash-loops the pod in two independent
+# ways, and both are default-ish configurations:
+#
+#   1. Stock install — app.telemetry.metrics.enabled is false, so
+#      METRICS_API_KEY is never emitted; with NODE_ENV=production the endpoint
+#      fails closed with 500 to every caller.
+#   2. secretKeyRef install — a kubelet httpGet probe cannot read a Secret, so
+#      no rendered Authorization header can carry the key and the probe gets 401.
+#
+# Baking the token into the podspec as a plain httpHeader is not a fix either:
+# it copies a secret into an object readable by anyone with `get deploy`, and
+# it still cannot cover case 1. See specs/server/worker-liveness-probe.feature.
+# ─────────────────────────────────────────────────────────────────────────────
+test_workers_probes() {
+  sep; info "Suite: workers liveness probe"
+
+  local workers_only
+  workers_only=$(tmpl_only "templates/workers/deployment.yaml" \
+    --set autogen.enabled=true --set workers.enabled=true)
+
+  assert_contains "workers probe path is /healthz" "$workers_only" "path: /healthz"
+  assert_not_contains "workers probe never targets /metrics" \
+    "$workers_only" "path: /metrics"
+  # Both probes, not just one — a startupProbe that passes while livenessProbe
+  # 500s still crash-loops the pod after startup.
+  local healthz_count
+  healthz_count=$(count_matches "$workers_only" "path: /healthz")
+  assert_eq "both startup and liveness probes use /healthz" "$healthz_count" "2"
+
+  # With a plain-value key configured the podspec must STILL carry no probe
+  # credentials — the token belongs in the env var (from the Secret), never in
+  # a probe header.
+  local with_key
+  with_key=$(tmpl_only "templates/workers/deployment.yaml" \
+    --set autogen.enabled=true --set workers.enabled=true \
+    --set app.telemetry.metrics.enabled=true \
+    --set app.telemetry.metrics.apiKey.value=probe-should-not-carry-this)
+  assert_not_contains "probes carry no httpHeaders when a key is set" \
+    "$with_key" "httpHeaders"
+  # The key still reaches the container as env (that is how the worker gates
+  # /metrics) — assert it is present there so this test can't pass by the key
+  # silently not being wired at all.
+  assert_contains "metrics key still reaches the container env" \
+    "$with_key" "probe-should-not-carry-this"
+
+  # The secretKeyRef path renders the env from the Secret and, again, no header.
+  local with_secret_ref
+  with_secret_ref=$(tmpl_only "templates/workers/deployment.yaml" \
+    --set autogen.enabled=true --set workers.enabled=true \
+    --set app.telemetry.metrics.enabled=true \
+    --set app.telemetry.metrics.apiKey.secretKeyRef.name=metrics-secret \
+    --set app.telemetry.metrics.apiKey.secretKeyRef.key=apiKey)
+  assert_contains "secretKeyRef key reaches the container env" \
+    "$with_secret_ref" "name: metrics-secret"
+  assert_not_contains "probes carry no httpHeaders under secretKeyRef" \
+    "$with_secret_ref" "httpHeaders"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Install — deploy size-dev + nodeport and verify live resources
 # ─────────────────────────────────────────────────────────────────────────────
 test_install_dev_nodeport() {
@@ -592,6 +654,7 @@ main() {
   test_size_overlays
   test_infra_overlays
   test_overlay_stacking
+  test_workers_probes
 
   # Phase 2: Live installs (slower, needs Kind + images)
   load_images

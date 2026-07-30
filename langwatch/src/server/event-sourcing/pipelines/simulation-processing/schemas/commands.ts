@@ -11,10 +11,12 @@ export const queueRunCommandDataSchema = z.object({
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
   /** Target for execution. Used by the execution reactor to spawn the right adapter. */
-  target: z.object({
-    type: z.enum(["prompt", "http", "code", "workflow"]),
-    referenceId: z.string(),
-  }).optional(),
+  target: z
+    .object({
+      type: z.enum(["prompt", "http", "code", "workflow"]),
+      referenceId: z.string(),
+    })
+    .optional(),
   occurredAt: z.number(),
 });
 export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;
@@ -40,7 +42,9 @@ export const messageSnapshotCommandDataSchema = z.object({
   status: z.string().optional(),
   occurredAt: z.number(),
 });
-export type MessageSnapshotCommandData = z.infer<typeof messageSnapshotCommandDataSchema>;
+export type MessageSnapshotCommandData = z.infer<
+  typeof messageSnapshotCommandDataSchema
+>;
 
 export const finishRunCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -60,7 +64,9 @@ export const textMessageStartCommandDataSchema = z.object({
   messageIndex: z.number().optional(),
   occurredAt: z.number(),
 });
-export type TextMessageStartCommandData = z.infer<typeof textMessageStartCommandDataSchema>;
+export type TextMessageStartCommandData = z.infer<
+  typeof textMessageStartCommandDataSchema
+>;
 
 export const textMessageEndCommandDataSchema = z.object({
   tenantId: z.string(),
@@ -73,22 +79,28 @@ export const textMessageEndCommandDataSchema = z.object({
   messageIndex: z.number().optional(),
   occurredAt: z.number(),
 });
-export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;
+export type TextMessageEndCommandData = z.infer<
+  typeof textMessageEndCommandDataSchema
+>;
 
 export const computeRunMetricsCommandDataSchema = z.object({
   tenantId: z.string(),
   scenarioRunId: z.string(),
   traceId: z.string(),
   /** ECST payload: metrics carried from trace-side reactor. Omitted in pull mode. */
-  metrics: z.object({
-    totalCost: z.number(),
-    roleCosts: z.record(z.string(), z.number()),
-    roleLatencies: z.record(z.string(), z.number()),
-  }).optional(),
+  metrics: z
+    .object({
+      totalCost: z.number(),
+      roleCosts: z.record(z.string(), z.number()),
+      roleLatencies: z.record(z.string(), z.number()),
+    })
+    .optional(),
   retryCount: z.number().default(0),
   occurredAt: z.number(),
 });
-export type ComputeRunMetricsCommandData = z.infer<typeof computeRunMetricsCommandDataSchema>;
+export type ComputeRunMetricsCommandData = z.infer<
+  typeof computeRunMetricsCommandDataSchema
+>;
 
 export const deleteRunCommandDataSchema = z.object({
   tenantId: z.string(),

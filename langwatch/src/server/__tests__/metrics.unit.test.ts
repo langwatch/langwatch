@@ -172,9 +172,9 @@ describe("isMetricsAuthorized", () => {
 describe("normalizeMetricsPath", () => {
   describe("when the path carries entity IDs", () => {
     it("collapses prefixed entity ids to {id}", () => {
-      expect(normalizeMetricsPath("/api/traces/trace_MWS36ZJSXeAGyj5zXLk7M")).toBe(
-        "/api/traces/{id}",
-      );
+      expect(
+        normalizeMetricsPath("/api/traces/trace_MWS36ZJSXeAGyj5zXLk7M"),
+      ).toBe("/api/traces/{id}");
       expect(normalizeMetricsPath("/api/prompts/prompt_Ab12Cd34Ef56")).toBe(
         "/api/prompts/{id}",
       );
@@ -182,7 +182,9 @@ describe("normalizeMetricsPath", () => {
 
     it("collapses hex trace ids to {id}", () => {
       expect(
-        normalizeMetricsPath("/api/trace/search/traces/957239e7ddb315d5518a4792601c3d67"),
+        normalizeMetricsPath(
+          "/api/trace/search/traces/957239e7ddb315d5518a4792601c3d67",
+        ),
       ).toBe("/api/trace/search/traces/{id}");
     });
 

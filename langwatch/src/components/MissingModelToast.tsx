@@ -93,14 +93,18 @@ export function showMissingModelToast(info: MissingModelInfo): void {
  * "double-check your model configuration" hint so the most common
  * cause (a misconfigured provider) is the first thing they think to
  * verify.
+ *
+ * There is deliberately no provider error string here. It used to be
+ * interpolated into the description, which put a raw SDK/upstream sentence —
+ * deployment names, endpoint hosts, echoed response bodies — on a customer's
+ * screen. The words now come from the `ai_call_failed` entry in the
+ * presentation registry; the provider's own text stays in the server log.
  */
 export type AiCallFailedInfo = {
   featureKey: string;
   featureDisplayName: string;
   role: MissingModelInfo["role"];
   projectSlug?: string;
-  /** Best-effort short error message from the provider/SDK. */
-  errorMessage?: string;
 };
 
 export function aiCallFailedToastId(info: AiCallFailedInfo): string {
@@ -113,9 +117,7 @@ export function showAiCallFailedToast(info: AiCallFailedInfo): void {
   const roleLabel = ROLE_LABEL[info.role];
   const href = settingsHref({ ...info, canConfigure: true });
 
-  const description = info.errorMessage
-    ? `Double-check your ${roleLabel} model configuration in Model Providers. ${info.errorMessage}`
-    : `Double-check your ${roleLabel} model configuration in Model Providers.`;
+  const description = `Double-check your ${roleLabel} model configuration in Model Providers.`;
 
   toaster.create({
     id,

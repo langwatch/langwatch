@@ -12,10 +12,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  type BatchRunSummary,
-  BatchRunsSidebar,
-} from "../BatchRunsSidebar";
+import { type BatchRunSummary, BatchRunsSidebar } from "../BatchRunsSidebar";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -70,10 +67,7 @@ describe("BatchRunsSidebar", () => {
     it("displays runs newest-first", () => {
       render(
         <Wrapper>
-          <BatchRunsSidebar
-            runs={runs}
-            onSelectRun={noop}
-          />
+          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
         </Wrapper>,
       );
 
@@ -87,10 +81,7 @@ describe("BatchRunsSidebar", () => {
     it("preserves chronological Run # numbering (Run #1 = oldest)", () => {
       render(
         <Wrapper>
-          <BatchRunsSidebar
-            runs={runs}
-            onSelectRun={noop}
-          />
+          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
         </Wrapper>,
       );
 
@@ -113,10 +104,7 @@ describe("BatchRunsSidebar", () => {
     it("still displays runs newest-first with correct numbering", () => {
       render(
         <Wrapper>
-          <BatchRunsSidebar
-            runs={runs}
-            onSelectRun={noop}
-          />
+          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
         </Wrapper>,
       );
 
@@ -140,10 +128,7 @@ describe("BatchRunsSidebar", () => {
     it("uses commit message instead of Run # when available", () => {
       render(
         <Wrapper>
-          <BatchRunsSidebar
-            runs={runs}
-            onSelectRun={noop}
-          />
+          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
         </Wrapper>,
       );
 

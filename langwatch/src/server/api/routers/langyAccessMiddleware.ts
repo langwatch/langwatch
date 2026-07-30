@@ -1,8 +1,8 @@
 import { TRPCError } from "@trpc/server";
 
 import { isDemoProjectId, type PermissionMiddleware } from "~/server/api/rbac";
-import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
 import { LangyNotEnabledError } from "~/server/app-layer/langy/errors";
+import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 
 /**
@@ -52,7 +52,9 @@ export const enforceLangyAccess: PermissionMiddleware<{
   // wins: `langyGithub` is org-scoped and has the real one.
   const organizationId =
     input.organizationId ??
-    (input.projectId ? await resolveOrganizationId(input.projectId) : undefined);
+    (input.projectId
+      ? await resolveOrganizationId(input.projectId)
+      : undefined);
 
   const allowed = await hasLangyAccess({
     user: ctx.session.user,

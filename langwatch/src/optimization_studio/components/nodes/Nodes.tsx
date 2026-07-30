@@ -47,11 +47,7 @@ import type {
   Field,
   LLMConfig,
 } from "../../types/dsl";
-import {
-  GATE_FIELD,
-  GATE_HANDLE_ID,
-  showsTemporaryGate,
-} from "../../utils/controlFlow";
+import { GATE_FIELD, showsTemporaryGate } from "../../utils/controlFlow";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { hasUnsavedChanges } from "../../utils/unsavedChanges";
 import { ComponentIcon } from "../ColorfulBlockIcons";

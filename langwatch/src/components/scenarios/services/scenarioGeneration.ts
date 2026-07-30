@@ -57,7 +57,7 @@ export class ScenarioGenerationError extends Error {
 export async function generateScenarioWithAI(
   prompt: string,
   projectId: string,
-  currentScenario?: GeneratedScenario | null
+  currentScenario?: GeneratedScenario | null,
 ): Promise<GeneratedScenario> {
   const response = await fetch("/api/scenario/generate", {
     method: "POST",
@@ -88,9 +88,7 @@ export async function generateScenarioWithAI(
   }
 
   if (!response.ok) {
-    const handled = serializedHandledErrorSchema.safeParse(
-      payload.domainError,
-    );
+    const handled = serializedHandledErrorSchema.safeParse(payload.domainError);
     if (handled.success) {
       throw new ScenarioGenerationError(
         payload.error || "Failed to generate scenario",

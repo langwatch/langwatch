@@ -12,7 +12,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.enums";
+import {
+  ScenarioRunStatus,
+  Verdict,
+} from "~/server/scenarios/scenario-event.enums";
 import { ScenarioTargetRow } from "../ScenarioTargetRow";
 import { makeScenarioRunData } from "./test-helpers";
 
@@ -87,12 +90,8 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText("Angry refund request"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByText(/:/),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText("Angry refund request")).toBeInTheDocument();
+      expect(screen.queryByText(/:/)).not.toBeInTheDocument();
     });
   });
 
@@ -126,9 +125,7 @@ describe("<ScenarioTargetRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.getByText("Angry refund request (#1)"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Angry refund request (#1)")).toBeInTheDocument();
     });
   });
 

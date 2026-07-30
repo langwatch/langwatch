@@ -1,10 +1,12 @@
+import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
+import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import {
+  guardOrganizationId,
   ORG_SCOPED_MODEL_NAMES,
   ORG_TENANCY_EXEMPT,
-  guardOrganizationId,
 } from "../dbOrganizationIdProtection";
 
 /**
@@ -40,7 +42,9 @@ describe("guardOrganizationId — original three models preserved", () => {
           model: "OrganizationUser",
           action: "findUnique",
           args: {
-            where: { userId_organizationId: { userId: "u_1", organizationId: "org_1" } },
+            where: {
+              userId_organizationId: { userId: "u_1", organizationId: "org_1" },
+            },
           },
         }),
       ).resolves.toBe("ok");
@@ -90,7 +94,9 @@ describe("guardOrganizationId — original three models preserved", () => {
           model: "CustomRole",
           action: "upsert",
           args: {
-            where: { organizationId_name: { organizationId: "org_1", name: "auditor" } },
+            where: {
+              organizationId_name: { organizationId: "org_1", name: "auditor" },
+            },
             create: { name: "auditor", permissions: [] },
             update: {},
           },
@@ -106,8 +112,14 @@ describe("guardOrganizationId — original three models preserved", () => {
           model: "CustomRole",
           action: "upsert",
           args: {
-            where: { organizationId_name: { organizationId: "org_1", name: "auditor" } },
-            create: { organizationId: "org_1", name: "auditor", permissions: [] },
+            where: {
+              organizationId_name: { organizationId: "org_1", name: "auditor" },
+            },
+            create: {
+              organizationId: "org_1",
+              name: "auditor",
+              permissions: [],
+            },
             update: {},
           },
         }),
@@ -151,10 +163,7 @@ describe("guardOrganizationId — single-organization invariant", () => {
           action: "findMany",
           args: {
             where: {
-              OR: [
-                { organizationId: "org_1" },
-                { organizationId: "org_2" },
-              ],
+              OR: [{ organizationId: "org_1" }, { organizationId: "org_2" }],
             },
           },
         }),
@@ -267,7 +276,11 @@ describe("guardOrganizationId — audited real query shapes pass", () => {
         runGuard({
           model: "Group",
           action: "findUnique",
-          args: { where: { organizationId_slug: { organizationId: "org_1", slug: "eng" } } },
+          args: {
+            where: {
+              organizationId_slug: { organizationId: "org_1", slug: "eng" },
+            },
+          },
         }),
       ).resolves.toBe("ok");
     });
@@ -311,7 +324,9 @@ describe("guardOrganizationId — unguarded models are ignored", () => {
  */
 describe("organization-tenancy regime partition", () => {
   const orgBearingModels = Prisma.dmmf.datamodel.models
-    .filter((model) => model.fields.some((field) => field.name === "organizationId"))
+    .filter((model) =>
+      model.fields.some((field) => field.name === "organizationId"),
+    )
     .map((model) => model.name);
 
   it("covers every org-bearing model with exactly one regime", () => {
@@ -343,5 +358,194 @@ describe("organization-tenancy regime partition", () => {
       (name) => !orgBearing.has(name),
     );
     expect(exemptWithoutColumn).toEqual([]);
+  });
+});
+
+/**
+ * The expired-Langy-session sweep is deliberately cross-tenant: it revokes every
+ * elapsed platform-minted session key, whoever owns it. It carries no
+ * organizationId, no row id and no lookupId, so the guard rejected it on every
+ * run — the reaper its own docstring calls "THE GUARANTEE" had never revoked a
+ * single key, and the metric that was meant to warn when revoke-on-death slipped
+ * was pinned at zero.
+ */
+describe("guardOrganizationId — platform-owned API-key sweeps", () => {
+  /**
+   * A Prisma stand-in that installs the SAME middleware the real client does
+   * (`db.ts` → `prisma.$use(guardOrganizationId)`), so a call through it is
+   * subject to the guard exactly as it is in production. No database: the guard
+   * is a pure function of the query arguments.
+   */
+  function guardedPrisma(rowsAffected: number) {
+    const calls: unknown[] = [];
+    const client = {
+      apiKey: {
+        updateMany: async (args: unknown) => {
+          calls.push(args);
+          return guardOrganizationId(
+            {
+              model: "ApiKey",
+              action: "updateMany",
+              args,
+              dataPath: [],
+              runInTransaction: false,
+            } as Prisma.MiddlewareParams,
+            async () => ({ count: rowsAffected }),
+          );
+        },
+      },
+    };
+    return { client, calls };
+  }
+
+  /**
+   * The where clause the REAL reaper writes, captured by running it through the
+   * guarded stand-in above.
+   *
+   * Every denied case below starts from THIS object rather than a re-typed copy
+   * of it. Re-typed literals are how the escape hatch drifted wider than the
+   * sweep it claimed to match: the guard's predicate was written to describe the
+   * reaper's and then only ever compared to it by eye, so it went on admitting
+   * shapes — un-expired keys, on any action — the reaper never writes. Deriving
+   * the attack shapes from the reaper keeps them tracking it: change the sweep
+   * and these cases change with it, or fail.
+   */
+  async function captureSweepWhere(): Promise<Record<string, unknown>> {
+    const { client, calls } = guardedPrisma(0);
+    await reapExpiredLangySessionApiKeys({
+      prisma: client as unknown as PrismaClient,
+      now: new Date("2026-07-28T12:00:00Z"),
+    });
+    return (calls[0] as { where: Record<string, unknown> }).where;
+  }
+
+  describe("when the expired-Langy-session reaper runs its real hourly sweep", () => {
+    /**
+     * The REAL reaper, not a re-typed copy of its where clause.
+     *
+     * What this pins is an INTERACTION — the reaper writes a predicate, the
+     * guard decides whether to admit it — and an interaction cannot be pinned
+     * by asserting a hand-copied literal on each side: generalise the reaper's
+     * predicate (say, to `name: { in: HIDDEN_SYSTEM_KEY_NAMES }`, or drop its
+     * un-revoked clause) and each literal still matches its own copy while
+     * every hourly tick throws in production. Driving the actual function
+     * through the actual middleware means drift on EITHER side fails here.
+     */
+    it("passes the guard and revokes the rows", async () => {
+      const { client, calls } = guardedPrisma(2);
+
+      await expect(
+        reapExpiredLangySessionApiKeys({
+          prisma: client as unknown as PrismaClient,
+          now: new Date("2026-07-28T12:00:00Z"),
+        }),
+      ).resolves.toBe(2);
+
+      expect(calls).toHaveLength(1);
+    });
+  });
+
+  describe("when the sweep's own shape is replayed as a cross-tenant read", () => {
+    it("THROWS — the hatch is granted to the sweep's updateMany, never to findMany", async () => {
+      // Exactly the predicate the guard admits for the reaper. Run as a read it
+      // hands back every organization's platform-minted keys, which is not a
+      // sweep — so the action, not just the shape, has to match.
+      const where = await captureSweepWhere();
+
+      await expect(
+        runGuard({ model: "ApiKey", action: "findMany", args: { where } }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+  });
+
+  describe("when the sweep's own shape is replayed as a cross-tenant delete", () => {
+    it("THROWS — the reaper revokes rows, so nothing here authorises removing them", async () => {
+      const where = await captureSweepWhere();
+
+      await expect(
+        runGuard({ model: "ApiKey", action: "deleteMany", args: { where } }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+  });
+
+  describe("when an updateMany carries the sweep's name and un-revoked clause but no expiry bound", () => {
+    it("THROWS — that predicate is every LIVE session key, in every organization", async () => {
+      const { expiresAt: _elapsed, ...withoutExpiryBound } =
+        await captureSweepWhere();
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: {
+            where: withoutExpiryBound,
+            data: { revokedAt: new Date() },
+          },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+  });
+
+  describe("when an updateMany keeps an expiresAt clause but drops its elapsed bound", () => {
+    it("THROWS — 'has an expiry' still names live keys; only 'already passed' does not", async () => {
+      const where = {
+        ...(await captureSweepWhere()),
+        expiresAt: { not: null },
+      };
+
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: { where, data: { revokedAt: new Date() } },
+        }),
+      ).rejects.toThrow(/tenancy key/);
+    });
+  });
+
+  describe("when a reserved-name query omits the sweep's un-revoked clause", () => {
+    it("THROWS — the name escape admits the sweep's shape, not any named read", async () => {
+      // The reserved name alone is sound for tenancy but far wider than the
+      // sweep needs: it would also admit a read of every session key that ever
+      // existed. `revokedAt: null` is what the reaper carries and an
+      // exfiltrating query would not.
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "findMany",
+          args: { where: { name: "Langy session" } },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when a query names a key a customer could own", () => {
+    it("THROWS — only RESERVED names are platform-owned by construction", async () => {
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: {
+            where: { name: "My production key", revokedAt: null },
+            data: { revokedAt: new Date() },
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("when a query tries to widen a reserved name with a matcher", () => {
+    it("THROWS — the name must match exactly, not by contains/startsWith", async () => {
+      await expect(
+        runGuard({
+          model: "ApiKey",
+          action: "updateMany",
+          args: {
+            where: { name: { contains: "Langy session" } },
+            data: { revokedAt: new Date() },
+          },
+        }),
+      ).rejects.toThrow();
+    });
   });
 });

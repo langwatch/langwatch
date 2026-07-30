@@ -1,5 +1,5 @@
 import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { isJson } from "../utils/isJson";
 import { Markdown } from "./Markdown";
 import { RenderInputOutput } from "./traces/RenderInputOutput";
@@ -41,15 +41,19 @@ export function ExpandedTextDialog({
           </HStack>
         </Dialog.Header>
         <Dialog.CloseTrigger />
-        <Dialog.Body paddingY={6} paddingX={8} overflow="auto" maxHeight="calc(100vh - 200px)">
+        <Dialog.Body
+          paddingY={6}
+          paddingX={8}
+          overflow="auto"
+          maxHeight="calc(100vh - 200px)"
+        >
           {open && textExpanded && isFormatted ? (
             isJson(textExpanded) ? (
               <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
             ) : (
               <Markdown>
                 {typeof textExpanded === "string"
-                  ? textExpanded
-                      .replace(/(\n+)\\(\n+)/g, "$1$2")
+                  ? textExpanded.replace(/(\n+)\\(\n+)/g, "$1$2")
                   : JSON.stringify(textExpanded, null, 2)}
               </Markdown>
             )

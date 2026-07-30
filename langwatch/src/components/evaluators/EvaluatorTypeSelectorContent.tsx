@@ -1,12 +1,11 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { LuExternalLink } from "react-icons/lu";
-import { useRouter } from "~/utils/compat/next-router";
-
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 
 /**
@@ -181,8 +180,7 @@ export function EvaluatorTypeSelectorContent({
           const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
           if (!evaluator) return null;
 
-          const availableEntry =
-            availableEvaluatorsQuery.data?.[evaluatorType];
+          const availableEntry = availableEvaluatorsQuery.data?.[evaluatorType];
           const missingEnvVars = availableEntry?.missingEnvVars ?? [];
           const isAzureEvaluator = evaluatorType.startsWith("azure/");
           // Not installed on this server is a different state from installed

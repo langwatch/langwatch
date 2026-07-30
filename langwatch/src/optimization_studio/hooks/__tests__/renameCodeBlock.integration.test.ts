@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
+import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";
 import {
   store as storeCreator,
@@ -71,10 +71,12 @@ describe("rename code blocks", () => {
       ];
       testStore.setState({ nodes, edges: [] });
 
-      testStore.getState().setNode(
-        { id: "code1", data: { name: "data_processor" } },
-        "data_processor",
-      );
+      testStore
+        .getState()
+        .setNode(
+          { id: "code1", data: { name: "data_processor" } },
+          "data_processor",
+        );
 
       const state = testStore.getState();
       const node = state.nodes.find((n) => n.id === "data_processor");
@@ -93,10 +95,12 @@ describe("rename code blocks", () => {
       ];
       testStore.setState({ nodes, edges: [] });
 
-      testStore.getState().setNode(
-        { id: "code1", data: { name: "data_processor" } },
-        "data_processor",
-      );
+      testStore
+        .getState()
+        .setNode(
+          { id: "code1", data: { name: "data_processor" } },
+          "data_processor",
+        );
 
       const state = testStore.getState();
       const node = state.nodes.find((n) => n.id === "data_processor");

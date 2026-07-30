@@ -7,7 +7,10 @@
  *
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
-import { GatewayGuardrailDirection, GatewayGuardrailFailureMode } from "@prisma/client";
+import {
+  GatewayGuardrailDirection,
+  GatewayGuardrailFailureMode,
+} from "@prisma/client";
 import { z } from "zod";
 
 import { GatewayGuardrailService } from "~/server/gateway/guardrail.service";

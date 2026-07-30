@@ -2,6 +2,8 @@
 // langwatch module is evaluated (or any import-time side effect can wire an exporter).
 // A platform process holding LANGWATCH_API_KEY would self-reference its own trace
 // ingest; the boot module throws. See langwatchPlatformGuard for the full rationale.
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import "./langwatchPlatformGuard.boot";
 
 import { metrics } from "@opentelemetry/api";
@@ -185,7 +187,8 @@ if (explicitEndpoint && isEnvTrue(process.env.OTEL_METRICS_ENABLED)) {
   // The graceful-shutdown path (start.ts / workers.ts) calls process.exit(0)
   // without waiting on this provider, so the last periodic export can be
   // dropped. Race a best-effort flush against that exit.
-  const flushMetricsOnExit = () => void meterProvider.forceFlush().catch(() => {});
+  const flushMetricsOnExit = () =>
+    void meterProvider.forceFlush().catch(() => {});
   process.on("SIGTERM", flushMetricsOnExit);
   process.on("SIGINT", flushMetricsOnExit);
 }

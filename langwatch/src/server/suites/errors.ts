@@ -1,35 +1,89 @@
 /**
- * Domain-specific error types for suite operations.
+ * Handled errors for the suite domain (ADR-045).
  *
- * These errors represent business rule violations in the suite domain,
- * allowing callers to handle different failure modes precisely.
+ * These were plain `extends Error` classes, which meant the only thing that
+ * reached the client was prose — and the client duly branched on it
+ * (`err.message.includes("All scenarios")`). That is exactly the "parsing
+ * prose" the handled-error contract exists to remove: each of these now
+ * carries a stable `code` the UI keys its copy off.
  */
+import {
+  HandledError,
+  type HandledErrorOptions,
+} from "@langwatch/handled-error";
 
-/** Base class for all suite domain errors */
-export class SuiteDomainError extends Error {
-  constructor(message: string) {
-    super(message);
+import type { AppErrorCode } from "~/features/errors/logic/codes";
+
+/**
+ * Base class for suite domain errors.
+ *
+ * `code` and `httpStatus` are REQUIRED, and both for the same reason: a
+ * catch-all default whose copy asserts a specific cause is how a name clash
+ * ends up telling the user "Run plan not found". This class used to default to
+ * `suite_not_found`/404, so `new SuiteDomainError("…")` for any new failure
+ * silently became a 404 claiming the suite was missing. There is nothing this
+ * base class knows about an unspecified failure, so it refuses to guess —
+ * "missing" is now {@link SuiteNotFoundError}, which says so in its name.
+ *
+ * `code` is narrowed to `AppErrorCode` rather than left as `string`: an
+ * unconstrained code is one the presentation registry is not exhaustive over,
+ * which is a customer reading a raw slug with no copy behind it.
+ */
+export class SuiteDomainError extends HandledError {
+  constructor(
+    message: string,
+    options: HandledErrorOptions & {
+      code: AppErrorCode;
+      httpStatus: number;
+    },
+  ) {
+    const { code, httpStatus, ...rest } = options;
+    super(code, message, { ...rest, httpStatus });
     this.name = "SuiteDomainError";
   }
 }
 
-/** Thrown when a suite references scenarios that do not exist */
+/** Thrown when the requested suite does not exist in the project */
+export class SuiteNotFoundError extends SuiteDomainError {
+  declare readonly code: "suite_not_found";
+
+  constructor(message = "Suite not found") {
+    super(message, { code: "suite_not_found", httpStatus: 404 });
+    this.name = "SuiteNotFoundError";
+  }
+}
+
+/**
+ * Thrown when a suite references scenarios that do not exist.
+ *
+ * The offending ids are in the message (for the log line) and nowhere else:
+ * `meta` is a client contract, and no component or agent reads these back, so
+ * carrying them there would be debug context masquerading as one.
+ */
 export class InvalidScenarioReferencesError extends SuiteDomainError {
+  declare readonly code: "suite_invalid_scenario_references";
   readonly invalidIds: string[];
 
   constructor({ invalidIds }: { invalidIds: string[] }) {
-    super(`Invalid scenario references: ${invalidIds.join(", ")}`);
+    super(`Invalid scenario references: ${invalidIds.join(", ")}`, {
+      code: "suite_invalid_scenario_references",
+      httpStatus: 422,
+    });
     this.name = "InvalidScenarioReferencesError";
     this.invalidIds = invalidIds;
   }
 }
 
-/** Thrown when a suite references targets that do not exist */
+/** Thrown when a suite references targets that do not exist. See above re `meta`. */
 export class InvalidTargetReferencesError extends SuiteDomainError {
+  declare readonly code: "suite_invalid_target_references";
   readonly invalidIds: string[];
 
   constructor({ invalidIds }: { invalidIds: string[] }) {
-    super(`Invalid target references: ${invalidIds.join(", ")}`);
+    super(`Invalid target references: ${invalidIds.join(", ")}`, {
+      code: "suite_invalid_target_references",
+      httpStatus: 422,
+    });
     this.name = "InvalidTargetReferencesError";
     this.invalidIds = invalidIds;
   }
@@ -37,16 +91,39 @@ export class InvalidTargetReferencesError extends SuiteDomainError {
 
 /** Thrown when all scenarios in a suite are archived */
 export class AllScenariosArchivedError extends SuiteDomainError {
+  declare readonly code: "suite_all_scenarios_archived";
+
   constructor() {
-    super("All scenarios in this suite are archived. Update the suite to include active scenarios.");
+    super(
+      "All scenarios in this suite are archived. Update the suite to include active scenarios.",
+      { code: "suite_all_scenarios_archived", httpStatus: 422 },
+    );
     this.name = "AllScenariosArchivedError";
   }
 }
 
 /** Thrown when all targets in a suite are archived */
 export class AllTargetsArchivedError extends SuiteDomainError {
+  declare readonly code: "suite_all_targets_archived";
+
   constructor() {
-    super("All targets in this suite are archived. Update the suite to include active targets.");
+    super(
+      "All targets in this suite are archived. Update the suite to include active targets.",
+      { code: "suite_all_targets_archived", httpStatus: 422 },
+    );
     this.name = "AllTargetsArchivedError";
+  }
+}
+
+/** Thrown when a suite name is already in use within the project */
+export class SuiteNameTakenError extends SuiteDomainError {
+  declare readonly code: "suite_name_taken";
+
+  constructor() {
+    super("A suite with this name already exists", {
+      code: "suite_name_taken",
+      httpStatus: 409,
+    });
+    this.name = "SuiteNameTakenError";
   }
 }

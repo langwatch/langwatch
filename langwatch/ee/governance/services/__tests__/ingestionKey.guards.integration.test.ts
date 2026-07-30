@@ -21,10 +21,9 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "~/server/db";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
 
 import { IngestionKeyService } from "../ingestionKey.service";
 
@@ -65,7 +64,12 @@ describe("IngestionKey ownership + list visibility", () => {
       data: { id: ORG_ID, name: `IKG ${ORG_ID}`, slug: ORG_ID },
     });
     await prisma.team.create({
-      data: { id: TEAM_ID, organizationId: ORG_ID, name: `team ${suffix}`, slug: `team-${suffix}` },
+      data: {
+        id: TEAM_ID,
+        organizationId: ORG_ID,
+        name: `team ${suffix}`,
+        slug: `team-${suffix}`,
+      },
     });
     await prisma.project.create({
       data: {
@@ -83,14 +87,30 @@ describe("IngestionKey ownership + list visibility", () => {
   });
 
   afterAll(async () => {
-    await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.apiKey.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.project.deleteMany({ where: { teamId: TEAM_ID } }).catch(() => undefined);
-    await prisma.team.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.organizationUser.deleteMany({ where: { organizationId: ORG_ID } }).catch(() => undefined);
-    await prisma.user.deleteMany({ where: { id: { in: [USER_A, USER_B] } } }).catch(() => undefined);
-    await prisma.organization.deleteMany({ where: { id: ORG_ID } }).catch(() => undefined);
+    await prisma.roleBinding
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.apiKey
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.customRole
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.project
+      .deleteMany({ where: { teamId: TEAM_ID } })
+      .catch(() => undefined);
+    await prisma.team
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.organizationUser
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.user
+      .deleteMany({ where: { id: { in: [USER_A, USER_B] } } })
+      .catch(() => undefined);
+    await prisma.organization
+      .deleteMany({ where: { id: ORG_ID } })
+      .catch(() => undefined);
   });
 
   describe("when a team-admin mints a personal-project ingest key", () => {
@@ -137,14 +157,18 @@ describe("IngestionKey ownership + list visibility", () => {
         });
         // A genuine org service key: userId null, no ingestSourceType, must
         // stay visible to all members exactly as before.
-        const { apiKey: serviceKey } = await ApiKeyService.create(prisma).create({
+        const { apiKey: serviceKey } = await ApiKeyService.create(
+          prisma,
+        ).create({
           name: `service ${suffix}`,
           userId: null,
           createdByUserId: USER_A,
           organizationId: ORG_ID,
           permissionMode: "restricted",
           permissions: ["traces:create"],
-          bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+          bindings: [
+            { role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID },
+          ],
         });
 
         const visibleToA = await apiKeyRepo.findAllByUser({

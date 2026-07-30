@@ -6,12 +6,13 @@
  *
  * @see specs/prompts/open-existing-prompt-from-trace.feature
  */
-import React from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Project } from "@prisma/client";
 import { cleanup, render, screen } from "@testing-library/react";
+import React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Project } from "@prisma/client";
 import type { Span } from "../../../server/tracer/types";
 import { SpanDetails } from "../SpanDetails";
 
@@ -43,7 +44,10 @@ vi.mock("~/utils/compat/next-router", () => ({
 }));
 
 vi.mock("~/utils/auth-client", () => ({
-  useSession: () => ({ data: { user: { id: "user-1" } }, status: "authenticated" }),
+  useSession: () => ({
+    data: { user: { id: "user-1" } },
+    status: "authenticated",
+  }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

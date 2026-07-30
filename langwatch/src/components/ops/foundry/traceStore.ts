@@ -1,7 +1,6 @@
 import { create } from "zustand";
-
-import { shortId } from "./types";
 import type { SpanConfig, SpanType, TraceConfig } from "./types";
+import { shortId } from "./types";
 
 function createDefaultSpan(type: SpanType = "span", name?: string): SpanConfig {
   return {
@@ -82,12 +81,15 @@ interface TraceStore {
 function updateSpanInTree(
   spans: SpanConfig[],
   id: string,
-  updater: (span: SpanConfig) => SpanConfig
+  updater: (span: SpanConfig) => SpanConfig,
 ): SpanConfig[] {
   return spans.map((span) => {
     if (span.id === id) return updater(span);
     if (span.children.length > 0) {
-      return { ...span, children: updateSpanInTree(span.children, id, updater) };
+      return {
+        ...span,
+        children: updateSpanInTree(span.children, id, updater),
+      };
     }
     return span;
   });
@@ -105,7 +107,7 @@ function removeSpanFromTree(spans: SpanConfig[], id: string): SpanConfig[] {
 function addSpanToTree(
   spans: SpanConfig[],
   parentId: string | null,
-  newSpan: SpanConfig
+  newSpan: SpanConfig,
 ): SpanConfig[] {
   if (parentId === null) return [...spans, newSpan];
   return spans.map((span) => {
@@ -122,7 +124,7 @@ function addSpanToTree(
 function findSpanParent(
   spans: SpanConfig[],
   id: string,
-  parent: SpanConfig | null = null
+  parent: SpanConfig | null = null,
 ): { parent: SpanConfig | null; siblings: SpanConfig[]; index: number } | null {
   for (let i = 0; i < spans.length; i++) {
     if (spans[i]!.id === id) {
@@ -213,7 +215,7 @@ export const useTraceStore = create<TraceStore>((set) => ({
     set((state) => {
       const newSpans = structuredClone(state.trace.spans);
       const found = findSpanParent(newSpans, id);
-      if (!found || !found.parent) return state;
+      if (!found?.parent) return state;
       const span = found.siblings.splice(found.index, 1)[0]!;
       const parentFound = findSpanParent(newSpans, found.parent.id);
       if (!parentFound) return state;

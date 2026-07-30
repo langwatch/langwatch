@@ -8,10 +8,11 @@
  * scoped to one purpose. Real ClickHouse + LocalFilesystemDriver; only
  * getClickHouseClientForProject is wired to the test client.
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";

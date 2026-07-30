@@ -1,8 +1,14 @@
 import { createLogger } from "@langwatch/observability";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
-import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
+import {
+  captureException,
+  toError,
+} from "../../../../../utils/posthogErrorCapture";
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../schemas/events";
 
@@ -42,8 +48,7 @@ export function createCustomerIoTraceSyncReactor(
   return {
     name: "customerIoTraceSync",
     options: {
-      makeJobId: (payload) =>
-        `cio-trace-sync-${payload.event.tenantId}`,
+      makeJobId: (payload) => `cio-trace-sync-${payload.event.tenantId}`,
       ttl: CIO_REACTOR_DEBOUNCE_TTL_MS,
     },
 
@@ -54,7 +59,8 @@ export function createCustomerIoTraceSyncReactor(
       const { tenantId: projectId, foldState } = context;
 
       try {
-        const { userId, firstMessage } = await deps.projects.resolveOrgAdmin(projectId);
+        const { userId, firstMessage } =
+          await deps.projects.resolveOrgAdmin(projectId);
 
         if (!userId) {
           logger.warn(
@@ -72,34 +78,53 @@ export function createCustomerIoTraceSyncReactor(
         if (!firstMessage) {
           // First trace — fire immediately, fire-and-forget
           void deps.nurturing
-            .identifyUser({ userId, traits: {
-              has_traces: true,
-              sdk_language: sdkLanguage,
-              sdk_framework: sdkFramework,
-              first_trace_at: traceOccurredAt,
-            }})
+            .identifyUser({
+              userId,
+              traits: {
+                has_traces: true,
+                sdk_language: sdkLanguage,
+                sdk_framework: sdkFramework,
+                first_trace_at: traceOccurredAt,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to identify user for first trace");
+              logger.error(
+                { projectId, error },
+                "Failed to identify user for first trace",
+              );
               captureException(toError(error));
             });
           void deps.nurturing
-            .trackEvent({ userId, event: "first_trace_integrated", properties: {
-              sdk_language: sdkLanguage,
-              sdk_framework: sdkFramework,
-              project_id: projectId,
-            }})
+            .trackEvent({
+              userId,
+              event: "first_trace_integrated",
+              properties: {
+                sdk_language: sdkLanguage,
+                sdk_framework: sdkFramework,
+                project_id: projectId,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to track first_trace_integrated event");
+              logger.error(
+                { projectId, error },
+                "Failed to track first_trace_integrated event",
+              );
               captureException(toError(error));
             });
         } else {
           // Subsequent trace — debounced via makeJobId, fire-and-forget
           void deps.nurturing
-            .identifyUser({ userId, traits: {
-              last_trace_at: traceOccurredAt,
-            }})
+            .identifyUser({
+              userId,
+              traits: {
+                last_trace_at: traceOccurredAt,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to identify user for trace update");
+              logger.error(
+                { projectId, error },
+                "Failed to identify user for trace update",
+              );
               captureException(toError(error));
             });
         }

@@ -22,40 +22,40 @@ const {
   credentialTypeRef,
   lastFirstMessageQueryOptions,
 } = vi.hoisted(() => {
-    const fetchMock = vi.fn();
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
-    const listeners = new Set<() => void>();
-    return {
-      fetchMock,
-      lastFirstMessageQueryOptions: {
-        current: undefined as
-          | { enabled?: boolean; refetchIntervalInBackground?: boolean }
-          | undefined,
+  const fetchMock = vi.fn();
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  const listeners = new Set<() => void>();
+  return {
+    fetchMock,
+    lastFirstMessageQueryOptions: {
+      current: undefined as
+        | { enabled?: boolean; refetchIntervalInBackground?: boolean }
+        | undefined,
+    },
+    sessionRef: {
+      current: {
+        data: { user: { id: "user-1", email: "dev@example.com" } },
+        status: "authenticated" as const,
       },
-      sessionRef: {
-        current: {
-          data: { user: { id: "user-1", email: "dev@example.com" } },
-          status: "authenticated" as const,
-        },
+    },
+    credentialTypeRef: {
+      current: "device_session" as "device_session" | "project_api_key",
+    },
+    firstMessageState: {
+      value: false,
+      listeners,
+      set(value: boolean) {
+        this.value = value;
+        for (const listener of listeners) listener();
       },
-      credentialTypeRef: {
-        current: "device_session" as "device_session" | "project_api_key",
+      subscribe(listener: () => void) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
       },
-      firstMessageState: {
-        value: false,
-        listeners,
-        set(value: boolean) {
-          this.value = value;
-          for (const listener of listeners) listener();
-        },
-        subscribe(listener: () => void) {
-          listeners.add(listener);
-          return () => listeners.delete(listener);
-        },
-        snapshot: () => firstMessageState.value,
-      },
-    };
-  });
+      snapshot: () => firstMessageState.value,
+    },
+  };
+});
 
 vi.mock("~/utils/auth-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/utils/auth-client")>();

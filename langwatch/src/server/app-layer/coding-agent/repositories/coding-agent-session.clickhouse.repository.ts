@@ -11,12 +11,24 @@ import type {
 import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import {
-  observeCodingAgentSessionListReadDuration,
   type CodingAgentSessionListReadOutcome,
+  observeCodingAgentSessionListReadDuration,
 } from "~/server/metrics";
 import type { CodingAgentSessionRepository } from "./coding-agent-session.repository";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
+
+/**
+ * How much `findManyRecent` over-reads so its TypeScript dedup cannot shorten
+ * the page.
+ *
+ * Duplicates only arise from an `UpdatedAt` tie between two versions of one
+ * session, so they are the exception rather than the rule and a doubling is
+ * ample headroom; anything the collapse still trims comes off the tail, which
+ * `slice` was going to drop anyway. Set this to 1 and a tie silently costs the
+ * caller a whole session.
+ */
+const LIST_READ_DEDUP_OVERFETCH = 2;
 
 const logger = createLogger(
   "langwatch:app-layer:coding-agent:session-repository",
@@ -480,7 +492,10 @@ export class CodingAgentSessionClickHouseRepository
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: CodingAgentSessionRow; appliedEventIds: string[] } | null> {
+  }): Promise<{
+    row: CodingAgentSessionRow;
+    appliedEventIds: string[];
+  } | null> {
     const record = await this.findLatestRecord(params);
     if (!record) return null;
     return {
@@ -526,11 +541,19 @@ export class CodingAgentSessionClickHouseRepository
    * 2-3). Duration only — the query result exposes no rows-scanned counter; see
    * the metric's docblock in `~/server/metrics`.
    *
-   * `userId`, when given, narrows to the agent-reported identity — folded
-   * into BOTH scopes so the two agree on which rows are in scope. Unlike the
-   * range filter it is safe there: it is a stable column, so it cannot move a
-   * version out of the dedup group. Omitted for personal-workspace usage,
-   * where the personal project already isolates the user.
+   * `userId`, when given, narrows to the agent-reported identity — in the
+   * OUTER scope only, for the same reason the range filter is. `UserId` is not
+   * the stable column it looks like: only Claude stamps identity on log
+   * events, spans carry none, and a re-fold after a read-back miss restarts
+   * from `init()` with `userId: null`. So a later span-only delivery can commit
+   * a version with an empty `UserId` that holds `max(UpdatedAt)`. Filtering the
+   * dedup scope would hide that version from the group, resolve the max to a
+   * SUPERSEDED row, and serve its stale totals — the moving-anchor defect
+   * again, wearing a different column. Narrowing outside the group instead
+   * drops such a session from the filtered list, which is the honest answer.
+   * Only `TenantId` is genuinely immune, because it is part of the key.
+   * Omitted for personal-workspace usage, where the personal project already
+   * isolates the user.
    */
   async findManyRecent({
     tenantId,
@@ -575,7 +598,6 @@ export class CodingAgentSessionClickHouseRepository
               SELECT TenantId, SessionId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
-                ${userFilter}
               GROUP BY TenantId, SessionId
             )
           ORDER BY StartedAt DESC
@@ -585,7 +607,15 @@ export class CodingAgentSessionClickHouseRepository
           tenantId,
           from: fromMs,
           to: toMs,
-          limit,
+          // Over-fetched because the collapse happens in TypeScript, below.
+          // Two versions of one session can tie on `max(UpdatedAt)` and both
+          // satisfy the IN-tuple — the tie `preferredOf` exists to resolve —
+          // so a page cut to `limit` HERE spends slots on rows that are about
+          // to merge, and the caller silently receives fewer sessions than it
+          // asked for. Through `getUsageTotals` that is not a short page but
+          // an omitted session's cost and tokens: the mirror of the double
+          // count the tiebreak prevents.
+          limit: limit * LIST_READ_DEDUP_OVERFETCH,
           ...(userId !== undefined ? { userId } : {}),
         },
         format: "JSONEachRow",
@@ -596,12 +626,16 @@ export class CodingAgentSessionClickHouseRepository
       observe("error");
       throw error;
     }
-    // Timed around the read alone: decoding ~90 columns per row is the caller's
-    // cost, not the dedup scan's, and mixing it in would move the distribution
-    // with page size rather than with scan width.
+    // Timed around the read and its row deserialization, but NOT the mapping to
+    // domain rows. The `empty` outcome is the one ADR-071 sequencing step 3
+    // reads, and it carries no rows to deserialize, so it isolates the dedup
+    // scan's own floor from anything that scales with page size.
     observe(rows.length > 0 ? "hit" : "empty");
 
-    return rows.map(fromRecord);
+    return dedupToLatestPerSession(rows)
+      .map(fromRecord)
+      .sort((a, b) => b.startedAtMs - a.startedAtMs)
+      .slice(0, limit);
   }
 
   async upsertBatch(
@@ -692,6 +726,90 @@ const asNumberMap = (value: unknown): Record<string, number> =>
         ]),
       )
     : {};
+
+/**
+ * Collapse versions the IN-tuple could not separate.
+ *
+ * The dedup subquery matches `(TenantId, SessionId, max(UpdatedAt))`, so two
+ * versions of one session sharing that `max(UpdatedAt)` BOTH satisfy it and the
+ * session renders TWICE. Such versions differ in `StartedAt` — that is why they
+ * are both still there — so they differ in the RMT sort key and no merge ever
+ * collapses them (ADR-071 consequence 1). `getUsageTotals` reduces over this
+ * array, so a duplicate does not merely look wrong: it counts that session's
+ * cost, tokens and active time twice.
+ *
+ * `findLatestRecord` closes the identical tie with `ORDER BY … LIMIT 1`. A list
+ * read cannot — its own `ORDER BY` is the caller's sort — so the same ranking is
+ * applied per session here. Like the point read's, this is DEFENCE IN DEPTH:
+ * `nextVersionStamp` makes the tie unreachable while per-aggregate serialization
+ * holds, and this covers the residual where two writers resumed from the same
+ * committed version outside that window.
+ *
+ * Insertion order is not relied on — the caller re-sorts — so this only has to
+ * pick the right version, not preserve a position.
+ */
+function dedupToLatestPerSession(
+  records: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const bySession = new Map<string, Record<string, unknown>>();
+  for (const record of records) {
+    const sessionId = String(record.SessionId ?? "");
+    const incumbent = bySession.get(sessionId);
+    bySession.set(
+      sessionId,
+      incumbent === undefined ? record : preferredOf(incumbent, record),
+    );
+  }
+  return [...bySession.values()];
+}
+
+/**
+ * `findLatestRecord`'s ranking, key for key, applied in TypeScript.
+ *
+ * See that query's docblock for why each key is here and, in particular, why
+ * `StartedAt ASC` closes the ordering without being a progress signal. Ties on
+ * every key return the incumbent, so the result does not depend on read order.
+ */
+function preferredOf(
+  incumbent: Record<string, unknown>,
+  challenger: Record<string, unknown>,
+): Record<string, unknown> {
+  // A column absent from the record ranks as "no progress" rather than NaN,
+  // which would make every comparison against it false and the winner depend on
+  // argument order.
+  const msOf = (value: unknown) => {
+    const ms = parseClickHouseDateTimeMs(String(value ?? ""));
+    return Number.isFinite(ms) ? ms : 0;
+  };
+  const progressOf = (record: Record<string, unknown>) => ({
+    watermark: msOf(record.LastEventOccurredAt),
+    signals:
+      asNumber(record.ModelCalls) +
+      asNumber(record.ToolCalls) +
+      asNumber(record.Prompts),
+    units: Array.isArray(record.MetricSeries) ? record.MetricSeries.length : 0,
+    applied: Array.isArray(record.AppliedEventIds)
+      ? record.AppliedEventIds.length
+      : 0,
+    startedAt: msOf(record.StartedAt),
+  });
+  const held = progressOf(incumbent);
+  const next = progressOf(challenger);
+
+  if (held.watermark !== next.watermark) {
+    return next.watermark > held.watermark ? challenger : incumbent;
+  }
+  if (held.signals !== next.signals) {
+    return next.signals > held.signals ? challenger : incumbent;
+  }
+  if (held.units !== next.units) {
+    return next.units > held.units ? challenger : incumbent;
+  }
+  if (held.applied !== next.applied) {
+    return next.applied > held.applied ? challenger : incumbent;
+  }
+  return next.startedAt < held.startedAt ? challenger : incumbent;
+}
 
 /**
  * Decode one `JSONEachRow` record.

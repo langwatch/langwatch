@@ -151,9 +151,7 @@ describe("sendLicenseEmail", () => {
       });
 
       const call = vi.mocked(sendEmail).mock.calls[0]!;
-      expect(call[0].attachments![0]!.filename).toMatch(
-        /\.langwatch-license$/,
-      );
+      expect(call[0].attachments![0]!.filename).toMatch(/\.langwatch-license$/);
     });
   });
 });

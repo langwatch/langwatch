@@ -2,7 +2,7 @@ import type {
   CanonicalMetricDataPoint,
   MetricRollupRow,
 } from "../schemas/metricDataPoint";
-import { addStats, resetOrGap, type BucketEntry } from "./row";
+import { addStats, type BucketEntry, resetOrGap } from "./row";
 import { numberValue, previousPoint, startsNewSequence } from "./sequence";
 
 export function buildGaugeRow({

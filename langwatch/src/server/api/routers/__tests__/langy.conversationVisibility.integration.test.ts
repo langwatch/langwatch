@@ -54,13 +54,13 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-import { createInnerTRPCContext } from "../../trpc";
-import { prisma } from "~/server/db";
 import { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service";
 import { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
 import { PrismaLangyConversationRepository } from "~/server/app-layer/langy/repositories/langy-conversation.prisma.repository";
 import { createLangyConversationUpdateBroadcastSubscriber } from "~/server/app-layer/langy/subscribers/langy-conversation-update-broadcast.subscriber";
+import { prisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { createInnerTRPCContext } from "../../trpc";
 import { langyRouter } from "../langy";
 
 const ns = nanoid(8);
@@ -180,10 +180,14 @@ const NOTHING = Symbol("nothing");
 async function signalWithin(
   pending: Promise<IteratorResult<{ event: string }>>,
   ms: number,
-): Promise<{ conversationId: string; cursor: LangyEventCursor } | typeof NOTHING> {
+): Promise<
+  { conversationId: string; cursor: LangyEventCursor } | typeof NOTHING
+> {
   const settled = await Promise.race([
     pending,
-    new Promise<typeof NOTHING>((resolve) => setTimeout(() => resolve(NOTHING), ms)),
+    new Promise<typeof NOTHING>((resolve) =>
+      setTimeout(() => resolve(NOTHING), ms),
+    ),
   ]);
   if (settled === NOTHING) return NOTHING;
   return JSON.parse(settled.value.event) as {
@@ -220,142 +224,139 @@ async function insertConversation({
   });
 }
 
-describe(
-  "Langy conversation updates reach exactly the members who may read",
-  () => {
-    beforeAll(async () => {
-      await insertConversation({
-        conversationId: PRIVATE_CONVERSATION,
-        isShared: false,
-      });
-      await insertConversation({
-        conversationId: SHARED_CONVERSATION,
-        isShared: true,
-      });
-
-      broadcast = new BroadcastService(null);
-      const conversations = new LangyConversationService(
-        new PrismaLangyConversationRepository(prisma),
-        {} as never,
-        undefined,
-        eventsReader,
-      );
-      appHolder.current = { broadcast, langy: { conversations } };
-
-      const subscriber = createLangyConversationUpdateBroadcastSubscriber({
-        broadcast,
-        conversations: freshnessReader,
-      });
-      recordProgress = async (conversationId: string) => {
-        const progress = recordedSteps(conversationId).at(-1)!;
-        await subscriber.handle(progress, {
-          tenantId: progress.tenantId,
-          aggregateId: String(progress.aggregateId),
-        });
-      };
+describe("Langy conversation updates reach exactly the members who may read", () => {
+  beforeAll(async () => {
+    await insertConversation({
+      conversationId: PRIVATE_CONVERSATION,
+      isShared: false,
+    });
+    await insertConversation({
+      conversationId: SHARED_CONVERSATION,
+      isShared: true,
     });
 
-    afterAll(async () => {
-      await prisma.langyConversationProjection.deleteMany({
-        where: { projectId: PROJECT_ID },
-      });
-      await broadcast?.close();
+    broadcast = new BroadcastService(null);
+    const conversations = new LangyConversationService(
+      new PrismaLangyConversationRepository(prisma),
+      {} as never,
+      undefined,
+      eventsReader,
+    );
+    appHolder.current = { broadcast, langy: { conversations } };
+
+    const subscriber = createLangyConversationUpdateBroadcastSubscriber({
+      broadcast,
+      conversations: freshnessReader,
     });
+    recordProgress = async (conversationId: string) => {
+      const progress = recordedSteps(conversationId).at(-1)!;
+      await subscriber.handle(progress, {
+        tenantId: progress.tenantId,
+        aggregateId: String(progress.aggregateId),
+      });
+    };
+  });
 
-    describe("given another project member with their own session", () => {
-      describe("when Langy records progress on a private conversation", () => {
-        /** @scenario A private conversation's updates stay with its owner */
-        it("tells the other member nothing and refuses their catch-up fetch as not-found", async () => {
-          const owner = await openSession(OWNER);
-          const other = await openSession(OTHER_MEMBER);
+  afterAll(async () => {
+    await prisma.langyConversationProjection.deleteMany({
+      where: { projectId: PROJECT_ID },
+    });
+    await broadcast?.close();
+  });
 
-          try {
-            await recordProgress(PRIVATE_CONVERSATION);
+  describe("given another project member with their own session", () => {
+    describe("when Langy records progress on a private conversation", () => {
+      /** @scenario A private conversation's updates stay with its owner */
+      it("tells the other member nothing and refuses their catch-up fetch as not-found", async () => {
+        const owner = await openSession(OWNER);
+        const other = await openSession(OTHER_MEMBER);
 
-            // The control: the signal really was published, so "receives
-            // nothing" below is a gate decision and not a silent test.
-            const toOwner = await signalWithin(owner.pending, 2_000);
-            expect(toOwner).not.toBe(NOTHING);
-            expect(toOwner).toMatchObject({
-              conversationId: PRIVATE_CONVERSATION,
-              cursor: PROGRESS_CURSOR,
-            });
+        try {
+          await recordProgress(PRIVATE_CONVERSATION);
 
-            expect(await signalWithin(other.pending, 500)).toBe(NOTHING);
-
-            // Proof that silence was a decision and not a dead stream: the
-            // SAME still-open session wakes for the shared conversation, and
-            // the private signal it skipped never turns up behind it.
-            await recordProgress(SHARED_CONVERSATION);
-            expect(await signalWithin(other.pending, 2_000)).toMatchObject({
-              conversationId: SHARED_CONVERSATION,
-            });
-          } finally {
-            await owner.close();
-            await other.close();
-          }
-
-          // ...and the other way in is closed too: the catch-up read refuses
-          // with a typed handled error carrying a kind the panel can render,
-          // reported as not-found so it cannot double as an existence probe.
-          const refusal = callerFor(OTHER_MEMBER).conversationEventsAfter({
-            projectId: PROJECT_ID,
+          // The control: the signal really was published, so "receives
+          // nothing" below is a gate decision and not a silent test.
+          const toOwner = await signalWithin(owner.pending, 2_000);
+          expect(toOwner).not.toBe(NOTHING);
+          expect(toOwner).toMatchObject({
             conversationId: PRIVATE_CONVERSATION,
-            after: BEHIND_CURSOR,
-          });
-          await expect(refusal).rejects.toMatchObject({
-            code: "NOT_FOUND",
-            cause: expect.objectContaining({
-              code: "langy_conversation_not_found",
-              httpStatus: 404,
-            }),
+            cursor: PROGRESS_CURSOR,
           });
 
-          const forOwner = await callerFor(OWNER).conversationEventsAfter({
-            projectId: PROJECT_ID,
-            conversationId: PRIVATE_CONVERSATION,
-            after: BEHIND_CURSOR,
-          });
-          expect(forOwner.events.map((event) => event.id)).toEqual([
-            PROGRESS_CURSOR.eventId,
-          ]);
-        });
-      });
-    });
+          expect(await signalWithin(other.pending, 500)).toBe(NOTHING);
 
-    describe("given the conversation is shared with the project", () => {
-      describe("when Langy records progress while another member has it open", () => {
-        /** @scenario A shared conversation updates every member watching it */
-        it("signals the other member and serves them the recorded steps they are behind on", async () => {
-          const other = await openSession(OTHER_MEMBER);
-
-          try {
-            await recordProgress(SHARED_CONVERSATION);
-
-            const signal = await signalWithin(other.pending, 2_000);
-            expect(signal).toMatchObject({
-              conversationId: SHARED_CONVERSATION,
-              cursor: PROGRESS_CURSOR,
-            });
-          } finally {
-            await other.close();
-          }
-
-          // The signal is inert on its own — the progress itself arrives by
-          // folding the tail after the member's own position, no reload.
-          const tail = await callerFor(OTHER_MEMBER).conversationEventsAfter({
-            projectId: PROJECT_ID,
+          // Proof that silence was a decision and not a dead stream: the
+          // SAME still-open session wakes for the shared conversation, and
+          // the private signal it skipped never turns up behind it.
+          await recordProgress(SHARED_CONVERSATION);
+          expect(await signalWithin(other.pending, 2_000)).toMatchObject({
             conversationId: SHARED_CONVERSATION,
-            after: BEHIND_CURSOR,
           });
-          expect(tail.events).toHaveLength(1);
-          expect(tail.events[0]).toMatchObject({
-            id: PROGRESS_CURSOR.eventId,
-            type: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED,
-          });
-          expect(tail.cursor).toEqual(PROGRESS_CURSOR);
+        } finally {
+          await owner.close();
+          await other.close();
+        }
+
+        // ...and the other way in is closed too: the catch-up read refuses
+        // with a typed handled error carrying a kind the panel can render,
+        // reported as not-found so it cannot double as an existence probe.
+        const refusal = callerFor(OTHER_MEMBER).conversationEventsAfter({
+          projectId: PROJECT_ID,
+          conversationId: PRIVATE_CONVERSATION,
+          after: BEHIND_CURSOR,
         });
+        await expect(refusal).rejects.toMatchObject({
+          code: "NOT_FOUND",
+          cause: expect.objectContaining({
+            code: "langy_conversation_not_found",
+            httpStatus: 404,
+          }),
+        });
+
+        const forOwner = await callerFor(OWNER).conversationEventsAfter({
+          projectId: PROJECT_ID,
+          conversationId: PRIVATE_CONVERSATION,
+          after: BEHIND_CURSOR,
+        });
+        expect(forOwner.events.map((event) => event.id)).toEqual([
+          PROGRESS_CURSOR.eventId,
+        ]);
       });
     });
-  },
-);
+  });
+
+  describe("given the conversation is shared with the project", () => {
+    describe("when Langy records progress while another member has it open", () => {
+      /** @scenario A shared conversation updates every member watching it */
+      it("signals the other member and serves them the recorded steps they are behind on", async () => {
+        const other = await openSession(OTHER_MEMBER);
+
+        try {
+          await recordProgress(SHARED_CONVERSATION);
+
+          const signal = await signalWithin(other.pending, 2_000);
+          expect(signal).toMatchObject({
+            conversationId: SHARED_CONVERSATION,
+            cursor: PROGRESS_CURSOR,
+          });
+        } finally {
+          await other.close();
+        }
+
+        // The signal is inert on its own — the progress itself arrives by
+        // folding the tail after the member's own position, no reload.
+        const tail = await callerFor(OTHER_MEMBER).conversationEventsAfter({
+          projectId: PROJECT_ID,
+          conversationId: SHARED_CONVERSATION,
+          after: BEHIND_CURSOR,
+        });
+        expect(tail.events).toHaveLength(1);
+        expect(tail.events[0]).toMatchObject({
+          id: PROGRESS_CURSOR.eventId,
+          type: LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED,
+        });
+        expect(tail.cursor).toEqual(PROGRESS_CURSOR);
+      });
+    });
+  });
+});

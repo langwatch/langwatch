@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { SELECT_ALL_MATCHING_CAP } from "../../traces-v2/stores/selectionStore";
+import { filterContextChip } from "../hooks/useLangyFilterContext";
 import { selectionContextChip } from "../hooks/useLangySelectionContext";
 import { describeChipContext } from "../logic/langyChipContext";
-import { filterContextChip } from "../hooks/useLangyFilterContext";
 import type { LangyContextChip } from "../stores/langyStore";
 
 /** Every kind the chip vocabulary has, so none can be added without copy. */

@@ -5,17 +5,11 @@
  * Used to show validation alerts and highlight fields that need attention.
  */
 
-import type { Field } from "~/optimization_studio/types/dsl";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators";
-import type {
-  DatasetReference,
-  EvaluatorConfig,
-  FieldMapping,
-  TargetConfig,
-} from "../types";
+import type { EvaluatorConfig, TargetConfig } from "../types";
 import { isGoldenFieldSatisfied } from "../types";
 import { extractVariablesFromBodyTemplate } from "./httpAgentUtils";
 import { toComparisonConfig } from "./normalizeComparison";

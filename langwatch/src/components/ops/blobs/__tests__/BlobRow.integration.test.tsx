@@ -39,11 +39,7 @@ const renderRow = ({
     <ChakraProvider value={defaultSystem}>
       <Table.Root>
         <Table.Body>
-          <BlobRow
-            blob={summary}
-            canManage={canManage}
-            onDelete={onDelete}
-          />
+          <BlobRow blob={summary} canManage={canManage} onDelete={onDelete} />
         </Table.Body>
       </Table.Root>
     </ChakraProvider>,

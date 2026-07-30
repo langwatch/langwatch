@@ -7,10 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  entityRegistry,
-  findEntityByPrefix,
-} from "../entityRegistry";
+import { entityRegistry, findEntityByPrefix } from "../entityRegistry";
 
 describe("entityRegistry", () => {
   describe("when looking up scenario prefixes", () => {

@@ -4,6 +4,19 @@
  * Domain files can import type identifiers from here without triggering schema evaluation.
  */
 
+import {
+  ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,
+  ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
+  ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
+} from "@ee/event-sourcing/typeIdentifiers";
+import {
+  LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
+  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
+} from "@langwatch/langy";
+import {
+  AUTOMATIONS_COMMAND_TYPES,
+  AUTOMATIONS_EVENT_TYPES,
+} from "../pipelines/automations/schemas/constants";
 import { BILLING_REPORTING_COMMAND_TYPES } from "../pipelines/billing-reporting/schemas/constants";
 import {
   CODING_AGENT_PROCESSING_COMMAND_TYPES,
@@ -14,22 +27,9 @@ import {
   EVALUATION_PROCESSING_EVENT_TYPES,
 } from "../pipelines/evaluation-processing/schemas/constants";
 import {
-  AUTOMATIONS_COMMAND_TYPES,
-  AUTOMATIONS_EVENT_TYPES,
-} from "../pipelines/automations/schemas/constants";
-import {
   EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES,
   EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
 } from "../pipelines/experiment-run-processing/schemas/constants";
-import {
-  ENTERPRISE_AGGREGATE_TYPE_IDENTIFIERS,
-  ENTERPRISE_COMMAND_TYPE_IDENTIFIERS,
-  ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
-} from "@ee/event-sourcing/typeIdentifiers";
-import {
-  LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
-  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-} from "@langwatch/langy";
 import {
   LOG_PROCESSING_COMMAND_TYPES,
   LOG_PROCESSING_EVENT_TYPES,

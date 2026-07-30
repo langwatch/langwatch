@@ -17,6 +17,31 @@ import { langyThemeConfig } from "../features/langy/langyTheme";
 // Inter font loaded via CSS @import in globals.scss (no more next/font/google)
 const interFontFamily = "'Inter', sans-serif";
 
+/**
+ * A restrained hairline in the status colour, mixed into the neutral border
+ * rather than drawn on top of it — the same formula as the Langy card's
+ * `accentBorder` (`features/asaplangy/tokens.ts`), which exists so a card can
+ * carry a tone without wearing a coloured ring.
+ */
+const statusHairline = (color: string) =>
+  `color-mix(in srgb, var(--chakra-colors-${color}) 26%, var(--chakra-colors-border-muted))`;
+
+/**
+ * The neutral card material every toast wears, whatever its status — the same
+ * panel + hairline pair as `INSET` in `features/asaplangy/tokens.ts`. It is
+ * repeated per `&[data-type=…]` because that is the shape (and specificity) of
+ * Chakra's own filled defaults, which set `bg: red.solid` / `color:
+ * red.contrast` and would otherwise survive the deep merge.
+ */
+const toastPanel = {
+  bg: "bg.panel",
+  color: "fg",
+  // Those same filled defaults hand the action trigger a white border and a
+  // white hover wash, both of which disappear on a light panel.
+  "--toast-trigger-bg": "colors.bg.muted",
+  "--toast-border-color": "colors.border.muted",
+} as const;
+
 const appConfig = defineConfig({
   globalCss: {
     body: {
@@ -1154,81 +1179,67 @@ const appConfig = defineConfig({
           size: "xl",
         },
       }),
+      /**
+       * Toasts are surface cards, not coloured slabs.
+       *
+       * They used to be a translucent wash of the status colour with white
+       * text — the message set on the paint, which is both loud and harder to
+       * read than the colour behind it. This follows the language Langy
+       * already established (`features/asaplangy/tokens.ts`,
+       * `features/langy/components/LangyError.tsx`): panel material, ONE
+       * hairline carrying the tone, the status colour spent on a small icon,
+       * and the accent reserved for the way forward — never on the trouble.
+       *
+       * It has to live here rather than as props on `<Toast.Root>`: Chakra's
+       * defaults are attribute selectors (`&[data-type=error]`), which a style
+       * prop cannot outrank — so both the neutral material and the per-status
+       * hairline are declared here. `components/ui/toaster.tsx` renders the
+       * status icon.
+       */
       toast: defineSlotRecipe({
-        slots: ["root"],
+        slots: ["root", "title", "description"],
         base: {
           root: {
             borderRadius: "xl",
             backdropFilter: "var(--lw-backdrop-blur, blur(12px))",
             border: "1px solid",
+            borderColor: "border.muted",
             boxShadow: "lg",
+            // The same neutral material for every status; ONE hairline carries
+            // the tone.
             "&[data-type=info]": {
-              bg: {
-                _light:
-                  "color-mix(in srgb, var(--chakra-colors-blue-solid) var(--lw-panel-alpha, 85%), transparent)",
-                _dark:
-                  "color-mix(in srgb, rgb(37, 99, 235) var(--lw-panel-alpha, 80%), transparent)",
-              },
-              borderColor: {
-                _light: "blue.solid/30",
-                _dark: "rgba(96, 165, 250, 0.25)",
-              },
-              color: "white",
-              "--toast-trigger-bg": "{white/10}",
-              "--toast-border-color": "{white/40}",
-            },
-            "&[data-type=success]": {
-              bg: {
-                _light:
-                  "color-mix(in srgb, var(--chakra-colors-green-solid) var(--lw-panel-alpha, 85%), transparent)",
-                _dark:
-                  "color-mix(in srgb, rgb(22, 163, 74) var(--lw-panel-alpha, 80%), transparent)",
-              },
-              borderColor: {
-                _light: "green.solid/30",
-                _dark: "rgba(74, 222, 128, 0.25)",
-              },
-              color: "white",
-            },
-            "&[data-type=error]": {
-              bg: {
-                _light:
-                  "color-mix(in srgb, var(--chakra-colors-red-solid) var(--lw-panel-alpha, 88%), transparent)",
-                _dark:
-                  "color-mix(in srgb, rgb(220, 38, 38) var(--lw-panel-alpha, 80%), transparent)",
-              },
-              borderColor: {
-                _light: "red.solid/30",
-                _dark: "rgba(248, 113, 113, 0.25)",
-              },
-              color: "white",
-            },
-            "&[data-type=warning]": {
-              bg: {
-                _light:
-                  "color-mix(in srgb, var(--chakra-colors-yellow-solid) var(--lw-panel-alpha, 88%), transparent)",
-                _dark:
-                  "color-mix(in srgb, rgb(217, 119, 6) var(--lw-panel-alpha, 80%), transparent)",
-              },
-              borderColor: {
-                _light: "yellow.solid/30",
-                _dark: "rgba(251, 191, 36, 0.25)",
-              },
-              color: "white",
+              ...toastPanel,
+              borderColor: "border.muted",
             },
             "&[data-type=loading]": {
-              bg: {
-                _light:
-                  "color-mix(in srgb, white var(--lw-panel-alpha, 80%), transparent)",
-                _dark:
-                  "color-mix(in srgb, rgb(30, 30, 36) var(--lw-panel-alpha, 80%), transparent)",
-              },
-              borderColor: {
-                _light: "black/8",
-                _dark: "rgba(255, 255, 255, 0.1)",
-              },
-              color: { _light: "gray.800", _dark: "gray.100" },
+              ...toastPanel,
+              borderColor: "border.muted",
             },
+            "&[data-type=error]": {
+              ...toastPanel,
+              borderColor: statusHairline("red-solid"),
+            },
+            "&[data-type=warning]": {
+              ...toastPanel,
+              borderColor: statusHairline("yellow-solid"),
+            },
+            "&[data-type=success]": {
+              ...toastPanel,
+              borderColor: statusHairline("green-solid"),
+            },
+          },
+          title: {
+            fontSize: "13.5px",
+            fontWeight: "640",
+            lineHeight: "1.35",
+            letterSpacing: "-0.005em",
+            marginEnd: "0",
+          },
+          description: {
+            fontSize: "13px",
+            lineHeight: "1.5",
+            color: "fg.muted",
+            opacity: "1",
           },
         },
       }),

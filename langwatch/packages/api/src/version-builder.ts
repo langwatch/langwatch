@@ -1,14 +1,13 @@
 import type { ZodType } from "zod";
-
+import type { SSEConfig, SSEHandler } from "./sse.js";
 import {
-  VERSION_LATEST,
-  VERSION_PREVIEW,
   type EndpointConfig,
   type EndpointRegistration,
   type Handler,
   type HttpMethod,
+  VERSION_LATEST,
+  VERSION_PREVIEW,
 } from "./types.js";
-import type { SSEConfig, SSEHandler } from "./sse.js";
 
 const DATE_VERSION_SEGMENT_RE = /^20\d{2}-\d{2}-\d{2}$/;
 
@@ -92,6 +91,7 @@ export class VersionBuilder<TApp> {
       method,
       path,
       config: {} as EndpointConfig,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: a withdrawn endpoint's handler is never invoked; the shape exists to satisfy the record type.
       handler: () => {},
       withdrawn: true,
     });

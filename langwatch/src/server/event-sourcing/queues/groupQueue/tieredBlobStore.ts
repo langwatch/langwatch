@@ -6,7 +6,11 @@ import type { Logger } from "@langwatch/observability";
 import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { mintAzureBlobUri, mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
+import {
+  mintAzureBlobUri,
+  mintFileUri,
+  mintS3Uri,
+} from "~/server/stored-objects/uri";
 
 import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";

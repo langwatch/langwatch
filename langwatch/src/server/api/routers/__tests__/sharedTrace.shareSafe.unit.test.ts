@@ -128,12 +128,16 @@ describe("sharedTrace share-safe gates", () => {
         resources,
         protections: {
           ...anonProtections,
-          hiddenAttributes: [{ pattern: "*", visibleTo: "members of this project" }],
+          hiddenAttributes: [
+            { pattern: "*", visibleTo: "members of this project" },
+          ],
         },
       });
       expect(out.resourceAttributes["service.name"]).not.toBe("api");
       expect(out.resourceAttributes["customer.id"]).not.toBe("acme");
-      expect(out.spans[0]?.resourceAttributes["deployment.env"]).not.toBe("prod");
+      expect(out.spans[0]?.resourceAttributes["deployment.env"]).not.toBe(
+        "prod",
+      );
     });
 
     it("leaves attributes untouched when no hidden rules apply", () => {

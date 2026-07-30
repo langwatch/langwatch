@@ -419,7 +419,8 @@ function foldModelCall(
   return {
     ...next,
     modelCalls: next.modelCalls + 1,
-    modelCallMs: next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
+    modelCallMs:
+      next.modelCallMs + (num(attrs.duration_ms) || fallbackDurationMs),
     ttftMsTotal: next.ttftMsTotal + ttft,
     ttftSamples: next.ttftSamples + (ttft > 0 ? 1 : 0),
     // Attempts includes the first try, so attempts > modelCalls means the
@@ -464,15 +465,31 @@ export interface SpanFactsView {
 export function applySpanToCodingAgentSession({
   state,
   span,
+  agent,
 }: {
   state: CodingAgentSessionData;
   span: SpanFactsView;
+  /**
+   * The CONTRIBUTION's detected agent — the same gate
+   * `applyLogToCodingAgentSession` applies, mirrored onto the span side.
+   *
+   * A logs-only agent folds its model calls and tool runs from its LOG events,
+   * so folding the equivalent span too counts one turn twice. `logsOnly` says
+   * the agent's telemetry is events-only, but nothing stops it also exporting
+   * spans — Cowork does exactly that behind its beta trace-export flag — so the
+   * gate has to be enforced on both sides, not just declared.
+   */
+  agent?: string;
 }): CodingAgentSessionData {
   const attrs = span.attrs;
   const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
+  const isLogsOnly = agent !== undefined && LOGS_ONLY_AGENT_IDS.has(agent);
 
   if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
-    return foldModelCall(withIdentity(state, attrs), attrs, durationMs);
+    // Identity still rides the span; only the counted facts are the log's.
+    return isLogsOnly
+      ? withIdentity(state, attrs)
+      : foldModelCall(withIdentity(state, attrs), attrs, durationMs);
   }
 
   if (span.name === CLAUDE.SPAN.SUBAGENT_SPAWN) {
@@ -500,6 +517,10 @@ export function applySpanToCodingAgentSession({
   }
 
   if (span.name !== CLAUDE.SPAN.TOOL) return state;
+
+  // Same gate as the model call above: a logs-only agent folds its tool runs
+  // from `tool_result`, so the tool span would be the second count.
+  if (isLogsOnly) return withIdentity(state, attrs);
 
   return foldToolInvocation(withIdentity(state, attrs), {
     attrs,
@@ -595,7 +616,6 @@ function foldToolInvocation(
 
   return withTool;
 }
-
 
 /**
  * Fold one LOG record's facts into the session.
@@ -796,9 +816,20 @@ export function applyLogToCodingAgentSession({
 }
 
 /**
- * Converged metric units kept per session. Well above any real session's
- * series count (a Claude Code session emits ~10–30) while bounding a
- * pathological delta stream.
+ * Converged metric UNITS kept per session — not series, and the difference is
+ * load-bearing.
+ *
+ * A cumulative point converges per series; a delta point is keyed by
+ * `point.pointId` (summing exactly once requires remembering each point), so
+ * one unit is one POINT. A session exporting deltas on an interval therefore
+ * reaches this bound on ordinary traffic, and past it the metric-fed fields
+ * (lines of code, commits, PRs, edit decisions, active time) freeze silently —
+ * sums already folded stay correct, they just stop moving.
+ *
+ * The bound has to exist (the unit map is persisted on the row). Fixing the
+ * freeze means changing what a unit IS — a per-series running total, point ids
+ * kept only long enough to dedup — which changes fold output and needs its own
+ * version bump. Raising the number only moves the cliff.
  */
 const MAX_METRIC_SERIES = 200;
 

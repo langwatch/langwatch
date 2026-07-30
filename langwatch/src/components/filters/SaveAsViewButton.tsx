@@ -9,7 +9,8 @@
 
 import { Button, HStack, Input, Text } from "@chakra-ui/react";
 import { Check, ChevronDown, User, Users } from "lucide-react";
-import React, { useCallback, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useRef, useState } from "react";
 import { MAX_VIEW_NAME_LENGTH, useSavedViews } from "../../hooks/useSavedViews";
 import { Dialog } from "../ui/dialog";
 import { Menu } from "../ui/menu";

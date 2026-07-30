@@ -401,7 +401,11 @@ describe("revokeLangySessionApiKey", () => {
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k1", projectId: "p1" }),
+          revokeLangySessionApiKey({
+            prisma: p,
+            apiKeyId: "k1",
+            projectId: "p1",
+          }),
         ).resolves.toBe("revoked");
 
         expect(p.apiKey.update).toHaveBeenCalledWith({
@@ -425,7 +429,11 @@ describe("revokeLangySessionApiKey", () => {
         });
 
         await expect(
-          revokeLangySessionApiKey({ prisma: p, apiKeyId: "k2", projectId: "p1" }),
+          revokeLangySessionApiKey({
+            prisma: p,
+            apiKeyId: "k2",
+            projectId: "p1",
+          }),
         ).resolves.toBe("refused");
 
         expect(p.apiKey.update).not.toHaveBeenCalled();
@@ -499,6 +507,11 @@ describe("revokeLangySessionApiKey", () => {
 describe("reapExpiredLangySessionApiKeys", () => {
   describe("given Langy session keys whose lifetime has elapsed", () => {
     describe("when the reaper runs", () => {
+      // Prisma is fully mocked here, so the org-tenancy middleware
+      // (`prisma.$use(guardOrganizationId)`) never runs — this covers the query
+      // SHAPE only. That the guard admits that shape is covered by
+      // `utils/__tests__/dbOrganizationIdProtection.unit.test.ts`, which drives
+      // this same function through the real middleware.
       it("revokes exactly the expired, unrevoked Langy session keys", async () => {
         const updateMany = vi.fn().mockResolvedValue({ count: 3 });
         const p = { apiKey: { updateMany } } as any;

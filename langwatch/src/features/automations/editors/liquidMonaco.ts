@@ -1,10 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
-import type {
-  editor,
-  languages,
-  Position,
-  Uri,
-} from "monaco-editor";
+import type { editor, languages, Position, Uri } from "monaco-editor";
 import { substituteLiquidForJsonValidation } from "./liquidJsonSubstitution";
 import { registerJsonSchema } from "./monacoSchemas";
 
@@ -365,19 +360,21 @@ export function validateLiquidModel(
   model: MonacoTextModel,
   variables: VariableInfo[],
 ): void {
-  const markers: editor.IMarkerData[] =
-    detectUnknownVariables(model.getValue(), variables).map((unknown) => {
-      const start = model.getPositionAt(unknown.index);
-      const end = model.getPositionAt(unknown.index + unknown.token.length);
-      return {
-        severity: monaco.MarkerSeverity.Warning,
-        message: `Unknown variable "${unknown.root}". Known roots: ${unknown.knownRoots.join(", ")}`,
-        startLineNumber: start.lineNumber,
-        startColumn: start.column,
-        endLineNumber: end.lineNumber,
-        endColumn: end.column,
-      };
-    });
+  const markers: editor.IMarkerData[] = detectUnknownVariables(
+    model.getValue(),
+    variables,
+  ).map((unknown) => {
+    const start = model.getPositionAt(unknown.index);
+    const end = model.getPositionAt(unknown.index + unknown.token.length);
+    return {
+      severity: monaco.MarkerSeverity.Warning,
+      message: `Unknown variable "${unknown.root}". Known roots: ${unknown.knownRoots.join(", ")}`,
+      startLineNumber: start.lineNumber,
+      startColumn: start.column,
+      endLineNumber: end.lineNumber,
+      endColumn: end.column,
+    };
+  });
 
   monaco.editor.setModelMarkers(model, MARKER_OWNER, markers);
 }
@@ -651,23 +648,22 @@ export function setupLiquidJsonSchema(params: {
     const shadowMarkers = monaco.editor.getModelMarkers({
       resource: shadowResource,
     });
-    const mapped: editor.IMarkerData[] =
-      shadowMarkers.map((m: editor.IMarker) => ({
+    const mapped: editor.IMarkerData[] = shadowMarkers.map(
+      (m: editor.IMarker) => ({
         severity: m.severity,
         message: m.message,
         startLineNumber: m.startLineNumber,
         startColumn: m.startColumn,
         endLineNumber: m.endLineNumber,
         endColumn: m.endColumn,
-      }));
+      }),
+    );
     monaco.editor.setModelMarkers(realModel, SCHEMA_MARKER_OWNER, mapped);
   };
 
   const onShadowMarkers = monaco.editor.onDidChangeMarkers(
     (resources: readonly Uri[]) => {
-      if (
-        resources.some((r) => r.toString() === shadowResource.toString())
-      ) {
+      if (resources.some((r) => r.toString() === shadowResource.toString())) {
         mirrorMarkers();
       }
     },

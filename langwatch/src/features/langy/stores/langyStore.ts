@@ -24,8 +24,7 @@ import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
  * Everything the panel needs to *decide what to render* lives here — panel
  * visibility, which conversation is active, the composer draft + model
  * override, the dismissed page-context chips, the per-proposal apply/discard
- * lifecycle, the Stream-B optimistic token buffer, and the persisted developer
- * mode. SERVER state (the recents list, a conversation's message history) is
+ * lifecycle, and the persisted developer mode. SERVER state (the recents list, a conversation's message history) is
  * NOT here — that is React Query (`data/useLangyConversationList`,
  * `data/useLangyMessages`) keyed by conversation id, kept fresh by the
  * `useLangyFreshness` SSE coordinator. This store holds only the pointer
@@ -404,7 +403,7 @@ interface LangyState extends TurnPhaseState {
   pinFeedback: (messageId: string) => void;
 
   // The turn phase — the SINGLE, event-driven source for the composer's send/stop
-  // affordance and every "is a turn in flight" read (ADR-058). It replaces the
+  // affordance and every "is a turn in flight" read (ADR-078). It replaces the
   // old scatter of isBusy / serverTurnInFlight / isStopping / settled-marker
   // booleans derived per-render across the panel: components read `turnPhase`,
   // and it changes ONLY through the four actions below.

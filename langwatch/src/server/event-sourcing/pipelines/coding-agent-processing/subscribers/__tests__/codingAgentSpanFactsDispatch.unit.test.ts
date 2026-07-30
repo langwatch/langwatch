@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import {
-  deserializeAttributes,
+  mapChRowToNormalized,
   serializeAttributes,
 } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
 import { SpanNormalizationPipelineService } from "~/server/app-layer/traces/span-normalization.service";
@@ -38,6 +38,7 @@ function rawSpanEvent({
   startMs = 1_000,
   endMs = 2_000,
   statusCode = 0,
+  traceId = TRACE_ID,
 }: {
   name: string;
   spanId: string;
@@ -49,10 +50,12 @@ function rawSpanEvent({
   endMs?: number;
   /** OTLP status: 0 UNSET, 1 OK, 2 ERROR. */
   statusCode?: number;
+  /** The trace this span belongs to — span ids are unique only within one. */
+  traceId?: string;
 }): TraceProcessingEvent {
   return {
     id: eventId,
-    aggregateId: TRACE_ID,
+    aggregateId: traceId,
     aggregateType: "trace",
     tenantId: createTenantId("tenant-1"),
     createdAt: startMs,
@@ -60,7 +63,7 @@ function rawSpanEvent({
     occurredAt: startMs,
     data: {
       span: {
-        traceId: TRACE_ID,
+        traceId,
         spanId,
         name,
         kind: 1,
@@ -103,23 +106,54 @@ function normalizedFrom(event: SpanReceivedEvent): NormalizedSpan {
 }
 
 /**
- * What the claim-check path actually reads: the normalized span AFTER its
- * attributes round-tripped ClickHouse's Map(String, String) columns — the
- * deliberately lossy deserialize turns "true"/"1.0"/"90210" style strings
- * into booleans and numbers, which is exactly the divergence the
- * identical-command contract has to absorb.
+ * What the claim-check path actually reads: the normalized span after a full
+ * trip through the span store's own columns.
+ *
+ * Built by projecting the normalized span onto a `stored_spans` row and
+ * running the REPOSITORY's `mapChRowToNormalized` over it, not by spreading
+ * the original. That mapping is where the two paths can diverge — `name` comes
+ * from `SpanName`, `startTimeUnixMs` from `StartTimeMs`, `statusCode` through
+ * `validateStatusCode`, the scope name null-coalesces to `""`, and `id` is
+ * dropped to `""` — so a fixture that copied those fields verbatim would keep
+ * the identical-command assertion green through exactly the regressions it
+ * exists to catch. The lossy Map(String, String) deserialize (turning
+ * "true"/"1.0"/"90210" back into booleans and numbers) rides along inside the
+ * mapper, which is where production does it too.
  */
 function storeReadBackFrom(event: SpanReceivedEvent): NormalizedSpan {
   const span = normalizedFrom(event);
-  return {
-    ...span,
-    spanAttributes: deserializeAttributes(
-      serializeAttributes(span.spanAttributes),
+  return mapChRowToNormalized({
+    SpanId: span.spanId,
+    TraceId: span.traceId,
+    TenantId: span.tenantId,
+    ParentSpanId: span.parentSpanId ?? null,
+    ParentTraceId: span.parentTraceId ?? null,
+    ParentIsRemote: span.parentIsRemote ?? null,
+    Sampled: span.sampled,
+    StartTimeMs: span.startTimeUnixMs,
+    EndTimeMs: span.endTimeUnixMs,
+    DurationMs: span.durationMs,
+    SpanName: span.name,
+    SpanKind: span.kind,
+    ResourceAttributes: serializeAttributes(span.resourceAttributes),
+    SpanAttributes: serializeAttributes(span.spanAttributes),
+    StatusCode: span.statusCode,
+    StatusMessage: span.statusMessage ?? null,
+    ScopeName: span.instrumentationScope?.name ?? null,
+    ScopeVersion: span.instrumentationScope?.version ?? null,
+    Cost: span.cost ?? null,
+    NonBilledCost: span.nonBilledCost ?? null,
+    Events_Timestamp: span.events.map((event) => event.timeUnixMs),
+    Events_Name: span.events.map((event) => event.name),
+    Events_Attributes: span.events.map((event) =>
+      serializeAttributes(event.attributes),
     ),
-    resourceAttributes: deserializeAttributes(
-      serializeAttributes(span.resourceAttributes),
+    Links_TraceId: span.links.map((link) => link.traceId),
+    Links_SpanId: span.links.map((link) => link.spanId),
+    Links_Attributes: span.links.map((link) =>
+      serializeAttributes(link.attributes),
     ),
-  };
+  }) as NormalizedSpan;
 }
 
 function makeSubscriber(
@@ -279,7 +313,7 @@ describe("codingAgentSpanFactsDispatch", () => {
 
   describe("given the dedup key", () => {
     describe("when keying a span job", () => {
-      /** @scenario a redelivered event is not processed twice */
+      /** @scenario a redelivered event resolves to the unit of work already queued */
       it("keys on tenant, trace and span so two traces' spans never collide", () => {
         const { subscriber } = makeSubscriber();
         const event = rawSpanEvent({
@@ -295,8 +329,21 @@ describe("codingAgentSpanFactsDispatch", () => {
           throw new Error("expected a custom deduplication config");
         }
 
-        expect(dedup.makeId(event)).toBe(
-          `coding-agent-span-facts:tenant-1:${TRACE_ID}:tool-dedup`,
+        // Redelivering the SAME span resolves to the same unit of work, which
+        // is what lets the queue recognise the duplicate.
+        expect(dedup.makeId(event)).toBe(dedup.makeId(event));
+
+        // And the same span id under a different trace does NOT: span ids are
+        // unique only within a trace, so a key without the trace would let two
+        // traces collide inside the TTL and silently drop one's facts.
+        const sameSpanIdOtherTrace = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "tool-dedup",
+          attributes: { tool_name: "Bash" },
+          traceId: `${TRACE_ID}-other`,
+        });
+        expect(dedup.makeId(sameSpanIdOtherTrace)).not.toBe(
+          dedup.makeId(event),
         );
       });
     });
@@ -356,8 +403,9 @@ describe("codingAgentSpanFactsDispatch", () => {
         // shape the seam happened to stage.
         expect(
           dedup.makeId(
-            makeSpanReferencedEvent(first as SpanReceivedEvent) as
-              TraceProcessingEvent,
+            makeSpanReferencedEvent(
+              first as SpanReceivedEvent,
+            ) as TraceProcessingEvent,
           ),
         ).toBe(dedup.makeId(first));
       });
@@ -498,33 +546,65 @@ describe("codingAgentSpanFactsDispatch", () => {
         ]);
       });
 
-      it("falls back to ingest time when the wire span carried no parseable start", async () => {
-        const valid = rawSpanEvent({
-          name: "claude_code.tool",
-          spanId: "no-start",
-          attributes: { tool_name: "Bash" },
-        }) as SpanReceivedEvent;
+      /** @scenario work whose payload is not readable yet retries, never drops */
+      it("centers the read on the start even when the wire carried a protobuf Long", async () => {
+        const threeDays = 3 * 24 * 60 * 60 * 1000;
+        const startMs = 1_753_000_000_000;
         const base = rawSpanEvent({
-          name: "claude_code.tool",
-          spanId: "no-start",
-          attributes: { tool_name: "Bash" },
+          name: "claude_code.blocked_on_user",
+          spanId: "long-span-proto",
+          startMs,
+          endMs: startMs + threeDays,
         }) as SpanReceivedEvent;
+        // An OTLP/protobuf decode yields a {low, high} Long here, not a decimal
+        // string: `parseOtlpBody` decodes without `toObject({longs: String})`.
+        const nano = BigInt(startMs) * 1_000_000n;
         const span = base.data.span as { startTimeUnixNano?: unknown };
-        span.startTimeUnixNano = "not-a-timestamp";
-        const event = { ...base, occurredAt: 5_000 };
+        span.startTimeUnixNano = {
+          low: Number(nano & 0xffffffffn) | 0,
+          high: Number(nano >> 32n),
+          unsigned: false,
+        };
+        const event = { ...base, occurredAt: startMs + threeDays };
 
-        // Only the read HINT is under test; the stub's span content just has
-        // to be a well-formed store row (a garbage start can't normalize, so
-        // the store never holds one).
         const { subscriber, reads } = makeSubscriber(async () =>
-          normalizedFrom(valid),
+          normalizedFrom(event),
         );
         await subscriber.handle(
           makeSpanReferencedEvent(event) as TraceProcessingEvent,
           context,
         );
 
-        expect(reads[0]?.occurredAtMs).toBe(5_000);
+        expect(reads[0]?.occurredAtMs).toBe(startMs);
+      });
+    });
+
+    describe("when the wire span carried no usable start", () => {
+      /** @scenario work whose payload is not readable yet retries, never drops */
+      it("stages the full event rather than a reference the read could not resolve", async () => {
+        const base = rawSpanEvent({
+          name: "claude_code.tool",
+          spanId: "zero-start",
+          attributes: { tool_name: "Bash" },
+        }) as SpanReceivedEvent;
+        // A zero start is stored as 1970, so a reference for it would be
+        // windowed on ingest time and never find its own row.
+        const span = base.data.span as { startTimeUnixNano?: unknown };
+        span.startTimeUnixNano = "0";
+        const event = { ...base, occurredAt: 5_000 };
+
+        const { subscriber, dispatched, reads } = makeSubscriber(
+          async () => null,
+        );
+        await subscriber.handle(
+          makeSpanReferencedEvent(event) as TraceProcessingEvent,
+          context,
+        );
+
+        // No store read at all — the facts come off the staged payload.
+        expect(reads).toHaveLength(0);
+        expect(dispatched).toHaveLength(1);
+        expect(dispatched[0]!.facts.tool_name).toBe("Bash");
       });
     });
 

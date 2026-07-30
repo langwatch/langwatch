@@ -269,7 +269,10 @@ describe("the open conversation's catch-up from the recorded tail", () => {
         // The snapshot resolves at a position taken BEFORE the step.
         snapshotLoads(at(100, "evt_a"), TURN_ID);
         eventsAfterFetch.mockResolvedValue(
-          tail([toolInitiated({ id: "evt_b", createdAt: 200 })], at(200, "evt_b")),
+          tail(
+            [toolInitiated({ id: "evt_b", createdAt: 200 })],
+            at(200, "evt_b"),
+          ),
         );
         deliverSignal(at(200, "evt_b"));
 
@@ -459,9 +462,7 @@ describe("the open conversation's catch-up from the recorded tail", () => {
         expect(eventsAfterFetch).toHaveBeenCalledTimes(1);
         const { turn } = useLangyStore.getState().turnProjection;
         expect(turn?.Status).toBe("completed");
-        expect(turn?.AnswerParts).toEqual([
-          { type: "text", text: "all done" },
-        ]);
+        expect(turn?.AnswerParts).toEqual([{ type: "text", text: "all done" }]);
         // The folded terminal is what pulls the completed reply into the
         // message history the thread renders.
         expect(messagesInvalidate).toHaveBeenCalledWith({

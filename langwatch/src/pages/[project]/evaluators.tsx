@@ -20,10 +20,10 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { createEvaluatorEditorCallbacks } from "~/experiments-v3/utils/evaluatorEditorCallbacks";
+import { showErrorToast } from "~/features/errors";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 /**
  * Evaluators management page
@@ -64,14 +64,11 @@ function Page() {
         meta: { closable: true },
       });
     },
-    onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error updating evaluator",
-        description: error.message ?? "Please try again later.",
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't update evaluator from source",
+      }),
   });
 
   const handleSyncFromSource = useCallback(
@@ -124,13 +121,8 @@ function Page() {
         meta: { closable: true },
       });
     },
-    onError: () => {
-      toaster.create({
-        title: "Error deleting evaluator",
-        description: "Please try again later.",
-        type: "error",
-      });
-    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't delete evaluator" }),
   });
 
   const handleEditEvaluator = (evaluator: {
@@ -195,13 +187,11 @@ function Page() {
               meta: { closable: true },
             });
           },
-          onError: () => {
-            toaster.create({
-              title: "Error deleting evaluator",
-              description: "Please try again later.",
-              type: "error",
-            });
-          },
+          onError: (error) =>
+            showErrorToast({
+              error,
+              fallbackTitle: "Couldn't delete evaluator",
+            }),
         },
       );
     }

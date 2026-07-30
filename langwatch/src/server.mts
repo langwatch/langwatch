@@ -29,7 +29,7 @@ dotenv.config({ override: true, quiet });
 // URLs + ports win over anything pinned in .env. In non-portless runs the file
 // is absent and this is a no-op — and stays quiet, or dotenv would announce
 // "injected env (0)" from a file that isn't there.
-// See tools/thuishaven + ADR-048.
+// See tools/thuishaven.
 dotenv.config({
   path: ".env.portless",
   override: true,

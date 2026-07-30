@@ -191,7 +191,9 @@ describe("AgentCodeEditorDrawer", () => {
 
       await waitFor(() => {
         // ScenarioInputMappingSection also renders variable-name-input, so expect multiple
-        expect(screen.getAllByTestId("variable-name-input").length).toBeGreaterThanOrEqual(1);
+        expect(
+          screen.getAllByTestId("variable-name-input").length,
+        ).toBeGreaterThanOrEqual(1);
         expect(screen.getByTestId("output-name-output")).toBeInTheDocument();
       });
     });
@@ -222,7 +224,9 @@ describe("AgentCodeEditorDrawer", () => {
 
       await waitFor(() => {
         // ScenarioInputMappingSection also renders variable-name-input, so use getAllBy
-        expect(screen.getAllByTestId("variable-name-input").length).toBeGreaterThanOrEqual(1);
+        expect(
+          screen.getAllByTestId("variable-name-input").length,
+        ).toBeGreaterThanOrEqual(1);
       });
 
       // Click the first variable-name-input (the editable one in the main Inputs section)
@@ -234,7 +238,9 @@ describe("AgentCodeEditorDrawer", () => {
       await user.keyboard("{Enter}");
 
       await waitFor(() => {
-        expect(screen.getAllByTestId("variable-name-query").length).toBeGreaterThanOrEqual(1);
+        expect(
+          screen.getAllByTestId("variable-name-query").length,
+        ).toBeGreaterThanOrEqual(1);
       });
     });
   });
@@ -274,7 +280,9 @@ describe("AgentCodeEditorDrawer", () => {
 
       // The existing mapping should show as a tag (ScenarioInputMappingSection also
       // renders mapping tags, so use getAllByTestId)
-      expect(screen.getAllByTestId("source-mapping-tag").length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getAllByTestId("source-mapping-tag").length,
+      ).toBeGreaterThanOrEqual(1);
     });
 
     it("calls onInputMappingsChange when a mapping is cleared", async () => {
@@ -288,7 +296,9 @@ describe("AgentCodeEditorDrawer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getAllByTestId("source-mapping-tag").length).toBeGreaterThanOrEqual(1);
+        expect(
+          screen.getAllByTestId("source-mapping-tag").length,
+        ).toBeGreaterThanOrEqual(1);
       });
 
       // Clear the first clear-mapping-button (belongs to the main Inputs section)
@@ -337,9 +347,7 @@ describe("AgentCodeEditorDrawer", () => {
     it("ships without any dspy reference", async () => {
       renderDrawer();
 
-      const textarea = await waitFor(() =>
-        screen.getByTestId("code-textarea"),
-      );
+      const textarea = await waitFor(() => screen.getByTestId("code-textarea"));
       const value = (textarea as HTMLTextAreaElement).value;
 
       expect(value).not.toContain("import dspy");
@@ -350,9 +358,7 @@ describe("AgentCodeEditorDrawer", () => {
     it("uses a plain Python class with a __call__ method", async () => {
       renderDrawer();
 
-      const textarea = await waitFor(() =>
-        screen.getByTestId("code-textarea"),
-      );
+      const textarea = await waitFor(() => screen.getByTestId("code-textarea"));
       const value = (textarea as HTMLTextAreaElement).value;
 
       // Default template uses Python's idiomatic `__call__` (instances

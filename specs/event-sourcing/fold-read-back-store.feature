@@ -1,3 +1,4 @@
+@unit
 Feature: Fold projections read back their own state
   A fold projection keeps its aggregate's state in a durable store fronted by a
   cache. When the cache is cold it recovers the state from the store — never by
@@ -70,6 +71,14 @@ Feature: Fold projections read back their own state
     Then the fold treats the older state as absent rather than reading it back
     And it rebuilds that aggregate's state from the event log
     And the bookkeeping the older shape never recorded is recovered
+
+  Scenario: a state that cannot be read back is never quietly replaced by a partial one
+    Given a fold that has since changed the shape of the state it stores
+    And an aggregate whose committed state was written under the older shape
+    And the fold has no way to rebuild that aggregate from the event log
+    When the next event for that aggregate arrives
+    Then the fold reports the failure rather than starting from an empty state
+    And the committed state is left as it is
 
   Scenario: rebuilding an aggregate once retires it from rebuilding again
     Given an aggregate whose state was rebuilt because it had been stored under an older shape

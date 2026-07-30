@@ -16,6 +16,7 @@ import (
 )
 
 func TestLLMProxy(t *testing.T) {
+	// @scenario "The manager injects the virtual key and the turn's trace context"
 	t.Run("when a worker makes an LLM call during a turn", func(t *testing.T) {
 		var gotAuth, gotTraceparent, gotPath, gotQuery string
 		gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -156,6 +157,7 @@ func TestLLMProxy(t *testing.T) {
 		})
 	})
 
+	// @scenario "Streaming LLM responses pass through unbuffered"
 	t.Run("when the response is a server-sent event stream", func(t *testing.T) {
 		// The gateway writes one event, then BLOCKS until the client has observed
 		// it, then writes the second. This only completes if the relay flushes
@@ -471,8 +473,12 @@ func TestLLMProxy_ErrorCapture(t *testing.T) {
 				if string(e.Code) != string(llmUpstreamErrorCode) {
 					t.Errorf("captured code = %q, want %q", e.Code, llmUpstreamErrorCode)
 				}
-				if e.Meta["message"] != tc.want {
-					t.Errorf("captured message = %q, want %q", e.Meta["message"], tc.want)
+				// The provider's prose never reaches the frame — see
+				// decodeLLMErrorBody. `tc.want` is retained as the sentence
+				// that USED to be captured, so each case still names the body
+				// it is about and this assertion stays legible.
+				if _, hasMessage := e.Meta["message"]; hasMessage {
+					t.Errorf("captured message = %q, want the provider's prose dropped (was %q)", e.Meta["message"], tc.want)
 				}
 				if e.Meta["http_status"] != http.StatusBadRequest {
 					t.Errorf("captured http_status = %v, want 400", e.Meta["http_status"])

@@ -1,8 +1,8 @@
 import { Box } from "@chakra-ui/react";
 import { motion } from "motion/react";
 import { createPortal } from "react-dom";
-import { PANEL_LAYOUT_TRANSITION } from "../logic/langyPanelLayout";
 import type { ComposerFlight } from "../hooks/useComposerMorph";
+import { PANEL_LAYOUT_TRANSITION } from "../logic/langyPanelLayout";
 
 const MotionBox = motion.create(Box);
 

@@ -6,7 +6,12 @@ import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
+import WeightBalancedSequencer from "./vitest.sequencer";
+
 config();
+
+// One switch for the CI-vs-laptop trade-offs below.
+const isCI = !!process.env.CI;
 
 export default defineConfig({
   test: {
@@ -23,17 +28,35 @@ export default defineConfig({
       "./test-setup.ts",
     ],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
-    exclude: [
-      ...configDefaults.exclude,
-      ".next/**/*",
-      ".next-saas/**/*",
-    ],
+    exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
     testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
     hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
     teardownTimeout: 30_000, // 30 seconds for cleanup
     // Run test files sequentially to avoid BullMQ/Redis resource contention
-    // when multiple pipelines are created and destroyed in parallel
-    fileParallelism: false,
+    // when multiple pipelines are created and destroyed in parallel.
+    //
+    // That contention is Redis-specific: BullMQ keys a queue by name alone, so
+    // two files building the same pipeline share it. The ClickHouse and
+    // Postgres fixtures do not have the same problem -- of the 111 integration
+    // files that touch ClickHouse there are five hardcoded tenant ids between
+    // them, and one appears in more than one file.
+    //
+    // So parallelism is opt-in rather than impossible: set both
+    // VITEST_INTEGRATION_PARALLEL and VITEST_ISOLATE_WORKER_REDIS (see
+    // setupEnv.ts, which then gives each worker its own Redis database) and
+    // the files can run concurrently.
+    //
+    // NOTHING SETS THE FIRST ONE TODAY, including CI. It was set for the
+    // integration job and withdrawn: groupQueue.decodeDrop and scripts began
+    // failing non-deterministically with state vanishing underneath them
+    // rather than with a wrong assertion, which is what a flushdb crossing a
+    // worker boundary looks like. The per-worker database is not obviously
+    // airtight either — setupEnv runs once at config load in the main
+    // process, where VITEST_POOL_ID is absent and the id falls back to 1, and
+    // again per worker as a setup file. Nothing asserts that two concurrent
+    // workers cannot see each other's keys; write that test before setting
+    // this again. CI parallelises across shards instead.
+    fileParallelism: process.env.VITEST_INTEGRATION_PARALLEL === "1",
     // Use forked child processes. We briefly tried pool: "threads" to
     // sidestep the post-test shard 4 wedge, but threads exposes a panic
     // in @prisma/client/query-engine-node-api when the client gets
@@ -41,6 +64,23 @@ export default defineConfig({
     // to deserialize constructor options"). The wedge in forks is
     // handled by a hard-floor process.exit timer in globalSetup.ts.
     pool: "forks",
+    // Unlike the unit config, this one does NOT switch pools in CI. The note
+    // above is the reason: threads panic inside @prisma/client's query engine,
+    // and that is true wherever it runs.
+    //
+    // This only takes effect when fileParallelism is on. Vitest documents that
+    // `fileParallelism: false` overrides maxWorkers to 1, so with the flag off
+    // — which is the current state everywhere — the value here is inert, and
+    // an earlier `isCI ? "100%" : 1` read as if CI were running four workers
+    // when it was running one. Keep it honest: ask for two, and let vitest
+    // clamp it to one while files are serial. Two rather than every core
+    // because the runner has 4 vCPUs and is also hosting ClickHouse, Postgres
+    // and Redis; handing vitest the whole box starved the datastores and
+    // suites failed on vi.waitFor timeouts rather than on their assertions.
+    maxWorkers: isCI ? 2 : 1,
+    // Same weight-balanced split as the unit config: equal file counts are not
+    // equal work, and a matrix is only as fast as its slowest leg.
+    sequence: { sequencer: WeightBalancedSequencer },
     // NOTE: BUILD_TIME is NOT set for integration tests because we need real Redis/ClickHouse connections.
     // The setup.ts file handles setting the correct URLs from globalSetup.
   },

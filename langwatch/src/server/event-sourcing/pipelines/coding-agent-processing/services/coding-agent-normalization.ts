@@ -313,23 +313,36 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
  * or null when the record is not a coding agent's, which doubles as the
  * consumer-side gate (a contribution without the lift never reaches the
  * session fold).
+ *
+ * **Deliberately blind to `service.name`**, unlike `detectCodingAgent`. This
+ * runs on every ingested log record, and the service name lives only inside
+ * `resourceAttributesFlatJson` — there is no extracted column for it — so
+ * consulting it here would put a JSON parse on the whole log firehose to
+ * answer a question that is almost always "no". That is the cost ADR-069
+ * exists to refuse, so the gate stays on the cheap signals (scope, event name)
+ * and the caller supplies `service.name` afterwards, to LABEL a record this
+ * has already admitted.
+ *
+ * The residual gap is narrow and known: an agent identified by service name
+ * ALONE, emitting bare event names under a scope this does not recognise,
+ * would be declined here. Cowork is not that case — it reuses Claude Code's
+ * runtime, so its records carry the anthropic scope and `claude_code.*` event
+ * names and pass on those. An agent that genuinely needs naming by service
+ * alone needs a `ServiceName` column extracted on the canonical log record
+ * first; do not close it by parsing resource attributes in this path.
  */
 export function liftCodingAgentLogFacts({
   scopeName,
   attributes,
-  serviceName,
 }: {
   scopeName: string | null | undefined;
   attributes: Record<string, unknown>;
-  /** Resource-level service.name — the only signal that names Cowork. */
-  serviceName?: string | null;
 }): Record<string, string | number | boolean> | null {
   const eventName = attributes["event.name"];
   if (
     detectCodingAgent({
       scopeName,
       recordName: typeof eventName === "string" ? eventName : null,
-      serviceName,
     }) === "unknown"
   ) {
     return null;

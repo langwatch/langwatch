@@ -68,7 +68,9 @@ vi.mock("~/utils/api", () => ({
 }));
 
 const renderDrawer = (
-  props: Partial<React.ComponentProps<typeof AgentWorkflowTargetEditorDrawer>> = {},
+  props: Partial<
+    React.ComponentProps<typeof AgentWorkflowTargetEditorDrawer>
+  > = {},
 ) =>
   render(
     <ChakraProvider value={defaultSystem}>
@@ -150,7 +152,10 @@ describe("AgentWorkflowTargetEditorDrawer", () => {
           id: "workflow-123",
           name: "empty workflow",
           currentVersion: {
-            dsl: { nodes: [{ id: "entry", type: "entry", data: {} }], edges: [] },
+            dsl: {
+              nodes: [{ id: "entry", type: "entry", data: {} }],
+              edges: [],
+            },
           },
         };
 

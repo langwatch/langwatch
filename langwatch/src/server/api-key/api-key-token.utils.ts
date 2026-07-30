@@ -147,14 +147,20 @@ export function verifySecret(
   const hmacHash = Buffer.from(hashSecret(secret), "hex");
   const stored = Buffer.from(hashedSecret, "hex");
 
-  if (hmacHash.length === stored.length && crypto.timingSafeEqual(hmacHash, stored)) {
+  if (
+    hmacHash.length === stored.length &&
+    crypto.timingSafeEqual(hmacHash, stored)
+  ) {
     return "match";
   }
 
   // Fall back to legacy plain SHA-256
   const legacyHash = Buffer.from(hashSecretLegacy(secret), "hex");
 
-  if (legacyHash.length === stored.length && crypto.timingSafeEqual(legacyHash, stored)) {
+  if (
+    legacyHash.length === stored.length &&
+    crypto.timingSafeEqual(legacyHash, stored)
+  ) {
     return "match_legacy";
   }
 

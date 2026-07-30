@@ -1,7 +1,15 @@
 import { VStack } from "@chakra-ui/react";
 import { useCallback, useMemo, useRef } from "react";
-import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
-import type { Output, OutputType } from "~/components/llmPromptConfigs/LLMConfigPopover";
+import {
+  Controller,
+  useFieldArray,
+  useFormContext,
+  useWatch,
+} from "react-hook-form";
+import type {
+  Output,
+  OutputType,
+} from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { PromptConfigFormValues } from "~/prompts";
 import type { LlmConfigOutputType } from "~/types";
@@ -46,18 +54,15 @@ export function WrappedOptimizationStudioLLMConfigField() {
   const outputsFieldArrayRef = useRef(outputsFieldArray);
   outputsFieldArrayRef.current = outputsFieldArray;
 
-  const handleOutputsChange = useCallback(
-    (newOutputs: Output[]) => {
-      outputsFieldArrayRef.current.replace(
-        newOutputs.map((o) => ({
-          identifier: o.identifier,
-          type: o.type as LlmConfigOutputType,
-          json_schema: o.json_schema as { type: string } | undefined,
-        })),
-      );
-    },
-    [],
-  );
+  const handleOutputsChange = useCallback((newOutputs: Output[]) => {
+    outputsFieldArrayRef.current.replace(
+      newOutputs.map((o) => ({
+        identifier: o.identifier,
+        type: o.type as LlmConfigOutputType,
+        json_schema: o.json_schema as { type: string } | undefined,
+      })),
+    );
+  }, []);
 
   return (
     <VStack align="start" width="full">

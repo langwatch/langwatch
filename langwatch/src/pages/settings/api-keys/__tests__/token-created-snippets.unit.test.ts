@@ -6,9 +6,9 @@
  * lazy-loading via dynamic().
  */
 
-import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
+import { describe, expect, it } from "vitest";
 
 const LANGWATCH_ROOT = path.resolve(__dirname, "../../../../../");
 
@@ -91,9 +91,7 @@ describe("given the token-created-snippets feature is implemented", () => {
 
     /** @scenario A single shared command-box component replaces CodeBlock and QuickCommand inside TokenCreatedDialog */
     it("ShikiCommandBox does not export accentCredentialSegments (decoration handled by Shiki grammar)", () => {
-      const commandBox = readFile(
-        "src/components/code/ShikiCommandBox.tsx",
-      );
+      const commandBox = readFile("src/components/code/ShikiCommandBox.tsx");
       // Visual distinction is achieved by Shiki's bash tokenization, not a regex pass
       expect(commandBox).not.toContain("function accentCredentialSegments(");
       expect(commandBox).not.toContain("CREDENTIAL_RE");
@@ -127,7 +125,9 @@ describe("given the token-created-snippets feature is implemented", () => {
 
     /** @scenario TokenCreatedDialog lazy-loads the Shiki-backed command box on dialog open */
     it("ApiKeysSection.tsx does not statically import shikiAdapter", () => {
-      const section = readFile("src/pages/settings/api-keys/ApiKeysSection.tsx");
+      const section = readFile(
+        "src/pages/settings/api-keys/ApiKeysSection.tsx",
+      );
       expect(section).not.toContain("shikiAdapter");
     });
   });
@@ -154,7 +154,11 @@ describe("given the token-created-snippets feature is implemented", () => {
         .sort();
       // Lock in the pre-existing set — any new highlighter dep added by a future
       // PR will fail this test until the allowlist is intentionally expanded.
-      expect(highlightLibs).toEqual(["prism-react-renderer", "prismjs", "shiki"]);
+      expect(highlightLibs).toEqual([
+        "prism-react-renderer",
+        "prismjs",
+        "shiki",
+      ]);
     });
   });
 });

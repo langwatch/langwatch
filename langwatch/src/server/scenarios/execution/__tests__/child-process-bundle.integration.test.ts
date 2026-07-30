@@ -5,14 +5,18 @@
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
 
-import { execSync, spawnSync, spawn } from "child_process";
+import { execSync, spawn, spawnSync } from "child_process";
 import fs from "fs";
 import { isBuiltin } from "module";
 import path from "path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "../../../../..");
-const BUNDLE_PATH = path.join(PACKAGE_ROOT, "dist", "scenario-child-process.js");
+const BUNDLE_PATH = path.join(
+  PACKAGE_ROOT,
+  "dist",
+  "scenario-child-process.js",
+);
 
 describe("Pre-compiled Scenario Child Process", () => {
   describe("when the child process build step runs", () => {
@@ -74,41 +78,39 @@ describe("Pre-compiled Scenario Child Process", () => {
     it("starts and reads from stdin within 5 seconds", async () => {
       const startTime = Date.now();
 
-      const result = await new Promise<{ readyMs: number; exitCode: number | null }>(
-        (resolve) => {
-          const child = spawn("node", [BUNDLE_PATH], {
-            env: {
-              ...process.env,
-              NODE_ENV: "test",
-              LANGWATCH_API_KEY: "test-key",
-              LANGWATCH_ENDPOINT: "http://localhost:9999",
-              SKIP_ENV_VALIDATION: "1",
-            },
-            stdio: ["pipe", "pipe", "pipe"],
-            cwd: PACKAGE_ROOT,
-          });
+      const result = await new Promise<{
+        readyMs: number;
+        exitCode: number | null;
+      }>((resolve) => {
+        const child = spawn("node", [BUNDLE_PATH], {
+          env: {
+            ...process.env,
+            NODE_ENV: "test",
+            LANGWATCH_API_KEY: "test-key",
+            LANGWATCH_ENDPOINT: "http://localhost:9999",
+            SKIP_ENV_VALIDATION: "1",
+          },
+          stdio: ["pipe", "pipe", "pipe"],
+          cwd: PACKAGE_ROOT,
+        });
 
-          let stderr = "";
+        // Drain stderr so a full pipe buffer cannot stall the child.
+        child.stderr?.resume();
 
-          child.stderr?.on("data", (data: Buffer) => {
-            stderr += data.toString();
-          });
+        // Send invalid JSON to trigger a fast parse error — proves stdin is being read
+        child.stdin?.write("invalid-json");
+        child.stdin?.end();
 
-          // Send invalid JSON to trigger a fast parse error — proves stdin is being read
-          child.stdin?.write("invalid-json");
-          child.stdin?.end();
+        const timeout = setTimeout(() => {
+          child.kill();
+          resolve({ readyMs: Date.now() - startTime, exitCode: null });
+        }, 10000);
 
-          const timeout = setTimeout(() => {
-            child.kill();
-            resolve({ readyMs: Date.now() - startTime, exitCode: null });
-          }, 10000);
-
-          child.on("close", (code) => {
-            clearTimeout(timeout);
-            resolve({ readyMs: Date.now() - startTime, exitCode: code });
-          });
-        },
-      );
+        child.on("close", (code) => {
+          clearTimeout(timeout);
+          resolve({ readyMs: Date.now() - startTime, exitCode: code });
+        });
+      });
 
       // Process should have attempted to parse stdin (and failed on invalid JSON)
       // within 5 seconds, proving it started and read from stdin quickly

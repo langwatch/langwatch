@@ -102,5 +102,7 @@ export function classifyLangyLinkDestination({
     (appHost !== null && host === appHost) ||
     LANGWATCH_LINK_DOMAINS.some((domain) => isHostWithin({ host, domain }));
 
-  return isOurs ? { kind: "internal" } : { kind: "external", url: url.href, host };
+  return isOurs
+    ? { kind: "internal" }
+    : { kind: "external", url: url.href, host };
 }

@@ -80,9 +80,10 @@ export const ASSISTANT_OPTIONS: Array<{
   value: AssistantKind;
   label: string;
 }> = [
-  ...(Object.entries(ASSISTANT_PRESETS) as Array<[
-    Exclude<AssistantKind, "custom">,
-    AssistantPreset,
-  ]>).map(([value, p]) => ({ value, label: p.label })),
+  ...(
+    Object.entries(ASSISTANT_PRESETS) as Array<
+      [Exclude<AssistantKind, "custom">, AssistantPreset]
+    >
+  ).map(([value, p]) => ({ value, label: p.label })),
   { value: "custom" as const, label: "Custom" },
 ];

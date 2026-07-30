@@ -14,8 +14,8 @@ import type {
 } from "../types";
 import { convertFromUIMapping } from "./fieldMappingConverters";
 import {
-  toTargetOutputFields,
   type PromptOutputField,
+  toTargetOutputFields,
 } from "./targetOutputFields";
 
 /**

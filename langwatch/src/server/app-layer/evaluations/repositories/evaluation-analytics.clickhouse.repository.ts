@@ -249,26 +249,39 @@ export class EvaluationAnalyticsClickHouseRepository
       "EvaluationAnalyticsClickHouseRepository.findByEvaluationIdWithApplied",
     );
 
-    return await queryWindowed<{
-      row: EvaluationAnalyticsRow;
-      appliedEventIds: string[];
-    } | null>({
-      table: TABLE_NAME,
-      hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
-      ...(window !== undefined
-        ? { windowMs: (window.toMs - window.fromMs) / 2 }
-        : {}),
-      fallback: "none",
-      isEmpty: (result) => result === null,
-      run: async (fragment) =>
-        await this.queryLatestVersion({
-          tenantId,
-          evaluationId,
-          window: fragment
-            ? { fromMs: fragment.fromMs, toMs: fragment.toMs }
-            : undefined,
-        }),
-    });
+    try {
+      return await queryWindowed<{
+        row: EvaluationAnalyticsRow;
+        appliedEventIds: string[];
+      } | null>({
+        table: TABLE_NAME,
+        hintMs: window !== undefined ? (window.fromMs + window.toMs) / 2 : null,
+        ...(window !== undefined
+          ? { windowMs: (window.toMs - window.fromMs) / 2 }
+          : {}),
+        fallback: "none",
+        isEmpty: (result) => result === null,
+        run: async (fragment) =>
+          await this.queryLatestVersion({
+            tenantId,
+            evaluationId,
+            window: fragment
+              ? { fromMs: fragment.fromMs, toMs: fragment.toMs }
+              : undefined,
+          }),
+      });
+    } catch (error) {
+      // Logged with its identifiers, like every other read in this file.
+      // `queryWindowed` counts the error and rethrows but knows nothing about
+      // the row, so without this the deploy window ADR-066 documents — workers
+      // rolling ahead of migration 00056, every read throwing
+      // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
+      logger.error(
+        { tenantId, evaluationId, error },
+        "Failed to read back evaluation analytics row",
+      );
+      throw error;
+    }
   }
 
   /**

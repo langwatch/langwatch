@@ -2,7 +2,7 @@ package egress
 
 import "strings"
 
-// egressPolicy is the per-worker allow decision (ADR-043 rungs 2 and 3). It is
+// egressPolicy is the per-worker allow decision (ADR-076 rungs 2 and 3). It is
 // constructed at worker spawn from that worker's credentials envelope
 // (customer allowlist) plus the operator floor, and never mutated afterwards —
 // a policy change recycles the worker (see domain.SignatureOf).
@@ -59,7 +59,7 @@ func (p egressPolicy) decide(host string) egressDecision {
 // exact FQDN ("registry.npmjs.org") or a single-leading-label wildcard
 // ("*.internal.acme.com" — matches "a.internal.acme.com" but NOT the bare
 // "internal.acme.com" nor a two-label "a.b.internal.acme.com"). The
-// single-label bound is deliberate (ADR-043 open question 1): it keeps the
+// single-label bound is deliberate (ADR-076 open question 1): it keeps the
 // matcher's attack surface narrow while covering the common "any host under my
 // internal domain" case.
 func hostMatchesAny(host string, patterns []string) bool {

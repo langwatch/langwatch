@@ -1,3 +1,4 @@
+@unit
 Feature: Coding-agent sessions
   A coding-agent run is a session: many model calls, many tool runs, sometimes
   several traces, and telemetry arriving as spans, logs and metrics. LangWatch
@@ -74,6 +75,23 @@ Feature: Coding-agent sessions
     And the project's sessions are listed for a period the session no longer starts in
     Then the session is not listed for that period
     And no version of it is shown with the totals it held before that signal
+
+  Scenario: a session stored as two indistinguishable versions is listed once
+    Given two stored versions of one session that cannot be told apart by update time
+    When the project's sessions are listed
+    Then the session appears once
+    And it shows the totals of the version that folded the most telemetry
+
+  Scenario: a user-narrowed list is never answered from a superseded version
+    Given a session whose newest version was folded from telemetry that reports no user
+    When that user's sessions are listed
+    Then the session is not listed
+    And an older version of it is not shown in its place
+
+  Scenario: a page is never shortened by collapsing a session's tied versions
+    Given more sessions than fit one page, each stored as versions that cannot be told apart by update time
+    When a page of the project's sessions is listed
+    Then the page holds as many distinct sessions as were asked for
 
   # Not shipped: the session's retention deadline is anchored on a start time
   # that a late earlier signal can still move, so it can move closer. The freeze
