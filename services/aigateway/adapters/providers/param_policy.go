@@ -325,7 +325,7 @@ var paramPolicyTable = map[string]map[policyLane]paramRule{
 	},
 	"response_format": {
 		laneAnthropic: {disp: dispMapped, refine: refineResponseFormat, note: "json_schema enforced; json_object refused (no parseable-JSON guarantee)"},
-		laneBedrock:   {disp: dispMapped, refine: refineResponseFormat, note: "json_schema enforced; json_object refused (no parseable-JSON guarantee)"},
+		laneBedrock:   {disp: dispMapped, refine: refineResponseFormat, note: "json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only"},
 		laneGemini:    {disp: dispMapped, refine: refineResponseFormat, note: "json_object and json_schema both enforced"},
 	},
 	"tools": {
@@ -348,7 +348,7 @@ var paramPolicyTable = map[string]map[policyLane]paramRule{
 	},
 	"reasoning_effort": {
 		laneAnthropic: mapped(),
-		laneBedrock:   {disp: dispMapped, refine: refineBedrockReasoning, note: "mapped for Anthropic (thinking) and Nova; refused for other families"},
+		laneBedrock:   {disp: dispMapped, refine: refineBedrockReasoning, note: "mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only"},
 		laneGemini:    mapped(),
 	},
 	"verbosity": {
@@ -509,6 +509,9 @@ func applyParamPolicy(body []byte, params *bfschemas.ChatParameters, provider bf
 // applyPolicyMappings performs the gateway-side mappings the table
 // classifies as mapped but the vendored translators get wrong.
 func applyPolicyMappings(body []byte, params *bfschemas.ChatParameters, lane policyLane) {
+	if params == nil {
+		return
+	}
 	// Bedrock: Converse has no tool_choice "none"; bifrost drops the field
 	// and the model may call tools it was told not to call. Removing the
 	// tools is the faithful translation of "never call a tool".

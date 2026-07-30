@@ -230,7 +230,7 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
       And no output cap the caller never sent is force-set
 
     @live
-    Scenario Outline: client cap verifiably bounds output on every translated lane
+    Scenario Outline: client cap verifiably bounds output on the anthropic and bedrock lanes
       When a client POSTs /v1/chat/completions toward <provider> with <cap_field> 16 asking for a long answer, <mode>
       Then the response carries usage.completion_tokens <= 16
       And the finish reason is "length"

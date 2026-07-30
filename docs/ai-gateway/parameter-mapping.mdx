@@ -4,7 +4,7 @@ description: "How every OpenAI chat-completions parameter behaves on each provid
 sidebarTitle: "Parameter mapping"
 ---
 
-The gateway speaks the OpenAI chat-completions wire format to every provider. For OpenAI-compatible targets (OpenAI, Azure OpenAI, self-hosted vLLM and other custom OpenAI-compatible endpoints) the request body is forwarded byte-for-byte, so whatever the provider accepts, you get. For the translated lanes (Anthropic, Bedrock, Gemini, Vertex) the gateway builds the provider-native request itself, and every parameter follows an explicit policy:
+The gateway speaks the OpenAI chat-completions wire format to every provider. OpenAI-compatible targets (OpenAI, Azure OpenAI, self-hosted vLLM and other custom OpenAI-compatible endpoints) bypass the policy on this page entirely: the request body is forwarded byte-for-byte apart from the gateway-only `drop_tuning_params` field, which is consumed before forwarding, so whatever the provider accepts, you get. For the translated lanes (Anthropic, Bedrock, Gemini, Vertex) the gateway builds the provider-native request itself, and every parameter follows an explicit policy:
 
 - **mapped**: translated faithfully to the provider's native field.
 - **dropped**: a tuning parameter with no equivalent on the lane. By default it is removed, the request proceeds, and the drop is signaled (see below). It is never silently ignored.
@@ -44,6 +44,7 @@ When a parameter is dropped, the drop is visible in three places:
 ## The table
 
 {/* param-table:begin generated from paramPolicyTable, kept in sync by TestParamPolicyDocsInSync */}
+
 | Parameter | anthropic | bedrock | gemini / vertex | Notes |
 |---|---|---|---|---|
 | `audio` | dropped | dropped | dropped |  |
@@ -60,8 +61,8 @@ When a parameter is dropped, the drop is visible in three places:
 | `presence_penalty` | dropped | dropped | mapped |  |
 | `prompt_cache_key` | dropped | dropped | dropped |  |
 | `prompt_cache_retention` | dropped | dropped | dropped |  |
-| `reasoning_effort` | mapped | mapped | mapped | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families |
-| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); gemini: json_object and json_schema both enforced |
+| `reasoning_effort` | mapped | mapped | mapped | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only |
+| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only; gemini: json_object and json_schema both enforced |
 | `safety_identifier` | dropped | dropped | dropped |  |
 | `seed` | dropped | dropped | dropped |  |
 | `service_tier` | dropped | dropped | dropped | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped |
@@ -77,6 +78,7 @@ When a parameter is dropped, the drop is visible in three places:
 | `verbosity` | dropped | dropped | dropped |  |
 | `web_search_options` | dropped | dropped | dropped |  |
 | any other key | dropped | dropped | dropped | vendor params with no mapping on translated lanes |
+
 {/* param-table:end */}
 
 ## reasoning_effort budgets

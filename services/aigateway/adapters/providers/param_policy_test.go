@@ -2,6 +2,8 @@ package providers
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -388,5 +390,54 @@ func TestInjectParamsDropped(t *testing.T) {
 	plain := `{"id":"x"}`
 	if string(injectParamsDropped([]byte(plain), nil)) != plain {
 		t.Fatal("no drops must mean no mutation")
+	}
+}
+
+// An empty chat body parses to nil ChatParameters (parseOpenAIChatRequest
+// returns early), and the Bedrock mapping pass reads params.ToolChoice.
+// Without a nil guard that pass panics on the one lane that has a mapping
+// to apply.
+func TestParamPolicy_EmptyBodyDoesNotPanic(t *testing.T) {
+	for _, provider := range []bfschemas.ModelProvider{
+		bfschemas.Bedrock,
+		bfschemas.Anthropic,
+		bfschemas.Gemini,
+	} {
+		if _, _, err := build(t, provider, "m", ""); err != nil {
+			t.Fatalf("%s: empty body must not error: %v", provider, err)
+		}
+	}
+}
+
+// The empty-choices repair is a translated-lane contract. An
+// OpenAI-compatible target raw-forwards, and it can legitimately answer 200
+// with an empty choices array when its safety system blocks the output;
+// rewriting that into finish_reason "length" would report a truncation the
+// provider never performed.
+func TestEnsureChoicesPresent_SkipsRawForwardLanes(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"chatcmpl-1","object":"chat.completion","created":1,` +
+			`"model":"local-model","choices":[],` +
+			`"usage":{"prompt_tokens":9,"completion_tokens":0,"total_tokens":9}}`))
+	}))
+	defer backend.Close()
+
+	router := newTestRouter(t)
+	req := &domain.Request{
+		Type:  domain.RequestTypeChat,
+		Model: "local-model",
+		Body:  []byte(`{"model":"local-model","messages":[{"role":"user","content":"hi"}]}`),
+	}
+
+	resp, err := router.Dispatch(context.Background(), req, customEndpointCred(backend.URL))
+	if err != nil {
+		t.Fatalf("dispatch: %v", err)
+	}
+	if n := gjson.GetBytes(resp.Body, "choices.#").Int(); n != 0 {
+		t.Fatalf("raw-forward empty choices must survive untouched, got %d: %s", n, resp.Body)
+	}
+	if got := gjson.GetBytes(resp.Body, "choices.0.finish_reason").String(); got != "" {
+		t.Fatalf("no finish reason may be synthesized on a raw-forward lane, got %q", got)
 	}
 }

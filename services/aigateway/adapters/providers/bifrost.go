@@ -311,8 +311,14 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	body, _ := sonic.Marshal(resp)
 	// Translated-lane response contract: a 200 must carry at least one
-	// choice, and a policy drop must be visible on the envelope.
-	body = ensureChoicesPresent(body)
+	// choice, and a policy drop must be visible on the envelope. Scoped to
+	// the translated lanes: an OpenAI-compatible target can legitimately
+	// answer 200 with an empty choices array when its safety system blocks
+	// the output, and rewriting that into finish_reason "length" would
+	// report a truncation that never happened.
+	if _, translated := policyLaneFor(provider); translated {
+		body = ensureChoicesPresent(body)
+	}
 	body = injectParamsDropped(body, paramsDroppedFrom(dispatchCtx))
 	return &domain.Response{
 		Body:       body,
