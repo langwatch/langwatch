@@ -17,7 +17,7 @@
  *   make service svc=nlpgo      # or: go build -o /tmp/nlpgo ./cmd/service && SERVER_ADDR=:5591 /tmp/nlpgo nlpgo
  */
 
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { WorkflowAgentData } from "../../types";
 import { SerializedWorkflowAgentAdapter } from "../workflow-agent.adapter";
@@ -28,7 +28,9 @@ let reachable = false;
 
 async function nlpReachable(): Promise<boolean> {
   try {
-    const r = await fetch(`${NLP}/healthz`, { signal: AbortSignal.timeout(2000) });
+    const r = await fetch(`${NLP}/healthz`, {
+      signal: AbortSignal.timeout(2000),
+    });
     return r.ok;
   } catch {
     return false;
@@ -69,7 +71,9 @@ function workflow(nodes: unknown[], edges: unknown[]): Record<string, unknown> {
   };
 }
 
-function adapterFor(dsl: Record<string, unknown>): SerializedWorkflowAgentAdapter {
+function adapterFor(
+  dsl: Record<string, unknown>,
+): SerializedWorkflowAgentAdapter {
   const config: WorkflowAgentData = {
     type: "workflow",
     agentId: "agent_live",
