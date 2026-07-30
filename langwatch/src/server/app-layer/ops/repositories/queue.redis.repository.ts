@@ -1542,7 +1542,7 @@ export class QueueRedisRepository implements QueueRepository {
    *
    * The metrics collector calls this every 2s, and each tick pays the full walk
    * costed on {@link scanLiveDlqGroupIds} — O(live members) per tick per queue,
-   * for as long as that backlog stays live. `collect()` is single-flighted
+   * for as long as those members stay live. `collect()` is single-flighted
    * (`isCollecting`), so a slow pass skips a tick rather than stacking up — that
    * bounds concurrency, not the size or cost of any single pass.
    */

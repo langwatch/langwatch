@@ -1708,15 +1708,15 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
  * text to identify them. Additive: `replayFromDlq` deletes this key wholesale on
  * restore, and the index sweep only asks whether it is non-empty.
  *
- * The one field it takes AWAY is `stack`, the third of that group-level triple:
- * this writer has none, `MOVE_TO_DLQ_LUA` can have left one on the same key, and
- * they must not be read as one failure. See the script body.
- *
  * Those two fields are group-level by definition, so several dead-lettered jobs in
  * one group share them: the list shows the MOST RECENT job's summary and time, and
  * the per-job field is where each job's own reason stays. That is the same shape
  * the operator's whole-group `moveToDlq` writes, and a per-job dead-letter VIEW —
  * which is what would render more than one — remains the disclosed follow-up.
+ *
+ * The one field it takes AWAY is `stack`, the third member of that group-level
+ * schema: this writer has none, `MOVE_TO_DLQ_LUA` can have left one on the same
+ * key, and the two must never be read as one failure. See the script body.
  */
 const WRITE_JOB_TO_DLQ_LUA = `
 local dlqJobsKey  = KEYS[1]
