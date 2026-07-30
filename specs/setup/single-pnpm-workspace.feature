@@ -7,17 +7,21 @@ Feature: One workspace for every JavaScript project in the repo
   See dev/docs/adr/076-single-pnpm-workspace.md.
 
   # These scenarios describe how the repository installs, resolves and packages
-  # itself, so most of them bind to packages/server/test/workspace-invariants.test.ts,
-  # which asserts the shape directly against the repo — one lockfile, one
-  # workspace definition, no member holding overrides pnpm would ignore, the
-  # app and the SDK on different names.
+  # itself. The @unit ones bind to packages/server/test/workspace-invariants.test.ts
+  # (and, for the fresh-clone scenario, tools/thuishaven/app/deps_test.go),
+  # which assert the shape directly against the repo — one lockfile, one
+  # workspace definition, no member holding install rules pnpm would ignore,
+  # the app and the SDK on different names, the install argv pinned to
+  # --frozen-lockfile and the app's closure.
   #
-  # The ones tagged @unimplemented are the ones a test cannot reach: they are
-  # enforced by the build instead — `pnpm install --frozen-lockfile` across the
-  # workspace, the assertions in scripts/pack-npm.sh (the tarball must carry
-  # the lockfile, the prebuilt client, and every tracked source file), and the
-  # npx-server-smoke job, which installs and boots the published artifact on
-  # three platforms.
+  # The @unimplemented ones are the ones a unit test cannot honestly reach —
+  # they are about what a PACKED ARTIFACT contains or what a full install
+  # resolves. Their enforcement is the build: the fail-closed assertions inside
+  # scripts/pack-npm.sh (the tarball must carry the lockfile, the prebuilt
+  # client, every tracked source file, and nothing secret-shaped), and the
+  # npx-server-smoke job, which packs, installs and boots the artifact on
+  # three platforms. Binding them to a manifest-inspecting unit test would
+  # read as coverage while proving nothing about the artifact.
 
   # Context. The repo grew six independent pnpm install roots — the repo root,
   # the application, the TypeScript SDK, the MCP server, the skills compiler,
@@ -87,7 +91,7 @@ Feature: One workspace for every JavaScript project in the repo
   # Shared dependency policy
   # ===========================================================================
 
-  @unit
+  @unimplemented
   Scenario: Security overrides are declared once
     Given a dependency that has to be pinned to a patched version
     When the pin is declared at the repo root
@@ -105,7 +109,7 @@ Feature: One workspace for every JavaScript project in the repo
     # package was required at a higher floor by one project than by the other
     # two, and the lower floor had been silently accepted everywhere else.
 
-  @unimplemented
+  @unit
   Scenario: No project keeps a dependency rule that no longer applies
     Given a project that used to be its own install root
     When it becomes a member of the single workspace
@@ -115,7 +119,7 @@ Feature: One workspace for every JavaScript project in the repo
     # Two projects each carried a second list in a place that was only ever
     # read while they were roots.
 
-  @unimplemented
+  @unit
   Scenario: A pin that suits one project is not forced onto the others
     Given a project that pinned an exact version of a package it depends on
       directly
@@ -146,7 +150,7 @@ Feature: One workspace for every JavaScript project in the repo
     And it installs only the application and what the application needs
     And it does not install the SDK, the skills compiler, or the test suites
 
-  @unit
+  @unimplemented
   Scenario: The published package carries a lockfile
     Given the published package
     When its contents are listed
@@ -157,7 +161,7 @@ Feature: One workspace for every JavaScript project in the repo
     # this by accident, because the lockfile happened to live beside the
     # application rather than at the top.
 
-  @unimplemented
+  @unit
   Scenario: The install still refuses to drift from the lockfile
     Given the published package
     When it installs the application's dependencies
@@ -165,7 +169,7 @@ Feature: One workspace for every JavaScript project in the repo
     # The frozen-lockfile guarantee is what makes an end user's install
     # reproducible; narrowing the install must not weaken it.
 
-  @unit
+  @unimplemented
   Scenario: The published layout is not a mirror of the repository layout
     Given the published package is assembled
     When its layout is chosen

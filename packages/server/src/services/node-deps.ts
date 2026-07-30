@@ -23,7 +23,31 @@ import type { EventBus } from "./event-bus.ts";
  * published TypeScript SDK uses, which is exactly why it had to change before
  * the two could live in one workspace.
  */
-const APP_PACKAGE_NAME = "@langwatch/web";
+export const APP_PACKAGE_NAME = "@langwatch/web";
+
+/**
+ * The argv for the workspace install both boot passes run — dev-deps-included
+ * before the build, prod-only after it. One builder rather than two inline
+ * arrays so the two invariants an end-user install depends on cannot drift
+ * apart silently: `--frozen-lockfile` (the install is reproducible or it
+ * fails) and the `...` filter (the SDK, skills compiler and test suites never
+ * install on a customer machine). Exported for tests — the spec scenario
+ * "The install still refuses to drift from the lockfile" binds to this.
+ */
+export function workspaceInstallArgs(
+	rootDir: string,
+	{ prod }: { prod: boolean },
+): string[] {
+	return [
+		"-C",
+		rootDir,
+		"install",
+		prod ? "--prod" : "--prod=false",
+		"--frozen-lockfile",
+		"--filter",
+		`${APP_PACKAGE_NAME}...`,
+	];
+}
 
 /**
  * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
@@ -148,13 +172,7 @@ export async function ensureLangwatchDeps(
 		// under packages/ and mcp-server/ still get installed.
 		await execAndPipe(bus, "prepare:langwatch", pnpm.command, [
 			...pnpm.args,
-			"-C",
-			rootDir,
-			"install",
-			"--prod=false",
-			"--frozen-lockfile",
-			"--filter",
-			`${APP_PACKAGE_NAME}...`,
+			...workspaceInstallArgs(rootDir, { prod: false }),
 		]);
 	}
 
@@ -205,16 +223,7 @@ export async function ensureLangwatchDeps(
 			bus,
 			"prepare:langwatch",
 			pnpm.command,
-			[
-				...pnpm.args,
-				"-C",
-				rootDir,
-				"install",
-				"--prod",
-				"--frozen-lockfile",
-				"--filter",
-				`${APP_PACKAGE_NAME}...`,
-			],
+			[...pnpm.args, ...workspaceInstallArgs(rootDir, { prod: true })],
 			{ env: { ...process.env, CI: "true" } },
 		);
 	}
