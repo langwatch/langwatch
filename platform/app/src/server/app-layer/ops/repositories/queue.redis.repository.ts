@@ -1,1793 +1,393 @@
-import { createLogger } from "@langwatch/observability";
-import type IORedis from "ioredis";
-import type { ChainableCommander, Cluster } from "ioredis";
+import type { JobHeader, Lane } from "@langwatch/event-sourcing";
+import { parseGroupKey } from "@langwatch/event-sourcing";
 import {
   CachedLuaScript,
-  isNoScriptResult,
-} from "~/server/event-sourcing.old/queues/groupQueue/cachedLuaScript";
-import {
-  decodeJobEnvelope,
-  readJobRoutingMeta,
-} from "~/server/event-sourcing.old/queues/groupQueue/jobEnvelope";
-import { RedisJobBlobStore } from "~/server/event-sourcing.old/queues/groupQueue/redisJobBlobStore";
-import {
-  GROUP_QUEUE_REGISTRY_KEY,
-  PARK_HELPER_LUA,
-  TTL_HELPER_LUA,
-} from "~/server/event-sourcing.old/queues/groupQueue/scripts";
-import { TieredBlobStore } from "~/server/event-sourcing.old/queues/groupQueue/tieredBlobStore";
-import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
+  LANE_REGISTRY_KEY,
+  laneKeys,
+} from "@langwatch/groupqueue";
+import { createLogger } from "@langwatch/observability";
+import type { Cluster, Redis as IORedis } from "ioredis";
 import { normalizeErrorMessage } from "../normalize-error-message";
-import type { ErrorCluster, GroupInfo, QueueInfo } from "../types";
+import type { ErrorCluster, LaneInfo, LaneKindInfo } from "../types";
 import type {
-  BlockedSummary,
-  DlqGroupInfo,
-  DrainPreview,
   JobEntry,
+  ParkedSummary,
   QueueRepository,
-  ReconcileResult,
 } from "./queue.repository";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 
-// ── Lua Scripts ──────────────────────────────────────────────────────
-
-const UNBLOCK_LUA =
-  TTL_HELPER_LUA +
-  PARK_HELPER_LUA +
-  `
-local blockedKey = KEYS[1]
-local activeKey  = KEYS[2]
-local jobsKey    = KEYS[3]
-local readyKey   = KEYS[4]
-local signalKey  = KEYS[5]
-local errorKey   = KEYS[6]
-local strikesKey = KEYS[7]
-local attemptKey = KEYS[8]
-local failStreakKey = KEYS[9]
-local groupId    = ARGV[1]
-local nowMs      = tonumber(ARGV[2])
-
-local wasBlocked = redis.call("SREM", blockedKey, groupId)
-
-if wasBlocked > 0 then
-  redis.call("DEL", activeKey)
-  redis.call("DEL", errorKey)
-  -- Unblocking is an operator's "try again", so EVERY counter that decides
-  -- whether trying is allowed has to be reset — not just the claim strikes
-  -- (ADR-080). A group blocked by retry exhaustion came back with its retry
-  -- chain still reading "budget spent" and its failure streak still at the
-  -- quarantine threshold, so the very first failure re-blocked it, and whether
-  -- it did depended on how long the operator took to press the button (the
-  -- chain expires on its own after GROUP_ATTEMPT_TTL_SECONDS).
-  redis.call("DEL", strikesKey)
-  -- specs/event-sourcing/poison-group-park-guard.feature
-  redis.call("DEL", attemptKey)
-  redis.call("DEL", failStreakKey)
-
-  local pendingCount = redis.call("ZCARD", jobsKey)
-  if pendingCount > 0 then
-    local score = 1
-    -- Route through the parked-aware write so unblock can't clobber a parked
-    -- group back into the dispatch scan (TRAP 1). A blocked group is never
-    -- itself parked, so this normally writes straight to ready; if the tenant
-    -- is over cap, the next dispatch parks it again.
-    addToReadyOrParked(readyKey, groupId, score, false)
-    -- The block path PERSISTs the group keys; restore the safety-net TTL now
-    -- that the group is live again (dataKey = jobsKey with the ":jobs" suffix
-    -- swapped for ":data").
-    local dataKey = string.sub(jobsKey, 1, #jobsKey - 5) .. ":data"
-    refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
-  else
-    redis.call("ZREM", readyKey, groupId)
-  end
-
-  redis.call("LPUSH", signalKey, "1")
-  redis.call("LTRIM", signalKey, 0, 999)
-end
-
-return wasBlocked
-`;
-
-const DRAIN_GROUP_LUA = `
-local jobsKey         = KEYS[1]
-local dataKey         = KEYS[2]
-local activeKey       = KEYS[3]
-local readyKey        = KEYS[4]
-local blockedKey      = KEYS[5]
-local signalKey       = KEYS[6]
-local errorKey        = KEYS[7]
-local totalPendingKey = KEYS[8]
-local strikesKey      = KEYS[9]
-local attemptKey      = KEYS[10]
-local failStreakKey   = KEYS[11]
-local groupId         = ARGV[1]
-
--- Total dropped = staged jobs (ZCARD) only. Previously this also counted
--- the active job (+hadActive), but since the counter DECR moved from
--- COMPLETE_LUA to DISPATCH (PR #4181), the active job's INCR is already
--- compensated at dispatch time. Counting it again here would double-DECR.
--- Added post-2026-05-11 incident — bulk drain at 500K scale would
--- otherwise leave the stat permanently overstated.
-local pendingCount = redis.call("ZCARD", jobsKey)
-local totalDropped = pendingCount
-
-redis.call("DEL", jobsKey)
-redis.call("DEL", dataKey)
-redis.call("DEL", activeKey)
-redis.call("DEL", errorKey)
--- Draining empties the group for a fresh start, so EVERY counter that decides
--- whether a later job is allowed to run goes with it. Leaving any behind means
--- a re-created group with the same id inherits it: claim strikes park it on its
--- first claim, a spent retry chain exhausts it on its first failure, and a
--- carried failure streak re-quarantines it (ADR-080,
--- specs/event-sourcing/poison-group-park-guard.feature).
-redis.call("DEL", strikesKey)
-redis.call("DEL", attemptKey)
-redis.call("DEL", failStreakKey)
-redis.call("ZREM", readyKey, groupId)
-redis.call("SREM", blockedKey, groupId)
-redis.call("LPUSH", signalKey, "1")
-redis.call("LTRIM", signalKey, 0, 999)
-
-if totalDropped > 0 then
-  redis.call("DECRBY", totalPendingKey, totalDropped)
-end
-
-return totalDropped
-`;
-
-const MOVE_TO_DLQ_LUA = `
-local srcJobsKey   = KEYS[1]
-local srcDataKey   = KEYS[2]
-local activeKey    = KEYS[3]
-local readyKey     = KEYS[4]
-local blockedKey   = KEYS[5]
-local signalKey    = KEYS[6]
-local srcErrorKey  = KEYS[7]
-local dstJobsKey   = KEYS[8]
-local dstDataKey   = KEYS[9]
-local dstErrorKey  = KEYS[10]
-local dlqIndexKey  = KEYS[11]
-local strikesKey   = KEYS[12]
-local attemptKey   = KEYS[13]
-local failStreakKey = KEYS[14]
-local groupId      = ARGV[1]
-local ttl          = tonumber(ARGV[2])
-
-local jobs = redis.call("ZRANGE", srcJobsKey, 0, -1, "WITHSCORES")
-local count = #jobs / 2
-if count > 0 then
-  for i = 1, #jobs, 2 do
-    redis.call("ZADD", dstJobsKey, jobs[i+1], jobs[i])
-  end
-end
-
-local data = redis.call("HGETALL", srcDataKey)
-for i = 1, #data, 2 do
-  redis.call("HSET", dstDataKey, data[i], data[i+1])
-end
-
-local errorData = redis.call("HGETALL", srcErrorKey)
-for i = 1, #errorData, 2 do
-  redis.call("HSET", dstErrorKey, errorData[i], errorData[i+1])
-end
-
-if ttl > 0 then
-  redis.call("EXPIRE", dstJobsKey, ttl)
-  redis.call("EXPIRE", dstDataKey, ttl)
-  redis.call("EXPIRE", dstErrorKey, ttl)
-end
-
-redis.call("SADD", dlqIndexKey, groupId)
-
-redis.call("DEL", srcJobsKey)
-redis.call("DEL", srcDataKey)
-redis.call("DEL", activeKey)
-redis.call("DEL", srcErrorKey)
--- Moving to the DLQ empties the live group just like a drain, so it clears the
--- same counters for the same reason: a re-created group with the same id must
--- get a fresh run, not inherit strikes, a spent retry chain, or a failure
--- streak from the jobs that were carried off (ADR-080).
-redis.call("DEL", strikesKey)
-redis.call("DEL", attemptKey)
-redis.call("DEL", failStreakKey)
-redis.call("ZREM", readyKey, groupId)
-redis.call("SREM", blockedKey, groupId)
-redis.call("LPUSH", signalKey, "1")
-redis.call("LTRIM", signalKey, 0, 999)
-
-return count
-`;
-
-const REPLAY_FROM_DLQ_LUA =
-  TTL_HELPER_LUA +
-  PARK_HELPER_LUA +
-  `
-local dlqJobsKey   = KEYS[1]
-local dlqDataKey   = KEYS[2]
-local dlqErrorKey  = KEYS[3]
-local dstJobsKey   = KEYS[4]
-local dstDataKey   = KEYS[5]
-local readyKey     = KEYS[6]
-local signalKey    = KEYS[7]
-local dlqIndexKey  = KEYS[8]
-local groupId      = ARGV[1]
-local nowMs        = tonumber(ARGV[2])
-
-local jobs = redis.call("ZRANGE", dlqJobsKey, 0, -1, "WITHSCORES")
-local count = #jobs / 2
-if count > 0 then
-  for i = 1, #jobs, 2 do
-    redis.call("ZADD", dstJobsKey, jobs[i+1], jobs[i])
-  end
-end
-
-local data = redis.call("HGETALL", dlqDataKey)
-for i = 1, #data, 2 do
-  redis.call("HSET", dstDataKey, data[i], data[i+1])
-end
-
-redis.call("DEL", dlqJobsKey)
-redis.call("DEL", dlqDataKey)
-redis.call("DEL", dlqErrorKey)
-redis.call("SREM", dlqIndexKey, groupId)
-
-if count > 0 then
-  -- Route through the parked-aware write so a replay can't clobber a parked
-  -- group back into the dispatch scan (TRAP 1). A DLQ group is never itself
-  -- parked; if the tenant is over cap, the next dispatch parks it again.
-  addToReadyOrParked(readyKey, groupId, 1, false)
-  -- Restore the safety-net TTL on the revived group keys (DLQ keys carry none).
-  refreshGroupKeyTtl(dstJobsKey, dstDataKey, nowMs)
-end
-
-redis.call("LPUSH", signalKey, "1")
-redis.call("LTRIM", signalKey, 0, 999)
-
-return count
-`;
-
-// ── Cached scripts ───────────────────────────────────────────────────
-//
-// EVALSHA, not EVAL: plain EVAL re-transfers and re-hashes the full source on
-// every call, which was measured at ~33% of the prod Redis engine CPU for the
-// queue's own scripts (see `cachedLuaScript.ts`). These ops scripts are larger
-// than they look — each one carries the shared TTL/park helpers — and the bulk
-// paths below run one per group across a whole page, so the same argument
-// applies. A NOSCRIPT miss falls back to EVAL once and warms the node's cache.
-
-const unblockScript = new CachedLuaScript(UNBLOCK_LUA);
-const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
-const moveToDlqScript = new CachedLuaScript(MOVE_TO_DLQ_LUA);
-const replayFromDlqScript = new CachedLuaScript(REPLAY_FROM_DLQ_LUA);
-
-// ── Constants ────────────────────────────────────────────────────────
-
-const SUMMARY_TOP_N = 200;
-const DLQ_TTL_SECONDS = 604800;
-const SSCAN_BATCH = 500;
-const PENDING_RECONCILE_SCAN_COUNT = 1000;
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
 /**
- * Run a pipeline of cached scripts, re-running any entry the node had no cached
- * copy of.
+ * Deletes every key belonging to one lane and drops it from the registry.
  *
- * `queue()` sends EVALSHA with no fallback of its own — a queued command cannot
- * retry itself — so a node whose script cache is cold (restart, SCRIPT FLUSH,
- * or the first call against a fresh cluster node) fails EVERY entry in the
- * batch with NOSCRIPT. These are the bulk operator paths, so without this a
- * "drain everything" would report zero drained and quietly do nothing. Re-running
- * through `run()` both completes the work and loads the source for later calls.
- *
- * Returns the same `[err, value]` tuples `pipeline.exec()` does, so callers read
- * the results exactly as before.
+ * All seven lane keys share the group key's hash tag, so they are one slot; the
+ * registry is not tagged, but it is only ever touched by single-key commands,
+ * which is what keeps this safe on a cluster. Returns the jobs dropped.
  */
-export async function execWithNoScriptRecovery(
-  pipeline: ChainableCommander,
-  rerun: (index: number) => Promise<unknown>,
-): Promise<Array<[Error | null, unknown]>> {
-  const results = (await pipeline.exec()) ?? [];
-  return await Promise.all(
-    results.map(async (result, index): Promise<[Error | null, unknown]> => {
-      if (!isNoScriptResult(result)) return result;
-      try {
-        return [null, await rerun(index)];
-      } catch (err) {
-        return [err instanceof Error ? err : new Error(String(err)), null];
-      }
-    }),
-  );
+const DRAIN_LANE_LUA = `
+local dropped = redis.call("ZCARD", KEYS[1])
+redis.call("DEL", KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7])
+redis.call("SREM", KEYS[8], ARGV[1])
+return dropped
+`;
+
+const drainLaneScript = new CachedLuaScript(DRAIN_LANE_LUA);
+
+/** How many lanes one operator read may describe. The registry is append-only
+ * — `stage` adds and nothing removes — so it outlives the lanes in it. */
+const SCAN_LANE_CAP = 5_000;
+
+const SSCAN_BATCH = 500;
+
+/** Enough clusters to see the shape of an incident without paging. */
+const SUMMARY_TOP_N = 20;
+
+interface LaneRef {
+  laneId: string;
+  tenantId: string;
+  laneKind: string;
+  laneName: string | null;
 }
 
-function stripHashTag(name: string): string {
-  if (name.startsWith("{") && name.endsWith("}")) {
-    return name.slice(1, -1);
+function parseLane(laneId: string): LaneRef | null {
+  try {
+    const key = parseGroupKey(laneId);
+    return {
+      laneId,
+      tenantId: key.tenantId,
+      laneKind: key.lane.kind,
+      laneName: key.lane.name ?? null,
+    };
+  } catch {
+    // A member the current build cannot parse is reported as absent rather
+    // than throwing: one malformed key must not blank the whole console.
+    logger.warn({ laneId }, "Skipping unparseable lane key");
+    return null;
   }
-  return name;
 }
 
-function parseRetryCount(id: string | null): number | null {
-  if (!id) return null;
-  const match = id.match(/\/r\/(\d+)$/);
-  if (!match) return null;
-  const n = parseInt(match[1]!, 10);
-  return n < 1000 ? n : null;
+/** Every lane kind, so the console lists a kind before anything is staged into it. */
+const LANE_KINDS: readonly Lane["kind"][] = [
+  "command",
+  "fold",
+  "map",
+  "subscriber",
+  "processManager",
+  "job",
+];
+
+function parseHeader(json: string | null | undefined): JobHeader | null {
+  if (!json) return null;
+  try {
+    return JSON.parse(json) as JobHeader;
+  } catch {
+    return null;
+  }
 }
 
-// ── Repository Implementation ────────────────────────────────────────
+/** `ZRANGE … WITHSCORES` and `HMGET` both answer as flat arrays; the value
+ * this file wants from either is the second element. */
+function secondElement(reply: unknown): number {
+  return Array.isArray(reply) ? Number(reply[1]) : Number.NaN;
+}
+
+function finiteOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
+}
+
+function laterThan(value: number, now: number): boolean {
+  return Number.isFinite(value) && value > now;
+}
+
+/** Lanes parked for the same reason are one row; a few lane ids per row are
+ * enough to act on without turning the summary into the listing. */
+const CLUSTER_SAMPLE_LANES = 5;
+
+function cluster(
+  clusters: Map<string, ErrorCluster>,
+  ref: LaneRef,
+  reason: string,
+): void {
+  const normalizedMessage = normalizeErrorMessage(reason);
+  const key = `${ref.laneKind}:${normalizedMessage}`;
+  const existing = clusters.get(key);
+  if (!existing) {
+    clusters.set(key, {
+      normalizedMessage,
+      sampleMessage: reason,
+      count: 1,
+      laneKind: ref.laneKind,
+      sampleLaneIds: [ref.laneId],
+    });
+    return;
+  }
+  existing.count += 1;
+  if (existing.sampleLaneIds.length < CLUSTER_SAMPLE_LANES) {
+    existing.sampleLaneIds.push(ref.laneId);
+  }
+}
+
+function highestAttempt(headers: unknown): number {
+  if (!Array.isArray(headers)) return 0;
+  return (headers as string[]).reduce((max, json) => {
+    const header = parseHeader(json);
+    return header ? Math.max(max, header.attempt) : max;
+  }, 0);
+}
 
 export class QueueRedisRepository implements QueueRepository {
-  private readonly redis: IORedis | Cluster;
+  constructor(private readonly redis: IORedis | Cluster) {}
 
-  constructor(redis: IORedis | Cluster) {
-    this.redis = redis;
+  async discoverLaneKinds(): Promise<string[]> {
+    const kinds = new Set<string>();
+    for (const lane of await this.registeredLanes()) kinds.add(lane.laneKind);
+    return LANE_KINDS.filter((kind) => kinds.has(kind));
   }
 
-  // ── Queue Discovery & Scanning ──────────────────────────────────
-
-  async discoverQueueNames(): Promise<string[]> {
-    // Fast path: producers register their queue name on construction, so the
-    // registry set is the authoritative list and reads in O(1).
-    const registered = await this.redis.smembers(GROUP_QUEUE_REGISTRY_KEY);
-    if (registered.length > 0) {
-      return registered;
-    }
-
-    // Fallback for the window after deploy before any producer has registered
-    // (or a wiped registry): scan once, then backfill so the next call is O(1).
-    // Without this the dashboard would scan the full keyspace on every poll.
-    const names = await this.scanReadyKeyNames();
-    if (names.length > 0) {
-      await this.redis.sadd(GROUP_QUEUE_REGISTRY_KEY, ...names);
-    }
-    return names;
-  }
-
-  private async scanReadyKeyNames(): Promise<string[]> {
-    const names = new Set<string>();
+  /** The registry, capped. `stage` is the only writer and it never prunes, so
+   * this is bounded here rather than trusted to be small. */
+  private async registeredLanes(): Promise<LaneRef[]> {
+    const lanes: LaneRef[] = [];
     let cursor = "0";
     do {
-      const [nextCursor, keys] = await this.redis.scan(
+      const [next, batch] = await this.redis.sscan(
+        LANE_REGISTRY_KEY,
         cursor,
-        "MATCH",
-        "*:gq:ready",
         "COUNT",
-        50000,
+        SSCAN_BATCH,
       );
-      cursor = nextCursor;
-      for (const key of keys) {
-        const gqIdx = key.indexOf(":gq:ready");
-        if (gqIdx > 0) {
-          names.add(key.slice(0, gqIdx));
-        }
+      cursor = next;
+      for (const member of batch) {
+        const lane = parseLane(member);
+        if (lane) lanes.push(lane);
       }
-    } while (cursor !== "0");
-
-    return Array.from(names);
+    } while (cursor !== "0" && lanes.length < SCAN_LANE_CAP);
+    return lanes.slice(0, SCAN_LANE_CAP);
   }
 
-  async scanQueues(params: {
-    queueNames: string[];
+  async scanLaneKinds({
+    laneKinds,
+    topN,
+  }: {
+    laneKinds: string[];
     topN?: number;
-  }): Promise<QueueInfo[]> {
-    const queues = await Promise.all(
-      params.queueNames.map((queueName) =>
-        this.scanSingleQueue(queueName, params.topN ?? SUMMARY_TOP_N),
-      ),
+  }): Promise<LaneKindInfo[]> {
+    const wanted = new Set(laneKinds);
+    const refs = (await this.registeredLanes()).filter((lane) =>
+      wanted.has(lane.laneKind),
     );
-    queues.sort((a, b) => a.displayName.localeCompare(b.displayName));
-    return queues;
+    const described = await this.describe(refs);
+
+    return laneKinds.map((laneKind) => {
+      const lanes = described.filter((lane) => lane.laneKind === laneKind);
+      // Deepest first: an operator opening this page is looking for the backlog.
+      const ranked = [...lanes].sort((a, b) => b.pendingJobs - a.pendingJobs);
+      return {
+        name: laneKind,
+        displayName: laneKind,
+        laneCount: lanes.length,
+        parkedLaneCount: lanes.filter((lane) => lane.isParked).length,
+        leasedLaneCount: lanes.filter((lane) => lane.leaseRemainingMs !== null)
+          .length,
+        totalPendingJobs: lanes.reduce(
+          (sum, lane) => sum + lane.pendingJobs,
+          0,
+        ),
+        lanes: topN === undefined ? ranked : ranked.slice(0, topN),
+      };
+    });
   }
 
-  private async scanSingleQueue(
-    queueName: string,
-    limit: number,
-    offset = 0,
-  ): Promise<QueueInfo> {
-    const displayName = stripHashTag(queueName);
-    const prefix = `${queueName}:gq:`;
+  /** Six reads per lane, pipelined, so a page of hundreds is a few round trips. */
+  private async describe(refs: LaneRef[]): Promise<LaneInfo[]> {
+    if (refs.length === 0) return [];
+    const now = Date.now();
 
-    const readyKey = `${prefix}ready`;
-    const blockedKey = `${prefix}blocked`;
-    const dlqKey = `${prefix}dlq`;
-    const totalPendingKey = `${prefix}stats:total-pending`;
-    const parkedTenantsKey = `${prefix}parked-tenants`;
-
-    const [
-      readyCount,
-      blockedCount,
-      dlqCount,
-      topReadyMembers,
-      totalPendingRaw,
-      parkedTenants,
-    ] = await Promise.all([
-      this.redis.zcard(readyKey),
-      this.redis.scard(blockedKey),
-      this.redis.scard(dlqKey),
-      this.redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
-      this.redis.get(totalPendingKey),
-      this.redis.smembers(parkedTenantsKey),
-    ]);
-
-    // Sum parked depth across the tenants currently over cap. The registry set
-    // is tiny (one entry per over-cap tenant), so this is a single SMEMBERS plus
-    // one ZCARD per parked tenant — effectively free in the cap=0 steady state
-    // where the registry is empty.
-    let parkedGroupCount = 0;
-    if (parkedTenants.length > 0) {
-      const parkedPipeline = this.redis.pipeline();
-      for (const tenantId of parkedTenants) {
-        parkedPipeline.zcard(`${prefix}parked:${tenantId}`);
-      }
-      const parkedResults = await parkedPipeline.exec();
-      for (const [err, val] of parkedResults ?? []) {
-        if (!err) parkedGroupCount += Number(val) || 0;
-      }
-    }
-
-    const groupIds: string[] = [];
-    const readyScores = new Map<string, number>();
-    for (let i = 0; i < topReadyMembers.length; i += 2) {
-      const groupId = topReadyMembers[i]!;
-      const score = parseFloat(topReadyMembers[i + 1]!);
-      groupIds.push(groupId);
-      readyScores.set(groupId, score);
-    }
-
-    const blockedMembers =
-      blockedCount > 0
-        ? await this.redis.srandmember(
-            blockedKey,
-            Math.min(limit, blockedCount),
-          )
-        : [];
-    const readyGroupIdSet = new Set(groupIds);
-    const blockedGroupIds = (blockedMembers ?? []).filter(
-      (id): id is string => id !== null && !readyGroupIdSet.has(id),
-    );
-
-    const allGroupIds = [...groupIds, ...blockedGroupIds];
-
-    const CMDS_PER_GROUP = 6;
     const pipeline = this.redis.pipeline();
-    for (const groupId of allGroupIds) {
-      const jobsKey = `${prefix}group:${groupId}:jobs`;
-      const activeKey = `${prefix}group:${groupId}:active`;
-      pipeline.zcard(jobsKey);
-      pipeline.get(activeKey);
-      pipeline.zrange(jobsKey, 0, 0, "WITHSCORES");
-      pipeline.zrange(jobsKey, -1, -1, "WITHSCORES");
-      pipeline.sismember(blockedKey, groupId);
-      pipeline.ttl(`${prefix}group:${groupId}:active`);
+    for (const ref of refs) {
+      const keys = laneKeys(ref.laneId);
+      pipeline.zcard(keys.z);
+      pipeline.zrange(keys.z, 0, 0, "WITHSCORES");
+      pipeline.hmget(keys.lease, "token", "expiresAt");
+      pipeline.get(keys.ready);
+      pipeline.get(keys.parked);
+      pipeline.hvals(keys.h);
     }
+    const results = (await pipeline.exec()) ?? [];
 
-    const pipelineResults = await pipeline.exec();
+    return refs.map((ref, index) => {
+      const at = (offset: number) => results[index * 6 + offset]?.[1];
+      const parked = at(4);
+      const expiresAt = secondElement(at(2));
+      const readyAt = Number(at(3) ?? Number.NaN);
 
-    const firstJobIds: Array<{ groupId: string; jobId: string | null }> = [];
-    for (let i = 0; i < allGroupIds.length; i++) {
-      const base = i * CMDS_PER_GROUP;
-      const oldestArr = (pipelineResults?.[base + 2]?.[1] as string[]) ?? [];
-      firstJobIds.push({
-        groupId: allGroupIds[i]!,
-        jobId: oldestArr[0] ?? null,
-      });
-    }
-
-    const dataPipeline = this.redis.pipeline();
-    let dataFetchCount = 0;
-    for (const { groupId, jobId } of firstJobIds) {
-      if (jobId) {
-        dataPipeline.hget(`${prefix}group:${groupId}:data`, jobId);
-        dataFetchCount++;
-      }
-    }
-    const dataResults = dataFetchCount > 0 ? await dataPipeline.exec() : [];
-
-    const errorPipeline = this.redis.pipeline();
-    for (const groupId of allGroupIds) {
-      errorPipeline.hgetall(`${prefix}group:${groupId}:error`);
-    }
-    const errorResults =
-      allGroupIds.length > 0 ? await errorPipeline.exec() : [];
-
-    const groupErrors = new Map<
-      string,
-      { message: string; stack: string; timestamp: string }
-    >();
-    for (let i = 0; i < allGroupIds.length; i++) {
-      const errorHash = errorResults?.[i]?.[1] as Record<string, string> | null;
-      if (errorHash?.message) {
-        groupErrors.set(allGroupIds[i]!, {
-          message: errorHash.message,
-          stack: errorHash.stack ?? "",
-          timestamp: errorHash.timestamp ?? "",
-        });
-      }
-    }
-
-    let dataIdx = 0;
-    const groups: GroupInfo[] = [];
-    let activeGroupCount = 0;
-
-    for (let i = 0; i < allGroupIds.length; i++) {
-      const groupId = allGroupIds[i]!;
-      const base = i * CMDS_PER_GROUP;
-
-      const pendingJobs = (pipelineResults?.[base]?.[1] as number) ?? 0;
-      const activeJobId = (pipelineResults?.[base + 1]?.[1] as string) ?? null;
-      const oldestArr = (pipelineResults?.[base + 2]?.[1] as string[]) ?? [];
-      const newestArr = (pipelineResults?.[base + 3]?.[1] as string[]) ?? [];
-      const isBlocked = (pipelineResults?.[base + 4]?.[1] as number) === 1;
-      const activeKeyTtlSec =
-        (pipelineResults?.[base + 5]?.[1] as number) ?? -2;
-
-      const oldestJobMs =
-        oldestArr.length >= 2 ? parseFloat(oldestArr[1]!) : null;
-      const newestJobMs =
-        newestArr.length >= 2 ? parseFloat(newestArr[1]!) : null;
-
-      let pipelineName: string | null = null;
-      let jobType: string | null = null;
-      let jobName: string | null = null;
-
-      if (firstJobIds[i]!.jobId) {
-        const rawData = (dataResults?.[dataIdx]?.[1] as string) ?? null;
-        dataIdx++;
-        if (rawData) {
-          const meta = readJobRoutingMeta(rawData);
-          pipelineName = meta.pipelineName;
-          jobType = meta.jobType;
-          jobName = meta.jobName;
-        }
-      }
-
-      const errorInfo = groupErrors.get(groupId);
-      if (activeJobId !== null) activeGroupCount++;
-
-      groups.push({
-        groupId,
-        pendingJobs,
-        score: readyScores.get(groupId) ?? 0,
-        hasActiveJob: activeJobId !== null,
-        activeJobId,
-        isBlocked,
-        oldestJobMs,
-        newestJobMs,
-        isStaleBlock: isBlocked && pendingJobs === 0 && activeJobId === null,
-        pipelineName,
-        jobType,
-        jobName,
-        errorMessage: errorInfo?.message ?? null,
-        errorStack: errorInfo?.stack ?? null,
-        errorTimestamp: errorInfo?.timestamp
-          ? parseFloat(errorInfo.timestamp)
-          : null,
-        retryCount: parseRetryCount(firstJobIds[i]!.jobId),
-        activeKeyTtlSec: activeKeyTtlSec > 0 ? activeKeyTtlSec : null,
-        processingDurationMs: null,
-      });
-    }
-
-    groups.sort((a, b) => b.pendingJobs - a.pendingJobs);
-
-    let totalPendingJobs: number;
-    if (totalPendingRaw !== null) {
-      totalPendingJobs = Math.max(0, parseInt(totalPendingRaw, 10) || 0);
-    } else {
-      totalPendingJobs = 0;
-      for (const g of groups) {
-        totalPendingJobs += g.pendingJobs;
-      }
-    }
-
-    return {
-      name: queueName,
-      displayName,
-      pendingGroupCount: readyCount,
-      blockedGroupCount: blockedCount,
-      activeGroupCount,
-      totalPendingJobs,
-      dlqCount,
-      parkedGroupCount,
-      groups,
-    };
+      return {
+        ...ref,
+        pendingJobs: Number(at(0) ?? 0),
+        headOrderingKey: finiteOrNull(secondElement(at(1))),
+        // Only a lease that has not expired holds the lane: an expired one is
+        // simply claimable again, which is what makes worker death self-heal.
+        leaseRemainingMs: laterThan(expiresAt, now) ? expiresAt - now : null,
+        isParked: typeof parked === "string",
+        parkReason: typeof parked === "string" ? parked : null,
+        readyAtMs: laterThan(readyAt, now) ? readyAt : null,
+        attempts: highestAttempt(at(5)),
+      };
+    });
   }
 
-  // ── Job Browsing ────────────────────────────────────────────────
-
-  async getGroupJobs(params: {
-    queueName: string;
-    groupId: string;
+  async getLaneJobs({
+    laneId,
+    page,
+    pageSize,
+  }: {
+    laneId: string;
     page: number;
     pageSize: number;
   }): Promise<{ jobs: JobEntry[]; total: number }> {
-    const prefix = `${params.queueName}:gq:`;
-    const jobsKey = `${prefix}group:${params.groupId}:jobs`;
+    const keys = laneKeys(laneId);
+    const start = Math.max(page - 1, 0) * pageSize;
+    const [total, members] = await Promise.all([
+      this.redis.zcard(keys.z),
+      this.redis.zrange(keys.z, start, start + pageSize - 1, "WITHSCORES"),
+    ]);
+    if (members.length === 0) return { jobs: [], total };
 
-    const total = await this.redis.zcard(jobsKey);
-    const start = (params.page - 1) * params.pageSize;
-    const end = start + params.pageSize - 1;
-    const jobEntries = await this.redis.zrange(
-      jobsKey,
-      start,
-      end,
-      "WITHSCORES",
-    );
+    const sequences = members.filter((_, index) => index % 2 === 0);
+    const headers = await this.redis.hmget(keys.h, ...sequences);
 
     const jobs: JobEntry[] = [];
-    const jobIds: string[] = [];
-
-    for (let i = 0; i < jobEntries.length; i += 2) {
-      const jobId = jobEntries[i]!;
-      const score = parseFloat(jobEntries[i + 1]!);
-      jobIds.push(jobId);
-      jobs.push({ jobId, score, data: null });
-    }
-
-    if (jobIds.length > 0) {
-      const dataPipeline = this.redis.pipeline();
-      for (const jobId of jobIds) {
-        dataPipeline.hget(`${prefix}group:${params.groupId}:data`, jobId);
-      }
-      const dataResults = await dataPipeline.exec();
-
-      const blobs = new RedisJobBlobStore({
-        redis: this.redis,
-        queueName: params.queueName,
+    for (let index = 0; index < sequences.length; index++) {
+      const header = parseHeader(headers[index]);
+      if (!header) continue;
+      jobs.push({
+        sequence: header.sequence,
+        orderingKey: Number(members[index * 2 + 1] ?? 0),
+        eventType: header.eventType,
+        eventId: header.eventId,
+        aggregateId: header.aggregateId,
+        attempt: header.attempt,
+        costBytes: header.costBytes,
+        blobRef: header.blobRef ?? null,
       });
-      // Wire the GQ2 tiered store too so an offloaded envelope renders its
-      // body in the ops dashboard once the write flag flips in prod. Without
-      // it, decode throws "no tiered store provided" and the catch below hides
-      // the payload from any operator trying to diagnose a stuck GQ2 job
-      // (2026-07-03 audit follow-up).
-      const tieredBlobs = new TieredBlobStore({
-        redisBlobs: blobs,
-        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
-        resolveDestination: resolveProjectStorageDestination,
-        queueName: params.queueName,
-        logger,
-      });
-      await Promise.all(
-        jobIds.map(async (_, i) => {
-          const raw = dataResults?.[i]?.[1] as string | null;
-          if (raw) {
-            try {
-              // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
-              // (2026-06-24 review). A repeatedly-viewed blocked group would
-              // otherwise keep its orphan blobs alive indefinitely. readMode
-              // "peek" routes BOTH the GQ1 blobs.get AND the tieredBlobs.get
-              // to their peek variants.
-              jobs[i]!.data = await decodeJobEnvelope({
-                value: raw,
-                blobs,
-                tieredBlobs,
-                readMode: "peek",
-              });
-            } catch {
-              // ignore undecodable values
-            }
-          }
-        }),
-      );
     }
-
     return { jobs, total };
   }
 
-  // ── Blocked Group Analysis ─────────────────────────────────────
-
-  async getBlockedSummary(params: {
-    queueNames: string[];
-  }): Promise<BlockedSummary> {
-    let totalBlocked = 0;
-    const clusterMap = new Map<string, ErrorCluster>();
-
-    for (const queueName of params.queueNames) {
-      const prefix = `${queueName}:gq:`;
-      const blockedKey = `${prefix}blocked`;
-
-      let cursor = "0";
-      do {
-        const [nextCursor, members] = await this.redis.sscan(
-          blockedKey,
-          cursor,
-          "COUNT",
-          SSCAN_BATCH,
-        );
-        cursor = nextCursor;
-        totalBlocked += members.length;
-
-        if (members.length === 0) continue;
-
-        const pipeline = this.redis.pipeline();
-        for (const groupId of members) {
-          pipeline.hgetall(`${prefix}group:${groupId}:error`);
-          pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0);
-        }
-        const results = await pipeline.exec();
-
-        const jobDataPipeline = this.redis.pipeline();
-        const jobDataRequests: { groupId: string; jobId: string }[] = [];
-        for (let i = 0; i < members.length; i++) {
-          const jobArr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
-          if (jobArr[0]) {
-            jobDataPipeline.hget(
-              `${prefix}group:${members[i]!}:data`,
-              jobArr[0],
-            );
-            jobDataRequests.push({ groupId: members[i]!, jobId: jobArr[0] });
-          }
-        }
-        const jobDataResults =
-          jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
-
-        const pipelineNames = new Map<string, string>();
-        for (let i = 0; i < jobDataRequests.length; i++) {
-          const raw = jobDataResults?.[i]?.[1] as string | null;
-          if (raw) {
-            const pipelineName = readJobRoutingMeta(raw).pipelineName;
-            if (pipelineName) {
-              pipelineNames.set(jobDataRequests[i]!.groupId, pipelineName);
-            }
-          }
-        }
-
-        for (let i = 0; i < members.length; i++) {
-          const groupId = members[i]!;
-          const errorHash = results?.[i * 2]?.[1] as Record<
-            string,
-            string
-          > | null;
-          const message = errorHash?.message ?? "Unknown error";
-          const stack = errorHash?.stack ?? null;
-          const pipelineName = pipelineNames.get(groupId) ?? null;
-
-          const normalized = normalizeErrorMessage(message);
-          const clusterKey = `${pipelineName ?? ""}::${normalized}`;
-
-          const existing = clusterMap.get(clusterKey);
-          if (existing) {
-            existing.count++;
-            if (existing.sampleGroupIds.length < 5) {
-              existing.sampleGroupIds.push(groupId);
-            }
-          } else {
-            clusterMap.set(clusterKey, {
-              normalizedMessage: normalized,
-              sampleMessage: message,
-              sampleStack: stack,
-              count: 1,
-              pipelineName,
-              queueName,
-              sampleGroupIds: [groupId],
-            });
-          }
-        }
-      } while (cursor !== "0");
-    }
-
-    const clusters = Array.from(clusterMap.values()).sort(
-      (a, b) => b.count - a.count,
+  /**
+   * Parked lanes, clustered by why the consumer parked them.
+   *
+   * The park reason is the only failure text the plane keeps — it replaces the
+   * per-group error key and stack the old plane stored, so a cluster names the
+   * failure but cannot show where it was thrown.
+   */
+  async getParkedSummary({
+    laneKinds,
+  }: {
+    laneKinds: string[];
+  }): Promise<ParkedSummary> {
+    const wanted = new Set(laneKinds);
+    const refs = (await this.registeredLanes()).filter((lane) =>
+      wanted.has(lane.laneKind),
     );
-
-    return { totalBlocked, clusters };
-  }
-
-  // ── Actions ─────────────────────────────────────────────────────
-
-  async unblockGroup(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ wasBlocked: boolean }> {
-    const prefix = `${params.queueName}:gq:`;
-    const result = await unblockScript.run(
-      this.redis,
-      9,
-      `${prefix}blocked`,
-      `${prefix}group:${params.groupId}:active`,
-      `${prefix}group:${params.groupId}:jobs`,
-      `${prefix}ready`,
-      `${prefix}signal`,
-      `${prefix}group:${params.groupId}:error`,
-      `${prefix}group:${params.groupId}:strikes`,
-      `${prefix}group:${params.groupId}:attempt`,
-      `${prefix}group:${params.groupId}:failstreak`,
-      params.groupId,
-      String(Date.now()),
-    );
-    return { wasBlocked: result === 1 };
-  }
-
-  async unblockAll(params: {
-    queueName: string;
-  }): Promise<{ unblockedCount: number }> {
-    const prefix = `${params.queueName}:gq:`;
-    const blockedKey = `${prefix}blocked`;
-    let unblockedCount = 0;
-
-    let cursor = "0";
-    do {
-      const [nextCursor, members] = await this.redis.sscan(
-        blockedKey,
-        cursor,
-        "COUNT",
-        SSCAN_BATCH,
-      );
-      cursor = nextCursor;
-
-      if (members.length === 0) continue;
-
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = members.map((groupId) => [
-        `${prefix}blocked`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        `${prefix}group:${groupId}:strikes`,
-        `${prefix}group:${groupId}:attempt`,
-        `${prefix}group:${groupId}:failstreak`,
-        groupId,
-        String(Date.now()),
-      ]);
-      for (const args of argsByIndex) {
-        unblockScript.queue(pipeline, 9, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
-      );
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err && result === 1) unblockedCount++;
-        }
-      }
-    } while (cursor !== "0");
-
-    return { unblockedCount };
-  }
-
-  async drainGroup(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ jobsRemoved: number }> {
-    const prefix = `${params.queueName}:gq:`;
-    const result = await drainGroupScript.run(
-      this.redis,
-      11,
-      `${prefix}group:${params.groupId}:jobs`,
-      `${prefix}group:${params.groupId}:data`,
-      `${prefix}group:${params.groupId}:active`,
-      `${prefix}ready`,
-      `${prefix}blocked`,
-      `${prefix}signal`,
-      `${prefix}group:${params.groupId}:error`,
-      `${prefix}stats:total-pending`,
-      `${prefix}group:${params.groupId}:strikes`,
-      `${prefix}group:${params.groupId}:attempt`,
-      `${prefix}group:${params.groupId}:failstreak`,
-      params.groupId,
-    );
-    return { jobsRemoved: Number(result) };
-  }
-
-  async pausePipeline(params: {
-    queueName: string;
-    key: string;
-  }): Promise<void> {
-    await this.redis.sadd(`${params.queueName}:gq:paused-jobs`, params.key);
-  }
-
-  async unpausePipeline(params: {
-    queueName: string;
-    key: string;
-  }): Promise<void> {
-    await this.redis.srem(`${params.queueName}:gq:paused-jobs`, params.key);
-    await this.redis.lpush(`${params.queueName}:gq:signal`, "1");
-  }
-
-  async retryBlocked(params: {
-    queueName: string;
-    groupId: string;
-    jobId: string;
-  }): Promise<{ wasBlocked: boolean }> {
-    return this.unblockGroup({
-      queueName: params.queueName,
-      groupId: params.groupId,
-    });
-  }
-
-  async listPausedKeys(params: { queueName: string }): Promise<string[]> {
-    return this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
-  }
-
-  // Tenant pause: encoded as a special "tenant:<id>" entry in the same
-  // paused-jobs SET that DISPATCH_BATCH_LUA already consults. The Lua dispatcher
-  // extracts the tenantId from each groupId (everything before the first
-  // "/") and checks SISMEMBER for "tenant:<id>". Added post-2026-05-11
-  // incident so an operator can halt ALL processing for a runaway tenant
-  // without touching pipeline keys. See specs/queue-pausing/.
-  static readonly TENANT_PAUSE_PREFIX = "tenant:";
-
-  async pauseTenant(params: {
-    queueName: string;
-    tenantId: string;
-  }): Promise<void> {
-    await this.redis.sadd(
-      `${params.queueName}:gq:paused-jobs`,
-      `${QueueRedisRepository.TENANT_PAUSE_PREFIX}${params.tenantId}`,
-    );
-  }
-
-  async unpauseTenant(params: {
-    queueName: string;
-    tenantId: string;
-  }): Promise<void> {
-    await this.redis.srem(
-      `${params.queueName}:gq:paused-jobs`,
-      `${QueueRedisRepository.TENANT_PAUSE_PREFIX}${params.tenantId}`,
-    );
-    // Kick the dispatcher loop so paused work resumes within the next scan.
-    await this.redis.lpush(`${params.queueName}:gq:signal`, "1");
-  }
-
-  async listPausedTenants(params: { queueName: string }): Promise<string[]> {
-    const all = await this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
-    const prefix = QueueRedisRepository.TENANT_PAUSE_PREFIX;
-    return all
-      .filter((k) => k.startsWith(prefix))
-      .map((k) => k.slice(prefix.length));
-  }
-
-  // Bulk-drain every group whose ID starts with "<tenantId>/" for the given
-  // queue, optionally narrowed by a substring filter on the groupId.
-  // Returns the total group count and total job count drained.
-  // Added post-2026-05-11 incident — clicking 500K Drain buttons by hand
-  // wasn't feasible.
-  //
-  // `groupIdContains`: optional plain-text fragment that the groupId
-  // must contain in addition to starting with `<tenantId>/`. Use this to
-  // scope a drain to part of a tenant's groups — for example:
-  //   - "/fold/traceSummary/" → drop only that fold's groups
-  //   - "/subscriber/traceUpdateBroadcast/" → drop only that subscriber's groups
-  //   - "/subscriber/pm:customEvaluationSync/" → drop only this process
-  //     manager's groups (each one runs behind a generated subscriber named
-  //     `pm:<process name>`, so the `pm:` prefix is part of the groupId)
-  //   - "/map/spanStorage/" → drop only the span-storage map groups
-  // Honest substring semantics (matches the operator's mental model of
-  // what they see in the Groups table): no fancy resolution to pipeline
-  // names — those live in job data which would require an HGET per group
-  // and dominate the latency. Document the groupId shape so operators
-  // know what to type.
-  //
-  // Performance: ZSCAN pages 1000 groupIds at a time, then ALL matching
-  // DRAIN_GROUP_LUA EVALs for that page are issued as a single Redis
-  // pipeline. At 500K groups → ~500 page round-trips instead of 500,000
-  // sequential ones. The PR-#3970 production drain of 507K groups took
-  // 4 min via a similar pipelined approach; the previous one-at-a-time
-  // shape would have been ~tens of minutes through TLS+ElastiCache.
-  async drainTenant(params: {
-    queueName: string;
-    tenantId: string;
-    groupIdContains?: string;
-  }): Promise<{ groupsDrained: number; jobsDrained: number }> {
-    const prefix = `${params.queueName}:gq:`;
-    const readyKey = `${prefix}ready`;
-    const totalPendingKey = `${prefix}stats:total-pending`;
-    const tenantPrefix = `${params.tenantId}/`;
-    const contains = params.groupIdContains ?? null;
-
-    let cursor = "0";
-    let groupsDrained = 0;
-    let jobsDrained = 0;
-    const SCAN_BATCH = 1000;
-
-    do {
-      const [next, members] = await this.redis.zscan(
-        readyKey,
-        cursor,
-        "COUNT",
-        SCAN_BATCH,
-      );
-      cursor = next;
-
-      // members alternates [groupId, score, groupId, score, ...] — collect
-      // just the groupIds that match our tenant prefix (and the optional
-      // groupIdContains fragment, if set).
-      const matched: string[] = [];
-      for (let i = 0; i < members.length; i += 2) {
-        const groupId = members[i]!;
-        if (!groupId.startsWith(tenantPrefix)) continue;
-        if (contains && !groupId.includes(contains)) continue;
-        matched.push(groupId);
-      }
-      if (matched.length === 0) continue;
-
-      // Pipeline all the drains for this page into a single network round-trip.
-      // Each call is independent; ioredis batches them and returns results in
-      // the same order.
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = matched.map((groupId) => [
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}group:${groupId}:active`,
-        readyKey,
-        `${prefix}blocked`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        totalPendingKey,
-        `${prefix}group:${groupId}:strikes`,
-        `${prefix}group:${groupId}:attempt`,
-        `${prefix}group:${groupId}:failstreak`,
-        groupId,
-      ]);
-      for (const args of argsByIndex) {
-        drainGroupScript.queue(pipeline, 11, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        drainGroupScript.run(this.redis, 11, ...argsByIndex[index]!),
-      );
-      if (!results) continue;
-      for (const [err, value] of results) {
-        if (err) continue;
-        groupsDrained++;
-        jobsDrained += Number(value);
-      }
-    } while (cursor !== "0");
-
-    return { groupsDrained, jobsDrained };
-  }
-
-  // ── DLQ Operations ──────────────────────────────────────────────
-
-  async moveToDlq(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ jobsMoved: number }> {
-    const prefix = `${params.queueName}:gq:`;
-    const result = await moveToDlqScript.run(
-      this.redis,
-      14,
-      `${prefix}group:${params.groupId}:jobs`,
-      `${prefix}group:${params.groupId}:data`,
-      `${prefix}group:${params.groupId}:active`,
-      `${prefix}ready`,
-      `${prefix}blocked`,
-      `${prefix}signal`,
-      `${prefix}group:${params.groupId}:error`,
-      `${prefix}dlq:${params.groupId}:jobs`,
-      `${prefix}dlq:${params.groupId}:data`,
-      `${prefix}dlq:${params.groupId}:error`,
-      `${prefix}dlq`,
-      `${prefix}group:${params.groupId}:strikes`,
-      `${prefix}group:${params.groupId}:attempt`,
-      `${prefix}group:${params.groupId}:failstreak`,
-      params.groupId,
-      String(DLQ_TTL_SECONDS),
-    );
-    return { jobsMoved: Number(result) };
-  }
-
-  async moveAllBlockedToDlq(params: {
-    queueName: string;
-    pipelineFilter?: string;
-    errorFilter?: string;
-  }): Promise<{ movedCount: number; jobsMoved: number }> {
-    const prefix = `${params.queueName}:gq:`;
-    const blockedKey = `${prefix}blocked`;
-    let movedCount = 0;
-    let jobsMoved = 0;
-    const hasFilters = !!params.pipelineFilter || !!params.errorFilter;
-
-    let cursor = "0";
-    do {
-      const [nextCursor, members] = await this.redis.sscan(
-        blockedKey,
-        cursor,
-        "COUNT",
-        SSCAN_BATCH,
-      );
-      cursor = nextCursor;
-
-      if (members.length === 0) continue;
-
-      const groupsToMove = hasFilters
-        ? await this.filterBlockedGroups({
-            prefix,
-            members,
-            pipelineFilter: params.pipelineFilter,
-            errorFilter: params.errorFilter,
-          })
-        : members;
-
-      if (groupsToMove.length === 0) continue;
-
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = groupsToMove.map((groupId) => [
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}group:${groupId}:active`,
-        `${prefix}ready`,
-        `${prefix}blocked`,
-        `${prefix}signal`,
-        `${prefix}group:${groupId}:error`,
-        `${prefix}dlq:${groupId}:jobs`,
-        `${prefix}dlq:${groupId}:data`,
-        `${prefix}dlq:${groupId}:error`,
-        `${prefix}dlq`,
-        `${prefix}group:${groupId}:strikes`,
-        `${prefix}group:${groupId}:attempt`,
-        `${prefix}group:${groupId}:failstreak`,
-        groupId,
-        String(DLQ_TTL_SECONDS),
-      ]);
-      for (const args of argsByIndex) {
-        moveToDlqScript.queue(pipeline, 14, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        moveToDlqScript.run(this.redis, 14, ...argsByIndex[index]!),
-      );
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err) {
-            const moved = Number(result);
-            if (moved >= 0) {
-              movedCount++;
-              jobsMoved += moved;
-            }
-          }
-        }
-      }
-    } while (cursor !== "0");
-
-    return { movedCount, jobsMoved };
-  }
-
-  async replayFromDlq(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<{ jobsReplayed: number }> {
-    const prefix = `${params.queueName}:gq:`;
-    const result = await replayFromDlqScript.run(
-      this.redis,
-      8,
-      `${prefix}dlq:${params.groupId}:jobs`,
-      `${prefix}dlq:${params.groupId}:data`,
-      `${prefix}dlq:${params.groupId}:error`,
-      `${prefix}group:${params.groupId}:jobs`,
-      `${prefix}group:${params.groupId}:data`,
-      `${prefix}ready`,
-      `${prefix}signal`,
-      `${prefix}dlq`,
-      params.groupId,
-      String(Date.now()),
-    );
-    return { jobsReplayed: Number(result) };
-  }
-
-  async replayAllFromDlq(params: {
-    queueName: string;
-    pipelineFilter?: string;
-    errorFilter?: string;
-  }): Promise<{ replayedCount: number; jobsReplayed: number }> {
-    const prefix = `${params.queueName}:gq:`;
-    const dlqIndexKey = `${prefix}dlq`;
-    let replayedCount = 0;
-    let jobsReplayed = 0;
-    const hasFilters = !!params.pipelineFilter || !!params.errorFilter;
-
-    let cursor = "0";
-    do {
-      const [nextCursor, members] = await this.redis.sscan(
-        dlqIndexKey,
-        cursor,
-        "COUNT",
-        SSCAN_BATCH,
-      );
-      cursor = nextCursor;
-
-      if (members.length === 0) continue;
-
-      const groupsToReplay = hasFilters
-        ? await this.filterDlqGroups({
-            prefix,
-            members,
-            pipelineFilter: params.pipelineFilter,
-            errorFilter: params.errorFilter,
-          })
-        : members;
-
-      if (groupsToReplay.length === 0) continue;
-
-      const pipeline = this.redis.pipeline();
-      const argsByIndex = groupsToReplay.map((groupId) => [
-        `${prefix}dlq:${groupId}:jobs`,
-        `${prefix}dlq:${groupId}:data`,
-        `${prefix}dlq:${groupId}:error`,
-        `${prefix}group:${groupId}:jobs`,
-        `${prefix}group:${groupId}:data`,
-        `${prefix}ready`,
-        `${prefix}signal`,
-        `${prefix}dlq`,
-        groupId,
-        String(Date.now()),
-      ]);
-      for (const args of argsByIndex) {
-        replayFromDlqScript.queue(pipeline, 8, ...args);
-      }
-      const results = await execWithNoScriptRecovery(pipeline, (index) =>
-        replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
-      );
-      if (results) {
-        for (const [err, result] of results) {
-          if (!err) {
-            const replayed = Number(result);
-            if (replayed > 0) {
-              replayedCount++;
-              jobsReplayed += replayed;
-            }
-          }
-        }
-      }
-    } while (cursor !== "0");
-
-    return { replayedCount, jobsReplayed };
-  }
-
-  // ── Canary Operations ───────────────────────────────────────────
-
-  async canaryRedrive(params: {
-    queueName: string;
-    count?: number;
-    pipelineFilter?: string;
-  }): Promise<{ redrivenCount: number; groupIds: string[] }> {
-    const count = params.count ?? 5;
-    const prefix = `${params.queueName}:gq:`;
-    const dlqIndexKey = `${prefix}dlq`;
-
-    const dlqSize = await this.redis.scard(dlqIndexKey);
-    if (dlqSize === 0) return { redrivenCount: 0, groupIds: [] };
-
-    const candidates = await this.redis.srandmember(
-      dlqIndexKey,
-      Math.min(count * 3, dlqSize),
-    );
-    if (!candidates || candidates.length === 0)
-      return { redrivenCount: 0, groupIds: [] };
-
-    let groupsToRedrive = candidates.filter((id): id is string => id !== null);
-
-    if (params.pipelineFilter) {
-      groupsToRedrive = await this.filterByPipelineName({
-        prefix,
-        members: groupsToRedrive,
-        pipelineFilter: params.pipelineFilter,
-        keyPrefix: "dlq",
-      });
-    }
-
-    groupsToRedrive = groupsToRedrive.slice(0, count);
-    if (groupsToRedrive.length === 0) return { redrivenCount: 0, groupIds: [] };
+    if (refs.length === 0) return { totalParked: 0, clusters: [] };
 
     const pipeline = this.redis.pipeline();
-    const argsByIndex = groupsToRedrive.map((groupId) => [
-      `${prefix}dlq:${groupId}:jobs`,
-      `${prefix}dlq:${groupId}:data`,
-      `${prefix}dlq:${groupId}:error`,
-      `${prefix}group:${groupId}:jobs`,
-      `${prefix}group:${groupId}:data`,
-      `${prefix}ready`,
-      `${prefix}signal`,
-      `${prefix}dlq`,
-      groupId,
-      String(Date.now()),
-    ]);
-    for (const args of argsByIndex) {
-      replayFromDlqScript.queue(pipeline, 8, ...args);
+    for (const ref of refs) pipeline.get(laneKeys(ref.laneId).parked);
+    const results = (await pipeline.exec()) ?? [];
+
+    const clusters = new Map<string, ErrorCluster>();
+    let totalParked = 0;
+    for (const [index, ref] of refs.entries()) {
+      const reason = results[index]?.[1];
+      if (typeof reason !== "string") continue;
+      totalParked += 1;
+      cluster(clusters, ref, reason);
     }
-    const results = await execWithNoScriptRecovery(pipeline, (index) =>
-      replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
-    );
-
-    let redrivenCount = 0;
-    const redrivenIds: string[] = [];
-    if (results) {
-      for (let i = 0; i < results.length; i++) {
-        const [err, result] = results[i]!;
-        if (!err && Number(result) > 0) {
-          redrivenCount++;
-          redrivenIds.push(groupsToRedrive[i]!);
-        }
-      }
-    }
-
-    return { redrivenCount, groupIds: redrivenIds };
-  }
-
-  async canaryUnblock(params: {
-    queueName: string;
-    count?: number;
-    pipelineFilter?: string;
-  }): Promise<{ unblockedCount: number; groupIds: string[] }> {
-    const count = params.count ?? 5;
-    const prefix = `${params.queueName}:gq:`;
-    const blockedKey = `${prefix}blocked`;
-
-    const candidates = await this.redis.srandmember(blockedKey, count * 3);
-    if (!candidates || candidates.length === 0)
-      return { unblockedCount: 0, groupIds: [] };
-
-    let groupsToUnblock = candidates.filter((id): id is string => id !== null);
-
-    if (params.pipelineFilter) {
-      groupsToUnblock = await this.filterByPipelineName({
-        prefix,
-        members: groupsToUnblock,
-        pipelineFilter: params.pipelineFilter,
-        keyPrefix: "group",
-      });
-    }
-
-    groupsToUnblock = groupsToUnblock.slice(0, count);
-    if (groupsToUnblock.length === 0)
-      return { unblockedCount: 0, groupIds: [] };
-
-    const unblockPipeline = this.redis.pipeline();
-    const argsByIndex = groupsToUnblock.map((groupId) => [
-      `${prefix}blocked`,
-      `${prefix}group:${groupId}:active`,
-      `${prefix}group:${groupId}:jobs`,
-      `${prefix}ready`,
-      `${prefix}signal`,
-      `${prefix}group:${groupId}:error`,
-      `${prefix}group:${groupId}:strikes`,
-      `${prefix}group:${groupId}:attempt`,
-      `${prefix}group:${groupId}:failstreak`,
-      groupId,
-      String(Date.now()),
-    ]);
-    for (const args of argsByIndex) {
-      unblockScript.queue(unblockPipeline, 9, ...args);
-    }
-    const results = await execWithNoScriptRecovery(unblockPipeline, (index) =>
-      unblockScript.run(this.redis, 9, ...argsByIndex[index]!),
-    );
-
-    let unblockedCount = 0;
-    const unblockedIds: string[] = [];
-    if (results) {
-      for (let i = 0; i < results.length; i++) {
-        const [err, result] = results[i]!;
-        if (!err && result === 1) {
-          unblockedCount++;
-          unblockedIds.push(groupsToUnblock[i]!);
-        }
-      }
-    }
-
-    return { unblockedCount, groupIds: unblockedIds };
-  }
-
-  // ── DLQ Listing ─────────────────────────────────────────────────
-
-  async listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]> {
-    const prefix = `${params.queueName}:gq:`;
-    const dlqIndexKey = `${prefix}dlq`;
-    const groups: DlqGroupInfo[] = [];
-
-    let cursor = "0";
-    do {
-      const [nextCursor, members] = await this.redis.sscan(
-        dlqIndexKey,
-        cursor,
-        "COUNT",
-        SSCAN_BATCH,
-      );
-      cursor = nextCursor;
-
-      if (members.length === 0) continue;
-
-      const pipeline = this.redis.pipeline();
-      for (const groupId of members) {
-        pipeline.hgetall(`${prefix}dlq:${groupId}:error`);
-        pipeline.zcard(`${prefix}dlq:${groupId}:jobs`);
-        pipeline.zrange(`${prefix}dlq:${groupId}:jobs`, 0, 0);
-      }
-      const results = await pipeline.exec();
-
-      const dataPipeline = this.redis.pipeline();
-      const dataRequests: { groupId: string; idx: number }[] = [];
-      for (let i = 0; i < members.length; i++) {
-        const jobArr = (results?.[i * 3 + 2]?.[1] as string[]) ?? [];
-        if (jobArr[0]) {
-          dataPipeline.hget(`${prefix}dlq:${members[i]!}:data`, jobArr[0]);
-          dataRequests.push({ groupId: members[i]!, idx: i });
-        }
-      }
-      const dataResults =
-        dataRequests.length > 0 ? await dataPipeline.exec() : [];
-
-      const groupPipelines = new Map<string, string>();
-      for (let j = 0; j < dataRequests.length; j++) {
-        const raw = dataResults?.[j]?.[1] as string | null;
-        if (raw) {
-          const pipelineName = readJobRoutingMeta(raw).pipelineName;
-          if (pipelineName) {
-            groupPipelines.set(dataRequests[j]!.groupId, pipelineName);
-          }
-        }
-      }
-
-      for (let i = 0; i < members.length; i++) {
-        const groupId = members[i]!;
-        const errorHash = results?.[i * 3]?.[1] as Record<
-          string,
-          string
-        > | null;
-        const jobCount = (results?.[i * 3 + 1]?.[1] as number) ?? 0;
-
-        groups.push({
-          groupId,
-          error: errorHash?.message ?? null,
-          errorStack: errorHash?.stack ?? null,
-          pipelineName: groupPipelines.get(groupId) ?? null,
-          jobCount,
-          movedAt: errorHash?.timestamp
-            ? parseFloat(errorHash.timestamp)
-            : null,
-        });
-      }
-    } while (cursor !== "0");
-
-    groups.sort((a, b) => (b.movedAt ?? 0) - (a.movedAt ?? 0));
-    return groups;
-  }
-
-  // ── Preview ─────────────────────────────────────────────────────
-
-  async drainAllBlockedPreview(params: {
-    queueName: string;
-    pipelineFilter?: string;
-    errorFilter?: string;
-  }): Promise<DrainPreview> {
-    const prefix = `${params.queueName}:gq:`;
-    const blockedKey = `${prefix}blocked`;
-    let totalAffected = 0;
-    const pipelineCounts = new Map<string, number>();
-    const errorCounts = new Map<string, number>();
-
-    let cursor = "0";
-    do {
-      const [nextCursor, members] = await this.redis.sscan(
-        blockedKey,
-        cursor,
-        "COUNT",
-        SSCAN_BATCH,
-      );
-      cursor = nextCursor;
-
-      if (members.length === 0) continue;
-
-      const pipeline = this.redis.pipeline();
-      for (const groupId of members) {
-        pipeline.hgetall(`${prefix}group:${groupId}:error`);
-        pipeline.zrange(`${prefix}group:${groupId}:jobs`, 0, 0);
-      }
-      const results = await pipeline.exec();
-
-      const jobDataPipeline = this.redis.pipeline();
-      const jobDataRequests: { groupId: string }[] = [];
-      for (let i = 0; i < members.length; i++) {
-        const jobArr = (results?.[i * 2 + 1]?.[1] as string[]) ?? [];
-        if (jobArr[0]) {
-          jobDataPipeline.hget(`${prefix}group:${members[i]!}:data`, jobArr[0]);
-          jobDataRequests.push({ groupId: members[i]! });
-        }
-      }
-      const jobDataResults =
-        jobDataRequests.length > 0 ? await jobDataPipeline.exec() : [];
-
-      const groupPipelines = new Map<string, string>();
-      for (let j = 0; j < jobDataRequests.length; j++) {
-        const raw = jobDataResults?.[j]?.[1] as string | null;
-        if (raw) {
-          const pipelineName = readJobRoutingMeta(raw).pipelineName;
-          if (pipelineName) {
-            groupPipelines.set(jobDataRequests[j]!.groupId, pipelineName);
-          }
-        }
-      }
-
-      for (let i = 0; i < members.length; i++) {
-        const groupId = members[i]!;
-        const errorHash = results?.[i * 2]?.[1] as Record<
-          string,
-          string
-        > | null;
-        const msg = errorHash?.message ?? "Unknown error";
-        const pName = groupPipelines.get(groupId) ?? "unknown";
-
-        if (
-          params.errorFilter &&
-          !msg.toLowerCase().includes(params.errorFilter.toLowerCase())
-        )
-          continue;
-        if (params.pipelineFilter && pName !== params.pipelineFilter) continue;
-
-        totalAffected++;
-        pipelineCounts.set(pName, (pipelineCounts.get(pName) ?? 0) + 1);
-
-        const normalizedMsg = normalizeErrorMessage(msg);
-        errorCounts.set(
-          normalizedMsg,
-          (errorCounts.get(normalizedMsg) ?? 0) + 1,
-        );
-      }
-    } while (cursor !== "0");
 
     return {
-      totalAffected,
-      byPipeline: Array.from(pipelineCounts.entries())
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count),
-      byError: Array.from(errorCounts.entries())
-        .map(([message, count]) => ({ message, count }))
-        .sort((a, b) => b.count - a.count),
+      totalParked,
+      clusters: [...clusters.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, SUMMARY_TOP_N),
     };
   }
 
-  // ── Counter Reconciliation ──────────────────────────────────────
+  async unparkLane({
+    laneId,
+  }: {
+    laneId: string;
+  }): Promise<{ wasParked: boolean }> {
+    // Unparking is only a DEL: the jobs never left the lane, so the next claim
+    // picks the lane up with its attempts intact.
+    const removed = await this.redis.del(laneKeys(laneId).parked);
+    return { wasParked: removed > 0 };
+  }
 
-  /**
-   * Reconcile the total-pending counter against the live ground truth.
-   *
-   * WHY: The `total-pending` counter is incremented at dispatch (INCR) and
-   * decremented at complete (DECR), but several paths leak without a DECR:
-   *   - worker death after dispatch but before complete
-   *   - the 6-hour `:jobs` TTL reaping a group without a DECR
-   *   - MOVE_TO_DLQ_LUA which deletes `:jobs` without decrementing the counter
-   * Over time the counter drifts upward. Since it is read-only ops metadata
-   * (drives the dashboard "pending" tile), overwriting it with the ZCARD-derived
-   * ground truth is safe and does not affect dispatch correctness.
-   *
-   * The ground truth is the authoritative Σ ZCARD over ALL `group:*:jobs` keys
-   * for this queue — intentionally the complete count, distinct from the top-N
-   * sampled per-group dashboard tile.
-   *
-   * A small re-drift from concurrent dispatch/complete INCR/DECR during the SET
-   * window is acceptable and self-corrects on the next scheduled cycle.
-   *
-   * The single-flight window default is shorter than the collector's reconcile
-   * interval so each scheduled cycle can acquire the marker while still guarding
-   * against multi-pod overlap.
-   *
-   * The reconcile is single-flighted per `singleFlightWindowMs` so only one
-   * pod recomputes per window. It is intentionally off the hot dispatch path.
-   *
-   * See issue #4683.
-   */
-  async reconcileTotalPending(
-    queueName: string,
-    singleFlightWindowMs = 55_000,
-  ): Promise<ReconcileResult | null> {
-    const prefix = `${queueName}:gq:`;
-    const counterKey = `${prefix}stats:total-pending`;
-    const markerKey = `${prefix}stats:pending-recon-ts`;
-
-    // Single-flight gate: only one pod/cycle runs per window.
-    const acquired = await this.redis.set(
-      markerKey,
-      String(Date.now()),
-      "PX",
-      singleFlightWindowMs,
-      "NX",
+  async unparkAll({
+    laneKind,
+  }: {
+    laneKind: string;
+  }): Promise<{ unparkedCount: number }> {
+    const refs = (await this.registeredLanes()).filter(
+      (lane) => lane.laneKind === laneKind,
     );
-    if (acquired !== "OK") return null;
+    if (refs.length === 0) return { unparkedCount: 0 };
 
-    // Read the pre-reconcile counter.
-    const raw = await this.redis.get(counterKey);
-    const counter = Math.max(0, parseInt(raw ?? "0", 10) || 0);
+    const pipeline = this.redis.pipeline();
+    for (const ref of refs) pipeline.del(laneKeys(ref.laneId).parked);
+    const results = (await pipeline.exec()) ?? [];
 
-    // Enumerate all group-jobs zsets via SCAN.
-    const jobsKeys: string[] = [];
-    const matchPattern = `${prefix}group:*:jobs`;
-    let cursor = "0";
-    do {
-      const [nextCursor, keys] = await this.redis.scan(
-        cursor,
-        "MATCH",
-        matchPattern,
-        "COUNT",
-        PENDING_RECONCILE_SCAN_COUNT,
-      );
-      cursor = nextCursor;
-      for (const key of keys) {
-        jobsKeys.push(key);
-      }
-    } while (cursor !== "0");
-
-    // Pipeline ZCARD for every collected key and sum the results.
-    // If ANY pipeline entry errors, abort — a flaky ZCARD must never write
-    // a partial under-count as ground truth; the next cycle retries.
-    let groundTruth = 0;
-    if (jobsKeys.length > 0) {
-      const pipeline = this.redis.pipeline();
-      for (const key of jobsKeys) {
-        pipeline.zcard(key);
-      }
-      const results = await pipeline.exec();
-      if (results) {
-        for (const [err, val] of results) {
-          if (err) {
-            logger.warn(
-              { error: err },
-              "ZCARD pipeline error during pending reconcile — aborting to avoid under-count",
-            );
-            return null;
-          }
-          groundTruth += Number(val) || 0;
-        }
-      }
-    }
-
-    const drift = counter - groundTruth;
-
-    // Overwrite the counter with the ground truth.
-    await this.redis.set(counterKey, String(groundTruth));
-
-    return { counter, groundTruth, drift };
-  }
-
-  // ── Private Filter Helpers ──────────────────────────────────────
-
-  private async filterByPipelineName(params: {
-    prefix: string;
-    members: string[];
-    pipelineFilter: string;
-    keyPrefix: "group" | "dlq";
-  }): Promise<string[]> {
-    const jobIdPipeline = this.redis.pipeline();
-    for (const groupId of params.members) {
-      jobIdPipeline.zrange(
-        `${params.prefix}${params.keyPrefix}:${groupId}:jobs`,
+    return {
+      unparkedCount: results.reduce(
+        (sum, result) => sum + Number(result?.[1] ?? 0),
         0,
-        0,
-      );
-    }
-    const jobIdResults = await jobIdPipeline.exec();
-
-    const dataPipeline = this.redis.pipeline();
-    const dataRequests: { groupId: string }[] = [];
-    for (let i = 0; i < params.members.length; i++) {
-      const jobArr = (jobIdResults?.[i]?.[1] as string[]) ?? [];
-      if (jobArr[0]) {
-        dataPipeline.hget(
-          `${params.prefix}${params.keyPrefix}:${params.members[i]!}:data`,
-          jobArr[0],
-        );
-        dataRequests.push({ groupId: params.members[i]! });
-      }
-    }
-    const dataResults =
-      dataRequests.length > 0 ? await dataPipeline.exec() : [];
-
-    const matchingGroups = new Set<string>();
-    for (let i = 0; i < dataRequests.length; i++) {
-      const raw = dataResults?.[i]?.[1] as string | null;
-      if (raw) {
-        if (readJobRoutingMeta(raw).pipelineName === params.pipelineFilter) {
-          matchingGroups.add(dataRequests[i]!.groupId);
-        }
-      }
-    }
-    return params.members.filter((id) => matchingGroups.has(id));
+      ),
+    };
   }
 
-  private async filterBlockedGroups(params: {
-    prefix: string;
-    members: string[];
-    pipelineFilter?: string;
-    errorFilter?: string;
-  }): Promise<string[]> {
-    const filterPipeline = this.redis.pipeline();
-    for (const groupId of params.members) {
-      filterPipeline.hgetall(`${params.prefix}group:${groupId}:error`);
-      filterPipeline.zrange(`${params.prefix}group:${groupId}:jobs`, 0, 0);
-    }
-    const filterResults = await filterPipeline.exec();
-
-    const jobDataPipeline = this.redis.pipeline();
-    const jobDataMap = new Map<string, number>();
-    let jobFetchIdx = 0;
-    for (let i = 0; i < params.members.length; i++) {
-      const jobArr = (filterResults?.[i * 2 + 1]?.[1] as string[]) ?? [];
-      if (jobArr[0]) {
-        jobDataPipeline.hget(
-          `${params.prefix}group:${params.members[i]!}:data`,
-          jobArr[0],
-        );
-        jobDataMap.set(params.members[i]!, jobFetchIdx++);
-      }
-    }
-    const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
-
-    return params.members.filter((groupId, i) => {
-      if (params.errorFilter) {
-        const errorHash = filterResults?.[i * 2]?.[1] as Record<
-          string,
-          string
-        > | null;
-        const msg = errorHash?.message ?? "";
-        if (!msg.toLowerCase().includes(params.errorFilter.toLowerCase()))
-          return false;
-      }
-      if (params.pipelineFilter) {
-        const fetchIdx = jobDataMap.get(groupId);
-        if (fetchIdx !== undefined) {
-          const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
-          if (raw) {
-            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter)
-              return false;
-          } else return false;
-        } else return false;
-      }
-      return true;
-    });
+  async drainLane({
+    laneId,
+  }: {
+    laneId: string;
+  }): Promise<{ jobsRemoved: number }> {
+    const keys = laneKeys(laneId);
+    const dropped = await drainLaneScript.run(
+      this.redis,
+      8,
+      keys.z,
+      keys.h,
+      keys.b,
+      keys.seq,
+      keys.lease,
+      keys.ready,
+      keys.parked,
+      LANE_REGISTRY_KEY,
+      laneId,
+    );
+    const jobsRemoved = Number(dropped ?? 0);
+    logger.warn({ laneId, jobsRemoved }, "Operator drained a lane");
+    return { jobsRemoved };
   }
 
-  private async filterDlqGroups(params: {
-    prefix: string;
-    members: string[];
-    pipelineFilter?: string;
-    errorFilter?: string;
-  }): Promise<string[]> {
-    const filterPipeline = this.redis.pipeline();
-    for (const groupId of params.members) {
-      filterPipeline.hgetall(`${params.prefix}dlq:${groupId}:error`);
-      filterPipeline.zrange(`${params.prefix}dlq:${groupId}:jobs`, 0, 0);
-    }
-    const filterResults = await filterPipeline.exec();
+  async drainTenant({
+    tenantId,
+    laneIdContains,
+  }: {
+    tenantId: string;
+    laneIdContains?: string;
+  }): Promise<{ lanesDrained: number; jobsDrained: number }> {
+    const refs = (await this.registeredLanes()).filter(
+      (lane) =>
+        lane.tenantId === tenantId &&
+        (laneIdContains === undefined || lane.laneId.includes(laneIdContains)),
+    );
 
-    const jobDataPipeline = this.redis.pipeline();
-    const jobDataMap = new Map<string, number>();
-    let jobFetchIdx = 0;
-    for (let i = 0; i < params.members.length; i++) {
-      const jobArr = (filterResults?.[i * 2 + 1]?.[1] as string[]) ?? [];
-      if (jobArr[0]) {
-        jobDataPipeline.hget(
-          `${params.prefix}dlq:${params.members[i]!}:data`,
-          jobArr[0],
-        );
-        jobDataMap.set(params.members[i]!, jobFetchIdx++);
-      }
+    let jobsDrained = 0;
+    for (const ref of refs) {
+      const { jobsRemoved } = await this.drainLane({ laneId: ref.laneId });
+      jobsDrained += jobsRemoved;
     }
-    const jobDataResults = jobFetchIdx > 0 ? await jobDataPipeline.exec() : [];
-
-    return params.members.filter((groupId, i) => {
-      if (params.errorFilter) {
-        const errorHash = filterResults?.[i * 2]?.[1] as Record<
-          string,
-          string
-        > | null;
-        const msg = errorHash?.message ?? "";
-        if (!msg.toLowerCase().includes(params.errorFilter.toLowerCase()))
-          return false;
-      }
-      if (params.pipelineFilter) {
-        const fetchIdx = jobDataMap.get(groupId);
-        if (fetchIdx !== undefined) {
-          const raw = jobDataResults?.[fetchIdx]?.[1] as string | null;
-          if (raw) {
-            if (readJobRoutingMeta(raw).pipelineName !== params.pipelineFilter)
-              return false;
-          } else return false;
-        } else return false;
-      }
-      return true;
-    });
+    return { lanesDrained: refs.length, jobsDrained };
   }
 }

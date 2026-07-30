@@ -1,5 +1,3 @@
-import type { BlobSweepReport } from "~/server/event-sourcing.old/queues/groupQueue/blobSweeper";
-
 import type {
   OpsBlobPage,
   OpsBlobSort,
@@ -10,43 +8,35 @@ import type {
 /**
  * Outcome of an atomic hand delete.
  *
- * `refusedLiveLeases` is non-zero only when the delete was refused because that
- * many live leases still referenced the blob at the instant it ran — the count
- * the lease-guarded script measured, not one read separately and now stale.
+ * `refusedHolders` is non-zero only when the delete was refused because that
+ * many holders still referenced the blob at the instant it ran — the count the
+ * guarded script measured, not one read separately and now stale.
  */
 export interface BlobDeleteResult {
   deleted: boolean;
-  refusedLiveLeases: number;
+  refusedHolders: number;
 }
 
 export interface BlobStoreRepository {
-  findAllQueueNames(): Promise<string[]>;
   findAll(params: {
-    queueName: string;
     cursor?: string | null;
     limit: number;
     projectId?: string | null;
     sort?: OpsBlobSort;
   }): Promise<OpsBlobPage>;
   findById(params: {
-    queueName: string;
     projectId: string;
     hash: string;
   }): Promise<OpsBlobSummary | null>;
   findStats(params: { sampleLimit: number }): Promise<OpsBlobStoreStats>;
   deleteOne(params: {
-    queueName: string;
     projectId: string;
     hash: string;
   }): Promise<BlobDeleteResult>;
-  runCleanup(params: { dryRun: boolean }): Promise<BlobSweepReport>;
 }
 
 /** Used when the app has no Redis wired, so ops degrades to empty rather than throwing. */
 export class NullBlobStoreRepository implements BlobStoreRepository {
-  async findAllQueueNames(): Promise<string[]> {
-    return [];
-  }
   async findAll(): Promise<OpsBlobPage> {
     return {
       blobs: [],
@@ -59,25 +49,14 @@ export class NullBlobStoreRepository implements BlobStoreRepository {
     return null;
   }
   async findStats(): Promise<OpsBlobStoreStats> {
-    return { queues: [] };
+    return {
+      sampledBlobs: 0,
+      sampledBytes: 0,
+      unreferenced: 0,
+      truncated: false,
+    };
   }
   async deleteOne(): Promise<BlobDeleteResult> {
-    return { deleted: false, refusedLiveLeases: 0 };
-  }
-  async runCleanup(): Promise<BlobSweepReport> {
-    return {
-      queues: [],
-      totals: {
-        scanned: 0,
-        truncated: false,
-        leased: 0,
-        repaired: 0,
-        reclaimed: 0,
-        bookkeeping: 0,
-        pending: 0,
-      },
-      dryRun: true,
-      durationMs: 0,
-    };
+    return { deleted: false, refusedHolders: 0 };
   }
 }

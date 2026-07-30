@@ -1,17 +1,35 @@
-import { createLogger } from "@langwatch/observability";
-import {
-  getDejaViewProjections,
-  getProjectionMetadata,
-} from "~/server/event-sourcing.old/introspection";
+import type { Registry } from "@langwatch/event-sourcing";
 import type {
   AggregateSearchResult,
   EventExplorerRepository,
 } from "./repositories/event-explorer.repository";
 
-const logger = createLogger("langwatch:ops:event-explorer");
+/** One fold or map, and the aggregate type whose events it is mounted on. */
+interface ProjectionRef {
+  projectionName: string;
+  aggregateType: string;
+}
 
 export class EventExplorerService {
-  constructor(readonly repo: EventExplorerRepository) {}
+  constructor(
+    readonly repo: EventExplorerRepository,
+    private readonly registry: Registry,
+  ) {}
+
+  /**
+   * Every fold and map registered, with its owning pipeline. A pipeline is
+   * registered under its aggregate type, so the pipeline name is the aggregate
+   * type — there is no second mapping to keep in step.
+   */
+  private projections(): ProjectionRef[] {
+    return this.registry
+      .all()
+      .flatMap(({ pipeline, aggregateType }) =>
+        [...Object.keys(pipeline.folds), ...Object.keys(pipeline.maps)].map(
+          (projectionName) => ({ projectionName, aggregateType }),
+        ),
+      );
+  }
 
   async discoverAggregates(params: {
     projectionNames: string[];
@@ -27,9 +45,8 @@ export class EventExplorerService {
       }>;
     }>;
   }> {
-    const allProjections = getProjectionMetadata();
-    const selected = allProjections.filter((p) =>
-      params.projectionNames.includes(p.projectionName),
+    const selected = this.projections().filter((projection) =>
+      params.projectionNames.includes(projection.projectionName),
     );
 
     if (selected.length === 0) {
@@ -58,30 +75,20 @@ export class EventExplorerService {
       byAggregateType.set(row.aggregateType, list);
     }
 
-    const projections: Array<{
-      projectionName: string;
-      aggregateCount: number;
-      tenantBreakdown: Array<{
-        tenantId: string;
-        aggregateCount: number;
-      }>;
-    }> = [];
-
-    for (const projection of selected) {
-      const tenantBreakdown =
-        byAggregateType.get(projection.aggregateType) ?? [];
-      const aggregateCount = tenantBreakdown.reduce(
-        (sum, t) => sum + t.aggregateCount,
-        0,
-      );
-      projections.push({
-        projectionName: projection.projectionName,
-        aggregateCount,
-        tenantBreakdown,
-      });
-    }
-
-    return { projections };
+    return {
+      projections: selected.map((projection) => {
+        const tenantBreakdown =
+          byAggregateType.get(projection.aggregateType) ?? [];
+        return {
+          projectionName: projection.projectionName,
+          aggregateCount: tenantBreakdown.reduce(
+            (sum, tenant) => sum + tenant.aggregateCount,
+            0,
+          ),
+          tenantBreakdown,
+        };
+      }),
+    };
   }
 
   async searchAggregates(params: {
@@ -124,100 +131,5 @@ export class EventExplorerService {
         payload: parsedPayload,
       };
     });
-  }
-
-  async computeProjectionState(params: {
-    aggregateId: string;
-    tenantId: string;
-    projectionName: string;
-    eventIndex: number;
-  }): Promise<{
-    state: unknown;
-    appliedEventCount: number;
-    projectionName: string;
-    aggregateType: string;
-  }> {
-    const projections = getProjectionMetadata();
-    const projection = projections.find(
-      (p) => p.projectionName === params.projectionName,
-    );
-
-    if (!projection) {
-      return {
-        state: null,
-        appliedEventCount: 0,
-        projectionName: params.projectionName,
-        aggregateType: "",
-      };
-    }
-
-    const limit = params.eventIndex + 1;
-    const rows = await this.repo.findEventsByAggregate({
-      aggregateId: params.aggregateId,
-      tenantId: params.tenantId,
-      limit,
-    });
-
-    const dejaViewProjections = getDejaViewProjections();
-    const dejaViewProj = dejaViewProjections.find(
-      (p) => p.projectionName === params.projectionName,
-    );
-
-    if (!dejaViewProj) {
-      return {
-        state: null,
-        appliedEventCount: rows.length,
-        projectionName: params.projectionName,
-        aggregateType: projection.aggregateType,
-      };
-    }
-
-    let state = dejaViewProj.init();
-    let appliedCount = 0;
-    for (const row of rows) {
-      let parsedPayload: unknown;
-      try {
-        parsedPayload =
-          typeof row.payload === "string"
-            ? JSON.parse(row.payload)
-            : row.payload;
-      } catch {
-        parsedPayload = {};
-      }
-      const timestampMs = parseInt(row.eventTimestamp, 10);
-      const event = {
-        id: row.eventId,
-        aggregateId: params.aggregateId,
-        aggregateType: projection.aggregateType,
-        tenantId: params.tenantId,
-        createdAt: timestampMs,
-        occurredAt: timestampMs,
-        type: row.eventType,
-        version: "",
-        data: parsedPayload,
-      };
-      if (dejaViewProj.eventTypes.includes(row.eventType)) {
-        try {
-          state = dejaViewProj.apply(state, event);
-          appliedCount++;
-        } catch (err) {
-          logger.warn(
-            {
-              error: err,
-              eventId: row.eventId,
-              projectionName: params.projectionName,
-            },
-            "Skipping event that failed to apply during projection state computation",
-          );
-        }
-      }
-    }
-
-    return {
-      state,
-      appliedEventCount: appliedCount,
-      projectionName: params.projectionName,
-      aggregateType: projection.aggregateType,
-    };
   }
 }
