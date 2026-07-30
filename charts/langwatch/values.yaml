@@ -45,7 +45,7 @@ global:
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
   ## @param global.scheduling.tolerations [array] Tolerations applied to all pods.
-  ## @param global.scheduling.priorityClassName [string] PriorityClass for all pods. Set a per-component priorityClassName to override.
+  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
   scheduling:
     nodeSelector: {}
     affinity: {}
@@ -1091,6 +1091,8 @@ cronjobs:
   # Enable or disable all cron jobs
   ## @param cronjobs.enabled [default: true] Enable all cron jobs.
   enabled: true
+  ## @param cronjobs.priorityClassName [string] PriorityClass for cronjobs pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   ## @param cronjobs.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node and taking its neighbours with it.
   scratchSizeLimit: 1Gi
   ## @param cronjobs.labels [object] Additional labels for CronJob resources.
@@ -1458,6 +1460,8 @@ postgresql:
   tolerations: []
   ## @param postgresql.affinity [object] Affinity rules. Falls back to global.scheduling.affinity.
   affinity: {}
+  ## @param postgresql.priorityClassName [string] PriorityClass for postgresql pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   ## @param postgresql.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs (socket dir, /tmp) the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
   scratchSizeLimit: 1Gi
   # Whether to manage PostgreSQL via this chart or use external instance
@@ -1673,6 +1677,8 @@ redis:
   tolerations: []
   ## @param redis.affinity [object] Affinity rules. Falls back to global.scheduling.affinity.
   affinity: {}
+  ## @param redis.priorityClassName [string] PriorityClass for redis pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
   ## @param redis.scratchSizeLimit [string, default: 1Gi] Size cap for the writable scratch emptyDirs (socket dir, /tmp) the container needs under a read-only root filesystem. Bounded so a looping pod is evicted on its own quota rather than filling the node.
   scratchSizeLimit: 1Gi
   # Whether to manage Redis via this chart or use external instance

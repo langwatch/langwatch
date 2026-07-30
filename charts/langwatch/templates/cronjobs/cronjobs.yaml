@@ -57,6 +57,9 @@ spec:
           securityContext:
             {{- include "langwatch.podSecurityContext" (dict "ctx" $root "component" $root.Values.cronjobs) | nindent 12 }}
           # Node selection
+          {{- with (coalesce $root.Values.cronjobs.priorityClassName $root.Values.global.scheduling.priorityClassName) }}
+          priorityClassName: {{ . | quote }}
+          {{- end }}
           {{- with (coalesce $root.Values.cronjobs.nodeSelector $root.Values.global.scheduling.nodeSelector) }}
           nodeSelector:
             {{- toYaml . | nindent 12 }}

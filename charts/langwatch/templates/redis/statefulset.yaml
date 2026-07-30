@@ -24,6 +24,9 @@ spec:
     spec:
       # Redis does not call the Kubernetes API, so don't mount the SA token.
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      {{- with (coalesce .Values.redis.priorityClassName .Values.global.scheduling.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       {{- with (coalesce .Values.redis.nodeSelector .Values.global.scheduling.nodeSelector) }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
