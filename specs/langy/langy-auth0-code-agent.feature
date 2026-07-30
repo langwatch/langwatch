@@ -134,13 +134,13 @@ Feature: Auth0-protected APIs reachable from a custom code agent
     Then Langy completes the setup rather than refusing
     And a project secret with the pinned name exists that was absent before the run
     And the client secret the stub token endpoint receives equals the seeded value
-    And Langy tells me the value is now in the conversation record and can be rotated
+    And Langy warns me that my own pasted message has put the value in my conversation history, and advises rotating the credential
     And Langy does not repeat the value back to me
 
   @e2e @unimplemented
   Scenario: The seeded secret appears on no persisted surface
-    Given a completed setup run
-    When every persisted surface is read back — the project's agents in full, the conversation record, the scenario run record and transcript, the judge prompt as sent, the browser-QA page text and screenshot filename, the persisted code-block output, and the test-runner and CI logs
+    Given a completed setup run in which the credential was provided out-of-band, never pasted into the conversation
+    When every persisted surface is read back — the project's agents in full, the conversation record, the scenario run record and transcript, the judge prompt as sent, the browser-QA page text and the rendered content of its screenshots, the persisted code-block output, and the test-runner and CI logs
     Then the seeded secret appears in none of them
 
   @integration @unimplemented
@@ -167,14 +167,14 @@ Feature: Auth0-protected APIs reachable from a custom code agent
     And the persisted output names the upstream rejection and the token endpoint
     And the persisted output does not contain the seeded secret, including when the secret was interpolated into the error message at runtime
 
-  @integration @unimplemented
+  @integration
   Scenario: Exceeding the wall-clock budget is reported as a timeout
     Given the stub delays past the runner's limit
     When the agent is executed
     Then the failure surfaced is the code-block timeout
     And the declared outputs are absent rather than present and empty
 
-  @unit @unimplemented
+  @unit
   Scenario: A declared output the code never returns fails the run
     Given an agent declaring an output key its Python does not return
     When the agent is executed

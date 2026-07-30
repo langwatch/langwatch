@@ -62,8 +62,15 @@ func newAuth0Stubs(t *testing.T, clientSecret string) *auth0Stubs {
 	s := &auth0Stubs{mintedToken: "minted-token-d41d8cd98f00"}
 
 	s.tokenServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// No require/assert in handlers (testifylint go-require): a decode
-		// failure surfaces as a 400, which fails the test at the caller.
+		// No require/assert in handlers (testifylint go-require): a contract
+		// violation surfaces as a 4xx, which fails the test at the caller.
+		// Enforce the full token-request HTTP contract, not just a parseable
+		// body: POST, the /oauth/token path, and a JSON content type.
+		if r.Method != http.MethodPost || r.URL.Path != "/oauth/token" ||
+			!strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		var req tokenRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -83,6 +90,10 @@ func newAuth0Stubs(t *testing.T, clientSecret string) *auth0Stubs {
 	t.Cleanup(s.tokenServer.Close)
 
 	s.apiServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/chat" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		s.mu.Lock()
 		s.apiAuthHeader = r.Header.Get("Authorization")
 		s.mu.Unlock()

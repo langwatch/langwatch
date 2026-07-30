@@ -30972,11 +30972,12 @@ A **custom code agent** closes that gap: a few lines of Python that fetch the to
 
 ## 1. Store the credentials as project secrets
 
-In **Settings → Secrets** (or via the CLI), create the credentials **and** the endpoint coordinates — keeping the endpoints in secrets too means the whole agent is configurable without touching its code or any API:
+In **Settings → Secrets**, create the credentials **and** the endpoint coordinates — keeping the endpoints in secrets too means the whole agent is configurable without touching its code or any API.
+
+Create **`AUTH0_CLIENT_SECRET` through the Settings → Secrets UI**, not on a command line: a secret passed as a CLI argument lands in your shell history and the process listing, and can end up in CI logs. The non-sensitive coordinates are fine to create via the CLI:
 
 ```bash
 langwatch secret create AUTH0_CLIENT_ID --value "<your client id>"
-langwatch secret create AUTH0_CLIENT_SECRET --value "<your client secret>"
 langwatch secret create AUTH0_TOKEN_URL --value "https://your-tenant.us.auth0.com/oauth/token"
 langwatch secret create AUTH0_AUDIENCE --value "https://api.your-company.internal"
 langwatch secret create AUTH0_API_URL --value "https://api.your-company.internal/chat"
@@ -30990,7 +30991,7 @@ Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encryp
 
 ## 2. Write the code agent
 
-Create a **code agent** with this Python — it is the reference implementation, exercised continuously against the real code-agent runtime:
+Create a **code agent** with a single input `message` and a single declared output `output` — the declared output key must match the key the Python returns, or the run fails with `missing_output`. Use this Python — it is the reference implementation, exercised continuously against the real code-agent runtime:
 
 ```python
 import requests

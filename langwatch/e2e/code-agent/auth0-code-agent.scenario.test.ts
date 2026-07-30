@@ -88,6 +88,16 @@ beforeAll(async () => {
   // Stub Auth0 token endpoint: mints MINTED_TOKEN for the right credentials.
   tokenServer = http.createServer((req, res) => {
     void readBody(req).then((body) => {
+      // Enforce the full token-request HTTP contract, not just a parseable
+      // body: POST, the /oauth/token path, and a JSON content type.
+      if (
+        req.method !== "POST" ||
+        req.url !== "/oauth/token" ||
+        !(req.headers["content-type"] ?? "").startsWith("application/json")
+      ) {
+        res.writeHead(400).end(JSON.stringify({ error: "bad_request" }));
+        return;
+      }
       const parsed = JSON.parse(body) as TokenRequest;
       received.tokenRequests.push(parsed);
       if (parsed.client_secret !== CLIENT_SECRET) {
@@ -106,6 +116,10 @@ beforeAll(async () => {
   // Stub protected API: answers with the protected fact ONLY for the minted token.
   apiServer = http.createServer((req, res) => {
     void readBody(req).then(() => {
+      if (req.method !== "POST" || req.url !== "/chat") {
+        res.writeHead(400).end(JSON.stringify({ error: "bad_request" }));
+        return;
+      }
       received.apiAuthHeaders.push(req.headers.authorization ?? "");
       if (req.headers.authorization !== `Bearer ${MINTED_TOKEN}`) {
         res.writeHead(401).end(JSON.stringify({ error: "unauthorized" }));
