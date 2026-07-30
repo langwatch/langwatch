@@ -504,6 +504,19 @@ const presentations = {
     title: "Your license has expired",
     describe: () => "Renew it to carry on, or talk to your account team.",
   },
+  license_signing_key_not_pem: {
+    title: "That doesn't look like a private key",
+    describe: () => "Paste the whole key, including its BEGIN and END lines.",
+  },
+  license_signing_key_encrypted: {
+    title: "That private key is passphrase-protected",
+    describe: () => "Use an unencrypted private key to sign licenses.",
+  },
+  license_signing_failed: {
+    title: "That private key couldn't sign the license",
+    describe: () =>
+      "Check it is the license signing key and was copied in full.",
+  },
   malformed_custom_role_permissions: {
     title: "This role's permissions are invalid",
     describe: () => "Edit the role and save it again.",
