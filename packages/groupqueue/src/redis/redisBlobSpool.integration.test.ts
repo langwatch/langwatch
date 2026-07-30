@@ -56,7 +56,7 @@ describe("redisBlobSpool", () => {
         redisTierThresholdBytes: 16,
         durableStore: fakeDurableStore(),
       });
-      const body = uniqueBody("x".repeat(10_000) + "héllo 🎉");
+      const body = uniqueBody(`${"x".repeat(10_000)}héllo 🎉`);
 
       const ref = await spool.put(uniqueTenant(), body);
       const roundTripped = await spool.get(ref);

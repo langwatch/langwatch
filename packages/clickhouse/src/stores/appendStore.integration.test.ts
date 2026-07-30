@@ -1,8 +1,17 @@
-import { createClient, type ClickHouseClient as DriverClient } from "@clickhouse/client";
+import {
+  createClient,
+  type ClickHouseClient as DriverClient,
+} from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appendLogTable } from "../__tests__/integration/fixtures";
-import { readTestClickHouseInfo, uniqueTenant } from "../__tests__/integration/testClickHouse";
-import { createClickHouseClient, type ClickHouseClient } from "../client/clickhouseClient";
+import {
+  readTestClickHouseInfo,
+  uniqueTenant,
+} from "../__tests__/integration/testClickHouse";
+import {
+  type ClickHouseClient,
+  createClickHouseClient,
+} from "../client/clickhouseClient";
 import { bindIdentifiers } from "../query/identifiers";
 import { clickhouseAppend } from "./appendStore";
 
@@ -66,7 +75,9 @@ describe("given clickhouseAppend against a live ClickHouse", () => {
     const tenantId = uniqueTenant();
     const store = buildStore();
 
-    await store.writeBatch([{ acceptedAt: new Date(), payload: "hello" }], { tenantId });
+    await store.writeBatch([{ acceptedAt: new Date(), payload: "hello" }], {
+      tenantId,
+    });
 
     // No FINAL, no sequential-consistency setting: `client.insert` only
     // resolves once `wait_for_async_insert` confirms the row is durable and

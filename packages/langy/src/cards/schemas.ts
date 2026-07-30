@@ -56,9 +56,7 @@ export const traceSummarySchema = z.looseObject({
   traceId: z.string().optional(),
   input: textValueSchema.optional(),
   output: textValueSchema.optional(),
-  timestamps: z
-    .looseObject({ started_at: z.number().optional() })
-    .optional(),
+  timestamps: z.looseObject({ started_at: z.number().optional() }).optional(),
   error: z.unknown().optional(),
 });
 
@@ -349,7 +347,11 @@ export const namesCreatedResource = (payload: unknown): boolean => {
   for (const [key, value] of Object.entries(record)) {
     if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
     if (/(^|_)id$|Id$/.test(key) && isNamedValue(value)) return true;
-    if (RESOURCE_COLLECTION_KEYS.includes(key) && Array.isArray(value) && value.length > 0) {
+    if (
+      RESOURCE_COLLECTION_KEYS.includes(key) &&
+      Array.isArray(value) &&
+      value.length > 0
+    ) {
       return true;
     }
   }

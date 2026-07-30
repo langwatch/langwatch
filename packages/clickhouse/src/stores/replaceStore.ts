@@ -7,20 +7,20 @@
  * a function of the SET of its events (ADR-098 §5).
  */
 
-import type { z } from "zod";
 import type {
   ReplaceStore,
   StateRead,
   StoreContext,
   StoredState,
 } from "@langwatch/event-sourcing";
+import type { z } from "zod";
 import type { ClickHouseClient } from "../client/clickhouseClient";
-import { bindIdentifiers } from "../query/identifiers";
 import {
   type AnyWireColumn,
   createRowCodec,
   type WireCodec,
 } from "../codec/rowCodec";
+import { bindIdentifiers } from "../query/identifiers";
 import type { ColumnMap } from "../schema/columns";
 import type { TableDefinition, TableRow } from "../schema/defineTable";
 import { deriveRowMapping, type RowMapping } from "./rowMapping";
@@ -125,7 +125,10 @@ export interface ClickHouseReplacingArgs<State, Columns extends ColumnMap> {
    * that exists outside the window as absent is the silent population-wide reset
    * ADR-107 decision 9 exists to prevent.
    */
-  readonly readWindow?: { readonly column: string; readonly lookbackMs: number };
+  readonly readWindow?: {
+    readonly column: string;
+    readonly lookbackMs: number;
+  };
   /** @default createRowCodec() */
   readonly codec?: WireCodec;
 }
@@ -240,10 +243,16 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
           `parts but ${keyColumns.length} key columns are declared`,
       );
     }
-    return Object.fromEntries(parts.map((part, index) => [`key${index}`, part]));
+    return Object.fromEntries(
+      parts.map((part, index) => [`key${index}`, part]),
+    );
   };
 
-  const queryRow = (foldKey: string, context: StoreContext, windowed: boolean) =>
+  const queryRow = (
+    foldKey: string,
+    context: StoreContext,
+    windowed: boolean,
+  ) =>
     client.query({
       tenantId: context.tenantId,
       sql: windowed ? (windowedReadSql ?? readSql) : readSql,
@@ -265,7 +274,11 @@ export function clickhouseReplacing<State, Columns extends ColumnMap>(
     // A windowed miss is not an answer: the row may simply be older than the
     // window, and reporting that as absent would refold the aggregate from
     // genesis and overwrite it.
-    let result = await queryRow(foldKey, context, windowedReadSql !== undefined);
+    let result = await queryRow(
+      foldKey,
+      context,
+      windowedReadSql !== undefined,
+    );
     if (!result.rows[0] && windowedReadSql !== undefined) {
       result = await queryRow(foldKey, context, false);
     }

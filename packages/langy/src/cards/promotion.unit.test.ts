@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   assertTotalOrder,
   CARD_PROBES,
-  promoteCard,
   type CardProbe,
+  promoteCard,
 } from "./registry.js";
 import { toCliToolResult } from "./tool-result.js";
 
-const promote = (nominal: Parameters<typeof promoteCard>[0]["nominal"], payload: unknown) =>
-  promoteCard({ nominal, payload, probes: CARD_PROBES });
+const promote = (
+  nominal: Parameters<typeof promoteCard>[0]["nominal"],
+  payload: unknown,
+) => promoteCard({ nominal, payload, probes: CARD_PROBES });
 
 describe("promoteCard", () => {
   describe("given a generic read whose payload carries cost", () => {
@@ -66,7 +68,9 @@ describe("promoteCard", () => {
     it("refuses a single point — one reading is not a trend", () => {
       expect(
         promote("resourceRead", {
-          series: [{ name: "Total cost", points: [{ t: "2026-07-15", v: 0.11 }] }],
+          series: [
+            { name: "Total cost", points: [{ t: "2026-07-15", v: 0.11 }] },
+          ],
         }),
       ).toBeNull();
     });
@@ -131,7 +135,10 @@ describe("promoteCard", () => {
 
     it("still keeps it when the payload earns nothing richer", () => {
       expect(
-        promote("metrics", { currentPeriod: [{ date: 1 }], previousPeriod: [] }),
+        promote("metrics", {
+          currentPeriod: [{ date: 1 }],
+          previousPeriod: [],
+        }),
       ).toBeNull();
     });
   });

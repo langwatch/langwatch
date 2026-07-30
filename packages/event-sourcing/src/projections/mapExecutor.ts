@@ -11,8 +11,8 @@
  * events down to one write.
  */
 
-import { noopMetrics } from "../ports/metrics";
 import type { Metrics } from "../ports/metrics";
+import { noopMetrics } from "../ports/metrics";
 import { withSpan } from "../ports/tracing";
 import type { AppendStore, MergeStore } from "./store.types";
 

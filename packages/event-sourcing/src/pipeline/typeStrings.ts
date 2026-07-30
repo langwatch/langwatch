@@ -47,7 +47,10 @@ export function assertNoSeparators(
   context: Record<string, unknown>,
 ): void {
   if (/[/.]/.test(value)) {
-    throw new ConfigurationError(`${what} must not contain "/" or "."`, context);
+    throw new ConfigurationError(
+      `${what} must not contain "/" or "."`,
+      context,
+    );
   }
 }
 

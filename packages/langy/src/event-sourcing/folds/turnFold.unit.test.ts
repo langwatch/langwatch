@@ -8,10 +8,10 @@ import {
 import {
   foldLangyConversationTurn,
   initLangyConversationTurnState,
-  makeConversationTurnKey,
-  parseConversationTurnKey,
   type LangyConversationTurnEvent,
   type LangyConversationTurnFoldState,
+  makeConversationTurnKey,
+  parseConversationTurnKey,
 } from "./turnFold";
 
 const IDS = { conversationId: "conv-1", turnId: "turn-1" };
@@ -219,7 +219,7 @@ describe("conversation turn keys", () => {
     // An empty identity used to return ":" — one shared document every caller
     // with a missing id collapsed onto, across every tenant.
     /** @scenario "A turn document with an incomplete identity is refused, not collapsed" */
-    it("throws rather than collapsing onto a shared \":\" key", () => {
+    it('throws rather than collapsing onto a shared ":" key', () => {
       expect(() => makeConversationTurnKey("", "")).toThrow();
       expect(() => makeConversationTurnKey("conv-1", "")).toThrow();
       expect(() => makeConversationTurnKey("", "turn-1")).toThrow();
@@ -251,14 +251,20 @@ describe("order-invariance under best-effort delivery (ADR-098 decision 4)", () 
   function foldAnyOrder(
     order: readonly LangyConversationTurnEvent[],
   ): LangyConversationTurnFoldState {
-    return order.reduce(foldLangyConversationTurn, initLangyConversationTurnState());
+    return order.reduce(
+      foldLangyConversationTurn,
+      initLangyConversationTurnState(),
+    );
   }
 
   // Two terminals race. Every arrival order must land on the same state, and it
   // is the terminal applied first that owns it.
   /** @scenario "A turn reaches exactly one terminal, first writer wins" */
   it("resolves a completed/failed race identically regardless of arrival order, first terminal winning", () => {
-    const completedFirst = foldAnyOrder([accepted(1_000), responded("completed", 5_000)]);
+    const completedFirst = foldAnyOrder([
+      accepted(1_000),
+      responded("completed", 5_000),
+    ]);
     const failedFirst = [
       accepted(1_000),
       responded("completed", 5_000),
@@ -286,7 +292,9 @@ describe("order-invariance under best-effort delivery (ADR-098 decision 4)", () 
           e.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED ||
           e.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
       );
-      if (firstTerminal?.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED) {
+      if (
+        firstTerminal?.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED
+      ) {
         expect(state.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.COMPLETED);
         expect(state.AnswerParts.length).toBeGreaterThan(0);
       } else {
@@ -333,7 +341,11 @@ describe("order-invariance under best-effort delivery (ADR-098 decision 4)", () 
         error: null,
       },
     };
-    const state = foldAnyOrder([accepted(1_000), responded("completed", 5_000), emptyRedelivery]);
+    const state = foldAnyOrder([
+      accepted(1_000),
+      responded("completed", 5_000),
+      emptyRedelivery,
+    ]);
     expect(state.AnswerParts).toEqual([{ type: "text", text: "because." }]);
   });
 });

@@ -112,7 +112,10 @@ export function mappedTenantRouter(args: {
 
   requireCompleteTarget(fallback, "mappedTenantRouter fallback target");
   for (const [tenantId, target] of overrides) {
-    requireCompleteTarget(target, `mappedTenantRouter override for tenant "${tenantId}"`);
+    requireCompleteTarget(
+      target,
+      `mappedTenantRouter override for tenant "${tenantId}"`,
+    );
   }
 
   const known = dedupeTargets([fallback, ...overrides.values()]);
@@ -171,7 +174,7 @@ export function createPoolRegistry<Pool>(args: {
 
       if (maxPools !== undefined && pools.size >= maxPools) {
         throw new Error(
-          `pool registry is at its limit of ${maxPools} pool(s); refusing to open a new pool for url "${target.url}" database "${target.database}"`
+          `pool registry is at its limit of ${maxPools} pool(s); refusing to open a new pool for url "${target.url}" database "${target.database}"`,
         );
       }
 

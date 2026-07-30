@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { compile, isCompiledSchema } from "zod-compiler";
-import { noopMetrics } from "../ports/metrics";
 import type { Metrics } from "../ports/metrics";
+import { noopMetrics } from "../ports/metrics";
 
 /**
  * The seam between the package and zod's interpreter.
@@ -52,7 +52,9 @@ export interface CompiledSchema<T> {
   /** Full parse with coercion. Use at a boundary, not per event. */
   parse(value: unknown): T;
   /** Non-throwing parse for paths that classify rather than fail. */
-  safeParse(value: unknown): { ok: true; value: T } | { ok: false; error: unknown };
+  safeParse(
+    value: unknown,
+  ): { ok: true; value: T } | { ok: false; error: unknown };
 }
 
 /**
@@ -142,12 +144,19 @@ const UNWRAPPABLE_TYPE_NAMES = new Set([
  * `zod-compiler`'s own full schema walk, which is exactly the duplication
  * this module exists to avoid.
  */
-function findUnsupportedReason(schema: z.ZodTypeAny, depth = 0): string | undefined {
+function findUnsupportedReason(
+  schema: z.ZodTypeAny,
+  depth = 0,
+): string | undefined {
   if (depth > 8) return undefined;
 
   const def = defOf(schema);
 
-  if (def.typeName !== undefined && UNWRAPPABLE_TYPE_NAMES.has(def.typeName) && def.innerType) {
+  if (
+    def.typeName !== undefined &&
+    UNWRAPPABLE_TYPE_NAMES.has(def.typeName) &&
+    def.innerType
+  ) {
     return findUnsupportedReason(def.innerType, depth + 1);
   }
 
@@ -167,15 +176,22 @@ function findUnsupportedReason(schema: z.ZodTypeAny, depth = 0): string | undefi
     }
     case "ZodString": {
       const algorithmic = def.checks?.find(
-        (check) => check.kind !== undefined && ALGORITHMIC_STRING_CHECK_KINDS.has(check.kind),
+        (check) =>
+          check.kind !== undefined &&
+          ALGORITHMIC_STRING_CHECK_KINDS.has(check.kind),
       );
-      return algorithmic ? FALLBACK_REASON_ALGORITHMIC_STRING_FORMAT : undefined;
+      return algorithmic
+        ? FALLBACK_REASON_ALGORITHMIC_STRING_FORMAT
+        : undefined;
     }
     case "ZodObject": {
       if (def.errorMap) return FALLBACK_REASON_DYNAMIC_ERROR_MAP;
       const shape = def.shape?.() ?? {};
       for (const key of Object.keys(shape)) {
-        const reason = findUnsupportedReason(shape[key] as z.ZodTypeAny, depth + 1);
+        const reason = findUnsupportedReason(
+          shape[key] as z.ZodTypeAny,
+          depth + 1,
+        );
         if (reason) return reason;
       }
       return undefined;
@@ -197,7 +213,10 @@ function findUnsupportedReason(schema: z.ZodTypeAny, depth = 0): string | undefi
  * ever compiled for the life of the module, turning this cache into a leak in
  * exactly the code paths that build and discard aggregates most often.
  */
-export type CompiledSchemaCache = WeakMap<z.ZodTypeAny, CompiledSchema<unknown>>;
+export type CompiledSchemaCache = WeakMap<
+  z.ZodTypeAny,
+  CompiledSchema<unknown>
+>;
 
 /**
  * The process-wide cache. Weak so a schema held only by a torn-down pipeline is

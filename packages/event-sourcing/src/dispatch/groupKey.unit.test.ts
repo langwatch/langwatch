@@ -55,7 +55,11 @@ describe("group key", () => {
       {
         tenantId: "tenant-1",
         lane: { kind: "command", name: "contributeSpanFacts" },
-        scope: { kind: "aggregate", aggregateType: "session", aggregateId: "s1" },
+        scope: {
+          kind: "aggregate",
+          aggregateType: "session",
+          aggregateId: "s1",
+        },
       },
       {
         tenantId: "tenant-1",
@@ -159,9 +163,9 @@ describe("group key", () => {
     it("separates tenants even under a global scope", () => {
       const lane = { kind: "subscriber", name: "ingest" } as const;
       const scope = { kind: "global" } as const;
-      expect(
-        renderGroupKey({ tenantId: "tenant-a", lane, scope }),
-      ).not.toEqual(renderGroupKey({ tenantId: "tenant-b", lane, scope }));
+      expect(renderGroupKey({ tenantId: "tenant-a", lane, scope })).not.toEqual(
+        renderGroupKey({ tenantId: "tenant-b", lane, scope }),
+      );
     });
 
     it("separates lanes of different kinds sharing a name", () => {
@@ -171,9 +175,17 @@ describe("group key", () => {
         aggregateId: "t1",
       } as const;
       expect(
-        renderGroupKey({ tenantId: "t", lane: { kind: "fold", name: "x" }, scope }),
+        renderGroupKey({
+          tenantId: "t",
+          lane: { kind: "fold", name: "x" },
+          scope,
+        }),
       ).not.toEqual(
-        renderGroupKey({ tenantId: "t", lane: { kind: "map", name: "x" }, scope }),
+        renderGroupKey({
+          tenantId: "t",
+          lane: { kind: "map", name: "x" },
+          scope,
+        }),
       );
     });
   });

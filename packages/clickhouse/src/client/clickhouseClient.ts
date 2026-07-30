@@ -26,7 +26,7 @@ import {
   type ClickHouseClient as DriverClient,
 } from "@clickhouse/client";
 import { INVALID_TRACE_ID } from "@langwatch/observability";
-import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
+import { type Span, SpanStatusCode, trace } from "@opentelemetry/api";
 import { decideRetry, type Operation, type WriteTarget } from "./retryPolicy";
 
 export type { WriteTarget } from "./retryPolicy";
@@ -66,8 +66,14 @@ export interface HistogramHandle {
 }
 
 export interface Metrics {
-  counter(spec: { readonly name: string; readonly help: string }): CounterHandle;
-  histogram(spec: { readonly name: string; readonly help: string }): HistogramHandle;
+  counter(spec: {
+    readonly name: string;
+    readonly help: string;
+  }): CounterHandle;
+  histogram(spec: {
+    readonly name: string;
+    readonly help: string;
+  }): HistogramHandle;
 }
 
 /** A metrics implementation that records nothing, so an unwired client still runs. */
@@ -214,9 +220,7 @@ const DURABLE_INSERT_SETTINGS = {
  * positional" section), so the first two entries are always the header when
  * this format was requested.
  */
-function splitHeaderRows(
-  parsed: readonly unknown[],
-): ClickHouseQueryResult {
+function splitHeaderRows(parsed: readonly unknown[]): ClickHouseQueryResult {
   const [names, types, ...rows] = parsed as [
     string[] | undefined,
     string[] | undefined,
@@ -251,7 +255,8 @@ function createNodeTransport(config: {
 
   return {
     async query(request) {
-      const format = (request.format as DataFormat | undefined) ?? DEFAULT_READ_FORMAT;
+      const format =
+        (request.format as DataFormat | undefined) ?? DEFAULT_READ_FORMAT;
       const resultSet = await driver.query({
         query: request.sql,
         query_params: request.params,
@@ -267,7 +272,8 @@ function createNodeTransport(config: {
     },
 
     async *stream(request) {
-      const format = (request.format as DataFormat | undefined) ?? DEFAULT_READ_FORMAT;
+      const format =
+        (request.format as DataFormat | undefined) ?? DEFAULT_READ_FORMAT;
       const resultSet = await driver.query({
         query: request.sql,
         query_params: request.params,
@@ -329,7 +335,9 @@ async function withSpan<T>(
       span.setStatus({ code: SpanStatusCode.OK });
       return result;
     } catch (error) {
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
+      span.recordException(
+        error instanceof Error ? error : new Error(String(error)),
+      );
       span.setStatus({
         code: SpanStatusCode.ERROR,
         message: error instanceof Error ? error.message : String(error),
@@ -361,7 +369,9 @@ async function withSpan<T>(
 function deriveQueryIdFamily(): string {
   const traceId = trace.getActiveSpan()?.spanContext().traceId;
   const unique = randomUUID();
-  return traceId && traceId !== INVALID_TRACE_ID ? `${traceId}-${unique}` : unique;
+  return traceId && traceId !== INVALID_TRACE_ID
+    ? `${traceId}-${unique}`
+    : unique;
 }
 
 function attemptQueryId(family: string, attempt: number): string {
@@ -447,7 +457,8 @@ class TenantBulkhead {
     if (next) {
       // Hand the slot directly to the next waiter (FIFO) rather than
       // decrementing and letting a fresh caller race it for the same slot.
-      if (queue !== undefined && queue.length === 0) this.waiters.delete(tenantId);
+      if (queue !== undefined && queue.length === 0)
+        this.waiters.delete(tenantId);
       next();
       return;
     }
@@ -497,9 +508,10 @@ export interface QueryOptions {
 }
 
 export interface ClickHouseClient {
-  query(
-    options: QueryOptions,
-  ): Promise<{ rows: unknown[][]; header?: { names: string[]; types: string[] } }>;
+  query(options: QueryOptions): Promise<{
+    rows: unknown[][];
+    header?: { names: string[]; types: string[] };
+  }>;
   stream(options: QueryOptions): AsyncIterable<unknown[][]>;
   insert(options: {
     tenantId: string;
@@ -534,13 +546,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function createClickHouseClient(config: ClickHouseClientConfig): ClickHouseClient {
-  const maxOpenConnections = config.maxOpenConnections ?? DEFAULT_MAX_OPEN_CONNECTIONS;
-  const requestTimeoutMs = config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+export function createClickHouseClient(
+  config: ClickHouseClientConfig,
+): ClickHouseClient {
+  const maxOpenConnections =
+    config.maxOpenConnections ?? DEFAULT_MAX_OPEN_CONNECTIONS;
+  const requestTimeoutMs =
+    config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   // Half the pool, and never zero, so the bulkhead is meaningfully below the
   // pool size (ADR-104 §4) even for a caller who never tunes it.
   const maxConcurrentPerTenant =
-    config.maxConcurrentPerTenant ?? Math.max(1, Math.floor(maxOpenConnections / 2));
+    config.maxConcurrentPerTenant ??
+    Math.max(1, Math.floor(maxOpenConnections / 2));
   const metrics = config.observability?.metrics ?? noopMetrics;
 
   const transport =
@@ -576,12 +593,26 @@ export function createClickHouseClient(config: ClickHouseClientConfig): ClickHou
           const queryId = attemptQueryId(queryIdFamily, attempt);
           try {
             const result = await args.attempt(queryId);
-            recordOutcome({ label: args.label, table: args.table, start, outcome: "success" });
+            recordOutcome({
+              label: args.label,
+              table: args.table,
+              start,
+              outcome: "success",
+            });
             return result;
           } catch (error) {
-            const decision = decideRetry({ operation: args.operation, error, attempt });
+            const decision = decideRetry({
+              operation: args.operation,
+              error,
+              attempt,
+            });
             if (!decision.retry) {
-              recordOutcome({ label: args.label, table: args.table, start, outcome: "error" });
+              recordOutcome({
+                label: args.label,
+                table: args.table,
+                start,
+                outcome: "error",
+              });
               throw new ClickHouseOperationError(
                 `ClickHouse ${args.label} failed: ${decision.reason}`,
                 {
@@ -607,8 +638,15 @@ export function createClickHouseClient(config: ClickHouseClientConfig): ClickHou
     start: number;
     outcome: "success" | "error";
   }): void {
-    const labels = { operation: args.label, table: args.table ?? "unknown", outcome: args.outcome };
-    operationMetrics.duration.observe((performance.now() - args.start) / 1000, labels);
+    const labels = {
+      operation: args.label,
+      table: args.table ?? "unknown",
+      outcome: args.outcome,
+    };
+    operationMetrics.duration.observe(
+      (performance.now() - args.start) / 1000,
+      labels,
+    );
     operationMetrics.total.inc(labels);
   }
 

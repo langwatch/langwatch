@@ -1,8 +1,18 @@
-import { createClient, type ClickHouseClient as DriverClient } from "@clickhouse/client";
+import {
+  createClient,
+  type ClickHouseClient as DriverClient,
+} from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { readTestClickHouseInfo, uniqueId } from "../__tests__/integration/testClickHouse";
+import {
+  readTestClickHouseInfo,
+  uniqueId,
+} from "../__tests__/integration/testClickHouse";
 import { ch } from "../schema/columns";
-import { createRowCodec, WireShapeMismatchError, type WireColumn } from "./rowCodec";
+import {
+  createRowCodec,
+  type WireColumn,
+  WireShapeMismatchError,
+} from "./rowCodec";
 
 /**
  * The codec's `WithNamesAndTypes` header check exists so a migration that
@@ -54,7 +64,13 @@ describe("given a live column type change", () => {
     // mutation semantics.
     await client.insert({
       table: tableName,
-      values: [{ TenantId: tenantId, AcceptedAt: "2026-01-01 00:00:00.000", Value: "42" }],
+      values: [
+        {
+          TenantId: tenantId,
+          AcceptedAt: "2026-01-01 00:00:00.000",
+          Value: "42",
+        },
+      ],
       format: "JSONEachRow",
     });
 
@@ -63,7 +79,13 @@ describe("given a live column type change", () => {
 
     // Reading through the codec against the column's original type succeeds,
     // establishing the baseline the ALTER below is a change from.
-    const before = await readOneRow({ client, tableName, tenantId, codec, valueColumn: stringColumn });
+    const before = await readOneRow({
+      client,
+      tableName,
+      tenantId,
+      codec,
+      valueColumn: stringColumn,
+    });
     expect(before).toEqual({ TenantId: tenantId, Value: "42" });
 
     // `mutations_sync: "1"` makes the ALTER block until the mutation
@@ -77,7 +99,13 @@ describe("given a live column type change", () => {
 
     let caught: unknown;
     try {
-      await readOneRow({ client, tableName, tenantId, codec, valueColumn: stringColumn });
+      await readOneRow({
+        client,
+        tableName,
+        tenantId,
+        codec,
+        valueColumn: stringColumn,
+      });
     } catch (error) {
       caught = error;
     }
@@ -107,7 +135,11 @@ async function readOneRow(args: {
     format: "JSONCompactEachRowWithNamesAndTypes",
   });
   const parsed = await resultSet.json<unknown[]>();
-  const [names, types, ...rows] = parsed as [string[], string[], ...unknown[][]];
+  const [names, types, ...rows] = parsed as [
+    string[],
+    string[],
+    ...unknown[][],
+  ];
 
   const [decoded] = args.codec.decodeRows<Record<string, unknown>>({
     columns: [ch.string(), args.valueColumn],

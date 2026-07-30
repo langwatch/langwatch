@@ -169,7 +169,12 @@ export function decideRetry(args: {
   attempt: number;
   maxAttempts?: number;
 }): RetryDecision {
-  const { operation, error, attempt, maxAttempts = DEFAULT_MAX_ATTEMPTS } = args;
+  const {
+    operation,
+    error,
+    attempt,
+    maxAttempts = DEFAULT_MAX_ATTEMPTS,
+  } = args;
 
   if (!isTransientTransportError(error)) {
     return {
@@ -193,7 +198,11 @@ export function decideRetry(args: {
 
   return {
     retry: true,
-    afterMs: fullJitterBackoff({ attempt, baseDelayMs: BASE_DELAY_MS, maxDelayMs: MAX_DELAY_MS }),
+    afterMs: fullJitterBackoff({
+      attempt,
+      baseDelayMs: BASE_DELAY_MS,
+      maxDelayMs: MAX_DELAY_MS,
+    }),
     attempt: attempt + 1,
   };
 }

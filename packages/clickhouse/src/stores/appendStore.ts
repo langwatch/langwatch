@@ -17,9 +17,13 @@
 
 import type { AppendStore, BatchContext } from "@langwatch/event-sourcing";
 import type { ClickHouseClient, WriteTarget } from "../client/clickhouseClient";
+import {
+  type AnyWireColumn,
+  createRowCodec,
+  type WireCodec,
+} from "../codec/rowCodec";
 import type { ColumnMap } from "../schema/columns";
 import type { TableDefinition, TableRow } from "../schema/defineTable";
-import { createRowCodec, type AnyWireColumn, type WireCodec } from "../codec/rowCodec";
 
 /**
  * Thrown at construction when a `clickhouseAppend` call targets a table this
@@ -33,10 +37,7 @@ export class AppendStoreConfigurationError extends Error {
 }
 
 /** What `clickhouseAppend` needs to wire an `AppendStore<Rec>` onto one table. */
-export interface ClickHouseAppendArgs<
-  Rec,
-  Columns extends ColumnMap,
-> {
+export interface ClickHouseAppendArgs<Rec, Columns extends ColumnMap> {
   readonly client: ClickHouseClient;
   /** Must declare `merge: append()` or `merge: replacing({ version })` (ADR-099). */
   readonly table: TableDefinition<Columns>;
@@ -61,10 +62,9 @@ export interface ClickHouseAppendArgs<
  * exactly what `MergeStore` — not this adapter — requires at the type level
  * (ADR-099).
  */
-export function clickhouseAppend<
-  Rec,
-  Columns extends ColumnMap,
->(args: ClickHouseAppendArgs<Rec, Columns>): AppendStore<Rec> {
+export function clickhouseAppend<Rec, Columns extends ColumnMap>(
+  args: ClickHouseAppendArgs<Rec, Columns>,
+): AppendStore<Rec> {
   const { client, table, toRow } = args;
   const codec = args.codec ?? createRowCodec();
 
@@ -95,7 +95,10 @@ export function clickhouseAppend<
   return {
     kind: "append",
 
-    async writeBatch(records: readonly Rec[], context: BatchContext): Promise<void> {
+    async writeBatch(
+      records: readonly Rec[],
+      context: BatchContext,
+    ): Promise<void> {
       if (records.length === 0) return;
 
       const rows = records.map((record) => toRow(record, context));

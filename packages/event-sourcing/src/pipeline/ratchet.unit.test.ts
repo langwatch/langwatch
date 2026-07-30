@@ -12,7 +12,9 @@ describe("checkTypeStringRatchet", () => {
     /** @scenario a new event type on an existing declaration is free */
     it("reports nothing when it also declares a further type string", () => {
       const snapshot = { trace: ["trace/span_received"] };
-      const current = { trace: ["trace/span_received", "trace/topic_assigned"] };
+      const current = {
+        trace: ["trace/span_received", "trace/topic_assigned"],
+      };
       expect(checkTypeStringRatchet({ snapshot, current })).toEqual([]);
     });
   });
@@ -83,7 +85,9 @@ describe("mergeSnapshot", () => {
     /** @scenario the committed file gains only what was added */
     it("carries every type string from both, deduplicated", () => {
       const snapshot = { trace: ["trace/span_received"] };
-      const current = { trace: ["trace/span_received", "trace/topic_assigned"] };
+      const current = {
+        trace: ["trace/span_received", "trace/topic_assigned"],
+      };
 
       expect(mergeSnapshot({ snapshot, current })).toEqual({
         trace: ["trace/span_received", "trace/topic_assigned"],
@@ -104,7 +108,9 @@ describe("mergeSnapshot", () => {
     /** @scenario a merge that changes nothing produces a byte-identical result */
     it("produces an unchanged result when merged again against its own output", () => {
       const snapshot = { trace: ["trace/span_received"] };
-      const current = { trace: ["trace/span_received", "trace/topic_assigned"] };
+      const current = {
+        trace: ["trace/span_received", "trace/topic_assigned"],
+      };
 
       const once = mergeSnapshot({ snapshot, current });
       const twice = mergeSnapshot({ snapshot: once, current: once });

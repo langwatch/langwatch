@@ -1,10 +1,5 @@
-export {
-  HandledError,
-  NotFoundError,
-  ValidationError,
-  handledErrorFromHerr,
-  setTraceUrlProvider,
-} from "./handled-error";
+export type { GoErrorCode, NodeErrorCode } from "./codes.generated";
+export { goErrorCodes, nodeErrorCodes } from "./codes.generated";
 export type {
   HandledErrorFault,
   HandledErrorOptions,
@@ -14,5 +9,10 @@ export type {
   TraceUrlProvider,
   ZodLikeError,
 } from "./handled-error";
-export { goErrorCodes, nodeErrorCodes } from "./codes.generated";
-export type { GoErrorCode, NodeErrorCode } from "./codes.generated";
+export {
+  HandledError,
+  handledErrorFromHerr,
+  NotFoundError,
+  setTraceUrlProvider,
+  ValidationError,
+} from "./handled-error";

@@ -111,8 +111,7 @@ export function checkOrderInvariance<State, Event>(args: {
     };
   }
 
-  const orders =
-    n <= 5 ? allPermutations(n) : sampledPermutations(n, cap);
+  const orders = n <= 5 ? allPermutations(n) : sampledPermutations(n, cap);
   const capped = orders.slice(0, cap);
 
   let checked = 1;
@@ -286,7 +285,7 @@ function structuralEquals(a: unknown, b: unknown): boolean {
   if (aKeys.length !== bKeys.length) return false;
   return aKeys.every(
     (key) =>
-      Object.prototype.hasOwnProperty.call(bRecord, key) &&
+      Object.hasOwn(bRecord, key) &&
       structuralEquals(aRecord[key], bRecord[key]),
   );
 }

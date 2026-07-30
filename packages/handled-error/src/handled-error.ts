@@ -238,7 +238,7 @@ export abstract class HandledError extends Error {
     ) => T,
     error: unknown,
   ): error is T {
-    return error instanceof this;
+    return error instanceof HandledError;
   }
 
   /**

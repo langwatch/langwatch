@@ -175,7 +175,10 @@ export function parseGroupKey(rendered: string): GroupKey {
   const lane: Lane = isSerialisedCommand
     ? { kind: "command" }
     : parseNamedLane(rendered, laneKind, segments[2]);
-  const scope = parseScope(rendered, segments.slice(isSerialisedCommand ? 2 : 3));
+  const scope = parseScope(
+    rendered,
+    segments.slice(isSerialisedCommand ? 2 : 3),
+  );
 
   return { tenantId: unescapeSegment(rawTenant), lane, scope };
 }
@@ -208,7 +211,10 @@ function parseScope(rendered: string, segments: string[]): Scope {
     case "agg": {
       const [type, id] = rest;
       if (type === undefined || id === undefined) {
-        throw new MalformedGroupKeyError(rendered, "aggregate scope needs 2 parts");
+        throw new MalformedGroupKeyError(
+          rendered,
+          "aggregate scope needs 2 parts",
+        );
       }
       return {
         kind: "aggregate",

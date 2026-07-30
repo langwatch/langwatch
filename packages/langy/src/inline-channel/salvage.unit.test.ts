@@ -24,9 +24,17 @@ describe("salvageJsonText", () => {
     const repairs: Array<[string, string, unknown]> = [
       ["unclosed object", '{"a": 1', { a: 1 }],
       ["unclosed array", '{"a": [1, 2', { a: [1, 2] }],
-      ["deeply unclosed nesting", '{"a": {"b": [{"c": 1', { a: { b: [{ c: 1 }] } }],
+      [
+        "deeply unclosed nesting",
+        '{"a": {"b": [{"c": 1',
+        { a: { b: [{ c: 1 }] } },
+      ],
       ["truncated mid-string value", '{"a": "hel', { a: "hel" }],
-      ["truncated mid-string with escape dangling", '{"a": "hel\\', { a: "hel" }],
+      [
+        "truncated mid-string with escape dangling",
+        '{"a": "hel\\',
+        { a: "hel" },
+      ],
       ["truncated mid-unicode-escape", '{"a": "x\\u00', { a: "x" }],
       ["truncated mid-array element", '{"a": [1, 2, tr', { a: [1, 2] }],
       ["truncated mid-literal value", '{"a": fal', {}],
@@ -113,15 +121,17 @@ describe("salvageLangyDerivedCard", () => {
   });
 
   describe("when the block claims a kind outside the derived-safe allowlist", () => {
-    it.each([["traces"], ["evalRun"], ["resourceCreated"], ["metrics"]])(
-      "refuses a %s block as invalid",
-      (kind) => {
-        const result = salvageLangyDerivedCard(
-          `{"kind": "${kind}", "blockId": "b1", "items": []}`,
-        );
-        expect(result).toEqual({ ok: false, reason: "invalid" });
-      },
-    );
+    it.each([
+      ["traces"],
+      ["evalRun"],
+      ["resourceCreated"],
+      ["metrics"],
+    ])("refuses a %s block as invalid", (kind) => {
+      const result = salvageLangyDerivedCard(
+        `{"kind": "${kind}", "blockId": "b1", "items": []}`,
+      );
+      expect(result).toEqual({ ok: false, reason: "invalid" });
+    });
   });
 
   describe("when the content cannot be salvaged at all", () => {

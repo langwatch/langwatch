@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   feedLangyDerivedCardPreview,
   initialLangyDerivedCardPreview,
-  reconcileLangyDerivedCardPreviews,
   type LangyDerivedCardPreview,
+  reconcileLangyDerivedCardPreviews,
 } from "./preview";
 
 /** Feed a sequence of cumulative buffers, as the stream would. */
@@ -56,10 +56,7 @@ describe("feedLangyDerivedCardPreview", () => {
       const withGood = feedAll([good]);
       expect(withGood.card?.kind).toBe("stats");
 
-      const broken = feedLangyDerivedCardPreview(
-        withGood,
-        '{"kind": "st',
-      );
+      const broken = feedLangyDerivedCardPreview(withGood, '{"kind": "st');
       expect(broken.card).toEqual(withGood.card);
       expect(broken.raw).toBe('{"kind": "st');
     });

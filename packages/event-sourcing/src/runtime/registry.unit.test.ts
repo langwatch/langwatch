@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { ConfigurationError } from "../errors";
 import { definePipeline } from "../pipeline/definePipeline";
-import { checkTypeStringRatchet, snapshotFromRegistry } from "../pipeline/ratchet";
-import type { ReplaceStore, StateRead, StoredState } from "../projections/store.types";
+import {
+  checkTypeStringRatchet,
+  snapshotFromRegistry,
+} from "../pipeline/ratchet";
+import type {
+  ReplaceStore,
+  StateRead,
+  StoredState,
+} from "../projections/store.types";
 import { createRegistry } from "./registry";
 
 /**
@@ -60,8 +67,16 @@ function fullPipeline() {
     .withProcessManager("settlement", {
       state: z.object({}),
       init: () => ({}),
-      intents: { notify: { payload: z.object({}), messageKey: () => "x", deliver: () => undefined } },
-      on: { spanReceived: (state) => ({ state, intents: [], nextWakeAt: null }) },
+      intents: {
+        notify: {
+          payload: z.object({}),
+          messageKey: () => "x",
+          deliver: () => undefined,
+        },
+      },
+      on: {
+        spanReceived: (state) => ({ state, intents: [], nextWakeAt: null }),
+      },
     })
     .build();
 }
@@ -100,11 +115,15 @@ describe("createRegistry", () => {
     /** @scenario two pipelines deriving the same event type string is refused, naming both */
     it("refuses a second, independently built pipeline deriving the identical event type", () => {
       const registry = createRegistry();
-      registry.register(definePipeline("trace").events({ spanReceived }).build());
+      registry.register(
+        definePipeline("trace").events({ spanReceived }).build(),
+      );
 
       let caught: unknown;
       try {
-        registry.register(definePipeline("trace").events({ spanReceived }).build());
+        registry.register(
+          definePipeline("trace").events({ spanReceived }).build(),
+        );
       } catch (error) {
         caught = error;
       }
@@ -156,7 +175,10 @@ describe("createRegistry", () => {
 
       let caught: unknown;
       try {
-        built.aggregateIdFor("trace/spanReceived", { traceId: "t1", spanId: "s1" });
+        built.aggregateIdFor("trace/spanReceived", {
+          traceId: "t1",
+          spanId: "s1",
+        });
       } catch (error) {
         caught = error;
       }
@@ -178,12 +200,18 @@ describe("createRegistry", () => {
         })
         .build();
 
-      expect(built.aggregateIdFor("trace/spanReceived", { traceId: "t1", spanId: "s1" })).toBe(
-        "span:t1",
-      );
-      expect(built.aggregateIdFor("trace/topicAssigned", { traceId: "t1", topic: "billing" })).toBe(
-        "topic:t1",
-      );
+      expect(
+        built.aggregateIdFor("trace/spanReceived", {
+          traceId: "t1",
+          spanId: "s1",
+        }),
+      ).toBe("span:t1");
+      expect(
+        built.aggregateIdFor("trace/topicAssigned", {
+          traceId: "t1",
+          topic: "billing",
+        }),
+      ).toBe("topic:t1");
     });
   });
 
@@ -209,7 +237,9 @@ describe("createRegistry", () => {
       const snapshot = snapshotFromRegistry(before);
 
       const after = createRegistry();
-      after.register(definePipeline("trace").events({ spanReceived, topicAssigned }).build());
+      after.register(
+        definePipeline("trace").events({ spanReceived, topicAssigned }).build(),
+      );
       const current = snapshotFromRegistry(after);
 
       expect(checkTypeStringRatchet({ snapshot, current })).toEqual([]);
@@ -230,7 +260,10 @@ describe("createRegistry", () => {
       const registry = createRegistry();
       registry.register(tracePipeline());
       expect(registry.all()).toEqual([
-        { pipeline: expect.objectContaining({ name: "trace" }), aggregateType: "trace" },
+        {
+          pipeline: expect.objectContaining({ name: "trace" }),
+          aggregateType: "trace",
+        },
       ]);
     });
 
@@ -249,12 +282,18 @@ describe("createRegistry", () => {
       const registry = createRegistry();
       registry.register(fullPipeline());
 
-      expect(registry.foldsFor("trace/spanReceived").map((m) => m.name)).toEqual(["summary"]);
-      expect(registry.mapsFor("trace/spanReceived").map((m) => m.name)).toEqual(["spans"]);
-      expect(registry.subscribersFor("trace/spanReceived").map((m) => m.name)).toEqual(["audit"]);
-      expect(registry.processManagersFor("trace/spanReceived").map((m) => m.name)).toEqual([
-        "settlement",
-      ]);
+      expect(
+        registry.foldsFor("trace/spanReceived").map((m) => m.name),
+      ).toEqual(["summary"]);
+      expect(registry.mapsFor("trace/spanReceived").map((m) => m.name)).toEqual(
+        ["spans"],
+      );
+      expect(
+        registry.subscribersFor("trace/spanReceived").map((m) => m.name),
+      ).toEqual(["audit"]);
+      expect(
+        registry.processManagersFor("trace/spanReceived").map((m) => m.name),
+      ).toEqual(["settlement"]);
 
       expect(registry.foldsFor("trace/unknown")).toEqual([]);
       expect(registry.mapsFor("trace/unknown")).toEqual([]);

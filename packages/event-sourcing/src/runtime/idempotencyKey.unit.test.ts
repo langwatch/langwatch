@@ -65,7 +65,9 @@ describe("a committed event's idempotency key", () => {
         tenantId: "project-1",
       });
 
-      expect(second.events[0]?.idempotencyKey).toBe(first.events[0]?.idempotencyKey);
+      expect(second.events[0]?.idempotencyKey).toBe(
+        first.events[0]?.idempotencyKey,
+      );
       // The in-memory log dedupes on the deployed sort key's tuple.
       expect(eventLog.rows).toHaveLength(1);
     });

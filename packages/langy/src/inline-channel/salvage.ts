@@ -18,11 +18,12 @@
  * The relay stamps and the client previews through this same module, so the
  * two runtimes repair identically.
  */
-import { langyDerivedCardSchema, type LangyDerivedCard } from "../cards/derived-safe.js";
+import {
+  type LangyDerivedCard,
+  langyDerivedCardSchema,
+} from "../cards/derived-safe.js";
 
-export type LangySalvageResult =
-  | { ok: true; value: unknown }
-  | { ok: false };
+export type LangySalvageResult = { ok: true; value: unknown } | { ok: false };
 
 /** How one tolerant parse step ended. */
 type Step =
@@ -251,7 +252,9 @@ export type LangyDerivedCardParseResult =
  * repaired document STRICTLY against the closed derived-safe allowlist. The relay
  * stamps with this; the client previews with this; nothing else re-decides.
  */
-export function salvageLangyDerivedCard(raw: string): LangyDerivedCardParseResult {
+export function salvageLangyDerivedCard(
+  raw: string,
+): LangyDerivedCardParseResult {
   const salvaged = salvageJsonText(raw);
   if (!salvaged.ok) return { ok: false, reason: "unsalvageable" };
   const parsed = langyDerivedCardSchema.safeParse(salvaged.value);

@@ -89,7 +89,7 @@ describe("redactSecretsInText", () => {
 
   describe("given an input larger than the scan budget", () => {
     it("returns it untouched", () => {
-      const input = "AKIAIOSFODNN7EXAMPLE " + "x".repeat(250_001);
+      const input = `AKIAIOSFODNN7EXAMPLE ${"x".repeat(250_001)}`;
       const { text, redactedCount } = redact(input);
       expect(text).toBe(input);
       expect(redactedCount).toBe(0);
@@ -182,7 +182,7 @@ describe("detectSecretsInText", () => {
       const input = "key sk-proj-aB3dEf_gHi-jKlMnOpQrStUvWx0123456789xY here";
       const matches = detectSecretsInText({ text: input });
       expect(matches).toHaveLength(1);
-      expect(matches[0]!.ruleId).toBe("provider_api_key");
+      expect(matches[0]?.ruleId).toBe("provider_api_key");
       // The detector never mutates the input.
       expect(input).toContain("sk-proj-");
     });
@@ -206,7 +206,7 @@ describe("detectSecretsInText", () => {
         customPatterns: custom,
       });
       expect(matches).toHaveLength(1);
-      expect(matches[0]!.ruleId).toBe("custom_pattern");
+      expect(matches[0]?.ruleId).toBe("custom_pattern");
     });
   });
 

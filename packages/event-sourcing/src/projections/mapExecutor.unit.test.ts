@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { createMapExecutor } from "./mapExecutor";
-import type {
-  AppendStore,
-  BatchContext,
-  MergeStore,
-} from "./store.types";
 import type { Metrics } from "../ports/metrics";
+import { createMapExecutor } from "./mapExecutor";
+import type { AppendStore, BatchContext, MergeStore } from "./store.types";
 
 interface TestEvent {
   readonly id: string;
@@ -42,8 +38,7 @@ function fakeMetrics(): Metrics & {
     labels?: Record<string, string>;
   }>;
 } {
-  const incCalls: Array<{ name: string; labels?: Record<string, string> }> =
-    [];
+  const incCalls: Array<{ name: string; labels?: Record<string, string> }> = [];
   const observeCalls: Array<{
     name: string;
     value: number;

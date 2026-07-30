@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { BatchContext } from "@langwatch/event-sourcing";
+import { z } from "zod";
 import type { AnyColumnDef, ColumnMap } from "../schema/columns";
 import type { TableDefinition, TableRow } from "../schema/defineTable";
 
@@ -303,7 +303,8 @@ function encodeValue(args: {
   // in state stays a `bigint` and a 64-bit id never loses precision.
   if (unwrap(args.schema) instanceof z.ZodNumber) {
     if (isDateColumn(column.chType)) return new Date(value as number);
-    if (isBigIntColumn(column.chType)) return BigInt(Math.round(value as number));
+    if (isBigIntColumn(column.chType))
+      return BigInt(Math.round(value as number));
   }
   if (
     isMapColumn(column.chType) &&

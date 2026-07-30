@@ -1,5 +1,5 @@
-import { config } from "dotenv";
 import { join } from "node:path";
+import { config } from "dotenv";
 import { defineConfig } from "vitest/config";
 
 // This package has no `.env` of its own — `LANGWATCH_TEST_CLICKHOUSE_URL`

@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   DERIVED_SAFE_CARD_KINDS,
+  type DerivedSafeCardKind,
   isDerivedSafeCardKind,
   langyDerivedCardSchema,
   langyDerivedChoicesCardSchema,
-  type DerivedSafeCardKind,
 } from "./derived-safe.js";
 import { CARD_KINDS, CARD_SHAPE } from "./schemas.js";
 
@@ -265,7 +265,8 @@ describe("langyDerivedChoicesCardSchema", () => {
   describe("given an empty options list", () => {
     it("refuses the card", () => {
       expect(
-        langyDerivedChoicesCardSchema.safeParse({ ...choices, options: [] }).success,
+        langyDerivedChoicesCardSchema.safeParse({ ...choices, options: [] })
+          .success,
       ).toBe(false);
     });
   });

@@ -67,14 +67,14 @@
 import * as z from "zod/v4";
 
 import {
-  CARD_SHAPE,
+  type CARD_SHAPE,
+  type CardKind,
   choicesCardFields,
   statsCardFields,
   tableCardFields,
   timeseriesComparisonFields,
   timeseriesPointFields,
   timeseriesUnitSchema,
-  type CardKind,
 } from "./schemas.js";
 
 /**
