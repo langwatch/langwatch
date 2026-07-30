@@ -108,9 +108,7 @@ describe("validateProviderApiKey for google_agent_platform", () => {
     // Three separate cases, not one covering both fields at once: an `||`
     // guard degrading to `&&` would still return no candidates when BOTH
     // are missing, and only a case with exactly one present catches that.
-    const expectUnreachable = async (
-      credentials: Record<string, string>,
-    ) => {
+    const expectUnreachable = async (credentials: Record<string, string>) => {
       mockFetch.mockResolvedValue(generated());
 
       await expect(
@@ -123,25 +121,28 @@ describe("validateProviderApiKey for google_agent_platform", () => {
     };
 
     /** @scenario A credential missing its project or location is not probed at all */
-    it("is unreachable when both project and location are missing", async () => {
+    it("rejects the check without probing when both project and location are missing", async () => {
       await expectUnreachable({
-        GOOGLE_AGENT_PLATFORM_API_KEY: CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+        GOOGLE_AGENT_PLATFORM_API_KEY:
+          CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
       });
     });
 
     /** @scenario A credential missing its project or location is not probed at all */
-    it("is unreachable when only the location is missing", async () => {
+    it("rejects the check without probing when only the location is missing", async () => {
       await expectUnreachable({
-        GOOGLE_AGENT_PLATFORM_API_KEY: CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+        GOOGLE_AGENT_PLATFORM_API_KEY:
+          CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
         GOOGLE_AGENT_PLATFORM_PROJECT:
           CREDENTIALS.GOOGLE_AGENT_PLATFORM_PROJECT,
       });
     });
 
     /** @scenario A credential missing its project or location is not probed at all */
-    it("is unreachable when only the project is missing", async () => {
+    it("rejects the check without probing when only the project is missing", async () => {
       await expectUnreachable({
-        GOOGLE_AGENT_PLATFORM_API_KEY: CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
+        GOOGLE_AGENT_PLATFORM_API_KEY:
+          CREDENTIALS.GOOGLE_AGENT_PLATFORM_API_KEY,
         GOOGLE_AGENT_PLATFORM_LOCATION:
           CREDENTIALS.GOOGLE_AGENT_PLATFORM_LOCATION,
       });
