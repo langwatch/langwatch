@@ -31,11 +31,12 @@ interface Vectors {
 }
 
 // Single source of truth, shared with the Go suite. cwd under vitest is
-// `langwatch/`, so the repo-root `specs/` dir is one level up.
+// `platform/app/`, so the repo-root `specs/` dir is two levels up.
 const VECTORS: Vectors = JSON.parse(
   readFileSync(
     resolve(
       process.cwd(),
+      "..",
       "..",
       "specs",
       "langy",

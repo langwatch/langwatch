@@ -47,6 +47,11 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    # The repo-root go.work targets a newer Go than the SDK's floor (see
+    # sdk-go-cd.yml); the SDK must build standalone at its declared go
+    # directive, so ignore the workspace for every step in this job.
+    env:
+      GOWORK: "off"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
@@ -110,6 +115,10 @@ jobs:
       && (github.event_name != 'pull_request_target'
           || github.event.label.name == 'approved-ci')
     runs-on: ubuntu-latest
+    # See the `test` job above: ignore the repo-root go.work so the SDK
+    # builds standalone at its own declared go directive.
+    env:
+      GOWORK: "off"
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
         with:
