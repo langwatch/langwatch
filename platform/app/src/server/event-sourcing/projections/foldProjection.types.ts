@@ -259,6 +259,20 @@ export interface FoldProjectionStore<State> {
    */
   readonly projectionVersion?: string;
 
+  /**
+   * Whether refusing a committed row is possible for this store, and therefore
+   * whether the executor must be able to rebuild the aggregate it refused.
+   *
+   * DECLARED BY THE STORE, because the store is the thing that owns the gate. A
+   * store built by `defineFoldStore` sets it, so a gate and the rebuild it needs
+   * arrive together and cannot be separated by an edit to the fold's options in
+   * a different file — which is exactly how `assertUndecodableIsRecoverable`
+   * came to be needed at runtime. Where it is set, it supersedes
+   * `FoldProjectionOptions.refoldOnStoreMiss`, which remains for the stores that
+   * still hand-roll their gate.
+   */
+  readonly refoldsOnMiss?: boolean;
+
   /** Persists the current fold state for an aggregate. */
   store(state: State, context: ProjectionStoreContext): Promise<void>;
 

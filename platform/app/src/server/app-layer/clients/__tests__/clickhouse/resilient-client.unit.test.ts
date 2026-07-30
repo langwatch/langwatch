@@ -390,8 +390,8 @@ describe("createResilientClickHouseClient()", () => {
     });
   });
 
-  describe("when a query cold-scans a time-partitioned table", () => {
-    it("logs a cold-scan warning naming the table", async () => {
+  describe("when a query breaks a ClickHouse convention", () => {
+    it("warns naming the table and the rule", async () => {
       const queryResult = { response_headers: {} };
       const mock = makeMockClient({
         query: vi.fn().mockResolvedValue(queryResult),
@@ -407,12 +407,12 @@ describe("createResilientClickHouseClient()", () => {
         expect.objectContaining({
           source: "clickhouse",
           operation: "query",
-          coldScan: true,
-          coldScanTable: "stored_spans",
+          conventionViolations: [
+            { table: "stored_spans", rule: "partition_predicate" },
+          ],
         }),
-        expect.stringContaining("cold scan of stored_spans"),
+        expect.stringContaining("stored_spans partition_predicate"),
       );
-      expect(mockQueryLogger.debug).not.toHaveBeenCalled();
     });
   });
 

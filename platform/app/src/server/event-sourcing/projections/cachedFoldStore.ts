@@ -181,6 +181,15 @@ export class CachedFoldStore<State> implements FoldProjectionStore<State> {
    */
   readonly projectionVersion?: string;
 
+  /**
+   * Forwarded for the same reason as the version: the executor reads it off the
+   * store the projection holds, which is this wrapper. Left to stop here, a
+   * store whose gate can refuse a row would look to the executor like a store
+   * that never refuses one — and the rebuild that makes refusing safe would
+   * never be armed.
+   */
+  readonly refoldsOnMiss?: boolean;
+
   constructor(
     private readonly inner: FoldProjectionStore<State>,
     private readonly cache: FoldCacheClient,
@@ -190,6 +199,7 @@ export class CachedFoldStore<State> implements FoldProjectionStore<State> {
     this.ttlSeconds = options.ttlSeconds ?? resolveFoldCacheTtlSeconds();
     this.updatedAtOf = options.updatedAtOf ?? readUpdatedAt;
     this.projectionVersion = options.version ?? inner.projectionVersion;
+    this.refoldsOnMiss = inner.refoldsOnMiss;
   }
 
   async get(

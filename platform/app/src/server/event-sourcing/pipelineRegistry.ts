@@ -90,8 +90,7 @@ import {
   createEvaluationProcessingPipeline,
   type EvaluationProcessingPipelineDeps,
 } from "./pipelines/evaluation-processing/pipeline";
-import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
-import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
+import { evaluationAnalyticsFoldStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
 import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
@@ -625,17 +624,18 @@ export class PipelineRegistry {
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
-        // Redis cache is the eval slim fold's warm read path; a miss now falls
+        // Redis cache is the eval slim fold's warm read path; a miss falls
         // through to the store's own ClickHouse read-back (ADR-066, migration
-        // 00056) rather than re-folding the event log. Same wiring as
-        // trace_analytics.
-        evaluationAnalyticsStore: new CachedFoldStore<EvaluationAnalyticsData>(
-          new EvaluationAnalyticsStore(
-            this.deps.repositories.evaluationAnalytics,
-          ),
-          this.deps.foldCacheClient,
-          { keyPrefix: "evaluation_analytics" },
-        ),
+        // 00056) rather than re-folding the event log.
+        //
+        // `cached()` is the only shape the library offers, deliberately: the
+        // cache tier is part of the storage design rather than something a
+        // composition site assembles. Assembling it by hand is what let five
+        // stores drift into four different read-back gates.
+        evaluationAnalyticsStore: evaluationAnalyticsFoldStore.cached({
+          repository: this.deps.repositories.evaluationAnalytics,
+          cache: this.deps.foldCacheClient,
+        }),
         evaluationAnalyticsRollupAppendStore:
           new EvaluationAnalyticsRollupAppendStore(
             this.deps.repositories.evaluationAnalyticsRollup,

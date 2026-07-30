@@ -104,6 +104,24 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST = "2026-07-28";
 export const CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP = "2026-07-21";
 
 /**
+ * The stamp WITHDRAWN by the 2026-07-28 bump.
+ *
+ * Its rows are perfectly readable — they carry every read-back column, in the
+ * current shape — and they are refused anyway, because what they RECORD is
+ * wrong: they were folded by the one-sided logs-only gate, so a Cowork session
+ * that also exported spans counted every turn twice. Refusing them is what
+ * rebuilds them.
+ *
+ * Named as its own generation rather than left implicit in a gate, because a
+ * withdrawn shape is not the same thing as an old one. An old shape sits below
+ * the decoder's floor and everything above it is readable; this one is a hole
+ * with readable shapes on BOTH sides — {@link
+ * CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP} below it is still decoded,
+ * and {@link CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST} above it is too.
+ */
+export const CODING_AGENT_SESSION_PROJECTION_VERSION_WITHDRAWN = "2026-07-27";
+
+/**
  * How far a session's StartedAt (the table's partition column) may drift from
  * the business time a read is anchored on — a folded event's occurredAt, or a
  * trace-session mapping's timestamp. Sessions run for hours and a late signal
@@ -176,25 +194,25 @@ export class CodingAgentSessionFoldProjection
    * round-trips the full working state, so `get()` returns it and, in steady
    * state, nothing on the delivery path reads `event_log`.
    *
-   * `refoldOnStoreMiss: true` — a schema-gated TRANSITIONAL net, not the old
-   * continuity mechanism. A row written before the 00053/00054 read-back columns
-   * existed decodes every one of them as a column default it cannot tell apart
-   * from a real value, so the store reports a miss and this option rebuilds that
-   * aggregate from `event_log` — once. The rebuild is rewritten at the current
-   * version, so the row hits from then on and the whole population self-heals
-   * with no backfill migration. In steady state `store.get()` hits and nothing
-   * refolds. Without the gate a stale row would collapse the metric-fed totals
-   * to whatever series arrived next, reset the sub-agent count to one, scramble
-   * the step sequence into arrival order, and blind the cache-rebuild detector
-   * for one model call.
+   * The store-miss rebuild is NOT declared here. It is a consequence of the
+   * store's generation ladder, not a choice this fold makes: a store that can
+   * refuse a committed row must be able to rebuild the one it refused, so
+   * `defineFoldStore` arms it in the same declaration as the gate and the two
+   * cannot be separated by an edit to this file. A row written before the
+   * 00053/00054 read-back columns existed decodes every one of them as a column
+   * default it cannot tell apart from a real value — collapsing the metric-fed
+   * totals to whatever series arrives next, resetting the sub-agent count to
+   * one, scrambling the step sequence into arrival order and blinding the
+   * cache-rebuild detector for one model call — so the store refuses it, it is
+   * rebuilt from `event_log` once, rewritten at the current stamp, and read back
+   * from then on. `es_fold_refold_on_miss_total{projection_name="codingAgentSession"}`
+   * is what says when that transitional net has stopped firing.
    *
-   * The gate is deliberately NOT "current stamp only": 00053 and 00054 shipped
+   * The ladder is deliberately NOT "current stamp only": 00053 and 00054 shipped
    * without bumping the version, so the pre-bump stamp covers rows on both sides
-   * of the column change and the store uses the `LastEventOccurredAt` checkpoint
-   * to tell them apart. Rejecting the whole stamp would refold a large live
-   * population for nothing — see `CodingAgentSessionStore.getWithApplied`.
-   * `es_fold_refold_on_miss_total{projection_name="codingAgentSession"}` is what
-   * says when this net has stopped firing and can come out.
+   * of the column change and the row's own `LastEventOccurredAt` checkpoint is
+   * the evidence that tells them apart. Refusing the whole stamp would rebuild a
+   * large live population for nothing — see `codingAgentSessionFoldStore`.
    *
    * `coalesceMaxBatch` — see `CODING_AGENT_SESSION_COALESCE_MAX_BATCH`.
    *
@@ -212,7 +230,6 @@ export class CodingAgentSessionFoldProjection
    * executor retries a windowed miss without the window.
    */
   override options: FoldProjectionOptions = {
-    refoldOnStoreMiss: true,
     refoldOnOutOfOrder: false,
     readWindow: { widthMs: CODING_AGENT_SESSION_READ_WINDOW_MS },
     coalesceMaxBatch: CODING_AGENT_SESSION_COALESCE_MAX_BATCH,

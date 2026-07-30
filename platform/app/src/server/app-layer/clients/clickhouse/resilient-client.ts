@@ -2,10 +2,14 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import {
   incrementClickHouseQueryCount,
+  incrementConventionViolation,
   observeClickHouseQueryDuration,
 } from "~/server/clickhouse/metrics";
 import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
-import { detectColdScan } from "./cold-scan-detector";
+import {
+  CONVENTION_GATE_THROWS,
+  findConventionViolations,
+} from "./convention-gate";
 import {
   TRANSIENT_NETWORK_CODES,
   translateClickHouseQueryError,
@@ -228,41 +232,72 @@ function logSuccess({
     const roundedMs = Math.round(durationMs);
     const meta = safeQueryMeta(params);
 
-    // A SELECT against a time-partitioned table with no predicate on its time
-    // column cannot prune partitions, so it walks the whole history including
-    // the cold tier on S3 - a burst of S3 GET requests per call. Worth warning
-    // even when fast, because the cost is request count, not latency.
-    const coldScanTable =
-      operation === "query" ? detectColdScan(extractRawQuery(params)) : null;
-
-    if (coldScanTable !== null) {
-      queryLogger.warn(
-        {
-          source: "clickhouse",
-          operation,
-          durationMs: roundedMs,
-          queryId: meta.queryId,
-          table: meta.table,
-          paramKeys: meta.paramKeys,
-          query: extractQueryPreview(params),
-          coldScan: true,
-          coldScanTable,
-        },
-        `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`,
-      );
-    } else {
-      queryLogger.debug(
-        {
-          source: "clickhouse",
-          operation,
-          durationMs: roundedMs,
-          queryId: meta.queryId,
-        },
-        `ClickHouse ${operation} succeeded`,
-      );
-    }
+    queryLogger.debug(
+      {
+        source: "clickhouse",
+        operation,
+        durationMs: roundedMs,
+        queryId: meta.queryId,
+      },
+      `ClickHouse ${operation} succeeded`,
+    );
   } catch (loggingError) {
     logger.error({ loggingError }, "Failed to log ClickHouse query success");
+  }
+}
+
+/**
+ * Counts the conventions a read breaks, BEFORE it is sent.
+ *
+ * Before the query rather than after it for two reasons. A read that fails —
+ * timed out, memory limit — is exactly the read most likely to have been
+ * unprunable, and checking on the success path never saw those at all. And a
+ * gate that is eventually allowed to refuse has to refuse before the cost is
+ * paid, or it is not a gate.
+ *
+ * Counting only: this never throws unless {@link CONVENTION_GATE_THROWS} is
+ * explicitly turned on, which it is not anywhere by default. See
+ * ./convention-gate.ts for why, and for the progression past counting.
+ *
+ * Wrapped so that a fault in the checker can never fail a customer's query.
+ * The check is advisory; the read is the product.
+ */
+function countConventionViolations(params: unknown): void {
+  try {
+    const query = extractRawQuery(params);
+    const violations = findConventionViolations(query);
+    if (violations.length === 0) return;
+
+    const meta = safeQueryMeta(params);
+
+    for (const { table, rule } of violations) {
+      incrementConventionViolation(table, rule);
+    }
+
+    queryLogger.warn(
+      {
+        source: "clickhouse",
+        operation: "query",
+        queryId: meta.queryId,
+        table: meta.table,
+        paramKeys: meta.paramKeys,
+        query: extractQueryPreview(params),
+        conventionViolations: violations,
+      },
+      `ClickHouse convention violation: ${violations
+        .map(({ table, rule }) => `${table} ${rule}`)
+        .join(", ")}`,
+    );
+
+    if (CONVENTION_GATE_THROWS) {
+      const summary = violations
+        .map(({ table, rule }) => `${table} ${rule}`)
+        .join(", ");
+      throw new Error(`ClickHouse query breaks a convention: ${summary}`);
+    }
+  } catch (error) {
+    if (CONVENTION_GATE_THROWS) throw error;
+    logger.error({ error }, "Failed to check ClickHouse query conventions");
   }
 }
 
@@ -285,6 +320,7 @@ export function createResilientClickHouseClient({
   wrapper.query = async (params) => {
     const queryType = extractQueryType(params);
     const table = extractTableName(params);
+    countConventionViolations(params);
     const start = performance.now();
     try {
       const result = await withTransientRetry(

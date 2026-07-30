@@ -443,15 +443,15 @@ export class EvaluationAnalyticsFoldProjection
    * CompletedAt, migration 00056), so `store.get()` returns the state and
    * nothing on the delivery path reads `event_log`.
    *
-   * `refoldOnStoreMiss: true` — a version-gated TRANSITIONAL net, not the old
-   * continuity mechanism. The store reads back only rows stamped with the
-   * CURRENT projection version; a row written before the 00056 read-back columns
-   * existed decodes StartedAt/CompletedAt as nulls indistinguishable from a
-   * genuinely unstarted evaluation, so the store reports a miss and this option
-   * rebuilds that aggregate from `event_log` — once. The rebuild is rewritten at
-   * the current version, so the row hits from then on and the population
-   * self-heals with no backfill migration. In steady state every row is
-   * current-version, `store.get()` hits, and nothing refolds.
+   * The store-miss rebuild is NOT declared here. It is a consequence of the
+   * store's generation ladder, not a choice this fold makes: a store that can
+   * refuse a committed row must be able to rebuild the one it refused, so
+   * `defineFoldStore` arms it in the same declaration as the gate and the two
+   * cannot be separated by an edit to this file. A row written before the 00056
+   * read-back columns existed decodes StartedAt/CompletedAt as nulls
+   * indistinguishable from a genuinely unstarted evaluation; the store refuses
+   * it and it is rebuilt from `event_log` once, rewritten at the current stamp,
+   * and read back from then on. In steady state nothing refolds.
    *
    * `coalesceMaxBatch` — see below.
    *
@@ -464,7 +464,6 @@ export class EvaluationAnalyticsFoldProjection
    */
   override options: FoldProjectionOptions = {
     eventOrdering: "acceptedAt",
-    refoldOnStoreMiss: true,
     refoldOnOutOfOrder: false,
     readWindow: { widthMs: EVALUATION_ANALYTICS_READ_WINDOW_MS },
     coalesceMaxBatch: EVALUATION_ANALYTICS_COALESCE_MAX_BATCH,

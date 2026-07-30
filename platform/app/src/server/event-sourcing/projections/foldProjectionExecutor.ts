@@ -634,13 +634,22 @@ export class FoldProjectionExecutor {
     );
   }
 
+  /**
+   * Whether a store miss rebuilds from the event log.
+   *
+   * The store's own declaration wins where it makes one: a store that can
+   * refuse a committed row arms the rebuild that makes refusing safe, in the
+   * same declaration as the gate, so the pair cannot be broken from a distance.
+   * `options.refoldOnStoreMiss` remains for the stores that still hand-roll
+   * their gate.
+   */
   private shouldRefoldOnMiss<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
   ): boolean {
-    return (
-      projection.options?.refoldOnStoreMiss === true &&
-      projection.eventLoaderUpTo !== undefined
-    );
+    const armed =
+      projection.store.refoldsOnMiss ??
+      projection.options?.refoldOnStoreMiss === true;
+    return armed && projection.eventLoaderUpTo !== undefined;
   }
 
   /**

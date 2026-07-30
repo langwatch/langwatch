@@ -2,16 +2,12 @@ import type { CodingAgentSessionRepository } from "~/server/app-layer/coding-age
 import type { CodingAgentTraceSessionRepository } from "~/server/app-layer/coding-agent/repositories/coding-agent-trace-session.repository";
 import type { SessionMetricSeriesRepository } from "~/server/app-layer/coding-agent/repositories/session-metric-series.repository";
 import { definePipeline } from "../..";
-import { CachedFoldStore } from "../../projections/cachedFoldStore";
 import type { FoldCacheClient } from "../../projections/foldCache/foldCacheClient";
 import { ContributeLogFactsCommand } from "./commands/contributeLogFactsCommand";
 import { ContributeMetricFactsCommand } from "./commands/contributeMetricFactsCommand";
 import { ContributeSpanFactsCommand } from "./commands/contributeSpanFactsCommand";
-import {
-  CodingAgentSessionFoldProjection,
-  type CodingAgentSessionState,
-} from "./projections/codingAgentSession.foldProjection";
-import { CodingAgentSessionStore } from "./projections/codingAgentSession.store";
+import { CodingAgentSessionFoldProjection } from "./projections/codingAgentSession.foldProjection";
+import { codingAgentSessionFoldStore } from "./projections/codingAgentSession.store";
 import { CodingAgentTraceSessionsMapProjection } from "./projections/codingAgentTraceSessions.mapProjection";
 import { SessionMetricSeriesMapProjection } from "./projections/sessionMetricSeries.mapProjection";
 import {
@@ -70,14 +66,15 @@ export function createCodingAgentProcessingPipeline(
       new CodingAgentSessionFoldProjection({
         // Read-through store (ADR-066): the cache tier is the warm read path;
         // on a miss the store reads its own last committed state back from
-        // coding_agent_sessions (store.get() → findBySessionId → decode row).
-        // The delivery path never reads event_log. Same wiring as
-        // trace_summaries.
-        store: new CachedFoldStore<CodingAgentSessionState>(
-          new CodingAgentSessionStore(deps.codingAgentSessionRepository),
-          deps.foldCacheClient,
-          { keyPrefix: "coding_agent_sessions" },
-        ),
+        // coding_agent_sessions. The delivery path never reads event_log.
+        //
+        // `cached()` is the only shape, deliberately — the cache is part of the
+        // storage design rather than something a call site assembles, which is
+        // what let five stores drift into four different read-back gates.
+        store: codingAgentSessionFoldStore.cached({
+          repository: deps.codingAgentSessionRepository,
+          cache: deps.foldCacheClient,
+        }),
       }),
     )
     .withMapProjection(
