@@ -501,15 +501,12 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
   describe("given a trace whose only signal so far is an assigned topic", () => {
     describe("when its cached state is lost and a later span arrives", () => {
       /**
-       * @scenario a signal with nothing else to store is not lost to a cold cache
-       *
-       * Until the always-write change this protection came from `refoldOnStoreMiss`
-       * rebuilding the topic out of `event_log` — the row was simply not
-       * written. Now the row IS written (readers derive hasSignal=false to keep it out of
-       * analytics) and the later span resumes from the read-back directly:
-       * same guarantee, no event_log replay, which is what lets the fold
-       * declare `trustAbsentMiss`.
+       * The row carries the classification, so the later span resumes from the
+       * read-back directly: no `event_log` replay, which is what lets the fold
+       * declare `trustAbsentMiss`. Readers derive hasSignal=false and keep the
+       * row out of analytics, so writing it costs the product nothing.
        */
+      /** @scenario a signal with nothing else to store is not lost to a cold cache */
       it("resumes the classification from the committed row instead of losing it", async () => {
         const { repo, rows } = recordingRepo();
         const fold = new TraceAnalyticsFoldProjection({
@@ -519,7 +516,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
         // the whole point of the always-write row is that it never needs to.
         fold.eventLoaderUpTo = async () => {
           throw new Error(
-            "event_log must not be read — the row carries the state",
+            "event_log must not be read: the row carries the state",
           );
         };
         const executor = new FoldProjectionExecutor();

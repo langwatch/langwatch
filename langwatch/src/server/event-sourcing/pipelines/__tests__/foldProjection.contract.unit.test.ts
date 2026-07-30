@@ -81,15 +81,18 @@ describe("fold projection contracts", () => {
     });
 
     /**
-     * @scenario a trusted fold's windowed read is backed by a time-local lifetime
-     *
      * Trusting a windowed absence claims the row can never sit outside the
-     * window — a bet on the aggregate's LIFETIME, the same one
+     * window, a bet on the aggregate's LIFETIME, the same one
      * `rehydrationLowerBoundMs` makes when bounding event reads. A fold bound
      * to a long-lived aggregate (a coding-agent session spanning weeks) may
      * declare a readWindow for pruning, but it must NOT trust the window's
      * misses: its rows legitimately outlive any width.
+     *
+     * The router refuses such a registration outright
+     * (projectionRouter.registrationGuard.unit.test.ts); this asserts the
+     * shipped folds are on the right side of that refusal.
      */
+    /** @scenario a trusted fold's windowed read is backed by a time-local lifetime */
     it("binds only to TIME_LOCAL aggregate types when it also declares a readWindow", () => {
       for (const fold of trusted) {
         if (fold.projection.options?.readWindow === undefined) continue;
@@ -101,12 +104,16 @@ describe("fold projection contracts", () => {
     });
 
     /**
-     * @scenario trusting absence must not orphan the undecodable net
-     *
      * A get()-only store can never answer `undecodable` (the executor stamps
      * its nulls `absent`), so under trustAbsentMiss its `refoldOnStoreMiss`
-     * would never fire again — dead config that reads like a safety net.
+     * would never fire again: dead config that reads like a safety net.
+     *
+     * The pairing is only visible here. By the time a fold reaches the router
+     * its store is wrapped in `RedisCachedFoldStore`, which declares
+     * `getWithApplied` whatever the durable tier behind it can do, so
+     * registration cannot tell the two apart.
      */
+    /** @scenario trusting absence must not orphan the undecodable net */
     it("pairs refoldOnStoreMiss with a store that can distinguish undecodable", () => {
       for (const fold of trusted) {
         if (fold.projection.options?.refoldOnStoreMiss !== true) continue;
@@ -150,12 +157,11 @@ describe("fold projection contracts", () => {
     });
 
     /**
-     * @scenario the redelivery watermark survives the write path
-     *
      * The executor dedups a redelivered batch against the ids persisted NEXT
      * TO the row. A store that drops them re-applies the batch on the next
-     * cold-cache retry — silent double-count, no error anywhere.
+     * cold-cache retry: silent double-count, no error anywhere.
      */
+    /** @scenario the redelivery watermark survives the write path */
     it("persists the applied-event-id watermark next to the row", async () => {
       const repo = makeRepo();
       const store = new TraceAnalyticsStore(repo as never);
@@ -185,12 +191,11 @@ describe("fold projection contracts", () => {
     });
 
     /**
-     * @scenario absence is authoritative because nothing is ever gated out
-     *
      * `trustAbsentMiss` on the fold is only sound while this holds. If a
      * write-gate returns, absence goes back to meaning "maybe declined" and
      * the executor overwrites live dimension state with init().
      */
+    /** @scenario absence is authoritative because nothing is ever gated out */
     it("writes a dimension-only state too, flagged HasSignal=false", async () => {
       const repo = makeRepo();
       const store = new TraceAnalyticsStore(repo as never);
@@ -246,11 +251,10 @@ describe("fold projection contracts", () => {
     });
 
     /**
-     * @scenario no state is unwritable — identity falls back to the aggregate id
-     *
      * The old gate refused a state with no identity; the aggregate-id stamp
      * makes one, so nothing is gated and absence stays authoritative.
      */
+    /** @scenario no state is unwritable, identity falls back to the aggregate id */
     it("writes a state with no identity of its own, stamped from the aggregate id", async () => {
       const repo = makeRepo();
       const store = new EvaluationAnalyticsStore(repo as never);
