@@ -15,11 +15,11 @@ import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
-import { spentSubline } from "~/components/me/spentSubline";
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
 } from "~/components/me/PersonalTracesEmptyState";
+import { spentSubline } from "~/components/me/spentSubline";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -46,8 +46,6 @@ function MyUsagePage() {
     personalProjectSlug,
     organizationName,
   } = ctx;
-
-  const isOverBudget = budget.status === "exceeded";
 
   // "Spent this month" leads with the actually-billed amount; the theoretical
   // bundled portion (e.g. Claude Max usage that isn't billed per token) is most
@@ -142,7 +140,6 @@ function MyUsagePage() {
             title="Spent this month"
             value={fmtUsd(summary.billedThisMonthUsd)}
             subline={spentCardSubline}
-            tone={isOverBudget ? "red" : "default"}
           />
           <SummaryCard
             title="Requests this month"
@@ -347,14 +344,12 @@ function SummaryCard({
   title,
   value,
   subline,
-  tone = "default",
 }: {
   title: string;
   value: string;
   /** Omitted or empty renders no second line at all, so the card keeps its
    *  shape instead of reserving a blank row. */
   subline?: string;
-  tone?: "default" | "red";
 }) {
   return (
     <Box
@@ -372,20 +367,11 @@ function SummaryCard({
       >
         {title}
       </Text>
-      <Text
-        fontSize="2xl"
-        fontWeight="semibold"
-        marginTop={1}
-        color={tone === "red" ? "red.500" : "fg"}
-      >
+      <Text fontSize="2xl" fontWeight="semibold" marginTop={1} color="fg">
         {value}
       </Text>
       {subline ? (
-        <Text
-          fontSize="sm"
-          color={tone === "red" ? "red.500" : "fg.muted"}
-          marginTop={1}
-        >
+        <Text fontSize="sm" color="fg.muted" marginTop={1}>
           {subline}
         </Text>
       ) : null}

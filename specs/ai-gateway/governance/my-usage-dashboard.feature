@@ -43,6 +43,8 @@ Feature: AI Gateway Governance — My Usage personal dashboard
     When I navigate to "/me"
     Then the spend card names the bundled amount
     And it states no budget figure
+    And the card carries no over-budget emphasis, since the exceeded budget is
+      already announced by its own banner above the cards
 
   # ---------------------------------------------------------------------------
   # Spending over time
