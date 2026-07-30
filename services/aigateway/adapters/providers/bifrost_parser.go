@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
+	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -145,7 +147,7 @@ func buildChatRequest(
 		return &bfschemas.BifrostChatRequest{
 				Provider:       provider,
 				Model:          model,
-				RawRequestBody: req.Body,
+				RawRequestBody: stripDropTuningParams(req.Body),
 				Input:          []bfschemas.ChatMessage{},
 			},
 			rawForwardCtx(ctx),
@@ -160,11 +162,14 @@ func buildChatRequest(
 	// preserves byte-for-byte identity and keeps cache hits working.
 	// Translation earns its keep only when the target wire format
 	// differs from the inbound (Anthropic / Gemini / Bedrock / Vertex).
+	// The parameter policy never applies here: whatever the provider
+	// accepts, the client gets, and the body stays byte-identical except
+	// for stripping the gateway-only drop_tuning_params field when present.
 	if isOpenAICompatibleProvider(provider) {
 		return &bfschemas.BifrostChatRequest{
 				Provider:       provider,
 				Model:          model,
-				RawRequestBody: req.Body,
+				RawRequestBody: stripDropTuningParams(req.Body),
 				Input:          []bfschemas.ChatMessage{},
 			},
 			rawForwardCtx(ctx),
@@ -175,12 +180,41 @@ func buildChatRequest(
 	if err != nil {
 		return nil, ctx, err
 	}
+	policy, err := applyParamPolicy(req.Body, params, provider, model)
+	if err != nil {
+		return nil, ctx, err
+	}
+	if len(policy.dropped) > 0 {
+		// The response-header seam for both sync and stream lanes is the
+		// dispatch meta accumulator (setMetaHeaders writes it before the
+		// first byte on either lane).
+		if meta := pipeline.MetaFromContext(ctx); meta != nil {
+			droppedCopy := slices.Clone(policy.dropped)
+			meta.Update(func(m *pipeline.Meta) { m.ParamsDropped = droppedCopy })
+		}
+		ctx = withParamsDropped(ctx, policy.dropped)
+	}
 	return &bfschemas.BifrostChatRequest{
 		Provider: provider,
 		Model:    model,
 		Input:    messages,
 		Params:   params,
 	}, ctx, nil
+}
+
+// stripDropTuningParams removes the gateway-only drop_tuning_params field before a
+// body is forwarded to a provider. Only mutates when the field is present
+// so raw-forward bodies stay byte-identical for the overwhelmingly common
+// case (OpenAI's prompt-prefix auto-cache depends on that identity).
+func stripDropTuningParams(body []byte) []byte {
+	if !gjson.GetBytes(body, "drop_tuning_params").Exists() {
+		return body
+	}
+	out, err := sjson.DeleteBytes(body, "drop_tuning_params")
+	if err != nil {
+		return body
+	}
+	return out
 }
 
 // isOpenAICompatibleProvider reports whether the destination provider
@@ -231,6 +265,7 @@ func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.Ch
 	if len(body) == 0 {
 		return nil, nil, nil
 	}
+	body = normalizeStopString(body)
 
 	var messagesWrap struct {
 		Messages []bfschemas.ChatMessage `json:"messages"`
@@ -250,6 +285,23 @@ func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.Ch
 	liftExtensionParams(body, &params)
 
 	return messagesWrap.Messages, &params, nil
+}
+
+// normalizeStopString accepts OpenAI's bare-string form of `stop`
+// ("stop": "END") by rewriting it to the one-element list form before the
+// structured parse. ChatParameters types Stop as []string, so without
+// this a valid OpenAI body that works on every raw-forward lane would
+// 400 on the translated lanes.
+func normalizeStopString(body []byte) []byte {
+	v := gjson.GetBytes(body, "stop")
+	if v.Type != gjson.String {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "stop", []string{v.String()})
+	if err != nil {
+		return body
+	}
+	return out
 }
 
 // liftMaxTokensAlias maps the legacy OpenAI output cap `max_tokens` onto

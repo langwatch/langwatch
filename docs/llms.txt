@@ -413,6 +413,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Audit log](https://langwatch.ai/docs/ai-gateway/audit.md): Who did what, when, to which resource, gateway mutations land in the same audit log as the rest of the platform.
 
 - [Model Naming](https://langwatch.ai/docs/ai-gateway/model-naming.md): How to name models in requests, bare, prefixed, or aliased, and how the gateway resolves each.
+- [Parameter mapping](https://langwatch.ai/docs/ai-gateway/parameter-mapping.md): How every OpenAI chat-completions parameter behaves on each provider lane, and how to control dropping with drop_tuning_params.
 - [Model Aliases](https://langwatch.ai/docs/ai-gateway/model-aliases.md): Per-VK redirects from client-facing model names to specific provider/model/deployment combinations.
 
 ### Operations

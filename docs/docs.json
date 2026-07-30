@@ -606,6 +606,7 @@
                 ]
               },
               "ai-gateway/model-naming",
+              "ai-gateway/parameter-mapping",
               "ai-gateway/model-aliases",
               {
                 "group": "Operations",
