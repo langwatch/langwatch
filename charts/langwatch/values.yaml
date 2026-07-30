@@ -1237,6 +1237,36 @@ ingress:
   ## @param ingress.annotations [object] Additional ingress annotations.
   annotations: {}
 
+  # Extra labels applied to the Ingress and to the blackhole Service that backs
+  # ingress.blockedPaths. Merged on top of the chart's standard label set.
+  # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.labels
+  ## @param ingress.labels [object] Additional labels for the Ingress and its blackhole Service.
+  labels: {}
+
+  # Path prefixes this ingress must never route to the app. Everything under
+  # `/api/internal/*` is the private control plane (Langy + AI-gateway callbacks,
+  # shared-secret gated), and the app's catch-all `/` would otherwise publish it.
+  #
+  # Each prefix is routed to a Service with no endpoints, so the controller has
+  # nowhere to forward the request (503 on ingress-nginx). In-cluster callers use
+  # the internal Service and are unaffected. The chart refuses to render a config
+  # that would defeat the block — an `ingress.hosts` path nested under a prefix,
+  # or a malformed prefix — rather than shipping one that only looks protected.
+  #
+  # This covers THIS ingress only, not the app: an install that publishes the app
+  # another way needs its own restriction. To disable, set `[]` in a values file
+  # or `--set-json` (plain `--set` assigns a string and is rejected).
+  #
+  # `/api/cron`, `/metrics` and `/api/ops` are internal-only in the default
+  # topology but are NOT blocked by default — some installs drive cron
+  # externally, federate metrics, or run ops tooling from outside. Add them here
+  # if yours does not.
+  #
+  # Full operator guide, including the AWS/GKE caveat: docs/self-hosting/security
+  ## @param ingress.blockedPaths [array] Path prefixes this ingress hard-blocks by routing them to a no-endpoints blackhole Service. Defaults to ["/api/internal"], the private control-plane surface. Set to an empty list to disable.
+  blockedPaths:
+    - /api/internal
+
   # Host configurations for routing
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.rules
   ## @param ingress.hosts [array] Ingress hosts and paths.

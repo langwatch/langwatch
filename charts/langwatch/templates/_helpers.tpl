@@ -975,3 +975,33 @@ podAffinity:
 {{- $override := .component.containerSecurityContext | default dict -}}
 {{- toYaml (mustMergeOverwrite (deepCopy $global) $override) -}}
 {{- end -}}
+
+{{/*
+Ingress: validated + normalised `ingress.blockedPaths`, as a JSON array.
+Consume with: {{- $blocked := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
+
+Validation is security-relevant: a trailing slash, a missing leading slash, a
+bare "/" or a non-list value each leave the block rendered but inert. Rejected
+here, once, by name, so both consuming templates agree.
+*/}}
+{{- define "langwatch.ingress.blockedPaths" -}}
+  {{- $normalised := list -}}
+  {{- $raw := .Values.ingress.blockedPaths -}}
+  {{- if $raw -}}
+    {{- if not (kindIs "slice" $raw) -}}
+      {{- fail (printf "ingress.blockedPaths must be a list, got %s (%v). With --set, a list literal is assigned as a string — use --set-json 'ingress.blockedPaths=[\"/api/internal\"]', or set it in a values file." (kindOf $raw) $raw) -}}
+    {{- end -}}
+    {{- range $entry := $raw -}}
+      {{- $path := toString $entry -}}
+      {{- if not (hasPrefix "/" $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must be an absolute path beginning with \"/\". As written it renders an Ingress the API server rejects, and blocks nothing in the meantime." $path) -}}
+      {{- end -}}
+      {{- $trimmed := trimSuffix "/" $path -}}
+      {{- if eq $trimmed "" -}}
+        {{- fail "ingress.blockedPaths may not contain \"/\" — that would route the whole site to the blackhole. Block a specific prefix, or set ingress.enabled: false." -}}
+      {{- end -}}
+      {{- $normalised = append $normalised $trimmed -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $normalised | uniq | toJson -}}
+{{- end -}}

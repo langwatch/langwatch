@@ -1,4 +1,29 @@
 {{- if .Values.ingress.enabled }}
+{{- $blockedPaths := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
+{{- /*
+  An app path nested under a blocked prefix out-matches the blackhole and
+  silently undoes the block, so refuse to render it. Matching is on
+  `/`-separated segments like `pathType: Prefix`, so the `/api/internal-status`
+  sibling — which the block does not cover — still renders.
+
+  Literal paths only: a regex `ImplementationSpecific` path covering the same
+  URLs passes the guard, and beats the blackhole on nginx with `use-regex`.
+*/ -}}
+{{- range $host := .Values.ingress.hosts }}
+  {{- if not $host.http }}
+    {{- fail (printf "ingress.hosts entry for host %q has no http.paths" (toString $host.host)) }}
+  {{- end }}
+  {{- range $path := $host.http.paths }}
+    {{- if not $path.path }}
+      {{- fail (printf "ingress.hosts entry for host %q has a path with no `path` key" (toString $host.host)) }}
+    {{- end }}
+    {{- range $blocked := $blockedPaths }}
+      {{- if or (eq $path.path $blocked) (hasPrefix (printf "%s/" $blocked) $path.path) }}
+        {{- fail (printf "ingress.hosts path %q is nested under the blocked prefix %q, so it would out-match the blackhole and re-expose the private control plane. Remove the path, or drop %q from ingress.blockedPaths to disable the block knowingly." $path.path $blocked $blocked) }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -30,6 +55,17 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
+          {{- /* Longest-match carries the block; emitting first hedges
+            controllers that rank by list position (AWS LBC). */}}
+          {{- range $blockedPaths }}
+          - path: {{ . | quote }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Release.Name }}-blackhole
+                port:
+                  number: 80
+          {{- end }}
           {{- range .http.paths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}

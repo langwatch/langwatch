@@ -510,13 +510,15 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 
 ### Ingress
 
-| Name                  | Description                                | Value   |
-| --------------------- | ------------------------------------------ | ------- |
-| `ingress.enabled`     | Enable ingress.                            | `false` |
-| `ingress.className`   | Ingress class name (e.g., nginx, traefik). | `""`    |
-| `ingress.annotations` | Additional ingress annotations.            | `{}`    |
-| `ingress.hosts`       | Ingress hosts and paths.                   | `[]`    |
-| `ingress.tls`         | TLS configuration for HTTPS.               | `[]`    |
+| Name                   | Description                                                                                                                                                                                    | Value   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| `ingress.enabled`      | Enable ingress.                                                                                                                                                                                | `false` |
+| `ingress.className`    | Ingress class name (e.g., nginx, traefik).                                                                                                                                                     | `""`    |
+| `ingress.annotations`  | Additional ingress annotations.                                                                                                                                                                | `{}`    |
+| `ingress.labels`       | Additional labels for the Ingress and its blackhole Service.                                                                                                                                   | `{}`    |
+| `ingress.blockedPaths` | Path prefixes this ingress hard-blocks by routing them to a no-endpoints blackhole Service. Defaults to ["/api/internal"], the private control-plane surface. Set to an empty list to disable. | `[]`    |
+| `ingress.hosts`        | Ingress hosts and paths.                                                                                                                                                                       | `[]`    |
+| `ingress.tls`          | TLS configuration for HTTPS.                                                                                                                                                                   | `[]`    |
 
 ### Prometheus
 

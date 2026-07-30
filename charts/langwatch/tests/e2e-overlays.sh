@@ -75,6 +75,44 @@ count_matches() {
   grep -c -- "$pattern" <<< "$haystack" || true
 }
 
+# Render with the standard prod+ingress overlays; extra args override per case.
+tmpl_ingress() {
+  tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" -f "${OVERLAYS}/access-ingress.yaml" "$@"
+}
+render_ingress()   { tmpl_only "templates/ingress.yaml" --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" -f "${OVERLAYS}/access-ingress.yaml" "$@"; }
+render_blackhole() { tmpl_only "templates/blackhole-service.yaml" --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" -f "${OVERLAYS}/access-ingress.yaml" "$@"; }
+
+# Assert the chart refuses to render, and for the stated reason — a bare
+# exit-code check would go green on any unrelated template error.
+# `out=$(...) && rc=0 || rc=$?` keeps helm's status without a `set -e` abort.
+assert_render_refuses() {
+  local label="$1" reason="$2"; shift 2
+  local out rc
+  out=$(tmpl_ingress "$@") && rc=0 || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
+    fail "$label: expected helm to refuse, got exit 0"
+  elif ! grep -qF "$reason" <<< "$out"; then
+    fail "$label: refused, but not for the expected reason (wanted '$reason')"
+  else
+    pass "$label"
+  fi
+}
+
+# Negative control for the guards above.
+assert_render_succeeds() {
+  local label="$1"; shift
+  local out rc
+  out=$(tmpl_ingress "$@") && rc=0 || rc=$?
+  if [[ "$rc" -eq 0 ]]; then
+    pass "$label"
+  else
+    fail "$label: helm exited ${rc} :: $(head -3 <<< "$out")"
+  fi
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Template rendering — every overlay combo renders without error
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,10 +208,15 @@ test_access_nodeport() {
 test_access_ingress() {
   sep; info "Suite: access-ingress overlay"
 
-  local out
+  # Capture the exit code rather than letting `set -e` kill the assignment: a
+  # render failure here would otherwise abort the whole suite before a single
+  # [PASS]/[FAIL] line printed, leaving CI with a bare non-zero exit and no clue
+  # which assertion was in flight.
+  local out rc
   out=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-prod.yaml" \
-    -f "${OVERLAYS}/access-ingress.yaml")
+    -f "${OVERLAYS}/access-ingress.yaml") && rc=0 || rc=$?
+  [[ "$rc" -eq 0 ]] || fail "prod+ingress render failed: $(head -3 <<< "$out")"
 
   # Ingress resource created
   assert_contains "Ingress created" "$out" "kind: Ingress"
@@ -186,6 +229,120 @@ test_access_ingress() {
 
   # Service type = ClusterIP (default, not NodePort)
   assert_not_contains "No NodePort" "$out" "type: NodePort"
+
+  # /api/internal is hard-blocked at the edge by default, routed to a
+  # no-endpoints blackhole so the private control plane (langy-internal /
+  # langy-relay / gateway-internal) is never internet-reachable.
+  local ingress_only rc
+  ingress_only=$(render_ingress) && rc=0 || rc=$?
+  [[ "$rc" -eq 0 ]] || fail "ingress.yaml did not render: $(head -3 <<< "$ingress_only")"
+  assert_contains "Ingress blocks /api/internal path" "$ingress_only" 'path: "/api/internal"'
+  assert_contains "Blocked path → blackhole Service" "$ingress_only" "name: ${RELEASE}-blackhole"
+
+  # Exact instead of Prefix would block only the literal path and let every real
+  # route (/api/internal/langy/*, /api/internal/gateway/*) through.
+  if grep -A1 -F 'path: "/api/internal"' <<< "$ingress_only" | grep -qF "pathType: Prefix"; then
+    pass "Blocked path is a Prefix match"
+  else
+    fail "Blocked path must render pathType: Prefix"
+  fi
+
+  # Longest-match carries the block; the ordering hedges controllers that rank by
+  # list position. `|| true` keeps a non-matching grep from aborting the suite
+  # before the diagnostic below can print.
+  local blocked_line app_line
+  blocked_line=$(grep -nF 'path: "/api/internal"' <<< "$ingress_only" | head -1 | cut -d: -f1 || true)
+  app_line=$(grep -nE 'path: "?/"?$' <<< "$ingress_only" | head -1 | cut -d: -f1 || true)
+  if [[ -n "$blocked_line" && -n "$app_line" && "$blocked_line" -lt "$app_line" ]]; then
+    pass "Blocked path listed before app catch-all"
+  else
+    fail "Blocked path should precede app catch-all (/api/internal@${blocked_line:-?}, /@${app_line:-?})"
+  fi
+
+  # The shipped default topology, whose catch-all is ImplementationSpecific —
+  # every other case here overrides ingress.hosts with Prefix.
+  local default_hosts
+  default_hosts=$(tmpl_only "templates/ingress.yaml" --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-prod.yaml" --set ingress.enabled=true) && rc=0 || rc=$?
+  [[ "$rc" -eq 0 ]] || fail "default-hosts ingress did not render"
+  assert_contains "Default hosts still block /api/internal" "$default_hosts" 'path: "/api/internal"'
+  assert_contains "Default catch-all is ImplementationSpecific" "$default_hosts" "pathType: ImplementationSpecific"
+
+  # Both loops have been narrowed by refactors before (blockedPaths[0], hosts[0]);
+  # a single-prefix, single-host suite cannot see either.
+  local multi
+  multi=$(tmpl_ingress --set-json 'ingress.blockedPaths=["/api/internal","/api/cron"]') && rc=0 || rc=$?
+  [[ "$rc" -eq 0 ]] || fail "multi-prefix ingress did not render"
+  assert_contains "Second blocked prefix rendered" "$multi" 'path: "/api/cron"'
+  assert_contains "First blocked prefix still rendered" "$multi" 'path: "/api/internal"'
+  assert_render_refuses "Nested path on a SECOND host is caught" "would out-match the blackhole" \
+    --set-json 'ingress.hosts=[{"host":"a.example.com","http":{"paths":[{"path":"/","pathType":"Prefix"}]}},{"host":"b.example.com","http":{"paths":[{"path":"/api/internal/status","pathType":"Prefix"}]}}]'
+
+  # No selector is what makes the blackhole a dead end.
+  local blackhole_svc
+  blackhole_svc=$(render_blackhole) && rc=0 || rc=$?
+  [[ "$rc" -eq 0 ]] || fail "blackhole-service.yaml did not render: $(head -3 <<< "$blackhole_svc")"
+  assert_contains "Blackhole Service rendered" "$blackhole_svc" "name: ${RELEASE}-blackhole"
+  assert_not_contains "Blackhole Service has no selector" "$blackhole_svc" "selector:"
+
+  # A textual label append emits a colliding key twice; kubectl rejects that.
+  local dup_labels
+  dup_labels=$(render_blackhole --set-json 'ingress.labels={"app.kubernetes.io/component":"custom"}')
+  if [[ "$(grep -c "app.kubernetes.io/component: " <<< "$dup_labels")" -eq 1 ]]; then
+    pass "Colliding ingress.labels key emitted once"
+  else
+    fail "ingress.labels collision produced a duplicate mapping key"
+  fi
+
+  # Emptying the list must drop the path as well as the Service — a path left
+  # pointing at a deleted backend would route nowhere.
+  local no_block
+  no_block=$(tmpl_ingress --set-json 'ingress.blockedPaths=[]')
+  assert_not_contains "blockedPaths=[] drops the block" "$no_block" "${RELEASE}-blackhole"
+  assert_not_contains "blockedPaths=[] removes blocked path" "$no_block" 'path: "/api/internal"'
+
+  # Configurations that leave the block rendered but inert are refused outright,
+  # by name, rather than shipped looking protected.
+  assert_render_refuses "Nested app path under a blocked prefix refuses to render" \
+    "would out-match the blackhole" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal/status","pathType":"Prefix"},{"path":"/","pathType":"ImplementationSpecific"}]}}]'
+  assert_render_refuses "App path equal to a blocked prefix refuses to render" \
+    "would out-match the blackhole" \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal","pathType":"Prefix"}]}}]'
+  # A trailing slash would make the guard's segment test build "/api/internal//",
+  # which matches nothing — the nested path then out-matches the blackhole.
+  assert_render_refuses "Trailing-slash prefix still catches a nested path" \
+    "would out-match the blackhole" \
+    --set-json 'ingress.blockedPaths=["/api/internal/"]' \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal/status","pathType":"Prefix"}]}}]'
+  assert_render_refuses "Prefix without a leading slash is rejected" \
+    "must be an absolute path" --set-json 'ingress.blockedPaths=["api/internal"]'
+  assert_render_refuses "A bare / prefix is rejected" \
+    "would route the whole site to the blackhole" --set-json 'ingress.blockedPaths=["/"]'
+  # `--set 'x=[]'` assigns the two-character STRING "[]", which is truthy.
+  assert_render_refuses "Non-list blockedPaths is rejected by name" \
+    "must be a list" --set 'ingress.blockedPaths=[]'
+
+  # …but matching is on `/`-separated segments: /api/internal-status is a
+  # sibling, not nested, and rejecting it would break a legitimate app path.
+  # A naive hasPrefix guard passes everything above and fails here.
+  local sibling_out
+  sibling_out=$(tmpl_ingress \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal-status","pathType":"Prefix"},{"path":"/","pathType":"ImplementationSpecific"}]}}]') \
+    && rc=0 || rc=$?
+  [[ "$rc" -eq 0 ]] || fail "Sibling path /api/internal-status should render (helm exited ${rc})"
+  pass "Sibling path outside the blocked prefix still renders"
+  if grep -A4 -F "path: /api/internal-status" <<< "$sibling_out" | grep -qF "name: ${RELEASE}-app"; then
+    pass "Sibling path routed to the app"
+  else
+    fail "Sibling path /api/internal-status should route to ${RELEASE}-app"
+  fi
+
+  # The opt-out drops the guard too, so an operator who knowingly disabled the
+  # block is not then blocked from configuring their own paths.
+  assert_render_succeeds "blockedPaths=[] disables the guard along with the block" \
+    --set-json 'ingress.blockedPaths=[]' \
+    --set-json 'ingress.hosts=[{"host":"lw.example.com","http":{"paths":[{"path":"/api/internal/status","pathType":"Prefix"}]}}]'
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -850,11 +1007,36 @@ test_install_prod_ingress() {
     -o jsonpath='{.spec.tls[0].secretName}')
   assert_eq "Ingress TLS secret" "$tls_secret" "langwatch-tls"
 
-  # Ingress backend auto-wired
+  # Ingress backend auto-wired. Select the app's catch-all path by VALUE, not by
+  # index: ingress.blockedPaths emits /api/internal first, so paths[0] is the
+  # blackhole Service, not the app.
   local backend_svc
   backend_svc=$(kc get ingress "${RELEASE}-ingress" \
-    -o jsonpath='{.spec.rules[0].http.paths[0].backend.service.name}')
+    -o jsonpath='{.spec.rules[0].http.paths[?(@.path=="/")].backend.service.name}')
   assert_eq "Ingress backend → app" "$backend_svc" "${RELEASE}-app"
+
+  # …and the blocked control-plane prefix really is wired to the no-endpoints
+  # blackhole in a live cluster, not just in the rendered template.
+  local blocked_svc
+  blocked_svc=$(kc get ingress "${RELEASE}-ingress" \
+    -o jsonpath='{.spec.rules[0].http.paths[?(@.path=="/api/internal")].backend.service.name}')
+  assert_eq "Ingress /api/internal → blackhole" "$blocked_svc" "${RELEASE}-blackhole"
+
+  # The blackhole Service must actually EXIST and be selector-less — that is what
+  # makes the block a dead end rather than a route to something live.
+  #
+  # Asserting on Endpoints instead would be unfalsifiable: a selector-less
+  # Service never gets an Endpoints object, so `kc get endpoints` returns
+  # NotFound, and an assertion that swallows the error and compares "" to ""
+  # also passes when the Service is missing, renamed, or has grown a selector
+  # (this suite runs app.replicaCount: 0, so a selector would match no pods and
+  # still produce no subsets). Assert the property directly instead.
+  kc get svc "${RELEASE}-blackhole" &>/dev/null \
+    && pass "Blackhole Service exists" \
+    || fail "Blackhole Service ${RELEASE}-blackhole not created"
+  local blackhole_selector
+  blackhole_selector=$(kc get svc "${RELEASE}-blackhole" -o jsonpath='{.spec.selector}')
+  assert_eq "Blackhole Service is selector-less" "$blackhole_selector" ""
 
   # Workers Deployment created (0 replicas, but resource exists)
   kc get deployment "${RELEASE}-workers" &>/dev/null \

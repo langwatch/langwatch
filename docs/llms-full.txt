@@ -53415,7 +53415,12 @@ clickhouse:
     # its password key.
     existingSecret: langwatch-clickhouse-creds
 
-# Ingress with TLS
+# Ingress with TLS.
+#
+# `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
+# so the private control plane is never internet-reachable. Blocked requests
+# answer 503 on ingress-nginx. See the Security guide for the opt-out, the
+# AWS/GKE caveat, and what the block does not cover.
 ingress:
   enabled: true
   className: nginx
@@ -55794,6 +55799,47 @@ The Helm chart's `secretKeyRef` pattern works with any Kubernetes Secret, regard
 - All other components (Workers, NLP, LangEvals, PostgreSQL, ClickHouse, Redis) should be on internal networks only (ClusterIP services)
 - Place databases in private subnets with no internet access
 - Use VPC endpoints, PrivateLink for S3 access
+
+### Private control-plane paths are blocked at the ingress
+
+Everything under `/api/internal/*` is the app's private control plane — the Langy
+agent's callbacks and the AI gateway's usage callbacks. Those routes authenticate
+with a shared secret, but they are never meant to be reachable from the internet.
+
+The chart blocks them at the ingress by default, via `ingress.blockedPaths`
+(default `["/api/internal"]`). Each blocked prefix is routed to a Service with no
+endpoints, so the controller has nowhere to forward the request:
+
+```yaml
+ingress:
+  enabled: true
+  # Defaults to ["/api/internal"]. Add prefixes your install keeps in-cluster.
+  blockedPaths:
+    - /api/internal
+    - /api/cron   # only if you do NOT drive cron from an external scheduler
+```
+
+Things worth knowing before you change it:
+
+- **Blocked requests answer 503** on ingress-nginx. The exact code is
+  controller-dependent (the Ingress API does not specify it) but every controller
+  fails closed. Expect a low background rate in your ingress 5xx metrics from
+  scanners — that is the block working, not the app faulting.
+- **In-cluster callers are unaffected** — the agent, gateway and CronJobs use the
+  internal Service.
+- **It covers this ingress only.** If you publish the app another way (NodePort,
+  LoadBalancer, your own Ingress), restrict these paths where that route ends.
+- **The chart refuses configurations that would defeat the block**, such as an
+  `ingress.hosts` path nested under a blocked prefix.
+- **AWS LBC (default `target-type: instance`) and GKE without NEG** reject a
+  ClusterIP backend and stop reconciling the Ingress. Set
+  `alb.ingress.kubernetes.io/target-type: ip` (or the NEG equivalent), or empty
+  `blockedPaths` and block at the load balancer instead.
+- **To disable**, set `blockedPaths: []` in a values file or use `--set-json`;
+  plain `--set` assigns a string and is rejected.
+- **Gateway or Langy agent running outside the cluster?** Their callbacks arrive
+  over the public ingress and will be blocked — narrow the list rather than
+  emptying it.
 
 ### Kubernetes Network Policies
 
