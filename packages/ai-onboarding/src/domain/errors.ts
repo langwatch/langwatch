@@ -1,6 +1,15 @@
 import type { RateLimitAxis } from "@langwatch/contracts/agent-onboarding";
 import { HandledError } from "@langwatch/handled-error";
 
+/** "3 seconds" / "5 minutes" / "an hour" — a wait a person can act on. */
+function describeWait(seconds: number): string {
+  if (seconds < 60) return `${Math.max(1, Math.round(seconds))} seconds`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.round(minutes / 60);
+  return `${hours} hour${hours === 1 ? "" : "s"}`;
+}
+
 /**
  * The operator turned anonymous provisioning off for this deployment. A
  * self-hosted install should be able to refuse account creation without
@@ -13,7 +22,14 @@ export class AnonymousProvisioningDisabledError extends HandledError {
     super(
       "anonymous_provisioning_disabled",
       "This LangWatch instance does not create temporary accounts. Sign in, or ask an administrator for a project API key.",
-      { httpStatus: 403, fault: "customer" },
+      {
+        httpStatus: 403,
+        fault: "customer",
+        tips: [
+          "This LangWatch instance does not create temporary accounts.",
+          "Sign in with `langwatch login`, or ask an administrator for a project API key.",
+        ],
+      },
     );
     this.name = "AnonymousProvisioningDisabledError";
   }
@@ -31,7 +47,11 @@ export class EphemeralAccountNotFoundError extends HandledError {
     super(
       "ephemeral_account_not_found",
       "This temporary account is not available.",
-      { httpStatus: 404, fault: "customer" },
+      {
+        httpStatus: 404,
+        fault: "customer",
+        tips: ["This temporary account is not available."],
+      },
     );
     this.name = "EphemeralAccountNotFoundError";
   }
@@ -88,7 +108,13 @@ export class ClaimHandoffNotFoundError extends HandledError {
     super(
       "claim_handoff_not_found",
       "This link has expired. Run the command again to get a fresh one.",
-      { httpStatus: 410, fault: "customer" },
+      {
+        httpStatus: 410,
+        fault: "customer",
+        tips: [
+          "This link has expired. Run the command again to get a fresh one.",
+        ],
+      },
     );
     this.name = "ClaimHandoffNotFoundError";
   }
@@ -106,7 +132,13 @@ export class ClaimHandoffVerifierMismatchError extends HandledError {
     super(
       "claim_handoff_verifier_mismatch",
       "This claim could not be verified. Run the command again to start a new one.",
-      { httpStatus: 400, fault: "customer" },
+      {
+        httpStatus: 400,
+        fault: "customer",
+        tips: [
+          "This claim could not be verified. Run the command again to start a new one.",
+        ],
+      },
     );
     this.name = "ClaimHandoffVerifierMismatchError";
   }
@@ -145,6 +177,12 @@ export class OnboardingRateLimitedError extends HandledError {
         axis: params.axis,
         retryAfterSeconds: params.retryAfterSeconds,
       },
+      tips: [
+        `Too many requests. Try again in ${describeWait(params.retryAfterSeconds)}.`,
+        params.axis === "fingerprint"
+          ? "This machine has provisioned its allowance of temporary workspaces for now."
+          : "Sign in with `langwatch login` to use an account you already have.",
+      ],
     });
     this.name = "OnboardingRateLimitedError";
   }
@@ -167,6 +205,10 @@ export class OnboardingUnavailableError extends HandledError {
         httpStatus: 503,
         fault: "platform",
         reasons: cause ? [cause] : undefined,
+        tips: [
+          "Temporary accounts are unavailable right now — this is on our side, not yours.",
+          "Try again shortly, or sign in with `langwatch login`.",
+        ],
       },
     );
     this.name = "OnboardingUnavailableError";
@@ -185,7 +227,13 @@ export class PasskeyRegistrationFailedError extends HandledError {
     super(
       "passkey_registration_failed",
       "That passkey could not be verified. Scan the code again to retry.",
-      { httpStatus: 400, fault: "customer" },
+      {
+        httpStatus: 400,
+        fault: "customer",
+        tips: [
+          "That passkey could not be verified. Scan the code again to retry.",
+        ],
+      },
     );
     this.name = "PasskeyRegistrationFailedError";
   }
@@ -199,7 +247,11 @@ export class PasskeyChallengeMissingError extends HandledError {
     super(
       "passkey_challenge_missing",
       "This passkey setup expired. Scan the code again to retry.",
-      { httpStatus: 410, fault: "customer" },
+      {
+        httpStatus: 410,
+        fault: "customer",
+        tips: ["This passkey setup expired. Scan the code again to retry."],
+      },
     );
     this.name = "PasskeyChallengeMissingError";
   }

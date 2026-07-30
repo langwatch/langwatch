@@ -18,9 +18,9 @@ import { resolveControlPlaneUrl } from "../utils/governance/resolveEndpoint";
 import { renderClaimBlock } from "../utils/governance/terminal-qr";
 import {
   conflictingExporter,
+  ensureEphemeralAccount,
   installTelemetry,
   onboardingSummary,
-  provisionEphemeralAccount,
 } from "../utils/governance/zero-auth-onboarding";
 
 export interface OnboardOptions {
@@ -57,9 +57,13 @@ export async function onboardCommand(
 
   const target = claudeProjectSettingsTarget(cwd);
 
-  // Provision first so we never nag about a conflict and then fail to get an
-  // account anyway — but check the conflict before writing anything.
-  const provisioned = await provisionEphemeralAccount({ endpoint, tool });
+  // Resolve the account first so we never nag about a conflict and then fail
+  // to get one anyway. Reuses the profile's existing account when there is
+  // one, so re-running here does not provision a second workspace.
+  const { provisioned, reused } = await ensureEphemeralAccount({
+    endpoint,
+    tool,
+  });
 
   const conflict = conflictingExporter({
     target,
@@ -77,10 +81,12 @@ export async function onboardCommand(
   installTelemetry({ tool, cwd, provisioned });
 
   const lines = [
-    ...onboardingSummary({
-      provisioned,
-      settingsPath: target.displayPath,
-    }),
+    ...(reused
+      ? [`Using this profile's temporary workspace: ${provisioned.account.projectName}`]
+      : onboardingSummary({
+          provisioned,
+          settingsPath: target.displayPath,
+        })),
     "",
     ...(await renderClaimBlock({
       url: provisioned.claim.url,
@@ -100,6 +106,7 @@ export async function onboardCommand(
   return {
     data: {
       profile,
+      reused,
       account: provisioned.account,
       ingestion: {
         apiKey: provisioned.ingestion.apiKey,

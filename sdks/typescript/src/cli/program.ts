@@ -151,8 +151,18 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // `--solo` is not a second mechanism — it resolves to an ordinary profile
   // named after the working directory, so it inherits the same storage,
   // permissions and cleanup rules as any other.
-  program.hook("preAction", async () => {
-    const opts = program.opts<{ profile?: string; solo?: boolean }>();
+  program.hook("preAction", async (_thisCommand, actionCommand) => {
+    // Read the leaf's options as well as the root's. `--solo` is declared
+    // globally, but `enablePositionalOptions` means a global only parses
+    // BEFORE the subcommand — and `langwatch onboard --solo` is what anyone
+    // would actually type, so commands that take it declare it too and both
+    // spellings land here.
+    const leaf = actionCommand.opts<{ profile?: string; solo?: boolean }>();
+    const root = program.opts<{ profile?: string; solo?: boolean }>();
+    const opts = {
+      profile: leaf.profile ?? root.profile,
+      solo: leaf.solo ?? root.solo,
+    };
     if (opts.solo) {
       const { soloProfileName } = await import(
         "./utils/governance/profile.js"
@@ -307,6 +317,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .option(
       "--force",
       "rewire even if this project already exports OTLP somewhere else",
+    )
+    // Declared here as well as globally so `langwatch onboard --solo` works,
+    // not only `langwatch --solo onboard`. The pre-action hook reads either.
+    .option("--profile <name>", "credential profile to use")
+    .option(
+      "--solo",
+      "ignore any signed-in identity and use a throwaway profile scoped to this directory",
     )
     ,
     async (opts: { tool?: string; endpoint?: string; force?: boolean }) => {

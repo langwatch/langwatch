@@ -8,6 +8,10 @@
  * CLI's HTTP style.
  */
 
+import {
+  assertUsableEndpoint,
+  diagnoseFetchFailure,
+} from "../networkError";
 import * as os from "node:os";
 import { setTimeout as wait } from "node:timers/promises";
 
@@ -301,19 +305,34 @@ async function postJSON<T>(opts: DeviceFlowOptions, path: string, body: unknown)
   return (await res.json()) as T;
 }
 
-function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<Response> {
-  const url = opts.baseUrl.replace(/\/+$/, "") + path;
+async function rawPost(
+  opts: DeviceFlowOptions,
+  path: string,
+  body: unknown,
+): Promise<Response> {
+  const base = opts.baseUrl.replace(/\/+$/, "");
+  // A malformed endpoint is a typo, not a network problem — say so before it
+  // becomes `fetch failed` six frames down.
+  assertUsableEndpoint(base);
+  const url = base + path;
   const f = opts.fetchImpl ?? fetch;
-  return f(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      // Origin enforcement on the server requires this for non-browser
-      // clients. The base URL is the same as the control plane, so
-      // mirroring it as Origin satisfies the same-origin gate.
-      Origin: opts.baseUrl.replace(/\/+$/, ""),
-    },
-    body: JSON.stringify(body ?? {}),
-  });
+  try {
+    return await f(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        // Origin enforcement on the server requires this for non-browser
+        // clients. The base URL is the same as the control plane, so
+        // mirroring it as Origin satisfies the same-origin gate.
+        Origin: base,
+      },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch (err) {
+    // `fetch failed` on its own tells the reader nothing about whose fault it
+    // is or what to do; this names the transport failure and blames the
+    // machine it actually happened on.
+    throw diagnoseFetchFailure(err, url);
+  }
 }

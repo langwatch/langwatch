@@ -74,6 +74,32 @@ export interface GovernanceConfig {
   >;
 
   /**
+   * A temporary workspace provisioned by `langwatch onboard` for this profile.
+   *
+   * Persisted so a re-run in the same directory picks the account back up
+   * instead of provisioning another one — which would burn the server's
+   * per-fingerprint rate limit within minutes and leave a trail of abandoned
+   * workspaces. This is what makes `--solo` per-directory rather than
+   * per-invocation.
+   *
+   * Holds the ingestion key and the claim token, so the file's 0600 mode is
+   * load-bearing.
+   */
+  ephemeral_account?: {
+    control_plane_url: string;
+    project_id: string;
+    project_slug: string;
+    project_name: string;
+    organization_id: string;
+    ingestion_key: string;
+    otlp_endpoint: string;
+    claim_token: string;
+    claim_url: string;
+    /** ISO 8601. Null once claimed. */
+    delete_after?: string | null;
+  };
+
+  /**
    * Persistent answer to the post-login "save export block to your
    * shell rc?" prompt. `skip` = user picked "never", stay quiet
    * forever. `undefined` = ask each login that lands in an

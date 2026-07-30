@@ -50,8 +50,7 @@ Feature: `npx langwatch claude` with no account at all
     Then the CLI asks before changing it
     # someone else's telemetry pipeline is not ours to redirect.
 
-  # @unimplemented: NOT BUILT: provisioned accounts are not yet persisted to the profile, so each run provisions afresh
-  @bdd @cli @onboarding @unit @unimplemented
+  @bdd @cli @onboarding @unit
   Scenario: the credentials land in a profile, not loose on disk
     When a temporary account is provisioned
     Then the ingestion key and claim token are stored in the resolved profile

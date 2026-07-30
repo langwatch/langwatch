@@ -12,11 +12,20 @@
 import { createHash } from "node:crypto";
 import * as os from "node:os";
 import {
+  type GovernanceConfig,
+  loadConfig,
+  saveConfig,
+} from "./config";
+import {
   type AppSettingsTarget,
   appEnvValues,
   claudeProjectSettingsTarget,
   installAppEnv,
 } from "./app-settings";
+import {
+  assertUsableEndpoint,
+  diagnoseFetchFailure,
+} from "../networkError";
 import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
 
 /** The `POST /api/agent-onboarding/provision` response we consume. */
@@ -91,11 +100,15 @@ export async function provisionEphemeralAccount(params: {
   }
 
   const base = params.endpoint.replace(/\/+$/, "");
+  // Fail on a malformed endpoint here rather than letting it become a
+  // confusing transport error six frames down.
+  assertUsableEndpoint(base);
   const f = params.fetchImpl ?? fetch;
 
+  const url = `${base}/api/agent-onboarding/provision`;
   let res: Response;
   try {
-    res = await f(`${base}/api/agent-onboarding/provision`, {
+    res = await f(url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -104,9 +117,9 @@ export async function provisionEphemeralAccount(params: {
       body: JSON.stringify({ agent }),
     });
   } catch (err) {
-    throw new ProvisioningFailedError(
-      `Could not reach ${base}: ${(err as Error).message}`,
-    );
+    // Names what actually went wrong and whose fault it is, instead of
+    // re-printing `fetch failed`.
+    throw diagnoseFetchFailure(err, url);
   }
 
   if (!res.ok) {
@@ -123,15 +136,44 @@ export async function provisionEphemeralAccount(params: {
   return (await res.json()) as ProvisionResult;
 }
 
+/**
+ * Read a handled error into something worth printing.
+ *
+ * The API deliberately sends the CODE as `message` — a HandledError's own
+ * message is server copy that can name env vars and internal hosts, so it
+ * never leaves the building. Prose for humans rides in `tips`, which is the
+ * channel authored for it. Printing `message` alone therefore yields
+ * `rate_limited` and nothing else, which is exactly the useless error this
+ * avoids.
+ */
 async function readHandledMessage(res: Response): Promise<string | null> {
   try {
-    const body = (await res.json()) as { message?: unknown; tips?: unknown };
-    const message = typeof body.message === "string" ? body.message : null;
-    if (!message) return null;
+    const body = (await res.json()) as {
+      code?: unknown;
+      message?: unknown;
+      tips?: unknown;
+      meta?: { retryAfterSeconds?: unknown };
+    };
     const tips = Array.isArray(body.tips)
       ? body.tips.filter((t): t is string => typeof t === "string")
       : [];
-    return [message, ...tips].join("\n");
+    const code = typeof body.code === "string" ? body.code : null;
+    const message = typeof body.message === "string" ? body.message : null;
+
+    if (tips.length > 0) {
+      // Lead with the guidance; keep the code as a trailing identifier so a
+      // bug report can name the failure precisely.
+      const head = tips[0]!;
+      const rest = tips.slice(1).map((t) => `  ${t}`);
+      return [head, ...rest, code ? `  (${code})` : ""]
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    // No tips: fall back to whatever we have, but never present a bare code as
+    // though it were a sentence.
+    if (code && message === code) return `The server refused this: ${code}`;
+    return message ?? code ?? null;
   } catch {
     return null;
   }
@@ -199,4 +241,94 @@ export function onboardingSummary(params: {
     provisioned.notice.dataRetention,
     provisioned.notice.claimWindow,
   ];
+}
+
+/**
+ * The temporary account for this profile, provisioning one only if there is
+ * not already a usable one stored.
+ *
+ * Reuse is the whole point of persisting it: provisioning afresh on every run
+ * would burn the server's per-fingerprint rate limit within minutes and leave
+ * a trail of abandoned workspaces. Bound to the control plane it came from, so
+ * pointing the CLI at a different instance provisions there rather than
+ * sending one instance's key to another.
+ */
+export async function ensureEphemeralAccount(params: {
+  endpoint: string;
+  tool: string;
+  fetchImpl?: typeof fetch;
+  loadImpl?: () => GovernanceConfig;
+  saveImpl?: (cfg: GovernanceConfig) => void;
+}): Promise<{ provisioned: ProvisionResult; reused: boolean }> {
+  const load = params.loadImpl ?? loadConfig;
+  const save = params.saveImpl ?? saveConfig;
+  const endpoint = params.endpoint.replace(/\/+$/, "");
+
+  const cfg = load();
+  const stored = cfg.ephemeral_account;
+  if (stored && stored.control_plane_url === endpoint) {
+    return { provisioned: fromStored(stored), reused: true };
+  }
+
+  const provisioned = await provisionEphemeralAccount({
+    endpoint,
+    tool: params.tool,
+    fetchImpl: params.fetchImpl,
+  });
+
+  save({
+    ...cfg,
+    ephemeral_account: {
+      control_plane_url: endpoint,
+      project_id: provisioned.account.projectId,
+      project_slug: provisioned.account.projectSlug,
+      project_name: provisioned.account.projectName,
+      organization_id: provisioned.account.organizationId,
+      ingestion_key: provisioned.ingestion.apiKey,
+      otlp_endpoint: provisioned.ingestion.otlpEndpoint,
+      claim_token: provisioned.claim.token,
+      claim_url: provisioned.claim.url,
+      delete_after: provisioned.lifecycle.deleteAfter,
+    },
+  });
+
+  return { provisioned, reused: false };
+}
+
+/**
+ * Rebuild the provisioning shape from what was persisted. The notice is not
+ * stored — it is the server's copy about windows that may since have changed,
+ * so a reused account simply does not re-print it rather than printing a
+ * possibly stale sentence.
+ */
+function fromStored(
+  stored: NonNullable<GovernanceConfig["ephemeral_account"]>,
+): ProvisionResult {
+  return {
+    account: {
+      organizationId: stored.organization_id,
+      projectId: stored.project_id,
+      projectSlug: stored.project_slug,
+      projectName: stored.project_name,
+    },
+    ingestion: {
+      apiKey: stored.ingestion_key,
+      keyPrefix: stored.ingestion_key.slice(0, 12),
+      endpoint: stored.control_plane_url,
+      otlpEndpoint: stored.otlp_endpoint,
+    },
+    claim: {
+      token: stored.claim_token,
+      url: stored.claim_url,
+      claimableUntil: stored.delete_after ?? "",
+    },
+    lifecycle: {
+      state: "active",
+      provisionedAt: "",
+      ingestionStopsAt: null,
+      deleteAfter: stored.delete_after ?? null,
+      daysRemainingInPhase: null,
+    },
+    notice: { dataRetention: "", claimWindow: "", afterExpiry: "" },
+  };
 }

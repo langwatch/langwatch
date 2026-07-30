@@ -3,8 +3,10 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { appEnvValues, claudeProjectSettingsTarget } from "../app-settings";
+import type { GovernanceConfig } from "../config";
 import {
   conflictingExporter,
+  ensureEphemeralAccount,
   installTelemetry,
   machineFingerprint,
   onboardingSummary,
@@ -321,6 +323,95 @@ describe("what the developer is told", () => {
 
       expect(text).not.toContain("ik-lw-secret-token");
       expect(text).not.toContain("claim-token");
+    });
+  });
+});
+
+describe("keeping the account between runs", () => {
+  /** A profile store in memory, so the test never touches a real home. */
+  function fakeStore() {
+    let saved = {} as GovernanceConfig;
+    return {
+      loadImpl: (): GovernanceConfig => saved,
+      saveImpl: (cfg: GovernanceConfig): void => {
+        saved = cfg;
+      },
+      current: (): GovernanceConfig => saved,
+    };
+  }
+
+  describe("given no stored account", () => {
+    /** @scenario "the credentials land in a profile, not loose on disk" */
+    it("provisions once and stores the key and claim token in the profile", async () => {
+      const store = fakeStore();
+
+      const first = await ensureEphemeralAccount({
+        endpoint: "https://app.langwatch.ai",
+        tool: "claude",
+        fetchImpl: async () => jsonResponse(PROVISIONED),
+        loadImpl: store.loadImpl,
+        saveImpl: store.saveImpl,
+      });
+
+      expect(first.reused).toBe(false);
+      expect(store.current().ephemeral_account).toMatchObject({
+        ingestion_key: "ik-lw-secret-token",
+        claim_token: "claim-token",
+        control_plane_url: "https://app.langwatch.ai",
+      });
+    });
+  });
+
+  describe("given an account already stored for this control plane", () => {
+    it("reuses it instead of provisioning a second workspace", async () => {
+      const store = fakeStore();
+      const provisionOnce = async () => jsonResponse(PROVISIONED);
+
+      await ensureEphemeralAccount({
+        endpoint: "https://app.langwatch.ai",
+        tool: "claude",
+        fetchImpl: provisionOnce,
+        loadImpl: store.loadImpl,
+        saveImpl: store.saveImpl,
+      });
+
+      const second = await ensureEphemeralAccount({
+        endpoint: "https://app.langwatch.ai",
+        tool: "claude",
+        // Provisioning again would burn the per-fingerprint rate limit and
+        // leave an abandoned workspace behind, so it must not be called.
+        fetchImpl: async () => {
+          throw new Error("must not provision again");
+        },
+        loadImpl: store.loadImpl,
+        saveImpl: store.saveImpl,
+      });
+
+      expect(second.reused).toBe(true);
+      expect(second.provisioned.ingestion.apiKey).toBe("ik-lw-secret-token");
+    });
+  });
+
+  describe("given the stored account belongs to a different control plane", () => {
+    it("provisions there rather than sending one instance's key to another", async () => {
+      const store = fakeStore();
+      await ensureEphemeralAccount({
+        endpoint: "https://app.langwatch.ai",
+        tool: "claude",
+        fetchImpl: async () => jsonResponse(PROVISIONED),
+        loadImpl: store.loadImpl,
+        saveImpl: store.saveImpl,
+      });
+
+      const elsewhere = await ensureEphemeralAccount({
+        endpoint: "https://langwatch.acme.internal",
+        tool: "claude",
+        fetchImpl: async () => jsonResponse(PROVISIONED),
+        loadImpl: store.loadImpl,
+        saveImpl: store.saveImpl,
+      });
+
+      expect(elsewhere.reused).toBe(false);
     });
   });
 });

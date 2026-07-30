@@ -172,7 +172,7 @@ describe("fold projection contracts", () => {
       expect(repo.upsert.mock.calls[0]![2]).toEqual(["evt-1", "evt-2"]);
     });
 
-    /** @scenario the watermark round-trips through the read-back */
+    /** @scenario a signal with nothing else to store is not lost to a cold cache */
     it("reads the same watermark back with the state", async () => {
       const repo = makeRepo();
       const store = new TraceAnalyticsStore(repo as never);
@@ -239,7 +239,6 @@ describe("fold projection contracts", () => {
         store: stubStore(),
       }).init() as EvaluationAnalyticsData;
 
-    /** @scenario the watermark survives the eval write path too */
     it("persists the applied-event-id watermark next to the row", async () => {
       const repo = makeRepo();
       const store = new EvaluationAnalyticsStore(repo as never);
