@@ -163,7 +163,19 @@ overrides:
   # skills/ >=8.0.2, mcp-server/ >=8.6.0. Taking the strictest — a package
   # patched in one project was, until now, left vulnerable in the others, which
   # is the whole reason these lists are merged.
-  protobufjs: ">=7.5.6 <8.0.0 || >=8.6.0"
+  # Per-major floors, NOT the single unconditional union three old roots
+  # carried. The union rewrites every request — including ^7.x ones — to
+  # "highest matching", which hoists @opentelemetry/otlp-transformer 0.55.0
+  # (declares protobufjs ^7.3.0) onto the 8.x runtime, and its pbjs-GENERATED
+  # static code fails there (`Cannot read properties of undefined (reading
+  # 'v1')` in ExportTraceServiceRequest.encode; reproduced locally on 8.6.5,
+  # 8.6.6 and 8.7.1 — the OTLP decode suite is green only with the
+  # transformer on 7.5.6, which is the state every green CI run of this
+  # branch actually had). Both floors sit at their majors' advisory-patched
+  # releases (CVE-2026-44289..44293), so nothing is left below a fixed
+  # version; the majors just stop being force-merged.
+  "protobufjs@<7.5.6": ">=7.5.6 <8.0.0"
+  "protobufjs@>=8.0.0 <8.6.0": ">=8.6.0"
   # OpenTelemetry Prometheus exporter crash via malformed HTTP (CVE-2026-44902)
   "@opentelemetry/exporter-prometheus@<0.217.0": ">=0.217.0"
   "@opentelemetry/sdk-node@<0.217.0": ">=0.217.0"
