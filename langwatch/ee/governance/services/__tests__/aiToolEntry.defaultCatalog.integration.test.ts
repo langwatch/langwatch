@@ -164,7 +164,9 @@ describe("AiToolEntryService.ensureDefaultCatalog", () => {
       select: { slug: true },
     });
     expect(rows).toHaveLength(STARTER_PACK_TILES.length);
-    expect(new Set(rows.map((r) => r.slug)).size).toBe(STARTER_PACK_TILES.length);
+    expect(new Set(rows.map((r) => r.slug)).size).toBe(
+      STARTER_PACK_TILES.length,
+    );
   });
 });
 
