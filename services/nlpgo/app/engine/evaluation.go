@@ -331,7 +331,7 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 		// here), so its result is always {} by design — not the
 		// missing-End symptom #3198 targets. Each per-row Execute() is a
 		// full execute_flow and already carries the End-node guard.
-		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started, false))
+		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
 		return
 	}
 	total := len(entries)
@@ -454,12 +454,12 @@ func (e *Engine) executeEvaluationStream(ctx context.Context, req ExecuteRequest
 		// (CodeRabbit major on PR #3607: producing two terminal
 		// states for one run confuses Studio's reducer).
 		// requireEnd=false — evaluation done frame, see kickoff comment.
-		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started, false))
+		emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
 		return
 	}
 	emit(ctx, out, workflowSuccessEvent(req, traceID, newRunState(req.Workflow), started, true))
 	// requireEnd=false — evaluation done frame, see kickoff comment.
-	emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started, false))
+	emit(ctx, out, doneEvent(traceID, newRunState(req.Workflow), started))
 }
 
 // selectEvaluationEntries materializes the workflow's Entry node dataset

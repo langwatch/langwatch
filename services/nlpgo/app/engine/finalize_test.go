@@ -27,7 +27,9 @@ func TestFinalize_RequireEndWithNoEndNodeErrors(t *testing.T) {
 	state := newRunState(w)
 	require.Empty(t, state.endNodeIDs, "fixture must have no End node")
 
-	res := finalize(state, "trace", time.Now(), nil, true)
+	state.requireEnd = true
+
+	res := finalize(state, "trace", time.Now(), nil)
 
 	require.Equal(t, "error", res.Status)
 	require.NotNil(t, res.Error)
@@ -44,7 +46,9 @@ func TestFinalize_RequireEndFalseAllowsNoEndNode(t *testing.T) {
 	w := &dsl.Workflow{Nodes: []dsl.Node{{ID: "code", Type: dsl.ComponentCode}}}
 	state := newRunState(w)
 
-	res := finalize(state, "trace", time.Now(), nil, false)
+	state.requireEnd = false
+
+	res := finalize(state, "trace", time.Now(), nil)
 
 	require.Equal(t, "success", res.Status)
 	assert.Nil(t, res.Error)
@@ -68,7 +72,9 @@ func TestFinalize_RequireEndWithEndNodeThatNeverRanErrors(t *testing.T) {
 	state := newRunState(w)
 	require.Equal(t, []string{"end"}, state.endNodeIDs, "fixture must have an End node")
 
-	res := finalize(state, "trace", time.Now(), nil, true)
+	state.requireEnd = true
+
+	res := finalize(state, "trace", time.Now(), nil)
 
 	require.Equal(t, "error", res.Status)
 	require.NotNil(t, res.Error)
@@ -88,7 +94,9 @@ func TestFinalize_RequireEndFalseAllowsEndNodeThatNeverRan(t *testing.T) {
 	}
 	state := newRunState(w)
 
-	res := finalize(state, "trace", time.Now(), nil, false)
+	state.requireEnd = false
+
+	res := finalize(state, "trace", time.Now(), nil)
 
 	require.Equal(t, "success", res.Status)
 	assert.Nil(t, res.Error)
@@ -111,7 +119,9 @@ func TestFinalize_UsesTheEndNodeThatActuallyProducedOutput(t *testing.T) {
 	require.Equal(t, []string{"end_a", "end_b"}, state.endNodeIDs, "both End nodes are tracked, in node order")
 	state.recordOutputs("end_b", map[string]any{"output": "from b"})
 
-	res := finalize(state, "trace", time.Now(), nil, true)
+	state.requireEnd = true
+
+	res := finalize(state, "trace", time.Now(), nil)
 
 	require.Equal(t, "success", res.Status)
 	assert.Nil(t, res.Error)
@@ -127,7 +137,9 @@ func TestFinalize_EmptyEndOutputsIsStillASuccess(t *testing.T) {
 	state := newRunState(w)
 	state.recordOutputs("end", map[string]any{})
 
-	res := finalize(state, "trace", time.Now(), nil, true)
+	state.requireEnd = true
+
+	res := finalize(state, "trace", time.Now(), nil)
 
 	require.Equal(t, "success", res.Status)
 	assert.Nil(t, res.Error)

@@ -213,6 +213,7 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 		return nil, err
 	}
 	state := newRunState(req.Workflow)
+	state.requireEnd = requireEndNode(req)
 	applyManualInputs(state, req)
 	started := time.Now()
 	// execute_component (req.NodeID set) dispatches ONLY the requested
@@ -228,18 +229,18 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 			return nil, fmt.Errorf("engine: execute_component target node %q not in workflow", req.NodeID)
 		}
 		e.runLayer(ctx, req, plan, state, []string{req.NodeID})
-		return finalize(state, traceID, started, nil, requireEndNode(req)), nil
+		return finalize(state, traceID, started, nil), nil
 	}
 	for _, layer := range plan.Layers {
 		if err := ctx.Err(); err != nil {
-			return finalize(state, traceID, started, err, requireEndNode(req)), nil
+			return finalize(state, traceID, started, err), nil
 		}
 		e.runLayer(ctx, req, plan, state, layer)
 		if state.firstError != nil {
-			return finalize(state, traceID, started, nil, requireEndNode(req)), nil
+			return finalize(state, traceID, started, nil), nil
 		}
 	}
-	return finalize(state, traceID, started, nil, requireEndNode(req)), nil
+	return finalize(state, traceID, started, nil), nil
 }
 
 func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner.Plan, state *runState, layer []string) {
@@ -354,6 +355,14 @@ func redactNodeSecrets(ns *NodeState, derr *NodeError, secrets map[string]string
 	}
 }
 
+// dispatchNode is the executor switch. It carries `dispatch`'s original
+// signature verbatim — this fix only moved the body down a level so redaction
+// could sit at the single choke point above it, so the argument count is
+// inherited, not chosen. Reshaping it into a params struct would touch every
+// executor for no benefit to the reader; the house rule is scoped to new and
+// changed lines, and the only thing new on this line is the name.
+//
+//nolint:revive // argument-limit: signature unchanged from dispatch, see above
 func (e *Engine) dispatchNode(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	switch node.Type {
 	case dsl.ComponentEntry:
@@ -1271,6 +1280,17 @@ type runState struct {
 	// inbound edges. Both are zero-valued for execute_flow runs.
 	manualInputsTarget string
 	manualInputs       map[string]any
+	// requireEnd says this run is a FULL run, so finalize must insist the
+	// End node exists and actually ran rather than reporting an empty
+	// success (#3198). Request-derived and fixed for the run's lifetime —
+	// see requireEndNode — so it rides here beside manualInputsTarget
+	// instead of being threaded through finalize and doneEvent.
+	//
+	// The zero value is the safe one: a throwaway runState built only to
+	// carry a `done` frame (executeEvaluationStream) never asserts an End
+	// node, which is correct — per-row results go to the batch POST, and
+	// each row's own Execute() carries this guard for real.
+	requireEnd bool
 }
 
 func newRunState(w *dsl.Workflow) *runState {
@@ -1467,7 +1487,7 @@ func stripHandlePrefix(handle, prefix string) string {
 // with finalize rather than in the planner's validation vocabulary.
 const UnreachedEndNodeMessage = "workflow finished without reaching its End node, so it produced no result; check that the End node is wired and reachable on every branch"
 
-func finalize(state *runState, traceID string, started time.Time, ctxErr error, requireEnd bool) *ExecuteResult {
+func finalize(state *runState, traceID string, started time.Time, ctxErr error) *ExecuteResult {
 	res := &ExecuteResult{
 		TraceID:    traceID,
 		Nodes:      state.states,
@@ -1490,7 +1510,7 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error, 
 	// gate (#3198). Partial runs (execute_component, "run until here")
 	// legitimately have no End, so requireEnd is false for them and the
 	// happy path proceeds.
-	if requireEnd && len(state.endNodeIDs) == 0 {
+	if state.requireEnd && len(state.endNodeIDs) == 0 {
 		res.Status = "error"
 		res.Error = &NodeError{Type: "missing_end_node", Message: planner.MissingEndNodeMessage}
 		return res
@@ -1510,7 +1530,7 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error, 
 	//
 	// A partial run (execute_component, "run until here") stops before the End
 	// by design, so requireEnd is false and the happy path proceeds.
-	if requireEnd && !endRan {
+	if state.requireEnd && !endRan {
 		res.Status = "error"
 		res.Error = &NodeError{Type: "unreached_end_node", Message: UnreachedEndNodeMessage}
 		return res
