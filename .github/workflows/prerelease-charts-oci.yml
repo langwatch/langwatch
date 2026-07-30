@@ -36,6 +36,14 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # workflow_dispatch can be triggered from ANY ref, and this job holds
+    # packages:write and id-token:write. Without this gate a manual run from a
+    # feature branch would push and SIGN a chart versioned `-main.<run>.<sha>`
+    # — an artifact that claims to come from main, carrying a valid Sigstore
+    # signature, built from unreviewed code. The version string is the whole
+    # trust signal for these prereleases, so it must not be forgeable by
+    # anyone who can click Run workflow.
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       # Required to push OCI artifacts to ghcr.io.
@@ -78,6 +86,17 @@ jobs:
                 --username "$GHCR_USER" \
                 --password-stdin
 
+          # Cosign needs its own login. `helm registry login` writes to Helm's
+          # registry config (~/.config/helm/registry/config.json); cosign reads
+          # the Docker config (~/.docker/config.json) and would otherwise get a
+          # 401 from ghcr.io when pushing the signature — AFTER the chart had
+          # already been pushed, leaving an unsigned artifact published and the
+          # job red.
+          printf '%s' "$GHCR_TOKEN" \
+            | cosign login ghcr.io \
+                --username "$GHCR_USER" \
+                --password-stdin
+
       - name: Add upstream Helm repositories
         run: |
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -89,6 +108,9 @@ jobs:
           # reference paths must be lowercase and GitHub org names are not.
           OWNER: ${{ github.repository_owner }}
           RUN_NUMBER: ${{ github.run_number }}
+          # Used to pin the expected signing identity on verification, so a
+          # signature minted by some other repository's workflow is rejected.
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
 
@@ -134,11 +156,20 @@ jobs:
             fi
 
             # Keyless: the signature is bound to this workflow's OIDC identity,
-            # so there is no private key to store or rotate. Verify with:
-            #   cosign verify ghcr.io/<owner>/charts/<chart>@<digest> \
-            #     --certificate-identity-regexp '^https://github.com/langwatch/langwatch/' \
-            #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
-            cosign sign --yes "ghcr.io/${OWNER_LC}/charts/${chart_name}@${digest}"
+            # so there is no private key to store or rotate.
+            ref="ghcr.io/${OWNER_LC}/charts/${chart_name}@${digest}"
+            cosign sign --yes "$ref"
+
+            # Verify immediately, matching .github/scripts/sign-image.sh. Signing
+            # can "succeed" while producing something no consumer can verify —
+            # a transparency-log hiccup, or a bundle format the verifier does not
+            # accept (the reason cosign is pinned to 2.x here). Checking now
+            # turns that into a red build rather than a chart that only fails
+            # when someone tries to trust it.
+            cosign verify "$ref" \
+              --certificate-identity-regexp "^https://github.com/${OWNER_LC}/${REPO_NAME}/" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              > /dev/null
             echo "::endgroup::"
 
             echo "- \`${registry}/${chart_name}:${version}\`" >> "$GITHUB_STEP_SUMMARY"
