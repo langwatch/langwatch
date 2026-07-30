@@ -209,9 +209,15 @@ const DELIVERY_ITEMS: { value: SlackDeliveryMethod; label: string }[] = [
  *     first; without it Slack rejects the post with `not_in_channel` until the
  *     bot is manually `/invite`d, which is the #1 setup snag
  *   - `channels:read` / `groups:read` — populate the channel picker
+ * `features.bot_user` is required alongside `oauth_config.scopes.bot` —
+ * Slack rejects the manifest with "OAuth requires bot_user" without it.
  */
-const SLACK_APP_MANIFEST = `display_information:
+export const SLACK_APP_MANIFEST = `display_information:
   name: LangWatch
+features:
+  bot_user:
+    display_name: LangWatch
+    always_online: false
 oauth_config:
   scopes:
     bot:

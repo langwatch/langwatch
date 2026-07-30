@@ -31,11 +31,7 @@ import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
-// Skip when running with testcontainers only (no PostgreSQL)
-// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)("plan.getActivePlan integration", () => {
+describe("plan.getActivePlan integration", () => {
   const testNamespace = `plan-active-${nanoid(8)}`;
   let organizationId: string;
   let userId: string;

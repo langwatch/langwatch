@@ -6,7 +6,7 @@ import { FileManager } from "../utils/fileManager";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { PromptConverter } from "../utils/promptConverter";
 import { ensureProjectInitialized } from "../utils/init";
-import { checkApiKey } from "../utils/apiKey";
+import { resolveCredentials } from "../utils/apiKey";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { failSpinner } from "../utils/spinnerError";
 
@@ -87,7 +87,7 @@ export const addCommand = async (
     }
 
     // Check API key before doing anything else
-    checkApiKey();
+    await resolveCredentials();
 
     const promptsApiService = new PromptsApiService();
     const version = options.version ?? "latest";

@@ -4,7 +4,7 @@ import {
   type BudgetOnBreach,
   GatewayBudgetsApiService,
 } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -26,7 +26,7 @@ export const updateGatewayBudgetCommand = async (
   id: string,
   options: UpdateGatewayBudgetOptions,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const onBreach: BudgetOnBreach | undefined = options.onBreach
     ? (options.onBreach.toUpperCase() as BudgetOnBreach)

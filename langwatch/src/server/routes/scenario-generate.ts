@@ -108,9 +108,11 @@ const secured = createServiceApp({ basePath: "/api/scenario" });
 
 secured
   .access(
-    handlerManagedAuth(
-      "user session validated in-handler via getServerAuthSession",
-    ),
+    handlerManagedAuth({
+      reason: "user session validated in-handler via getServerAuthSession",
+      permissions: ["scenarios:manage"],
+      credential: "session",
+    }),
   )
   .post("/generate", async (c) => {
     const session = await getServerAuthSession({ req: c.req.raw as any });

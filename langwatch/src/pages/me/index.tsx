@@ -13,12 +13,14 @@ import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import { CodingAgentUsageContent } from "~/components/me/CodingAgentUsageContent";
+import { ConnectYourAgentButton } from "~/components/me/ConnectYourAgentButton";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalRecentTracesTable } from "~/components/me/PersonalRecentTracesTable";
 import {
   PERSONAL_AI_TOOLS_ANCHOR,
   PERSONAL_TRACE_INGEST_ANCHOR,
 } from "~/components/me/PersonalTracesEmptyState";
+import { spentSubline } from "~/components/me/spentSubline";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -46,8 +48,6 @@ function MyUsagePage() {
     organizationName,
   } = ctx;
 
-  const isOverBudget = budget.status === "exceeded";
-
   // "Spent this month" leads with the actually-billed amount; the theoretical
   // bundled portion (e.g. Claude Max usage that isn't billed per token) is most
   // of a coding-assistant user's spend and would mislead as the headline, so it
@@ -56,15 +56,7 @@ function MyUsagePage() {
     0,
     summary.spentThisMonthUsd - summary.billedThisMonthUsd,
   );
-  const budgetSubline = isOverBudget
-    ? "Limit reached"
-    : summary.budgetUsd !== null
-      ? `of ${fmtUsd(summary.budgetUsd)} budget`
-      : "No budget set";
-  const spentSubline =
-    bundledThisMonthUsd > 0
-      ? `${fmtUsd(bundledThisMonthUsd)} bundled · ${budgetSubline}`
-      : budgetSubline;
+  const spentCardSubline = spentSubline({ bundledUsd: bundledThisMonthUsd });
 
   // Two cost series across the spend charts: the theoretical list-price total
   // (includes bundled / not-billed-per-token usage like Claude Max) and the
@@ -124,6 +116,9 @@ function MyUsagePage() {
             </Text>
           </VStack>
           <Spacer />
+          {/* Renders only once the personal project has traces: exploration
+              of usage that exists, not another setup entry point. */}
+          <ConnectYourAgentButton projectId={personalProjectId} />
         </HStack>
 
         {budget.status === "exceeded" && (
@@ -148,8 +143,7 @@ function MyUsagePage() {
           <SummaryCard
             title="Spent this month"
             value={fmtUsd(summary.billedThisMonthUsd)}
-            subline={spentSubline}
-            tone={isOverBudget ? "red" : "default"}
+            subline={spentCardSubline}
           />
           <SummaryCard
             title="Requests this month"
@@ -354,12 +348,12 @@ function SummaryCard({
   title,
   value,
   subline,
-  tone = "default",
 }: {
   title: string;
   value: string;
-  subline: string;
-  tone?: "default" | "red";
+  /** Omitted or empty renders no second line at all, so the card keeps its
+   *  shape instead of reserving a blank row. */
+  subline?: string;
 }) {
   return (
     <Box
@@ -377,21 +371,14 @@ function SummaryCard({
       >
         {title}
       </Text>
-      <Text
-        fontSize="2xl"
-        fontWeight="semibold"
-        marginTop={1}
-        color={tone === "red" ? "red.500" : "fg"}
-      >
+      <Text fontSize="2xl" fontWeight="semibold" marginTop={1} color="fg">
         {value}
       </Text>
-      <Text
-        fontSize="sm"
-        color={tone === "red" ? "red.500" : "fg.muted"}
-        marginTop={1}
-      >
-        {subline}
-      </Text>
+      {subline ? (
+        <Text fontSize="sm" color="fg.muted" marginTop={1}>
+          {subline}
+        </Text>
+      ) : null}
     </Box>
   );
 }

@@ -27,6 +27,10 @@ import {
   verifySignature,
 } from "../../../../../ee/licensing";
 import {
+  canonicalPemKey,
+  mangledPemPastes,
+} from "../../../../../ee/licensing/__tests__/fixtures/mangledPemPastes";
+import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
 } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
@@ -503,6 +507,46 @@ describe("License Router Integration", () => {
       const parsedLicense = parseLicenseKey(result.licenseKey);
       expect(parsedLicense?.data.plan.type).toBe("ENTERPRISE");
       expect(parsedLicense?.data.plan.name).toBe("Enterprise");
+    });
+
+    describe("when the pasted private key carries stray whitespace", () => {
+      const pastes = mangledPemPastes(canonicalPemKey(TEST_PRIVATE_KEY));
+
+      for (const [description, privateKey] of Object.entries(pastes)) {
+        it(`generates a verifiable license from a key with ${description}`, async () => {
+          const result = await adminCaller.license.generate({
+            ...getValidInput(),
+            privateKey,
+          });
+
+          const parsedLicense = parseLicenseKey(result.licenseKey);
+          expect(parsedLicense).not.toBeNull();
+          expect(verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(true);
+        });
+      }
+
+      it("generates a verifiable license from a public+private PEM bundle", async () => {
+        const result = await adminCaller.license.generate({
+          ...getValidInput(),
+          privateKey: `${TEST_PUBLIC_KEY}${TEST_PRIVATE_KEY}`,
+        });
+
+        const parsedLicense = parseLicenseKey(result.licenseKey);
+        expect(parsedLicense).not.toBeNull();
+        expect(verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(true);
+      });
+    });
+
+    it("throws BAD_REQUEST with a keyable code when the private key is not a PEM key", async () => {
+      await expect(
+        adminCaller.license.generate({
+          ...getValidInput(),
+          privateKey: "not-a-private-key",
+        }),
+      ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
+        cause: { code: "license_signing_key_not_pem" },
+      });
     });
 
     it("throws BAD_REQUEST for past expiration date", async () => {
