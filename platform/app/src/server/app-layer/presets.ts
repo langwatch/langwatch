@@ -932,11 +932,13 @@ export function initializeDefaultApp(options?: {
     simulation: { cache: foldCache("simulation_run_state") },
     topicClustering: {
       ports: {
-        runClusteringPage: ({ projectId, searchAfter, runId, page }) =>
-          clusterTopicsForProject(projectId, searchAfter ?? undefined, {
+        // The tenant rides on the handler context now, not the intent payload.
+        runClusteringPage: async ({ searchAfter, runId, page }, ctx) => {
+          await clusterTopicsForProject(ctx.tenantId, searchAfter ?? undefined, {
             runId,
             page,
-          }),
+          });
+        },
       },
     },
     trace: {
@@ -972,9 +974,16 @@ export function initializeDefaultApp(options?: {
       prisma,
       redis: redis ?? null,
       commands: {
-        recordTopics: (args) => commands.topicClustering.recordTopics(args),
-        requestClustering: (args) =>
-          commands.topicClustering.requestClustering(args),
+        recordTopics: async (args) => {
+          await commands.topicClustering.recordTopics(args, {
+            tenantId: args.tenantId,
+          });
+        },
+        requestClustering: async (args) => {
+          await commands.topicClustering.requestClustering(args, {
+            tenantId: args.tenantId,
+          });
+        },
       },
     });
   }
@@ -1060,7 +1069,9 @@ export function initializeDefaultApp(options?: {
   const traceCollection = traced(
     new TraceRequestCollectionService({
       dedup: spanDedup,
-      recordSpan: commands.traces.recordSpan,
+      recordSpan: async (data) => {
+        await commands.traces.recordSpan(data, { tenantId: data.tenantId });
+      },
       // ADR-022: Edge size-check + transient S3 spool, flag-gated per project.
       // projectId === tenantId (routes/otel.ts passes project.id). processCommandData
       // runs PER SPAN (not once per OTLP request/batch); the flag is read per span and

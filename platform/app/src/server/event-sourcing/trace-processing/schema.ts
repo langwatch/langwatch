@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { metricKindSchema } from "../metric-processing/schema";
 
 /**
  * The `trace` aggregate's payloads — what crosses `event_log`, not raw OTLP.
@@ -211,15 +212,13 @@ export const logContributionSchema = z.object({
 });
 export type LogContribution = z.infer<typeof logContributionSchema>;
 
-export const metricKindSchema = z.enum([
-  "counter",
-  "gauge",
-  "histogram",
-  "summary",
-]);
-export type MetricKind = z.infer<typeof metricKindSchema>;
-
-/** Bridged from `metric-processing`, whose aggregate id is the point's content hash. */
+/**
+ * Bridged from `metric-processing`, whose aggregate id is the point's content
+ * hash — so the kind is that pipeline's, not a second enum. The local copy had
+ * drifted to `counter | gauge | histogram | summary`, which cannot represent
+ * the `sum` and `exponential_histogram` OTLP actually sends, so a correlation
+ * for either would have been rejected on the way in.
+ */
 export const metricCorrelationSchema = z.object({
   traceId: z.string().regex(/^[a-f0-9]{32}$/i),
   spanId: z.string().regex(/^[a-f0-9]{16}$/i),
