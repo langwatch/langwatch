@@ -7,12 +7,23 @@
  *
  * The unit tests next door stub `fetch`, so they prove the adapter reads an
  * envelope correctly but not that the engine actually emits the envelope they
- * describe. This one closes that gap: if the engine ever stopped returning
- * `{status:"error"}` for these shapes, or started returning a 4xx, the unit
- * tests would stay green and this would not.
+ * describe. This closes that gap when it runs.
  *
- * Skipped automatically when nlpgo is unreachable, so CI without the Go engine
- * does not red-X. Point it elsewhere with LANGWATCH_NLP_SERVICE.
+ * ⚠ READ THIS BEFORE TREATING IT AS A GUARD. Every case here opens with
+ * `if (!reachable) skip()`, and nothing binds an nlpgo to the probed port in CI,
+ * so in CI all of them SKIP — unconditionally. It is a LOCAL backstop you run
+ * deliberately, NOT a regression guard, and it must not be cited as CI evidence
+ * that the engine still emits `{status:"error"}`. The CI-enforced half of that
+ * claim is the fetch-stubbed unit suite next door, which does include the
+ * "does not resolve with an empty string" case.
+ *
+ * To make it a real guard it needs to boot its own engine rather than probe for
+ * one: `startNlpgoSubprocess`/`hasGo` in `~/server/nlpgo/__tests__/_nlpgoSubprocess`
+ * exist for exactly this and are already used by two integration tests. That is a
+ * deliberate follow-up — 8+ pre-existing live-nlpgo tests share this
+ * probe-and-skip pattern, so it is a migration rather than a one-file change.
+ *
+ * Point it at an engine with LANGWATCH_NLP_SERVICE:
  *
  *   make service svc=nlpgo      # binds :5561, the default this file probes
  *   # or: go build -o /tmp/nlpgo ./cmd/service && SERVER_ADDR=:5561 /tmp/nlpgo nlpgo
