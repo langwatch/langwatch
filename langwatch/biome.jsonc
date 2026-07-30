@@ -293,7 +293,20 @@
 						"useTestHooksOnTop": "error"
 					},
 					"complexity": {
-						"noExcessiveNestedTestSuites": "error"
+						"noExcessiveNestedTestSuites": "error",
+
+						// A `describe` callback is a suite declaration, not a
+						// function, and its length counts the cases covered —
+						// the one number a test file is meant to grow. CLAUDE.md
+						// mandates the nested `describe("given …") /
+						// describe("when …")` structure that makes the outer
+						// callback span the whole file, so every well-formed
+						// suite past ~60 lines trips this, and the only edit
+						// that satisfies it splits the file on a boundary the
+						// rule picked rather than the subject did.
+						// `noExcessiveNestedTestSuites` above is the rule that
+						// actually governs the shape of a suite.
+						"noExcessiveLinesPerFunction": "off"
 					}
 				}
 			}

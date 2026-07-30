@@ -772,7 +772,10 @@ export function ScopeChipPicker<
               the long tail (one policy attached to N projects /
               cross-team rules). Active whenever the current selection
               doesn't reduce to a single quick-pick scope. Hidden in
-              single-scope mode, where multi-scope is not representable. */}
+              single-scope mode, where multi-scope is not representable.
+              With ZERO scopes selected the chip is still the active one
+              (nothing else can be), so its label must say what is true:
+              "None selected", never "Multiple". */}
           {!singleSelect && (
             <Button
               type="button"
@@ -784,7 +787,9 @@ export function ScopeChipPicker<
             >
               <HStack gap={1}>
                 <CheckCheck size={14} aria-hidden />
-                <Text>Multiple</Text>
+                <Text>
+                  {scopes.length === 0 ? "None selected" : "Multiple"}
+                </Text>
               </HStack>
             </Button>
           )}

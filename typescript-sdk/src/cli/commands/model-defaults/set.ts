@@ -6,7 +6,7 @@ import {
   ModelDefaultsApiService,
 } from "@/client-sdk/services/model-defaults/model-defaults-api.service";
 
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -68,7 +68,7 @@ export const setModelDefaultCommand = async (
   model: string,
   options: SetModelDefaultOptions,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new ModelDefaultsApiService();
   const spinner = createSpinner(

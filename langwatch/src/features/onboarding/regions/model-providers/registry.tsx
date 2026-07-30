@@ -58,13 +58,19 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     label: "Google Gemini",
     defaultModel: "gemini-2.5-flash",
     defaultBaseUrl: "https://generativelanguage.googleapis.com/v1",
+    // Google answers the same key on /v1, /v1beta and the OpenAI-compatible
+    // surface, and which one a key was minted for is not knowable up front.
+    apiRoot: "https://generativelanguage.googleapis.com",
     icon: singleIcon("/images/external-icons/google.svg", "Google Gemini"),
     externalDocsUrl: "https://ai.google.dev/",
     fieldMetadata: {
       GEMINI_API_KEY: {
         label: "Gemini API Key",
+        // Naming the API restriction is the whole point: a Google Cloud key
+        // is commonly scoped to one API, and a customer told only "Gemini
+        // API key" has no way to know this is the Generative Language API.
         description:
-          "Your Google AI Studio API key from aistudio.google.com/apikey",
+          "Your Google AI Studio key, or a Google Cloud key allowed to call the Generative Language API. On Google Cloud, Vertex AI is usually the better fit.",
       },
     },
   },
@@ -271,3 +277,10 @@ export const providerDefaultBaseUrls: Record<string, string> =
       .filter((p) => p.defaultBaseUrl)
       .map((p) => [p.backendModelProviderKey, p.defaultBaseUrl!]),
   );
+
+/** Version-less API roots keyed by backendModelProviderKey — see `apiRoot`. */
+export const providerApiRoots: Record<string, string> = Object.fromEntries(
+  modelProviderRegistry
+    .filter((p) => p.apiRoot)
+    .map((p) => [p.backendModelProviderKey, p.apiRoot!]),
+);
