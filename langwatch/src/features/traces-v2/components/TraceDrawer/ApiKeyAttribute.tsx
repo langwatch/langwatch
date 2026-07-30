@@ -61,10 +61,15 @@ export function ApiKeyAttributeValue({ apiKeyId }: { apiKeyId: string }) {
   }
 
   return (
+    // `display="flex"` rather than `flex={1}`: the cell this sits in is a
+    // block box, so a flex-grow on this element would be inert and the link,
+    // being inline-flex by default, would shrink-to-fit its own text and
+    // overrun the column. Block-level flex fills the cell instead, which is
+    // what lets the name below truncate.
     <Link
       href={apiKeySettingsHref(apiKeyId)}
       variant="plain"
-      flex={1}
+      display="flex"
       minWidth={0}
       overflow="hidden"
     >
