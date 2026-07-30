@@ -59,7 +59,13 @@ export function ApiKeyAttributeValue({ apiKeyId }: { apiKeyId: string }) {
   }
 
   return (
-    <Link href={apiKeySettingsHref(apiKeyId)} variant="plain" minWidth={0}>
+    <Link
+      href={apiKeySettingsHref(apiKeyId)}
+      variant="plain"
+      flex={1}
+      minWidth={0}
+      overflow="hidden"
+    >
       <HStack gap={1.5} minWidth={0} paddingX={3} paddingY={1.5}>
         <Icon as={Key} boxSize={3} color="fg.subtle" flexShrink={0} />
         <Text textStyle="xs" fontFamily="mono" color="blue.fg" truncate>
