@@ -1,0 +1,119 @@
+---
+title: Testing Agents Behind Authentication
+sidebarTitle: Authenticated agents
+keywords: langwatch, agent simulations, auth0, oauth2, client credentials, code agent, secrets, machine-to-machine
+description: Connect an API protected by OAuth2 client-credentials (Auth0 machine-to-machine) to LangWatch simulations using a custom code agent and project secrets.
+---
+
+# Testing Agents Behind Authentication
+
+Many production agents sit behind an API that requires authentication — most commonly an **OAuth2 client-credentials** flow (Auth0 "machine-to-machine" is the canonical example). LangWatch's HTTP agent type carries a *static* credential (`bearer` / `api_key` / `basic`), which is not enough when a token has to be **exchanged** first.
+
+A **custom code agent** closes that gap: a few lines of Python that fetch the token, call your API with it, and keep the credentials in your project's encrypted secret store — never in the agent's stored source.
+
+## How it fits together
+
+1. **Project secrets** hold the client ID and client secret, encrypted at rest. They are exposed to your code agent's Python as the injected `secrets` namespace.
+2. **The code agent** exchanges the credentials for an access token and calls your protected API with it.
+3. **A scenario** drives the agent like a real user and judges the answers — the agent only passes if it actually got through the auth wall.
+
+## 1. Store the credentials as project secrets
+
+In **Settings → Secrets** (or via the CLI), create:
+
+```bash
+langwatch secret create AUTH0_CLIENT_ID --value "<your client id>"
+langwatch secret create AUTH0_CLIENT_SECRET --value "<your client secret>"
+```
+
+Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted and never returned by any API.
+
+<Warning>
+  Never paste the client secret into the agent's Python. The stored code is readable by anyone with project access — the `secrets` namespace exists so the credential lives only in the encrypted store.
+</Warning>
+
+## 2. Write the code agent
+
+Create a **code agent** with this Python — it is the reference implementation, exercised continuously against the real code-agent runtime:
+
+```python
+import requests
+
+
+class Code:
+    def __call__(self, message: str, token_url: str, audience: str, api_url: str):
+        # Step 1: exchange the client credentials for an access token.
+        token_response = requests.post(
+            token_url,
+            json={
+                "grant_type": "client_credentials",
+                "client_id": secrets.AUTH0_CLIENT_ID,
+                "client_secret": secrets.AUTH0_CLIENT_SECRET,
+                "audience": audience,
+            },
+            timeout=10,
+        )
+        token_response.raise_for_status()
+        access_token = token_response.json()["access_token"]
+
+        # Step 2: call the protected API with the minted token.
+        api_response = requests.post(
+            api_url,
+            json={"message": message},
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=30,
+        )
+        api_response.raise_for_status()
+
+        return {"output": api_response.json()["reply"]}
+```
+
+Things the sandbox enforces, in the order people trip on them:
+
+- **Entry point**: `class Code` with `__call__` (no constructor arguments).
+- **`secrets` is injected** into the module globals — it is *not* the Python stdlib `secrets` module. Do **not** `import secrets`; that would shadow the injected namespace. `os.environ` is *not* populated in the sandbox.
+- **Return every declared output key**, or the run fails with `missing_output`.
+- **Available packages**: `requests`, `httpx`, `pydantic`, `langwatch`.
+- **Budget**: the token fetch *plus* your API call must finish inside the runner's wall-clock limit (60s by default) — keep explicit timeouts on both requests.
+- **Failure behavior**: `raise_for_status()` puts the URL and status code in the error — never the request body — so a rejected credential fails loudly without exposing the secret.
+
+## 3. Map the agent's inputs for scenarios
+
+For a scenario to drive this agent, its inputs need mappings: `message` comes from the conversation (`scenario` source, `input` path), while `token_url`, `audience`, and `api_url` are static values.
+
+```json
+{
+  "scenarioMappings": {
+    "message":   { "type": "source", "sourceId": "scenario", "path": ["input"] },
+    "token_url": { "type": "value", "value": "https://your-tenant.us.auth0.com/oauth/token" },
+    "audience":  { "type": "value", "value": "https://api.your-company.internal" },
+    "api_url":   { "type": "value", "value": "https://api.your-company.internal/chat" }
+  },
+  "scenarioOutputField": "output"
+}
+```
+
+<Note>
+  Static value mappings currently have to be set through the agents API (`PATCH /api/agents/:id`, merging the block above into the agent's `config`) — the agent editor UI cannot create them yet. UI support is tracked in [#6371](https://github.com/langwatch/langwatch/issues/6371).
+</Note>
+
+## 4. Run a scenario against it
+
+Create a scenario whose criteria can only pass if the agent really got through the auth wall — e.g. facts that only your protected API returns — bundle it with the agent in a [suite](/agent-simulations/getting-started), and run it. The simulation transcript shows the agent's answers; the run fails if the exchange breaks.
+
+```text
+[user]      where is my order #1042?
+[assistant] Order #1042 shipped from the Rotterdam warehouse on Tuesday
+            and arrives Thursday before noon.
+```
+
+That answer exists only behind the auth wall — which is the point: the scenario passing *is* the proof that authentication works.
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---|---|
+| Agent answers are empty | The token exchange or API call raised — check the credentials and endpoint URLs. (Improved error surfacing is tracked in [#6340](https://github.com/langwatch/langwatch/issues/6340).) |
+| `missing_output` error | The Python returned a dict without one of the agent's declared output keys. |
+| Credential works locally but not on the platform | The secret name in `secrets.NAME` doesn't match a stored project secret, or the value was stored in a different project. |
+| Timeout | Token fetch + downstream call exceeded the 60s runner budget — check both endpoints' latency. |
