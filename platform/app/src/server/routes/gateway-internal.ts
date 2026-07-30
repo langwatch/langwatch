@@ -375,7 +375,9 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   });
 
   // Fire-and-forget last-used bump. Failures here must not deny the request.
-  void service.touchUsage(vk.id).catch(() => {});
+  void service.touchUsage(vk.id).catch(() => {
+    // Best-effort: a failed bump must never deny the request.
+  });
 
   return c.json({
     jwt,
@@ -654,7 +656,9 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
   // DB blip doesn't deny the request.
   if (!vk.lastUsedAt || Date.now() - vk.lastUsedAt.getTime() > 60 * 1000) {
     const vkService = VirtualKeyService.create(prisma);
-    void vkService.touchUsage(vk.id).catch(() => {});
+    void vkService.touchUsage(vk.id).catch(() => {
+      // Best-effort: a failed bump must never deny the request.
+    });
   }
 
   const service = GatewayBudgetService.create(

@@ -1,6 +1,5 @@
 import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "../scenarios/scenario-event.types";
-import { resolveRunStatus } from "../scenarios/stall-detection";
 
 type ScenarioMessages = ScenarioRunData["messages"];
 

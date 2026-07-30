@@ -22,7 +22,6 @@ import {
 } from "./events";
 import {
   deliverExperimentRunExecutionFailRun,
-  EXPERIMENT_RUN_STALLED_CODE,
   type ExperimentRunExecutionDeps,
   experimentRunExecutionFailRunIntentSchema,
   experimentRunExecutionStateSchema,
