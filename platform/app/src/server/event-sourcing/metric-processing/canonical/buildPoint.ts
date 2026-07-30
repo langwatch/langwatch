@@ -7,14 +7,10 @@ import type {
 } from "../schema";
 import { canonicalAttributes } from "./attributes";
 import { correlations } from "./correlations";
+import { sha256 } from "./hash";
 import { aggregationTemporalityOf } from "./kinds";
 import { integerDecimal, timestampDecimal, timestampMs } from "./numbers";
-import {
-  isRecord,
-  sha256,
-  stableStringify,
-  type UnknownRecord,
-} from "./serialization";
+import { isRecord, stableStringify, type UnknownRecord } from "./serialization";
 import { validatePointShape } from "./validate";
 import { canonicalPointValues, canonicalValueSection } from "./values";
 

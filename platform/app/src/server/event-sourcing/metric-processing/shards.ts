@@ -1,4 +1,4 @@
-import { sha256 } from "./canonical/serialization";
+import { sha256 } from "./canonical/hash";
 
 /**
  * Every `partition` scope this pipeline declares spreads across these lanes. A
