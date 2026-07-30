@@ -51,7 +51,12 @@ export default defineConfig({
     // Forks everywhere, then. The memory argument was always the stronger one;
     // this just means the speed argument was never available to trade against
     // it. Anything that reads process-global state — TZ, cwd, process.env —
-    // needs a process, and this suite has such tests.
+    // needs a process, and this suite has such tests. (The TZ suites also
+    // assign through node:process rather than the context's `process` global —
+    // the wrapped global misses the native env setter that flushes V8's
+    // timezone cache, so in a REUSED context the assignment used to do
+    // nothing and the failure came and went with the sequencer's file
+    // grouping. Keep it that way.)
     pool: "vmForks",
     // Half the cores locally so a run leaves the machine usable; all of them
     // in CI. The workflow also sets VITEST_MAX_WORKERS, which vitest applies
