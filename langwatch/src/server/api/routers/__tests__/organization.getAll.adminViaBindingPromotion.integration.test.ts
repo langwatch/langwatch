@@ -21,7 +21,6 @@
  * RBAC model unification in this PR.
  */
 
-import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -29,6 +28,7 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "../../../app-layer/organizations/repositories/organization.prisma.repository";

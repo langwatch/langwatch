@@ -30,7 +30,6 @@ import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
 } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
-import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
@@ -39,6 +38,7 @@ import {
   GARBAGE_DATA,
   VALID_LICENSE_KEY,
 } from "../../../../../ee/licensing/__tests__/fixtures/testLicenses";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
 import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";

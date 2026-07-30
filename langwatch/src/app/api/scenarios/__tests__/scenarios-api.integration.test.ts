@@ -79,9 +79,7 @@ describe("Scenarios API", () => {
   });
 
   afterEach(async () => {
-    await cleanupTestRows(prisma, [
-      ["scenario", { projectId: testProjectId }],
-    ]);
+    await cleanupTestRows(prisma, [["scenario", { projectId: testProjectId }]]);
 
     await prisma.project.delete({
       where: { id: testProjectId },

@@ -9,8 +9,8 @@
 import type { Department, Project, Team, User } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getTestProject } from "../../../utils/testUtils";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
+import { getTestProject } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { DataPrivacyPolicyRepository } from "../dataPrivacyPolicy.repository";
 
@@ -89,9 +89,7 @@ describe("DataPrivacyPolicyRepository integration", () => {
   });
 
   afterAll(async () => {
-    await cleanupTestRows(prisma, [
-      ["dataPrivacyPolicy", { organizationId }],
-    ]);
+    await cleanupTestRows(prisma, [["dataPrivacyPolicy", { organizationId }]]);
     await prisma.project.delete({ where: { id: personalProject.id } });
     await prisma.team.delete({
       where: { id: personalTeam.id, organizationId },

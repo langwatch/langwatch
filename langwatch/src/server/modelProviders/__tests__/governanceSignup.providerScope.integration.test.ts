@@ -26,8 +26,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PersonalWorkspaceService } from "../../../../ee/governance/services/personalWorkspace.service";
-import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { selectAmbientTeam } from "../../../hooks/useOrganizationTeamProject";
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";

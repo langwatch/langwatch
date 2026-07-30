@@ -203,6 +203,19 @@ describe("scanTestSourceForUnsafeDeleteMany", () => {
         expect.objectContaining({ variable: "teamIds", model: "team" }),
       ]);
     });
+
+    it("flags a reassignable object spread merged into the filter", () => {
+      const violations = scan(
+        [
+          `let scope: { organizationId: string };`,
+          `await prisma.team.deleteMany({ where: { ...scope } });`,
+        ].join("\n"),
+      );
+
+      expect(violations).toEqual([
+        expect.objectContaining({ variable: "scope", model: "team" }),
+      ]);
+    });
   });
 
   describe("when scanning the configured test roots", () => {

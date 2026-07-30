@@ -2,7 +2,6 @@ import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
@@ -16,6 +15,7 @@ import {
   ProcessRuntime,
 } from "~/server/event-sourcing/process-manager/processRuntime";
 import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 import { langyConversationProcess } from "../langyConversationProcess";
 import {

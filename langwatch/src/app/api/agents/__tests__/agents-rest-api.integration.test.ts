@@ -114,9 +114,7 @@ describe("Feature: Agent REST API", () => {
   });
 
   afterEach(async () => {
-    await cleanupTestRows(prisma, [
-      ["agent", { projectId: testProjectId }],
-    ]);
+    await cleanupTestRows(prisma, [["agent", { projectId: testProjectId }]]);
     await prisma.project.delete({
       where: { id: testProjectId },
     });

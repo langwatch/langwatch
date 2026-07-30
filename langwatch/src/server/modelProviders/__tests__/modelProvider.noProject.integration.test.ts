@@ -36,11 +36,10 @@ import {
   expect,
   it,
 } from "vitest";
-
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
-import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { ModelProviderService } from "../modelProvider.service";
 
 describe("ModelProviderService on an organization with no project (real DB)", () => {

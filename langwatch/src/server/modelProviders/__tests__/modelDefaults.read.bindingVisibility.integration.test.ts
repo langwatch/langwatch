@@ -130,10 +130,7 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["user", { id: bindingMemberUserId }],
-      [
-        "project",
-        { id: { in: [projectAId, projectBId, otherTeamProjectId] } },
-      ],
+      ["project", { id: { in: [projectAId, projectBId, otherTeamProjectId] } }],
       ["team", { id: { in: [teamId, otherTeamId] } }],
       ["organization", { id: organizationId }],
     ]);

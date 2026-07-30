@@ -22,7 +22,6 @@
 import { STARTER_PACK_TILES } from "@ee/governance/services/aiToolEntry.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
@@ -30,6 +29,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createInnerTRPCContext } from "../../../trpc";
 import { onboardingRouter } from "../onboarding.router";
 

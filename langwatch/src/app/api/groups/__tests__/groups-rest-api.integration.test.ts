@@ -8,9 +8,9 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
@@ -133,9 +133,11 @@ describe("Feature: Groups REST API", () => {
       ["team", { organizationId: testOrganization.id }],
       ["user", { id: { in: [userId, secondUserId] } }],
     ]);
-    await prisma.organization.delete({
-      where: { id: testOrganization.id },
-    }).catch(() => {});
+    await prisma.organization
+      .delete({
+        where: { id: testOrganization.id },
+      })
+      .catch(() => {});
   });
 
   describe("GET /api/groups", () => {

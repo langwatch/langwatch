@@ -170,13 +170,10 @@ describe("Feature: base key in the organizations payload", () => {
       ["project", { team: { organizationId } }],
       ["team", { organizationId }],
       ["organizationUser", { organizationId }],
+      ["organization", { id: organizationId }],
+      // Last: makeUser's rows are still referenced by the memberships above.
+      ["user", { email: { contains: ns } }],
     ]);
-    await prisma.organization
-      .delete({ where: { id: organizationId } })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({ where: { email: { contains: ns } } })
-      .catch(() => {});
   });
 
   describe("given a caller who can change the project", () => {

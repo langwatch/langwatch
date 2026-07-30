@@ -1,4 +1,3 @@
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -26,6 +25,7 @@ import {
 import { MapProjectionExecutor } from "~/server/event-sourcing/projections/mapProjectionExecutor";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 import { PrismaLangyConversationTurnProjectionRepository } from "../langy-conversation-turn-projection.prisma.repository";

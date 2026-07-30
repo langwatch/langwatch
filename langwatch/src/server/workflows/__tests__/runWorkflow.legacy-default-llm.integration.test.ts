@@ -25,8 +25,8 @@ import type {
   LLMConfig,
   Workflow,
 } from "../../../optimization_studio/types/dsl";
-import { prisma } from "../../db";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
+import { prisma } from "../../db";
 import { runWorkflow } from "../runWorkflow";
 
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;

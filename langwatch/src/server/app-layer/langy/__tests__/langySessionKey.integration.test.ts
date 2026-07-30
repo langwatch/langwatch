@@ -17,8 +17,8 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
-import { prisma } from "../../../db";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
+import { prisma } from "../../../db";
 import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,

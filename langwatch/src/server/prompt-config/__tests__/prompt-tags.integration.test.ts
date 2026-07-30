@@ -1,10 +1,10 @@
 import type { Organization, Project, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { projectFactory } from "~/factories/project.factory";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PromptService } from "../prompt.service";
 
 describe("Feature: Prompt version tags", () => {

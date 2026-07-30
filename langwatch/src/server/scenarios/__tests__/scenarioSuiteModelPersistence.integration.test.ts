@@ -12,9 +12,8 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "../../db";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
+import { prisma } from "../../db";
 import { SuiteRepository } from "../../suites/suite.repository";
 import { ScenarioService } from "../scenario.service";
 

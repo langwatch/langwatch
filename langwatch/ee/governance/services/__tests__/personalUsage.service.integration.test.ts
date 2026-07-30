@@ -21,11 +21,11 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PersonalUsageService } from "../personalUsage.service";
 
 async function insertTrace(

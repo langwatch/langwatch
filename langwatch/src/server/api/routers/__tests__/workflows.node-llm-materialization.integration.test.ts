@@ -31,9 +31,9 @@ import type {
   LLMConfig,
   Workflow,
 } from "../../../../optimization_studio/types/dsl";
+import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";
-import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 

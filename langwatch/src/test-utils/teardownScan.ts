@@ -126,6 +126,16 @@ function checkWhereExpression({
           model,
           violations,
         });
+      } else if (ts.isSpreadAssignment(property)) {
+        // `{ ...filterVars }` merges the whole object in: check what is
+        // being spread, the same way an array spread is checked below.
+        checkWhereExpression({
+          expression: property.expression,
+          reassignable,
+          source,
+          model,
+          violations,
+        });
       }
     }
     return;
@@ -146,6 +156,77 @@ function checkWhereExpression({
       });
     }
   }
+}
+
+/**
+ * Judge one deleteMany call's argument: it is safe only when an inline
+ * object literal carries a `where` whose every filter value is proven
+ * assigned.
+ */
+function checkDeleteManyArgument({
+  argument,
+  line,
+  model,
+  reassignable,
+  source,
+  violations,
+}: {
+  argument: ts.Expression | undefined;
+  line: number;
+  model: string;
+  reassignable: Set<string>;
+  source: ts.SourceFile;
+  violations: TeardownViolation[];
+}): void {
+  if (!argument) {
+    violations.push({
+      line,
+      variable: "<none>",
+      model,
+      reason: "deleteMany with no filter deletes every row in the table",
+    });
+    return;
+  }
+
+  const argumentValue = unwrapExpression(argument);
+  if (!ts.isObjectLiteralExpression(argumentValue)) {
+    // A variable, call result, or spread standing in for the whole args
+    // object: this scanner only proves safety for an inline literal, so
+    // anything else cannot be told apart from an unfiltered delete.
+    violations.push({
+      line,
+      variable: "<none>",
+      model,
+      reason:
+        "deleteMany argument is not an inline object literal, so this scanner cannot verify its filter is safe",
+    });
+    return;
+  }
+
+  const whereProperty = argumentValue.properties.find(
+    (property): property is ts.PropertyAssignment =>
+      ts.isPropertyAssignment(property) &&
+      ts.isIdentifier(property.name) &&
+      property.name.text === "where",
+  );
+  if (!whereProperty) {
+    violations.push({
+      line,
+      variable: "<none>",
+      model,
+      reason:
+        "deleteMany without a where clause deletes every row in the table",
+    });
+    return;
+  }
+
+  checkWhereExpression({
+    expression: whereProperty.initializer,
+    reassignable,
+    source,
+    model,
+    violations,
+  });
 }
 
 /**
@@ -171,57 +252,14 @@ export function scanTestSourceForUnsafeDeleteMany(
       ts.isPropertyAccessExpression(node.expression) &&
       node.expression.name.text === "deleteMany"
     ) {
-      const model = modelNameOf(node.expression);
-      const line = lineOf(source, node);
-      const argument = node.arguments[0];
-
-      if (!argument) {
-        violations.push({
-          line,
-          variable: "<none>",
-          model,
-          reason: "deleteMany with no filter deletes every row in the table",
-        });
-      } else {
-        const argumentValue = unwrapExpression(argument);
-        if (ts.isObjectLiteralExpression(argumentValue)) {
-          const whereProperty = argumentValue.properties.find(
-            (property): property is ts.PropertyAssignment =>
-              ts.isPropertyAssignment(property) &&
-              ts.isIdentifier(property.name) &&
-              property.name.text === "where",
-          );
-          if (!whereProperty) {
-            violations.push({
-              line,
-              variable: "<none>",
-              model,
-              reason:
-                "deleteMany without a where clause deletes every row in the table",
-            });
-          } else {
-            checkWhereExpression({
-              expression: whereProperty.initializer,
-              reassignable,
-              source,
-              model,
-              violations,
-            });
-          }
-        } else {
-          // A variable, call result, or spread standing in for the whole
-          // args object: this scanner only proves safety for an inline
-          // literal, so anything else cannot be told apart from an
-          // unfiltered delete.
-          violations.push({
-            line,
-            variable: "<none>",
-            model,
-            reason:
-              "deleteMany argument is not an inline object literal, so this scanner cannot verify its filter is safe",
-          });
-        }
-      }
+      checkDeleteManyArgument({
+        argument: node.arguments[0],
+        line: lineOf(source, node),
+        model: modelNameOf(node.expression),
+        reassignable,
+        source,
+        violations,
+      });
     }
     ts.forEachChild(node, visit);
   };

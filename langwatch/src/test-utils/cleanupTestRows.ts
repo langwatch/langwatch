@@ -202,8 +202,8 @@ function sanitizeWhere(where: unknown, label: string): SanitizeResult {
  * prelude has the same collapse as the deletes: `findMany({ where: {
  * teamId: undefined } })` is `findMany({})`, every row in the table, which
  * would then feed everyone's ids into the cleanup. Anchoring the prelude
- * on `requireAssigned({ value: teamId, name: "teamId" })` turns a broken
- * setup into a loud skip before any query runs.
+ * on `requireAssigned({ value: teamId, name: "teamId" })` makes a broken
+ * setup throw before any query runs.
  */
 export function requireAssigned<T>({
   value,
@@ -225,8 +225,8 @@ export function requireAssigned<T>({
 /**
  * Delete this suite's rows, refusing any entry whose filter can no longer
  * identify them. Throws after cleaning everything cleanable if anything
- * was refused, narrowed, or failed, so a broken setup produces a loud
- * skip rather than a silent sweep.
+ * was refused, narrowed, or failed, so a broken setup fails loudly
+ * instead of sweeping the table.
  */
 export async function cleanupTestRows(
   prisma: PrismaClient,

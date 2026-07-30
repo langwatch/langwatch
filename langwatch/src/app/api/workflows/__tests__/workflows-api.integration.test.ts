@@ -82,9 +82,7 @@ describe("Workflows REST API", () => {
   });
 
   afterEach(async () => {
-    await cleanupTestRows(prisma, [
-      ["workflow", { projectId: testProjectId }],
-    ]);
+    await cleanupTestRows(prisma, [["workflow", { projectId: testProjectId }]]);
 
     await prisma.project.delete({
       where: { id: testProjectId },
@@ -147,7 +145,7 @@ describe("Workflows REST API", () => {
         expect(body[0].id).toBe(workflow.id);
         expect(body[0].name).toBe("Test Workflow");
         expect(body[0].description).toBe("A test workflow");
-        // Each row's platform link addresses THAT workflow's editor, never
+        // The row's platform link addresses THAT workflow's editor, never
         // the bare /workflows index.
         expect(body[0].platformUrl).toContain(`/studio/${workflow.id}`);
       });
