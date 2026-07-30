@@ -10,7 +10,8 @@ import {
 
 describe("subnet grouping", () => {
   describe("when a caller rotates addresses inside one v4 /24", () => {
-    it("puts every address in the same bucket", () => {
+    /** @scenario "the IP subnet axis groups v4 by /24 and v6 by /64" */
+    it("groups v4 by /24 and v6 by /64 into one bucket each", () => {
       const keys = ["192.0.2.1", "192.0.2.99", "192.0.2.254"].map(subnetKey);
 
       expect(new Set(keys).size).toBe(1);
@@ -22,7 +23,7 @@ describe("subnet grouping", () => {
   });
 
   describe("when a caller is handed fresh v6 addresses inside one /64", () => {
-    it("puts every address in the same bucket", () => {
+    it("puts every v6 address of one /64 in the same bucket", () => {
       const keys = [
         "2001:db8:abcd:1234:0000:0000:0000:0001",
         "2001:db8:abcd:1234::beef",

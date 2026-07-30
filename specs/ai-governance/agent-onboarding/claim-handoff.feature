@@ -27,7 +27,7 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
   # Direct claim — the CLI already has an identity
   # ─────────────────────────────────────────────────────────────────────
 
-  @bdd @claim
+  @bdd @claim @unit
   Scenario: a logged-in CLI claims without opening a browser
     Given the CLI has a valid device session
     When it POSTs the claim token to `/claim/direct`
@@ -35,7 +35,7 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     And the account is marked claimed
     And no browser is opened
 
-  @bdd @claim
+  @bdd @claim @unit
   Scenario: claiming keeps the ingestion key exactly as it was
     When the account is claimed
     Then the ingestion key is unchanged
@@ -44,14 +44,15 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     # the agent's OTEL_* config was written on day 0 and nobody is going to
     # rewrite it mid-session.
 
-  @bdd @claim
+  @bdd @claim @unit
   Scenario: claiming cancels the reaper
     When the account is claimed
     Then `deleteAfter` is cleared
     And `ingestionStopsAt` is cleared
     And the account no longer appears in the reaper's work list
 
-  @bdd @claim
+  # @unimplemented: route-level auth middleware; needs the mounted service, not the domain
+  @bdd @claim @unit @unimplemented
   Scenario: an unauthenticated direct claim is refused
     Given the CLI has no device session
     When it POSTs the claim token to `/claim/direct`
@@ -62,7 +63,7 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
   # PKCE handoff — the CLI has no identity
   # ─────────────────────────────────────────────────────────────────────
 
-  @bdd @claim @pkce
+  @bdd @claim @pkce @unit
   Scenario: starting a handoff returns a URL the CLI can open
     Given the CLI generated a code verifier and its S256 challenge
     When it POSTs the claim token and the challenge to `/claim/handoff`
@@ -71,13 +72,13 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     And the response carries the poll interval the CLI must honour
     And the response carries the handoff's own expiry
 
-  @bdd @claim @pkce
+  @bdd @claim @pkce @unit
   Scenario: only S256 is accepted
     When the CLI starts a handoff with challenge method `plain`
     Then the response is 422
     # `plain` puts the verifier in the URL, which defeats the point.
 
-  @bdd @claim @pkce
+  @bdd @claim @pkce @unit
   Scenario: the browser page can describe what is about to be claimed
     Given a handoff is in progress
     When the signed-in website GETs `/claim/handoff/{code}`
@@ -87,7 +88,7 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     # the page has to explain the handoff to a human, and that is all it
     # needs to do it.
 
-  @bdd @claim @pkce
+  @bdd @claim @pkce @unit
   Scenario: approving in the browser attaches the signed-in identity
     Given a handoff is in progress
     And a user is signed in to the website
@@ -95,21 +96,22 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     Then that user becomes an owner of the ephemeral organization
     And the handoff is marked approved
 
-  @bdd @claim @pkce
+  # @unimplemented: route-level session middleware; needs the mounted service
+  @bdd @claim @pkce @unit @unimplemented
   Scenario: approving requires a signed-in user
     Given a handoff is in progress
     When an anonymous visitor posts the approval
     Then the response is 401
     And the handoff stays pending
 
-  @bdd @claim @pkce
+  @bdd @claim @pkce @unit
   Scenario: the CLI's poll returns pending until the human approves
     Given a handoff is in progress and not yet approved
     When the CLI POSTs to `/claim/exchange` with the handoff code and verifier
     Then the response says pending
     And it repeats the poll interval
 
-  @bdd @claim @pkce
+  @bdd @claim @pkce @unit
   Scenario: the CLI's poll succeeds once approved
     Given the human approved in the browser
     When the CLI polls `/claim/exchange` with the correct verifier
@@ -117,7 +119,7 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     And it carries the organization id and project id
     And the account is marked claimed
 
-  @bdd @claim @pkce @security
+  @bdd @claim @pkce @security @unit
   Scenario: a stolen handoff code is useless without the verifier
     Given an attacker observed the handoff code in the URL
     When they poll `/claim/exchange` with a verifier they made up
@@ -126,18 +128,18 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     # PKCE is the whole reason the code can safely ride in a URL that gets
     # pasted into chat, shoulder-surfed, or logged by a browser.
 
-  @bdd @claim @pkce @security
+  @bdd @claim @pkce @security @unit
   Scenario: the verifier is checked by hashing, never by storing it
     Then only the challenge is persisted for the handoff
     And the verifier is never stored server-side
 
-  @bdd @claim @pkce
+  @bdd @claim @pkce @unit
   Scenario: a handoff code is single-use
     Given a handoff was exchanged successfully
     When the CLI polls `/claim/exchange` again with the same code
     Then the response is 410
 
-  @bdd @claim @pkce
+  @bdd @claim @pkce @unit
   Scenario: a handoff expires long before the account does
     Given a handoff was started 20 minutes ago
     When the CLI polls `/claim/exchange`
@@ -150,21 +152,21 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
   # Claiming twice, and claiming late
   # ─────────────────────────────────────────────────────────────────────
 
-  @bdd @claim
+  @bdd @claim @unit
   Scenario: claiming an already-claimed account is refused, not silently re-run
     Given the account was claimed yesterday
     When a second caller claims it with the same token
     Then the response is 409 with code `ephemeral_account_already_claimed`
     And ownership does not change
 
-  @bdd @claim
+  @bdd @claim @unit
   Scenario: a claim after the deletion deadline is refused
     Given the account passed its `deleteAfter`
     When the CLI claims it
     Then the response is 410
     And the message says the data is gone
 
-  @bdd @claim
+  @bdd @claim @unit
   Scenario: a claim during the read-only window still works
     Given the account passed `ingestionStopsAt` but not `deleteAfter`
     When the CLI claims it
@@ -172,7 +174,8 @@ Feature: Claiming an ephemeral account — CLI, or a PKCE handoff to the browser
     And ingestion resumes
     # day 7 to day 30 is exactly the window the claim exists to rescue.
 
-  @bdd @claim @race
+  # @unimplemented: the reaper is not built yet; the conditional UPDATE that decides the race is covered by the double-claim tests
+  @bdd @claim @race @unit @unimplemented
   Scenario: a claim landing at the same moment as the reaper resolves for the claim
     Given the reaper has selected the account for deletion
     When a claim commits before the delete

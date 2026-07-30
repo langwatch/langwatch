@@ -18,6 +18,7 @@ const caller = { ip: "203.0.113.42", fingerprint: "fp-".padEnd(20, "x") };
 
 describe("provisioning rate limits", () => {
   describe("given a caller with an address and a fingerprint", () => {
+    /** @scenario "provisioning is metered on four independent axes" */
     it("meters all four axes", async () => {
       const limiter = new FakeRateLimiter();
       await guardWith(limiter).guardProvision(caller);
@@ -49,6 +50,7 @@ describe("provisioning rate limits", () => {
   });
 
   describe("when the fingerprint bucket is exhausted", () => {
+    /** @scenario "each axis refuses once its own budget is spent" */
     it("refuses with the axis that tripped and a retry hint", async () => {
       const limiter = new FakeRateLimiter();
       limiter.exhausted.add("fingerprint");
@@ -64,6 +66,7 @@ describe("provisioning rate limits", () => {
       });
     });
 
+    /** @scenario "the tightest axis decides, and the others are not consumed" */
     it("does not also burn the shared IP budget", async () => {
       const limiter = new FakeRateLimiter();
       limiter.exhausted.add("fingerprint");
@@ -78,6 +81,7 @@ describe("provisioning rate limits", () => {
   });
 
   describe("when the caller sends no fingerprint", () => {
+    /** @scenario "a caller cannot escape the fingerprint axis by omitting it" */
     it("still meters the address axes", async () => {
       const limiter = new FakeRateLimiter();
       await guardWith(limiter).guardProvision({
@@ -104,6 +108,7 @@ describe("provisioning rate limits", () => {
   });
 
   describe("when the limiter's store is unreachable", () => {
+    /** @scenario "the limiter fails closed when its backing store is unavailable" */
     it("refuses provisioning rather than serving it unmetered", async () => {
       const limiter = new FakeRateLimiter();
       limiter.unavailable = true;
@@ -113,6 +118,7 @@ describe("provisioning rate limits", () => {
       ).rejects.toBeInstanceOf(OnboardingUnavailableError);
     });
 
+    /** @scenario "the claim path stays open when the limiter's store is unavailable" */
     it("still lets a token-holding owner claim", async () => {
       const limiter = new FakeRateLimiter();
       limiter.unavailable = true;
@@ -124,6 +130,7 @@ describe("provisioning rate limits", () => {
   });
 
   describe("when a claim presents a token that does not resolve", () => {
+    /** @scenario "a wrong claim token is metered harder than a right one" */
     it("counts the failure against its own axis", async () => {
       const limiter = new FakeRateLimiter();
       await guardWith(limiter).recordClaimFailure(caller);

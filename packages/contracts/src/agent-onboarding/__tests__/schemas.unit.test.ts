@@ -17,6 +17,7 @@ describe("the provision request", () => {
   });
 
   describe("when the agent is not one we know", () => {
+    /** @scenario "an unknown agent slug is rejected rather than silently stored" */
     it("is rejected rather than stored as provenance we cannot read", () => {
       expect(
         provisionRequestSchema.safeParse({ agent: "totally_made_up" }).success,
@@ -58,6 +59,7 @@ describe("the PKCE handoff request", () => {
   });
 
   describe("when the method is plain", () => {
+    /** @scenario "only S256 is accepted" */
     it("is refused — plain puts the verifier in the request", () => {
       expect(
         claimHandoffStartRequestSchema.safeParse({

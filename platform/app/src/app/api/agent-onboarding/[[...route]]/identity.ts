@@ -1,8 +1,15 @@
 import { ClaimRequiresIdentityError } from "@langwatch/ai-onboarding";
 import type { Context, MiddlewareHandler } from "hono";
-import type { NextRequest } from "next/server";
 import { getServerAuthSession } from "~/server/auth";
 import { validateAccessToken } from "~/server/routes/auth-cli";
+
+/**
+ * `getServerAuthSession` predates this being a Vite app and still declares its
+ * request in Next's types, which no longer resolve here. It only ever reads
+ * `.headers`, and a Hono `Request` has those — so the cast is to the parameter's
+ * own type rather than to `any`.
+ */
+type AuthSessionRequest = Parameters<typeof getServerAuthSession>[0]["req"];
 
 /**
  * Resolving *who* is claiming. Two credentials, because the two halves of the
@@ -24,7 +31,7 @@ export function userIdFrom(c: Context): string | null {
 /** The human half of the handoff: a signed-in browser. */
 export const browserSessionAuth: MiddlewareHandler = async (c, next) => {
   const session = await getServerAuthSession({
-    req: c.req.raw as unknown as NextRequest,
+    req: c.req.raw as unknown as AuthSessionRequest,
   });
   if (!session?.user?.id) throw new ClaimRequiresIdentityError();
 

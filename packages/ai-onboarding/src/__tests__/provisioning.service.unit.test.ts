@@ -48,6 +48,7 @@ beforeEach(() => {
 
 describe("provisioning a temporary account", () => {
   describe("given an unauthenticated caller within its budget", () => {
+    /** @scenario "provisioning mints an org, a project and an ingestion-only key" */
     it("returns an ingestion key, the project, and a claim token", async () => {
       const response = await serviceWith().provision({
         request: { agent: "claude_code" },
@@ -59,6 +60,7 @@ describe("provisioning a temporary account", () => {
       expect(response.claim.token).toBeTruthy();
     });
 
+    /** @scenario "the response states both lifecycle deadlines" */
     it("states both deadlines as absolute timestamps", async () => {
       const response = await serviceWith().provision({
         request: { agent: "claude_code" },
@@ -94,6 +96,7 @@ describe("provisioning a temporary account", () => {
   });
 
   describe("what it persists", () => {
+    /** @scenario "the claim token is returned exactly once" */
     it("keeps only a hash of the claim token", async () => {
       const service = serviceWith();
       const response = await service.provision({
@@ -106,11 +109,21 @@ describe("provisioning a temporary account", () => {
       expect(stored).not.toContain(response.claim.token);
     });
 
-    it("keeps only hashes of the fingerprint and the address", async () => {
-      const capture: string[] = [];
+    async function captureStoredHashes(): Promise<{
+      fingerprintHash: string | null;
+      ipHash: string | null;
+    }> {
+      let captured: { fingerprintHash: string | null; ipHash: string | null } =
+        {
+          fingerprintHash: null,
+          ipHash: null,
+        };
       const originalCreate = accounts.create.bind(accounts);
       accounts.create = async (params) => {
-        capture.push(String(params.fingerprintHash), String(params.ipHash));
+        captured = {
+          fingerprintHash: params.fingerprintHash,
+          ipHash: params.ipHash,
+        };
         return originalCreate(params);
       };
 
@@ -118,13 +131,23 @@ describe("provisioning a temporary account", () => {
         request: { agent: "claude_code" },
         identity,
       });
+      return captured;
+    }
 
-      expect(capture).toEqual([
-        peppered(identity.fingerprint, PEPPER),
-        peppered(identity.ip, PEPPER),
-      ]);
-      expect(capture).not.toContain(identity.ip);
-      expect(capture).not.toContain(identity.fingerprint);
+    /** @scenario "the client fingerprint is peppered before it is stored" */
+    it("keeps only a hash of the fingerprint", async () => {
+      const { fingerprintHash } = await captureStoredHashes();
+
+      expect(fingerprintHash).toBe(peppered(identity.fingerprint, PEPPER));
+      expect(fingerprintHash).not.toBe(identity.fingerprint);
+    });
+
+    /** @scenario "the provisioning IP is peppered before it is stored" */
+    it("keeps only a hash of the address", async () => {
+      const { ipHash } = await captureStoredHashes();
+
+      expect(ipHash).toBe(peppered(identity.ip, PEPPER));
+      expect(ipHash).not.toBe(identity.ip);
     });
 
     it.each([
@@ -147,6 +170,7 @@ describe("provisioning a temporary account", () => {
       expect(seen).toBeNull();
     });
 
+    /** @scenario "a missing fingerprint is allowed, and is not treated as a shared one" */
     it("does not meter an empty fingerprint as a shared bucket", async () => {
       // An empty header value hashing to one key would mean the first
       // fingerprint-less caller to exhaust it refuses every other one.
@@ -173,6 +197,7 @@ describe("provisioning a temporary account", () => {
       ).rejects.toBeInstanceOf(OnboardingRateLimitedError);
     });
 
+    /** @scenario "a refused request creates nothing" */
     it("creates nothing at all", async () => {
       await serviceWith()
         .provision({ request: { agent: "claude_code" }, identity })
@@ -184,6 +209,7 @@ describe("provisioning a temporary account", () => {
   });
 
   describe("when the deployment has anonymous provisioning turned off", () => {
+    /** @scenario "provisioning is disabled by configuration" */
     it("refuses before metering or creating anything", async () => {
       const service = serviceWith({ provisioningEnabled: false });
 
@@ -197,6 +223,7 @@ describe("provisioning a temporary account", () => {
   });
 
   describe("when creating the workspace fails", () => {
+    /** @scenario "a failed key mint leaves no half-built account behind" */
     it("does not leave an account row pointing at nothing", async () => {
       workspaces.failure = new Error("key mint exploded");
 
@@ -247,6 +274,7 @@ describe("reading an account's status", () => {
   });
 
   describe("given a claim token that does not resolve", () => {
+    /** @scenario "`/status` does not leak an account to whoever asks" */
     it("answers not-found", async () => {
       await expect(
         serviceWith().status({ claimToken: "nope" }),

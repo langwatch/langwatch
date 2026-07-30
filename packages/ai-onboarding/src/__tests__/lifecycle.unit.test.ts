@@ -16,6 +16,7 @@ describe("the unclaimed ramp", () => {
   describe("given an account provisioned with the default windows", () => {
     const account = anAccount({ provisionedAt: PROVISIONED });
 
+    /** @scenario "the account reports its state from the two deadlines" */
     it.each([
       { day: 0, state: "active" },
       { day: 6, state: "active" },
@@ -68,6 +69,7 @@ describe("the unclaimed ramp", () => {
       expect(daysRemainingInPhase(claimed, dayN(31))).toBeNull();
     });
 
+    /** @scenario "a claimed account has no deadlines at all" */
     it("reports no deadlines on the wire", () => {
       const lifecycle = toLifecycle(claimed, dayN(31));
       expect(lifecycle.ingestionStopsAt).toBeNull();
@@ -114,6 +116,7 @@ describe("computeDeadlines", () => {
 
 describe("the lifecycle notice", () => {
   describe("when a deployment changed the windows", () => {
+    /** @scenario "provisioning states both deadlines in words the CLI can print" */
     it("states the numbers that deployment actually enforces", () => {
       const notice = buildLifecycleNotice({
         ingestionDays: 3,
@@ -125,6 +128,7 @@ describe("the lifecycle notice", () => {
   });
 
   describe("regardless of configuration", () => {
+    /** @scenario "the copy never mentions how any of it is built" */
     it("never names how any of it is stored or cleaned up", () => {
       const prose = Object.values(
         buildLifecycleNotice({ ingestionDays: 7, retentionDays: 30 }),

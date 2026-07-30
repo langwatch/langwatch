@@ -21,7 +21,7 @@ Feature: Rate limiting the anonymous onboarding surface
   # The axes
   # ─────────────────────────────────────────────────────────────────────
 
-  @bdd @ratelimit
+  @bdd @ratelimit @unit
   Scenario: provisioning is metered on four independent axes
     When a caller POSTs to `/provision`
     Then the request is counted against the per-fingerprint bucket
@@ -29,7 +29,7 @@ Feature: Rate limiting the anonymous onboarding surface
     And the request is counted against the per-IP-subnet bucket
     And the request is counted against the global bucket
 
-  @bdd @ratelimit
+  @bdd @ratelimit @unit
   Scenario Outline: each axis refuses once its own budget is spent
     Given the `<axis>` bucket for this caller is already at its limit
     When the caller POSTs to `/provision`
@@ -44,7 +44,7 @@ Feature: Rate limiting the anonymous onboarding surface
       | ip_subnet   |
       | global      |
 
-  @bdd @ratelimit
+  @bdd @ratelimit @unit
   Scenario: the tightest axis decides, and the others are not consumed
     Given the per-fingerprint bucket is exhausted
     And the per-IP bucket has budget left
@@ -54,13 +54,13 @@ Feature: Rate limiting the anonymous onboarding surface
     # short-circuiting keeps a blocked abuser from also burning the shared
     # IP budget of everyone behind the same NAT.
 
-  @bdd @ratelimit
+  @bdd @ratelimit @unit
   Scenario: a refused request creates nothing
     Given any axis is exhausted
     When the caller POSTs to `/provision`
     Then no organization, team, project or ingestion key is created
 
-  @bdd @ratelimit
+  @bdd @ratelimit @unit
   Scenario: the IP subnet axis groups v4 by /24 and v6 by /64
     Given a caller rotating through addresses inside one `/24`
     When they POST to `/provision` repeatedly
@@ -69,7 +69,7 @@ Feature: Rate limiting the anonymous onboarding surface
     # rotating the last octet, or being handed a fresh v6 address per
     # connection, is the cheapest possible evasion — group it away.
 
-  @bdd @ratelimit @security
+  @bdd @ratelimit @security @unit
   Scenario: the client cannot pick its own IP
     Given the caller sends a forged `X-Forwarded-For` header
     When they POST to `/provision`
@@ -77,7 +77,7 @@ Feature: Rate limiting the anonymous onboarding surface
     And not from an arbitrary client-supplied header
     # otherwise every axis except fingerprint is one header away from useless.
 
-  @bdd @ratelimit @security
+  @bdd @ratelimit @security @unit
   Scenario: a caller cannot escape the fingerprint axis by omitting it
     Given the caller sends no fingerprint
     When they POST to `/provision`
@@ -88,13 +88,13 @@ Feature: Rate limiting the anonymous onboarding surface
   # Claim endpoints
   # ─────────────────────────────────────────────────────────────────────
 
-  @bdd @ratelimit @claim
+  @bdd @ratelimit @claim @unit
   Scenario: claim attempts are metered per IP
     Given a caller has made the maximum claim attempts from one IP
     When they POST to `/claim/handoff` again
     Then the response is 429 with code `rate_limited`
 
-  @bdd @ratelimit @claim @security
+  @bdd @ratelimit @claim @security @unit
   Scenario: a wrong claim token is metered harder than a right one
     When a caller submits an invalid claim token
     Then the failure is counted against a dedicated failed-claim bucket
@@ -102,7 +102,7 @@ Feature: Rate limiting the anonymous onboarding surface
     # claim tokens are 256-bit so guessing is hopeless on paper; the bucket
     # is there so trying anyway is not free.
 
-  @bdd @ratelimit @claim @security
+  @bdd @ratelimit @claim @security @unit
   Scenario: a token that does not resolve gets one answer, whatever the reason
     When a caller submits a claim token that never existed
     And another caller submits the token of an account already deleted
@@ -110,7 +110,7 @@ Feature: Rate limiting the anonymous onboarding surface
     # a different answer per case turns the endpoint into an oracle for
     # "did an account with this token ever exist".
 
-  @bdd @ratelimit @claim @security
+  @bdd @ratelimit @claim @security @unit
   Scenario: a genuine token past its deadline is told the truth
     Given a caller holds a real claim token whose account passed `deleteAfter`
     When they claim it
@@ -120,7 +120,7 @@ Feature: Rate limiting the anonymous onboarding surface
     # this branch by guessing, so the only person who can see it is the
     # owner, and they deserve a real answer rather than "not available".
 
-  @bdd @ratelimit @claim
+  @bdd @ratelimit @claim @unit
   Scenario: polling the handoff has its own minimum interval
     Given the CLI polled `/claim/exchange` less than the advertised interval ago
     When it polls again
@@ -131,12 +131,12 @@ Feature: Rate limiting the anonymous onboarding surface
   # Operability
   # ─────────────────────────────────────────────────────────────────────
 
-  @bdd @ratelimit @ops
+  @bdd @ratelimit @ops @unit
   Scenario: limits are configuration, not constants in a handler
     Then every bucket's window and ceiling is resolved from configuration
     And a deployment can tighten them without a code change
 
-  @bdd @ratelimit @ops
+  @bdd @ratelimit @ops @unit
   Scenario: the limiter fails closed when its backing store is unavailable
     Given Redis is unreachable
     When a caller POSTs to `/provision`
@@ -145,7 +145,7 @@ Feature: Rate limiting the anonymous onboarding surface
     # an open-on-failure limiter is exactly the state an abuser waits for;
     # provisioning is not important enough to serve unmetered.
 
-  @bdd @ratelimit @ops
+  @bdd @ratelimit @ops @unit
   Scenario: the claim path stays open when the limiter's store is unavailable
     Given Redis is unreachable
     When a legitimate owner POSTs to `/claim/handoff` with a valid token
