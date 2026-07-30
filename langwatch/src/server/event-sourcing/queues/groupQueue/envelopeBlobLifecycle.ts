@@ -6,6 +6,10 @@ import {
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
 import { createTenantId, type TenantId } from "../../domain/tenantId";
+import {
+  BLOB_BACKSTOP_TTL_SECONDS,
+  BLOB_RELEASE_GRACE_TTL_SECONDS,
+} from "./blobConstants";
 import { BlobLeases } from "./blobLeases";
 import {
   decodeJobEnvelope,
@@ -28,6 +32,39 @@ import type { DlqBodyPreservation } from "./scripts";
 import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore";
 
 const logger = createLogger("langwatch:event-sourcing:envelope-blob-lifecycle");
+
+/**
+ * How long the body behind an `unextended` dead-letter entry really stays
+ * readable — the number an operator acts on when a preserve-for-DLQ fails.
+ *
+ * It is a property of the CALLER, not of the failure: a caller that releases its
+ * lease next drops the blob onto the release grace window, while one that
+ * releases nothing leaves it on the routine backstop. Those differ by orders of
+ * magnitude, so a single hardcoded figure is necessarily wrong at one of the two
+ * call sites.
+ *
+ * Both figures are derived from the TTL constants rather than written into prose,
+ * so the window quoted to oncall cannot drift away from the expiry that will
+ * actually happen.
+ */
+function unextendedRecoveryWindow({
+  releasesLeaseAfter,
+}: {
+  releasesLeaseAfter: boolean;
+}): { seconds: number; description: string } {
+  if (releasesLeaseAfter) {
+    const hours = Math.round(BLOB_RELEASE_GRACE_TTL_SECONDS / 3600);
+    return {
+      seconds: BLOB_RELEASE_GRACE_TTL_SECONDS,
+      description: `the release grace window (~${hours}h, counting from the lease release this drop performs next)`,
+    };
+  }
+  const days = Math.round(BLOB_BACKSTOP_TTL_SECONDS / (24 * 3600));
+  return {
+    seconds: BLOB_BACKSTOP_TTL_SECONDS,
+    description: `the routine blob backstop (~${days}d, because this drop releases no lease)`,
+  };
+}
 
 /**
  * Owns the GQ2 content-addressed blob lifecycle for a GroupQueue — the tiered
@@ -330,16 +367,15 @@ export class EnvelopeBlobLifecycle {
    * `releaseLease()` runs immediately after this call, so that reclaim is not a
    * hypothetical, it is the next statement.
    *
-   * That is also the FAILURE window, and it is the same hour: when this returns
-   * `unextended` the blob is not sitting on the 4-day routine backstop, it is
-   * heading for the 1-hour grace window as soon as the drop releases its lease.
-   * An operator who sees the warn below has about an hour to drain, not four
-   * days. (An earlier revision of this comment said a failure "relies on the
-   * existing backstop" of 4 days. That was wrong by ~96× post-#6028, and being
-   * wrong about it is exactly why `holdForDlq` had to take a real lease rather
-   * than bump a TTL.) The DRAINED-sibling caller is the one exception, and only
-   * because it releases nothing: an unextended blob there keeps the routine
-   * backstop — longer than an hour, still short of the quarantine window.
+   * That is also the FAILURE window, and WHICH window it is belongs to the
+   * caller, not to this method: when this returns `unextended` and the caller
+   * releases its lease next, the blob is not sitting on the routine backstop at
+   * all — it is heading for the grace window as soon as that release lands, an
+   * hour rather than days. The DRAINED-sibling caller is the one exception, and
+   * only because it releases nothing: an unextended blob there keeps the routine
+   * backstop — longer than an hour, still short of the quarantine window. That is
+   * what `releasesLeaseAfter` exists to tell the warn below, so the figure oncall
+   * reads is the one they actually have (see {@link unextendedRecoveryWindow}).
    *
    * Best-effort — never throws, never blocks the drop. The return value is how
    * the caller records the true state on the dead-letter entry
@@ -349,10 +385,21 @@ export class EnvelopeBlobLifecycle {
     value,
     groupId,
     ttlSeconds,
+    releasesLeaseAfter = true,
   }: {
     value: string;
     groupId: string;
     ttlSeconds: number;
+    /**
+     * Whether the caller releases this value's blob lease immediately after this
+     * returns — the only thing that decides how long an unextended body survives.
+     *
+     * Defaults to `true`, the shorter window, deliberately: a caller that forgets
+     * to say then understates the time oncall has rather than overstating it. The
+     * one caller that releases nothing (`GroupQueueProcessor.deadLetterDrainedValue`,
+     * whose value has already left staging) passes `false` explicitly.
+     */
+    releasesLeaseAfter?: boolean;
   }): Promise<DlqBodyPreservation> {
     const { lease, blobId } = readEnvelopeRetirement(value);
     try {
@@ -387,14 +434,18 @@ export class EnvelopeBlobLifecycle {
       }
       return this.classifyUnreferencedForDlq({ value, groupId });
     } catch (err) {
+      const window = unextendedRecoveryWindow({ releasesLeaseAfter });
       logger.warn(
         {
           groupId,
+          // Structured twin of the clause in the message, from the same value, so
+          // an alert threshold and the sentence oncall reads cannot disagree.
+          recoveryWindowSeconds: window.seconds,
           error: redactStorageUrisInText(
             err instanceof Error ? err.message : String(err),
           ),
         },
-        "Blob TTL preserve-for-DLQ failed — the dead-letter entry will outlive the body it references unless it is drained within the release grace window (~1h)",
+        `Blob TTL preserve-for-DLQ failed — the dead-letter entry will outlive the body it references unless it is drained within ${window.description}`,
       );
       return "unextended";
     }

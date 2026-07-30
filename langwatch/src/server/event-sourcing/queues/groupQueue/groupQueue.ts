@@ -1668,11 +1668,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         // no complete() to withhold here (touching the live slot would corrupt a
         // group this job already left), so the value has ALREADY left staging: if
         // the dead-letter write rejects, deadLetterDrainedValue re-stages the raw
-        // value rather than losing it (Critical review #5853, RaiMx).
+        // value rather than losing it.
         const outcome = await this.deadLetterDrainedValue({
           groupId,
           stagedJobId: sibling.stagedJobId,
           jobDataJson: sibling.jobDataJson,
+          err,
           reason,
           originalScore: sibling.originalScore,
         });
@@ -1779,12 +1780,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         //
         // Body intact and out of staging: dead-letter it (with the re-stage
         // fallback) so a re-stage failure becomes recoverable, not a silent
-        // discard (#719 / RaiMx). Counted AFTER, on the outcome it reports — see
+        // discard (#719). Counted AFTER, on the outcome it reports — see
         // recordDrainedOutcome.
         const outcome = await this.deadLetterDrainedValue({
           groupId,
           stagedJobId: sibling.stagedJobId,
           jobDataJson: sibling.jobDataJson,
+          err,
           reason: "sibling_restage_failed",
           originalScore: sibling.originalScore,
         });
@@ -1806,15 +1808,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // (envelopeBlobLifecycle.renewLease), so a lease hiccup must NOT
       // dead-letter a sibling that is already back in live staging — that would
       // duplicate a live job into the dead-letter and let it double-process
-      // after a drain (Major review #5853, RaiMv).
+      // after a drain.
       await this.blobLifecycle.renewLease(sibling.jobDataJson);
     }
   }
 
   /**
    * Persist a discarded DRAINED value into the job-scoped dead-letter, with a
-   * re-stage durability fallback (Critical review #5853, RaiMx), and report which
-   * of the three branches it actually took.
+   * re-stage durability fallback, and report which of the three branches it
+   * actually took.
    *
    * A drained value has already left live staging, so — unlike the dispatch and
    * transient-exhaustion sites, which withhold `complete()` until AFTER the DLQ
@@ -1835,12 +1837,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     groupId,
     stagedJobId,
     jobDataJson,
+    err,
     reason,
     originalScore,
   }: {
     groupId: string;
     stagedJobId: string;
     jobDataJson: string;
+    /**
+     * The failure that made this value a discard in the first place.
+     *
+     * Carried in so the `restaged` branch can log it: that branch returns before
+     * {@link recordDrop}, which is the only other place this error text is
+     * written, and it is the branch that repeats every drain for a stuck job — so
+     * it is the one where losing the original cause hurts most.
+     */
+    err: unknown;
     reason: DropReason;
     originalScore: number;
   }): Promise<DrainedDlqOutcome> {
@@ -1850,10 +1862,17 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // `preserveForDlq` never throws; it REPORTS whether the body will still be
       // there, and that is stamped on the entry so an operator can tell a
       // recoverable entry from one that will drain as missing_blob (#720, review).
+      //
+      // `releasesLeaseAfter: false` is load-bearing, not boilerplate: this value
+      // already left staging and nothing here releases its lease, so an
+      // unextended body keeps the routine blob backstop rather than falling to
+      // the release grace window. It is what makes the failure warn quote the
+      // window an operator actually has at THIS site.
       const bodyPreservation = await this.blobLifecycle.preserveForDlq({
         value: jobDataJson,
         groupId,
         ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
+        releasesLeaseAfter: false,
       });
       await this.scripts.writeJobToDlq({
         groupId,
@@ -1888,7 +1907,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
             groupId,
             stagedJobId,
             reason,
-            error: errText(dlqErr),
+            // BOTH errors, on the one line. `dlqError` is why the dead-letter
+            // write rejected; `dropError` is why the value was being discarded at
+            // all, and this branch is the only one that never reaches recordDrop,
+            // so without it that text reaches no log anywhere — for the branch
+            // that repeats on every drain of a stuck job. Redacted exactly as
+            // recordDrop redacts the same value: a decode failure's message can
+            // echo bytes of the body, which is the one thing never logged.
+            dlqError: errText(dlqErr),
+            dropError: redactStorageUrisInText(errText(err)),
           },
           "Dead-letter write failed for a drained value — re-staged the raw value as a durability fallback",
         );
@@ -1933,6 +1960,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    *   job whose dead-letter write keeps failing was re-counted once per drain
    *   cycle: one stuck job inflating the drop counter without bound. It gets
    *   `gq_drained_dlq_restaged_total` instead — a different event, told apart.
+   *   Counting differently must not mean saying less: the branch returns before
+   *   {@link recordDrop}, so the original failure is logged by
+   *   {@link deadLetterDrainedValue}'s own warn (`dropError`, beside the write
+   *   failure that triggered the fallback) rather than nowhere.
    * - `lost` IS a drop, and a body-gone one: both the write and the fallback
    *   failed, so `bodyPreserved` is false, not true.
    * - `dead_lettered` is the preserved drop the old code assumed every time.
@@ -2154,10 +2185,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // throws — it REPORTS whether that worked, and the entry records it, so an
       // operator can tell a recoverable entry from one that will drain as
       // missing_blob without draining it to find out (review #5853).
+      // `releasesLeaseAfter: true` — this method releases the lease at its end, so
+      // a body it fails to hold is heading for the release grace window, not the
+      // routine backstop. Stated rather than left to the default so the warn's
+      // window and the release below can only ever be read together.
       dlqBodyPreservation = await this.blobLifecycle.preserveForDlq({
         value: jobDataJson,
         groupId,
         ttlSeconds: GROUP_QUEUE_DLQ_TTL_SECONDS,
+        releasesLeaseAfter: true,
       });
       await this.scripts.writeJobToDlq({
         groupId,

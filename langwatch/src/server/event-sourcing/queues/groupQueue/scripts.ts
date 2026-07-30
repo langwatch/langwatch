@@ -1708,6 +1708,10 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
  * text to identify them. Additive: `replayFromDlq` deletes this key wholesale on
  * restore, and the index sweep only asks whether it is non-empty.
  *
+ * The one field it takes AWAY is `stack`, the third of that group-level triple:
+ * this writer has none, `MOVE_TO_DLQ_LUA` can have left one on the same key, and
+ * they must not be read as one failure. See the script body.
+ *
  * Those two fields are group-level by definition, so several dead-lettered jobs in
  * one group share them: the list shows the MOST RECENT job's summary and time, and
  * the per-job field is where each job's own reason stays. That is the same shape
@@ -1740,6 +1744,18 @@ redis.call("HSET", dlqErrorKey, stagedJobId, reason)
 -- millisecond epoch as a string, and Lua 5.1 formats numbers with %.14g, so
 -- round-tripping it through tonumber is a precision risk for no benefit.
 redis.call("HSET", dlqErrorKey, "message", summary, "timestamp", ARGV[5])
+-- The group-level triple must describe ONE failure. This writer has no stack to
+-- offer, but the operator's whole-group MOVE_TO_DLQ copies the live group's
+-- error hash into this very key without clearing the destination — stack
+-- included — so a group moved earlier in the same quarantine window leaves one
+-- behind, and overwriting only message/timestamp would have the dead-letter list
+-- render `error` from this failure next to `errorStack` from a different one. A
+-- null stack is honest; a mismatched pair is worse than none. Cleared here, in
+-- the same script, so it is atomic with the summary it belongs to — and AFTER
+-- the per-job HSET above for the same reason the group-level fields are written
+-- last: a stagedJobId that literally collides with a schema name loses to the
+-- schema rather than redefining what the dashboard renders.
+redis.call("HDEL", dlqErrorKey, "stack")
 redis.call("SADD", dlqIndexKey, groupId)
 
 if ttl > 0 then

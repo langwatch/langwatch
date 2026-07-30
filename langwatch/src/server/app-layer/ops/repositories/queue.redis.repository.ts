@@ -1479,13 +1479,25 @@ export class QueueRedisRepository implements QueueRepository {
    * set resized mid-scan could count one dead-letter twice, list it twice, and
    * re-check members already swept.
    *
-   * Cost: one EVALSHA per page where `dlqCount` used to be a single SCARD. The
+   * COST — the one statement of it; every caller links here rather than restating
+   * it. One EVALSHA per page, where `dlqCount` used to be a single SCARD. The
    * liveness check runs inside Redis, so a page is one round trip no matter how
    * many members it holds — but that round trip is not free work: per
    * {@link SWEEP_DLQ_INDEX_LUA}, the script runs a `ZCARD` and an `HLEN` per
    * member (2 × page size) inside Redis's single-threaded main loop before
-   * returning. The sweep shrinks its own input — after the first pass over a
-   * queue the index holds only real dead-letters again.
+   * returning.
+   *
+   * What the sweep amortises, precisely: DEAD members, and only those. The first
+   * pass over a queue SREMs every member whose dead-letter has expired, so those
+   * are gone from the input for good and a later pass no longer pays for them.
+   * A member that is still LIVE is removed by nothing here, so it is re-walked in
+   * full on every pass — steady-state cost is O(live members) per call per queue
+   * and does not decay with repetition. Read either half alone and you get the
+   * wrong answer to "is this path cheap?": it gets cheaper exactly once, by the
+   * orphans it drops, and never again. A queue whose dead-letter fills
+   * automatically per job under never-reused group ids (see "WHY THIS EXISTS" on
+   * {@link SWEEP_DLQ_INDEX_LUA}) can carry a large, persistently live backlog and
+   * pays the full walk for it on every read.
    */
   private async *scanLiveDlqGroupIds(params: {
     prefix: string;
