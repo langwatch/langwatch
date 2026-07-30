@@ -118,16 +118,25 @@ async function main() {
   });
   await page.waitForSelector("text=Spent this month", { timeout: 30_000 });
   await page.waitForTimeout(2500);
-  const chartButtons = await page
+  const chartIcons = await page
     .locator('[data-testid^="vk-spend-chart-"]')
     .count();
   check(
-    "chart-line icon button renders in the spend cell",
-    chartButtons > 0,
-    `${chartButtons} buttons`,
+    "chart-line icon renders in the spend cell",
+    chartIcons > 0,
+    `${chartIcons} icons`,
   );
-  const spendCells = await page.locator('[data-testid^="vk-spend-"]').count();
+  // Not `^="vk-spend-"`, which also matches the chart icon's own id and so
+  // reports twice as many cells as there are keys.
+  const spendCells = await page
+    .locator('[data-testid^="vk-spend-"]:not([data-testid^="vk-spend-chart-"])')
+    .count();
   check("spend values render", spendCells > 0, `${spendCells} cells`);
+  check(
+    "every spend value carries a chart icon",
+    spendCells === chartIcons,
+    `${spendCells} values / ${chartIcons} icons`,
+  );
   await shot(page, "01-virtual-keys-desktop");
 
   // ── Defect 1: click the affordance, expect real data ──────────────
