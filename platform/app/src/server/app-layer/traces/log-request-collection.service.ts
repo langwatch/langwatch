@@ -17,7 +17,12 @@ import { OtlpSpanPiiRedactionService } from "./span-pii-redaction.service";
 
 export interface LogRequestCollectionDeps {
   recordLogRecords: (data: CanonicalLogRecord[]) => Promise<void>;
-  recordLogContributions: (data: LogContribution[]) => Promise<void>;
+  /** A contribution carries no tenant of its own — it is a fragment of the
+   * record it was lifted from — so the tenant travels beside it. */
+  recordLogContributions: (
+    data: LogContribution[],
+    ctx: { tenantId: string },
+  ) => Promise<void>;
   piiRedactionService?: LogRedactionService;
 }
 
@@ -169,7 +174,7 @@ export class LogRequestCollectionService {
 
         if (contributions.length > 0) {
           try {
-            await this.deps.recordLogContributions(contributions);
+            await this.deps.recordLogContributions(contributions, { tenantId });
           } catch (error) {
             // Correlation is deliberately best-effort and separate from log
             // acceptance, matching the metric pipeline: the canonical record

@@ -1118,17 +1118,46 @@ export function initializeDefaultApp(options?: {
 
   const logCollection = traced(
     new LogRequestCollectionService({
-      recordLogRecords: commands.logs.recordLogRecord.sendBatch!,
-      recordLogContributions: commands.traces.recordLogContribution.sendBatch!,
+      recordLogRecords: async (batch) => {
+        await Promise.all(
+          batch.map((record) =>
+            commands.logs.recordCanonicalLog(record, {
+              tenantId: record.tenantId,
+            }),
+          ),
+        );
+      },
+      recordLogContributions: async (batch, { tenantId }) => {
+        await Promise.all(
+          batch.map((contribution) =>
+            commands.traces.recordLogContribution(contribution, { tenantId }),
+          ),
+        );
+      },
     }),
     "LogRequestCollectionService",
   );
 
   const metricCollection = traced(
     new MetricRequestCollectionService({
-      recordDataPoints: commands.metrics.recordDataPoint.sendBatch!,
-      recordMetricCorrelations:
-        commands.traces.recordMetricCorrelation.sendBatch!,
+      recordDataPoints: async (batch) => {
+        await Promise.all(
+          batch.map((point) =>
+            commands.metrics.recordDataPoint(point, {
+              tenantId: point.tenantId,
+            }),
+          ),
+        );
+      },
+      recordMetricCorrelations: async (batch) => {
+        await Promise.all(
+          batch.map((correlation) =>
+            commands.traces.recordMetricCorrelation(correlation, {
+              tenantId: correlation.tenantId,
+            }),
+          ),
+        );
+      },
     }),
     "MetricRequestCollectionService",
   );
