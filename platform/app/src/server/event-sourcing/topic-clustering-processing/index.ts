@@ -170,7 +170,7 @@ export function createTopicClusteringProcessingPipeline(
     row: foldStateRow<ReturnType<typeof initRunStatusState>>(),
     // No cache tier exists for this fold yet — a deliberate point read per
     // delivery, not an oversight.
-    cache: noFoldStateCache(),
+    cache: noFoldStateCache<ReturnType<typeof initRunStatusState>>(),
   });
   assertMountIsLegal("topicClusteringRunStatus", {
     projection: "fold",
@@ -186,7 +186,7 @@ export function createTopicClusteringProcessingPipeline(
     key: "ProjectId",
     stateVersionColumn: "StateVersion",
     row: foldStateRow<ReturnType<typeof initRunHistoryState>>(),
-    cache: noFoldStateCache(),
+    cache: noFoldStateCache<ReturnType<typeof initRunHistoryState>>(),
   });
   assertMountIsLegal("topicClusteringRunHistory", {
     projection: "fold",
@@ -202,7 +202,7 @@ export function createTopicClusteringProcessingPipeline(
     key: "ProjectId",
     stateVersionColumn: "StateVersion",
     row: foldStateRow<ReturnType<typeof initTopicModelState>>(),
-    cache: noFoldStateCache(),
+    cache: noFoldStateCache<ReturnType<typeof initTopicModelState>>(),
   });
   assertMountIsLegal("topicModel", {
     projection: "fold",

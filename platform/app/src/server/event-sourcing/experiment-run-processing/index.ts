@@ -219,7 +219,7 @@ export function createExperimentRunProcessingPipeline(
     stateVersionColumn: "Version",
     row: { toRow: runRowMapping.toRow, fromRow: runRowFromRow },
     retentionDays: DEFAULT_RETENTION_DAYS,
-    cache: deps.cache ?? noFoldStateCache(),
+    cache: deps.cache ?? noFoldStateCache<ExperimentRunState>(),
   });
   assertMountIsLegal("experimentRunState", {
     projection: "fold",
