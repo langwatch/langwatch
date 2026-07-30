@@ -11,7 +11,8 @@ const MIN_SECONDS = Math.floor(MIN_TRACE_DEBOUNCE_MS / 1000);
 const MAX_SECONDS = Math.floor(MAX_TRACE_DEBOUNCE_MS / 1000);
 
 /**
- * Per-trigger trace-readiness debounce (ADR-026). Notify actions only —
+ * Per-trigger trace-readiness debounce (ADR-026, retired; ground now
+ * ADR-098). Notify actions only —
  * the cadence secondary drawer gates this on `isNotifyAction`, so no
  * internal gate. Persist actions dispatch inline and ignore the column.
  * Exposed as seconds for readability; converted to/from milliseconds at

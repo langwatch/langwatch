@@ -1270,3 +1270,75 @@ describe("availableGroupByOptions()", () => {
     });
   });
 });
+
+describe("groupRunsByBatchId() with expectedCounts", () => {
+  describe("given a batch that queued more runs than have landed", () => {
+    /** @scenario "A partly dispatched batch reports a shortfall" */
+    it("reports the size the batch set out to queue, not the rows that arrived", () => {
+      const runs = [
+        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_1" }),
+        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_2" }),
+        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_3" }),
+        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_4" }),
+        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_5" }),
+      ];
+
+      const [batch] = groupRunsByBatchId({
+        runs,
+        expectedCounts: { batch_1: 6 },
+      });
+      const summary = computeBatchRunSummary({ batchRun: batch! });
+
+      expect(summary.totalCount).toBe(5);
+      expect(summary.expectedCount).toBe(6);
+    });
+  });
+
+  describe("given a batch whose runs are still being queued", () => {
+    /** @scenario "The expected total is known from the first run in the batch" */
+    it("keeps the expected total steady as the remaining runs appear", () => {
+      const expectedCounts = { batch_1: 3 };
+      const first = [
+        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_1" }),
+      ];
+
+      const [earlyBatch] = groupRunsByBatchId({ runs: first, expectedCounts });
+      expect(
+        computeBatchRunSummary({ batchRun: earlyBatch! }).expectedCount,
+      ).toBe(3);
+
+      const all = [
+        ...first,
+        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_2" }),
+        makeScenarioRunData({ batchRunId: "batch_1", scenarioRunId: "run_3" }),
+      ];
+
+      const [fullBatch] = groupRunsByBatchId({ runs: all, expectedCounts });
+      expect(
+        computeBatchRunSummary({ batchRun: fullBatch! }).expectedCount,
+      ).toBe(3);
+    });
+  });
+
+  describe("given a batch queued before the expected total was recorded", () => {
+    /** @scenario "A batch from before the total was recorded counts its runs" */
+    it("falls back to the runs it can see rather than reporting none", () => {
+      const runs = [
+        makeScenarioRunData({
+          batchRunId: "batch_old",
+          scenarioRunId: "run_1",
+        }),
+        makeScenarioRunData({
+          batchRunId: "batch_old",
+          scenarioRunId: "run_2",
+        }),
+      ];
+
+      const [batch] = groupRunsByBatchId({ runs, expectedCounts: {} });
+      const summary = computeBatchRunSummary({ batchRun: batch! });
+
+      expect(summary.expectedCount).toBe(2);
+      expect(summary.expectedCount).toBe(summary.totalCount);
+    });
+  });
+});

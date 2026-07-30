@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   HStack,
   Icon,
   Skeleton,
@@ -8,16 +9,18 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
-import { LuCircleX } from "react-icons/lu";
+import { LuCircleX, LuRotateCw } from "react-icons/lu";
 import {
   ContentPrivacyMarkers,
   PiiIncompleteNotice,
 } from "~/components/ui/ContentPrivacyMarkers";
 import { RedactedField } from "~/components/ui/RedactedField";
+import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useSpanLogs } from "../../../hooks/useSpanLogs";
 import { useTraceResources } from "../../../hooks/useTraceResources";
+import { useDrawerStore } from "../../../stores/drawerStore";
 import { AttributeTable } from "../AttributeTable";
 import { IOViewer } from "../IOViewer";
 import { hasPromptMetadata, PromptAccordion } from "../PromptAccordion";
@@ -32,6 +35,18 @@ import { UnmappedCostSuggestion } from "./UnmappedCostSuggestion";
 import { useSectionFocusGlow } from "./useSectionFocusGlow";
 import { countFlatLeaves } from "./utils";
 
+/**
+ * A failure that says the thing is not there, as opposed to one that says the
+ * read did not work. Refetching only helps the second kind.
+ *
+ * Read off the handled payload rather than the tRPC envelope's `code` so it
+ * reflects what the server actually decided; an unhandled failure has no
+ * payload at all and is treated as retryable.
+ */
+function isSettledAbsence(error: unknown): boolean {
+  return readHandledError(error)?.httpStatus === 404;
+}
+
 export function SpanAccordions({
   traceId,
   span,
@@ -43,6 +58,7 @@ export function SpanAccordions({
 }) {
   const detailQuery = useSpanDetail();
   const detail = detailQuery.data;
+  const clearSpan = useDrawerStore((s) => s.clearSpan);
   const resources = useTraceResources(traceId);
   const spanResource = resources.bySpanId[span.spanId] ?? null;
   const spanScope = spanResource?.scope ?? null;
@@ -121,6 +137,54 @@ export function SpanAccordions({
     setOpenSections,
     containerRef,
   });
+
+  // The span detail read failed. Everything else in the drawer is intact —
+  // the header, the waterfall in the pane next door, the trace's own data —
+  // so the failure is reported HERE rather than taking the whole drawer over
+  // the way a failed trace header does. Without this branch the panel fell
+  // through to an accordion stack with nothing in it, which read as a load
+  // that never finished rather than as something that went wrong.
+  //
+  // This surface means the span is genuinely absent — typically a stale
+  // `drawer.span` in a shared link. A span the viewer's plan hides does not
+  // reach it: the visibility gate teaser-redacts an out-of-window span and
+  // returns it present, so it renders as a redacted span rather than a missing
+  // one. There is one message here because there is one cause, not because two
+  // causes were collapsed.
+  //
+  // The words come from the code-keyed registry via `<HandledErrorAlert>` —
+  // never `error.message`, which since #5984 is the code slug itself.
+  if (detailQuery.isError) {
+    return (
+      <Box padding={4}>
+        <VStack align="stretch" gap={3}>
+          <HandledErrorAlert
+            error={detailQuery.error}
+            fallbackTitle="Couldn't load this span"
+          />
+          <HStack gap={2}>
+            <Button size="xs" variant="outline" onClick={() => clearSpan()}>
+              Choose another span
+            </Button>
+            {/* Retry only where retrying can change the answer. A 404 is
+                settled — the same rule `TraceDrawerEmptyState` applies when it
+                offers "Try again" for a load failure but not for a missing
+                trace. */}
+            {!isSettledAbsence(detailQuery.error) && (
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => void detailQuery.refetch()}
+              >
+                <Icon as={LuRotateCw} boxSize={3} />
+                Try again
+              </Button>
+            )}
+          </HStack>
+        </VStack>
+      </Box>
+    );
+  }
 
   return (
     <Box ref={containerRef}>

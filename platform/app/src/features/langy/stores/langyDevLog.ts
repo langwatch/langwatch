@@ -28,7 +28,8 @@ import { useLangyStore } from "./langyStore";
  *   outbound  OUTBOUND. What this client asked the server to do — the sent
  *             message, the stop request — so "did we even send it?" and "in
  *             what order relative to the stream?" are on the same tape.
- *   durable   INBOUND. The EVENT LOG itself (ADR-059): the recorded events the
+ *   durable   INBOUND. The EVENT LOG itself (ADR-059, retired; ground now
+ *             ADR-098): the recorded events the
  *             tail fetch returns and the snapshot seeds, i.e. the durable truth
  *             the local fold is built from. This lane is REPLAYABLE — see
  *             {@link replayTurnProjection}.
@@ -273,7 +274,8 @@ export function tapeUpTo(
 
 /**
  * REPLAY the durable lane through the SAME reducers the live store uses
- * (ADR-059): seed from the recorded snapshot, fold the recorded tail. Because
+ * (ADR-059, retired; ground now ADR-098): seed from the recorded snapshot,
+ * fold the recorded tail. Because
  * the fold is pure and cursor-gated, replaying any prefix of the tape is safe
  * and deterministic — this is what the scrubber shows as "the fold at that
  * moment", recomputed from scratch on every call, never cached state.

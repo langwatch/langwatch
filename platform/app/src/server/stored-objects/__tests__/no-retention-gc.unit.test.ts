@@ -77,9 +77,10 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // reference. Audited: no delete/update/truncate on stored_objects.
   /^src\/server\/tracer\/types\.ts$/,
   // evaluation-inputs-offload.ts stores and resolves oversized evaluator
-  // inputs through StoredObjectsService (ADR-040). Audited: write + read
+  // inputs through StoredObjectsService (ADR-096, retired; ground now
+  // ADR-098). Audited: write + read
   // only; deletion happens solely via the existing project-delete cascade.
-  // Known gap (accepted in ADR-040, follow-up noted there): an offloaded
+  // Known gap (accepted in the retired ADR-096, ground now ADR-098, follow-up noted there): an offloaded
   // evaluation-input object outlives its evaluation row's retention TTL - the
   // row is GC'd on the normal data-retention schedule, but its stored object is
   // only reclaimed by the project-delete cascade, so it can linger past the

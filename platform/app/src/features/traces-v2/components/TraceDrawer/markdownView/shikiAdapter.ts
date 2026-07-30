@@ -10,7 +10,7 @@ import {
 // attribute values, transcripts, markdown). Loaded with the singleton
 // highlighter on first use; every other Shiki language is lazy-loaded on
 // demand via `ensureShikiLangLoaded`. See
-// dev/docs/adr/027-trace-drawer-code-highlighting.md
+// dev/docs/adr/092-trace-drawer-code-highlighting.md
 export const SHIKI_BASE_LANGS = [
   "json",
   "markdown",

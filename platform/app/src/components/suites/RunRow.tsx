@@ -12,6 +12,7 @@ import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useNow } from "~/hooks/useNow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
@@ -35,7 +36,6 @@ type RunRowDataProps = {
   onToggle: () => void;
   resolveTargetName: (scenarioRun: ScenarioRunData) => string | null;
   onScenarioRunClick: (scenarioRun: ScenarioRunData) => void;
-  expectedJobCount?: number;
   suiteName?: string;
   viewMode?: ViewMode;
   onCancelRun?: (scenarioRun: ScenarioRunData) => void;
@@ -128,7 +128,6 @@ function RunRowData({
   onToggle,
   resolveTargetName,
   onScenarioRunClick,
-  expectedJobCount,
   suiteName,
   viewMode = "grid",
   onCancelRun,
@@ -223,12 +222,21 @@ function RunRowData({
           <Text fontSize="xs" color="fg.subtle" flexShrink={0}>
             {timeAgo}
           </Text>
-          {expectedJobCount != null &&
-            summary.totalCount < expectedJobCount && (
-              <Text fontSize="xs" color="fg.muted" flexShrink={0}>
-                {summary.totalCount} of {expectedJobCount}
+          {summary.totalCount < summary.expectedCount && (
+            <Tooltip
+              content={`${summary.expectedCount - summary.totalCount} of the ${summary.expectedCount} scenarios in this run never started. Run the suite again to retry them.`}
+            >
+              <Text
+                as="span"
+                fontSize="xs"
+                color="yellow.fg"
+                flexShrink={0}
+                data-testid="batch-shortfall"
+              >
+                {summary.totalCount} of {summary.expectedCount} started
               </Text>
-            )}
+            </Tooltip>
+          )}
           {onCancelAll && hasCancellableRuns && (
             <HStack
               as="span"

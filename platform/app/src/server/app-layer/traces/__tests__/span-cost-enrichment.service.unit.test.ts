@@ -6,7 +6,7 @@ import {
   matchModelCostWithFallbacks,
   stripProviderSubtype,
 } from "~/server/tracer/collector/cost";
-import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "../ingest/otlp";
 import {
   createCostEnrichmentDeps,
   OtlpSpanCostEnrichmentService,

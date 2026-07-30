@@ -32,11 +32,7 @@ function createMockSubscriber(): CancellationSubscriber {
 describe("publishCancellation", () => {
   it("publishes the message to the cancel channel", async () => {
     const publisher = createMockPublisher();
-    const message: CancellationMessage = {
-      projectId: "proj1",
-      scenarioRunId: "run1",
-      batchRunId: "batch1",
-    };
+    const message: CancellationMessage = { scenarioRunId: "run1" };
 
     await publishCancellation({ publisher, message });
 
@@ -67,11 +63,7 @@ describe("subscribeToCancellations", () => {
     expect(onCall[0]).toBe("message");
     const handler = onCall[1] as (channel: string, raw: string) => void;
 
-    const msg: CancellationMessage = {
-      projectId: "proj1",
-      scenarioRunId: "run1",
-      batchRunId: "batch1",
-    };
+    const msg: CancellationMessage = { scenarioRunId: "run1" };
     handler(CANCELLATION_CHANNEL, JSON.stringify(msg));
 
     expect(onCancel).toHaveBeenCalledWith(msg);

@@ -300,6 +300,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(output.extracted_output).toBe("extracted text");
     });
 
+    /** @scenario "Outgoing request carries a W3C traceparent header" */
     it("sends traceparent header in outgoing request", async () => {
       mockSuccessResponse();
 
@@ -319,6 +320,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(headers.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
     });
 
+    /** @scenario "The traceparent trace ID matches the submitted trace" */
     it("uses same trace ID in traceparent header and submitted trace", async () => {
       mockSuccessResponse();
 
@@ -386,6 +388,7 @@ describe("HTTP Proxy Tracing", () => {
   });
 
   describe("when request body is invalid JSON", () => {
+    /** @scenario "Trace captures a request body that is not valid JSON" */
     it("creates a trace with the parse error", async () => {
       await caller.httpProxy.execute({
         projectId,
@@ -482,6 +485,7 @@ describe("HTTP Proxy Tracing", () => {
   });
 
   describe("when agentId is not provided", () => {
+    /** @scenario "No trace is created when there is no agent ID" */
     it("does not create a trace", async () => {
       mockSuccessResponse();
 
@@ -495,6 +499,7 @@ describe("HTTP Proxy Tracing", () => {
       expect(mockScheduleTrace).not.toHaveBeenCalled();
     });
 
+    /** @scenario "No traceparent header is sent when there is no agent ID" */
     it("does not send traceparent header", async () => {
       mockSuccessResponse();
 

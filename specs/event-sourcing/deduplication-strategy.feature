@@ -8,6 +8,7 @@ Feature: Deduplication Strategy for Event Processing
 
   # Default behavior
 
+  @unit
   Scenario: Default behavior processes every event
     When a handler is configured without explicit deduplication
     Then every event is processed individually
@@ -15,6 +16,7 @@ Feature: Deduplication Strategy for Event Processing
 
   # Aggregate deduplication (shorthand)
 
+  @unit
   Scenario: Aggregate deduplication batches events by aggregate
     When a handler is configured with deduplication: "aggregate"
     And multiple events arrive for the same aggregate within the TTL
@@ -23,6 +25,7 @@ Feature: Deduplication Strategy for Event Processing
 
   # Custom deduplication
 
+  @unit
   Scenario: Custom deduplication uses provided ID function
     When a handler is configured with custom deduplication config
       | makeId | (event) => event.tenantId + ':' + event.type |
@@ -31,6 +34,7 @@ Feature: Deduplication Strategy for Event Processing
     Then events with the same custom ID are deduplicated within 500ms
     And events with different custom IDs are processed separately
 
+  @integration
   Scenario: Custom deduplication with extended TTL
     When a handler is configured with deduplication extending enabled
       | extend | true |
@@ -41,6 +45,7 @@ Feature: Deduplication Strategy for Event Processing
 
   # Type safety
 
+  @unimplemented
   Scenario: Aggregate deduplication requires tenantId in payload
     Given a command handler payload type without tenantId
     When configuring the handler with deduplication: "aggregate"

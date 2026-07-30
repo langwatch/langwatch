@@ -24,6 +24,7 @@ describe("slackBotTokenMissing", () => {
     ).toBe(false);
   });
 
+  /** @scenario "A bot automation is incomplete without a token" */
   it("is true for a bot connection with neither a new nor a stored token", () => {
     expect(
       slackBotTokenMissing({
@@ -59,6 +60,7 @@ describe("slackBotTokenMissing", () => {
 });
 
 describe("persistSlackActionParams", () => {
+  /** @scenario "Switching to a webhook leaves no bot fields behind" */
   it("keeps only the webhook in webhook mode (no stale bot fields)", () => {
     expect(
       persistSlackActionParams({
@@ -75,6 +77,7 @@ describe("persistSlackActionParams", () => {
     });
   });
 
+  /** @scenario "The bot token is protected at rest" */
   it("encrypts a freshly-entered bot token", () => {
     expect(
       persistSlackActionParams({
@@ -91,6 +94,7 @@ describe("persistSlackActionParams", () => {
     });
   });
 
+  /** @scenario "Editing a bot automation without re-entering the token" */
   it("keeps the stored ciphertext when the token is left blank on edit", () => {
     expect(
       persistSlackActionParams({
@@ -100,6 +104,7 @@ describe("persistSlackActionParams", () => {
     ).toBe("enc(xoxb-old)");
   });
 
+  /** @scenario "The bot token is protected at rest" */
   it("routes the token through encrypt() before persisting (never raw)", () => {
     // The fake cipher wraps as enc(…); a raw token would be stored verbatim.
     // The real no-plaintext guarantee is AES in encryption.ts — here we assert
@@ -117,6 +122,7 @@ describe("persistSlackActionParams", () => {
 });
 
 describe("redactSlackActionParams", () => {
+  /** @scenario "The bot token is protected at rest" */
   it("replaces the ciphertext with a set flag", () => {
     expect(
       redactSlackActionParams({

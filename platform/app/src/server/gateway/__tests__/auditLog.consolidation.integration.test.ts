@@ -31,7 +31,7 @@ import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { GatewayAuditAdapter } from "../auditLog.repository";
 
 const suffix = nanoid(8);

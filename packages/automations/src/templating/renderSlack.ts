@@ -13,7 +13,8 @@ import type {
 } from "./templateContext";
 
 /**
- * Default-template overrides for `renderTriggerSlack` (ADR-034 Phase 8.1).
+ * Default-template overrides for `renderTriggerSlack` (ADR-034, retired;
+ * ground now ADR-099, Phase 8.1).
  * Lets the graph-alert path render against `ALERT_TRIGGER_DEFAULTS`
  * without forking the engine; trace callers omit it and keep the
  * trace defaults (`DEFAULT_SLACK_TEMPLATE` / `DEFAULT_SLACK_BLOCK_KIT_TEMPLATE`).
@@ -102,7 +103,8 @@ export async function renderTriggerSlack({
   templateType: SlackTemplateType | null;
   template: string | null;
   context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
-  /** Per-context default overrides (ADR-034 Phase 8.1). When omitted,
+  /** Per-context default overrides (ADR-034, retired; ground now ADR-099,
+   *  Phase 8.1). When omitted,
    *  the trace defaults apply — same behaviour as before. */
   defaults?: SlackRenderDefaults;
   testFire?: boolean;

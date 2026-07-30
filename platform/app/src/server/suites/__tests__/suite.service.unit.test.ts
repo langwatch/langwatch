@@ -722,21 +722,33 @@ describe("SuiteService", () => {
     });
 
     describe("given idempotencyKey is provided", () => {
-      describe("when the suite run is triggered", () => {
-        it("passes idempotencyKey through to suiteRunService", async () => {
+      describe("when the same suite run is triggered twice", () => {
+        // The key now has force. Run ids are derived from it, and everything
+        // downstream already keys on `scenarioRunId` — QueueRunCommand's
+        // aggregateId, its idempotencyKey and its job id — so a retry
+        // re-dispatches identical commands the event store collapses. The
+        // service is still entered twice; what changed is that the second
+        // pass asks for the runs that already exist.
+        it("passes the key down so the same runs are asked for", async () => {
           const { service, suiteRunService } = createService();
           const suite = makeSuite();
+          const run = () =>
+            service.run({
+              suite,
+              projectId: "proj_1",
+              organizationId: "org_1",
+              idempotencyKey: "user-provided-key",
+            });
 
-          await service.run({
-            suite,
-            projectId: "proj_1",
-            organizationId: "org_1",
-            idempotencyKey: "user-provided-key",
-          });
+          await run();
+          await run();
 
-          expect(suiteRunService.startRun).toHaveBeenCalledWith(
-            expect.objectContaining({ idempotencyKey: "user-provided-key" }),
-          );
+          expect(suiteRunService.startRun).toHaveBeenCalledTimes(2);
+          for (const call of suiteRunService.startRun.mock.calls) {
+            expect(call[0]).toMatchObject({
+              idempotencyKey: "user-provided-key",
+            });
+          }
         });
       });
     });

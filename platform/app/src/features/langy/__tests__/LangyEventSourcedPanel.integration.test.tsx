@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The panel's picture of a conversation IS the recorded conversation (ADR-059):
+ * The panel's picture of a conversation IS the recorded conversation
+ * (ADR-059, retired; ground now ADR-098):
  * the snapshot it reads back after a refresh, the optimistic overlay that
  * covers the instant between clicking Send and the backend accepting the turn,
  * the rollback when the backend refuses, and the ahead-only rule that keeps a

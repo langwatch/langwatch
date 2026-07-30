@@ -1,3 +1,4 @@
+import type { BuiltPipeline, Registry } from "@langwatch/event-sourcing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventExplorerService } from "../event-explorer.service";
 import type {
@@ -5,22 +6,28 @@ import type {
   RawEventRow,
 } from "../repositories/event-explorer.repository";
 
-vi.mock("~/server/event-sourcing/pipelineRegistry", () => ({
-  getProjectionMetadata: vi.fn(() => [
-    { projectionName: "traceMetrics", aggregateType: "Trace" },
-    { projectionName: "experimentRun", aggregateType: "Experiment" },
-  ]),
-  getDejaViewProjections: vi.fn(() => [
+/** Two pipelines, one fold each — a projection name resolves through the
+ * registry to the aggregate type of the pipeline that declares it. */
+const registry = {
+  all: () => [
     {
-      projectionName: "traceMetrics",
-      eventTypes: ["TraceIngested", "TraceUpdated"],
-      init: () => ({ count: 0 }),
-      apply: (state: { count: number }, _event: unknown) => ({
-        count: state.count + 1,
-      }),
+      aggregateType: "Trace",
+      pipeline: {
+        name: "Trace",
+        folds: { traceMetrics: {} },
+        maps: {},
+      } as unknown as BuiltPipeline,
     },
-  ]),
-}));
+    {
+      aggregateType: "Experiment",
+      pipeline: {
+        name: "Experiment",
+        folds: {},
+        maps: { experimentRun: {} },
+      } as unknown as BuiltPipeline,
+    },
+  ],
+} as unknown as Registry;
 
 function createMockRepo(
   overrides: Partial<Record<keyof EventExplorerRepository, unknown>> = {},
@@ -33,27 +40,44 @@ function createMockRepo(
   } as unknown as EventExplorerRepository;
 }
 
+function createService(repo: EventExplorerRepository): EventExplorerService {
+  return new EventExplorerService(repo, registry);
+}
+
 describe("EventExplorerService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe("discoverAggregates()", () => {
-    describe("when projection names match registry entries", () => {
+    describe("when projection names match registered folds", () => {
       it("queries repo with matching aggregate types", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
 
-        await service.discoverAggregates({
+        await createService(repo).discoverAggregates({
           projectionNames: ["traceMetrics"],
           since: "2024-01-01",
           tenantIds: [],
         });
 
         expect(repo.findAggregates).toHaveBeenCalledWith(
-          expect.objectContaining({
-            aggregateTypes: ["Trace"],
-          }),
+          expect.objectContaining({ aggregateTypes: ["Trace"] }),
+        );
+      });
+    });
+
+    describe("when a projection name matches a registered map", () => {
+      it("resolves it to the declaring pipeline's aggregate type", async () => {
+        const repo = createMockRepo();
+
+        await createService(repo).discoverAggregates({
+          projectionNames: ["experimentRun"],
+          since: "2024-01-01",
+          tenantIds: [],
+        });
+
+        expect(repo.findAggregates).toHaveBeenCalledWith(
+          expect.objectContaining({ aggregateTypes: ["Experiment"] }),
         );
       });
     });
@@ -61,9 +85,8 @@ describe("EventExplorerService", () => {
     describe("when no projection names match", () => {
       it("returns empty projections array", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
 
-        const result = await service.discoverAggregates({
+        const result = await createService(repo).discoverAggregates({
           projectionNames: ["nonexistent"],
           since: "2024-01-01",
           tenantIds: [],
@@ -82,9 +105,8 @@ describe("EventExplorerService", () => {
             { aggregateType: "Trace", tenantId: "t2", aggregateCount: 20 },
           ]),
         });
-        const service = new EventExplorerService(repo);
 
-        const result = await service.discoverAggregates({
+        const result = await createService(repo).discoverAggregates({
           projectionNames: ["traceMetrics"],
           since: "2024-01-01",
           tenantIds: [],
@@ -99,9 +121,8 @@ describe("EventExplorerService", () => {
     describe("when since is a date string", () => {
       it("converts to milliseconds for repo query", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
 
-        await service.discoverAggregates({
+        await createService(repo).discoverAggregates({
           projectionNames: ["traceMetrics"],
           since: "2024-06-15",
           tenantIds: [],
@@ -116,18 +137,15 @@ describe("EventExplorerService", () => {
     describe("when tenantIds are provided", () => {
       it("passes them through to repo", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
 
-        await service.discoverAggregates({
+        await createService(repo).discoverAggregates({
           projectionNames: ["traceMetrics"],
           since: "2024-01-01",
           tenantIds: ["t1", "t2"],
         });
 
         expect(repo.findAggregates).toHaveBeenCalledWith(
-          expect.objectContaining({
-            tenantIds: ["t1", "t2"],
-          }),
+          expect.objectContaining({ tenantIds: ["t1", "t2"] }),
         );
       });
     });
@@ -135,18 +153,15 @@ describe("EventExplorerService", () => {
     describe("when tenantIds are empty", () => {
       it("passes undefined to repo", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
 
-        await service.discoverAggregates({
+        await createService(repo).discoverAggregates({
           projectionNames: ["traceMetrics"],
           since: "2024-01-01",
           tenantIds: [],
         });
 
         expect(repo.findAggregates).toHaveBeenCalledWith(
-          expect.objectContaining({
-            tenantIds: undefined,
-          }),
+          expect.objectContaining({ tenantIds: undefined }),
         );
       });
     });
@@ -156,9 +171,11 @@ describe("EventExplorerService", () => {
     describe("when tenantIds is empty", () => {
       it("passes undefined to repo", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
 
-        await service.searchAggregates({ query: "trace_abc", tenantIds: [] });
+        await createService(repo).searchAggregates({
+          query: "trace_abc",
+          tenantIds: [],
+        });
 
         expect(repo.searchAggregates).toHaveBeenCalledWith({
           query: "trace_abc",
@@ -170,9 +187,8 @@ describe("EventExplorerService", () => {
     describe("when tenantIds has values", () => {
       it("passes them through to repo", async () => {
         const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
 
-        await service.searchAggregates({
+        await createService(repo).searchAggregates({
           query: "trace_abc",
           tenantIds: ["t1"],
         });
@@ -199,9 +215,8 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
         });
-        const service = new EventExplorerService(repo);
 
-        const result = await service.getAggregateEvents({
+        const result = await createService(repo).getAggregateEvents({
           aggregateId: "a1",
           tenantId: "t1",
           limit: 10,
@@ -224,189 +239,14 @@ describe("EventExplorerService", () => {
         const repo = createMockRepo({
           findEventsByAggregate: vi.fn().mockResolvedValue(rows),
         });
-        const service = new EventExplorerService(repo);
 
-        const result = await service.getAggregateEvents({
+        const result = await createService(repo).getAggregateEvents({
           aggregateId: "a1",
           tenantId: "t1",
           limit: 10,
         });
 
         expect(result[0]!.payload).toBe("not-json");
-      });
-    });
-  });
-
-  describe("computeProjectionState()", () => {
-    describe("when projection not found in registry", () => {
-      it("returns null state", async () => {
-        const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
-
-        const result = await service.computeProjectionState({
-          aggregateId: "a1",
-          tenantId: "t1",
-          projectionName: "nonexistent",
-          eventIndex: 0,
-        });
-
-        expect(result.state).toBeNull();
-        expect(result.appliedEventCount).toBe(0);
-      });
-    });
-
-    describe("when dejaView projection not found", () => {
-      it("returns null state with event count", async () => {
-        const rows: RawEventRow[] = [
-          {
-            eventId: "e1",
-            eventType: "ExperimentStarted",
-            eventTimestamp: "1700000000000",
-            payload: "{}",
-          },
-        ];
-        const repo = createMockRepo({
-          findEventsByAggregate: vi.fn().mockResolvedValue(rows),
-        });
-        const service = new EventExplorerService(repo);
-
-        // experimentRun is in projection metadata but NOT in dejaView projections
-        const result = await service.computeProjectionState({
-          aggregateId: "a1",
-          tenantId: "t1",
-          projectionName: "experimentRun",
-          eventIndex: 0,
-        });
-
-        expect(result.state).toBeNull();
-        expect(result.appliedEventCount).toBe(1);
-        expect(result.aggregateType).toBe("Experiment");
-      });
-    });
-
-    describe("when events match projection eventTypes", () => {
-      it("folds them via apply function", async () => {
-        const rows: RawEventRow[] = [
-          {
-            eventId: "e1",
-            eventType: "TraceIngested",
-            eventTimestamp: "1700000000000",
-            payload: "{}",
-          },
-          {
-            eventId: "e2",
-            eventType: "TraceUpdated",
-            eventTimestamp: "1700000001000",
-            payload: "{}",
-          },
-        ];
-        const repo = createMockRepo({
-          findEventsByAggregate: vi.fn().mockResolvedValue(rows),
-        });
-        const service = new EventExplorerService(repo);
-
-        const result = await service.computeProjectionState({
-          aggregateId: "a1",
-          tenantId: "t1",
-          projectionName: "traceMetrics",
-          eventIndex: 1,
-        });
-
-        expect(result.state).toEqual({ count: 2 });
-        expect(result.appliedEventCount).toBe(2);
-      });
-    });
-
-    describe("when events don't match projection eventTypes", () => {
-      it("skips them", async () => {
-        const rows: RawEventRow[] = [
-          {
-            eventId: "e1",
-            eventType: "UnrelatedEvent",
-            eventTimestamp: "1700000000000",
-            payload: "{}",
-          },
-        ];
-        const repo = createMockRepo({
-          findEventsByAggregate: vi.fn().mockResolvedValue(rows),
-        });
-        const service = new EventExplorerService(repo);
-
-        const result = await service.computeProjectionState({
-          aggregateId: "a1",
-          tenantId: "t1",
-          projectionName: "traceMetrics",
-          eventIndex: 0,
-        });
-
-        expect(result.state).toEqual({ count: 0 }); // init() returns {count:0}, no apply called
-        expect(result.appliedEventCount).toBe(0);
-      });
-    });
-
-    describe("when apply throws for an event", () => {
-      it("skips that event and continues", async () => {
-        const { getDejaViewProjections } = await vi.importMock<
-          typeof import("~/server/event-sourcing/pipelineRegistry")
-        >("~/server/event-sourcing/pipelineRegistry");
-        (getDejaViewProjections as ReturnType<typeof vi.fn>).mockReturnValue([
-          {
-            projectionName: "traceMetrics",
-            eventTypes: ["TraceIngested"],
-            init: () => ({ count: 0 }),
-            apply: (state: { count: number }, _event: unknown) => {
-              if (state.count === 0) throw new Error("bad event");
-              return { count: state.count + 1 };
-            },
-          },
-        ]);
-
-        const rows: RawEventRow[] = [
-          {
-            eventId: "e1",
-            eventType: "TraceIngested",
-            eventTimestamp: "1700000000000",
-            payload: "{}",
-          },
-          {
-            eventId: "e2",
-            eventType: "TraceIngested",
-            eventTimestamp: "1700000001000",
-            payload: "{}",
-          },
-        ];
-        const repo = createMockRepo({
-          findEventsByAggregate: vi.fn().mockResolvedValue(rows),
-        });
-        const service = new EventExplorerService(repo);
-
-        const result = await service.computeProjectionState({
-          aggregateId: "a1",
-          tenantId: "t1",
-          projectionName: "traceMetrics",
-          eventIndex: 1,
-        });
-
-        // First event throws (count===0), second event also throws (count still 0)
-        expect(result.appliedEventCount).toBe(0);
-      });
-    });
-
-    describe("when eventIndex limits events", () => {
-      it("only processes events up to that index", async () => {
-        const repo = createMockRepo();
-        const service = new EventExplorerService(repo);
-
-        await service.computeProjectionState({
-          aggregateId: "a1",
-          tenantId: "t1",
-          projectionName: "traceMetrics",
-          eventIndex: 5,
-        });
-
-        expect(repo.findEventsByAggregate).toHaveBeenCalledWith(
-          expect.objectContaining({ limit: 6 }), // eventIndex + 1
-        );
       });
     });
   });

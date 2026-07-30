@@ -4,6 +4,14 @@
 // Migrations run in key order. Goose only runs ClickHouse migrations numbered
 // above the version the database is on, so one numbered below a migration that
 // already merged never runs there. Prisma runs it, but out of order.
+//
+// It also checks what a goose migration's Down section holds. A Down block is
+// written commented out, with a note saying to roll back, uncomment and run
+// manually, so that reverting is a decision an operator takes rather than
+// something a tool can do by accident — a live DROP COLUMN in a Down block is
+// one `goose down` away from deleting a column nothing can rebuild. The same
+// pass checks that a StatementBegin block holds a single statement, which is
+// all ClickHouse accepts per query.
 package migrationorder
 
 import (
@@ -26,6 +34,9 @@ type Set struct {
 	Format string
 	// Render turns a free key into the name fragment the suggested rename uses.
 	Render func(key int64) string
+	// Goose marks a set whose entries are goose SQL files, split into an Up and
+	// a Down section by `-- +goose` annotations. Only those are read as SQL.
+	Goose bool
 }
 
 // Sets are the ordered migration directories in this repository.
@@ -48,5 +59,6 @@ var Sets = []Set{
 		Key:                 regexp.MustCompile(`^(\d{5})_.*\.sql$`),
 		Format:              "NNNNN_name.sql",
 		Render:              func(key int64) string { return fmt.Sprintf("%05d", key) },
+		Goose:               true,
 	},
 }

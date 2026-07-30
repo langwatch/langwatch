@@ -50,7 +50,8 @@ type WorkerPool interface {
 	KillSessionVanished(conversationID string)
 	// StartReaper begins the idle-worker sweep.
 	StartReaper()
-	// ShutdownHandoff (ADR-048) is the pre-drain SIGTERM step: it notifies each
+	// ShutdownHandoff (ADR-048, retired; ground now
+	// dev/docs/adr/098-event-sourcing-core.md) is the pre-drain SIGTERM step: it notifies each
 	// live worker that shutdown is imminent (so opencode checkpoints the
 	// in-flight turn and emits a terminal handoff frame) and waits, bounded by
 	// deadline, for those turns to quiesce. Runs BEFORE Shutdown so the handoff
@@ -142,7 +143,8 @@ type TurnResult struct {
 	ProjectID      string `json:"projectId"`
 	ConversationID string `json:"conversationId"`
 	// Status is "completed" or "failed". Only "completed" is posted today;
-	// failures are covered by the relay's error dispatch and the liveness reactor.
+	// failures are covered by the relay's error dispatch and the liveness
+	// subscriber.
 	Status    string          `json:"status"`
 	Text      string          `json:"text,omitempty"`
 	ToolCalls []FinalToolCall `json:"toolCalls,omitempty"`

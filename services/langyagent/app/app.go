@@ -44,7 +44,8 @@ var reachingLangyStatuses = []string{
 }
 
 // readyStatusFor words the pre-first-frame status by the transition actually
-// happening: resuming a checkpointed turn (ADR-048), waking a worker that has
+// happening: resuming a checkpointed turn (ADR-048, retired; ground now
+// dev/docs/adr/098-event-sourcing-core.md), waking a worker that has
 // never answered, or reaching one that has. Lines rotate deterministically off
 // the turn id — stable for a re-drive of the same turn, different across turns.
 func readyStatusFor(req ChatRequest, worker Worker) string {
@@ -98,7 +99,7 @@ func WithTelemetry(t *telemetry.Telemetry) Option { return func(a *App) { a.tele
 
 // WithFinalizer injects the durable turn-result poster. Optional: when absent
 // (tests, or a deployment with no internal secret) the app skips the durable
-// HTTP-final and relies on the relay + liveness reactor alone.
+// HTTP-final and relies on the relay + liveness subscriber alone.
 func WithFinalizer(f TurnFinalizer) Option { return func(a *App) { a.finalizer = f } }
 
 // WithFrameRelay injects the control-plane relay push client. Optional: when
@@ -231,8 +232,9 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 	// produces — must be a benign no-op, never a second run.
 	switch worker.ClaimTurn(req.TurnID) {
 	case ClaimAlreadyHandled:
-		// Nothing claimed, nothing to drive; the transport answers 202 so the
-		// re-driving reactor treats it as accepted, not a failure.
+		// Nothing claimed, nothing to drive; the transport answers 202 so
+		// the re-driving liveness subscriber treats it as accepted, not a
+		// failure.
 		return func(context.Context) {}, nil
 	case ClaimBusy:
 		// Expected hot-path control-flow outcome — no stack capture needed.
@@ -474,8 +476,8 @@ func emitError(ctx context.Context, sink *frameSink, message, code string) {
 
 // finalizeCompletedTurn posts the accumulated final for a successful turn. It is
 // detached from the request ctx and fire-and-forget with a panic guard: a dropped
-// final is recoverable via the ingest's idempotency and the liveness reactor
-// backstop, so it must never block or fail the turn.
+// final is recoverable via the ingest's idempotency and the liveness
+// subscriber backstop, so it must never block or fail the turn.
 func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, sink *frameSink) {
 	if a.finalizer == nil || req.TurnID == "" {
 		return
@@ -493,7 +495,7 @@ func (a *App) finalizeCompletedTurn(ctx context.Context, req ChatRequest, sink *
 			Text:           text,
 			ToolCalls:      toolCalls,
 		}); err != nil {
-			clog.Get(detached).Warn("durable turn finalize failed; liveness reactor is the backstop", zap.Error(err))
+			clog.Get(detached).Warn("durable turn finalize failed; liveness subscriber is the backstop", zap.Error(err))
 		}
 	}()
 }

@@ -9,7 +9,7 @@ import type { TraceEvalResult, TraceListItem } from "../../types/trace";
  * Table-layer helpers for per-evaluator eval columns. The id grammar
  * (`eval:<field>:<evaluatorKey>`) lives in the dependency-free
  * `lens/evalColumnId`; this module adds the bits that need the trace data
- * shape and TanStack. See dev/docs/adr/029-trace-table-per-evaluator-columns.md.
+ * shape and TanStack. See dev/docs/adr/094-trace-table-per-evaluator-columns.md.
  */
 
 /** Resolve the human label for an eval column header / picker entry. */

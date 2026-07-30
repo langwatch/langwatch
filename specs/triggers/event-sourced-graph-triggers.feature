@@ -4,9 +4,9 @@ Feature: Event-sourced custom-graph threshold alerts
   So that alerts stay timely and trustworthy.
 
   # The event-sourced path is the sole graph-alert path: the real-time outbox
-  # reactor fires on fold updates and the 30s heartbeat covers no-data and
-  # resolve. The K8s cron that used to share this work was removed once every
-  # project had cut over (ADR-034).
+  # process manager fires on fold updates and the 30s heartbeat covers no-data
+  # and resolve. The K8s cron that used to share this work was removed once
+  # every project had cut over (ADR-034).
 
   Background:
     Given a project owns active custom-graph triggers

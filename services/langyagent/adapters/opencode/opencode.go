@@ -40,7 +40,8 @@ var terminalEventTypes = map[string]struct{}{
 	"error":         {},
 	"session.error": {},
 	"message.error": {},
-	// ADR-048: opencode emits a terminal `handoff` frame carrying an opaque
+	// ADR-048 (retired; ground now dev/docs/adr/098-event-sourcing-core.md):
+	// opencode emits a terminal `handoff` frame carrying an opaque
 	// resume token when it checkpoints on a shutdown-imminent notice. Treating
 	// it as terminal lets the in-flight turn's StreamEvents forward the frame to
 	// the sink (and thence to the control plane over the open /chat response)

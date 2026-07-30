@@ -19,7 +19,8 @@ import { persist } from "zustand/middleware";
 import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";
 
 /**
- * Single client/UI-state store for the Langy panel (ADR-046 frontend).
+ * Single client/UI-state store for the Langy panel (ADR-046 frontend,
+ * retired; ground now ADR-098).
  *
  * Everything the panel needs to *decide what to render* lives here — panel
  * visibility, which conversation is active, the composer draft + model
@@ -110,11 +111,11 @@ export interface LangyContextChip {
  * Null means the skill has no specific target — a perfectly good state, and the
  * default until the user says otherwise.
  *
- * It stores the chip's ID, not its label: labels change (a title reactor lands,
- * a filter is edited) and a binding that silently pointed at a stale string
- * would be worse than no binding. The label is resolved at send time, from the
- * chip that is actually present — and if that chip has since been removed, the
- * binding resolves to nothing rather than to a lie.
+ * It stores the chip's ID, not its label: labels change (a generated title
+ * lands, a filter is edited) and a binding that silently pointed at a stale
+ * string would be worse than no binding. The label is resolved at send time,
+ * from the chip that is actually present — and if that chip has since been
+ * removed, the binding resolves to nothing rather than to a lie.
  */
 export interface LangySkillChip {
   /** Feature-map feature id, or agent skill name. See ~/shared/langy/langySkills.ts. */
@@ -441,7 +442,8 @@ interface LangyState extends TurnPhaseState {
   /** A genuine end-of-turn frame settled the turn: go `idle` immediately. */
   settleTurn: (turnId: string | null) => void;
   /**
-   * The LOCAL turn projection (ADR-059): the durable event tail folded through
+   * The LOCAL turn projection (ADR-059, retired; ground now ADR-098): the
+   * durable event tail folded through
    * the same reducer the server projection runs. Seeded from the conversation
    * snapshot, advanced by `applyTurnEvents`, and composed with the phase
    * machine — a folded terminal settles the phase, a folded running turn
@@ -767,7 +769,7 @@ export const useLangyStore = create<LangyState>()(
             (attached) => attached.id === item.id,
           );
           // Re-attaching an id is a refresh, not a duplicate: replace in place so
-          // a label/meta that changed (a title reactor landed) updates without
+          // a label/meta that changed (a generated title landed) updates without
           // stacking a second chip or losing the item's position.
           if (existingIndex >= 0) {
             const next = [...state.attachedContext];
@@ -903,7 +905,8 @@ export const useLangyStore = create<LangyState>()(
         set((s) => reduceObserveBackendTurn(s, inFlight)),
       settleTurn: (turnId) => set((s) => reduceSettleTurn(s, turnId)),
 
-      // The local turn projection (ADR-059) — pure reducers from
+      // The local turn projection (ADR-059, retired; ground now ADR-098) —
+      // pure reducers from
       // @langwatch/langy, composed with the phase machine in the two places
       // durable truth arrives: the snapshot seed and the folded tail.
       turnProjection: initialLangyTurnProjection,

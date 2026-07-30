@@ -39,10 +39,11 @@ const CausalityDepthHeader = "X-LangWatch-Causality-Depth"
 //
 // The header gate is load-bearing. Without it, EVERY nlpgo request —
 // playground runs, workflow runs, scenarios — would stamp depth>=1 on
-// emitted spans and the reactor's per-span depth_direct guard would
-// silently block ON_MESSAGE monitors on legitimate non-evaluator
-// workflow runs. The TS dispatcher always sends the header on the
-// evaluator path (nlpgoFetch.ts) so eval-chain detection stays intact.
+// emitted spans and the evaluation-trigger process manager's per-span
+// depth_direct guard would silently block ON_MESSAGE monitors on
+// legitimate non-evaluator workflow runs. The TS dispatcher always sends
+// the header on the evaluator path (nlpgoFetch.ts) so eval-chain
+// detection stays intact.
 func applyInboundCausality(ctx context.Context, r *http.Request) context.Context {
 	ctx = traceContextPropagator.Extract(ctx, propagation.HeaderCarrier(r.Header))
 

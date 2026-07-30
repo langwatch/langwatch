@@ -1,9 +1,9 @@
+import { validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { AnalyticsClientUnavailableError } from "~/server/app-layer/analytics/errors";
 import { validateTimeZone } from "~/server/app-layer/analytics/query-builders/_shared";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type {
   FindMonitorPerformanceParams,
   MonitorPerformanceBucket,
@@ -105,7 +105,7 @@ export class MonitorPerformanceClickHouseRepository
     params: FindMonitorPerformanceParams,
   ): Promise<MonitorPerformanceBucket[]> {
     if (params.evaluatorIds.length === 0) return [];
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "MonitorPerformanceClickHouseRepository.findBuckets",
     );

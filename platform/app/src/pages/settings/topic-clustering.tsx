@@ -16,7 +16,7 @@ import type { ClusteringErrorCode } from "~/server/app-layer/topic-clustering/cl
 import type {
   TopicClusteringRunMode,
   TopicClusteringSkipReason,
-} from "~/server/event-sourcing/pipelines/topic-clustering-processing/schemas/constants";
+} from "~/server/event-sourcing/topic-clustering-processing/schema";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
@@ -339,7 +339,8 @@ function ClusteringStatusCard({
 
 /**
  * What one history row says about its run, in the customer's terms. The
- * server never sends raw error text (ADR-051 §8) — a failed run's detail is
+ * server never sends raw error text (ADR-051 §8, retired; ground now
+ * ADR-098) — a failed run's detail is
  * the same fixed guidance the status card uses.
  */
 function runDetail(run: {
@@ -413,7 +414,9 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
               {history.data.map((run) => (
                 <Table.Row key={run.runId}>
                   <Table.Cell whiteSpace="nowrap">
-                    {formatTimeAgo(run.startedAt)}
+                    {run.startedAt === null
+                      ? "—"
+                      : formatTimeAgo(run.startedAt)}
                   </Table.Cell>
                   <Table.Cell whiteSpace="nowrap">
                     {run.trigger === "manual" ? "You" : "Schedule"}

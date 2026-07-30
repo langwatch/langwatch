@@ -5,7 +5,8 @@ import { useLangyStore } from "../langyStore";
 
 /**
  * The store-level composition of the local turn projection with the turn-phase
- * machine (ADR-059): durable events drive the SAME machine the transport and
+ * machine (ADR-059, retired; ground now ADR-098): durable events drive the
+ * SAME machine the transport and
  * the fold-flag effect drive — a folded terminal settles it, a folded running
  * turn confirms it, and a snapshot naming an in-flight turn lets a refreshed
  * tab adopt it. The reducers themselves are package-tested; this file pins the

@@ -218,7 +218,7 @@ Forms always allow Save to be clicked. Validation runs on submit and surfaces er
 - Users sometimes click Save expecting to discover what's missing. A pre-disabled button is silent and frustrating.
 - Async validation (uniqueness checks, server-side rules) can't always pre-compute disabled state — the button would lie about readiness.
 
-See [ADR 018](../adr/018-form-validation-and-save.md) for the full decision context.
+See [ADR 087](../adr/087-form-validation-and-save.md) for the full decision context.
 
 ### Implementation
 

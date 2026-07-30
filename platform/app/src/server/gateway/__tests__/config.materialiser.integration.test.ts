@@ -35,7 +35,7 @@ import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { GatewayGuardrailService } from "../guardrail.service";
 import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "../virtualKey.config";

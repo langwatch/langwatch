@@ -2,7 +2,6 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import { env } from "../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";
 import {
@@ -25,6 +24,7 @@ import type {
   TopicClusteringTrace,
 } from "./clustering.types";
 import { CLUSTERING_ERROR_CODES, ClusteringError } from "./clustering-error";
+import { clusteringErrorExcerpt } from "./clustering-error-excerpt";
 import { seedProjectTopicModel } from "./seedTopicModel";
 
 const logger = createLogger("langwatch:topicClustering");
@@ -56,6 +56,20 @@ const CLUSTERING_MODE_WINDOW_DAYS = 365;
  * unaffected.
  */
 const CLUSTERING_FETCH_WINDOW_DAYS = 49;
+
+/**
+ * The lease must OUTLIVE the slowest healthy clustering page, or a second
+ * dispatcher re-leases the row mid-flight and re-runs the same page
+ * concurrently. A page is up to 2000 traces through langevals batch
+ * clustering (embeddings + LLM naming) — minutes, not seconds — so a
+ * generic 30s default is unsafe here. Mirrors the outbox lease the topic
+ * clustering process manager claims with; the two must not drift apart.
+ *
+ * Belongs on `event-sourcing/topic-clustering-processing` next to
+ * `TOPIC_CLUSTERING_STALE_RUN_MS`, not here — parked in app-layer only
+ * because that pipeline directory is out of scope for this repoint.
+ */
+export const TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS = 20 * 60 * 1000;
 
 /**
  * Hard deadline on a single langevals clustering call, DERIVED from the outbox
@@ -866,7 +880,7 @@ export const storeResults = async (
 
 /**
  * Topic clustering runs on langevals (the workspace member at
- * services/langevals/evaluators/topic_clustering — see contract.md §11). Returns
+ * langevals/evaluators/topic_clustering — see contract.md §11). Returns
  * the base URL, or `null` if LANGEVALS_ENDPOINT is unset, in which case
  * the caller warns and skips.
  */
@@ -974,15 +988,12 @@ const postToTopicClustering = async (opts: {
     });
 
     if (!response.ok) {
-      let body = await response.text();
-      try {
-        body = JSON.stringify(JSON.parse(body), null, 2)
-          .split("\n")
-          .slice(0, 10)
-          .join("\n");
-      } catch {
-        /* this is just a safe json parse fallback */
-      }
+      // Bounded in BYTES and with the request echo stripped, because this
+      // message is logged AND recorded on the run's failure event. A pydantic
+      // 422 quotes the value it rejected — which for us is a trace's own
+      // text — and the previous line-bound let a single long line through
+      // whole. See clustering-error-excerpt.ts.
+      const body = clusteringErrorExcerpt(await response.text());
       // Ours by default. The body often quotes an upstream provider error,
       // but quoting is not evidence — attributing a 5xx to the customer's
       // credentials on the strength of the text inside it is how this used to

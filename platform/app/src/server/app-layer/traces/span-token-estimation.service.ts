@@ -1,7 +1,7 @@
-import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
+import type { OtlpSpan } from "./ingest/otlp";
 import { extractModelName } from "./utils/spanModel";
 
 /**

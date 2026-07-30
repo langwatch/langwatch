@@ -1,6 +1,6 @@
 import { createServer, type Server } from "node:http";
+import { DispatchError } from "@langwatch/event-sourcing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import { createSSRFValidator } from "~/utils/ssrfProtection";
 import { sendHttpDestination } from "../httpDestination";
 

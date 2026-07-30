@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { REHYDRATION_WINDOW_MS } from "~/server/event-sourcing/stores/rehydrationWindow";
+import { REHYDRATION_WINDOW_MS } from "~/server/app-layer/langy/langy-conversation.service";
 import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,

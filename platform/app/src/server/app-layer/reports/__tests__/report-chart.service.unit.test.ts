@@ -62,6 +62,7 @@ function run({
 
 describe("loadReportCharts", () => {
   describe("given a customGraph report", () => {
+    /** @scenario "A custom-graph report sends the graph" */
     it("plots the graph's series over the report window", async () => {
       const deps = makeDeps({
         graphs: [makeGraph()],
@@ -92,6 +93,7 @@ describe("loadReportCharts", () => {
     });
 
     describe("when the graph returns no buckets", () => {
+      /** @scenario "A report whose source has no data still delivers" */
       it("marks the chart empty rather than inventing a flat line", async () => {
         const deps = makeDeps({
           graphs: [makeGraph()],
@@ -192,6 +194,7 @@ describe("loadReportCharts", () => {
   });
 
   describe("given a dashboard report", () => {
+    /** @scenario "A dashboard report sends every panel on the dashboard" */
     it("returns one chart per panel", async () => {
       const deps = makeDeps({
         graphs: [
@@ -218,6 +221,7 @@ describe("loadReportCharts", () => {
   });
 
   describe("given a dashboard with more panels than the query concurrency cap", () => {
+    /** @scenario "A dashboard wider than the query concurrency cap still sends every panel" */
     it("bounds concurrent getTimeseries queries and still returns every chart in order", async () => {
       // Regression for the ADR-044 §5 finding: an unbounded Promise.all fanned
       // every panel's heavy ClickHouse query out at once. A large dashboard must

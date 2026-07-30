@@ -1,7 +1,7 @@
 import type {
   NormalizedAttrScalar,
   NormalizedAttrValue,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "../ingest/normalizedSpan";
 
 export const toAttrValue = (v: unknown): NormalizedAttrValue | null => {
   if (v === null || v === undefined) return null;

@@ -7,7 +7,7 @@
  * "Budget pre-check"), so banner + CLI box can never disagree.
  *
  * The hard_block / 402 path is exercised end-to-end by
- * gatewayBudgetSync.reactor.integration.test.ts which uses the same
+ * budgetEnforcement.integration.test.ts which uses the same
  * `GatewayBudgetService.check()` code path. This file focuses on:
  *
  *   1. Org-membership guard (rejected when caller is not in the org).
@@ -25,12 +25,11 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { prisma } from "../../../db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
+import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 

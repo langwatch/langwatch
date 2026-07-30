@@ -1,38 +1,72 @@
+import {
+  type ClickHouseClient,
+  ch,
+  createRowCodec,
+  defineTable,
+  replacing,
+  type TableRow,
+} from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type {
   LangyAnalyticsEventRecord,
   LangyAnalyticsEventRepository,
 } from "./langy-analytics-event.repository";
 
-const TABLE_NAME = "langy_analytics_events" as const;
 const logger = createLogger(
   "langwatch:app-layer:langy:analytics-event-repository",
 );
 
-interface ClickHouseLangyAnalyticsEventRecord {
-  TenantId: string;
-  EventId: string;
-  EventType: string;
-  EventVersion: string;
-  AggregateId: string;
-  TurnId: string | null;
-  UserId: string | null;
-  Role: string | null;
-  ToolName: string | null;
-  Outcome: string | null;
-  Model: string | null;
-  DurationMs: string | null;
-  OccurredAt: Date;
-  AcceptedAt: Date;
-  _retention_days: number;
-}
+/**
+ * `langy_analytics_events` (migration 00047). `OccurredAt` anchors the
+ * partition and TTL despite its name: unlike a trace's OccurredAt (customer
+ * timing, movable), this table's `OccurredAt` is stamped once per `EventId`
+ * and never revised — the migration's own comment establishes that — so it
+ * carries the `acceptedAt` role here (ADR-099). The literal `AcceptedAt`
+ * column is a separate timestamp the domain also carries and takes no role.
+ */
+const table = defineTable({
+  name: "langy_analytics_events",
+  merge: replacing({ version: "ProjectedAt" }),
+  sortKey: ["TenantId", "OccurredAt", "EventId"],
+  partition: { by: "toYearWeek(toDate(OccurredAt))", column: "OccurredAt" },
+  tenant: ["TenantId"],
+  ttl: { anchor: "OccurredAt" },
+  columns: {
+    TenantId: ch.string(),
+    EventId: ch.string(),
+    EventType: ch.lowCardinality(ch.string()),
+    EventVersion: ch.lowCardinality(ch.string()),
+    AggregateId: ch.string(),
+    TurnId: ch.nullable(ch.string()),
+    UserId: ch.nullable(ch.string()),
+    Role: ch.lowCardinality(ch.nullable(ch.string())),
+    ToolName: ch.lowCardinality(ch.nullable(ch.string())),
+    Outcome: ch.lowCardinality(ch.nullable(ch.string())),
+    Model: ch.lowCardinality(ch.nullable(ch.string())),
+    DurationMs: ch.nullable(ch.uint64()),
+    OccurredAt: ch.acceptedAt(),
+    AcceptedAt: ch.dateTime64(3),
+    ProjectedAt: ch.writtenAt(),
+    _retention_days: ch.uint16(),
+  },
+});
 
-function toClickHouseRecord(
+type Row = TableRow<typeof table.columns>;
+
+const codec = createRowCodec();
+
+/**
+ * `writtenAt` is supplied by the caller rather than read from `Date.now()`
+ * here, so one batch insert stamps every row with the same instant (the
+ * table's `ProjectedAt DEFAULT now64(3)` used to give each row whatever the
+ * server's clock read at merge time) and so this mapping stays a pure
+ * function.
+ */
+function toRow(
   record: LangyAnalyticsEventRecord,
   retentionDays: number,
-): ClickHouseLangyAnalyticsEventRecord {
+  writtenAt: Date,
+): Row {
   return {
     TenantId: record.tenantId,
     EventId: record.eventId,
@@ -46,9 +80,10 @@ function toClickHouseRecord(
     Outcome: record.outcome,
     Model: record.model,
     DurationMs:
-      record.durationMs === null ? null : String(Math.round(record.durationMs)),
+      record.durationMs === null ? null : BigInt(Math.round(record.durationMs)),
     OccurredAt: new Date(record.occurredAtMs),
     AcceptedAt: new Date(record.acceptedAtMs),
+    ProjectedAt: writtenAt,
     _retention_days: retentionDays,
   };
 }
@@ -58,10 +93,11 @@ function validateBatch(records: LangyAnalyticsEventRecord[]): string | null {
   if (!tenantId) return null;
 
   for (const record of records) {
-    EventUtils.validateTenantId(
-      { tenantId: record.tenantId },
-      "ClickHouseLangyAnalyticsEventRepository.insert",
-    );
+    if (!record.tenantId) {
+      throw new Error(
+        "ClickHouseLangyAnalyticsEventRepository requires a tenantId for tenant isolation",
+      );
+    }
     if (record.tenantId !== tenantId) {
       throw new Error("Langy analytics batch must contain exactly one tenant");
     }
@@ -72,42 +108,51 @@ function validateBatch(records: LangyAnalyticsEventRecord[]): string | null {
 export class ClickHouseLangyAnalyticsEventRepository
   implements LangyAnalyticsEventRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  constructor(
+    private readonly resolveClient: (tenantId: string) => ClickHouseClient,
+  ) {}
 
   async insert(
     record: LangyAnalyticsEventRecord,
     retentionDays: number,
   ): Promise<void> {
-    await this.insertRecords([record], retentionDays, false);
+    await this.insertRecords([record], retentionDays);
   }
 
   async insertBatch(
     records: LangyAnalyticsEventRecord[],
     retentionDays: number,
   ): Promise<void> {
-    await this.insertRecords(records, retentionDays, true);
+    await this.insertRecords(records, retentionDays);
   }
 
   private async insertRecords(
     records: LangyAnalyticsEventRecord[],
     retentionDays: number,
-    waitForInsert: boolean,
   ): Promise<void> {
     const tenantId = validateBatch(records);
     if (tenantId === null) return;
 
+    const writtenAt = new Date();
+    const rows = records.map((record) =>
+      toRow(record, retentionDays, writtenAt),
+    );
+    const encodedRows = codec.encodeRows({
+      columns: table.wireColumns,
+      columnNames: table.columnNames,
+      rows,
+    });
+
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.resolveClient(tenantId);
       await client.insert({
-        table: TABLE_NAME,
-        values: records.map((record) =>
-          toClickHouseRecord(record, retentionDays),
-        ),
-        format: "JSONEachRow",
-        clickhouse_settings: {
-          async_insert: 1,
-          wait_for_async_insert: waitForInsert ? 1 : 0,
-        },
+        tenantId,
+        table: table.name,
+        rows: encodedRows,
+        columns: table.columnNames,
+        // Retryable: ProjectedAt is the replacing version, so a redelivered
+        // batch collapses at merge instead of duplicating (ADR-104 §2).
+        target: { kind: "replacing" },
       });
     } catch (error) {
       logger.error(

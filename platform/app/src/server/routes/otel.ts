@@ -13,6 +13,11 @@ import {
   stampIngestKeyProvenanceOnMetricRequest,
   stampIngestKeyProvenanceOnTraceRequest,
 } from "@ee/governance/services/ingestKeyProvenance.utils";
+import {
+  stripReservedOriginAttrsFromLogRequest,
+  stripReservedOriginAttrsFromMetricRequest,
+  stripReservedOriginAttrsFromTraceRequest,
+} from "@ee/governance/services/reservedOriginAttrs";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
@@ -28,7 +33,7 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/trace-processing/schema";
 import {
   parseOtlpLogs,
   parseOtlpMetrics,
@@ -375,6 +380,16 @@ secured.access(otelIngestAuth).post("/traces", async (c) => {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
 
+      // Governance identity is receiver-established, never payload-asserted.
+      // This route authenticates a PROJECT, not an IngestionSource, so it has
+      // no origin to stamp — it only removes the reserved namespace. Without
+      // this, a project API key could assert `langwatch.origin.kind` plus any
+      // `langwatch.ingestion_source.id` and inject forged rows into the
+      // auditor-facing governance_ocsf_events / governance_kpis streams.
+      // Genuine governance traffic never passes through here; it is handed to
+      // the pipeline by ingestionRoutes.ts after being stamped.
+      stripReservedOriginAttrsFromTraceRequest(traceRequest);
+
       // Receiver-authoritative provenance stamp for ingestion-key traces.
       // Overwrites any payload-supplied provenance keys (langwatch.source /
       // langwatch.api_key.id / langwatch.origin / langwatch.organization_id
@@ -488,6 +503,11 @@ secured.access(otelIngestAuth).post("/logs", async (c) => {
       if (resolved.type === "apiKey") {
         tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
       }
+
+      // See the traces route: the reserved governance namespace is the
+      // receiver's to set, and this route has no IngestionSource to set it
+      // from.
+      stripReservedOriginAttrsFromLogRequest(logRequest);
 
       if (resolved.type === "apiKey" && resolved.ingestSourceType) {
         // Log-based tools (Claude Code et al. emit OTLP logs, not spans)
@@ -603,6 +623,11 @@ secured.access(otelIngestAuth).post("/metrics", async (c) => {
         return c.json({ error: "Failed to parse metrics" }, { status: 400 });
       }
       const metricsRequest = parsed.request;
+
+      // See the traces route: the reserved governance namespace is the
+      // receiver's to set, and this route has no IngestionSource to set it
+      // from.
+      stripReservedOriginAttrsFromMetricRequest(metricsRequest);
 
       // Receiver-authoritative provenance stamp for ingestion-key metrics —
       // same contract as traces + logs, so the source / key / origin / org

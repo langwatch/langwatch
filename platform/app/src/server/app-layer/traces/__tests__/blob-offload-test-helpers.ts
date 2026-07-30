@@ -6,11 +6,41 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { generate } from "@langwatch/ksuid";
 import { expect } from "vitest";
 import { IO_PREVIEW_BYTES } from "~/server/app-layer/traces/lean-for-projection";
-import type { Event } from "~/server/event-sourcing";
 
 export const AGGREGATE_TYPE = "trace";
+
+/**
+ * The legacy `event_log` envelope. Nothing writes one any more, but rows
+ * written under it stay within retention and the blob read path still decodes
+ * them — `EventPayload` IS `data`, with no wrapper.
+ */
+export interface LoggedEvent {
+  id: string;
+  aggregateId?: string;
+  aggregateType?: string;
+  tenantId?: string;
+  type: string;
+  version?: string;
+  createdAt?: number;
+  occurredAt?: number;
+  data: unknown;
+  metadata?: Record<string, unknown>;
+}
+
+export function legacyLoggedEvent(
+  fields: Omit<LoggedEvent, "id"> & { id?: string },
+): LoggedEvent {
+  const now = Date.now();
+  return {
+    id: fields.id ?? generate("event").toString(),
+    createdAt: now,
+    occurredAt: now,
+    ...fields,
+  };
+}
 
 /**
  * A 200 KB deterministic payload whose final bytes only exist past the 64 KB
@@ -74,7 +104,7 @@ export async function insertEventLogRow({
 }
 
 /** Reads span attributes out of a leaned SpanReceived event into a string map. */
-export function extractSpanAttrs(event: Event): Record<string, string> {
+export function extractSpanAttrs(event: LoggedEvent): Record<string, string> {
   const data = event.data as {
     span?: {
       attributes?: Array<{ key: string; value: { stringValue?: string } }>;

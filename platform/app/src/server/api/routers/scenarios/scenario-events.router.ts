@@ -85,6 +85,7 @@ async function fetchSuiteRunData({
       lastUpdatedAt: 0,
       runs: data.runs,
       scenarioSetIds,
+      expectedCounts: data.expectedCounts,
       hasMore: data.hasMore,
       nextCursor: data.nextCursor,
     };

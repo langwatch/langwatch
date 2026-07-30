@@ -58,27 +58,30 @@ import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repo
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceRequestCollectionService } from "~/server/app-layer/traces/trace-request-collection.service";
 import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
-import { type AggregateType, definePipeline } from "~/server/event-sourcing";
 import {
-  getTestClickHouseClient,
-  getTestRedisConnection,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+  type AggregateType,
+  definePipeline,
+} from "~/server/event-sourcing.old";
 import {
   cleanupTestDataForTenant,
   createTestTenantId,
   getTenantIdString,
-} from "~/server/event-sourcing/__tests__/integration/testHelpers";
-import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
-import { AssignTopicCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/assignTopicCommand";
-import { RecordSpanCommand } from "~/server/event-sourcing/pipelines/trace-processing/commands/recordSpanCommand";
-import { SpanStorageMapProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.mapProjection";
-import { SpanAppendStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/spanStorage.store";
-import { TraceSummaryFoldProjection } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { EventStoreClickHouse } from "~/server/event-sourcing/stores/eventStoreClickHouse";
-import { EventRepositoryClickHouse } from "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse";
+} from "~/server/event-sourcing.old/__tests__/integration/testHelpers";
+import { EventSourcing } from "~/server/event-sourcing.old/eventSourcing";
+import { AssignTopicCommand } from "~/server/event-sourcing.old/pipelines/trace-processing/commands/assignTopicCommand";
+import { RecordSpanCommand } from "~/server/event-sourcing.old/pipelines/trace-processing/commands/recordSpanCommand";
+import { SpanStorageMapProjection } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/spanStorage.mapProjection";
+import { SpanAppendStore } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/spanStorage.store";
+import { TraceSummaryFoldProjection } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import { TraceSummaryStore } from "~/server/event-sourcing.old/pipelines/trace-processing/projections/traceSummary.store";
+import type { TraceProcessingEvent } from "~/server/event-sourcing.old/pipelines/trace-processing/schemas/events";
+import { EventStoreClickHouse } from "~/server/event-sourcing.old/stores/eventStoreClickHouse";
+import { EventRepositoryClickHouse } from "~/server/event-sourcing.old/stores/repositories/eventRepositoryClickHouse";
 import { makeQueueName } from "~/server/queues/makeQueueName";
+import {
+  getTestClickHouseClient,
+  getTestRedisConnection,
+} from "~/test-utils/integration/testContainers";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const otlpRoot = require("@opentelemetry/otlp-transformer/build/src/generated/root");
@@ -204,8 +207,6 @@ function ensureNlpgoBinary(timeoutMs = 600_000): string {
   return NLPGO_TEST_BIN;
 }
 
-const noopReactor = { name: "noop", options: {}, handle: async () => {} };
-
 describe.skipIf(!shouldRun)(
   "nlpgo traceparent — full roundtrip through real event-sourcing pipeline into ClickHouse",
   () => {
@@ -288,16 +289,6 @@ describe.skipIf(!shouldRun)(
           "spanStorage",
           new SpanStorageMapProjection({ store: spanAppendStore }) as any,
         )
-        .withReactor("traceSummary", "evaluationTrigger", noopReactor as any)
-        .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
-        .withReactor("traceSummary", "traceUpdateBroadcast", noopReactor as any)
-        .withReactor(
-          "traceSummary",
-          "simulationMetricsSync",
-          noopReactor as any,
-        )
-        .withReactor("traceSummary", "projectMetadata", noopReactor as any)
-        .withReactor("spanStorage", "spanStorageBroadcast", noopReactor as any)
         // REAL RecordSpanCommand with no-op PII/cost/token deps —
         // same pattern as the other event-sourcing integration tests.
         .withCommand(
@@ -355,11 +346,10 @@ describe.skipIf(!shouldRun)(
       otlpDeliveries.length = 0;
       nlpgoStderrBuf = "";
 
-      // Clear reactor-job orphans from prior runs once, so they don't log
-      // "Unknown job in global queue" noise (matches the
-      // loopPrevention.reactor.integration.test.ts pattern). Wrap in
-      // a one-retry helper so a transient ETIMEDOUT on a saturated CI
-      // runner doesn't kill the whole suite before the test even runs.
+      // Clear orphaned jobs from prior runs once, so they don't log
+      // "Unknown job in global queue" noise. Wrap in a one-retry helper so a
+      // transient ETIMEDOUT on a saturated CI runner doesn't kill the whole
+      // suite before the test even runs.
       //
       // Scoped to the global queue's own keys, NOT flushdb(): flushdb empties
       // the whole logical database, so it deleted the in-flight state of

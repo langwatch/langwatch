@@ -23,7 +23,7 @@
  * Codex doesn't pin its log scope name in a stable way across releases,
  * so we gate on event.name (matches the bespoke
  * extractCodexSseEventMetrics + extractCodexConversationStartMetrics +
- * codex.user_prompt branch in extractIOFromLogRecord this class replaces).
+ * codex.user_prompt branch of the retired log IO extractor this class replaces).
  *
  * On the SPAN side, codex 0.137+ emits native spans under scope
  * `codex_cli_rs` to /v1/traces (Path B with `[otel.trace_exporter.otlp-http]`).

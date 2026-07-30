@@ -6,6 +6,7 @@
 
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
+import type { ExperimentRunTotals } from "~/server/event-sourcing/experiment-run-processing/totals";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type {
   ExperimentRun,
@@ -22,7 +23,13 @@ import type {
 // ClickHouse row types
 // ---------------------------------------------------------------------------
 
-/** Row shape returned from the `experiment_runs` ClickHouse table. */
+/**
+ * Row shape returned from the `experiment_runs` ClickHouse table. The eleven
+ * counter columns ADR-103 decision 1 retired are absent: a run's progress is
+ * a query over `experiment_run_items` (see `totals.ts`), never a column here.
+ * `Total` stays — the denominator is stamped once by the fold and is not a
+ * totals concern.
+ */
 export interface ClickHouseExperimentRunRow {
   ProjectionId: string;
   TenantId: string;
@@ -31,19 +38,30 @@ export interface ClickHouseExperimentRunRow {
   WorkflowVersionId: string | null;
   Version: string;
   Total: number;
-  Progress: number;
-  CompletedCount: number;
-  FailedCount: number;
-  TotalCost: number | null;
-  TotalDurationMs: number | null;
-  AvgScoreBps: number | null;
-  PassRateBps: number | null;
   Targets: string;
   CreatedAt: string;
   UpdatedAt: string;
   FinishedAt: string | null;
   StoppedAt: string | null;
 }
+
+/** The exact columns {@link ClickHouseExperimentRunRow} reads, so a query can
+ * name them instead of `SELECT *` — a retired column cannot silently return
+ * a DDL default that way. */
+export const EXPERIMENT_RUN_ROW_COLUMNS = [
+  "ProjectionId",
+  "TenantId",
+  "RunId",
+  "ExperimentId",
+  "WorkflowVersionId",
+  "Version",
+  "Total",
+  "Targets",
+  "CreatedAt",
+  "UpdatedAt",
+  "FinishedAt",
+  "StoppedAt",
+] as const satisfies readonly (keyof ClickHouseExperimentRunRow)[];
 
 /** Row shape returned from the `experiment_run_items` ClickHouse table. */
 export interface ClickHouseExperimentRunItemRow {
@@ -74,6 +92,36 @@ export interface ClickHouseExperimentRunItemRow {
   EvaluationDurationMs: number | null;
   CreatedAt: string;
 }
+
+/** The exact columns {@link ClickHouseExperimentRunItemRow} reads — see
+ * {@link EXPERIMENT_RUN_ROW_COLUMNS} for why this is named rather than `*`. */
+export const EXPERIMENT_RUN_ITEM_ROW_COLUMNS = [
+  "ProjectionId",
+  "TenantId",
+  "RunId",
+  "ExperimentId",
+  "RowIndex",
+  "TargetId",
+  "ResultType",
+  "DatasetEntry",
+  "Predicted",
+  "TargetCost",
+  "TargetDurationMs",
+  "TargetError",
+  "TargetDomainError",
+  "TraceId",
+  "EvaluatorId",
+  "EvaluatorName",
+  "EvaluationStatus",
+  "Score",
+  "Label",
+  "Passed",
+  "EvaluationDetails",
+  "EvaluationCost",
+  "EvaluationInputs",
+  "EvaluationDurationMs",
+  "CreatedAt",
+] as const satisfies readonly (keyof ClickHouseExperimentRunItemRow)[];
 
 /** Per-evaluator aggregation row from ClickHouse GROUP BY query. */
 export interface ClickHouseEvaluatorBreakdownRow {
@@ -116,11 +164,14 @@ export function mapClickHouseRunToExperimentRun({
   workflowVersion,
   evaluatorBreakdown,
   costSummary,
+  totals,
 }: {
   record: ClickHouseExperimentRunRow;
   workflowVersion?: ExperimentRunWorkflowVersion | null;
   evaluatorBreakdown?: ClickHouseEvaluatorBreakdownRow[];
   costSummary?: ClickHouseCostSummaryRow;
+  /** Absent when no item has landed yet — distinct from a present zero. */
+  totals?: ExperimentRunTotals;
 }): ExperimentRun {
   const evaluations: Record<string, ExperimentRunEvaluationSummary> = {};
 
@@ -162,7 +213,7 @@ export function mapClickHouseRunToExperimentRun({
         ? parseClickHouseDateTimeMs(record.StoppedAt)
         : null,
     },
-    progress: record.Progress,
+    progress: totals ? totals.progress : null,
     total: record.Total,
     summary,
   };
@@ -201,10 +252,13 @@ export function mapClickHouseItemsToRunWithItems({
   runRecord,
   items,
   projectId,
+  totals,
 }: {
   runRecord: ClickHouseExperimentRunRow;
   items: ClickHouseExperimentRunItemRow[];
   projectId: string;
+  /** Absent when no item has landed yet — distinct from a present zero. */
+  totals?: ExperimentRunTotals;
 }): ExperimentRunWithItems {
   const dataset: ExperimentRunDatasetEntry[] = [];
   const evaluations: ExperimentRunEvaluation[] = [];
@@ -286,7 +340,7 @@ export function mapClickHouseItemsToRunWithItems({
     runId: runRecord.RunId,
     projectId,
     workflowVersionId: runRecord.WorkflowVersionId,
-    progress: runRecord.Progress,
+    progress: totals ? totals.progress : null,
     total: runRecord.Total,
     targets,
     dataset,

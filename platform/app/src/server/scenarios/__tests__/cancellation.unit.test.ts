@@ -128,6 +128,23 @@ describe("ScenarioCancellationService", () => {
         );
       });
 
+      /**
+       * The terminal event is what an open suite panel is nudged from, and the
+       * nudge carries only what the event carries. A panel filtered to a set
+       * ignores one that does not name the set, so a queued run cancelled while
+       * the user watched it stayed on screen as queued until they reloaded.
+       *
+       * @scenario "Cancelling a queued run updates the panel the user is watching"
+       */
+      it("says which batch and set the cancelled run belongs to", () => {
+        expect(mockDispatchFinishRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            batchRunId: "batch1",
+            scenarioSetId: "set1",
+          }),
+        );
+      });
+
       it("returns cancelled: true", () => {
         expect(result).toEqual({ cancelled: true });
       });

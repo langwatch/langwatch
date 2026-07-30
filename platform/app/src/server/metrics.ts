@@ -190,7 +190,7 @@ export const workerRestartsCounter = new Counter({
   help: "Number of times the worker has been restarted",
 });
 
-// ADR-022: edge-spool fail-open counter. The edge spool falls back to
+// ADR-022 (retired; ground now ADR-099): edge-spool fail-open counter. The edge spool falls back to
 // unmodified command data when the feature-flag store or S3 errors, so
 // ingestion is never blocked. A healthy fleet emits this at ~zero rate;
 // sustained increments (esp. reason="spool") indicate an S3 outage worth
@@ -248,6 +248,29 @@ register.removeSingleMetric("langwatch_evaluator_loop_blocked_total");
 export const evaluatorLoopBlockedCounter = new Counter({
   name: "langwatch_evaluator_loop_blocked_total",
   help: "Number of online-evaluator dispatches blocked by the loop guards",
+  labelNames: ["reason"] as const,
+});
+
+// Custom SDK evaluations the trace pipeline declined to relay. Each increment
+// is a verdict the CUSTOMER's SDK already computed that the platform will now
+// never show — which reads to them as an evaluation that never ran — so the
+// drop is counted as well as logged rather than being inferable only from a
+// missing row.
+//
+// Per-tenant attribution lives in the structured log line beside each
+// increment, NOT as a Prometheus label, for the same cardinality reason as
+// langwatch_evaluator_loop_blocked_total above.
+//
+// labels.reason ∈ "stale"           (the span's own business time is older than
+//                                    STALE_TRACE_THRESHOLD_MS at handling time —
+//                                    a batch-exporting SDK, a skewed client
+//                                    clock, or a group parked past the window)
+//               | "unreferenceable" (the span carried verdicts but cannot be
+//                                    addressed for read-back)
+register.removeSingleMetric("langwatch_custom_evaluation_sync_dropped_total");
+export const customEvaluationSyncDroppedCounter = new Counter({
+  name: "langwatch_custom_evaluation_sync_dropped_total",
+  help: "Custom SDK evaluation reports the trace pipeline declined to relay",
   labelNames: ["reason"] as const,
 });
 
@@ -313,12 +336,10 @@ export const eventSourcingStoreDurationHistogram = new Histogram({
 });
 
 // ============================================================================
-// Event Sourcing Pipeline Metrics (command, fold, map, reactor)
+// Event Sourcing Pipeline Metrics (command, fold, map)
 // ============================================================================
 
 type ESStatus = "completed" | "failed";
-/** Reactors additionally skip pre-enqueue when shouldReact returns false. */
-type ReactorStatus = ESStatus | "skipped";
 
 // --- Unified projection metrics ---
 // Keep the existing kind-specific metrics below for backwards compatibility,
@@ -481,7 +502,8 @@ const esFoldRefoldOnMissTotal = new Counter({
 });
 
 /**
- * Makes the ADR-066 transitional net observable. `refoldOnStoreMiss` survives on
+ * Makes the ADR-066 (retired; ground now ADR-099) transitional net
+ * observable. `refoldOnStoreMiss` survives on
  * the three read-back folds ONLY to rebuild aggregates whose committed row
  * predates their read-back columns, and its deletion condition is "it stopped
  * firing" — which without this counter is an assumption, not an observation. A
@@ -518,46 +540,6 @@ export const incrementEsFoldReadWindowFallbackTotal = (
   projectionName: string,
   outcome: "recovered" | "absent",
 ) => esFoldReadWindowFallbackTotal.labels(projectionName, outcome).inc();
-
-register.removeSingleMetric("es_fold_absent_miss_trusted_total");
-const esFoldAbsentMissTrustedTotal = new Counter({
-  name: "es_fold_absent_miss_trusted_total",
-  help: "Absent store misses a trustAbsentMiss fold answered from init(), by which recovery mechanism was skipped",
-  labelNames: ["projection_name", "skipped"] as const,
-});
-
-/**
- * The direct measure of what `trustAbsentMiss` saves — each increment is one
- * ClickHouse read that no longer happens. `fallback_read` — the unwindowed
- * fallback scan of the fold's own backing table. `refold` — the `event_log`
- * history replay under `refoldOnStoreMiss`. Their pre-change steady state was
- * ~290/min and ~180/min respectively; if this counter goes quiet while
- * `es_fold_read_window_fallback_total` climbs again, the option was disabled
- * (env kill-switch) or dropped from the fold.
- */
-export const incrementEsFoldAbsentMissTrustedTotal = (
-  projectionName: string,
-  skipped: "fallback_read" | "refold",
-) => esFoldAbsentMissTrustedTotal.labels(projectionName, skipped).inc();
-
-register.removeSingleMetric("es_reactor_collapsed_total");
-const esReactorCollapsedTotal = new Counter({
-  name: "es_reactor_collapsed_total",
-  help: "Reactor dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
-  labelNames: ["pipeline_name", "reactor_name"] as const,
-});
-
-/**
- * Counts the sends a coalesced batch did NOT make. Each one would have
- * serialized, gzipped and blobbed `{event, foldState}` only for the queue's
- * dedup to discard it, so this is the direct measure of the churn the collapse
- * removes (2026-07-09 incident).
- */
-export const incrementEsReactorCollapsedTotal = (
-  pipelineName: string,
-  reactorName: string,
-  skipped: number,
-) => esReactorCollapsedTotal.labels(pipelineName, reactorName).inc(skipped);
 
 // --- Map projection metrics ---
 register.removeSingleMetric("es_map_projection_total");
@@ -613,34 +595,6 @@ export const observeEsMapProjectionDuration = ({
   });
 };
 
-// --- Reactor metrics ---
-register.removeSingleMetric("es_reactor_total");
-const esReactorTotal = new Counter({
-  name: "es_reactor_total",
-  help: "Total number of reactor executions",
-  labelNames: ["pipeline_name", "reactor_name", "status"] as const,
-});
-
-export const incrementEsReactorTotal = (
-  pipelineName: string,
-  reactorName: string,
-  status: ReactorStatus,
-) => esReactorTotal.labels(pipelineName, reactorName, status).inc();
-
-register.removeSingleMetric("es_reactor_duration_milliseconds");
-const esReactorDuration = new Histogram({
-  name: "es_reactor_duration_milliseconds",
-  help: "Duration of reactor execution in milliseconds",
-  labelNames: ["pipeline_name", "reactor_name"] as const,
-  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000],
-});
-
-export const observeEsReactorDuration = (
-  pipelineName: string,
-  reactorName: string,
-  durationMs: number,
-) => esReactorDuration.labels(pipelineName, reactorName).observe(durationMs);
-
 // --- Event subscriber metrics ---
 register.removeSingleMetric("es_subscriber_total");
 const esSubscriberTotal = new Counter({
@@ -680,46 +634,68 @@ export const observeEsSubscriberDuration = ({
 
 /**
  * Outcome of a subscriber's enqueue-time fan-out decision (payload-cost
- * doctrine invariant 4 — ADR-069):
+ * doctrine invariant 4 — ADR-069, retired; ground now ADR-098):
  *
  * - `filtered` — the predicate declined; no job was minted.
  * - `staged` — a job carrying the full event was handed off to the
  *   subscriber's lane.
  * - `referenced` — a job carrying a claim-check reference instead of the
  *   payload was handed off.
+ * - `collapsed` — another event in the same handoff was already queueing the
+ *   identical unit of work (the same subscriber dedup id), so this event's
+ *   payload was never serialised, compressed or written away. Its work is not
+ *   lost: the surviving job covers it, exactly as it would have when the queue
+ *   squashed the duplicate itself a moment later. This is the ONLY series that
+ *   shows the saving — the collapse is otherwise invisible, and a change that
+ *   silently disabled it would reintroduce the cost with no series moving.
  *
  * - `failed` — the filter, the stage hook or the handoff threw. The routing
  *   path has no retry, so this subscriber's job for this event is gone.
  *
- * `staged` and `referenced` are counted only after the handoff succeeded: the
- * queue accepted the job, or (in the no-queue configuration) the handler ran
- * inline. A handoff that throws counts `failed` instead, so a queue outage
- * cannot inflate either.
+ * `staged`, `referenced` and `collapsed` are counted only after the handoff
+ * succeeded: the queue accepted the job, or (in the no-queue configuration) the
+ * handler ran inline. A handoff that throws counts `failed` for every event the
+ * batch carried, the collapsed-away ones included — nothing reached the queue,
+ * so no survivor is covering them and the loss is real. That is why a queue
+ * outage cannot inflate any of the three.
  *
  * - `killed` — an operator disabled this subscriber for the event's tenant, so
  *   the seam never judged relevance. Counted rather than skipped silently:
- *   subscriber fan-out is never replayed (ADR-069), so a kill drops those
+ *   subscriber fan-out is never replayed (ADR-069, retired; ground now
+ *   ADR-098), so a kill drops those
  *   events permanently, and an operator must be able to tell a killed
  *   subscriber from an idle one — which is exactly when they are looking.
  *
- * The five outcomes therefore DO sum to "events routed to this subscriber",
+ * The six outcomes therefore DO sum to "events routed to this subscriber",
  * which is what makes `failed` readable as a rate: it is the only outcome that
  * loses work unintentionally, and it is otherwise invisible — a permanent drop
  * that moved no series looked exactly like a quiet day. `killed` loses work
  * too, but deliberately, which is why it is its own outcome and not `filtered`:
  * conflating "an operator stopped this" with "the subscriber judged it
  * irrelevant" would hide the kill behind an ordinary-looking series.
+ *
+ * `collapsed` is counted INSTEAD OF the `staged`/`referenced` the event's own
+ * staging produced, never in addition to it. Counting both would sum to more
+ * than the events routed and silently change the denominator every other
+ * outcome is read against. Instead-of also repairs an existing mis-attribution
+ * rather than merely adding a series: the collapsed-away events were being
+ * counted `staged` although nothing was ever staged for them, so on a hot
+ * aggregate the series read thousands while the queue was handed tens.
+ * `staged` + `referenced` is now exactly the payloads handed over, and
+ * `collapsed / (all outcomes)` is the share of the fan-out the collapse
+ * avoided paying for.
  */
 type SubscriberEnqueueOutcome =
   | "filtered"
   | "staged"
   | "referenced"
+  | "collapsed"
   | "failed"
   | "killed";
 register.removeSingleMetric("es_subscriber_enqueue_total");
 const esSubscriberEnqueueTotal = new Counter({
   name: "es_subscriber_enqueue_total",
-  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069): filtered before staging, staged as a full event or referenced as a claim-check once the handoff succeeded, failed — the retry-less routing path lost the job — or killed, an operator disabled the subscriber for that tenant",
+  help: "Event-sourcing subscriber fan-out outcomes decided at enqueue time (ADR-069), one count per event routed to the subscriber: filtered before staging, staged as a full event or referenced as a claim-check once the handoff succeeded, collapsed — another event in the batch was already queueing the identical work, so this one cost no payload — failed, the retry-less routing path lost the job, or killed, an operator disabled the subscriber for that tenant",
   labelNames: ["pipeline_name", "subscriber_name", "outcome"] as const,
 });
 
@@ -860,7 +836,8 @@ export const observeEsProcessOutboxDispatchLag = ({
 
 // Commits whose intents were dropped as already-dispatched (ADR-054).
 // Legitimate on event redelivery — but a sustained per-process rate is
-// exactly how the ADR-051 lost-day scheduling bug hid, so it is measured,
+// exactly how the ADR-051 (retired; ground now ADR-098) lost-day scheduling
+// bug hid, so it is measured,
 // logged AND alertable rather than only logged.
 register.removeSingleMetric("es_process_intents_suppressed_total");
 const esProcessIntentsSuppressed = new Counter({
@@ -877,7 +854,7 @@ export const incrementEsProcessIntentsSuppressed = ({
   count: number;
 }) => esProcessIntentsSuppressed.labels(processName).inc(count);
 
-// --- Topic clustering domain metrics (ADR-051/ADR-054) ---
+// --- Topic clustering domain metrics (ADR-051 [retired; ground now ADR-098]/ADR-054) ---
 // Run-page outcomes as the domain sees them, not just generic es_* counters:
 // `failed_final` is the alertable one (retries exhausted, run_failed
 // recorded); `failed_retryable` is expected noise under provider hiccups.
@@ -1170,42 +1147,6 @@ export const getLangyBlocksCounter = (
 ) => langyBlocksTotal.labels(outcome);
 
 // ============================================================================
-// Fold redelivery
-// ============================================================================
-
-register.removeSingleMetric("es_fold_post_store_failure_total");
-const esFoldPostStoreFailure = new Counter({
-  name: "es_fold_post_store_failure_total",
-  help: "Fold deliveries that threw after their state was durably stored, by stage",
-  labelNames: ["projection_name", "stage"] as const,
-});
-
-/**
- * A fold threw *after* its state was already written durably.
- *
- * Queue delivery is at-least-once and the fold's state is stored before
- * reactors are dispatched, so anything that throws from that point fails the
- * job without un-writing it: the queue re-delivers events the store already
- * holds. Folds accumulate rather than being idempotent (trace summary does
- * `spanCount + 1` and sums cost), so the re-apply double-counts.
- *
- * Every other fold signal reports this as a plain failure, which is
- * indistinguishable from one that threw *before* the write and is therefore
- * harmless to retry. The two need opposite responses, so they need separate
- * counters.
- *
- * Rate against `es_fold_projection_total{status="failed"}` for the share of
- * fold failures that land in the dangerous half.
- */
-export const incrementEsFoldPostStoreFailure = ({
-  projectionName,
-  stage,
-}: {
-  projectionName: string;
-  stage: "reactor_dispatch";
-}) => esFoldPostStoreFailure.labels(projectionName, stage).inc();
-
-// ============================================================================
 // Stored Objects Metrics
 // ============================================================================
 
@@ -1292,7 +1233,8 @@ const codingAgentSessionListReadDuration = new Histogram({
   help: "Duration of the coding-agent session list read, whose dedup scope scans the tenant unpruned, by table and outcome",
   labelNames: ["table", "outcome"] as const,
   // Runs to 30s deliberately. This metric's job is to catch the unpruned scan
-  // becoming expensive enough to promote ADR-071's writer freeze from "next" to
+  // becoming expensive enough to promote ADR-071's (retired; ground now
+  // ADR-099) writer freeze from "next" to
   // "now", and a top bucket at 5s would put exactly that degradation into
   // `+Inf`, where a p99 cannot be resolved — the histogram would go blind at
   // the moment it was supposed to speak.
@@ -1300,7 +1242,8 @@ const codingAgentSessionListReadDuration = new Histogram({
 });
 
 /**
- * Prices ADR-071 sequencing step 2. `findManyRecent`'s inner `max(UpdatedAt)`
+ * Prices ADR-071 (retired; ground now ADR-099) sequencing step 2.
+ * `findManyRecent`'s inner `max(UpdatedAt)`
  * subquery dropped its `StartedAt` bound, because a bound on a moving column
  * inside a dedup scope returns a stale version. The scope therefore no longer
  * prunes partitions and scans this tenant's sessions rather than the window's

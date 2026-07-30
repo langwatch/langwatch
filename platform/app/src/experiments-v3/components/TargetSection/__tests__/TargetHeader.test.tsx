@@ -153,6 +153,7 @@ describe("TargetHeader", () => {
     // summary refused to shrink — the row grew past the column and the run
     // button slid under the next column. The button must be the one thing that
     // never shrinks; everything else absorbs the squeeze.
+    /** @scenario "Runner header shows play button" */
     it("keeps the play button from being squeezed out of its column", () => {
       renderWithProviders(
         <TargetHeader
@@ -181,6 +182,7 @@ describe("TargetHeader", () => {
       });
     });
 
+    /** @scenario "Runner header shows play button" */
     it("shows play button on the far right", () => {
       renderWithProviders(
         <TargetHeader
@@ -193,6 +195,7 @@ describe("TargetHeader", () => {
       expect(screen.getByTestId("target-play-button")).toBeInTheDocument();
     });
 
+    /** @scenario "Runner header shows a menu on click" */
     it("opens menu when clicking on the header", async () => {
       const user = userEvent.setup();
       renderWithProviders(
@@ -213,6 +216,7 @@ describe("TargetHeader", () => {
       });
     });
 
+    /** @scenario "Edit prompt from the runner header menu" */
     it("calls onEdit when clicking Edit Prompt", async () => {
       const user = userEvent.setup();
       renderWithProviders(
@@ -253,6 +257,7 @@ describe("TargetHeader", () => {
       expect(mockOnDuplicate).toHaveBeenCalledWith(promptTarget);
     });
 
+    /** @scenario "Remove runner from workbench" */
     it("calls onRemove when clicking Remove from Workbench", async () => {
       const user = userEvent.setup();
       renderWithProviders(
@@ -273,6 +278,7 @@ describe("TargetHeader", () => {
       expect(mockOnRemove).toHaveBeenCalledWith(promptTarget.id);
     });
 
+    /** @scenario "Runner header shows a menu on click" */
     it("shows Switch Prompt option in menu", async () => {
       const user = userEvent.setup();
       renderWithProviders(
@@ -355,6 +361,7 @@ describe("TargetHeader", () => {
       ).not.toBeInTheDocument();
     });
 
+    /** @scenario "Runner header shows orange dot for unpublished modifications" */
     it("shows orange dot when localPromptConfig exists", () => {
       renderWithProviders(
         <TargetHeader
@@ -414,6 +421,7 @@ describe("TargetHeader", () => {
       expect(screen.getByText("Python Processor")).toBeInTheDocument();
     });
 
+    /** @scenario "Agent header menu shows Edit Agent" */
     it("shows Edit Agent option for agents", async () => {
       const user = userEvent.setup();
       renderWithProviders(
@@ -451,6 +459,7 @@ describe("TargetHeader", () => {
       expect(mockOnEdit).toHaveBeenCalledWith(agentTarget);
     });
 
+    /** @scenario "Agent header menu shows Edit Agent" */
     it("shows Switch Agent option in menu", async () => {
       const user = userEvent.setup();
       renderWithProviders(

@@ -1,7 +1,7 @@
+import { DispatchError } from "@langwatch/event-sourcing";
 import { AlertType } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerData } from "~/server/app-layer/automations/trigger.types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 
 const { sendEmailMock, computeDefaultFromMock } = vi.hoisted(() => ({
@@ -14,7 +14,11 @@ vi.mock("../emailSender", () => ({
   computeDefaultFrom: computeDefaultFromMock,
 }));
 
-import { injectFooterIntoBody, sendTriggerEmail } from "../triggerEmail";
+import {
+  injectFooterIntoBody,
+  sendRenderedTriggerEmail,
+  sendTriggerEmail,
+} from "../triggerEmail";
 import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../triggerNoReply";
 
 function callEmailWithDedup(
@@ -107,6 +111,7 @@ describe("sendTriggerEmail", () => {
   });
 
   describe("when the provider accepts the send", () => {
+    /** @scenario A successful email send returns without raising */
     it("returns without raising", async () => {
       sendEmailMock.mockResolvedValue(undefined);
       await expect(callEmail()).resolves.toBeUndefined();
@@ -305,8 +310,35 @@ describe("sendTriggerEmail", () => {
   });
 
   describe("when the provider throttles the send", () => {
+    /** @scenario A throttled email send is retryable */
     it("raises a retryable DispatchError", async () => {
       sendEmailMock.mockRejectedValue({ $metadata: { httpStatusCode: 500 } });
+      const err = await callEmail().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DispatchError);
+      expect((err as DispatchError).retryable).toBe(true);
+    });
+
+    // SendGrid raises a numeric `code` rather than an AWS `$metadata` envelope;
+    // the classifier must read both or a throttled SendGrid send would fall
+    // through to the unknown-status default by accident rather than by decision.
+    it("classifies a SendGrid 429 as retryable", async () => {
+      sendEmailMock.mockRejectedValue({
+        code: 429,
+        message: "Too Many Requests",
+      });
+      const err = await callEmail().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DispatchError);
+      expect((err as DispatchError).retryable).toBe(true);
+    });
+
+    // A socket timeout carries no HTTP status at all. ADR-027 (retired;
+    // ground now ADR-045) makes the unknown
+    // case retryable on purpose: dead-lettering an alert we never classified is
+    // worse than paying for the retries.
+    it("classifies a transport timeout with no status as retryable", async () => {
+      sendEmailMock.mockRejectedValue(
+        Object.assign(new Error("socket hang up"), { code: "ETIMEDOUT" }),
+      );
       const err = await callEmail().catch((e: unknown) => e);
       expect(err).toBeInstanceOf(DispatchError);
       expect((err as DispatchError).retryable).toBe(true);
@@ -314,11 +346,76 @@ describe("sendTriggerEmail", () => {
   });
 
   describe("when the provider rejects the address", () => {
+    /** @scenario A rejected email address is terminal */
     it("raises a non-retryable DispatchError", async () => {
       sendEmailMock.mockRejectedValue({ $metadata: { httpStatusCode: 400 } });
       const err = await callEmail().catch((e: unknown) => e);
       expect(err).toBeInstanceOf(DispatchError);
       expect((err as DispatchError).retryable).toBe(false);
+    });
+
+    it("classifies a SendGrid 403 rejection as terminal", async () => {
+      sendEmailMock.mockRejectedValue({ code: 403, message: "Forbidden" });
+      const err = await callEmail().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DispatchError);
+      expect((err as DispatchError).retryable).toBe(false);
+    });
+  });
+});
+
+/**
+ * The outbox and the report dispatcher both send through
+ * `sendRenderedTriggerEmail` (ADR-036), not `sendTriggerEmail` — so the
+ * classification that decides retry-vs-dead in production is this one.
+ */
+describe("sendRenderedTriggerEmail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const callRendered = () =>
+    sendRenderedTriggerEmail({
+      triggerEmails: ["user@example.com"],
+      triggerId: "trigger_test123",
+      projectId: "project-1",
+      subject: "Trigger - Quality Alert",
+      html: "<html><body><p>hi</p></body></html>",
+    });
+
+  describe("when the provider accepts the send", () => {
+    it("returns without raising", async () => {
+      sendEmailMock.mockResolvedValue(undefined);
+      await expect(callRendered()).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when the provider returns a server error", () => {
+    it("raises a retryable DispatchError", async () => {
+      sendEmailMock.mockRejectedValue({ $metadata: { httpStatusCode: 503 } });
+      const err = await callRendered().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DispatchError);
+      expect((err as DispatchError).retryable).toBe(true);
+    });
+  });
+
+  describe("when the provider rejects the message", () => {
+    it("raises a non-retryable DispatchError", async () => {
+      sendEmailMock.mockRejectedValue({ $metadata: { httpStatusCode: 422 } });
+      const err = await callRendered().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DispatchError);
+      expect((err as DispatchError).retryable).toBe(false);
+    });
+  });
+
+  describe("when an already-classified DispatchError reaches the boundary", () => {
+    it("passes the original classification through unchanged", async () => {
+      sendEmailMock.mockRejectedValue(
+        new DispatchError({ message: "already classified", retryable: false }),
+      );
+      const err = await callRendered().catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DispatchError);
+      expect((err as DispatchError).retryable).toBe(false);
+      expect((err as DispatchError).message).toBe("already classified");
     });
   });
 });

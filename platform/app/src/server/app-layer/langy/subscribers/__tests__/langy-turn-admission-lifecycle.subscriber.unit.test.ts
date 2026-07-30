@@ -1,7 +1,7 @@
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { EventSubscriberContext } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
+import type { EventSubscriberContext } from "~/server/app-layer/langy/subscribers/eventSubscriber.types";
+import type { LangyConversationProcessingEvent } from "~/server/app-layer/langy/subscribers/langyConversationProcessingEvent";
 import { createLangyTurnAdmissionLifecycleSubscriber } from "../langy-turn-admission-lifecycle.subscriber";
 
 const context: EventSubscriberContext = {

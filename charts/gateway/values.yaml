@@ -177,8 +177,8 @@ admin:
 # precheck are both enforced locally against the cached bundle snapshot;
 # there is no control-plane call on the hot path. The gateway does not
 # send debits: cost rides the OTel span and the control plane's
-# trace-fold reactor writes the ClickHouse ledger, which flows back into
-# the snapshot on the next /changes refresh. Watch
+# gatewayBudgetDebits map projection writes the ClickHouse ledger, which
+# flows back into the snapshot on the next /changes refresh. Watch
 # `gateway_budget_blocks_total{scope}` to confirm a hard cap is firing.
 budget:
   # Fraction of the hard limit at which a `warn`-mode scope starts

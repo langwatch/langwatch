@@ -43,12 +43,18 @@ interface UseSimulationUpdateListenerOptions {
   onTabNavigate?: (payload: ScenarioTabNavigatePayload) => void;
 }
 
+/**
+ * The non-streaming `simulation_updated` push.
+ *
+ * Ids only. A `status` used to ride along and nothing ever read it — the run's
+ * state comes from the refetch this nudge triggers, never from the nudge
+ * itself, and `matchesFilter` below matches on the three ids.
+ */
 export interface SimulationBroadcastPayload {
   event: string;
   scenarioRunId?: string;
   batchRunId?: string;
   scenarioSetId?: string;
-  status?: string;
 }
 
 export function useSimulationUpdateListener({

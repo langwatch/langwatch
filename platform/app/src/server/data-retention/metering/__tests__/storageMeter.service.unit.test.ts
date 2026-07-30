@@ -43,6 +43,7 @@ describe("StorageMeterService memory guard", () => {
       }
     });
 
+    /** @scenario "Per-tenant storage query sums across all tables" */
     it("meters Langy analytics into the traces category", async () => {
       const query = vi.fn(async ({ query }: { query: string }) => ({
         json: async () => [
@@ -172,6 +173,7 @@ describe("StorageMeterService memory guard", () => {
     }
 
     describe("when the cached value is still fresh", () => {
+      /** @scenario "Storage size is cached in Redis" */
       it("returns it without recomputing", async () => {
         const { service, query, advance } = makeClockService([42]);
 

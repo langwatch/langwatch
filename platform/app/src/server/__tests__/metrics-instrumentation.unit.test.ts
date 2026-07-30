@@ -11,7 +11,6 @@ import {
   incrementEsProcessManagerTotal,
   incrementEsProcessOutboxTotal,
   incrementEsProjectionTotal,
-  incrementEsReactorTotal,
   incrementEsSubscriberTotal,
   observeEsCommandDuration,
   observeEsFoldCacheGetDuration,
@@ -21,7 +20,6 @@ import {
   observeEsProcessManagerDuration,
   observeEsProcessOutboxDuration,
   observeEsProjectionDuration,
-  observeEsReactorDuration,
   observeEsSubscriberDuration,
   withMetrics,
 } from "../metrics";
@@ -81,18 +79,6 @@ describe("ES pipeline metrics", () => {
       expect(register.getSingleMetric(metricName)).toBeDefined();
     });
 
-    it("registers es_reactor_total counter", () => {
-      const metric = register.getSingleMetric("es_reactor_total");
-      expect(metric).toBeDefined();
-    });
-
-    it("registers es_reactor_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric(
-        "es_reactor_duration_milliseconds",
-      );
-      expect(metric).toBeDefined();
-    });
-
     it("registers es_fold_cache_total counter", () => {
       const metric = register.getSingleMetric("es_fold_cache_total");
       expect(metric).toBeDefined();
@@ -115,18 +101,6 @@ describe("ES pipeline metrics", () => {
     it("registers es_fold_cache_redis_error_total counter", () => {
       const metric = register.getSingleMetric(
         "es_fold_cache_redis_error_total",
-      );
-      expect(metric).toBeDefined();
-    });
-
-    /**
-     * Pinned by name: a rename or accidental removal would break the redelivery
-     * dashboard silently, and this counter is the only signal that separates a
-     * fold failure that left durable state behind from one that did not.
-     */
-    it("registers es_fold_post_store_failure_total counter", () => {
-      const metric = register.getSingleMetric(
-        "es_fold_post_store_failure_total",
       );
       expect(metric).toBeDefined();
     });
@@ -366,31 +340,6 @@ describe("ES pipeline metrics", () => {
       );
       expect(outboxDurations).toContain('process_name="langy-conversation"');
       expect(outboxDurations).toContain('intent_type="worker-dispatch"');
-    });
-  });
-
-  describe("when reactor metrics are recorded", () => {
-    it("increments reactor total with correct labels", async () => {
-      incrementEsReactorTotal(
-        "test-pipeline",
-        "evaluationTrigger",
-        "completed",
-      );
-
-      const lines = await register.getSingleMetricAsString("es_reactor_total");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('reactor_name="evaluationTrigger"');
-      expect(lines).toContain('status="completed"');
-    });
-
-    it("records reactor duration with correct labels", async () => {
-      observeEsReactorDuration("test-pipeline", "evaluationTrigger", 150.0);
-
-      const lines = await register.getSingleMetricAsString(
-        "es_reactor_duration_milliseconds",
-      );
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('reactor_name="evaluationTrigger"');
     });
   });
 

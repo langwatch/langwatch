@@ -23,11 +23,15 @@
  * Spec: specs/ai-gateway/governance/siem-export.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createClickHouseClient } from "@langwatch/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
+  getTestClickHouseClient,
+  startTestContainers,
+} from "~/test-utils/integration/testContainers";
 
 import {
   GovernanceOcsfEventsClickHouseRepository,
@@ -42,7 +46,11 @@ const ns = `ocsf-ver-${nanoid(8)}`;
 
 let organizationId: string;
 let govProjectId: string;
+/** The raw driver, for this test's own SELECT / DELETE / column-omitting INSERT. */
 let ch: ClickHouseClient;
+/** What the repository writes through — a different `ClickHouseClient` (the
+ * `@langwatch/clickhouse` wrapper), so the two cannot substitute for one another. */
+let repositoryClient: ReturnType<typeof createClickHouseClient>;
 
 beforeAll(async () => {
   const client = getTestClickHouseClient();
@@ -50,6 +58,8 @@ beforeAll(async () => {
     throw new Error("Test ClickHouse client not initialised");
   }
   ch = client;
+  const { clickHouseUrl } = await startTestContainers();
+  repositoryClient = createClickHouseClient({ url: clickHouseUrl });
 
   // Seed: org → team → hidden Gov Project. The export service resolves
   // the Gov Project by org via Prisma so we need a real PG row, then
@@ -101,12 +111,15 @@ afterAll(async () => {
   await prisma.organization
     .deleteMany({ where: { slug: `--ocsf-ver-${ns}` } })
     .catch(() => {});
+  await repositoryClient.close().catch(() => {});
 });
 
 describe("OCSF schema-version forward-compat", () => {
   describe("write path stamps OCSF_SCHEMA_VERSION", () => {
     it("inserts the constant on every row written via insertEvent", async () => {
-      const repo = new GovernanceOcsfEventsClickHouseRepository(async () => ch);
+      const repo = new GovernanceOcsfEventsClickHouseRepository(
+        () => repositoryClient,
+      );
       const eventId = `evt-write-${ns}`;
       await repo.insertEvent({
         tenantId: govProjectId,
@@ -152,7 +165,9 @@ describe("OCSF schema-version forward-compat", () => {
 
   describe("read path surfaces the version", () => {
     it("returns ocsfSchemaVersion='1.1.0' on each event from the export service", async () => {
-      const repo = new GovernanceOcsfEventsClickHouseRepository(async () => ch);
+      const repo = new GovernanceOcsfEventsClickHouseRepository(
+        () => repositoryClient,
+      );
       const eventId = `evt-read-${ns}`;
       await repo.insertEvent({
         tenantId: govProjectId,

@@ -608,7 +608,7 @@ Rule: Column visibility and reorder
 #   - per-evaluator columns (Score / Verdict / Label, added via the picker)
 #     under "Per-evaluator eval columns"
 #   - the inline summary badges column under "Evals summary column"
-# See dev/docs/adr/029-trace-table-per-evaluator-columns.md.
+# See dev/docs/adr/094-trace-table-per-evaluator-columns.md.
 
 Rule: Event column display
   Event columns show counts with exception flags.

@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { OtlpSpan } from "../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpSpan } from "~/server/app-layer/traces/ingest/otlp";
 import { matchesAnyAttributePattern } from "./attributePatternMatcher";
 import type { ResolvedDataPrivacy } from "./dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "./dataPrivacyPolicy.service";

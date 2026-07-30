@@ -855,6 +855,7 @@ describe("LangyPanel conversation history", () => {
     });
 
     describe("when the user clicks a conversation in the recent list", () => {
+      /** @scenario "Choosing a conversation hands the panel back" */
       it("switches the panel to that conversation's messages", async () => {
         installScenario({ conversations, messagesById });
         renderPanel();

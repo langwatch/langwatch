@@ -143,10 +143,6 @@ const presentations = {
     describe: () =>
       "Narrow the time range, add a filter, or select fewer fields.",
   },
-  time_range_too_wide: {
-    title: "Time range is too wide",
-    describe: () => "Pick a shorter range and try again.",
-  },
   filter_parse_error: {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",
@@ -831,6 +827,14 @@ const presentations = {
   missing_annotator: {
     title: "No annotator assigned",
     describe: () => "Add at least one annotator to the queue.",
+  },
+  invalid_annotator_reference: {
+    // Raised on two surfaces — the bulk "send to queue" dialog and an
+    // automation replaying its saved annotators — so the copy names neither.
+    // The annotator itself stays out of it: the string is unusable precisely
+    // because it identifies nothing a person would recognise.
+    title: "That annotator can't be used",
+    describe: () => "Pick the queue or person again, then try once more.",
   },
   notification_delivery_error: {
     title: "We couldn't deliver that notification",

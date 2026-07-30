@@ -117,6 +117,12 @@ Feature: Langy conversations are an event-sourced projection
     Then each turn is its own document
     And neither turn's tool calls or answer bleed into the other
 
+  Scenario: A turn document with an incomplete identity is refused, not collapsed
+    Given a turn whose conversation or turn identifier is missing
+    When its document key is derived
+    Then deriving the key fails
+    And no document is written under a key shared with every other incomplete turn
+
   # ============================================================================
   # Reading conversations (projections)
   # ============================================================================

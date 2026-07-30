@@ -17,7 +17,7 @@
  * read paths call: it gates, reads the logs, and never fails the read.
  */
 import type { Logger } from "pino";
-import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
+import { capPayloadString } from "~/server/app-layer/traces/capOversizedPayload";
 import type { Span } from "~/server/tracer/types";
 import {
   type ClaudeContentLog,
@@ -152,16 +152,6 @@ export function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
       requestId: readStringParam(span.params, SPAN_REQUEST_ID_KEY),
       querySource: readStringParam(span.params, SPAN_QUERY_SOURCE_KEY),
     }));
-}
-
-/**
- * True when the trace carries Claude Code model-call spans — i.e. at least one
- * span has a `request_id` for the logs to join onto.
- */
-export function hasClaudeModelCallSpans(spans: Span[]): boolean {
-  return spans.some(
-    (span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null,
-  );
 }
 
 function spanToolUseId(span: Span): string | null {

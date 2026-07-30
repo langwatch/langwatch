@@ -11,7 +11,8 @@
  * @see specs/agents/workflow-agent-as-target.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentWorkflowTargetEditorDrawer } from "../AgentWorkflowTargetEditorDrawer";
 
@@ -119,6 +120,7 @@ describe("AgentWorkflowTargetEditorDrawer", () => {
 
   describe("given a workflow-type agent target", () => {
     describe("when the drawer opens with a resolved workflow", () => {
+      /** @scenario Editing the target opens a mapping drawer, not a dead end */
       it("renders the linked workflow's name with a link to open it in Studio", () => {
         renderDrawer();
 
@@ -132,17 +134,80 @@ describe("AgentWorkflowTargetEditorDrawer", () => {
         );
       });
 
+      /** @scenario Editing the target opens a mapping drawer, not a dead end */
+      it("opens the Studio editor in a new tab rather than inside the sidebar", () => {
+        renderDrawer();
+
+        expect(screen.getByTestId("open-workflow-link")).toHaveAttribute(
+          "target",
+          "_blank",
+        );
+      });
+
+      /** @scenario Editing the target opens a mapping drawer, not a dead end */
       it("renders the workflow's real input fields for mapping, not a code editor", () => {
         renderDrawer();
 
         expect(screen.getByText("question")).toBeInTheDocument();
       });
 
+      /** @scenario Mapping a dataset column to a workflow input field */
       it("renders a Close button and no Save button, since mappings persist immediately", () => {
         renderDrawer();
 
         expect(screen.getByTestId("close-drawer-button")).toBeInTheDocument();
         expect(screen.queryByText(/save/i)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when the user maps a dataset column onto a workflow input", () => {
+      const datasetSource = {
+        id: "dataset-1",
+        name: "Support tickets",
+        type: "dataset" as const,
+        fields: [
+          { name: "customer_message", type: "str" },
+          { name: "expected_output", type: "str" },
+        ],
+      };
+
+      /** @scenario Mapping a dataset column to a workflow input field */
+      it("records the mapping the moment the column is picked, with nothing left to save", async () => {
+        const user = userEvent.setup();
+        renderDrawer({ availableSources: [datasetSource] });
+
+        await user.click(screen.getByRole("textbox"));
+
+        await waitFor(() =>
+          expect(screen.getByText("customer_message")).toBeInTheDocument(),
+        );
+        await user.click(screen.getByText("customer_message"));
+
+        expect(mockOnMappingChange).toHaveBeenCalledWith("question", {
+          type: "source",
+          sourceId: "dataset-1",
+          path: ["customer_message"],
+        });
+        // Immediately: the drawer never grew a save control to press.
+        expect(screen.queryByText(/save/i)).not.toBeInTheDocument();
+      });
+
+      /** @scenario Mapping a dataset column to a workflow input field */
+      it("shows the mapped column back to the user on the question field", () => {
+        renderDrawer({
+          availableSources: [datasetSource],
+          inputMappings: {
+            question: {
+              type: "source",
+              sourceId: "dataset-1",
+              path: ["customer_message"],
+            },
+          },
+        });
+
+        expect(screen.getByTestId("source-mapping-tag")).toHaveTextContent(
+          "customer_message",
+        );
       });
     });
 

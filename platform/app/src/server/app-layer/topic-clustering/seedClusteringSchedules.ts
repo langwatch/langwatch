@@ -30,8 +30,9 @@ export interface BackfillDeps {
    * repeats a project. It CAN miss a project inserted mid-walk with an id
    * lexically behind the cursor (ids are nanoid, not monotonic) — harmless
    * here, because a project created after the walk started has
-   * `firstMessage: false` and gets its schedule from the projectMetadata
-   * reactor's bootstrap on first trace, not from this walk.
+   * `firstMessage: false` and gets its schedule from the
+   * `topicClusteringBootstrap` subscriber on its next trace, not from this
+   * walk.
    */
   findEligibleProjectsPage: (params: {
     afterId: string | null;

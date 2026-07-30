@@ -10,16 +10,26 @@
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  clickhouseEventLog,
+  createClickHouseClient,
+  createPoolRegistry,
+  mappedTenantRouter,
+  type ClickHouseClient as PkgClickHouseClient,
+  type TenantTarget,
+} from "@langwatch/clickhouse";
+import type { CommittedEvent } from "@langwatch/event-sourcing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
 import { prisma } from "~/server/db";
-import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types";
 import { startTestClickHouseEndpoints } from "~/test-utils/clickhouseTestEndpoints";
 import type { ClickHouseClientResolver } from "../clickhouseClient";
 
 let sharedClient: ClickHouseClient;
 let privateClient: ClickHouseClient;
+let sharedTarget: TenantTarget;
+let privateTarget: TenantTarget;
 
 const PRIVATE_ORG_ID = `test-iso-priv-org-${nanoid(6)}`;
 const SHARED_ORG_ID = `test-iso-shared-org-${nanoid(6)}`;
@@ -129,6 +139,15 @@ async function queryStoredSpans(
   return result.json();
 }
 
+/** `url` carries the database as its path, the way `CLICKHOUSE_URL` does. */
+function parseTenantTarget(rawUrl: string): TenantTarget {
+  const parsed = new URL(rawUrl);
+  const database =
+    decodeURIComponent(parsed.pathname.replace(/^\//, "")) || "default";
+  parsed.pathname = "/";
+  return { url: parsed.toString(), database };
+}
+
 const createdProjectIds: string[] = [];
 const createdTeamIds: string[] = [];
 const createdOrgIds: string[] = [];
@@ -180,7 +199,7 @@ async function createTestOrgWithProject({
   };
 }
 
-function makeEventRecord({
+function makeCommittedEvent({
   tenantId,
   eventId,
   aggregateId,
@@ -188,19 +207,17 @@ function makeEventRecord({
   tenantId: string;
   eventId?: string;
   aggregateId?: string;
-}): EventRecord {
+}): CommittedEvent {
   return {
-    TenantId: tenantId,
-    AggregateType: "trace",
-    AggregateId: aggregateId ?? `agg-${nanoid(8)}`,
-    EventId: eventId ?? `evt-${nanoid(8)}`,
-    EventTimestamp: Date.now(),
-    EventOccurredAt: Date.now(),
-    EventType: "TraceIngested",
-    EventVersion: "1",
-    EventPayload: JSON.stringify({ test: true }),
-    ProcessingTraceparent: "",
-    IdempotencyKey: `idem-${nanoid(8)}`,
+    tenantId,
+    aggregateType: "trace",
+    aggregateId: aggregateId ?? `agg-${nanoid(8)}`,
+    eventId: eventId ?? `evt-${nanoid(8)}`,
+    eventType: "TraceIngested",
+    eventVersion: "1",
+    idempotencyKey: `idem-${nanoid(8)}`,
+    occurredAt: Date.now(),
+    payload: JSON.stringify({ test: true }),
   };
 }
 
@@ -256,6 +273,8 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
 
     const sharedUrl = shared!.url;
     const privateUrl = private_!.url;
+    sharedTarget = parseTenantTarget(sharedUrl);
+    privateTarget = parseTenantTarget(privateUrl);
 
     // Set the private CH env var so the clickhouseClient module resolves it
     process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;
@@ -326,6 +345,32 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
    * Builds a ClickHouseClientResolver that uses getClickHouseClientForProject
    * and throws if the client is null (mirrors production wiring).
    */
+  /**
+   * One client that resolves each call's tenant to its own endpoint — the
+   * shape the engine's event log is handed in production, so the routing
+   * decision under test is the router's, not the caller's.
+   */
+  function buildRoutedClient(): PkgClickHouseClient {
+    const registry = createPoolRegistry({
+      create: (target: TenantTarget) =>
+        createClickHouseClient({ url: target.url, database: target.database }),
+      destroy: (client) => client.close(),
+    });
+    const router = mappedTenantRouter({
+      fallback: sharedTarget,
+      overrides: new Map([[privateProjectId, privateTarget]]),
+    });
+    const For = (tenantId: string) =>
+      registry.acquire(router.resolve(tenantId));
+
+    return {
+      query: (options) => For(options.tenantId).query(options),
+      stream: (options) => For(options.tenantId).stream(options),
+      insert: (options) => For(options.tenantId).insert(options),
+      close: () => registry.closeAll(),
+    };
+  }
+
   async function buildResolver(): Promise<ClickHouseClientResolver> {
     const { getClickHouseClientForProject } = await import(
       "../clickhouseClient"
@@ -341,45 +386,37 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     };
   }
 
-  describe("EventRepositoryClickHouse", () => {
-    describe("when inserting events for a private-CH org", () => {
+  describe("the event log", () => {
+    describe("when appending events for a private-CH org", () => {
       /** @scenario Events for a private-CH org are stored in the private instance */
       it("stores events in the private instance only", async () => {
-        const { EventRepositoryClickHouse } = await import(
-          "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse"
-        );
-        const resolver = await buildResolver();
-        const repo = new EventRepositoryClickHouse(resolver);
+        const log = clickhouseEventLog({ client: buildRoutedClient() });
 
-        const record = makeEventRecord({ tenantId: privateProjectId });
-        await repo.insertEventRecords([record]);
+        const event = makeCommittedEvent({ tenantId: privateProjectId });
+        await log.append([event]);
 
         const privateRows = await queryEventLog(
           privateClient,
           privateProjectId,
         );
         expect(privateRows).toHaveLength(1);
-        expect(privateRows[0]!.EventId).toBe(record.EventId);
+        expect(privateRows[0]!.EventId).toBe(event.eventId);
 
         const sharedRows = await queryEventLog(sharedClient, privateProjectId);
         expect(sharedRows).toHaveLength(0);
       });
     });
 
-    describe("when inserting events for a shared-CH org", () => {
+    describe("when appending events for a shared-CH org", () => {
       it("stores events in the shared instance only", async () => {
-        const { EventRepositoryClickHouse } = await import(
-          "~/server/event-sourcing/stores/repositories/eventRepositoryClickHouse"
-        );
-        const resolver = await buildResolver();
-        const repo = new EventRepositoryClickHouse(resolver);
+        const log = clickhouseEventLog({ client: buildRoutedClient() });
 
-        const record = makeEventRecord({ tenantId: sharedProjectId });
-        await repo.insertEventRecords([record]);
+        const event = makeCommittedEvent({ tenantId: sharedProjectId });
+        await log.append([event]);
 
         const sharedRows = await queryEventLog(sharedClient, sharedProjectId);
         expect(sharedRows).toHaveLength(1);
-        expect(sharedRows[0]!.EventId).toBe(record.EventId);
+        expect(sharedRows[0]!.EventId).toBe(event.eventId);
 
         const privateRows = await queryEventLog(privateClient, sharedProjectId);
         expect(privateRows).toHaveLength(0);

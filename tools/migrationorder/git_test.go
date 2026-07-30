@@ -38,13 +38,26 @@ func commitMigration(t *testing.T, root, name string) {
 	commitMigrationAt(t, root, clickhouseDir, name)
 }
 
+// commitMigrationAt varies the directory, for the sets that moved in a repo
+// restructure; commitMigrationBody varies the SQL, for the goose Down-section
+// and single-statement checks.
 func commitMigrationAt(t *testing.T, root, directory, name string) {
+	t.Helper()
+	commitMigrationIn(t, root, directory, name, "SELECT 1;\n")
+}
+
+func commitMigrationBody(t *testing.T, root, name, body string) {
+	t.Helper()
+	commitMigrationIn(t, root, clickhouseDir, name, body)
+}
+
+func commitMigrationIn(t *testing.T, root, directory, name, body string) {
 	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(directory), name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte("SELECT 1;\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	gitIn(t, root, "add", ".")

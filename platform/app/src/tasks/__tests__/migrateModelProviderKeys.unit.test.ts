@@ -8,6 +8,7 @@ vi.mock("../../utils/encryption", () => ({
 describe("migrateModelProviderKeysRow", () => {
   describe("given a row with plaintext object customKeys", () => {
     describe("when migrating", () => {
+      /** @scenario "The migration encrypts a plaintext row" */
       it("returns the encrypted string", () => {
         const row = {
           id: "provider-1",
@@ -26,6 +27,7 @@ describe("migrateModelProviderKeysRow", () => {
 
   describe("given a row with already-encrypted string customKeys", () => {
     describe("when migrating", () => {
+      /** @scenario "Migration is idempotent" */
       it("returns null to indicate no migration needed", () => {
         const row = {
           id: "provider-2",

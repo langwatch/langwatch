@@ -62,6 +62,19 @@ Feature: Scenario Failure Handler
       | setId      | set_789      |
       | batchRunId | batch_abc    |
 
+  # This handler writes the terminal state for every run that cannot report its
+  # own — one that stalled, one whose cancellation nobody honoured, one whose
+  # executor faulted after it was dispatched — so what it fails to say about the
+  # run, nothing else says either. A suite panel only acts on an update it can
+  # tell belongs to the suite it is showing.
+  @unit
+  Scenario: A run that could not report its own ending still updates the open panel
+    Given a scenario job failed and cannot report its own result
+    And the user is watching the suite run it belongs to
+    When the failure is recorded for it
+    Then the run leaves "in progress" on the open panel
+    And the user does not have to reload the page to see it
+
   # ============================================================================
   # Worker Event Handler Integration - Integration Tests
   # ============================================================================

@@ -10,20 +10,19 @@
  * invariant in lean-for-projection.unit.test.ts + replay-projection-parity.integration.test.ts.
  */
 
-import type { Event } from "~/server/event-sourcing";
-import {
-  LOG_RECORD_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_TYPE,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type {
-  OtlpResource,
-  OtlpSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   capOversizedAttributes,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   hasOversizedAttribute,
-} from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedAttributes";
+} from "~/server/app-layer/traces/ingest/attributeCap";
+import {
+  LOG_RECORD_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "~/server/app-layer/traces/ingest/constants";
+import type {
+  OtlpResource,
+  OtlpSpan,
+} from "~/server/app-layer/traces/ingest/otlp";
 
 /**
  * Spans whose serialized command payload exceeds this threshold are spooled to S3 at
@@ -31,6 +30,33 @@ import {
  * `capOversizedAttributes` boundary.
  */
 export const COMMAND_INLINE_THRESHOLD = 256 * 1024;
+
+/**
+ * The structural minimum `leanForProjection` reads: the type it switches on,
+ * the payload it rewrites, and the id it embeds in every eventref.
+ *
+ * Stated as a shape rather than the nominal domain `Event` because replay feeds
+ * it its own row-derived event (`ReplayEvent`). Both call sites therefore reach
+ * the same code with no cast between them, which is exactly what ADR-022's
+ * "live and replay produce byte-identical projection state" rests on.
+ */
+export interface LeanableEvent {
+  id: string;
+  type: string;
+  data: unknown;
+}
+
+/**
+ * Returns `event` with a rewritten payload, preserving its concrete type.
+ *
+ * The spread reproduces every field of `E` verbatim and replaces only `data`,
+ * which the constraint types as `unknown` — so the result is an `E` by
+ * construction. TypeScript cannot express that through a generic spread, hence
+ * the single assertion here rather than one per rewrite site.
+ */
+function withData<E extends LeanableEvent>(event: E, data: unknown): E {
+  return { ...event, data } as E;
+}
 
 /**
  * Preview budget for IO attributes. Covers a complete chat-style Claude completion at
@@ -183,7 +209,7 @@ export function structuredIoPreview(
  * @returns A new event with IO attributes replaced by previews + eventrefs, or the original
  *   event if no leaning was necessary.
  */
-export function leanForProjection(event: Event): Event {
+export function leanForProjection<E extends LeanableEvent>(event: E): E {
   if (event.type === SPAN_RECEIVED_EVENT_TYPE) {
     return leanSpanReceivedEvent(event);
   }
@@ -210,7 +236,7 @@ export function leanForProjection(event: Event): Event {
  * CLONED attributes — so the original input event is byte-for-byte untouched. The clone only
  * happens on the "heavy" branch so the sub-threshold hot path stays allocation-free.
  */
-function leanSpanReceivedEvent(event: Event): Event {
+function leanSpanReceivedEvent<E extends LeanableEvent>(event: E): E {
   const data = event.data as {
     span?: OtlpSpan;
     resource?: OtlpResource | null;
@@ -298,21 +324,18 @@ function leanSpanReceivedEvent(event: Event): Event {
   // IO attrs are already ≤ IO_PREVIEW_BYTES (64 KB) < DEFAULT_MAX (256 KB), so they are untouched.
   capOversizedAttributes(clonedSpan, clonedResource);
 
-  return {
-    ...event,
-    data: {
-      ...data,
-      span: clonedSpan,
-      resource: clonedResource,
-    },
-  };
+  return withData(event, {
+    ...data,
+    span: clonedSpan,
+    resource: clonedResource,
+  });
 }
 
 /**
  * Leans a LogRecordReceived event by truncating the body if it exceeds IO_PREVIEW_BYTES
  * and attaching an eventref pointer in the event's attributes.
  */
-function leanLogRecordReceivedEvent(event: Event): Event {
+function leanLogRecordReceivedEvent<E extends LeanableEvent>(event: E): E {
   const data = event.data as {
     body: string;
     attributes?: Record<string, string>;
@@ -328,16 +351,13 @@ function leanLogRecordReceivedEvent(event: Event): Event {
   const preview = utf8Preview(data.body, IO_PREVIEW_BYTES);
   const eventrefKey = `${EVENTREF_ATTR_PREFIX}body`;
 
-  return {
-    ...event,
-    data: {
-      ...data,
-      body: preview,
-      attributes: {
-        ...(data.attributes ?? {}),
-        // ADR-022: embed event.id so the read path can resolve via event_log.
-        [eventrefKey]: JSON.stringify({ field: "body", eventId: event.id }),
-      },
+  return withData(event, {
+    ...data,
+    body: preview,
+    attributes: {
+      ...(data.attributes ?? {}),
+      // ADR-022: embed event.id so the read path can resolve via event_log.
+      [eventrefKey]: JSON.stringify({ field: "body", eventId: event.id }),
     },
-  };
+  });
 }

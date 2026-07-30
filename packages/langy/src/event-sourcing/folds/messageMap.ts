@@ -1,7 +1,7 @@
 /**
  * The Langy message MAP — one durable message-bearing event to one message
  * row, shared by the server's Postgres map projection and (ADR-059 Phase 4,
- * client half) the browser's local message list.
+ * client half, retired; ground now ADR-098) the browser's local message list.
  */
 import { LANGY_CONVERSATION_EVENT_TYPES } from "../../constants";
 import type {

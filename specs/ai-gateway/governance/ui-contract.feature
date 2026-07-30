@@ -247,7 +247,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   @bdd @ui @ui-contract @anomaly-rules
   Scenario: The anomaly rule composer's scope picker still works against
             IngestionSource IDs after the cutover
-    Given Sergey's anomaly reactor has rebased on governance_kpis fold
+    Given Sergey's anomaly evaluator has rebased on governance_kpis fold
     When the admin opens the AnomalyRule composer at
       "/settings/governance/anomaly-rules/new"
     And selects scope = "source"
@@ -305,7 +305,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # Deferred items — explicitly NOT in this PR
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @ui-contract @deferred
+  @bdd @ui @ui-contract @deferred @unimplemented
   Scenario: Cryptographic tamper-evidence is NOT exposed in the UI
     When the admin navigates to any governance surface
     Then there is NO "Verify integrity" button, "Merkle root" display,

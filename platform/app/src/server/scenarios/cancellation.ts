@@ -60,10 +60,21 @@ export interface CancellationServiceDeps {
     scenarioRunId: string;
     occurredAt: number;
   }) => Promise<void>;
-  /** Dispatch a finished event with CANCELLED status. Used for queued jobs that no worker will pick up. */
+  /**
+   * Dispatch a finished event with CANCELLED status. Used for queued jobs that
+   * no worker will pick up.
+   *
+   * `batchRunId` and `scenarioSetId` ride along because the terminal event is
+   * what the SSE nudge is built from: the broadcast subscriber reads the run's
+   * placement off the event, and a run-history panel filtered to a set drops a
+   * push that does not carry it. Cancelling a queued run without them left the
+   * open panel showing it as queued until the user navigated away.
+   */
   dispatchFinishRun: (params: {
     tenantId: string;
     scenarioRunId: string;
+    batchRunId: string;
+    scenarioSetId: string;
     status: string;
     occurredAt: number;
   }) => Promise<void>;
@@ -137,6 +148,8 @@ export class ScenarioCancellationService {
       await this.dispatchFinishRun({
         tenantId: projectId,
         scenarioRunId,
+        batchRunId,
+        scenarioSetId,
         status: ScenarioRunStatus.CANCELLED,
         occurredAt: now + 1, // +1ms to ensure ordering after cancel_requested
       });

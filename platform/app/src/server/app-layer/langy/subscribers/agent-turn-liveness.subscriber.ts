@@ -1,7 +1,9 @@
+import { DispatchError } from "@langwatch/event-sourcing";
 import {
   cursorHasReachedEvent,
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
+  type LangyEventCursor,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -13,11 +15,8 @@ import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import type { ProjectionCursor } from "~/server/event-sourcing/projections/stateProjection.types";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import type { EventSubscriberDefinition } from "~/server/event-sourcing/subscribers/eventSubscriber.types";
-
+import type { EventSubscriberDefinition } from "./eventSubscriber.types";
+import type { LangyConversationProcessingEvent } from "./langyConversationProcessingEvent";
 import { projectionNotReadyError } from "./projection-cursor";
 
 const logger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");
@@ -31,7 +30,7 @@ const LIVENESS_EVENT_TYPES = [
 ] as const;
 
 export interface LangyConversationLivenessRecord {
-  cursor: ProjectionCursor;
+  cursor: LangyEventCursor;
   status: string;
   currentTurnId: string | null;
   lastActivityAtMs: number | null;

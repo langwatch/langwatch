@@ -15,7 +15,7 @@
  * dependencies and are unit-tested without ClickHouse. The candidate-finder
  * (findQueuedRunCandidates) owns the cross-tenant scan.
  *
- * @see specs/scenarios/queued-run-orphan-recovery.feature
+ * @see specs/scenarios/orphaned-run-reconciliation.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

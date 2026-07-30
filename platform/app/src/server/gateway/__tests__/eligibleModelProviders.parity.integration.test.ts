@@ -26,11 +26,11 @@ import {
   resolveEligible,
 } from "~/components/gateway/eligibleModelProviders";
 import { prisma } from "~/server/db";
+import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
+} from "~/test-utils/integration/testContainers";
 import { eligibleModelProvidersForVk } from "../scopeResolver";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 

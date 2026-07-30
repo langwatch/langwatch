@@ -1,16 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { INTERRUPTED_THRESHOLD_MS, isRunFinished } from "../isRunFinished";
 
 describe("isRunFinished", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   describe("when finishedAt is set", () => {
     it("returns true", () => {
       expect(isRunFinished({ finishedAt: 1705312800000 })).toBe(true);
@@ -32,50 +23,51 @@ describe("isRunFinished", () => {
     });
   });
 
-  describe("when updatedAt is recent (< 5 minutes)", () => {
-    /** @scenario Show running indicator for in-progress run */
+  describe("given no explicit finishedAt or stoppedAt", () => {
+    describe("when progress has reached total", () => {
+      /** @scenario A run running at 50 of 50 reads as finished immediately */
+      it("returns true without waiting on any wall clock", () => {
+        expect(isRunFinished({ progress: 50, total: 50 })).toBe(true);
+      });
+
+      it("returns true when progress has overshot total", () => {
+        expect(isRunFinished({ progress: 51, total: 50 })).toBe(true);
+      });
+    });
+
+    describe("when progress is behind total", () => {
+      /** @scenario A run finished at 47 of 50 is the bug this closes */
+      it("returns false, even though the wall-clock heuristic used to mark it finished", () => {
+        expect(isRunFinished({ progress: 47, total: 50 })).toBe(false);
+      });
+    });
+
+    describe("when progress or total is not known yet", () => {
+      /** @scenario Show running indicator for in-progress run */
+      it("returns false", () => {
+        expect(isRunFinished({})).toBe(false);
+        expect(isRunFinished({ progress: null, total: 50 })).toBe(false);
+        expect(isRunFinished({ progress: 0, total: null })).toBe(false);
+      });
+    });
+  });
+
+  describe("when all fields are null or undefined", () => {
     it("returns false", () => {
-      const twoMinutesAgo = Date.now() - 2 * 60 * 1000;
-      expect(isRunFinished({ updatedAt: twoMinutesAgo })).toBe(false);
-    });
-  });
-
-  describe("when updatedAt is stale (> 5 minutes)", () => {
-    it("returns true (interrupted)", () => {
-      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-      expect(isRunFinished({ updatedAt: tenMinutesAgo })).toBe(true);
-    });
-  });
-
-  describe("when updatedAt is exactly at threshold", () => {
-    it("returns false (threshold is exclusive)", () => {
-      const exactlyAtThreshold = Date.now() - INTERRUPTED_THRESHOLD_MS;
-      expect(isRunFinished({ updatedAt: exactlyAtThreshold })).toBe(false);
-    });
-  });
-
-  describe("when updatedAt is just past threshold", () => {
-    it("returns true", () => {
-      const justPastThreshold = Date.now() - INTERRUPTED_THRESHOLD_MS - 1;
-      expect(isRunFinished({ updatedAt: justPastThreshold })).toBe(true);
-    });
-  });
-
-  describe("when all timestamps are null or undefined", () => {
-    it("returns false", () => {
-      expect(isRunFinished({})).toBe(false);
       expect(
         isRunFinished({
           finishedAt: null,
           stoppedAt: null,
-          updatedAt: null,
+          progress: null,
+          total: null,
         }),
       ).toBe(false);
       expect(
         isRunFinished({
           finishedAt: undefined,
           stoppedAt: undefined,
-          updatedAt: undefined,
+          progress: undefined,
+          total: undefined,
         }),
       ).toBe(false);
     });

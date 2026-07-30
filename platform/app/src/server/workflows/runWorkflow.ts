@@ -129,12 +129,12 @@ export async function runEvaluationWorkflow(
       // do_not_trace=false: we WANT the evaluator's spans to land on
       // the parent trace so they show in Studio's waterfall as a
       // child sub-tree. This was historically `true` to avoid an
-      // eval-of-eval loop (pre-2026-05-11 fix), but loop prevention
-      // now lives in the depth-attribute reactor — the do_not_trace
-      // path is now actively harmful: it skips parent-context setup
-      // in nlpgo's startStudioSpan so eval child spans (LLM calls,
-      // execute_component) get a fresh trace_id and land as a
-      // separate orphan trace. See the 2026-05-14 prod regression
+      // eval-of-eval loop (pre-2026-05-11 fix), but loop prevention now
+      // lives in the `evaluationTrigger` process manager's causality-depth
+      // guard — the do_not_trace path is now actively harmful: it skips
+      // parent-context setup in nlpgo's startStudioSpan so eval child
+      // spans (LLM calls, execute_component) get a fresh trace_id and land
+      // as a separate orphan trace. See the 2026-05-14 prod regression
       // reported by rchaves.
       false, // do_not_trace
       false, // run_evaluations - disable evaluators inside the workflow when running as an online evaluation

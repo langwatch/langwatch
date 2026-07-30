@@ -82,7 +82,7 @@ Feature: Simulation Runner Service
   # ============================================================================
   # Scenario execution is fully event-driven:
   # 1. API dispatches queueRun command → queued event
-  # 2. Execution reactor picks up the event → submits to execution pool
+  # 2. scenarioExecution process manager picks up the event → submits to execution pool
   # 3. Pool spawns an isolated child process
   # No BullMQ is used — the event-sourcing GroupQueue distributes work.
 

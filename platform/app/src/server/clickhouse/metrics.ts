@@ -72,6 +72,32 @@ export const incrementWindowedReadCount = (
   outcome: WindowedReadOutcome,
 ) => clickhouseWindowedReadTotal.labels(table, outcome).inc();
 
+// Counter for ClickHouse convention violations, counted on the way OUT of the
+// app and before the query is sent (see app-layer/clients/clickhouse/
+// convention-gate.ts). One increment per (table, rule) pair per query.
+//
+//   partition_predicate - reads a partitioned table with no filter on its
+//                         partition column, so it cannot prune and walks the
+//                         cold tier on S3
+//   tenant_predicate    - reads a table with no comparison on any of its tenant
+//                         columns
+//
+// This exists to be READ before anything is made to throw. Twenty-two of the
+// thirty-three partitioned tables were invisible to the old detector, so the
+// real violation rate is unknown; ranking tables by this counter is what
+// decides which reads are worth fixing and when the gate can be promoted past
+// counting. Same measure-before-limit discipline as
+// clickhouse_windowed_read_total (ADR-068).
+register.removeSingleMetric("clickhouse_convention_violation_total");
+const clickhouseConventionViolationTotal = new Counter({
+  name: "clickhouse_convention_violation_total",
+  help: "ClickHouse reads that break a query convention, by table and rule",
+  labelNames: ["table", "rule"] as const,
+});
+
+export const incrementConventionViolation = (table: string, rule: string) =>
+  clickhouseConventionViolationTotal.labels(table, rule).inc();
+
 // ============================================================================
 // Storage Metrics
 // ============================================================================
@@ -257,7 +283,7 @@ const MONITORED_TABLES = [
   "llm_spans_tokens_usage",
   "evaluations",
   "events",
-  // ADR-040: offloaded evaluator inputs (and other externalized content) live
+  // ADR-096: offloaded evaluator inputs (and other externalized content) live
   // here; monitoring its on-disk footprint surfaces the durable-object cost.
   "stored_objects",
 ];

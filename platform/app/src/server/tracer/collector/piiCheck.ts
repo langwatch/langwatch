@@ -2,7 +2,7 @@ import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import { createLogger } from "@langwatch/observability";
 import { normalizePresidioMarkers } from "@langwatch/redaction";
-import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { PIIRedactionLevel } from "~/server/event-sourcing/trace-processing/schema";
 import { env } from "../../../env.mjs";
 import type { BatchEvaluationResult } from "../../evaluations/evaluators";
 import {

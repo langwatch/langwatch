@@ -30,6 +30,7 @@ describe("collectRemoteSpans()", () => {
   };
 
   describe("when spans are available", () => {
+    /** @scenario "Spans are queried from ES by trace ID after conversation completes" */
     it("returns a collector populated with user agent spans", async () => {
       const querySpans = vi
         .fn()
@@ -49,6 +50,7 @@ describe("collectRemoteSpans()", () => {
   });
 
   describe("when spans have not yet arrived", () => {
+    /** @scenario "Span query retries when spans have not yet arrived" */
     it("retries until spans appear", async () => {
       const querySpans = vi
         .fn()
@@ -68,6 +70,7 @@ describe("collectRemoteSpans()", () => {
       expect(spans.length).toBe(1);
     });
 
+    /** @scenario "Empty span collection does not fail the scenario" */
     it("returns empty collector after timeout when no spans arrive", async () => {
       const querySpans = vi.fn().mockResolvedValue([]);
 
@@ -89,6 +92,7 @@ describe("collectRemoteSpans()", () => {
   });
 
   describe("when response contains infrastructure spans", () => {
+    /** @scenario "Span query filters out scenario infrastructure spans" */
     it("filters out scenario infrastructure spans", async () => {
       const querySpans = vi.fn().mockResolvedValue([
         createTestSpan({ name: "my-agent-tool-call", span_id: "user1" }),
@@ -122,6 +126,7 @@ describe("collectRemoteSpans()", () => {
   });
 
   describe("when the span query fails", () => {
+    /** @scenario "ES query failure produces a synthetic error span" */
     it("produces a collector with a synthetic error span", async () => {
       const querySpans = vi
         .fn()
@@ -142,6 +147,7 @@ describe("collectRemoteSpans()", () => {
   });
 
   describe("when response contains a realistic tool-call span with hierarchy", () => {
+    /** @scenario "Judge can evaluate tool call behavior from collected spans" */
     it("preserves tool-call attributes and parent span through the full pipeline", async () => {
       const parentSpan = createTestSpan({
         span_id: "parent_llm_span",
@@ -216,6 +222,7 @@ describe("collectRemoteSpans()", () => {
   });
 
   describe("when timeout is reached", () => {
+    /** @scenario "Span collection timeout does not block scenario indefinitely" */
     it("completes with whatever was found", async () => {
       const querySpans = vi.fn().mockResolvedValue([]);
 

@@ -55,7 +55,7 @@ export function CacheRuleCreateDrawer({
     if (!organization) return;
     // A complaint, not an error: `validateForm` is a pure local function
     // returning copy this form wrote about state it can see, and none of it
-    // ever crossed a wire. That is exactly the case ADR-018 still lets
+    // ever crossed a wire. That is exactly the case ADR-087 still lets
     // `toaster.create` handle — calling it an error would read as a caught
     // rejection, which has to go through `showErrorToast` instead.
     const complaint = validateForm(state);

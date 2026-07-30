@@ -12,7 +12,8 @@ interface SessionTabProps {
 /**
  * The Session tab's data boundary.
  *
- * Two keyed seeks of the pre-folded SESSION row (ADR-056): the trace resolves
+ * Two keyed seeks of the pre-folded SESSION row (ADR-056, retired; ground
+ * now ADR-105): the trace resolves
  * its session through `coding_agent_trace_sessions`, and the session row
  * already spans every trace of the run — the fold merged them at ingest,
  * which is the whole reason the aggregate exists. The alternative is every

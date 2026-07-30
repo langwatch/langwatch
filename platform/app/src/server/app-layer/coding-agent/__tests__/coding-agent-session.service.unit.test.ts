@@ -5,13 +5,12 @@
  * @see specs/coding-agent/personal-usage.feature
  */
 import { describe, expect, it } from "vitest";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
-import {
-  CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
-  projectCodingAgentSessionToRow,
-} from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
+import { CODING_AGENT_SESSION_STATE_VERSION } from "~/server/event-sourcing/coding-agent-processing/codingAgentSession.projection";
 import { CodingAgentSessionService } from "../coding-agent-session.service";
-import type { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository";
+import type {
+  CodingAgentSessionRepository,
+  CodingAgentSessionRow,
+} from "../repositories/coding-agent-session.repository";
 import type { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository";
 import type {
   SessionMetricSeriesRepository,
@@ -25,42 +24,29 @@ const TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 function makeRow(
   overrides?: Partial<CodingAgentSessionRow>,
 ): CodingAgentSessionRow {
-  const base = projectCodingAgentSessionToRow({
-    state: {
-      // A structurally-complete empty state via the projection itself would
-      // need the fold; build the row from a minimal literal instead.
-      ...emptyState(),
-      sessionKeySource: "provider",
-      traceIds: [TRACE],
-      startedAtMs: 1_700_000_000_000,
-      createdAt: 0,
-      updatedAt: 0,
-      LastEventOccurredAt: 0,
-    },
+  return {
     tenantId: PROJECT,
     sessionId: SESSION,
-    version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
-  });
-  return { ...base, ...overrides };
-}
+    sessionKeySource: "provider",
+    version: CODING_AGENT_SESSION_STATE_VERSION,
+    startedAtMs: 1_700_000_000_000,
 
-function emptyState() {
-  return {
-    agent: "claude_code" as string | null,
-    sessionId: SESSION as string | null,
-    agentVersion: null,
-    terminalType: null,
-    entrypoint: null,
-    finalRequestId: null,
-    userId: "user-1" as string | null,
+    agent: "claude_code",
+    agentVersion: "",
+    traceIds: [TRACE],
+    finalRequestId: "",
+    userId: "user-1",
+    terminalType: "",
+    entrypoint: "",
+
     modelCalls: 0,
     toolCalls: 0,
     subAgents: 0,
-    subAgentIds: [],
-    steps: [],
     prompts: 0,
     promptChars: 0,
     responseChars: 0,
+    steps: [],
+
     toolCounts: {},
     toolDurationMs: {},
     filesTouched: [],
@@ -70,11 +56,13 @@ function emptyState() {
     models: [],
     mcpServers: [],
     mcpTools: [],
+
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheCreationTokens: 0,
     costUsd: 0,
+
     modelCallMs: 0,
     toolMs: 0,
     ttftMsTotal: 0,
@@ -82,6 +70,7 @@ function emptyState() {
     blockedOnUserMs: 0,
     activeTimeUserSec: 0,
     activeTimeCliSec: 0,
+
     toolResultBytes: 0,
     toolInputBytes: 0,
     compactions: 0,
@@ -90,8 +79,7 @@ function emptyState() {
     peakContextTokens: 0,
     cacheRebuildCount: 0,
     largestCacheRebuildTokens: 0,
-    previousCallContextTokens: 0,
-    metricSeries: {},
+
     failedTools: 0,
     errorTypes: {},
     apiErrors: 0,
@@ -102,13 +90,15 @@ function emptyState() {
     refusals: 0,
     refusalCategories: [],
     internalErrors: 0,
+
     toolsDenied: 0,
     toolsAborted: 0,
-    permissionMode: null,
+    permissionMode: "",
     permissionChanges: 0,
     hooksBlocked: 0,
     hooksCancelled: 0,
     hookMs: 0,
+
     linesAdded: 0,
     linesRemoved: 0,
     commits: 0,
@@ -117,8 +107,19 @@ function emptyState() {
     editsRejected: 0,
     languagesEdited: [],
     atMentions: 0,
-    stopReason: null,
+
+    stopReason: "",
     truncated: false,
+
+    subAgentIds: [],
+    stepStartedAt: [],
+    previousCallContextTokens: 0,
+    metricSeries: [],
+    createdAt: 0,
+    updatedAt: 0,
+    lastEventOccurredAt: 0,
+
+    ...overrides,
   };
 }
 
@@ -130,7 +131,7 @@ function makeService({
 }: {
   row?: CodingAgentSessionRow | null;
   rows?: CodingAgentSessionRow[];
-  mapping?: { sessionId: string; occurredAtMs: number } | null;
+  mapping?: { sessionId: string; occurredAt: number } | null;
   totals?: SessionMetricTotal[];
 }) {
   const listed = rows ?? (row ? [row] : []);
@@ -160,7 +161,7 @@ describe("CodingAgentSessionService", () => {
       const row = makeRow({ modelCalls: 3, costUsd: 1.2 });
       const service = makeService({
         row,
-        mapping: { sessionId: SESSION, occurredAtMs: row.startedAtMs },
+        mapping: { sessionId: SESSION, occurredAt: row.startedAtMs },
       });
 
       const session = await service.getSessionForTrace({

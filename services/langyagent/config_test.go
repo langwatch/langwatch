@@ -236,7 +236,8 @@ func TestLoadConfig_ShutdownHandoffDefaults(t *testing.T) {
 	if cfg.ShutdownDrainBudget() != 3*time.Second {
 		t.Errorf("ShutdownDrainBudget default = %s, want 3s", cfg.ShutdownDrainBudget())
 	}
-	// The ADR-048 invariant holds for the defaults: handoff + drain (8s) < the
+	// The ADR-048 (retired; ground now dev/docs/adr/098-event-sourcing-core.md)
+	// invariant holds for the defaults: handoff + drain (8s) < the
 	// 10s default graceful window.
 	if d := cfg.ShutdownHandoffDeadlineMS + cfg.ShutdownDrainBudgetMS; d >= int64(cfg.Server.GracefulSeconds)*1000 {
 		t.Errorf("defaults violate the ADR-048 deadline math: %d >= %d", d, int64(cfg.Server.GracefulSeconds)*1000)

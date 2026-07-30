@@ -49,6 +49,7 @@ describe("given a plan with a visibility window", () => {
       visibilityCutoffMs: Date.now() - 14 * DAY_MS,
     };
 
+    /** @scenario "Free org reading an old trace gets teaser-redacted content" */
     it("teases trace content and stamps the redacted flag", () => {
       const result = applyTraceProtections(makeTrace(15), protections);
       expect(result.input?.value).toHaveLength(
@@ -60,6 +61,7 @@ describe("given a plan with a visibility window", () => {
       expect(result.redacted_by_visibility_window).toBe(true);
     });
 
+    /** @scenario "Both read stacks redact — legacy trace service and spans" */
     it("teases span content through the same pass", () => {
       const result = applyTraceProtections(makeTrace(15), protections);
       const spanInput = result.spans?.[0]?.input as { value: string };
@@ -78,6 +80,7 @@ describe("given a plan with a visibility window", () => {
   });
 
   describe("when the trace is within the window", () => {
+    /** @scenario "Free org reading a fresh trace sees full content" */
     it("returns full content and no redacted flag", () => {
       const result = applyTraceProtections(makeTrace(5), {
         ...FULL_ACCESS,

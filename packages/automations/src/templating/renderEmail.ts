@@ -40,7 +40,8 @@ function clipSubject(subject: string): string {
  * backend (subject prefix + body callout) above the customer content.
  *
  * `defaults` (optional) overrides the framework subject/body templates the
- * renderer falls back to. ADR-034 Phase 8.1 uses this to render
+ * renderer falls back to. ADR-034 (retired; ground now ADR-099) Phase 8.1
+ * uses this to render
  * `GraphAlertTemplateContext` against the alert-default templates without
  * forking the engine; trace callers omit it and keep the trace defaults.
  * Both `TemplateContext` and `GraphAlertTemplateContext` carry the

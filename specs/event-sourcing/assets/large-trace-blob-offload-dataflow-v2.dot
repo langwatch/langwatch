@@ -5,7 +5,7 @@ digraph G {
   edge [fontname="Helvetica", fontsize=9, color="#333", arrowsize=0.7];
 
   labelloc=t;
-  label=<<B>ADR-022 — event_log as source of truth · S3 as transient spool</B><BR/><FONT POINT-SIZE="10">Issue #4215 — supersedes ADR-021 edge-permanent-S3 design</FONT>>;
+  label=<<B>ADR-022 — event_log as source of truth · S3 as transient spool</B><BR/><FONT POINT-SIZE="10">Issue #4215 — supersedes ADR-088 edge-permanent-S3 design</FONT>>;
   fontsize=13;
 
   // ============== WRITE PATH ==============

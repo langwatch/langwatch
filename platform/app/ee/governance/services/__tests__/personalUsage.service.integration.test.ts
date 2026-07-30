@@ -24,7 +24,7 @@ import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { PersonalUsageService } from "../personalUsage.service";
 
 async function insertTrace(

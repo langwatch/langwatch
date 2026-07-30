@@ -357,13 +357,11 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   // On-route: derive from the full snapshot the dashboard already loaded.
   // Off-route: read from the lightweight badge counts. Either way the
   // badge stays in sync.
-  const blockedCount = isOnOpsRoute
-    ? (opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ??
-      0)
-    : (opsBadge.data?.blockedCount ?? 0);
-  const dlqCount = isOnOpsRoute
-    ? (opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0)
-    : (opsBadge.data?.dlqCount ?? 0);
+  // A parked lane is the one thing that needs an operator: it has stopped
+  // claiming work and stays stopped until someone looks.
+  const parkedCount = isOnOpsRoute
+    ? (opsData.data?.parkedLanes ?? 0)
+    : (opsBadge.data?.parkedCount ?? 0);
 
   return (
     <SidebarSection id="ops" label="Ops" showExpanded={showExpanded}>
@@ -375,7 +373,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
           router.pathname === "/ops" ||
           router.pathname.startsWith("/ops/queues")
         }
-        badgeNumber={blockedCount + dlqCount}
+        badgeNumber={parkedCount}
         showLabel={showExpanded}
       />
       <SideMenuLink

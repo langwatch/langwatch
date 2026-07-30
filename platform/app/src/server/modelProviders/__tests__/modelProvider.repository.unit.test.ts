@@ -117,6 +117,7 @@ describe("ModelProviderRepository", () => {
 
   describe("encryptCustomKeys", () => {
     describe("when given a Record of keys", () => {
+      /** @scenario "New model provider keys are encrypted on save" */
       it("produces an encrypted string", () => {
         const keys = { OPENAI_API_KEY: "sk-secret123" };
         const result = (repository as any).encryptCustomKeys(keys);
@@ -132,6 +133,7 @@ describe("ModelProviderRepository", () => {
         expect(encrypt).toHaveBeenCalledWith(JSON.stringify(keys));
       });
 
+      /** @scenario "New model provider keys are encrypted on save" */
       it("produces a value that is not valid JSON for an object", () => {
         const keys = { OPENAI_API_KEY: "sk-secret123" };
         const result = (repository as any).encryptCustomKeys(keys);
@@ -164,6 +166,7 @@ describe("ModelProviderRepository", () => {
 
   describe("decryptCustomKeys", () => {
     describe("when given an encrypted string", () => {
+      /** @scenario "Encrypted keys are decrypted on read" */
       it("round-trips correctly with encryptCustomKeys", () => {
         const original = {
           OPENAI_API_KEY: "sk-secret123",
@@ -203,6 +206,7 @@ describe("ModelProviderRepository", () => {
 
   describe("findById()", () => {
     describe("when provider exists", () => {
+      /** @scenario "Encrypted keys are decrypted on read" */
       it("decrypts customKeys before returning", async () => {
         const encrypted = (repository as any).encryptCustomKeys({
           OPENAI_API_KEY: "sk-secret",
@@ -234,6 +238,7 @@ describe("ModelProviderRepository", () => {
     });
 
     describe("when provider has null customKeys", () => {
+      /** @scenario "Null customKeys are handled gracefully" */
       it("returns null customKeys", async () => {
         const stored = createModelProvider({ customKeys: null });
         (prisma.modelProvider.findFirst as any).mockResolvedValue(stored);
@@ -491,6 +496,7 @@ describe("ModelProviderRepository", () => {
     });
 
     describe("when customKeys are provided", () => {
+      /** @scenario "New model provider keys are encrypted on save" */
       it("encrypts customKeys before storing", async () => {
         const keys = { OPENAI_API_KEY: "sk-secret" };
         (prisma.modelProvider.create as any).mockResolvedValue(
@@ -516,6 +522,7 @@ describe("ModelProviderRepository", () => {
     });
 
     describe("when customKeys are null", () => {
+      /** @scenario "Null customKeys are handled gracefully" */
       it("stores null without encryption", async () => {
         (prisma.modelProvider.create as any).mockResolvedValue(
           createModelProvider(),

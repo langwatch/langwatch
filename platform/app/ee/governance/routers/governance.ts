@@ -41,7 +41,6 @@ import {
 } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { featureFlagService } from "~/server/featureFlag";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 
@@ -284,14 +283,10 @@ export const governanceRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("governance:view"))
     .mutation(async ({ ctx, input }) => {
+      // ADR-104: resolve through the composition root's client, not a
+      // second one built here.
       const ocsfRepository = new GovernanceOcsfEventsClickHouseRepository(
-        async (tenantId) => {
-          const client = await getClickHouseClientForProject(tenantId);
-          if (!client) {
-            throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-          }
-          return client;
-        },
+        (tenantId) => getApp().resolveClickHouseClient(tenantId),
       );
       const service = AdminWorkspaceViewAuditService.create({
         prisma: ctx.prisma,

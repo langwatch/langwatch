@@ -1,6 +1,6 @@
 # Facet perspectives — three task-oriented views of the facet manager
 #
-# Design: dev/docs/adr/028-trace-facet-sidebar-presentation-and-perspectives.md
+# Design: dev/docs/adr/093-trace-facet-sidebar-presentation-and-perspectives.md
 #
 # Implementation:
 #   platform/app/src/features/traces-v2/components/FilterSidebar/constants.ts       (FACET_GROUPS refined into finer sub-groups)

@@ -76,7 +76,7 @@ export type PersonalContext = {
  * + API-key list from real tRPC. Cost / spend-over-time / by-tool /
  * recent-activity are still mocked because the per-user ClickHouse
  * aggregations aren't shipped yet — they will plug in here once the
- * trace-fold reactor learns to project per-user totals.
+ * `traceAnalytics` fold projection learns to project per-user totals.
  *
  * Spec: specs/ai-gateway/governance/personal-keys.feature
  *       specs/ai-gateway/governance/my-usage-dashboard.feature

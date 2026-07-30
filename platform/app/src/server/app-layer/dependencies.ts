@@ -3,13 +3,16 @@ import type { NotificationService } from "../../../ee/billing/notifications/noti
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { AnnotationService } from "../annotations/annotation.service";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import type { EventSourcing } from "../event-sourcing/eventSourcing";
-import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import type {
+  AppCommands,
+  createEventSourcingRegistry,
+} from "../event-sourcing/registry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
@@ -18,6 +21,7 @@ import type {
   TestFireTriggerInput,
 } from "./automations/trigger-template.service";
 import type { BroadcastService } from "./broadcast/broadcast.service";
+import type { AppClickHouseClient } from "./clients/clickhouseClient.factory";
 import type { CodingAgentSessionService } from "./coding-agent/coding-agent-session.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
@@ -127,6 +131,7 @@ export interface AppDependencies {
     feedbackPrompt: LangyFeedbackPromptService;
   };
   experiments: ExperimentService;
+  annotations: AnnotationService;
   triggers: TriggerService;
   /** Wraps `testFireTrigger(deps, input)` with the composition-time
    *  `{baseHost, notifier}` bag already bound — the router only needs
@@ -156,8 +161,15 @@ export interface AppDependencies {
   commands: AppCommands;
   ops?: OpsDependencies;
 
+  /**
+   * ADR-104 composition-root client, exposed so callers outside presets.ts
+   * (governance router, puller worker) resolve through the same pool
+   * instead of building their own.
+   */
+  newClickHouseClient: AppClickHouseClient;
+
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
-  _eventSourcing?: EventSourcing;
+  _eventSourcing?: ReturnType<typeof createEventSourcingRegistry>;
 
   /** Internal — resources to gracefully close on shutdown. */
   _gracefulCloseables?: Array<{ name: string; close: () => Promise<void> }>;

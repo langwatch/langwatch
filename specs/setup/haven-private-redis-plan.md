@@ -128,10 +128,13 @@ as the explicit "nuke my queue state now" escape hatch.
 
 ### 7. Specs / ADRs
 
-No thuishaven ADR exists yet. **Write** `dev/docs/adr/049-haven-worktree-isolation.md`
+No thuishaven ADR exists yet. **Write** `dev/docs/adr/<next-free>-haven-worktree-isolation.md`
 (the first thuishaven ADR: hostname routing + per-slug DB isolation +
 private-Redis-with-linger), cross-linking ADR-004's worktree-isolation amendment
-(`:152-156`) and ADR-006 (redis queue-keyspace). **Write**
+(`:152-156`) and ADR-006 (redis queue-keyspace). Resolve `<next-free>` when you
+write it — the next number above the current maximum in `dev/docs/adr/`, per that
+directory's README numbering rule. Pinning a number in this plan only goes stale.
+**Write**
 `specs/setup/haven-private-redis.feature` (scenarios: each worktree gets its own
 redis; down→up within 20 min keeps queued jobs; idle past 20 min is reaped; two
 worktrees never share a keyspace; missing `redis-server` warns + falls back).

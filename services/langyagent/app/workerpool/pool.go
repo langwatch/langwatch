@@ -251,7 +251,8 @@ func (p *Pool) Shutdown() {
 	p.baseCancel()
 }
 
-// ShutdownHandoff is the ADR-048 pre-drain SIGTERM step. For each live worker it
+// ShutdownHandoff is the ADR-048 (retired; ground now
+// dev/docs/adr/098-event-sourcing-core.md) pre-drain SIGTERM step. For each live worker it
 // posts a shutdown-imminent notice (so opencode checkpoints the in-flight turn
 // and emits a terminal `handoff` frame), then waits — bounded by deadline — for
 // every in-flight turn to quiesce, so the frames flush to the control plane over

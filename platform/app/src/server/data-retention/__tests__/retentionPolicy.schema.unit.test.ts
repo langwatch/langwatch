@@ -34,6 +34,7 @@ describe("retentionDaysSchema", () => {
   describe("when the value is not a whole number of weeks", () => {
     // Every managed table is partitioned weekly (toYearWeek), so retention
     // must align to a 7-day boundary.
+    /** @scenario "Retention must be a whole number of weeks" */
     it("rejects a day count that isn't a multiple of 7", () => {
       expect(
         retentionDaysSchema.safeParse(MIN_RETENTION_DAYS + 1).success,
@@ -57,6 +58,7 @@ describe("retentionDaysSchema", () => {
   });
 
   describe("when the value is below the minimum", () => {
+    /** @scenario "Retention below the minimum is rejected" */
     it("rejects it even when it is a whole number of weeks", () => {
       expect(
         retentionDaysSchema.safeParse(MIN_RETENTION_DAYS - RETENTION_WEEK_DAYS)

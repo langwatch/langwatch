@@ -61,7 +61,14 @@ const updateSuiteInputSchema = z.object({
 });
 
 const runSuiteInputSchema = z.object({
-  idempotencyKey: z.string().optional(),
+  // Bounded because it is load-bearing, not decorative: the key feeds the
+  // SHA-256 that DERIVES the batch and run ids (`scenario.ids.ts`).
+  // `.min(1)` because the downstream check is a truthiness test — an empty
+  // string is silently treated as "no key given" and the submit mints random
+  // ids, so a caller who believed they had opted into an idempotent retry
+  // gets a second run instead of a 400. `.max(255)` bounds what an
+  // authenticated caller can make us hash.
+  idempotencyKey: z.string().min(1).max(255).optional(),
 });
 
 const suiteRunResultSchema = z.object({
@@ -410,14 +417,14 @@ secured.access(requires("scenarios:create")).post(
     }
 
     try {
-      const idempotencyKey =
-        body.idempotencyKey ??
-        `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Passed through as-is: a fabricated default would make every submit
+      // look keyed while none of them deduplicated. Supplying a key is what
+      // opts a caller into an idempotent retry.
       const result = await service.run({
         suite,
         projectId: project.id,
         organizationId,
-        idempotencyKey,
+        idempotencyKey: body.idempotencyKey,
       });
 
       return c.json({

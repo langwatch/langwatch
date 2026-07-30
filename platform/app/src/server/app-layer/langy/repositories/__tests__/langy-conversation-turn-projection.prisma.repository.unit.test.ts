@@ -1,8 +1,7 @@
 import { LANGY_CONVERSATION_TURN_STATUS } from "@langwatch/langy";
 import { type LangyConversationTurnProjection, Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import type { LegacyProjectionStoreContext } from "~/server/app-layer/_shared/legacyProjectionStore.types";
 import { PrismaLangyConversationTurnProjectionRepository } from "../langy-conversation-turn-projection.prisma.repository";
 
 type Row = LangyConversationTurnProjection;
@@ -68,11 +67,11 @@ function setup(result: Row) {
   };
 }
 
-function context(projectId = "project-1"): ProjectionStoreContext {
+function context(projectId = "project-1"): LegacyProjectionStoreContext {
   return {
     aggregateId: "conversation-1",
     key: "conversation-1:turn-1",
-    tenantId: createTenantId(projectId),
+    tenantId: projectId,
   };
 }
 

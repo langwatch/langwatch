@@ -100,6 +100,7 @@ describe("HTTP trace context propagation", () => {
 
   describe("given an active OTEL trace context", () => {
     describe("when the adapter makes a request", () => {
+      /** @scenario "Serialized HTTP adapter injects traceparent header" */
       it("includes a valid W3C traceparent header", async () => {
         const tracer = trace.getTracer("test");
         const span = tracer.startSpan("test-scenario");
@@ -122,6 +123,7 @@ describe("HTTP trace context propagation", () => {
         expect(traceparent).toMatch(W3C_TRACEPARENT_REGEX);
       });
 
+      /** @scenario "Adapter records the propagated trace ID for later ES query" */
       it("returns the propagated trace ID via getTraceId()", async () => {
         const tracer = trace.getTracer("test");
         const span = tracer.startSpan("test-scenario");
@@ -147,6 +149,7 @@ describe("HTTP trace context propagation", () => {
 
   describe("given a multi-turn conversation", () => {
     describe("when the adapter makes requests for multiple turns", () => {
+      /** @scenario "Same trace ID is propagated across all turns of a conversation" */
       it("propagates the same trace ID across all turns", async () => {
         const tracer = trace.getTracer("test");
         const span = tracer.startSpan("multi-turn-scenario");
@@ -212,6 +215,7 @@ describe("HTTP trace context propagation", () => {
 
   describe("given custom headers are configured", () => {
     describe("when the adapter makes a request", () => {
+      /** @scenario "Trace headers coexist with custom headers" */
       it("preserves custom headers alongside trace context headers", async () => {
         const tracer = trace.getTracer("test");
         const span = tracer.startSpan("custom-headers-scenario");

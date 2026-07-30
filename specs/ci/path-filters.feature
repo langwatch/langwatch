@@ -32,7 +32,7 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
   # ============================================================================
 
   Scenario: e2e-ci has a complementary stub
-    Given e2e-ci.yml triggers on platform/app/, sdks/python/, and tests/agentic-e2e/ changes
+    Given e2e-ci.yml triggers on platform/app/, sdks/python/, and dev/tests/agentic-e2e/ changes
     When a PR does not touch those directories
     Then e2e-ci-unmodified.yml reports success for all e2e-ci job names
 

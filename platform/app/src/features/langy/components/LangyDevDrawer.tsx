@@ -343,7 +343,8 @@ function DrawerHeader({
  * caps at that moment — the log, the tokens as they stood, the calls that had
  * settled — and the readout underneath shows the TURN FOLD replayed from the
  * recorded durable lane up to that point, through the same @langwatch/langy
- * reducers the live store runs (ADR-059's replayability, made a control).
+ * reducers the live store runs (ADR-059's replayability, made a control;
+ * ADR-059 retired, ground now ADR-098).
  * Snapping to the right edge returns to LIVE, which follows the tape's edge.
  */
 function TimeScrubber({
@@ -1018,7 +1019,8 @@ function StoreTab() {
     { label: "activeTurnId", value: state.activeTurnId },
     { label: "settledTurnId", value: state.settledTurnId },
     { label: "backendSawTurnInFlight", value: state.backendSawTurnInFlight },
-    // The LOCAL turn projection (ADR-059): the durable tail folded in the
+    // The LOCAL turn projection (ADR-059, retired; ground now ADR-098): the
+    // durable tail folded in the
     // browser. `projection.cursor` against the freshness signal's cursor is
     // THE question when debugging the event stream — is the client behind,
     // and did the fold land?

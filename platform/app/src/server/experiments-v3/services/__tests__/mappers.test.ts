@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { emptyExperimentRunTotals } from "~/server/event-sourcing/experiment-run-processing/totals";
 import type {
   ClickHouseEvaluatorBreakdownRow,
   ClickHouseExperimentRunItemRow,
@@ -22,13 +23,6 @@ const baseClickHouseRun: ClickHouseExperimentRunRow = {
   WorkflowVersionId: "wfv-1",
   Version: "1",
   Total: 10,
-  Progress: 5,
-  CompletedCount: 4,
-  FailedCount: 1,
-  TotalCost: 0.5,
-  TotalDurationMs: 1200,
-  AvgScoreBps: 8500,
-  PassRateBps: 9000,
   Targets: "[]",
   CreatedAt: "2024-01-15 10:30:00.000",
   UpdatedAt: "2024-01-15 10:35:00.000",
@@ -76,8 +70,32 @@ describe("mapClickHouseRunToExperimentRun", () => {
 
     expect(result.experimentId).toBe("exp-1");
     expect(result.runId).toBe("run-1");
-    expect(result.progress).toBe(5);
     expect(result.total).toBe(10);
+  });
+
+  describe("given derived totals for the run", () => {
+    /** @scenario Progress and outcomes reflect the run's items */
+    it("reports progress from the derived totals, not a counter on the row", () => {
+      const result = mapClickHouseRunToExperimentRun({
+        record: baseClickHouseRun,
+        totals: { ...emptyExperimentRunTotals(), progress: 7 },
+      });
+
+      expect(result.progress).toBe(7);
+    });
+
+    it("reports null progress when no item has landed yet, distinct from zero", () => {
+      const withNoItems = mapClickHouseRunToExperimentRun({
+        record: baseClickHouseRun,
+      });
+      const withZeroProgress = mapClickHouseRunToExperimentRun({
+        record: baseClickHouseRun,
+        totals: emptyExperimentRunTotals(),
+      });
+
+      expect(withNoItems.progress).toBeNull();
+      expect(withZeroProgress.progress).toBe(0);
+    });
   });
 
   it("parses ClickHouse DateTime64 strings to UTC Unix milliseconds", () => {
@@ -119,6 +137,7 @@ describe("mapClickHouseRunToExperimentRun", () => {
     expect(result.workflowVersion).toBeNull();
   });
 
+  /** @scenario Progress and outcomes reflect the run's items */
   it("aggregates evaluator breakdown into summary evaluations", () => {
     const result = mapClickHouseRunToExperimentRun({
       record: baseClickHouseRun,
@@ -158,6 +177,42 @@ describe("mapClickHouseRunToExperimentRun", () => {
       record: baseClickHouseRun,
     });
     expect(result.summary.evaluations).toEqual({});
+  });
+
+  describe("when a cost summary derived from the run's items is supplied", () => {
+    /** @scenario Progress and outcomes reflect the run's items */
+    it("reports the item-derived costs and durations, not the run row's", () => {
+      const result = mapClickHouseRunToExperimentRun({
+        record: baseClickHouseRun,
+        costSummary: {
+          ExperimentId: "exp-1",
+          RunId: "run-1",
+          datasetCost: 0.03,
+          evaluationsCost: 0.002,
+          datasetAverageCost: 0.01,
+          datasetAverageDuration: 400,
+          evaluationsAverageCost: 0.001,
+          evaluationsAverageDuration: 25,
+        },
+      });
+
+      expect(result.summary.datasetCost).toBe(0.03);
+      expect(result.summary.evaluationsCost).toBe(0.002);
+      expect(result.summary.datasetAverageDuration).toBe(400);
+      expect(result.summary.evaluationsAverageDuration).toBe(25);
+    });
+  });
+
+  describe("when no item-derived cost summary is supplied", () => {
+    it("reports no cost at all rather than a figure carried on the run row", () => {
+      const result = mapClickHouseRunToExperimentRun({
+        record: baseClickHouseRun,
+      });
+
+      expect(result.summary.datasetCost).toBeUndefined();
+      expect(result.summary.evaluationsCost).toBeUndefined();
+      expect(result.summary.datasetAverageDuration).toBeUndefined();
+    });
   });
 });
 
@@ -233,6 +288,7 @@ describe("mapClickHouseItemsToRunWithItems", () => {
     expect(result.evaluations).toHaveLength(1);
   });
 
+  /** @scenario An item that reports its own cost keeps that figure */
   it("maps target item fields correctly", () => {
     const result = mapClickHouseItemsToRunWithItems({
       runRecord: baseClickHouseRun,
@@ -359,6 +415,37 @@ describe("mapClickHouseItemsToRunWithItems", () => {
       });
 
       expect(result.dataset[0]!.predicted).toBeUndefined();
+    });
+  });
+
+  describe("given derived totals for the run", () => {
+    /** @scenario Progress and outcomes reflect the run's items */
+    it("reports progress from the derived totals, not a counter on the row", () => {
+      const result = mapClickHouseItemsToRunWithItems({
+        runRecord: baseClickHouseRun,
+        items: [targetItem],
+        projectId: "project-1",
+        totals: { ...emptyExperimentRunTotals(), progress: 3 },
+      });
+
+      expect(result.progress).toBe(3);
+    });
+
+    it("reports null progress when no item has landed yet, distinct from zero", () => {
+      const withNoItems = mapClickHouseItemsToRunWithItems({
+        runRecord: baseClickHouseRun,
+        items: [],
+        projectId: "project-1",
+      });
+      const withZeroProgress = mapClickHouseItemsToRunWithItems({
+        runRecord: baseClickHouseRun,
+        items: [],
+        projectId: "project-1",
+        totals: emptyExperimentRunTotals(),
+      });
+
+      expect(withNoItems.progress).toBeNull();
+      expect(withZeroProgress.progress).toBe(0);
     });
   });
 });

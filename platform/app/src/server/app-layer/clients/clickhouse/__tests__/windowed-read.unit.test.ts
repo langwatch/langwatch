@@ -34,6 +34,7 @@ function fakeRun<T>(results: T[]) {
 
 describe("queryWindowed", () => {
   describe("given a hint whose window has rows", () => {
+    /** @scenario "a windowed read that finds its answer stays in the window" */
     it("runs the windowed attempt once and records a hit", async () => {
       const before = await outcomeCount("hit");
       const { run } = fakeRun([["row"]]);
@@ -95,6 +96,7 @@ describe("queryWindowed", () => {
 
   describe("given a hint whose window is empty", () => {
     describe("when the fallback is unbounded", () => {
+      /** @scenario "an unlimited widen is recorded as unlimited, not as a bounded one" */
       it("re-runs with a null (unbounded) fragment and records unbounded_hit", async () => {
         const before = await outcomeCount("unbounded_hit");
         const { run, windows } = fakeRun([[], ["row"]]);
@@ -131,6 +133,7 @@ describe("queryWindowed", () => {
     });
 
     describe("when the fallback is none", () => {
+      /** @scenario "a caller that forbids widening stays bounded on a miss" */
       it("does not re-run and records a hit", async () => {
         const before = await outcomeCount("hit");
         const { run } = fakeRun([[]]);
@@ -150,6 +153,7 @@ describe("queryWindowed", () => {
     });
 
     describe("when the fallback is a lookback frame", () => {
+      /** @scenario "a windowed read that misses widens, and the widening is recorded" */
       it("re-runs with a [now - lookbackMs, now + windowMs] fragment and records widened_hit", async () => {
         const before = await outcomeCount("widened_hit");
         vi.spyOn(Date, "now").mockReturnValue(10_000_000);
@@ -177,6 +181,7 @@ describe("queryWindowed", () => {
         }
       });
 
+      /** @scenario "a widen that still finds nothing is recorded as an empty widen" */
       it("records widened_empty when the lookback scan is also empty", async () => {
         const before = await outcomeCount("widened_empty");
         const { run } = fakeRun([[], []]);
@@ -196,6 +201,7 @@ describe("queryWindowed", () => {
   });
 
   describe("given no hint", () => {
+    /** @scenario "a read with no time hint is recorded as unwindowed" */
     it("runs the unbounded fallback directly and records unwindowed", async () => {
       const before = await outcomeCount("unwindowed");
       const { run, windows } = fakeRun([["row"]]);
@@ -241,6 +247,7 @@ describe("queryWindowed", () => {
   });
 
   describe("given an attempt that throws", () => {
+    /** @scenario "a read that fails is recorded as a failure, not lost" */
     it("records an error outcome and rethrows when the hinted attempt fails", async () => {
       const before = await outcomeCount("error");
       const run = vi.fn(async () => {

@@ -499,6 +499,7 @@ describe("ShareService", () => {
 
     describe("when it was the trace's last link", () => {
       /** @scenario A revoked link stops resolving */
+      /** @scenario "Auto-unpin on unshare when no manual pin exists" */
       it("revokes the link and auto-unpins the trace", async () => {
         vi.mocked(repo.findById).mockResolvedValue(buildShare());
         vi.mocked(repo.hasActiveShareForResource).mockResolvedValue(false);

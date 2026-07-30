@@ -6,10 +6,7 @@ import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
-import type {
-  OtlpKeyValue,
-  OtlpSpan,
-} from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { OtlpKeyValue, OtlpSpan } from "../ingest/otlp";
 import {
   type BatchClearPIIFunction,
   type DataPrivacyResolver,
@@ -23,10 +20,9 @@ vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: vi.fn(async () => false) },
 }));
 
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { featureFlagService } from "~/server/featureFlag";
 
-const TENANT = createTenantId("project-web-app");
+const TENANT = "project-web-app";
 
 function mkPolicy({
   piiLevel = "essential" as PiiLevel,

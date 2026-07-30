@@ -1,12 +1,12 @@
 # Code block language support — lazy on-demand + graceful fallback
 #
-# See dev/docs/adr/027-trace-drawer-code-highlighting.md for the rationale.
+# See dev/docs/adr/092-trace-drawer-code-highlighting.md for the rationale.
 #
 # Implementation:
 #   platform/app/src/features/traces-v2/components/TraceDrawer/markdownView/shikiAdapter.ts   (eager base, ensureLanguageLoaded, normalizeShikiLang)
 #   platform/app/src/features/traces-v2/components/TraceDrawer/markdownView/ShikiHighlight.tsx (ShikiCodeBlock + render-gating hook)
 #
-# Related specs (same Shiki highlighting path, all governed by ADR-027):
+# Related specs (same Shiki highlighting path, all governed by ADR-092):
 #   specs/traces-v2/attribute-value-readability.feature — JSON via the shared Shiki renderer
 #   specs/traces-v2/io-pretty-markdown.feature          — RenderedMarkdown, whose fenced code lazy-loads here
 #
@@ -16,7 +16,7 @@
 # hand-maintained list. Shiki bundles ~200 languages as lazy chunks, so we
 # load any of them on demand instead.
 #
-# Decisions (ADR-027):
+# Decisions (ADR-092):
 #   - Eager base for hot paths: json, markdown, bash, typescript, python.
 #   - Any other Shiki-bundled language is lazy-loaded on first use
 #     (loadLanguage), rendering plain until its grammar resolves.

@@ -100,7 +100,8 @@ export type CHTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
 
 /**
  * Field mapping configuration for the legacy `trace_summaries` SQL builder
- * (`aggregation-builder.ts`). The ADR-034 routing metadata (`availableOn`)
+ * (`aggregation-builder.ts`). The ADR-034 (retired; ground now ADR-099)
+ * routing metadata (`availableOn`)
  * previously carried here has moved to
  * `~/server/app-layer/analytics/routing/field-availability.ts` where the
  * router + slim/rollup builders consume it directly.

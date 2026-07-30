@@ -164,6 +164,7 @@ describe("computeSpanCost", () => {
       expect(result).toBeCloseTo(0.005, 6);
     });
 
+    /** @scenario "Explicit cost wins for a known model with tokens" */
     it("prefers the explicit cost over the registry for a known model with tokens", () => {
       // Regression: a known model + tokens used to win via the registry,
       // silently dropping an explicit negotiated/override cost. The explicit
@@ -180,6 +181,7 @@ describe("computeSpanCost", () => {
       expect(result).toBeCloseTo(0.042, 6);
     });
 
+    /** @scenario "Provider-reported cost wins for an on-table Claude model" */
     it("prefers a provider-reported cost over the registry for an on-table model (Claude Code cost_usd)", () => {
       // Anthropic reports its own cost_usd on every claude turn; for on-table
       // models it must win over our token×registry estimate.
@@ -194,6 +196,7 @@ describe("computeSpanCost", () => {
       expect(result).toBeCloseTo(0.123, 6);
     });
 
+    /** @scenario "A zero explicit cost falls through to the registry" */
     it("falls through to the registry when the explicit cost is zero", () => {
       // A zero (or absent) explicit cost must not suppress registry costing.
       const result = computeSpanCost({
@@ -207,6 +210,7 @@ describe("computeSpanCost", () => {
       expect(result).toBeCloseTo(0.00125, 6);
     });
 
+    /** @scenario "Per-token enrichment rates outrank an explicit total cost" */
     it("keeps per-token enrichment rates ahead of an explicit total cost", () => {
       // Custom per-token rates are a deliberate pricing policy and stay first.
       const result = computeSpanCost({

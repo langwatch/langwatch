@@ -9,6 +9,7 @@ describe("RetroactiveUpdateService", () => {
   describe("triggerUpdate()", () => {
     describe("given the traces category is updated", () => {
       /** @scenario Retroactive retention update applies uniformly across all retention-managed tables */
+      /** @scenario "Explicit retroactive update applies to existing data" */
       it("issues a parametrized ALTER TABLE per traces table including event_log", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
@@ -153,6 +154,7 @@ describe("RetroactiveUpdateService", () => {
 
     describe("when a mutation is already in progress for a table", () => {
       /** @scenario Conflict error names the mutation IDs callers can kill */
+      /** @scenario "Rate-limited to one mutation per tenant per table" */
       it("throws RetroactiveMutationInProgressError listing mutationId + table for every blocker", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({
@@ -213,6 +215,7 @@ describe("RetroactiveUpdateService", () => {
 
   describe("getMutationProgress()", () => {
     describe("given retention-managed table mutations exist", () => {
+      /** @scenario "Retroactive update progress is tracked" */
       it("returns category for each mutation derived from RETENTION_TABLE_CATEGORY_MAP", async () => {
         const mockRows = [
           {
@@ -298,6 +301,7 @@ describe("RetroactiveUpdateService", () => {
   });
 
   describe("killMutation()", () => {
+    /** @scenario "Stuck mutation can be killed" */
     it("parametrizes mutation_id and tenant filter", async () => {
       const command = vi.fn().mockResolvedValue(undefined);
       const service = new RetroactiveUpdateService(

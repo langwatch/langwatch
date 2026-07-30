@@ -27,6 +27,7 @@ const makeService = (summary: unknown) =>
 
 describe("given a trace summary read with a visibility gate", () => {
   describe("when the summary is older than the cutoff", () => {
+    /** @scenario "Traces-v2 drawer summary redacts old content the same as spans" */
     it("teases computed input, output, and error message", async () => {
       const service = makeService(makeSummary(20));
       const summary = await service.getByTraceId("project-1", "trace-1", {
@@ -56,6 +57,7 @@ describe("given a trace summary read with a visibility gate", () => {
   });
 
   describe("when the summary is within the window", () => {
+    /** @scenario "Traces-v2 drawer summary shows fresh traces in full" */
     it("returns full content and no flag", async () => {
       const service = makeService(makeSummary(5));
       const summary = await service.getByTraceId("project-1", "trace-1", {

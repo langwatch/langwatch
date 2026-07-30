@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { NormalizedAttributes } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
   estimateCost,

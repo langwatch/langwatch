@@ -65,9 +65,10 @@ export interface NLPGOFetchOptions<TBody = unknown> {
   organizationId?: string;
   /**
    * Causality depth of the *caller*. nlpgo increments by 1 and stamps
-   * the result on every span it emits. The reactor in trace-processing
-   * skips dispatching evaluations on spans where depth >= 1, breaking
-   * the eval-of-eval loop. See
+   * the result on every span it emits. The `evaluationTrigger` process
+   * manager in trace-processing declines to dispatch when the only new
+   * spans behind a request are at depth >= 1, breaking the eval-of-eval
+   * loop. See
    * specs/monitors/online-evaluator-loop-prevention.feature.
    *
    * 0 (or absent) means "this call originates from non-evaluator code"

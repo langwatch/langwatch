@@ -1,6 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import type { EventSourcing } from "../event-sourcing/eventSourcing";
-import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import type {
+  AppCommands,
+  createEventSourcingRegistry,
+} from "../event-sourcing/registry";
 import type { AppConfig } from "./config";
 import type {
   AppDependencies,
@@ -22,7 +24,8 @@ export class App {
   readonly dspySteps: AppDependencies["dspySteps"];
   readonly simulations: AppDependencies["simulations"] &
     AppCommands["simulations"];
-  readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
+  /** Service only — suite runs have no pipeline of their own (ADR-072). */
+  readonly suiteRuns: AppDependencies["suiteRuns"];
   readonly topicClustering: AppDependencies["topicClustering"] &
     AppCommands["topicClustering"];
   readonly codingAgents: AppDependencies["codingAgents"] &
@@ -30,6 +33,7 @@ export class App {
   readonly commands: AppCommands;
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
+  readonly annotations: AppDependencies["annotations"];
   readonly triggers: AppDependencies["triggers"];
   readonly triggerTemplates: AppDependencies["triggerTemplates"];
   readonly emailSuppressions: AppDependencies["emailSuppressions"];
@@ -49,13 +53,23 @@ export class App {
   readonly dataRetention: DataRetentionDependencies;
   readonly share: AppDependencies["share"];
   readonly sharedTraceCache: AppDependencies["sharedTraceCache"];
+  readonly newClickHouseClient: AppDependencies["newClickHouseClient"];
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
-  private readonly _eventSourcing?: EventSourcing;
+  private readonly _eventSourcing?: ReturnType<
+    typeof createEventSourcingRegistry
+  >;
 
-  get eventSourcing(): EventSourcing | undefined {
+  get eventSourcing():
+    | ReturnType<typeof createEventSourcingRegistry>
+    | undefined {
     return this._eventSourcing;
   }
+
+  /** ADR-104: the one client, for callers outside the composition root. */
+  resolveClickHouseClient = (tenantId: string) =>
+    this.newClickHouseClient.resolveClient(tenantId);
+
   private readonly _gracefulCloseables: Array<{
     name: string;
     close: () => Promise<void>;
@@ -64,6 +78,7 @@ export class App {
   constructor(deps: AppDependencies) {
     this.config = deps.config;
     this.experiments = deps.experiments;
+    this.annotations = deps.annotations;
     this.triggers = deps.triggers;
     this.triggerTemplates = deps.triggerTemplates;
     this.emailSuppressions = deps.emailSuppressions;
@@ -85,7 +100,7 @@ export class App {
     this.experimentRuns = deps.commands.experimentRuns;
     this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
-    this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
+    this.suiteRuns = deps.suiteRuns;
     this.topicClustering = {
       ...deps.topicClustering,
       ...deps.commands.topicClustering,
@@ -101,6 +116,7 @@ export class App {
     this.dataRetention = deps.dataRetention;
     this.share = deps.share;
     this.sharedTraceCache = deps.sharedTraceCache;
+    this.newClickHouseClient = deps.newClickHouseClient;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }
@@ -110,7 +126,7 @@ export class App {
       (async () => {
         if (this._eventSourcing) {
           try {
-            await this._eventSourcing.close();
+            await this._eventSourcing.stop();
           } catch (error) {
             logger.error({ error }, "Failed to close EventSourcing");
           }

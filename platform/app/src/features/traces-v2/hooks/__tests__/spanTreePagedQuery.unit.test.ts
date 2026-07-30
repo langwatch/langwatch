@@ -102,6 +102,7 @@ describe("fetchSpanTreePages", () => {
   });
 
   describe("when the trace spans multiple pages", () => {
+    /** @scenario "Span tree is fetched in cursor pages, never as one response" */
     it("threads each page's nextCursor into the following fetch and concatenates in order", async () => {
       const { utils, query } = makeUtils([
         {
@@ -169,6 +170,7 @@ describe("fetchSpanTreePages", () => {
       });
     });
 
+    /** @scenario "A page never shows a superseded version of a span" */
     it("keeps a single row, re-sorted to its corrected position, for a span that reappears on a later page", async () => {
       const { utils } = makeUtils([
         {
@@ -230,6 +232,7 @@ describe("spanTreeQueryFn progressive publishing", () => {
   });
 
   describe("when the cache entry is empty (first load)", () => {
+    /** @scenario "Span tree is fetched in cursor pages, never as one response" */
     it("publishes each partial page so the waterfall paints early", async () => {
       const { utils } = makeUtils([
         {

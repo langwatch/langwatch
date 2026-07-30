@@ -29,7 +29,7 @@ import {
   cleanupTestData,
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { buildSeriesName } from "../repositories/_timeseries-row-parser";
 import { ClickHouseLegacyAnalyticsShim } from "../repositories/legacy.shim";
 

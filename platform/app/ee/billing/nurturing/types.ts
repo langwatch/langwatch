@@ -1,7 +1,8 @@
 /**
  * Customer.io trait schema contract.
  *
- * Defines the complete data model pushed to Customer.io by reactors and hooks.
+ * Defines the complete data model pushed to Customer.io by the nurturing
+ * hooks in `ee/billing/nurturing/hooks/`, which are the only writers.
  * All call sites use these typed parameters instead of ad-hoc Record<string, unknown>.
  */
 
@@ -40,31 +41,16 @@ export interface CioPersonTraits {
   utm_content?: string;
   referrer?: string;
 
-  // Trace milestones (customerIoTraceSync reactor)
+  // Trace milestones. Delivered live from Prisma by
+  // ee/billing/nurturing/hooks/userSync.ts on first login per process
+  // lifetime — the pipeline-side sync (customerIoTraceSync) that used to
+  // keep the rest of this block (sdk_language, trace_count, etc.) live was
+  // never wired up and was deleted outright.
   has_traces: boolean;
-  sdk_language: string;
-  sdk_framework: string;
-  first_trace_at: string;
-  trace_count: number;
-  daily_trace_count: number;
-  last_trace_at: string;
-  trace_count_updated_at: string;
-
-  // Evaluation milestones (customerIoEvaluationSync reactor)
-  has_evaluations: boolean;
-  evaluation_count: number;
-  first_evaluation_at: string;
-  last_evaluation_at: string;
 
   // Prompt milestones (prompt creation hook)
   has_prompts: boolean;
   prompt_count: number;
-
-  // Simulation milestones (customerIoSimulationSync reactor)
-  has_simulations: boolean;
-  simulation_count: number;
-  first_simulation_at: string;
-  last_simulation_at: string;
 
   // Feature adoption
   team_member_count: number;

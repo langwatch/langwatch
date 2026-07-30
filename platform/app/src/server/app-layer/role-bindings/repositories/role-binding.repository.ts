@@ -63,28 +63,3 @@ export interface RoleBindingRepository {
     scopeId: string;
   }): Promise<void>;
 }
-
-export class NullRoleBindingRepository implements RoleBindingRepository {
-  async listForOrganizationsAndUser(_params: {
-    orgIds: string[];
-    userId: string;
-  }): Promise<RoleBindingForSynthesis[]> {
-    return [];
-  }
-
-  async listTeamScopedUserBindingsByTeamIds({
-    teamIds,
-  }: {
-    organizationId: string;
-    teamIds: string[];
-  }): Promise<Map<string, TeamScopedMemberBinding[]>> {
-    // Honor the contract: every requested teamId is present (empty array).
-    return new Map(teamIds.map((teamId) => [teamId, []]));
-  }
-
-  async validateScopeInOrg(_params: {
-    organizationId: string;
-    scopeType: RoleBindingScopeType;
-    scopeId: string;
-  }): Promise<void> {}
-}

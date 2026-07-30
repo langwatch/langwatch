@@ -33,7 +33,7 @@ import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
 import {
   EVENT_LOG_RESOLVE_CONCURRENCY,
   resolveOffloadedTracesBatch,

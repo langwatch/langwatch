@@ -5,11 +5,12 @@
  * trace isolation. Each scenario runs in its own process with separate
  * LANGWATCH_API_KEY and LANGWATCH_ENDPOINT env vars.
  *
- * Execution is triggered by the scenarioExecution reactor (event-driven via
- * GroupQueue), NOT by BullMQ. The execution pool manages concurrency.
+ * Execution is triggered by the `scenarioExecution` process manager's leased
+ * outbox (ADR-073 step 2, retired; ground now ADR-103), which holds the run's lease for the whole child
+ * process and therefore bounds concurrency itself.
  *
  * @see specs/scenarios/simulation-runner.feature
- * @see specs/scenarios/event-driven-execution-prep.feature
+ * @see specs/scenarios/scenario-execution-process-manager.feature
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -57,6 +58,7 @@ import {
   type FailureEventParams,
   ScenarioFailureHandler,
 } from "./scenario-failure-handler";
+import { classifyScenarioInfraError } from "./scenario-infra-error";
 import {
   findQueuedRunCandidates,
   LOOKBACK_MS,
@@ -139,60 +141,6 @@ export async function handleFailedJobResult(
 }
 
 /**
- * Emit a terminal failure for every run still in flight, then drain the pool.
- *
- * Called on processor shutdown — including the worker's max-runtime restart,
- * which awaits `close()` before it rejects/restarts. Without this, in-flight
- * runs (running children killed by drain, and buffered pending jobs silently
- * dropped) would never get a terminal event and would orphan at QUEUED, with
- * the suites page polling them forever.
- *
- * Each emission is isolated by a per-job try/catch so one failure can't block
- * draining the rest. Double-emitting for
- * a running child whose own close handler also emits is safe — finishRun is
- * idempotent.
- */
-export async function drainInFlightRuns(
-  pool: ScenarioExecutionPool,
-  deps: ProcessorDependencies,
-): Promise<void> {
-  const inFlight = pool.inFlightJobs;
-  if (inFlight.length > 0) {
-    logger.info(
-      { count: inFlight.length },
-      "Draining: emitting terminal failure for in-flight scenario runs before shutdown",
-    );
-    await Promise.all(
-      inFlight.map(async (jobData) => {
-        try {
-          if (pool.wasCancelled(jobData.scenarioRunId)) {
-            await handleCancelledJobResult(
-              jobData,
-              "Cancelled before execution started",
-              deps,
-            );
-          } else {
-            await handleFailedJobResult(
-              jobData,
-              "Worker restarting — scenario run terminated before completion",
-              deps,
-            );
-          }
-        } catch (err) {
-          logger.warn(
-            { err, scenarioRunId: jobData.scenarioRunId },
-            "Failed to emit terminal failure for in-flight run during drain",
-          );
-        }
-      }),
-    );
-  }
-
-  // Kills running children and clears the pending buffer.
-  pool.drain();
-}
-
-/**
  * Handle a cancelled job result by emitting cancellation events.
  */
 export async function handleCancelledJobResult(
@@ -214,11 +162,97 @@ export async function handleCancelledJobResult(
     error: error ?? "Cancelled by user",
     name: scenario?.name,
     description: scenario?.situation,
-    cancelled: true,
+    outcome: "cancelled",
   });
 }
 
 const logger = createLogger("langwatch:scenarios:processor");
+
+/**
+ * Kill every child this worker holds, and record a terminal state for each of
+ * their runs before the process leaves.
+ *
+ * A deploy is the most common way a run loses its worker, and the only one
+ * where the worker is still alive to say so. Killing the children and exiting
+ * leaves the write to a race — each child's own close handler tries to record
+ * the failure, but nothing waits for it — and when that race is lost the run
+ * sits non-terminal until the process manager's deadline fires against it,
+ * roughly half an hour later. Writing it here costs a second. This is the
+ * mitigation ADR-073 (retired; ground now ADR-103) names in "Deleting the
+ * drain costs deploy latency".
+ *
+ * It does NOT replace the deadline, and is not written as though it could: a
+ * hard kill reaches none of this, `finishRun` is idempotent so a child that
+ * records its own death first simply wins, and anything this cannot finish
+ * inside `timeoutMs` is left to the deadline rather than allowed to hold the
+ * shutdown open past the pod's termination grace period.
+ *
+ * Runs still in their prefetch window are deliberately out of scope: nothing
+ * has been spawned for them, so their dispatch is still a leased outbox row
+ * that is redelivered and executed for real — a better outcome than recording
+ * a failure for a run the customer never got.
+ */
+export async function settleInFlightRuns({
+  pool,
+  deps,
+  timeoutMs = SCENARIO_WORKER.SHUTDOWN_SETTLE_TIMEOUT_MS,
+}: {
+  pool: ScenarioExecutionPool;
+  deps: ProcessorDependencies;
+  timeoutMs?: number;
+}): Promise<void> {
+  // Read before signalling: an exiting child removes itself from the registry,
+  // so a view taken after `drain()` is already losing entries.
+  const inFlight = pool.inFlightJobs;
+  pool.drain();
+  if (inFlight.length === 0) return;
+
+  logger.info(
+    { count: inFlight.length, timeoutMs },
+    "Shutting down: recording a terminal state for the runs this worker holds",
+  );
+
+  // Per-run isolation, so one rejected write cannot strand the others.
+  const recorded = Promise.all(
+    inFlight.map(async (jobData) => {
+      try {
+        if (pool.wasCancelled(jobData.scenarioRunId)) {
+          await handleCancelledJobResult(
+            jobData,
+            "Cancelled before execution finished",
+            deps,
+          );
+        } else {
+          await handleFailedJobResult(
+            jobData,
+            "Worker restarting — scenario run terminated before completion",
+            deps,
+          );
+        }
+      } catch (err) {
+        logger.warn(
+          { err, scenarioRunId: jobData.scenarioRunId },
+          "Could not record a terminal state on shutdown — leaving the run to its deadline",
+        );
+      }
+    }),
+  );
+
+  let budget: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    recorded,
+    new Promise<void>((resolve) => {
+      budget = setTimeout(() => {
+        logger.warn(
+          { count: inFlight.length, timeoutMs },
+          "Shutdown budget spent before every run was recorded — the rest keep their deadlines",
+        );
+        resolve();
+      }, timeoutMs);
+    }),
+  ]);
+  if (budget) clearTimeout(budget);
+}
 
 /**
  * Creates a child logger with scenario job context bound.
@@ -330,8 +364,10 @@ export function parseChildProcessResult(
 /**
  * Execute a scenario run by spawning an isolated child process.
  *
- * Called by the ScenarioExecutionPool when a slot is available.
- * The pool manages concurrency and tracks running children.
+ * Called by the `scenarioExecution` process outbox while it holds the run's
+ * lease, so this resolves only when the child is done. Concurrency is the
+ * dispatcher's; the pool only tracks the running children so cancellation can
+ * find them.
  */
 export async function executeScenarioRun(
   jobData: ExecutionJobData,
@@ -346,6 +382,19 @@ export async function executeScenarioRun(
 
   await runWithContext(requestContext, async () => {
     const startTime = Date.now();
+
+    // A cancel that landed before this dispatch was leased. Checked here
+    // rather than in the pool, which no longer decides when a job starts.
+    if (pool.wasCancelled(jobData.scenarioRunId)) {
+      jobLogger.info("Scenario cancelled before execution started");
+      await handleCancelledJobResult(
+        jobData,
+        "Cancelled before execution started",
+        deps,
+      );
+      return;
+    }
+
     getJobProcessingCounter("scenario", "processing").inc();
     jobLogger.info("Processing scenario job");
 
@@ -415,14 +464,23 @@ export async function executeScenarioRun(
       await handleCancelledJobResult(jobData, result.error, deps);
     } else {
       getJobProcessingCounter("scenario", "failed").inc();
+      // The classified code, not the raw failure text. `result.error` is
+      // whatever the runner or its stderr produced, which is the simulated
+      // conversation and the judge's verdict about it — customer content that
+      // must not land in the platform's own log retention. The code is enough
+      // to tell an operator why the run died; the raw text stays at debug.
       jobLogger.warn(
         {
           success: false,
-          error: result.error,
+          errorCode: classifyScenarioInfraError(result.error).code,
           totalDurationMs,
           childDurationMs,
         },
         "Scenario job completed with failure",
+      );
+      jobLogger.debug(
+        { error: result.error },
+        "Scenario job failure, raw runner error",
       );
       await handleFailedJobResult(jobData, result.error, deps);
     }
@@ -450,7 +508,7 @@ async function spawnScenarioChildProcess(
     });
 
     const log = (
-      level: "info" | "warn" | "error",
+      level: "debug" | "info" | "warn" | "error",
       message: string,
       extra?: Record<string, unknown>,
     ) => {
@@ -502,8 +560,9 @@ async function spawnScenarioChildProcess(
       spawnMs: Date.now() - spawnStart,
     });
 
-    // Register in the pool so cancel broadcasts can find this child
-    pool.registerChild(jobData.scenarioRunId, child);
+    // Register in the pool so cancel broadcasts can find this child, and so a
+    // shutdown knows which run it is about to abandon.
+    pool.registerChild({ job: jobData, child });
 
     let stderr = "";
     let stdout = "";
@@ -527,20 +586,32 @@ async function spawnScenarioChildProcess(
       });
     }, CHILD_PROCESS.TIMEOUT_MS);
 
+    // The child's output is CUSTOMER CONTENT, not our diagnostics. Its own
+    // pino logger writes to stdout — including the judge's `reasoning`, which
+    // is verdict text about the simulated conversation — and its structured
+    // result line carries the same. Re-emitting those lines at `info`/`warn`
+    // copied every one of them verbatim into the platform's log retention.
+    //
+    // So the raw stream is forwarded at `debug` and nowhere else, and the
+    // result line is read from the accumulated `stdout` at close (see
+    // `parseChildProcessResult`) rather than by re-emitting lines as they
+    // arrive. Everything an operator needs at `info` — spawn, pid, exit code,
+    // classified failure reason — is logged by this file in its own words.
     child.stdout?.on("data", (data: Buffer) => {
       const chunk = data.toString();
       stdout += chunk;
       const lines = chunk.trim().split("\n");
       for (const line of lines) {
-        if (line) log("info", line);
+        if (line) log("debug", line);
       }
     });
 
     child.stderr?.on("data", (data: Buffer) => {
-      stderr += data.toString();
-      const lines = data.toString().trim().split("\n");
+      const chunk = data.toString();
+      stderr += chunk;
+      const lines = chunk.trim().split("\n");
       for (const line of lines) {
-        if (line) log("warn", line);
+        if (line) log("debug", line);
       }
     });
 
@@ -570,10 +641,15 @@ async function spawnScenarioChildProcess(
           childResult?.error && childResult.error.trim().length > 0
             ? childResult.error
             : `Child process exited with code ${code}: ${stderr}`;
+        // Exit code + classified reason is what an operator needs, and neither
+        // quotes the child. The raw stderr is an unbounded, unsanitised stream
+        // (it can carry the conversation the run was about), so it stays at
+        // debug.
         log("error", `Child process exited with code ${code}`, {
           exitCode: code,
-          stderr,
+          errorCode: classifyScenarioInfraError(error).code,
         });
+        log("debug", "Child process stderr", { exitCode: code, stderr });
         resolve({
           success: false,
           error,
@@ -617,9 +693,9 @@ async function spawnScenarioChildProcess(
 /**
  * Start the scenario processor.
  *
- * Sets up the cancel subscription (Redis pub/sub) and wires the execution
- * pool's spawn function. The actual job processing is triggered by the
- * scenarioExecution reactor via the GroupQueue.
+ * Sets up the cancel subscription (Redis pub/sub). Job execution itself is
+ * driven by the `scenarioExecution` process outbox, which calls
+ * {@link executeScenarioRun} while holding the run's lease.
  *
  * @returns A shutdown handle, or undefined if Redis is not available.
  */
@@ -632,31 +708,12 @@ export async function startScenarioProcessor(
     return undefined;
   }
 
-  // Wire the spawn function into the pool
-  pool.setSpawnFunction(async (jobData) => {
-    await executeScenarioRun(jobData, pool, deps);
-  });
-
-  // Wire the callback for when the pool skips a cancelled job —
-  // dispatch finished(CANCELLED) so the run reaches terminal state
-  pool.setOnSkipCancelled((jobData) => {
-    logger.info(
-      { scenarioRunId: jobData.scenarioRunId },
-      "Dispatching finished(CANCELLED) for skipped cancelled job",
-    );
-    void handleCancelledJobResult(
-      jobData,
-      "Cancelled before execution started",
-      deps,
-    );
-  });
-
-  // Subscribe to cancellation signals from the event-sourcing reactor
+  // Subscribe to cancellation signals from the event-sourcing pipeline
   const subscriber = connection.duplicate();
   const unsubscribe = await subscribeToCancellations({
     subscriber,
     onCancel: (message: CancellationMessage) => {
-      const child = pool.runningChildren.get(message.scenarioRunId);
+      const child = pool.findChild(message.scenarioRunId);
       if (child) {
         logger.info(
           { scenarioRunId: message.scenarioRunId, pid: child.pid },
@@ -668,16 +725,53 @@ export async function startScenarioProcessor(
     },
   });
 
-  logger.info(
-    { concurrency: SCENARIO_WORKER.CONCURRENCY },
-    "Scenario processor started (event-driven)",
-  );
+  logger.info("Scenario processor started (event-driven)");
 
-  // Belt-and-braces for hard kills (OOM/SIGKILL) where the graceful drain
-  // above never ran: reconcile runs left orphaned at QUEUED by a previous
-  // worker. Fire-and-forget — a slow or failing cross-tenant ClickHouse scan
-  // must never wedge worker startup. Uses the shared (non-tenant) client
-  // because the scan is intentionally cross-tenant.
+  // Ongoing stuck-run recovery is NOT here any more. Two cross-tenant
+  // ClickHouse sweeps used to run at this point — one for runs orphaned at
+  // QUEUED, one for runs orphaned at IN_PROGRESS — and because they ran only
+  // at boot, the recovery bound was the deploy cadence: a run abandoned an
+  // hour after the last restart waited for the next one.
+  //
+  // The `scenarioExecution` process manager on the simulation pipeline holds
+  // that guarantee continuously now. Every progress event re-arms its durable
+  // deadline; when one fires, it writes the terminal state itself. See
+  // ADR-073 (retired; ground now ADR-103).
+  // The graceful drain survives alongside it (`settleInFlightRuns`, on
+  // `close()` below) — not as the guarantee, but because waiting out a
+  // half-hour deadline for something the worker knew at SIGTERM is a bad deal
+  // on the one path that happens every deploy.
+  //
+  // ── CUTOVER AID — DELETE ONE RELEASE AFTER ADR-073 SHIPS ──────────────────
+  //
+  // The sweeps still run, once per boot, for exactly one population: runs that
+  // were already stuck when this version deployed. The process manager arms
+  // deadlines from live events only — it does not replay history and does not
+  // seed `ProcessManagerInstance` rows for runs that went quiet before it
+  // existed. Those rows have no heartbeat, no `nextWakeAt`, and nothing else
+  // that would ever terminalise them: `STALLED` is a stored status, not a
+  // read-time derivation, so they would sit non-terminal in the UI forever —
+  // the precise failure the sweeps were written for (#3195).
+  //
+  // So they are kept as a drain, not as the mechanism. Once a release has
+  // passed with the process manager live, no run predating it can still be
+  // open, this block and the three modules it calls are dead, and they go.
+  //
+  // BOOT-ONLY AND THRESHOLDED IS A DELIBERATE GAP, NOT AN OVERSIGHT. A run
+  // that went quiet less than `ORPHAN_QUEUED_THRESHOLD_MS` (30 min) before the
+  // cutover rollout is under the threshold at every boot in that rollout, so
+  // no sweep in it takes the run terminal, and the next sweep is the next
+  // restart. Three things make that acceptable rather than worth a repeating
+  // timer. The release being replaced settles its own in-flight runs on
+  // SIGTERM, and a rolling deploy is graceful, so the pods on the way out
+  // terminalise exactly this population themselves. What survives that is the
+  // hard-kill case, whose STORED status was already stuck before this change —
+  // the read-time derivation that showed it as STALLED wrote nothing and fired
+  // nothing downstream, so only the display regresses, and only until the next
+  // restart inside `LOOKBACK_MS`. And a timer would cost an unfiltered
+  // cross-tenant 7-day aggregation over `simulation_runs` per worker per tick,
+  // unsynchronised across pods — reinstating the periodic scan ADR-073 exists
+  // to retire, to cover one deploy's worth of exposure.
   const sharedClickHouseClient = getSharedClickHouseClient();
   if (sharedClickHouseClient) {
     const reconcilerNow = Date.now();
@@ -704,13 +798,6 @@ export async function startScenarioProcessor(
     }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
   }
 
-  // The sweep above only takes QUEUED runs terminal — a run nobody ever picked
-  // up. A run a dead worker had already STARTED is invisible to it and spins in
-  // the UI forever (#3195), so this second sweep takes the IN_PROGRESS orphans
-  // terminal. The two are disjoint by status and never touch the same run:
-  // queue wait cannot be read as worker death (nothing bounds it), while an
-  // idle IN_PROGRESS run past 2× the child timeout provably has no live worker.
-  // Fire-and-forget so a large/slow sweep never blocks worker startup.
   void reconcileOrphanedRunsOnBoot({
     failureEmitter: deps.failureEmitter,
   }).catch((err: unknown) =>
@@ -719,11 +806,13 @@ export async function startScenarioProcessor(
 
   return {
     close: async () => {
-      // Emit a terminal failure for every in-flight run, then drain. This is
-      // what makes the worker's max-runtime restart (which awaits close()
-      // before it rejects/restarts) safe: in-flight runs reach a terminal
-      // state instead of orphaning at QUEUED.
-      await drainInFlightRuns(pool, deps);
+      // Kill the children this worker holds, then wait — within a bounded
+      // budget — for each of their runs to be recorded as finished. The armed
+      // deadline is what covers a hard kill and anything the budget does not
+      // reach; it is NOT a reason to skip this, because on the common path
+      // (a deploy) it means half an hour of a run displaying as live when the
+      // worker knew it was dead the moment it was asked to stop.
+      await settleInFlightRuns({ pool, deps });
       await unsubscribe().catch((err: unknown) =>
         logger.warn({ err }, "Error closing cancellation subscriber"),
       );
