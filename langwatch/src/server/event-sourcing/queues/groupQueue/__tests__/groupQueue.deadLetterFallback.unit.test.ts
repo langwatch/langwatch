@@ -15,6 +15,11 @@
  *    job that is already back in live staging — duplicating it and
  *    double-processing after a drain. `renewLease()` now sits outside that
  *    `catch`.
+ *  - P2 (Aryansharma28): both drained sites claimed the drop BEFORE attempting
+ *    the dead-letter, so the re-stage fallback above — a designed path on which
+ *    nothing is thrown away — was counted in `gq_jobs_dropped_total`, and
+ *    re-counted on every drain cycle for as long as the write kept failing. The
+ *    tally now follows the outcome the attempt reports.
  *
  * These exercise the private seams directly because the per-site coalesced-batch
  * fault-injection harness is deferred (AC-719.5/719.7 @unimplemented); the real
@@ -26,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { GroupQueueProcessor } from "../groupQueue";
 import { DecodeFailureError } from "../jobEnvelope";
+import { gqDrainedDlqRestagedTotal, gqJobsDroppedTotal } from "../metrics";
 import type { DrainedJob } from "../scripts";
 
 // Mirror groupQueue.blockingConnection.unit.test.ts: mock the collaborators the
@@ -115,7 +121,32 @@ function useSpyProcessor() {
     get blobLifecycle() {
       return blobLifecycle;
     },
+    /**
+     * This test's own queue name — every test builds a fresh random one, so the
+     * counter samples below are this test's and nothing else's. The registry is
+     * process-global and never reset, so filtering by label is what keeps these
+     * assertions from reading another test's increments.
+     */
+    get queueName(): string {
+      return (processor as any).queueName as string;
+    },
   };
+}
+
+/** Total `gq_jobs_dropped_total` recorded for one queue, across every reason. */
+async function discardsCounted(queueName: string): Promise<number> {
+  const metric = await gqJobsDroppedTotal.get();
+  return metric.values
+    .filter((v) => v.labels.queue_name === queueName)
+    .reduce((sum, v) => sum + v.value, 0);
+}
+
+/** Total `gq_drained_dlq_restaged_total` recorded for one queue. */
+async function putBacksCounted(queueName: string): Promise<number> {
+  const metric = await gqDrainedDlqRestagedTotal.get();
+  return metric.values
+    .filter((v) => v.labels.queue_name === queueName)
+    .reduce((sum, v) => sum + v.value, 0);
 }
 
 describe("GroupQueueProcessor drained-sibling dead-letter durability — write failures", () => {
