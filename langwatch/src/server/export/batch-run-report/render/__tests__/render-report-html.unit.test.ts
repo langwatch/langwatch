@@ -1,0 +1,328 @@
+import { describe, expect, it } from "vitest";
+import { renderReportHtml } from "../render-report-html";
+import { REPORT_SCRIPT } from "../report-script";
+import {
+  EVERY_BLOCK,
+  makeEveryBlockModel,
+  makeFiguresOnlyModel,
+  makeMarkupModel,
+  makeMarkupNameModel,
+  makeModel,
+  makeNothingSettledModel,
+  makeSection,
+  makeSmallSampleModel,
+} from "./report-fixtures";
+
+/** The document's single script, or null when there is not exactly one. */
+function soleScriptBody(html: string): string | null {
+  const matches = [
+    ...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g),
+  ];
+  return matches.length === 1 ? (matches[0]?.[1] ?? null) : null;
+}
+
+function urlAttributes(html: string): string[] {
+  return [...html.matchAll(/(?:src|href)\s*=\s*"([^"]*)"/g)].map(
+    (match) => match[1] ?? "",
+  );
+}
+
+function headlineRate(html: string): string {
+  return /<p class="headline-rate">([\s\S]*?)<\/p>/.exec(html)?.[1] ?? "";
+}
+
+describe("Feature: Run report — the file itself", () => {
+  describe("given any report", () => {
+    const html = renderReportHtml({ model: makeModel() });
+
+    /** @scenario The report opens with no network access */
+    it("renders one document with its style and script inlined", () => {
+      expect(html.startsWith("<!doctype html>")).toBe(true);
+      expect(html).toContain("<style>");
+      expect(html).toContain("<script>");
+    });
+
+    /** @scenario The report opens with no network access */
+    it("references nothing over the network", () => {
+      for (const url of urlAttributes(html)) {
+        expect(url).not.toMatch(/^https?:/);
+        expect(url).not.toContain("//");
+      }
+      expect(html).not.toContain("http://");
+      expect(html).not.toContain("https://");
+    });
+
+    /** @scenario The report says how it was produced */
+    it("states which half was computed and which was written", () => {
+      expect(html).toContain("How this report was produced");
+      expect(html).toContain("The figures are computed");
+      expect(html).toContain("traced back to the run");
+    });
+
+    /** @scenario Printing the report produces a clean document */
+    it("carries print rules and marks the on-screen controls unprintable", () => {
+      expect(html).toContain("@media print");
+      expect(html).toContain('class="controls no-print"');
+      expect(html).toContain(".no-print { display: none !important; }");
+    });
+  });
+});
+
+describe("Feature: Run report — model output is text", () => {
+  describe("when the analysis contains markup", () => {
+    const html = renderReportHtml({ model: makeMarkupModel() });
+
+    /** @scenario Text from the analysis is shown as text */
+    it("shows the statement as text rather than as part of the page", () => {
+      expect(html).not.toContain("<img src=x");
+      expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    });
+
+    /** @scenario Text from the analysis is shown as text */
+    it("renders an artifact body in a code block with its markup escaped", () => {
+      expect(html).toContain("<pre><code>");
+      expect(html).toContain("&lt;/script&gt;&lt;script&gt;alert(1)");
+    });
+
+    /** @scenario Text from the analysis is shown as text */
+    it("still contains exactly one script, and it is the report's own", () => {
+      expect(soleScriptBody(html)).toBe(REPORT_SCRIPT);
+    });
+  });
+
+  describe("when a scenario is named like markup", () => {
+    const name = '<svg onload="alert(1)">';
+    const html = renderReportHtml({ model: makeMarkupNameModel(name) });
+
+    /** @scenario A scenario named like markup is shown as text */
+    it("shows the name as text wherever it appears", () => {
+      expect(html).not.toContain("<svg onload");
+      expect(html).toContain("&lt;svg onload=&quot;alert(1)&quot;&gt;");
+    });
+
+    /** @scenario A scenario named like markup is shown as text */
+    it("leaves the document with one script it did not author", () => {
+      expect(soleScriptBody(html)).toBe(REPORT_SCRIPT);
+    });
+  });
+});
+
+describe("Feature: Run report — reading it", () => {
+  describe("when failure detail is present", () => {
+    const html = renderReportHtml({ model: makeEveryBlockModel() });
+
+    /** @scenario Failure detail is hidden until I ask for it */
+    it("puts each group behind a disclosure that starts closed", () => {
+      expect(html).toContain("<details");
+      expect(html).toContain("<summary>Agent skipped the confirmation step");
+      expect(html).not.toContain("<details open");
+    });
+
+    /** @scenario Failure detail is hidden until I ask for it */
+    it("offers on-screen-only controls for opening every disclosure", () => {
+      expect(html).toContain('data-details="expand"');
+      expect(html).toContain('data-details="collapse"');
+    });
+
+    /** @scenario The same run produces the same report twice */
+    it("marks the header sortable and puts the sort key on the cell", () => {
+      expect(html).toContain('<th scope="col" data-sortable aria-sort="none">');
+      expect(html).toContain('data-sort-value="1200"');
+    });
+  });
+});
+
+describe("Feature: Run report — determinism", () => {
+  describe("when the same model is rendered twice", () => {
+    /** @scenario The same run produces the same report twice */
+    it("produces byte-identical documents", () => {
+      const model = makeModel({
+        sections: [
+          makeSection({ computed: EVERY_BLOCK, written: EVERY_BLOCK }),
+        ],
+      });
+      expect(renderReportHtml({ model })).toBe(renderReportHtml({ model }));
+    });
+
+    /** @scenario The same run produces the same report twice */
+    it("takes its timestamp from the model rather than the clock", () => {
+      expect(renderReportHtml({ model: makeModel() })).toContain(
+        "Generated 2026-07-29 10:00 UTC",
+      );
+    });
+  });
+});
+
+describe("Feature: Run report — what survived being produced", () => {
+  describe("when no model is configured for the report", () => {
+    const html = renderReportHtml({ model: makeFiguresOnlyModel() });
+
+    /** @scenario A report still downloads when no model is configured */
+    it("states that the written analysis is unavailable", () => {
+      expect(html).toContain("The written analysis is unavailable");
+      expect(html).toContain("Figures only");
+    });
+
+    /** @scenario A report still downloads when no model is configured */
+    it("still renders every section's computed figures", () => {
+      expect(html).toContain("What failed?");
+      expect(html).toContain("What holds?");
+      expect(html).toContain("Agent skipped the confirmation step");
+      expect(html).toContain("Refunds held.");
+    });
+  });
+
+  describe("when the second reading could not be completed", () => {
+    /** @scenario A report still downloads when the check fails */
+    it("states that the analysis could not be independently checked", () => {
+      const html = renderReportHtml({
+        model: makeModel({ tier: "unchecked" }),
+      });
+      expect(html).toContain("could not be independently checked");
+    });
+  });
+});
+
+describe("Feature: Run report — gaps and integrity", () => {
+  describe("when a question has nothing left to say", () => {
+    /** @scenario A question left with nothing to say is shown as a gap */
+    it("renders the question and says why it cannot be answered", () => {
+      const html = renderReportHtml({
+        model: makeModel({
+          sections: [
+            makeSection({
+              question: "What should I do next?",
+              gap: "There is not enough evidence to answer this.",
+              written: [],
+            }),
+          ],
+        }),
+      });
+
+      expect(html).toContain("What should I do next?");
+      expect(html).toContain(
+        '<p class="gap">There is not enough evidence to answer this.</p>',
+      );
+    });
+  });
+
+  describe("when statements were removed on the way here", () => {
+    /** @scenario Removed statements are counted rather than hidden */
+    it("counts each reason a statement went, and repeats the notes", () => {
+      const html = renderReportHtml({
+        model: makeModel({
+          integrity: {
+            claimsDroppedUncited: 2,
+            claimsDroppedUnresolvable: 1,
+            claimsDroppedUnconfirmed: 3,
+            notes: ["The second reading covered 4 of 7 failure groups."],
+          },
+        }),
+      });
+
+      expect(html).toContain("2 statements removed for citing nothing");
+      expect(html).toContain("1 statements removed for citing something");
+      expect(html).toContain("3 statements removed because the second reading");
+      expect(html).toContain("covered 4 of 7 failure groups.");
+    });
+  });
+});
+
+describe("Feature: Run report — the headline", () => {
+  describe("when the sample is too small to conclude from", () => {
+    const rate = headlineRate(
+      renderReportHtml({ model: makeSmallSampleModel() }),
+    );
+
+    /** @scenario A small sample is reported as a small sample */
+    it("says how many failed out of how many", () => {
+      expect(rate).toContain("3 of 4 settled runs failed");
+    });
+
+    /** @scenario A small sample is reported as a small sample */
+    it("says there were too few runs to draw a conclusion", () => {
+      expect(rate).toContain("Too few runs to draw a conclusion");
+    });
+
+    /** @scenario A small sample is reported as a small sample */
+    it("does not state a failure percentage on its own", () => {
+      expect(rate).not.toContain("%");
+    });
+  });
+
+  describe("when the sample is large enough", () => {
+    /** @scenario A large enough sample states its rate with a margin */
+    it("states the rate and the range it likely sits in", () => {
+      const rate = headlineRate(renderReportHtml({ model: makeModel() }));
+      expect(rate).toContain("Pass rate 80.0%");
+      expect(rate).toContain("likely between 49.0% and 94.0%");
+    });
+  });
+
+  describe("when nothing has settled yet", () => {
+    /** @scenario A run still in progress reports only what has finished */
+    it("says there is no pass rate rather than showing a zero", () => {
+      const rate = headlineRate(
+        renderReportHtml({ model: makeNothingSettledModel() }),
+      );
+      expect(rate).toContain("no pass rate to state");
+    });
+  });
+});
+
+describe("Feature: Run report — every block variant", () => {
+  describe("when a section carries one of each", () => {
+    const html = renderReportHtml({ model: makeEveryBlockModel() });
+
+    /** @scenario Every question the report asks appears in it */
+    it("renders each variant without throwing", () => {
+      expect(html).toContain('<dl class="stats">');
+      expect(html).toContain('<svg class="chart"');
+      expect(html).toContain('<div class="table-wrap">');
+      expect(html).toContain('<ul class="list">');
+      expect(html).toContain("<details");
+      expect(html).toContain('<p class="note');
+      expect(html).toContain('<ul class="claims">');
+      expect(html).toContain('<article class="finding">');
+      expect(html).toContain('<article class="artifact">');
+    });
+
+    /** @scenario The report names the turn where a conversation went wrong */
+    it("spells out every citation kind behind a claim", () => {
+      expect(html).toContain("<li>run run-1</li>");
+      expect(html).toContain("<li>criterion crit-1</li>");
+      expect(html).toContain("<li>failure group sig-1</li>");
+      expect(html).toContain("<li>run run-1, turn 4</li>");
+      expect(html).toContain("<li>figure counts.failedCount</li>");
+    });
+
+    /** @scenario The most consequential failure is the first one I read */
+    it("shows the computed severity beside one the analysis disagreed with", () => {
+      expect(html).toContain("critical (computed: high)");
+    });
+  });
+});
+
+describe("Feature: Run report — the three acts", () => {
+  describe("when the questions span all three", () => {
+    /** @scenario Questions are grouped into what happened, what is true now, and what to do next */
+    it("groups the sections under their act in a fixed order", () => {
+      const html = renderReportHtml({
+        model: makeModel({
+          sections: [
+            makeSection({ questionId: "q3", tier: "future" }),
+            makeSection({ questionId: "q1", tier: "past" }),
+            makeSection({ questionId: "q2", tier: "present" }),
+          ],
+        }),
+      });
+
+      expect(html.indexOf("What happened")).toBeLessThan(
+        html.indexOf("What is true now"),
+      );
+      expect(html.indexOf("What is true now")).toBeLessThan(
+        html.indexOf("What to do next"),
+      );
+    });
+  });
+});

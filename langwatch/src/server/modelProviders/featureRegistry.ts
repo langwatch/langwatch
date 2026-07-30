@@ -82,6 +82,13 @@ const REGISTRY: FeatureDescriptor[] = [
     displayName: "New workflow model",
     description: "Starts new workflows with a ready-to-use model.",
   },
+  {
+    key: "scenarios.run_report",
+    role: "DEFAULT",
+    displayName: "Run report analysis",
+    description:
+      "Reads the failing conversations in a run to explain why they failed.",
+  },
 
   // FAST — assistive / background surfaces.
   {
@@ -108,6 +115,16 @@ const REGISTRY: FeatureDescriptor[] = [
     role: "FAST",
     displayName: "Scenario generator",
     description: "Generates synthetic agent scenarios from a goal.",
+  },
+  // Separate from scenarios.run_report so the check can run on a different
+  // model from the one that wrote the report. A model reviewing its own output
+  // agrees with itself, which is not a check.
+  {
+    key: "scenarios.run_report_check",
+    role: "FAST",
+    displayName: "Run report fact check",
+    description:
+      "Checks every statement in a run report against the run's own data.",
   },
   {
     key: "datasets.generator",

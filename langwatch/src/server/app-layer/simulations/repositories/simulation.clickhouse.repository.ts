@@ -791,7 +791,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         : undefined;
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({
+    const runs = await this.findRunOutcomesForBatchIds({
       projectId,
       batchRunIds,
       scenarioSetId,
@@ -911,7 +911,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
+    const runs = await this.findRunOutcomesForBatchIds({ projectId, batchRunIds });
     const lastUpdatedAt = runs.reduce(
       (max, r) => Math.max(max, r.timestamp),
       0,
@@ -1175,7 +1175,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
   // ---- Batch helper ----
 
-  private async getRunsForBatchIds({
+  /**
+   * Runs for a known set of batches, read without transcripts.
+   *
+   * LIST_COLUMNS rather than RUN_COLUMNS: callers here want outcomes and
+   * criteria across several batches at once, and pulling every conversation
+   * for ten prior runs would be the most expensive read in the product.
+   */
+  async findRunOutcomesForBatchIds({
     projectId,
     batchRunIds,
     scenarioSetId,

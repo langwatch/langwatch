@@ -28,6 +28,7 @@ import {
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import { BatchRunReportService } from "~/server/export/batch-run-report/batch-run-report.service";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
@@ -478,6 +479,9 @@ export function initializeDefaultApp(options?: {
   const simulationReads = SimulationRunService.create(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
+  const batchRunReport = BatchRunReportService.create({
+    reader: simulationReads.repository,
+  });
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
   const evaluations = {
@@ -1264,7 +1268,7 @@ export function initializeDefaultApp(options?: {
     triggerTemplates,
     emailSuppressions,
     dspySteps: { steps: dspySteps },
-    simulations: { runs: simulationReads },
+    simulations: { runs: simulationReads, report: batchRunReport },
     suiteRuns: { runs: suiteRunService },
     topicClustering: {
       status: new TopicClusteringStatusService(
@@ -1468,7 +1472,13 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           testFireTrigger(testDeps, input),
       };
     })(),
-    simulations: { runs: SimulationRunService.create(null) },
+    simulations: (() => {
+      const runs = SimulationRunService.create(null);
+      return {
+        runs,
+        report: BatchRunReportService.create({ reader: runs.repository }),
+      };
+    })(),
     suiteRuns: {
       runs: SuiteRunService.create({
         resolveClickHouseClient: null,

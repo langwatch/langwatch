@@ -16,6 +16,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { NullSimulationRepository } from "~/server/app-layer/simulations/repositories/simulation.repository";
 import { SimulationRunService } from "~/server/app-layer/simulations/simulation-run.service";
 import { prisma } from "~/server/db";
+import { BatchRunReportService } from "~/server/export/batch-run-report/batch-run-report.service";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { app } from "../[[...route]]/app";
@@ -86,11 +87,13 @@ describe("Feature: simulation-runs platform link addresses the run", () => {
   }
 
   function withRuns(over: { getScenarioRunData?: ScenarioRunData | null }) {
+    const runs = new SimulationRunService(
+      new TestSimulationRepository(over.getScenarioRunData ?? null),
+    );
     globalForApp.__langwatch_app = createTestApp({
       simulations: {
-        runs: new SimulationRunService(
-          new TestSimulationRepository(over.getScenarioRunData ?? null),
-        ),
+        runs,
+        report: BatchRunReportService.create({ reader: runs.repository }),
       },
     });
   }

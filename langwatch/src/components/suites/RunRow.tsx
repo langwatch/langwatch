@@ -9,9 +9,16 @@
  */
 
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, Square } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  MoreVertical,
+  Square,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
+import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
@@ -43,6 +50,12 @@ type RunRowDataProps = {
   isCancellingBatch?: boolean;
   cancellingJobId?: string | null;
   isHighlighted?: boolean;
+  /** Produces the run report for this batch. Absent when it cannot be scoped. */
+  onExportReport?: () => void;
+  /** Stops the report currently being produced for this batch. */
+  onCancelReport?: () => void;
+  /** Whether a report is being produced for THIS batch, not for any other. */
+  isReportRunning?: boolean;
 };
 
 type RunRowProps = RunRowLoadingProps | RunRowDataProps;
@@ -136,6 +149,9 @@ function RunRowData({
   isCancellingBatch = false,
   cancellingJobId,
   isHighlighted = false,
+  onExportReport,
+  onCancelReport,
+  isReportRunning = false,
 }: RunRowDataProps) {
   const [isCancelAllDialogOpen, setIsCancelAllDialogOpen] = useState(false);
   const now = useNow();
@@ -272,8 +288,100 @@ function RunRowData({
               <Text fontSize="xs">Stop</Text>
             </HStack>
           )}
+          {/* Transient, like the Stop chip beside it: it exists only while a
+              report is being produced, and it is how that one is stopped. */}
+          {isReportRunning && onCancelReport && (
+            <HStack
+              as="span"
+              role="button"
+              tabIndex={0}
+              gap={1}
+              paddingX={2}
+              paddingY={0.5}
+              borderRadius="md"
+              border="1px solid"
+              borderColor="border"
+              fontSize="xs"
+              color="fg"
+              cursor="pointer"
+              flexShrink={0}
+              _hover={{ bg: "bg.muted", borderColor: "border.emphasized" }}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+                onCancelReport();
+              }}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  onCancelReport();
+                }
+              }}
+              aria-label="Cancel report"
+              data-testid="cancel-report-button"
+            >
+              <Spinner size="xs" />
+              <Text fontSize="xs">Report</Text>
+            </HStack>
+          )}
           <Box flex={1} />
           <RunMetricsSummary summary={summary} />
+          {/* Row actions live in one overflow menu (row-actions-overflow-menu.md).
+              The trigger is a span rather than the doc's Button because this whole
+              header IS a <button>, and browsers flatten a nested one — the click
+              would then land on the header and toggle the row instead. */}
+          {onExportReport && (
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Box
+                  as="span"
+                  role="button"
+                  tabIndex={0}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  padding={1}
+                  borderRadius="md"
+                  color="fg.muted"
+                  cursor="pointer"
+                  flexShrink={0}
+                  _hover={{ bg: "bg.muted", color: "fg" }}
+                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  onKeyDown={(e: React.KeyboardEvent) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                    }
+                  }}
+                  aria-label={`Actions for ${suiteName ?? "this run"}`}
+                  data-testid="run-row-actions-button"
+                >
+                  <MoreVertical size={14} />
+                </Box>
+              </Menu.Trigger>
+              <Menu.Content>
+                <Menu.Item
+                  value="export-report"
+                  disabled={isReportRunning}
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    if (isReportRunning) return;
+                    onExportReport();
+                  }}
+                  data-testid="export-report-menu-item"
+                >
+                  <FileText size={14} />
+                  <Text>Export report</Text>
+                  <Box flex={1} />
+                  {/* The wait costs money and time, so the size of the job is
+                      on the menu item, not in a toast after the click. */}
+                  <Text fontSize="xs" color="fg.muted">
+                    {summary.totalCount}{" "}
+                    {summary.totalCount === 1 ? "scenario" : "scenarios"}
+                  </Text>
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Root>
+          )}
         </HStack>
       </Box>
 

@@ -1,0 +1,415 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Integration tests for the per-run "Export report" action in run history.
+ *
+ * The rows and the hook are exercised together, because the thing worth
+ * proving is the wiring between them: which run a click reports on, that a
+ * click never toggles the row it came from, and that two rows can be producing
+ * a report at the same time without one cancelling the other.
+ *
+ * @see specs/scenarios/scenario-run-report.feature
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RunRow } from "../RunRow";
+import { useBatchRunReport } from "../useBatchRunReport";
+import { makeBatchRun, makeSummary } from "./test-helpers";
+
+const showErrorToastMock = vi.fn();
+const toasterCreateMock = vi.fn();
+
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
+
+vi.mock("~/features/errors", () => ({
+  showErrorToast: (...args: unknown[]) => showErrorToastMock(...args),
+  readHandledError: () => false,
+}));
+
+vi.mock("~/components/ui/toaster", () => ({
+  toaster: { create: (...args: unknown[]) => toasterCreateMock(...args) },
+}));
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+type PendingRequest = {
+  url: string;
+  body: Record<string, unknown>;
+  signal: AbortSignal;
+  resolve: (response: unknown) => void;
+};
+
+const pendingRequests: PendingRequest[] = [];
+const downloadedFilenames: (string | null)[] = [];
+
+/**
+ * A fetch that hands back a promise the test resolves by hand, so a report can
+ * be left mid-flight while another one starts.
+ */
+function installFetchMock() {
+  const fetchMock = vi.fn((url: string, init: RequestInit) => {
+    return new Promise((resolve, reject) => {
+      const signal = init.signal!;
+      signal.addEventListener("abort", () => {
+        const abortError = new Error("The operation was aborted.");
+        abortError.name = "AbortError";
+        reject(abortError);
+      });
+      pendingRequests.push({
+        url,
+        body: JSON.parse(init.body as string) as Record<string, unknown>,
+        signal,
+        resolve,
+      });
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function reportResponse({
+  tier = "verified",
+  filename = "checkout-suite-report.html",
+}: {
+  tier?: string;
+  filename?: string;
+} = {}) {
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "X-Report-Tier": tier,
+    }),
+    blob: () =>
+      Promise.resolve(new Blob(["<html></html>"], { type: "text/html" })),
+  };
+}
+
+function rejectedResponse() {
+  return {
+    ok: false,
+    status: 500,
+    headers: new Headers(),
+    json: () => Promise.resolve({ message: "boom" }),
+  };
+}
+
+/** Two rows off one hook, exactly as the run history panel wires them. */
+function ReportRows({
+  batchRunIds,
+  onToggle,
+  projectId = "project_1",
+}: {
+  batchRunIds: string[];
+  onToggle?: (batchRunId: string) => void;
+  projectId?: string;
+}) {
+  const { startReport, cancelReport, isReportRunning } = useBatchRunReport({
+    projectId,
+  });
+
+  return (
+    <>
+      {batchRunIds.map((batchRunId) => (
+        <RunRow
+          key={batchRunId}
+          batchRun={makeBatchRun({ batchRunId })}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={() => onToggle?.(batchRunId)}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+          suiteName={`Suite ${batchRunId}`}
+          onExportReport={() =>
+            startReport({
+              batchRunId,
+              scenarioSetId: "set_1",
+              suiteName: `Suite ${batchRunId}`,
+            })
+          }
+          onCancelReport={() => cancelReport({ batchRunId })}
+          isReportRunning={isReportRunning(batchRunId)}
+        />
+      ))}
+    </>
+  );
+}
+
+async function openReportMenu({
+  user,
+  batchRunId,
+}: {
+  user: ReturnType<typeof userEvent.setup>;
+  batchRunId: string;
+}) {
+  await user.click(
+    screen.getByRole("button", { name: `Actions for Suite ${batchRunId}` }),
+  );
+  return screen.getByTestId("export-report-menu-item");
+}
+
+function rowOf(batchRunId: string): HTMLElement {
+  const row = document.querySelector<HTMLElement>(
+    `[data-batch-id="${batchRunId}"]`,
+  );
+  if (!row) throw new Error(`No row rendered for ${batchRunId}`);
+  return row;
+}
+
+/**
+ * Captures downloads instead of performing them.
+ *
+ * jsdom has no download machinery, and the hook's last act is an anchor click,
+ * so intercepting that click is the only place the filename it chose can be
+ * observed.
+ */
+function captureDownloads() {
+  vi.stubGlobal("URL", {
+    ...window.URL,
+    createObjectURL: vi.fn(() => "blob:report"),
+    revokeObjectURL: vi.fn(),
+  });
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+    this: HTMLAnchorElement,
+  ) {
+    downloadedFilenames.push(this.getAttribute("download"));
+  });
+}
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  pendingRequests.length = 0;
+  downloadedFilenames.length = 0;
+  installFetchMock();
+  captureDownloads();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("run report action on a run history row", () => {
+  describe("given a run in the history", () => {
+    /** @scenario "Every run offers a report" */
+    it("offers an export report action on the row", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_a" });
+      expect(item).toHaveTextContent("Export report");
+    });
+
+    /** @scenario "I am told what the report will cover before I wait for it" */
+    it("names how many scenarios the report covers before it is asked for", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_a" });
+      expect(item).toHaveTextContent("2 scenarios");
+      expect(pendingRequests).toHaveLength(0);
+    });
+  });
+
+  describe("when the action is clicked", () => {
+    /** @scenario "Exporting a report leaves the run history alone" */
+    it("does not expand or collapse the row", async () => {
+      const user = userEvent.setup();
+      const onToggle = vi.fn();
+      render(<ReportRows batchRunIds={["batch_a"]} onToggle={onToggle} />, {
+        wrapper: Wrapper,
+      });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_a" });
+      await user.click(item);
+
+      await waitFor(() => expect(pendingRequests).toHaveLength(1));
+      expect(onToggle).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Exporting a report leaves the run history alone" */
+    it("keeps the row header the only <button> in its own subtree", () => {
+      render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
+
+      // A nested <button> is closed early by the HTML parser, which detaches
+      // the trigger from its handler and lets the click reach the header.
+      const trigger = screen.getByRole("button", {
+        name: "Actions for Suite batch_a",
+      });
+      expect(trigger.tagName.toLowerCase()).not.toBe("button");
+
+      const header = screen.getAllByTestId("run-row-header")[0]!;
+      expect(header.tagName.toLowerCase()).toBe("button");
+      expect(header.querySelectorAll("button")).toHaveLength(0);
+    });
+
+    /** @scenario "The report covers the run I asked for" */
+    it("asks for a report scoped to that row's run", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a", "batch_b"]} />, {
+        wrapper: Wrapper,
+      });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_b" });
+      await user.click(item);
+
+      await waitFor(() => expect(pendingRequests).toHaveLength(1));
+      expect(pendingRequests[0]!.url).toBe(
+        "/api/export/batch-run-report/download",
+      );
+      expect(pendingRequests[0]!.body).toEqual({
+        projectId: "project_1",
+        scenarioSetId: "set_1",
+        batchRunId: "batch_b",
+      });
+    });
+  });
+});
+
+describe("run report action results", () => {
+  describe("when the report comes back", () => {
+    /** @scenario "The file downloads with a descriptive name" */
+    it("downloads the file under the name the server chose", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_a" });
+      await user.click(item);
+      await waitFor(() => expect(pendingRequests).toHaveLength(1));
+
+      pendingRequests[0]!.resolve(
+        reportResponse({ filename: "checkout-suite-report.html" }),
+      );
+
+      await waitFor(() =>
+        expect(downloadedFilenames).toEqual(["checkout-suite-report.html"]),
+      );
+      expect(window.URL.revokeObjectURL).toHaveBeenCalledWith("blob:report");
+    });
+
+    /** @scenario "A report still downloads when no model is configured" */
+    it("says the written analysis is missing when only the figures came back", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_a" });
+      await user.click(item);
+      await waitFor(() => expect(pendingRequests).toHaveLength(1));
+
+      pendingRequests[0]!.resolve(reportResponse({ tier: "figures_only" }));
+
+      await waitFor(() => expect(downloadedFilenames).toHaveLength(1));
+      await waitFor(() => expect(toasterCreateMock).toHaveBeenCalledOnce());
+      expect(toasterCreateMock.mock.calls[0]![0]).toMatchObject({
+        type: "info",
+      });
+    });
+
+    // No scenario in the feature file covers a rejected request — the feature
+    // is written from the reader's side, where the file always arrives. This
+    // guards the client half of that promise: a rejection is said out loud
+    // rather than leaving a row spinning at nothing.
+    it("raises an error and downloads nothing when the request is rejected", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
+
+      const item = await openReportMenu({ user, batchRunId: "batch_a" });
+      await user.click(item);
+      await waitFor(() => expect(pendingRequests).toHaveLength(1));
+
+      pendingRequests[0]!.resolve(rejectedResponse());
+
+      await waitFor(() => expect(showErrorToastMock).toHaveBeenCalledOnce());
+      expect(downloadedFilenames).toHaveLength(0);
+      await waitFor(() =>
+        expect(
+          within(rowOf("batch_a")).queryByTestId("cancel-report-button"),
+        ).not.toBeInTheDocument(),
+      );
+    });
+  });
+});
+
+describe("run report action concurrency", () => {
+  describe("when two rows are asked for a report", () => {
+    /** @scenario "Two reports can be produced at once" */
+    it("keeps both in flight, each row showing its own state", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a", "batch_b"]} />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(await openReportMenu({ user, batchRunId: "batch_a" }));
+      await waitFor(() =>
+        expect(
+          within(rowOf("batch_a")).getByTestId("cancel-report-button"),
+        ).toBeInTheDocument(),
+      );
+      expect(
+        within(rowOf("batch_b")).queryByTestId("cancel-report-button"),
+      ).not.toBeInTheDocument();
+
+      await user.click(await openReportMenu({ user, batchRunId: "batch_b" }));
+      await waitFor(() => expect(pendingRequests).toHaveLength(2));
+
+      expect(
+        within(rowOf("batch_a")).getByTestId("cancel-report-button"),
+      ).toBeInTheDocument();
+      expect(
+        within(rowOf("batch_b")).getByTestId("cancel-report-button"),
+      ).toBeInTheDocument();
+      expect(pendingRequests[0]!.signal.aborted).toBe(false);
+      expect(pendingRequests[1]!.signal.aborted).toBe(false);
+
+      // Finishing the second leaves the first running.
+      pendingRequests[1]!.resolve(reportResponse({ filename: "b.html" }));
+      await waitFor(() => expect(downloadedFilenames).toEqual(["b.html"]));
+      expect(
+        within(rowOf("batch_a")).getByTestId("cancel-report-button"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when a report in progress is cancelled", () => {
+    /** @scenario "Cancelling a report in progress stops it" */
+    it("stops that report and downloads nothing", async () => {
+      const user = userEvent.setup();
+      render(<ReportRows batchRunIds={["batch_a", "batch_b"]} />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(await openReportMenu({ user, batchRunId: "batch_a" }));
+      await user.click(await openReportMenu({ user, batchRunId: "batch_b" }));
+      await waitFor(() => expect(pendingRequests).toHaveLength(2));
+
+      await user.click(
+        within(rowOf("batch_a")).getByTestId("cancel-report-button"),
+      );
+
+      await waitFor(() =>
+        expect(
+          within(rowOf("batch_a")).queryByTestId("cancel-report-button"),
+        ).not.toBeInTheDocument(),
+      );
+      expect(pendingRequests[0]!.signal.aborted).toBe(true);
+      expect(pendingRequests[1]!.signal.aborted).toBe(false);
+      expect(downloadedFilenames).toHaveLength(0);
+      expect(showErrorToastMock).not.toHaveBeenCalled();
+    });
+  });
+});

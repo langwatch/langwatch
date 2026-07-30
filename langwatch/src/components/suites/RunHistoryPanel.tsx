@@ -50,6 +50,7 @@ import {
   resolveOriginLabel,
 } from "./run-history-transforms";
 import { useAutoExpansion } from "./useAutoExpansion";
+import { useBatchRunReport } from "./useBatchRunReport";
 import { useCancelScenarioRun } from "./useCancelScenarioRun";
 import { useRunHistoryPagination } from "./useRunHistoryPagination";
 import { useRunHistoryStore } from "./useRunHistoryStore";
@@ -192,6 +193,12 @@ export function RunHistoryPanel({
         showErrorToast({ error, fallbackTitle: "Couldn't cancel jobs" }),
     },
   );
+
+  // One instance for the whole list: the scope of a report is passed per call,
+  // so two rows can be producing one at the same time.
+  const { startReport, cancelReport, isReportRunning } = useBatchRunReport({
+    projectId: project?.id,
+  });
 
   // Apply filters to raw runs
   const filteredRuns = useMemo(() => {
@@ -480,6 +487,11 @@ export function RunHistoryPanel({
                     }) ?? undefined)
                   : undefined;
 
+                // A batch carries its own set in the all-runs view; the panel
+                // prop is the fallback for the single-suite view, where every
+                // batch belongs to the suite being looked at.
+                const reportSetId = batchRun.scenarioSetId ?? scenarioSetId;
+
                 return (
                   <RunRow
                     key={batchRun.batchRunId}
@@ -511,6 +523,20 @@ export function RunHistoryPanel({
                     isCancellingBatch={isCancellingBatch}
                     cancellingJobId={cancellingJobId}
                     isHighlighted={highlightedBatchId === batchRun.batchRunId}
+                    onExportReport={
+                      reportSetId
+                        ? () =>
+                            startReport({
+                              batchRunId: batchRun.batchRunId,
+                              scenarioSetId: reportSetId,
+                              suiteName,
+                            })
+                        : undefined
+                    }
+                    onCancelReport={() =>
+                      cancelReport({ batchRunId: batchRun.batchRunId })
+                    }
+                    isReportRunning={isReportRunning(batchRun.batchRunId)}
                   />
                 );
               })
