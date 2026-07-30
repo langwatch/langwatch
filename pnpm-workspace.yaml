@@ -36,6 +36,10 @@ minimumReleaseAge: 10080
 # Version-pinned so only the pinned release bypasses the gate; drop each entry
 # once that version ages past it.
 minimumReleaseAgeExclude:
+  # First-party: the scenario SDK is LangWatch's own. skills/.npmrc carried a
+  # standing (unversioned) exemption for it that silently died with the merge —
+  # a member .npmrc is never read once the install root is the repo root.
+  - "@langwatch/scenario"
   - langwatch@1.0.0
   - ws@8.21.1
   - "@browserbasehq/sdk@2.16.0"
@@ -57,8 +61,16 @@ minimumReleaseAgeExclude:
 #                                  and @langwatch/langy compiles against it via
 #                                  the `zod/v4` subpath. Global would force the
 #                                  app to zod 4 and break that arrangement.
-#   @opentelemetry/api-logs: 0.205.0   (typescript-sdk) — older than the app's
-#   @opentelemetry/sdk-logs: 0.205.0   otel stack; global would downgrade it.
+#
+#   ...and typescript-sdk's whole OpenTelemetry pin set, eleven entries in
+#   all: api, api-logs 0.205.0, sdk-logs 0.205.0, core, resources,
+#   sdk-trace-base, sdk-node 0.219.0, instrumentation 0.219.0,
+#   context-async-hooks, exporter-logs-otlp-http 0.219.0 and
+#   exporter-trace-otlp-http 0.219.0. All are the SDK's own direct
+#   (peer)dependency declarations, several older than the app's stack — made
+#   global they would downgrade the app's telemetry pipeline. None sits below
+#   a known advisory floor: the security-relevant OTel floors (>=0.217.0 for
+#   CVE-2026-44902) are carried as ranges below and apply to the SDK too.
 #
 # Anything expressed as a RANGE (`pkg@<x`) is safe to share and all of them are
 # merged below: a range pin only bites the versions it names.

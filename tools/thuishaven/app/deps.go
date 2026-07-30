@@ -25,7 +25,13 @@ import (
 // fork-authored code with the developer's environment and credentials before a
 // single service starts. `haven pr` has always guarded this (see installDeps in
 // pr.go); play must guard it the same way.
-func (o *Orchestrator) ensureDeps(ctx context.Context, rootDir string, withLifecycleScripts bool) error {
+func (o *Orchestrator) ensureDeps(ctx context.Context, dir string, withLifecycleScripts bool) error {
+	// Resolve the workspace root ourselves rather than trusting the caller to
+	// know the layout. The regression this guards against: both call sites
+	// used to pass langwatch/, depsStale found no lockfile there, and haven
+	// silently installed nothing. A caller-side fix leaves the same mistake
+	// open to the next caller; resolving here makes the class unreachable.
+	rootDir := findWorkspaceRoot(dir)
 	if !depsStale(rootDir) {
 		return nil
 	}
@@ -40,6 +46,25 @@ func (o *Orchestrator) ensureDeps(ctx context.Context, rootDir string, withLifec
 		return fmt.Errorf("pnpm install failed: %w", err)
 	}
 	return nil
+}
+
+// findWorkspaceRoot walks up from dir to the nearest directory holding a
+// pnpm-lock.yaml — the workspace root, the only place the lockfile and
+// node_modules exist since ADR-076. Handed the root itself it returns it
+// unchanged; handed a member (langwatch/, a sandbox's langwatch/) it climbs
+// out. If no lockfile exists anywhere up the tree, the original dir comes
+// back and depsStale correctly reports nothing to install.
+func findWorkspaceRoot(dir string) string {
+	for d := dir; ; {
+		if _, err := os.Stat(filepath.Join(d, "pnpm-lock.yaml")); err == nil {
+			return d
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return dir
+		}
+		d = parent
+	}
 }
 
 // depsStale reports whether rootDir's installed modules predate its lockfile.

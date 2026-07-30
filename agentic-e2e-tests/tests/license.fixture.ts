@@ -10,9 +10,12 @@
  * This is the pre-signed `ENTERPRISE_LICENSE_KEY` fixture from
  * `langwatch/ee/licensing/__tests__/fixtures/testLicenses.ts`, signed with the
  * in-repo TEST keypair (`.../fixtures/testKeys.ts` `TEST_PRIVATE_KEY`), plan
- * ENTERPRISE, maxMembers=100, expires 2030-12-31. It is copied here as a literal
- * because agentic-e2e-tests is a standalone pnpm project (installed with
- * `--ignore-workspace`) and cannot import across the workspace boundary.
+ * ENTERPRISE, maxMembers=100, expires 2030-12-31. It stays a copied literal
+ * even though agentic-e2e-tests is a workspace member since ADR-076 and COULD
+ * now import the app's fixture: this suite deliberately depends on nothing but
+ * @playwright/test, so its install stays a few packages rather than the app's
+ * whole tree. One string against that is a fair trade — but it must stay in
+ * sync (see below).
  *
  * The app trusts it only because the e2e-ci workflow sets
  * `LANGWATCH_LICENSE_PUBLIC_KEY` to the matching `TEST_PUBLIC_KEY`. If the
