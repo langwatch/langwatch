@@ -159,6 +159,43 @@ export const apiKeyRouter = createTRPCRouter({
     }),
 
   /**
+   * Resolve a single API key id to its display name.
+   *
+   * Deliberately narrower than {@link list}, which is admin-gated for the full
+   * org and would otherwise show most of the team a raw row id wherever a key
+   * is referenced. This answers one question, for one id the caller already
+   * has, and returns nothing else: no lookup id, no secret, no owner, no
+   * bindings, no list. Any member of the organization may ask, because anyone
+   * who can already read a trace can already see the id stamped on it, and a
+   * name is less revealing than the id.
+   *
+   * Not an enumeration surface: it takes a whole id rather than a prefix or a
+   * filter, answers one at a time, and returns null identically for an id that
+   * does not exist and one that belongs to another organization.
+   */
+  nameById: protectedProcedure
+    .input(z.object({ organizationId: z.string(), apiKeyId: z.string() }))
+    .use(
+      skipPermissionCheck({
+        allow: {
+          organizationId: "naming an API key the caller can already see",
+        },
+      }),
+    )
+    .query(async ({ ctx, input }) => {
+      const apiKeyService = ApiKeyService.create(ctx.prisma);
+      await ensureCallerIsOrgMember(
+        apiKeyService,
+        ctx.session.user.id,
+        input.organizationId,
+      );
+      return apiKeyService.getNameByIdInOrg({
+        id: input.apiKeyId,
+        organizationId: input.organizationId,
+      });
+    }),
+
+  /**
    * Lists API keys. Admins see all keys in the org; non-admins see only their own.
    */
   list: protectedProcedure

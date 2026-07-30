@@ -3,7 +3,8 @@
  *
  * The `langwatch.api_key.id` metadata row in the trace drawer: label trimmed to
  * `langwatch.api_key`, value resolved from the ApiKey row id to the key's name
- * and linked to that key on the settings page.
+ * and linked to that key on the settings page. The name is resolved one id at
+ * a time so an ordinary member sees it, not only key administrators.
  *
  * Spec: specs/traces-v2/api-key-attribute.feature
  */
@@ -28,11 +29,11 @@ vi.mock("~/utils/compat/next-link", () => ({
   }) => <a href={href}>{children}</a>,
 }));
 
-const mockApiKeyList = vi.fn();
+const mockNameById = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
-    apiKey: { list: { useQuery: () => mockApiKeyList() } },
+    apiKey: { nameById: { useQuery: () => mockNameById() } },
   },
 }));
 
@@ -55,8 +56,8 @@ describe("langwatch.api_key.id attribute row", () => {
   describe("given the viewer can list the key that ingested the trace", () => {
     /** @scenario The attribute label drops the trailing id segment */
     it("labels the row 'langwatch.api_key'", () => {
-      mockApiKeyList.mockReturnValue({
-        data: [{ id: "key_abc123", name: "CI Pipeline" }],
+      mockNameById.mockReturnValue({
+        data: { name: "CI Pipeline", revoked: false },
       });
       renderWithApiKeyAttribute();
 
@@ -68,8 +69,8 @@ describe("langwatch.api_key.id attribute row", () => {
 
     /** @scenario The value resolves to the key's name and links to it */
     it("shows the key name as a link to that key on the settings page", () => {
-      mockApiKeyList.mockReturnValue({
-        data: [{ id: "key_abc123", name: "CI Pipeline" }],
+      mockNameById.mockReturnValue({
+        data: { name: "CI Pipeline", revoked: false },
       });
       renderWithApiKeyAttribute();
 
@@ -83,10 +84,23 @@ describe("langwatch.api_key.id attribute row", () => {
     });
   });
 
-  describe("given the key is revoked, deleted, or not listable by the viewer", () => {
+  describe("given the key that ingested the trace has been revoked", () => {
+    /** @scenario A revoked key still shows its name */
+    it("still shows the name rather than the raw id", () => {
+      mockNameById.mockReturnValue({
+        data: { name: "Retired ingestion key", revoked: true },
+      });
+      renderWithApiKeyAttribute();
+
+      expect(screen.getByText("Retired ingestion key")).toBeInTheDocument();
+      expect(screen.queryByText("key_abc123")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the key is deleted, foreign, or the view is publicly shared", () => {
     /** @scenario An unresolvable key falls back to the raw id */
     it("falls back to the raw id with no link", () => {
-      mockApiKeyList.mockReturnValue({ data: [] });
+      mockNameById.mockReturnValue({ data: null });
       renderWithApiKeyAttribute();
 
       expect(screen.getByText("key_abc123")).toBeInTheDocument();
@@ -94,8 +108,8 @@ describe("langwatch.api_key.id attribute row", () => {
     });
 
     /** @scenario An unresolvable key falls back to the raw id */
-    it("falls back to the raw id while the key list is still loading", () => {
-      mockApiKeyList.mockReturnValue({ data: undefined });
+    it("falls back to the raw id while the name is still loading", () => {
+      mockNameById.mockReturnValue({ data: undefined });
       renderWithApiKeyAttribute();
 
       expect(screen.getByText("key_abc123")).toBeInTheDocument();

@@ -20,26 +20,28 @@ export const API_KEY_ATTRIBUTE_LABEL = "langwatch.api_key";
  * which tells an operator nothing, so the cell resolves it to the key's name
  * and links to that key on the API keys settings page.
  *
- * Names come from the org's key list, which admins see in full and everyone
- * else sees only their own slice of. A key that is revoked, deleted, or out of
- * the viewer's reach resolves to nothing and the cell falls back to the raw id
- * rather than rendering a dead link.
+ * The name comes from `apiKey.nameById`, which answers for any member of the
+ * organization. A deleted key, a key from another organization, or a shared
+ * read-only view resolves to nothing and the cell falls back to the raw id
+ * rather than rendering a dead link. A revoked key still resolves by name: the
+ * trace it authorized is still readable, so naming it is still useful.
  */
 export function ApiKeyAttributeValue({ apiKeyId }: { apiKeyId: string }) {
   const { organization } = useOrganizationTeamProject();
   const isReadOnly = useIsReadOnlyTrace();
   const organizationId = organization?.id ?? "";
 
-  const { data } = api.apiKey.list.useQuery(
-    { organizationId },
+  const { data } = api.apiKey.nameById.useQuery(
+    { organizationId, apiKeyId },
     {
-      enabled: !!organizationId && !isReadOnly,
+      enabled: !!organizationId && !!apiKeyId && !isReadOnly,
       staleTime: 60_000,
       refetchOnWindowFocus: false,
+      retry: false,
     },
   );
 
-  const name = data?.find((key) => key.id === apiKeyId)?.name;
+  const name = data?.name;
 
   if (!name) {
     return (
