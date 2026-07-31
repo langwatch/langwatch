@@ -62,6 +62,27 @@ type BatchEvaluationResultsProps = {
 /** Grace period after run finishes to continue refetching for final results */
 const REFETCH_GRACE_PERIOD_MS = 3000; // 3 seconds
 
+type RouterQuery = Record<string, string | string[] | undefined>;
+
+/**
+ * The router query that applying `groupBy` would produce, or `null` when
+ * it would be a no-op — replacing the URL with an identical query still
+ * costs a navigation, and in Next that re-runs every `router.query`
+ * effect on the page.
+ */
+const queryWithGroupBy = (
+  query: RouterQuery,
+  groupBy: string | null,
+): RouterQuery | null => {
+  if (groupBy) {
+    if (query.groupBy === groupBy) return null;
+    return { ...query, groupBy };
+  }
+  if (!("groupBy" in query)) return null;
+  const { groupBy: _dropped, ...rest } = query;
+  return rest;
+};
+
 export function BatchEvaluationResults({
   project,
   experiment,
@@ -309,14 +330,8 @@ export function BatchEvaluationResults({
         setLocalGroupBy(next);
         return;
       }
-      const newQuery = { ...router.query };
-      if (next) {
-        if (newQuery.groupBy === next) return;
-        newQuery.groupBy = next;
-      } else {
-        if (!("groupBy" in newQuery)) return;
-        delete newQuery.groupBy;
-      }
+      const newQuery = queryWithGroupBy(router.query, next);
+      if (!newQuery) return;
       void router.replace(
         { pathname: router.pathname, query: newQuery },
         undefined,

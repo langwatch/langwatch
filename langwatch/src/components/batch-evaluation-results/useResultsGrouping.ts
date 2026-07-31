@@ -50,6 +50,23 @@ export function useResultsGrouping({
   return { availableKeys };
 }
 
+/** Arrays and objects are payloads, not slicing dimensions. */
+const isGroupableValue = (value: unknown): boolean =>
+  value !== null && value !== undefined && typeof value !== "object";
+
+/** Record every scalar dataset-entry value of one row against its key. */
+function recordRowValues(
+  datasetEntry: Record<string, unknown>,
+  distinctValuesPerKey: Map<string, Set<string>>,
+): void {
+  for (const [key, value] of Object.entries(datasetEntry)) {
+    if (!isGroupableValue(value)) continue;
+    const seen = distinctValuesPerKey.get(key) ?? new Set<string>();
+    seen.add(String(value));
+    distinctValuesPerKey.set(key, seen);
+  }
+}
+
 /**
  * Pick metadata keys from `row.datasetEntry` that make useful grouping
  * dimensions. A key qualifies when it has 2+ distinct values but is not
@@ -60,16 +77,10 @@ function discoverDatasetEntryKeys(data: ComparisonRunData[]): string[] {
   let maxRowsInAnyRun = 0;
 
   for (const run of data) {
-    if (!run.data) continue;
-    maxRowsInAnyRun = Math.max(maxRowsInAnyRun, run.data.rows.length);
-    for (const row of run.data.rows) {
-      for (const [key, value] of Object.entries(row.datasetEntry)) {
-        if (value === null || value === undefined) continue;
-        if (typeof value === "object") continue; // arrays/objects are not group-able
-        const seen = distinctValuesPerKey.get(key) ?? new Set<string>();
-        seen.add(String(value));
-        distinctValuesPerKey.set(key, seen);
-      }
+    const rows = run.data?.rows ?? [];
+    maxRowsInAnyRun = Math.max(maxRowsInAnyRun, rows.length);
+    for (const row of rows) {
+      recordRowValues(row.datasetEntry, distinctValuesPerKey);
     }
   }
 
@@ -91,14 +102,18 @@ function discoverDatasetEntryKeys(data: ComparisonRunData[]): string[] {
 function discoverTargetMetadataKeys(data: ComparisonRunData[]): string[] {
   const keys = new Set<string>();
   for (const run of data) {
-    if (!run.data) continue;
-    for (const targetCol of run.data.targetColumns) {
-      if (!targetCol.metadata) continue;
-      for (const key of Object.keys(targetCol.metadata)) {
-        if (TARGET_METADATA_RESERVED.has(key)) continue;
+    for (const targetCol of run.data?.targetColumns ?? []) {
+      for (const key of unreservedKeys(targetCol.metadata)) {
         keys.add(key);
       }
     }
   }
   return Array.from(keys).sort();
 }
+
+const unreservedKeys = (
+  metadata: Record<string, unknown> | undefined | null,
+): string[] =>
+  Object.keys(metadata ?? {}).filter(
+    (key) => !TARGET_METADATA_RESERVED.has(key),
+  );

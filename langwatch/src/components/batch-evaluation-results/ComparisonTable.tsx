@@ -6,7 +6,7 @@
  * metadata field (issue #4632).
  */
 
-import { Box, Button, HStack, Portal, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -14,11 +14,12 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { DiffCell, type DiffValue } from "./DiffCell";
 import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
+import { GroupByRowsMenu } from "./GroupByRowsMenu";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   calculateMinTableWidth,
@@ -296,10 +297,7 @@ const buildComparisonRows = (
  * Pick the group value for a row from whichever run carries it.
  * Falls back to "Unspecified" if no run has a usable value.
  */
-const getGroupValueForRow = (
-  row: ComparisonRow,
-  groupBy: string,
-): string => {
+const getGroupValueForRow = (row: ComparisonRow, groupBy: string): string => {
   for (const runId of Object.keys(row.datasetEntries)) {
     const entry = row.datasetEntries[runId];
     const value = entry?.[groupBy];
@@ -342,6 +340,42 @@ type GroupAggregates = Record<
   Record<string, { mean: number; count: number; evaluatorName: string }>
 >;
 
+/** Running sum/count per evaluatorId, before it is turned into a mean. */
+type EvaluatorScoreTotals = Map<
+  string,
+  { sum: number; count: number; evaluatorName: string }
+>;
+
+/** Fold one target's scored evaluator results into the running totals. */
+const accumulateTargetScores = (
+  totals: EvaluatorScoreTotals,
+  target: BatchResultRow["targets"][string],
+): void => {
+  for (const ev of target.evaluatorResults) {
+    if (ev.score === null || ev.score === undefined) continue;
+    const slot = totals.get(ev.evaluatorId) ?? {
+      sum: 0,
+      count: 0,
+      evaluatorName: ev.evaluatorName,
+    };
+    slot.sum += ev.score;
+    slot.count += 1;
+    totals.set(ev.evaluatorId, slot);
+  }
+};
+
+const meanScores = (totals: EvaluatorScoreTotals): GroupAggregates[string] => {
+  const means: GroupAggregates[string] = {};
+  for (const [evaluatorId, slot] of totals) {
+    means[evaluatorId] = {
+      mean: slot.sum / slot.count,
+      count: slot.count,
+      evaluatorName: slot.evaluatorName,
+    };
+  }
+  return means;
+};
+
 /**
  * Mean evaluator score per (runId, evaluatorId) across the rows in the
  * group. Aggregates from `evaluatorResults` rather than the top-level
@@ -354,35 +388,13 @@ const computeGroupAggregates = (
 ): GroupAggregates => {
   const result: GroupAggregates = {};
   for (const run of comparisonData) {
-    const perEval = new Map<
-      string,
-      { sum: number; count: number; evaluatorName: string }
-    >();
+    const totals: EvaluatorScoreTotals = new Map();
     for (const row of rowsInGroup) {
-      const targets = row.targetsByRun[run.runId];
-      if (!targets) continue;
-      for (const target of Object.values(targets)) {
-        for (const ev of target.evaluatorResults) {
-          if (ev.score === null || ev.score === undefined) continue;
-          const slot = perEval.get(ev.evaluatorId) ?? {
-            sum: 0,
-            count: 0,
-            evaluatorName: ev.evaluatorName,
-          };
-          slot.sum += ev.score;
-          slot.count += 1;
-          perEval.set(ev.evaluatorId, slot);
-        }
+      for (const target of Object.values(row.targetsByRun[run.runId] ?? {})) {
+        accumulateTargetScores(totals, target);
       }
     }
-    result[run.runId] = {};
-    for (const [evId, slot] of perEval) {
-      result[run.runId]![evId] = {
-        mean: slot.sum / slot.count,
-        count: slot.count,
-        evaluatorName: slot.evaluatorName,
-      };
-    }
+    result[run.runId] = meanScores(totals);
   }
   return result;
 };
@@ -458,18 +470,6 @@ export function ComparisonTable({
     },
     [onGroupByChange],
   );
-
-  // Group-by dropdown state. Match the chart's portal-popover pattern
-  // (see ComparisonCharts.tsx) so the menu can't be clipped by an
-  // overflow:hidden ancestor in BatchEvaluationResults.
-  const [groupByDropdownOpen, setGroupByDropdownOpen] = useState(false);
-  const [groupByBtnRect, setGroupByBtnRect] = useState<DOMRect | null>(null);
-  const groupByBtnRef = useRef<HTMLButtonElement>(null);
-  const openGroupByDropdown = () => {
-    const rect = groupByBtnRef.current?.getBoundingClientRect() ?? null;
-    setGroupByBtnRect(rect);
-    setGroupByDropdownOpen(true);
-  };
 
   // Collapse state for grouped sections.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
@@ -583,113 +583,15 @@ export function ComparisonTable({
       : 0;
 
   const showGroupByControl = availableKeys.length > 0;
-  const dropdownOptions: Array<{ key: string | null; label: string }> = [
-    { key: null, label: "No grouping" },
-    ...availableKeys.map((k) => ({ key: k, label: k })),
-  ];
 
   return (
     <VStack align="stretch" width="100%" height="100%" gap={0}>
       {showGroupByControl && (
-        <HStack paddingX={2} paddingY={2} flexShrink={0}>
-          <Box>
-            <Button
-              ref={groupByBtnRef}
-              size="xs"
-              variant="outline"
-              onClick={() =>
-                groupByDropdownOpen
-                  ? setGroupByDropdownOpen(false)
-                  : openGroupByDropdown()
-              }
-              aria-haspopup="menu"
-              aria-expanded={groupByDropdownOpen}
-              data-testid="group-by-row-button"
-            >
-              Group rows by: {effectiveGroupBy ?? "No grouping"}
-            </Button>
-            {groupByDropdownOpen && groupByBtnRect && (
-              <Portal>
-                <Box
-                  position="fixed"
-                  inset={0}
-                  zIndex={1000}
-                  onClick={() => setGroupByDropdownOpen(false)}
-                  data-testid="group-by-row-backdrop"
-                />
-                <Box
-                  position="fixed"
-                  top={`${groupByBtnRect.bottom + 4}px`}
-                  left={`${groupByBtnRect.left}px`}
-                  bg="bg.panel"
-                  border="1px solid"
-                  borderColor="border"
-                  borderRadius="md"
-                  boxShadow="md"
-                  zIndex={1001}
-                  minWidth="180px"
-                  padding={2}
-                  style={{
-                    maxHeight: `calc(100vh - ${groupByBtnRect.bottom + 16}px)`,
-                    overflowY: "auto",
-                  }}
-                  data-testid="group-by-row-dropdown"
-                  role="menu"
-                  tabIndex={-1}
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setGroupByDropdownOpen(false);
-                      groupByBtnRef.current?.focus();
-                    }
-                  }}
-                >
-                  <VStack align="stretch" gap={1}>
-                    {dropdownOptions.map((opt) => {
-                      const selected = effectiveGroupBy === opt.key ||
-                        (effectiveGroupBy == null && opt.key === null);
-                      return (
-                        <HStack
-                          key={opt.key ?? "none"}
-                          padding={1}
-                          borderRadius="sm"
-                          cursor="pointer"
-                          bg={selected ? "blue.subtle" : "transparent"}
-                          _hover={{
-                            bg: selected ? "blue.muted" : "bg.subtle",
-                          }}
-                          onClick={() => {
-                            handleGroupByChange(opt.key);
-                            setGroupByDropdownOpen(false);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleGroupByChange(opt.key);
-                              setGroupByDropdownOpen(false);
-                              groupByBtnRef.current?.focus();
-                            }
-                          }}
-                          role="menuitem"
-                          tabIndex={0}
-                          data-testid={`group-by-row-option-${opt.key ?? "none"}`}
-                        >
-                          <Text
-                            fontSize="sm"
-                            fontWeight={selected ? "medium" : "normal"}
-                            color={selected ? "blue.fg" : "inherit"}
-                          >
-                            {opt.label}
-                          </Text>
-                        </HStack>
-                      );
-                    })}
-                  </VStack>
-                </Box>
-              </Portal>
-            )}
-          </Box>
-        </HStack>
+        <GroupByRowsMenu
+          availableKeys={availableKeys}
+          value={effectiveGroupBy}
+          onChange={handleGroupByChange}
+        />
       )}
 
       <Box
@@ -725,18 +627,14 @@ export function ComparisonTable({
             groupedRows.map(({ value, rows, aggregates }) => {
               const collapsed = collapsedGroups.has(value);
               return (
-                <tbody
-                  key={value}
-                  data-testid={`group-section-${value}`}
-                >
+                <tbody key={value} data-testid={`group-section-${value}`}>
                   <tr data-testid={`group-header-${value}`}>
                     <td
                       colSpan={columnCount}
                       style={{
                         background: "var(--chakra-colors-bg-subtle)",
                         borderTop: "1px solid var(--chakra-colors-border)",
-                        borderBottom:
-                          "1px solid var(--chakra-colors-border)",
+                        borderBottom: "1px solid var(--chakra-colors-border)",
                         padding: "6px 8px",
                       }}
                     >
@@ -804,15 +702,10 @@ export function ComparisonTable({
                   </tr>
                   {!collapsed &&
                     rows.map((comparisonRow) => {
-                      const tableRow = tableRowByIndex.get(
-                        comparisonRow.index,
-                      );
+                      const tableRow = tableRowByIndex.get(comparisonRow.index);
                       if (!tableRow) return null;
                       return (
-                        <tr
-                          key={tableRow.id}
-                          data-index={tableRow.index}
-                        >
+                        <tr key={tableRow.id} data-index={tableRow.index}>
                           {tableRow.getVisibleCells().map((cell) => (
                             <td
                               key={cell.id}
@@ -837,8 +730,14 @@ export function ComparisonTable({
                 tableRows.map((row) => (
                   <tr key={row.id} data-index={row.index}>
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      <td
+                        key={cell.id}
+                        style={{ width: cell.column.getSize() }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
                       </td>
                     ))}
                   </tr>
