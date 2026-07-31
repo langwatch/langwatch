@@ -36,3 +36,18 @@ export const CODING_AGENT_PROCESSING_COMMAND_TYPES = [
   CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
   CONTRIBUTE_METRIC_FACTS_COMMAND_TYPE,
 ] as const;
+
+/**
+ * How many same-group events the pipeline's map projections persist through
+ * one `bulkAppend` call when a group is backed up. Without it the framework
+ * default is 1 — one append per queued event — which is the O(n²) drain
+ * pattern these maps showed during the 2026-07-31 backlog (one-event-per-job
+ * at ~90 busy fleet slots). 256 matches the log/metric map ceilings
+ * (`LOG_MAP_COALESCE_MAX_BATCH`, `METRIC_MAP_COALESCE_MAX_BATCH`): both
+ * stores append into ClickHouse via `insertMany`, so the batch lands as one
+ * insert either way — the ceiling only bounds payload size per dispatch.
+ * Unlike `CODING_AGENT_SESSION_COALESCE_MAX_BATCH` (128), no per-row
+ * watermark is persisted by these maps, so the session fold's tighter bound
+ * does not apply.
+ */
+export const CODING_AGENT_MAP_COALESCE_MAX_BATCH = 256;
