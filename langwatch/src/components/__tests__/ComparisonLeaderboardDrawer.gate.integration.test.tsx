@@ -133,9 +133,8 @@ describe("the expanded comparison leaderboard, opened straight from a URL", () =
      * The reason this case matters beyond the crash: the rollout gate used to
      * sit BELOW the dereference that threw, so on the one route it exists to
      * guard it was never reached.
-     *
-     * @scenario "A shared leaderboard link opens nothing for an organization without it"
      */
+    /** @scenario "A shared leaderboard link opens nothing for an organization without it" */
     it("still refuses an organization the rollout has not reached", () => {
       rollout.enabled = false;
 

@@ -16,6 +16,9 @@ vi.mock("../api-key-token.utils", () => ({
 // Mock the role binding permission check
 vi.mock("~/server/rbac/role-binding-resolver", () => ({
   checkRoleBindingPermission: vi.fn().mockResolvedValue(true),
+  // These cases are about the binding path; the legacy fallback grants
+  // nothing so the binding decision is the only one under test.
+  resolveLegacyCeiling: vi.fn().mockResolvedValue({ grants: () => false }),
 }));
 
 // Mock the custom role permissions module

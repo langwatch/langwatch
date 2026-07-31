@@ -1,4 +1,4 @@
-import { TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -26,11 +26,23 @@ const TEAM_ID = "team1";
 const PROJECT_ID = "proj1";
 
 // No RoleBindings anywhere — the exact condition the fallback exists for.
+//
+// Only the binding check is stubbed. `resolveLegacyCeiling` is the code under
+// test and now lives in this same module (shared with the request-time
+// ceiling, which has to reach the identical answer), so it is imported for
+// real and driven through the fake prisma below.
 const mockCheckPermission = vi.fn().mockResolvedValue(false);
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: (...args: unknown[]) =>
-    mockCheckPermission(...args),
-}));
+vi.mock("~/server/rbac/role-binding-resolver", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("~/server/rbac/role-binding-resolver")
+    >();
+  return {
+    ...actual,
+    checkRoleBindingPermission: (...args: unknown[]) =>
+      mockCheckPermission(...args),
+  };
+});
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -74,6 +86,8 @@ const { ApiKeyService } = await import("../api-key.service");
 function makePrisma({
   roleBindingCount = 0,
   legacyTeamUser = null as { role: TeamUserRole } | null,
+  organizationRole = OrganizationUserRole.MEMBER as OrganizationUserRole,
+  groupIds = [] as string[],
 } = {}) {
   const projectWithTeam = {
     id: PROJECT_ID,
@@ -82,6 +96,10 @@ function makePrisma({
   };
   const roleBindingCountFn = vi.fn().mockResolvedValue(roleBindingCount);
   const teamUserFindFirst = vi.fn().mockResolvedValue(legacyTeamUser);
+  const userFindFirst = vi.fn().mockResolvedValue({
+    orgMemberships: [{ role: organizationRole }],
+    groupMemberships: groupIds.map((groupId) => ({ groupId })),
+  });
   const tx = {
     apiKey: {
       create: vi.fn().mockResolvedValue({ id: "ak_1", name: "k" }),
@@ -101,6 +119,9 @@ function makePrisma({
       deleteMany: vi.fn(),
     },
     teamUser: { findFirst: teamUserFindFirst },
+    // The ceiling runs INSIDE the transaction, so every table it reads has to
+    // exist on the tx client, not just the outer one.
+    user: { findFirst: userFindFirst },
   };
 
   return {
@@ -126,9 +147,12 @@ function makePrisma({
         findMany: vi.fn().mockResolvedValue([]),
       },
       teamUser: { findFirst: teamUserFindFirst },
+      // Membership and group ids in one round trip — see `resolveLegacyCeiling`.
+      user: { findFirst: userFindFirst },
       apiKey: { findMany: vi.fn().mockResolvedValue([]) },
     } as any,
     teamUserFindFirst,
+    roleBindingCountFn,
   };
 }
 
@@ -271,6 +295,85 @@ describe("ApiKeyService.create() — ceiling for legacy-membership users", () =>
       await expect(createRestrictedKey(prisma)).rejects.toThrow(
         /exceeds your own access/,
       );
+    });
+  });
+
+  describe("the predicate that decides whether the fallback applies at all", () => {
+    /**
+     * It has to be the same one `loadScopeResolution` uses, or the ceiling and
+     * the tRPC path disagree about who this user is. Two narrower versions
+     * were each wrong in their own direction, so the query shape is pinned
+     * rather than only its result.
+     */
+    it("counts bindings held through a group, not just direct ones", async () => {
+      const { prisma, roleBindingCountFn } = makePrisma({
+        legacyTeamUser: { role: TeamUserRole.MEMBER },
+        groupIds: ["group1"],
+      });
+
+      await createRestrictedKey(prisma);
+
+      const where = roleBindingCountFn.mock.calls[0]?.[0]?.where;
+      expect(where.OR).toEqual(
+        expect.arrayContaining([{ groupId: { in: ["group1"] } }]),
+      );
+    });
+
+    it("counts only bindings at the scopes in play, not the whole organization", async () => {
+      const { prisma, roleBindingCountFn } = makePrisma({
+        legacyTeamUser: { role: TeamUserRole.MEMBER },
+      });
+
+      await createRestrictedKey(prisma);
+
+      // An org-wide count let a binding on an UNRELATED team switch the
+      // fallback off here while tRPC still applied it — which is the scope
+      // violation this fallback was written to cure, still live.
+      const where = roleBindingCountFn.mock.calls[0]?.[0]?.where;
+      expect(where.scopeId).toEqual({ in: [ORG_ID, PROJECT_ID, TEAM_ID] });
+    });
+
+    it("caps an EXTERNAL member by their organization role", async () => {
+      const { prisma } = makePrisma({
+        legacyTeamUser: { role: TeamUserRole.ADMIN },
+        organizationRole: OrganizationUserRole.EXTERNAL,
+      });
+
+      // A legacy ADMIN team row would carry `secrets:manage` outright. Both
+      // tRPC evaluators cap an EXTERNAL member at EXTERNAL_MEMBER_PERMISSIONS
+      // BEFORE the team role is read, and this ceiling has to agree or it
+      // hands out what the rest of the product refuses.
+      await expect(
+        ApiKeyService.create(prisma).create({
+          name: "Langy session",
+          isSystemManaged: true,
+          userId: USER_ID,
+          createdByUserId: USER_ID,
+          organizationId: ORG_ID,
+          permissionMode: "restricted",
+          permissions: ["secrets:manage"],
+          bindings: [
+            {
+              role: "CUSTOM",
+              scopeType: "PROJECT",
+              scopeId: PROJECT_ID,
+            } as any,
+          ],
+        }),
+      ).rejects.toThrow(/exceeds your own access/);
+    });
+
+    it("still allows an EXTERNAL member what that floor does cover", async () => {
+      const { prisma } = makePrisma({
+        legacyTeamUser: { role: TeamUserRole.ADMIN },
+        organizationRole: OrganizationUserRole.EXTERNAL,
+      });
+
+      // `traces:view` IS in EXTERNAL_MEMBER_PERMISSIONS, so the cap above must
+      // not be a blanket refusal.
+      await expect(createRestrictedKey(prisma)).resolves.toMatchObject({
+        token: "sk-lw-test",
+      });
     });
   });
 });
