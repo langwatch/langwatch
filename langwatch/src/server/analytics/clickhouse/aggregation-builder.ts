@@ -80,20 +80,6 @@ const SPAN_TIME_FILTER_START_END =
   "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
 
 /**
- * The same envelope for `evaluation_runs`, whose partition column is
- * `OccurredAt`. Its JOIN took no bound at all until now, so every query
- * carrying an evaluation metric or filter cold-scanned the table twice — the
- * outer read plus the dedup's full-table GROUP BY. One constant per caller date
- * regime, mirroring the span pair above.
- */
-const EVAL_TIME_FILTER_BOTH_PERIODS =
-  "AND OccurredAt >= {previousStart:DateTime64(3)} - INTERVAL 2 DAY " +
-  "AND OccurredAt < {currentEnd:DateTime64(3)} + INTERVAL 2 DAY";
-const EVAL_TIME_FILTER_START_END =
-  "AND OccurredAt >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
-  "AND OccurredAt < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
-
-/**
  * Returns a deduped FROM-clause expression for trace_summaries.
  *
  * trace_summaries uses ReplacingMergeTree(UpdatedAt) which can return
@@ -803,7 +789,6 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
         table,
         requiredColumns,
         spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
-        evalTimeFilter: EVAL_TIME_FILTER_BOTH_PERIODS,
       });
     })
     .join("\n");
@@ -2293,7 +2278,6 @@ function buildDateBucketedPipelineQuery({
           table,
           requiredColumns,
           spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
-          evalTimeFilter: EVAL_TIME_FILTER_BOTH_PERIODS,
         });
       })
       .join("\n");
@@ -2745,7 +2729,6 @@ export function buildDataForFilterQuery(
         table,
         requiredColumns,
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
-        evalTimeFilter: EVAL_TIME_FILTER_START_END,
       });
     })
     .join("\n");
@@ -2842,7 +2825,6 @@ export function buildDataForFilterQuery(
         table: "stored_spans",
         requiredColumns: new Set(["SpanAttributes"]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
-        evalTimeFilter: EVAL_TIME_FILTER_START_END,
       });
       sql = `
         SELECT
@@ -2869,7 +2851,6 @@ export function buildDataForFilterQuery(
         table: "stored_spans",
         requiredColumns: new Set(["SpanAttributes"]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
-        evalTimeFilter: EVAL_TIME_FILTER_START_END,
       });
       sql = `
         SELECT
@@ -2893,10 +2874,7 @@ export function buildDataForFilterQuery(
 
     case "evaluations.evaluator_id":
     case "evaluations.evaluator_id.guardrails_only":
-      joins = buildJoinClause({
-        table: "evaluation_runs",
-        evalTimeFilter: EVAL_TIME_FILTER_START_END,
-      });
+      joins = buildJoinClause({ table: "evaluation_runs" });
       sql = `
         SELECT
           ${es}.EvaluatorId AS field,
