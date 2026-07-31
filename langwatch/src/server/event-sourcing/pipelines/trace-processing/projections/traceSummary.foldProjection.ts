@@ -101,23 +101,6 @@ export const MAX_PROCESSED_SPANS = 512;
 export const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * How many same-trace events one load/apply/store cycle may coalesce.
- *
- * Without this the framework default is 1: a trace whose group backed up to
- * N events paid N full load/apply/store cycles — the O(n²) drain pattern
- * measured during the 2026-07-30/31 backlog, where hot traces queued
- * hundreds of recordSpan-derived events and traceSummary held ~46 busy
- * fleet slots processing them one at a time. Coalescing drains a backed-up
- * trace in 128-event bites: one state read, N in-memory applies, one write.
- *
- * 128 mirrors `CODING_AGENT_SESSION_COALESCE_MAX_BATCH` (the proven fold
- * ceiling) and stays well under `MAX_APPLIED_EVENT_IDS` (1000), the
- * redelivery-dedup watermark cap the projection router validates at
- * registration.
- */
-export const TRACE_SUMMARY_COALESCE_MAX_BATCH = 128;
-
-/**
  * Reserved trace-summary attribute keys holding cache / reasoning token
  * SUMS across the whole trace. The per-span `gen_ai.usage.cache_*` numbers
  * never reach the trace-level attribute map (the accumulation allowlist
@@ -516,7 +499,6 @@ export class TraceSummaryFoldProjection
     refoldOnOutOfOrder: false,
     trustAbsentMiss: true,
     readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS },
-    coalesceMaxBatch: TRACE_SUMMARY_COALESCE_MAX_BATCH,
   } as const;
 
   protected readonly events = traceSummaryEvents;
