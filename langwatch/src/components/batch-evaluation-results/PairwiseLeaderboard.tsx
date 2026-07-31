@@ -1,5 +1,4 @@
 import { Box, HStack, Icon, Table, Text, VStack } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
 import {
   LuArrowDown,
   LuArrowUp,
@@ -8,6 +7,12 @@ import {
 } from "react-icons/lu";
 import type { BTLeaderboard } from "./computeBTLeaderboard";
 import { winMatrixHasPairwiseDetail } from "./computeWinMatrixShape";
+import {
+  usePairwiseSort,
+  type RankedEntry,
+  type SortDir,
+  type SortKey,
+} from "./usePairwiseSort";
 
 /**
  * Bradley-Terry leaderboard panel for the Comparison evaluator (#5103).
@@ -40,9 +45,6 @@ export type PairwiseLeaderboardProps = {
   showWarnings?: boolean;
 };
 
-type SortKey = "rank" | "score" | "winRate" | "matchups";
-type SortDir = "asc" | "desc";
-
 /**
  * Matchups per variant below which a Bradley-Terry score is treated as
  * unstable. Exported because the drawer gates its own trust panel on the same
@@ -58,51 +60,10 @@ export function PairwiseLeaderboard({
   onCellClick,
   showWarnings = true,
 }: PairwiseLeaderboardProps) {
-  const [sortKey, setSortKey] = useState<SortKey>("rank");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
-
-  // Stable rank derived from incoming entry order — entries arrive sorted by
-  // score desc (degenerate sunk). Rank stays attached to the variant when the
-  // user re-sorts by another column.
-  const ranked = useMemo(
-    () =>
-      leaderboard.entries.map((e, i) => ({
-        ...e,
-        rank: i + 1,
-        name: variantNames[e.variantId] ?? e.variantId,
-      })),
-    [leaderboard.entries, variantNames],
-  );
-
-  const sorted = useMemo(() => {
-    const arr = [...ranked];
-    const dir = sortDir === "asc" ? 1 : -1;
-    arr.sort((a, b) => {
-      switch (sortKey) {
-        case "score":
-          return (a.score - b.score) * dir;
-        case "winRate":
-          return ((a.winRate ?? -1) - (b.winRate ?? -1)) * dir;
-        case "matchups":
-          return (a.matchups - b.matchups) * dir;
-        case "rank":
-        default:
-          return (a.rank - b.rank) * dir;
-      }
-    });
-    return arr;
-  }, [ranked, sortKey, sortDir]);
-
-  const onSort = (key: SortKey) => {
-    if (key === sortKey) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "rank" ? "asc" : "desc");
-    }
-  };
-
-  const isLowSample = showWarnings && leaderboard.minMatchups < warnThreshold;
+  const { sorted, sortKey, sortDir, onSort } = usePairwiseSort({
+    entries: leaderboard.entries,
+    variantNames,
+  });
 
   return (
     <VStack
@@ -131,6 +92,49 @@ export function PairwiseLeaderboard({
         </Text>
       </HStack>
 
+      <LeaderboardWarnings
+        leaderboard={leaderboard}
+        warnThreshold={warnThreshold}
+        showWarnings={showWarnings}
+      />
+
+      <LeaderboardTable
+        sorted={sorted}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onSort={onSort}
+      />
+
+      <WinMatrixHeatmap
+        leaderboard={leaderboard}
+        variantNames={variantNames}
+        onCellClick={onCellClick}
+      />
+    </VStack>
+  );
+}
+
+/**
+ * The three conditions that make a Bradley-Terry fit less trustworthy than its
+ * numbers look. Kept together so the drawer can silence all of them with one
+ * flag — it states the same conditions once in its own trust step, and a reader
+ * shown the warning twice learns to scroll past it.
+ */
+function LeaderboardWarnings({
+  leaderboard,
+  warnThreshold,
+  showWarnings,
+}: {
+  leaderboard: BTLeaderboard;
+  warnThreshold: number;
+  showWarnings: boolean;
+}) {
+  if (!showWarnings) return null;
+
+  const isLowSample = leaderboard.minMatchups < warnThreshold;
+
+  return (
+    <>
       {isLowSample ? (
         <WarnBanner
           tone="warning"
@@ -139,7 +143,7 @@ export function PairwiseLeaderboard({
         />
       ) : null}
 
-      {showWarnings && leaderboard.hasDegenerate ? (
+      {leaderboard.hasDegenerate ? (
         <WarnBanner
           tone="info"
           icon={LuTriangleAlert}
@@ -147,82 +151,89 @@ export function PairwiseLeaderboard({
         />
       ) : null}
 
-      {showWarnings && !leaderboard.didConverge ? (
+      {!leaderboard.didConverge ? (
         <WarnBanner
           tone="warning"
           icon={LuTriangleAlert}
           text="BT solver did not fully converge; scores are approximate."
         />
       ) : null}
+    </>
+  );
+}
 
-      <Box overflowX="auto">
-        <Table.Root size="sm" variant="outline">
-          <Table.Header>
-            <Table.Row>
-              <SortableHeader
-                label="Rank"
-                col="rank"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={onSort}
-              />
-              <Table.ColumnHeader>Variant</Table.ColumnHeader>
-              <SortableHeader
-                label="BT score (± 95% CI)"
-                col="score"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={onSort}
-              />
-              <SortableHeader
-                label="Win rate"
-                col="winRate"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={onSort}
-              />
-              <SortableHeader
-                label="N"
-                col="matchups"
-                sortKey={sortKey}
-                sortDir={sortDir}
-                onSort={onSort}
-              />
+/** The ranked table itself. Every measure column is sortable; Variant is not. */
+function LeaderboardTable({
+  sorted,
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  sorted: RankedEntry[];
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  return (
+    <Box overflowX="auto">
+      <Table.Root size="sm" variant="outline">
+        <Table.Header>
+          <Table.Row>
+            <SortableHeader
+              label="Rank"
+              col="rank"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={onSort}
+            />
+            <Table.ColumnHeader>Variant</Table.ColumnHeader>
+            <SortableHeader
+              label="BT score (± 95% CI)"
+              col="score"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Win rate"
+              col="winRate"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="N"
+              col="matchups"
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={onSort}
+            />
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {sorted.map((e) => (
+            <Table.Row key={e.variantId}>
+              <Table.Cell>{e.rank}</Table.Cell>
+              <Table.Cell>
+                <HStack gap={2}>
+                  <Text>{e.name}</Text>
+                  {e.isDegenerate ? (
+                    <Text fontSize="xs" color="fg.muted">
+                      (degenerate)
+                    </Text>
+                  ) : null}
+                </HStack>
+              </Table.Cell>
+              <Table.Cell>{formatScoreWithCI(e.score, e.scoreCI)}</Table.Cell>
+              <Table.Cell>
+                {e.winRate === null ? "—" : `${Math.round(e.winRate * 100)}%`}
+              </Table.Cell>
+              <Table.Cell>{e.matchups}</Table.Cell>
             </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {sorted.map((e) => (
-              <Table.Row key={e.variantId}>
-                <Table.Cell>{e.rank}</Table.Cell>
-                <Table.Cell>
-                  <HStack gap={2}>
-                    <Text>{e.name}</Text>
-                    {e.isDegenerate ? (
-                      <Text fontSize="xs" color="fg.muted">
-                        (degenerate)
-                      </Text>
-                    ) : null}
-                  </HStack>
-                </Table.Cell>
-                <Table.Cell>{formatScoreWithCI(e.score, e.scoreCI)}</Table.Cell>
-                <Table.Cell>
-                  {e.winRate === null
-                    ? "—"
-                    : `${Math.round(e.winRate * 100)}%`}
-                </Table.Cell>
-                <Table.Cell>{e.matchups}</Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Box>
-
-      <WinMatrixHeatmap
-        leaderboard={leaderboard}
-        variantNames={variantNames}
-        onCellClick={onCellClick}
-      />
-    </VStack>
+          ))}
+        </Table.Body>
+      </Table.Root>
+    </Box>
   );
 }
 
