@@ -297,9 +297,18 @@ export function BatchEvaluationResults({
     return null;
   }, [router.query.groupBy]);
 
+  // In controlled mode a parent owns the URL, so grouping is held here
+  // instead. Returning early without this would leave the dropdown rendered
+  // but inert — ComparisonTable shows it whenever the data has groupable
+  // keys, and it has no way to know the parent swallowed the change.
+  const [localGroupBy, setLocalGroupBy] = useState<string | null>(null);
+
   const handleGroupByChange = useCallback(
     (next: string | null) => {
-      if (onSelectRunId) return; // Don't sync URL in controlled mode
+      if (onSelectRunId) {
+        setLocalGroupBy(next);
+        return;
+      }
       const newQuery = { ...router.query };
       if (next) {
         if (newQuery.groupBy === next) return;
@@ -625,7 +634,7 @@ export function BatchEvaluationResults({
                   showEvaluations={fields.scores}
                   showCostAndLatency={fields.costAndLatency}
                   rowHeight={rowHeight}
-                  groupBy={queryGroupBy}
+                  groupBy={onSelectRunId ? localGroupBy : queryGroupBy}
                   onGroupByChange={handleGroupByChange}
                 />
               </Card.Body>

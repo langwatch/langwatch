@@ -6,7 +6,8 @@
  *
  * URL persistence is verified at the BatchEvaluationResults level + in
  * the browser. This file scopes to ComparisonTable as a controlled
- * component (groupBy / onGroupByChange / availableGroupByKeys props).
+ * component (groupBy / onGroupByChange props; the keys themselves are
+ * derived internally by useResultsGrouping).
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

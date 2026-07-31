@@ -433,10 +433,24 @@ export function ComparisonTable({
     getCoreRowModel: coreRowModel,
   });
 
+  const { availableKeys } = useResultsGrouping({
+    source: "dataset-entry",
+    comparisonData,
+  });
+
   // Group-by: controlled (parent owns URL sync) or internal (component-local).
   const [internalGroupBy, setInternalGroupBy] = useState<string | null>(null);
-  const effectiveGroupBy =
+  const requestedGroupBy =
     controlledGroupBy !== undefined ? controlledGroupBy : internalGroupBy;
+  // A group-by key only means something if this comparison actually has it.
+  // The controlled value comes from the URL, so `?groupBy=input` survives a
+  // link being shared into a run that has no such field — grouping on it would
+  // put every row in its own singleton group and read as a broken table rather
+  // than as a stale parameter.
+  const effectiveGroupBy =
+    requestedGroupBy && availableKeys.includes(requestedGroupBy)
+      ? requestedGroupBy
+      : null;
   const handleGroupByChange = useCallback(
     (next: string | null) => {
       if (onGroupByChange) onGroupByChange(next);
@@ -444,11 +458,6 @@ export function ComparisonTable({
     },
     [onGroupByChange],
   );
-
-  const { availableKeys } = useResultsGrouping({
-    source: "dataset-entry",
-    comparisonData,
-  });
 
   // Group-by dropdown state. Match the chart's portal-popover pattern
   // (see ComparisonCharts.tsx) so the menu can't be clipped by an
@@ -476,10 +485,17 @@ export function ComparisonTable({
   }, []);
 
   // Bucket rows when grouping is active.
+  // Aggregates are computed here rather than in the render body: grouped mode
+  // turns the virtualizer off, so every group is mounted at once and a call
+  // per group would re-run an O(groups x rows x targets x evaluators) pass on
+  // each render — including renders that only opened a dropdown.
   const groupedRows = useMemo(() => {
     if (!effectiveGroupBy) return null;
-    return bucketRowsByGroup(comparisonRows, effectiveGroupBy);
-  }, [comparisonRows, effectiveGroupBy]);
+    return bucketRowsByGroup(comparisonRows, effectiveGroupBy).map((group) => ({
+      ...group,
+      aggregates: computeGroupAggregates(group.rows, comparisonData),
+    }));
+  }, [comparisonRows, effectiveGroupBy, comparisonData]);
 
   // State for scroll container - using state triggers re-render when mounted
   const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(
@@ -586,6 +602,8 @@ export function ComparisonTable({
                   ? setGroupByDropdownOpen(false)
                   : openGroupByDropdown()
               }
+              aria-haspopup="menu"
+              aria-expanded={groupByDropdownOpen}
               data-testid="group-by-row-button"
             >
               Group rows by: {effectiveGroupBy ?? "No grouping"}
@@ -616,6 +634,15 @@ export function ComparisonTable({
                     overflowY: "auto",
                   }}
                   data-testid="group-by-row-dropdown"
+                  role="menu"
+                  tabIndex={-1}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setGroupByDropdownOpen(false);
+                      groupByBtnRef.current?.focus();
+                    }
+                  }}
                 >
                   <VStack align="stretch" gap={1}>
                     {dropdownOptions.map((opt) => {
@@ -635,6 +662,16 @@ export function ComparisonTable({
                             handleGroupByChange(opt.key);
                             setGroupByDropdownOpen(false);
                           }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleGroupByChange(opt.key);
+                              setGroupByDropdownOpen(false);
+                              groupByBtnRef.current?.focus();
+                            }
+                          }}
+                          role="menuitem"
+                          tabIndex={0}
                           data-testid={`group-by-row-option-${opt.key ?? "none"}`}
                         >
                           <Text
@@ -685,8 +722,7 @@ export function ComparisonTable({
           {groupedRows ? (
             // Grouped mode: one <tbody> per group. Header row spans all
             // columns and carries the per-run mean badges.
-            groupedRows.map(({ value, rows }) => {
-              const aggregates = computeGroupAggregates(rows, comparisonData);
+            groupedRows.map(({ value, rows, aggregates }) => {
               const collapsed = collapsedGroups.has(value);
               return (
                 <tbody
