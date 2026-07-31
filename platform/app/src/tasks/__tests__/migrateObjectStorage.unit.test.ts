@@ -9,6 +9,7 @@ import {
   parseMigrationTaskConfig,
   parseMigrationTaskPhase,
   resolveMigrationS3Region,
+  toAzureCredentials,
 } from "../migrateObjectStorage";
 
 const validEnvironment = (): NodeJS.ProcessEnv => ({
@@ -272,5 +273,59 @@ describe("createCutoverAuditRedis", () => {
     expect(audit.redis).toBe(single);
     expect(audit.scanNodes).toEqual([single]);
     expect(() => audit.cleanup()).not.toThrow();
+  });
+});
+
+describe("toAzureCredentials transport guards", () => {
+  /**
+   * The migration builds credentials from its own OBJECT_STORAGE_MIGRATION_*
+   * namespace, bypassing resolveAzureCredentials — so it must apply the same
+   * transport guards itself or a token-mode run against an http:// endpoint
+   * puts a bearer token on the wire in plaintext.
+   */
+  it("refuses a plaintext endpoint in a token-based auth mode", () => {
+    const config = parseMigrationTaskConfig({
+      ...validEnvironment(),
+      OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE: "azureCli",
+      OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY: "",
+      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT: "http://storage.internal:10000",
+    });
+
+    expect(() => toAzureCredentials(config)).toThrow(/must use https/);
+  });
+
+  it("refuses a sovereign endpoint without an identity authority", () => {
+    const config = parseMigrationTaskConfig({
+      ...validEnvironment(),
+      OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE: "azureCli",
+      OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY: "",
+      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT:
+        "https://destination.blob.core.usgovcloudapi.net",
+    });
+
+    expect(() => toAzureCredentials(config)).toThrow(/AUTHORITY_HOST/);
+  });
+
+  it("accepts a sovereign endpoint once the authority is supplied", () => {
+    const config = parseMigrationTaskConfig({
+      ...validEnvironment(),
+      OBJECT_STORAGE_MIGRATION_AZURE_AUTH_MODE: "azureCli",
+      OBJECT_STORAGE_MIGRATION_AZURE_ACCOUNT_KEY: "",
+      OBJECT_STORAGE_MIGRATION_AZURE_ENDPOINT:
+        "https://destination.blob.core.usgovcloudapi.net",
+      OBJECT_STORAGE_MIGRATION_AZURE_AUTHORITY_HOST:
+        "https://login.microsoftonline.us",
+    });
+
+    expect(toAzureCredentials(config)).toMatchObject({
+      mode: "azureCli",
+      authorityHost: "https://login.microsoftonline.us",
+    });
+  });
+
+  it("leaves sharedKey mode unguarded — no bearer token is at stake", () => {
+    const config = parseMigrationTaskConfig(validEnvironment());
+
+    expect(toAzureCredentials(config)).toMatchObject({ mode: "sharedKey" });
   });
 });

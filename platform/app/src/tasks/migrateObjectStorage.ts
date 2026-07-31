@@ -28,7 +28,10 @@ import { getPrivateS3Configs } from "~/server/dataplane-s3";
 import { prisma } from "~/server/db";
 import { connection } from "~/server/redis";
 import { AzureBlobDriver } from "~/server/stored-objects/azure-blob-driver";
-import type { AzureCredentials } from "~/server/stored-objects/azure-credentials";
+import {
+  type AzureCredentials,
+  assertTokenModeTransportSafety,
+} from "~/server/stored-objects/azure-credentials";
 import { ObjectNotFoundError } from "~/server/stored-objects/errors";
 import type { StorageDriver } from "~/server/stored-objects/storage-driver";
 import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.repository";
@@ -433,7 +436,9 @@ async function runMigrationPhase(
   return migration.finalize();
 }
 
-function toAzureCredentials(config: MigrationTaskConfig): AzureCredentials {
+export function toAzureCredentials(
+  config: MigrationTaskConfig,
+): AzureCredentials {
   const common = {
     accountName: config.azure.accountName,
     endpointBaseUrl: config.azure.endpoint,
@@ -445,6 +450,14 @@ function toAzureCredentials(config: MigrationTaskConfig): AzureCredentials {
       accountKey: config.azure.accountKey!,
     };
   }
+  // The same transport guards the app's own resolver enforces: without them
+  // a token-mode migration against an http:// endpoint would put a bearer
+  // token on the wire in plaintext, and a sovereign endpoint without an
+  // authority host would request tokens from the public-cloud issuer.
+  assertTokenModeTransportSafety({
+    endpointBaseUrl: config.azure.endpoint,
+    authorityHost: config.azure.authorityHost,
+  });
   return {
     mode: config.azure.authMode,
     ...common,

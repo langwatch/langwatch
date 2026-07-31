@@ -325,7 +325,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
       {{- $azureEndpoint := .Values.app.dataplane.providers.azureBlob.endpoint.value }}
       {{- $azureEndpointFromSecret := .Values.app.dataplane.providers.azureBlob.endpoint.secretKeyRef.name }}
       {{- $hasAuthority := or .Values.app.dataplane.providers.azureBlob.authorityHost.value .Values.app.dataplane.providers.azureBlob.authorityHost.secretKeyRef.name }}
-      {{- if and $azureEndpoint (not (contains ".blob.core.windows.net" $azureEndpoint)) }}
+      {{/* Hostnames are case-insensitive (the runtime check lowercases
+           before comparing), so classify on the lowered value or a valid
+           public endpoint written in uppercase gets rejected as sovereign. */}}
+      {{- if and $azureEndpoint (not (contains ".blob.core.windows.net" (lower $azureEndpoint))) }}
         {{- if not $hasAuthority }}
           {{- $errors = append $errors (printf "app.dataplane.providers.azureBlob.endpoint is %q, which is not the Azure public cloud — a token-based authMode also requires providers.azureBlob.authorityHost so tokens are requested from the matching identity authority" $azureEndpoint) }}
         {{- end }}

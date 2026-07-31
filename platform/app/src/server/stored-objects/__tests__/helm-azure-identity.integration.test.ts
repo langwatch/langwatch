@@ -480,6 +480,23 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
       expect(out).toContain("name: AZURE_BLOB_TOKEN_AUDIENCE");
       expect(out).toContain('value: "https://storage.azure.us"');
     });
+
+    /**
+     * Hostnames are case-insensitive and the app's runtime check lowercases
+     * before classifying — an uppercase public-cloud endpoint must not be
+     * mistaken for sovereign and rejected for a missing authority.
+     */
+    it("classifies an uppercase public-cloud endpoint as public, not sovereign", () => {
+      const out = render(
+        SOVEREIGN.map((arg) =>
+          arg.includes("endpoint.value=")
+            ? "app.dataplane.providers.azureBlob.endpoint.value=https://ACCT.BLOB.CORE.WINDOWS.NET"
+            : arg,
+        ),
+      );
+
+      expect(out).toContain("name: AZURE_BLOB_ENDPOINT");
+    });
   });
 
   describe("given workloadIdentity with a service account the chart creates", () => {
