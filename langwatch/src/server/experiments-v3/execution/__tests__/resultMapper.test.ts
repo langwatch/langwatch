@@ -386,6 +386,50 @@ describe("resultMapper", () => {
       }
     });
 
+    it("keeps only the candidate ids, not the whole request payload", () => {
+      // Everything but the ids duplicates what the run already stores per
+      // target, and this column reaches ClickHouse twice, the browser via a
+      // `SELECT *`, and the storage meter — at rows x targets x evaluators.
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        { status: "success", outputs: { label: "target-a" } },
+        {
+          inputs: {
+            candidates: [
+              { id: "target-a", output: "a long answer", cost: 0.01 },
+              { id: "target-b", output: "another long answer", cost: 0.02 },
+            ],
+            golden: "the reference answer",
+            input: "the task",
+          },
+        },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toEqual({
+          candidates: [{ id: "target-a" }, { id: "target-b" }],
+        });
+      }
+    });
+
+    it("omits inputs for an evaluator that has no candidate list", () => {
+      // A non-Comparison evaluator persists nothing here rather than an
+      // empty object.
+      const result = mapEvaluatorResult(
+        "target-1.eval-1",
+        0,
+        { status: "success", outputs: { passed: true, score: 1.0 } },
+        { inputs: { input: "the task", output: "the answer" } },
+      );
+
+      expect(result.type).toBe("evaluator_result");
+      if (result.type === "evaluator_result") {
+        expect(result.inputs).toBeUndefined();
+      }
+    });
+
     it("omits inputs when none are provided", () => {
       const result = mapEvaluatorResult("target-1.eval-1", 0, {
         status: "success",
