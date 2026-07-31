@@ -276,6 +276,9 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
         },
       },
     });
+    await prisma.gatewayBudget.deleteMany({
+      where: { organizationId: organization.id },
+    });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.organization.deleteMany({
       where: {
