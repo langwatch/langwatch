@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDeriveSlugIsTheWorktreeName(t *testing.T) {
 	if got := DeriveSlug("/work/trees/portless", nil); got != "portless" {
@@ -176,6 +179,29 @@ func TestOverlayEmitsRedisURLOnlyWhenManagedWithNoDatabaseSuffix(t *testing.T) {
 	want := "redis://127.0.0.1:6379"
 	if got := valueOf(managed.OverlayEnv(), "REDIS_URL"); got != want {
 		t.Errorf("REDIS_URL = %q, want %q (must have no /<db> suffix — REDIS_DB_INDEX carries that separately)", got, want)
+	}
+}
+
+// The CA has to be in the overlay FILE, not just in the env haven hands its own
+// children: a CLI a developer runs by hand in their own terminal reads the file
+// and nothing else, and without it every request to a stack hostname dies at the
+// TLS handshake.
+//
+// @scenario "the local CA is published to tools haven does not spawn"
+func TestOverlayEmitsPortlessCAOnlyWhenThereIsOne(t *testing.T) {
+	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
+		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
+	}}
+	if hasKey(base.OverlayEnv(), "NODE_EXTRA_CA_CERTS") {
+		t.Fatalf("a stack with no local CA must not set NODE_EXTRA_CA_CERTS — outside portless the real roots are correct")
+	}
+	portless := base
+	portless.PortlessCACertPath = "/Users/dev/.portless/ca.pem"
+	if got := valueOf(portless.OverlayEnv(), "NODE_EXTRA_CA_CERTS"); got != "/Users/dev/.portless/ca.pem" {
+		t.Errorf("NODE_EXTRA_CA_CERTS = %q, want the portless CA path", got)
+	}
+	if !strings.Contains(portless.OverlayFile(), "NODE_EXTRA_CA_CERTS=/Users/dev/.portless/ca.pem") {
+		t.Error("NODE_EXTRA_CA_CERTS must reach .env.portless, not only the spawned children")
 	}
 }
 

@@ -206,6 +206,26 @@ The resolved config lands in `platform/app/.env.portless`, which every TS entry
 point loads **last with `override: true`** so it beats anything pinned in `.env`
 (that repo runs `dotenv.config({ override: true })`).
 
+### Trusting the stack's certificates from your own terminal
+
+Every `*.langwatch.localhost` hostname is signed by the **portless Local CA**.
+Node and Bun ship their own root list and consult neither the macOS keychain nor
+`--use-system-ca`, so a JS process that dials one fails with `self signed
+certificate in certificate chain`. haven publishes the CA as
+`NODE_EXTRA_CA_CERTS` in the overlay, and injects it into every child it spawns —
+so the app, the workers and the langy worker are already fine.
+
+Anything haven does **not** spawn has to pick it up itself, and there is a trap:
+Node reads `NODE_EXTRA_CA_CERTS` **once at startup**, so loading `.env.portless`
+with dotenv *inside* the process sets the variable and still fails the handshake.
+It must be in the environment before the command runs:
+
+```bash
+pnpm cli:haven onboard                                    # from typescript-sdk/
+dotenv -e langwatch/.env.portless -- node ./some-script   # anything else
+set -a; . langwatch/.env.portless; set +a                 # or export it once
+```
+
 ### Why native processes, not kind/k8s (yet)
 
 Vite/tsx run as **native host processes** for instant HMR — running the dev

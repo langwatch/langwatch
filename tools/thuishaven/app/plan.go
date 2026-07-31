@@ -28,16 +28,12 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 	logPath := func(name string) string {
 		return filepath.Join(o.cfg.Home, "logs", st.Slug, name+".log")
 	}
-	// Bun and Node use their own bundled CA roots, NOT the macOS system store, so
-	// the app process and the langy worker's opencode (Bun) subprocess otherwise
-	// reject the portless HTTPS certs on every gateway/control-plane call ("self
-	// signed certificate in certificate chain"). Point them at the portless Local
-	// CA so those runtimes trust the same hostnames curl/Go/the browser already do.
-	// Dev/portless only — production serves real certs, and CACertPath is "" when
-	// the CA is absent, so this appends nothing outside a portless stack.
-	if ca := o.proxy.CACertPath(); ca != "" {
-		base = append(base, "NODE_EXTRA_CA_CERTS="+ca)
-	}
+	// NODE_EXTRA_CA_CERTS is no longer appended here: it rides in OverlayEnv (see
+	// Stack.PortlessCACertPath), so the children haven spawns and the
+	// .env.portless a developer's own terminal reads carry the same CA from one
+	// source. Bun and Node use their own bundled CA roots, NOT the macOS system
+	// store, so without it every call to a stack hostname fails the handshake
+	// with "self signed certificate in certificate chain".
 	port := func(name string) int {
 		for _, s := range st.Services {
 			if s.Name == name {

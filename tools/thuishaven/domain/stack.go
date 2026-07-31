@@ -59,6 +59,15 @@ type Stack struct {
 	// LocalAPIKey is the stable, deterministic local dev API key haven seeds and
 	// injects, so every worktree (and every agent) authenticates with the same key.
 	LocalAPIKey string `json:"localApiKey"`
+	// PortlessCACertPath is the portless Local CA that signs every
+	// *.langwatch.localhost certificate, or "" outside a portless stack. Node and
+	// Bun ship their own CA roots and consult neither the macOS keychain nor
+	// --use-system-ca, so any JS process that dials a stack hostname fails the
+	// handshake until it is pointed here. Held on the stack (not read from the
+	// proxy at use time) so it reaches OverlayEnv, which is what puts it in
+	// .env.portless for tools haven does not itself spawn — the CLI a developer
+	// runs by hand in their own terminal.
+	PortlessCACertPath string `json:"portlessCaCertPath,omitempty"`
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
 	IsBaseline bool `json:"baseline,omitempty"`

@@ -52,6 +52,7 @@
   "scripts": {
     "generate": "pnpm run generate:server-types && pnpm run generate:openapi-types",
     "cli": "node dist/cli/index.js",
+    "cli:haven": "dotenv -e ../../platform/app/.env.portless -- node dist/cli/index.js",
     "prelint": "pnpm run generate",
     "lint": "eslint .",
     "pretest": "pnpm run generate",

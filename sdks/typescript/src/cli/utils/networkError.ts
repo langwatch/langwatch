@@ -193,8 +193,9 @@ export function diagnoseFetchFailure(
         code: "network_tls_untrusted",
         message: `Your machine does not trust the TLS certificate for ${host} (${code}).`,
         tips: [
-          "A local stack usually needs its development CA trusted first.",
-          "A corporate proxy re-signing traffic needs its root installed.",
+          "Point Node at the signing certificate: NODE_EXTRA_CA_CERTS=/path/to/ca.pem langwatch <command>",
+          "Set it before the command runs. Node reads that variable once at startup, so exporting it afterwards has no effect.",
+          "A private root is the usual cause: a corporate proxy that re-signs traffic, a self-hosted install, or a local development stack.",
         ],
       });
 

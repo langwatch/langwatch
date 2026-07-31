@@ -85,6 +85,17 @@ resolved config lands in `platform/app/.env.portless` (loaded last with
 `HAVEN_AGENT=1`) for plain, token-free output; `haven status --json` is
 machine-readable. See `tools/thuishaven/README.md`.
 
+**Running a JS tool against a haven stack from your own terminal.** The stack's
+hostnames are signed by the portless Local CA, which Node does not trust (it
+ignores the macOS keychain and `--use-system-ca`), so a hand-run script or CLI
+dies with `self signed certificate in certificate chain`. haven publishes the CA
+as `NODE_EXTRA_CA_CERTS` in `.env.portless` and injects it into everything it
+spawns. Anything else must have it in the environment **before the process
+starts** — Node reads that variable once at startup, so loading `.env.portless`
+with dotenv from inside the process sets it and still fails. Use
+`pnpm cli:haven <cmd>` (in `typescript-sdk/`) or
+`dotenv -e langwatch/.env.portless -- <cmd>`.
+
 ```bash
 make quickstart                        # Interactive preset picker
 make quickstart all-local              # Local CH + PG + Redis + app + workers, no NLP (fast iteration default)

@@ -72,6 +72,22 @@ describe("naming a failed fetch", () => {
     });
   });
 
+  describe("given an untrusted certificate", () => {
+    /** @scenario "an untrusted certificate says which variable fixes it" */
+    it("names the variable that fixes it, and when it has to be set", () => {
+      // Node reads NODE_EXTRA_CA_CERTS once at startup, so setting it from
+      // inside the process — the obvious first attempt — silently does nothing.
+      // Saying so is the difference between a one-minute fix and an afternoon.
+      const diagnosed = diagnoseFetchFailure(
+        fetchFailed("SELF_SIGNED_CERT_IN_CHAIN"),
+        URL_,
+      );
+
+      expect(diagnosed.message).toContain("NODE_EXTRA_CA_CERTS");
+      expect(diagnosed.message).toMatch(/before the command|at startup/i);
+    });
+  });
+
   describe("given a failure with no recognisable code", () => {
     it("still says where it failed, and surfaces the underlying text", () => {
       const diagnosed = diagnoseFetchFailure(new Error("something odd"), URL_);

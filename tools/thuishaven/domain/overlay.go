@@ -88,6 +88,18 @@ func (s Stack) OverlayEnv() []string {
 		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
+	// The portless Local CA, so JS runtimes trust the stack's own hostnames.
+	//
+	// This one line has a rule the others do not: it must be in the environment
+	// BEFORE the process starts. Node reads NODE_EXTRA_CA_CERTS once at
+	// bootstrap, so a tool that loads this file with dotenv sets the variable and
+	// still fails the handshake — the read has already happened. Children haven
+	// spawns get it for free (planChildren passes this env to exec). Anything
+	// else must export it first: `dotenv -e langwatch/.env.portless -- <cmd>`,
+	// or `set -a; . langwatch/.env.portless; set +a`.
+	if s.PortlessCACertPath != "" {
+		env = append(env, "NODE_EXTRA_CA_CERTS="+s.PortlessCACertPath)
+	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
 	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch
