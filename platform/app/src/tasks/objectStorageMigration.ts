@@ -171,6 +171,11 @@ type EligibleScope = {
   excludedProjects: string[];
 };
 
+type DatasetChunkUris = {
+  sourceUri: string;
+  destinationUri: string;
+};
+
 const INVENTORY_PAGE_SIZE = 250;
 
 export class ObjectStorageMigration {
@@ -235,45 +240,67 @@ export class ObjectStorageMigration {
       report[result] += 1;
     }
 
-    for await (const dataset of this.eligibleDatasets(scope)) {
-      for (let index = 0; index < dataset.chunkCount; index++) {
-        const sourceUri = this.deps.source.datasetChunkUri(
-          dataset.projectId,
-          dataset.id,
-          index,
-        );
-        const destinationUri = this.deps.destination.datasetChunkUri(
-          dataset.projectId,
-          dataset.id,
-          index,
-        );
-        // A chunk can already live ONLY at the destination: a dataset
-        // uploaded while the destination provider was briefly active (the
-        // backend-flip posture #6323 documents), or a previous reverse
-        // migration. Chunks carry no recorded digest, so there is no source
-        // to verify against — presence at the destination is the strongest
-        // available check, and aborting here would deny the operator every
-        // other copy this run could safely make.
-        if (!(await this.deps.source.driver.exists(sourceUri))) {
-          if (await this.deps.destination.driver.exists(destinationUri)) {
-            report.skippedVerified += 1;
-            continue;
-          }
-          throw new MigrationBlockedError(
-            `Dataset chunk is missing from both providers: ${redactStorageUri(sourceUri)}`,
-          );
-        }
-        const result = await copyVerified({
-          source: this.deps.source,
-          sourceUri,
-          destination: this.deps.destination,
-          destinationUri,
-          mediaType: "application/x-ndjson",
-        });
-        report[result] += 1;
-      }
+    for await (const chunk of this.eligibleDatasetChunks(scope)) {
+      report[await this.copyDatasetChunk(chunk)] += 1;
     }
     return report;
+  }
+
+  private async *eligibleDatasetChunks(
+    scope: EligibleScope,
+  ): AsyncGenerator<DatasetChunkUris> {
+    for await (const dataset of this.eligibleDatasets(scope)) {
+      for (let index = 0; index < dataset.chunkCount; index++) {
+        yield {
+          sourceUri: this.deps.source.datasetChunkUri(
+            dataset.projectId,
+            dataset.id,
+            index,
+          ),
+          destinationUri: this.deps.destination.datasetChunkUri(
+            dataset.projectId,
+            dataset.id,
+            index,
+          ),
+        };
+      }
+    }
+  }
+
+  /**
+   * A chunk can already live ONLY at the destination: a dataset uploaded
+   * while the destination provider was briefly active (the backend-flip
+   * posture #6323 documents), or a previous reverse migration. Chunks carry
+   * no recorded digest, so there is no source to verify against — presence
+   * at the destination is the strongest available check, and aborting would
+   * deny the operator every other copy this run could safely make.
+   */
+  private async copyDatasetChunk({
+    sourceUri,
+    destinationUri,
+  }: DatasetChunkUris): Promise<"copied" | "repaired" | "skippedVerified"> {
+    if (!(await this.deps.source.driver.exists(sourceUri))) {
+      return this.acceptDestinationOnlyChunk({ sourceUri, destinationUri });
+    }
+    return copyVerified({
+      source: this.deps.source,
+      sourceUri,
+      destination: this.deps.destination,
+      destinationUri,
+      mediaType: "application/x-ndjson",
+    });
+  }
+
+  private async acceptDestinationOnlyChunk({
+    sourceUri,
+    destinationUri,
+  }: DatasetChunkUris): Promise<"skippedVerified"> {
+    if (await this.deps.destination.driver.exists(destinationUri)) {
+      return "skippedVerified";
+    }
+    throw new MigrationBlockedError(
+      `Dataset chunk is missing from both providers: ${redactStorageUri(sourceUri)}`,
+    );
   }
 
   async finalize(): Promise<MigrationFinalizeReport> {
@@ -354,38 +381,22 @@ export class ObjectStorageMigration {
         row.sha256,
       );
     }
-    for await (const dataset of this.eligibleDatasets(scope)) {
-      for (let index = 0; index < dataset.chunkCount; index++) {
-        const sourceUri = this.deps.source.datasetChunkUri(
-          dataset.projectId,
-          dataset.id,
-          index,
-        );
-        const destinationUri = this.deps.destination.datasetChunkUri(
-          dataset.projectId,
-          dataset.id,
-          index,
-        );
-        // Mirror of the copy loop's already-at-destination tolerance: a
-        // chunk with no source copy has no digest to compare, so presence at
-        // the destination is the strongest check available (#6323).
-        if (!(await this.deps.source.driver.exists(sourceUri))) {
-          if (await this.deps.destination.driver.exists(destinationUri)) {
-            continue;
-          }
-          throw new MigrationBlockedError(
-            `Dataset chunk is missing from both providers: ${redactStorageUri(sourceUri)}`,
-          );
-        }
-        const sourceBytes = await readAll(
-          await this.deps.source.driver.get(sourceUri),
-        );
-        await assertUriDigest(
-          this.deps.destination.driver,
-          destinationUri,
-          sha256(sourceBytes),
-        );
+    for await (const chunk of this.eligibleDatasetChunks(scope)) {
+      // Mirror of the copy loop's already-at-destination tolerance: a chunk
+      // with no source copy has no digest to compare, so presence at the
+      // destination is the strongest check available (#6323).
+      if (!(await this.deps.source.driver.exists(chunk.sourceUri))) {
+        await this.acceptDestinationOnlyChunk(chunk);
+        continue;
       }
+      const sourceBytes = await readAll(
+        await this.deps.source.driver.get(chunk.sourceUri),
+      );
+      await assertUriDigest(
+        this.deps.destination.driver,
+        chunk.destinationUri,
+        sha256(sourceBytes),
+      );
     }
   }
 
