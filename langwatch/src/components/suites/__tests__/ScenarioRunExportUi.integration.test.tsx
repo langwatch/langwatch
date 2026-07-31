@@ -131,18 +131,24 @@ describe("<ScenarioRunExportDialog/> and its trigger", () => {
     });
   });
 
-  describe("when no runs match the current filters", () => {
+  describe("when the panel says there is nothing to export", () => {
     /**
-     * Offering it would produce a header and nothing else, which reads as a
-     * broken export rather than an empty one.
+     * Deciding there is nothing to export belongs to the panel, and is pinned
+     * against the real one in RunHistoryEmptyState. This covers the other half:
+     * the bar honours the flag instead of rendering an enabled button anyway.
      */
-    /** @scenario Export is unavailable when no runs match */
-    it("disables the button rather than exporting an empty file", () => {
+    it("renders the button disabled", () => {
       render(<ExportSurface runCount={0} />, { wrapper: Wrapper });
 
       expect(
         screen.getByRole("button", { name: /export csv/i }),
       ).toBeDisabled();
+    });
+
+    it("leaves it clickable as soon as there are runs", () => {
+      render(<ExportSurface runCount={1} />, { wrapper: Wrapper });
+
+      expect(screen.getByRole("button", { name: /export csv/i })).toBeEnabled();
     });
   });
 

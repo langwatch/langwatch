@@ -126,6 +126,24 @@ describe("<RunHistoryPanel/>", () => {
         screen.getByText("Run this suite to see results here."),
       ).toBeInTheDocument();
     });
+
+    /**
+     * Exporting here would write a header and no rows, which reads as a broken
+     * export rather than an empty one. Asserted against the panel rather than
+     * the filter bar on its own, because the panel is what decides — the bar
+     * only renders the flag it is handed.
+     */
+    /** @scenario Export is unavailable when no runs match */
+    it("disables Export CSV rather than offering a header-only file", () => {
+      render(
+        <RunHistoryPanel scenarioSetId={scenarioSetId} period={widePeriod} />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByRole("button", { name: /export csv/i }),
+      ).toBeDisabled();
+    });
   });
 
   describe("given a suite with at least one run", () => {

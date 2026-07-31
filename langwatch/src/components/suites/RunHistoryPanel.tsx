@@ -452,10 +452,12 @@ export function RunHistoryPanel({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onExport={openExportDialog}
-          // Disabled only when nothing has loaded at all. totals.runCount
-          // counts the pages fetched so far, not what the server would export,
-          // so gating on it would block a valid export of a longer history.
-          isExportDisabled={isLoading}
+          // totals.runCount counts the pages fetched so far, not what the
+          // server would export, so it is never compared against a total —
+          // that would block a valid export of a longer history. Zero is the
+          // one value it reports exactly: nothing matched, and exporting would
+          // write a header and no rows.
+          isExportDisabled={isLoading || totals.runCount === 0}
           isExporting={isExporting}
           exportProgress={exportProgress}
           onCancelExport={cancelExport}
