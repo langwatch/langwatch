@@ -35,7 +35,8 @@
 --     node, and with this engine the rebuilt rows replicate. The
 --     table's contract has always been replay-rebuilds-truncate-first
 --     (00038); after this migration the truncation has already
---     happened.
+--     happened. Operator steps and verification:
+--     dev/docs/runbooks/analytics-rollup-replay.md.
 --
 -- Single-connection correctness on a cluster: goose runs every statement
 -- through one connection. CREATE / EXCHANGE / DROP are DDL and replicate
@@ -101,6 +102,10 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementBegin
 -- Single-node carry-over. On a cluster the predicate is constant-false:
 -- the plain-engine table's content is per-replica and must not be read.
+-- The ENVSUB fallback is 1 (skip the copy): an environment that runs
+-- migrations without buildMigrationEnvVars must fail towards an empty,
+-- replay-recoverable table, never towards planting one node's private
+-- fraction as content.
 INSERT INTO ${CLICKHOUSE_DATABASE}.trace_analytics_rollup_rebuild
     (TenantId, BucketStart, Model, SpanType, SpanCount, TraceCount, ErrorCount,
      CostSum, NonBilledCostSum, DurationSum, PromptTokensSum, CompletionTokensSum,
@@ -110,7 +115,7 @@ SELECT
     CostSum, NonBilledCostSum, DurationSum, PromptTokensSum, CompletionTokensSum,
     CacheReadTokensSum, CacheWriteTokensSum, ReasoningTokensSum, _retention_days
 FROM ${CLICKHOUSE_DATABASE}.trace_analytics_rollup
-WHERE ${CLICKHOUSE_IS_REPLICATED:-0} = 0;
+WHERE ${CLICKHOUSE_IS_REPLICATED:-1} = 0;
 -- +goose StatementEnd
 
 -- +goose StatementBegin

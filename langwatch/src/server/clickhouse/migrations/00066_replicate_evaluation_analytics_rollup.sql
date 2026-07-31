@@ -26,7 +26,8 @@
 --     equivalent, so the rebuild path is the event-sourcing replay (ops
 --     replay, projection `evaluationAnalyticsRollup`) over the
 --     replicated event_log, matching the table's
---     replay-rebuilds-truncate-first contract (00040).
+--     replay-rebuilds-truncate-first contract (00040). Operator steps
+--     and verification: dev/docs/runbooks/analytics-rollup-replay.md.
 --
 -- Single-connection correctness, mid-migration insert bounds, and re-run
 -- safety (drop-not-truncate scratch, because a crash past the EXCHANGE
@@ -73,6 +74,10 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementBegin
 -- Single-node carry-over. On a cluster the predicate is constant-false:
 -- the plain-engine table's content is per-replica and must not be read.
+-- The ENVSUB fallback is 1 (skip the copy): an environment that runs
+-- migrations without buildMigrationEnvVars must fail towards an empty,
+-- replay-recoverable table, never towards planting one node's private
+-- fraction as content.
 INSERT INTO ${CLICKHOUSE_DATABASE}.evaluation_analytics_rollup_rebuild
     (TenantId, BucketStart, EvaluatorType, Status, EvalCount, PassCount, FailCount,
      ErrorCount, SkippedCount, ScoreSum, ScoreCount, DurationSum, CostSum,
@@ -82,7 +87,7 @@ SELECT
     ErrorCount, SkippedCount, ScoreSum, ScoreCount, DurationSum, CostSum,
     NonBilledCostSum, _retention_days
 FROM ${CLICKHOUSE_DATABASE}.evaluation_analytics_rollup
-WHERE ${CLICKHOUSE_IS_REPLICATED:-0} = 0;
+WHERE ${CLICKHOUSE_IS_REPLICATED:-1} = 0;
 -- +goose StatementEnd
 
 -- +goose StatementBegin

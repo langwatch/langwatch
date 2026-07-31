@@ -35,6 +35,20 @@ const GOOSE_SOURCE = readFileSync(
   "utf8",
 );
 
+/**
+ * The body of buildMigrationEnvVars, so the provisioning assertion below can
+ * only be satisfied by an actual key in the vars object, never by a mention
+ * in a comment or another function.
+ */
+const ENV_VARS_BODY = (() => {
+  const start = GOOSE_SOURCE.indexOf("function buildMigrationEnvVars");
+  if (start < 0) {
+    throw new Error("buildMigrationEnvVars not found in goose.ts");
+  }
+  const end = GOOSE_SOURCE.indexOf("\n}", start);
+  return GOOSE_SOURCE.slice(start, end);
+})();
+
 const APPROVED_ENGINE_PATTERNS: { name: string; pattern: RegExp }[] = [
   {
     name: "${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}<VersionColumn>)",
@@ -125,7 +139,11 @@ function collectEngineDeclarations(): EngineDeclaration[] {
         /CREATE\s+(TABLE|MATERIALIZED\s+VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)/i,
       );
       if (!create) continue;
-      const engine = statement.match(/ENGINE\s*=\s*([^\n]+)/);
+      // Case-insensitive so a lowercase `engine =` cannot slip a declaration
+      // past the guard entirely. Lowercase spellings of the APPROVED patterns
+      // then fail the (case-sensitive) approval below, which is the correct
+      // failure direction: flagged, not skipped.
+      const engine = statement.match(/ENGINE\s*=\s*([^\n]+)/i);
       // A materialized view with a TO target has no engine of its own; the
       // engine that matters is the target table's.
       if (!engine) continue;
@@ -233,7 +251,7 @@ describe("ClickHouse migration engine guard", () => {
 
     for (const name of [...referenced].sort()) {
       expect(
-        GOOSE_SOURCE.includes(`${name}:`),
+        new RegExp(`^\\s*${name}:`, "m").test(ENV_VARS_BODY),
         `migrations reference \${${name}} but buildMigrationEnvVars in goose.ts does not provide it; ` +
           `the ENVSUB default would silently apply on every deployment, including production`,
       ).toBe(true);
