@@ -28,6 +28,7 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import { prisma } from "../../../db";
@@ -327,22 +328,24 @@ describe("project.create with RoleBinding-only membership (no TeamUser)", () => 
   });
 
   afterAll(async () => {
-    await prisma.project.deleteMany({ where: { teamId } }).catch(() => {});
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId, userId } })
-      .catch(() => {});
-    await prisma.team
-      .deleteMany({ where: { slug: `--test-team-rb-${testNamespace}` } })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({ where: { organizationId, userId } })
-      .catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { slug: `--test-org-rb-${testNamespace}` } })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({ where: { email: `rb-${testNamespace}@example.com` } })
-      .catch(() => {});
+    // ProjectSecret's tenancy guard demands literal project ids, so they
+    // are collected first, anchored so a broken setup cannot widen the
+    // findMany into every project in the database.
+    const projectIds = (
+      await prisma.project.findMany({
+        where: { teamId: requireAssigned({ value: teamId, name: "teamId" }) },
+        select: { id: true },
+      })
+    ).map((project) => project.id);
+    await cleanupTestRows(prisma, [
+      ["projectSecret", { projectId: { in: projectIds } }],
+      ["project", { teamId }],
+      ["roleBinding", { organizationId, userId }],
+      ["team", { organizationId }],
+      ["organizationUser", { organizationId, userId }],
+      ["organization", { slug: `--test-org-rb-${testNamespace}` }],
+      ["user", { email: `rb-${testNamespace}@example.com` }],
+    ]);
   });
 
   it("creates the project without a TeamUser row", async () => {

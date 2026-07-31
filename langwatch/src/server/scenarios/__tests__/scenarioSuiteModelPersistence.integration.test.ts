@@ -13,6 +13,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { SuiteRepository } from "../../suites/suite.repository";
 import { ScenarioService } from "../scenario.service";
@@ -50,25 +51,13 @@ describe("Scenario / run-plan model persistence (real DB)", () => {
   });
 
   afterAll(async () => {
-    // beforeAll assigns these three ids in sequence and Vitest runs afterAll
-    // even when beforeAll throws, so a failure partway through leaves the
-    // later ones undefined. Prisma drops an undefined `where` key rather than
-    // matching nothing, which would turn each deleteMany below into "delete
-    // every row in the table". Setup is all-or-nothing, so teardown is too:
-    // bail before a single filter is built.
-    if (!organizationId || !teamId || !projectId) return;
-
-    await prisma.scenario.deleteMany({ where: { projectId } }).catch(() => {});
-    await prisma.simulationSuite
-      .deleteMany({ where: { projectId } })
-      .catch(() => {});
-    await prisma.project
-      .deleteMany({ where: { id: projectId } })
-      .catch(() => {});
-    await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-    await prisma.organization
-      .deleteMany({ where: { id: organizationId } })
-      .catch(() => {});
+    await cleanupTestRows(prisma, [
+      ["scenario", { projectId }],
+      ["simulationSuite", { projectId }],
+      ["project", { id: projectId }],
+      ["team", { id: teamId }],
+      ["organization", { id: organizationId }],
+    ]);
   });
 
   describe("given a scenario", () => {

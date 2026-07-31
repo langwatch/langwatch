@@ -27,6 +27,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PersonalWorkspaceService } from "../../../../ee/governance/services/personalWorkspace.service";
 import { selectAmbientTeam } from "../../../hooks/useOrganizationTeamProject";
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
@@ -120,39 +121,16 @@ describe("AGENT_GOVERNANCE signup then adding a model provider (real DB)", () =>
   });
 
   afterAll(async () => {
-    // A `beforeAll` that threw partway leaves these ids unset, and Prisma
-    // drops an `undefined` from a where clause rather than matching nothing:
-    // `deleteMany({ where: { organizationId: undefined } })` is
-    // `deleteMany({})`, which empties the table. This database is shared with
-    // every other suite and worktree, so a broken setup must not escalate
-    // into a destructive teardown. Clean up only what was actually created,
-    // and let a genuine cleanup failure surface instead of swallowing it —
-    // blanket catches are what hid the tenancy-guard errors here before.
-    if (organizationId) {
-      const teams = await prisma.team.findMany({
-        where: { organizationId },
-        select: { id: true },
-      });
-      const teamIds = teams.map((t) => t.id);
-
-      await prisma.modelProvider.deleteMany({ where: { organizationId } });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      if (teamIds.length > 0) {
-        await prisma.teamUser.deleteMany({
-          where: { teamId: { in: teamIds } },
-        });
-        await prisma.project.deleteMany({
-          where: { teamId: { in: teamIds } },
-        });
-      }
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
-    }
-
-    if (userId) {
-      await prisma.user.deleteMany({ where: { id: userId } });
-    }
+    await cleanupTestRows(prisma, [
+      ["modelProvider", { organizationId }],
+      ["roleBinding", { organizationId }],
+      ["teamUser", { team: { organizationId } }],
+      ["project", { team: { organizationId } }],
+      ["organizationUser", { organizationId }],
+      ["team", { organizationId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: userId }],
+    ]);
   });
 
   /** Step 1: the signup really produces the shape the seam assumes. */

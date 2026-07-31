@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { SEEDED_TAGS } from "~/prompts/constants/tags";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PromptService } from "../prompt.service";
 
 describe("Feature: Prompt version tags", () => {
@@ -77,29 +78,27 @@ describe("Feature: Prompt version tags", () => {
 
   afterEach(async () => {
     // Clean up tags/versions/configs for both projects
-    await prisma.promptTagAssignment.deleteMany({
-      where: { projectId: { in: [testProject.id, otherProject.id] } },
-    });
-    await prisma.llmPromptConfigVersion.deleteMany({
-      where: { projectId: { in: [testProject.id, otherProject.id] } },
-    });
-    await prisma.llmPromptConfig.deleteMany({
-      where: { projectId: { in: [testProject.id, otherProject.id] } },
-    });
-    await prisma.promptTag.deleteMany({
-      where: { organizationId: testOrganization.id },
-    });
-    await prisma.modelDefaultConfigScope.deleteMany({
-      where: { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
-    });
-    if (testDefaultConfigId) {
-      await prisma.modelDefaultConfig.deleteMany({
-        where: { id: testDefaultConfigId },
-      });
-    }
-    await prisma.project.deleteMany({
-      where: { id: { in: [testProject.id, otherProject.id] } },
-    });
+    await cleanupTestRows(prisma, [
+      [
+        "promptTagAssignment",
+        { projectId: { in: [testProject.id, otherProject.id] } },
+      ],
+      [
+        "llmPromptConfigVersion",
+        { projectId: { in: [testProject.id, otherProject.id] } },
+      ],
+      [
+        "llmPromptConfig",
+        { projectId: { in: [testProject.id, otherProject.id] } },
+      ],
+      ["promptTag", { organizationId: testOrganization.id }],
+      [
+        "modelDefaultConfigScope",
+        { scopeType: "ORGANIZATION", scopeId: testOrganization.id },
+      ],
+      ["modelDefaultConfig", { id: testDefaultConfigId }],
+      ["project", { id: { in: [testProject.id, otherProject.id] } }],
+    ]);
     await prisma.team.delete({ where: { id: testTeam.id } });
     await prisma.organization.delete({
       where: { id: testOrganization.id },

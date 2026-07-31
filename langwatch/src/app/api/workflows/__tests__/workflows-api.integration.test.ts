@@ -9,6 +9,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 // The evaluate endpoint now runs through the evaluations-v3 orchestrator, which
 // dispatches each row to nlpgo in the background. That boundary is mocked so the
@@ -81,9 +82,7 @@ describe("Workflows REST API", () => {
   });
 
   afterEach(async () => {
-    await prisma.workflow.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [["workflow", { projectId: testProjectId }]]);
 
     await prisma.project.delete({
       where: { id: testProjectId },
@@ -146,7 +145,7 @@ describe("Workflows REST API", () => {
         expect(body[0].id).toBe(workflow.id);
         expect(body[0].name).toBe("Test Workflow");
         expect(body[0].description).toBe("A test workflow");
-        // Each row's platform link addresses THAT workflow's editor, never
+        // The row's platform link addresses THAT workflow's editor, never
         // the bare /workflows index.
         expect(body[0].platformUrl).toContain(`/studio/${workflow.id}`);
       });
@@ -363,13 +362,11 @@ describe("Workflows REST API", () => {
     afterEach(async () => {
       // The evaluate endpoint creates the workflow's backing experiment, which
       // must be removed before the project (required Experiment->Project relation).
-      await prisma.experiment.deleteMany({
-        where: { projectId: testProjectId },
-      });
-      await prisma.workflowVersion.deleteMany({
-        where: { projectId: testProjectId },
-      });
-      await prisma.workflow.deleteMany({ where: { projectId: testProjectId } });
+      await cleanupTestRows(prisma, [
+        ["experiment", { projectId: testProjectId }],
+        ["workflowVersion", { projectId: testProjectId }],
+        ["workflow", { projectId: testProjectId }],
+      ]);
       await prisma.user.delete({ where: { id: author.id } });
     });
 

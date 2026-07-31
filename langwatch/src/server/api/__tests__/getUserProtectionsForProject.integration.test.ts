@@ -17,6 +17,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Session } from "~/server/auth";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "../../../utils/testUtils";
 import { getDataPrivacyPolicyService } from "../../data-privacy/dataPrivacyPolicy.service";
 import { prisma } from "../../db";
@@ -88,20 +89,22 @@ describe("getUserProtectionsForProject audience-aware visibility", () => {
   });
 
   beforeEach(async () => {
-    await prisma.dataPrivacyPolicy.deleteMany({ where: { organizationId } });
+    await cleanupTestRows(prisma, [["dataPrivacyPolicy", { organizationId }]]);
   });
 
   afterAll(async () => {
-    await prisma.dataPrivacyPolicy.deleteMany({ where: { organizationId } });
-    await prisma.roleBinding.deleteMany({
-      where: { userId: { in: [adminUserId, memberUserId] }, organizationId },
-    });
-    await prisma.organizationUser.deleteMany({
-      where: { userId: { in: [adminUserId, memberUserId] }, organizationId },
-    });
-    await prisma.user.deleteMany({
-      where: { id: { in: [adminUserId, memberUserId] } },
-    });
+    await cleanupTestRows(prisma, [
+      ["dataPrivacyPolicy", { organizationId }],
+      [
+        "roleBinding",
+        { userId: { in: [adminUserId, memberUserId] }, organizationId },
+      ],
+      [
+        "organizationUser",
+        { userId: { in: [adminUserId, memberUserId] }, organizationId },
+      ],
+      ["user", { id: { in: [adminUserId, memberUserId] } }],
+    ]);
   });
 
   async function protections(userId: string) {

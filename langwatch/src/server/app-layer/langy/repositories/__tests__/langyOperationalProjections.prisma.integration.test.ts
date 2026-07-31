@@ -25,6 +25,7 @@ import {
 import { MapProjectionExecutor } from "~/server/event-sourcing/projections/mapProjectionExecutor";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import { StateProjectionExecutor } from "~/server/event-sourcing/projections/stateProjectionExecutor";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";
 import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
 import { PrismaLangyConversationTurnProjectionRepository } from "../langy-conversation-turn-projection.prisma.repository";
@@ -147,9 +148,11 @@ async function projectConversationAndMessage(
 
 afterEach(async () => {
   const where = { projectId: { in: projectIds } };
-  await prisma.langyMessageProjection.deleteMany({ where });
-  await prisma.langyConversationTurnProjection.deleteMany({ where });
-  await prisma.langyConversationProjection.deleteMany({ where });
+  await cleanupTestRows(prisma, [
+    ["langyMessageProjection", where],
+    ["langyConversationTurnProjection", where],
+    ["langyConversationProjection", where],
+  ]);
 });
 
 describe("Langy operational projections with Postgres", () => {

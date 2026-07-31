@@ -36,7 +36,7 @@ import {
   expect,
   it,
 } from "vitest";
-
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
 import { prisma } from "../../db";
@@ -183,37 +183,18 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
   });
 
   afterAll(async () => {
-    // A `beforeAll` that threw partway leaves these ids unset, and Prisma
-    // drops an `undefined` from a where clause rather than matching
-    // nothing: `deleteMany({ where: { id: undefined } })` is
-    // `deleteMany({})`, which empties the table. This database is shared
-    // with every other suite and worktree, so a broken setup must not
-    // escalate into a destructive teardown.
-    const orgIds = [orgId, outsiderOrgId].filter(Boolean);
-    if (orgIds.length === 0) return;
-
-    await prisma.modelProvider
-      .deleteMany({
-        where: { organizationId: { in: orgIds } },
-      })
-      .catch(() => {});
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId: { in: orgIds } } })
-      .catch(() => {});
-    await prisma.organizationUser
-      .deleteMany({
-        where: { organizationId: { in: orgIds } },
-      })
-      .catch(() => {});
-    if (teamId) {
-      await prisma.team.deleteMany({ where: { id: teamId } }).catch(() => {});
-    }
-    await prisma.organization
-      .deleteMany({ where: { id: { in: orgIds } } })
-      .catch(() => {});
-    await prisma.user
-      .deleteMany({
-        where: {
+    await cleanupTestRows(prisma, [
+      // ModelProvider's tenancy guard takes a literal organizationId,
+      // not an in-list, so one entry per organization.
+      ["modelProvider", { organizationId: orgId }],
+      ["modelProvider", { organizationId: outsiderOrgId }],
+      ["roleBinding", { organizationId: { in: [orgId, outsiderOrgId] } }],
+      ["organizationUser", { organizationId: { in: [orgId, outsiderOrgId] } }],
+      ["team", { id: teamId }],
+      ["organization", { id: { in: [orgId, outsiderOrgId] } }],
+      [
+        "user",
+        {
           email: {
             in: [
               `noproj-admin-${ns}@example.com`,
@@ -223,8 +204,8 @@ describe("ModelProviderService on an organization with no project (real DB)", ()
             ],
           },
         },
-      })
-      .catch(() => {});
+      ],
+    ]);
   });
 
   it("has no project, which is the state under test", async () => {

@@ -12,6 +12,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AgentService } from "~/server/agents/agent.service";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject, getTestUser } from "~/utils/testUtils";
 import { loadExecutionData, workflowLoadKey } from "../dataLoader";
 
@@ -29,15 +30,14 @@ describe("loadExecutionData", () => {
   });
 
   afterAll(async () => {
-    for (const id of cleanupAgentIds) {
-      await prisma.agent.deleteMany({ where: { id, projectId } });
-    }
-    for (const id of cleanupWorkflowIds) {
-      await prisma.workflowVersion.deleteMany({
-        where: { workflowId: id, projectId },
-      });
-      await prisma.workflow.deleteMany({ where: { id, projectId } });
-    }
+    await cleanupTestRows(prisma, [
+      ["agent", { id: { in: cleanupAgentIds }, projectId }],
+      [
+        "workflowVersion",
+        { workflowId: { in: cleanupWorkflowIds }, projectId },
+      ],
+      ["workflow", { id: { in: cleanupWorkflowIds }, projectId }],
+    ]);
   });
 
   const createPublishedWorkflow = async (name: string) => {
