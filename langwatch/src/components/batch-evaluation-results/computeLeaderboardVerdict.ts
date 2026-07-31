@@ -149,6 +149,26 @@ export type CheaperAlternative = {
 };
 
 /**
+ * Whether a paired cost interval establishes a real saving.
+ *
+ * Absent means the run produced no interval to consult, where the mean gap
+ * remains the best answer available — so that case passes. A NON-FINITE bound
+ * is different: the measurement ran and returned nonsense, and it does not get
+ * the benefit of the absent-interval fallback. Folding the finiteness test
+ * into the same `&&` as the includes-zero test made NaN short-circuit the
+ * whole condition to false and wave the recommendation through, which is the
+ * opposite of how `scoreSeparation` guards this exact shape one file over.
+ */
+const pairedSavingIsEstablished = (
+  interval: [number, number] | undefined,
+): boolean => {
+  if (!interval) return true;
+  if (!interval.every((bound) => Number.isFinite(bound))) return false;
+  // cheapest minus baseline: a real saving sits entirely below zero.
+  return interval[1] < 0;
+};
+
+/**
  * Among variants the run cannot tell apart, the cheapest one.
  *
  * This is the payoff of reporting ties honestly. If two variants are
@@ -237,18 +257,14 @@ export const findCheaperTiedAlternative = ({
   // interval exists and includes zero, there is no established saving to
   // quote. An absent interval means the run produced none to consult, where
   // the mean gap remains the best answer available.
-  const pairedSaving =
-    variantMetrics[cheapest.variantId]?.costDifferenceCI?.[baseline.variantId];
-  if (pairedSaving) {
-    // A non-finite bound is a measurement that ran and returned nonsense, not
-    // one that was never taken, so it does not get the absent-interval
-    // treatment of falling back to the mean gap. `every(isFinite)` as part of
-    // the same `&&` made NaN short-circuit the whole condition to false and
-    // wave the recommendation through — the opposite of how `scoreSeparation`
-    // guards this exact shape one file over.
-    if (!pairedSaving.every((bound) => Number.isFinite(bound))) return null;
-    // cheapest minus baseline: a real saving sits entirely below zero.
-    if (pairedSaving[1] >= 0) return null;
+  if (
+    !pairedSavingIsEstablished(
+      variantMetrics[cheapest.variantId]?.costDifferenceCI?.[
+        baseline.variantId
+      ],
+    )
+  ) {
+    return null;
   }
 
   return {
