@@ -35,7 +35,7 @@ import (
 
 // StagedPayloadHeader carries a presigned S3 GET URL for the real request
 // body when the TS side offloaded an oversized Studio invoke payload. Must
-// match STAGED_HEADER in langwatch/src/server/s3/stagePayload.ts.
+// match STAGED_HEADER in platform/app/src/server/s3/stagePayload.ts.
 const StagedPayloadHeader = "X-Payload-S3-URL"
 
 // stagedPayloadClient fetches offloaded bodies. The 60s timeout covers a

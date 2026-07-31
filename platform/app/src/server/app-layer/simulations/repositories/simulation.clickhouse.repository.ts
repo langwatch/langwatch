@@ -11,7 +11,6 @@ import type {
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
-import { resolveRunStatus } from "~/server/scenarios/stall-detection";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -22,33 +21,17 @@ import {
   type WindowFragment,
 } from "../../clients/clickhouse/windowed-read";
 import type { SimulationRepository } from "./simulation.repository";
+import {
+  SIMULATION_FAILED_STATUSES,
+  SIMULATION_RUNS_TABLE,
+  SIMULATION_TERMINAL_STATUSES,
+  simulationRunDedupPredicate,
+  statusList,
+} from "./simulationRuns.sql";
 
-const TABLE_NAME = "simulation_runs" as const;
+const TABLE_NAME = SIMULATION_RUNS_TABLE;
 
 export const RUN_ID_CAP = 10000;
-
-/**
- * Returns an IN-tuple dedup predicate for simulation_runs.
- *
- * simulation_runs uses ReplacingMergeTree(UpdatedAt) with dedup key
- * (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId). This predicate
- * resolves dedup using only lightweight key columns in the inner GROUP BY,
- * avoiding the per-row dedup anti-pattern which materializes ALL columns
- * per granule (~8K rows).
- *
- * @param whereFilters - The same WHERE filters from the outer query,
- *   duplicated here for partition pruning in the inner subquery.
- *
- * @see dev/docs/best_practices/clickhouse-queries.md — "Safe Pattern: IN-Tuple Dedup"
- */
-function simulationRunDedupPredicate(whereFilters: string): string {
-  return `AND (TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, UpdatedAt) IN (
-    SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-    FROM ${TABLE_NAME}
-    WHERE ${whereFilters}
-    GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-  )`;
-}
 
 /**
  * Builds date filter clauses from startDate/endDate:
@@ -115,12 +98,19 @@ function buildDateFilter({
  * page run's latest StartedAt lies inside [min, max]. Bounding step 2 to that
  * window prunes the heavy read to the page's few weeks without dropping rows.
  *
- * The window must be applied on the OUTER query only, not inside the
- * max(UpdatedAt) dedup subquery: StartedAt is not strictly immutable across a
- * run's ReplacingMergeTree versions (a snapshot arriving before the run-started
- * event seeds a provisional StartedAt that the started event later overwrites),
- * so filtering versions by StartedAt before picking the latest could resolve the
- * wrong version. Filtering the already-deduped outer rows is always correct.
+ * StartedAt is NOT immutable across a run's ReplacingMergeTree versions — a
+ * snapshot arriving before the run-started event seeds a provisional StartedAt
+ * that the started event overwrites — so in general a StartedAt range inside a
+ * max(UpdatedAt) dedup subquery is the movable-column defect the rulebook
+ * forbids: the true latest version drifts out of the filtered scope and the
+ * group resolves to a stale in-window one. This particular window is the
+ * exception, and only because of where it comes from: step 1 aggregated
+ * [min, max] over the *deduped, latest-version* rows of exactly these batches,
+ * so every page run's latest StartedAt lies inside it by construction. The
+ * filter can therefore never exclude a latest version, which makes it safe in
+ * both scopes — and repeating it in the dedup scope is what lets that scan
+ * prune partitions too, rather than reading every week of the tenant's light
+ * key columns. Do not generalise this to a caller-supplied window.
  *
  * Returns `null` when no valid bound exists (an empty page, or rows whose
  * StartedAt is still provisional/zero). {@link queryWindowed} meters a null hint
@@ -146,6 +136,29 @@ export function startedAtBoundsForPage(
 }
 
 /**
+ * Maps each batch on the page to the number of runs it set out to queue
+ * (`BatchTotal`, ADR-072), so a caller holding only the runs that landed can
+ * still tell a five-run batch from a six-run batch that lost one.
+ *
+ * A batch queued before the denominator existed reports 0, and is left out
+ * entirely rather than published as a zero total — the absence is what tells
+ * the reader to count the runs instead. Callers must apply that fallback; see
+ * `computeGroupSummary` in run-history-transforms.ts for the read side.
+ */
+export function expectedCountsForPage(
+  rows: { BatchRunId: string; ExpectedCount: string }[],
+): Record<string, number> {
+  const expectedCounts: Record<string, number> = {};
+  for (const row of rows) {
+    const expected = Number(row.ExpectedCount);
+    if (Number.isFinite(expected) && expected > 0) {
+      expectedCounts[row.BatchRunId] = expected;
+    }
+  }
+  return expectedCounts;
+}
+
+/**
  * Renders the StartedAt predicate the step-2 read has always emitted, from a
  * {@link queryWindowed} fragment (or the empty clause for an unbounded `null`
  * fragment). Deliberately hand-written as `toUInt64({...:String})` rather than
@@ -154,18 +167,31 @@ export function startedAtBoundsForPage(
  * fragment's `[fromMs, toMs]` reproduces the page's exact integer `[min, max]`
  * (a midpoint hint ± a half-range window), so `String(fromMs)`/`String(toMs)`
  * equal the bounds' own decimal strings.
+ *
+ * `alias` qualifies the column for outer scopes that alias the table: both
+ * {@link RUN_COLUMNS} and {@link LIST_COLUMNS} project
+ * `toString(...) AS StartedAt`, a `String` alias that shadows the raw
+ * `DateTime64` column and would otherwise make the comparison a type error.
+ * The dedup subquery selects no such alias, so it takes the unqualified form.
  */
-export function buildStartedAtWindowClause(window: WindowFragment | null): {
+export function buildStartedAtWindowClause({
+  window,
+  alias,
+}: {
+  window: Pick<WindowFragment, "fromMs" | "toMs"> | null;
+  alias?: string;
+}): {
   whereClause: string;
   params: Record<string, string>;
 } {
   if (!window) {
     return { whereClause: "", params: {} };
   }
+  const column = alias ? `${alias}.StartedAt` : "StartedAt";
   return {
     whereClause:
-      "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
-      "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
+      `AND ${column} >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) ` +
+      `AND ${column} <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))`,
     params: {
       minStartedAtMs: String(window.fromMs),
       maxStartedAtMs: String(window.toMs),
@@ -298,7 +324,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
            ${dateFilter.whereClause}
-           ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
+           ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: dateFilter.whereClause })}
        )
        WHERE ArchivedAt IS NULL
        GROUP BY NormalizedSetId
@@ -345,6 +371,43 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     return mapClickHouseRowToScenarioRunData(row);
   }
 
+  /**
+   * One light column off the run's latest version — see
+   * {@link SimulationRepository.findRunStatus} for why it is its own read.
+   *
+   * `ORDER BY UpdatedAt DESC LIMIT 1` rather than the IN-tuple dedup the list
+   * reads use: this is a primary-key point lookup (the sort key is
+   * `(TenantId, ScenarioRunId)`) projecting a single small column, so the
+   * versions of one run are all it ever orders, and zero rows is the answer
+   * "nothing is stored yet" rather than a row to filter out afterwards.
+   *
+   * No partition predicate on purpose. The caller holds a run id and nothing
+   * else — no window to prune to — and a run queued either side of a week
+   * boundary has to be found anyway. Missing the row here does not read as
+   * "not found and therefore cheap", it reads as "never dispatched", so the
+   * cost of the wider index scan is the price of not running the scenario
+   * twice.
+   */
+  async findRunStatus({
+    projectId,
+    scenarioRunId,
+  }: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<string | null> {
+    const rows = await this.queryRows<{ Status: string }>(
+      `SELECT Status
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         AND ScenarioRunId = {scenarioRunId:String}
+       ORDER BY UpdatedAt DESC
+       LIMIT 1`,
+      { tenantId: projectId, scenarioRunId },
+    );
+
+    return rows[0]?.Status ?? null;
+  }
+
   async getBatchHistoryForScenarioSet({
     projectId,
     scenarioSetId,
@@ -386,7 +449,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: dateFilter.whereClause })}`,
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
@@ -398,6 +461,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const batchRowsPromise = this.queryRows<{
       BatchRunId: string;
       TotalCount: string;
+      ExpectedCount: string;
       PassCount: string;
       FailCount: string;
       RunningCount: string;
@@ -411,16 +475,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       `SELECT
         BatchRunId,
         toString(count())                                               AS TotalCount,
+        toString(max(BatchTotal))                                       AS ExpectedCount,
         toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
-        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
+        toString(countIf(Status IN (${statusList(SIMULATION_FAILED_STATUSES)},'CANCELLED'))) AS FailCount,
         toString(countIf(Status IN ('IN_PROGRESS','PENDING')))         AS RunningCount,
         toString(toUnixTimestamp64Milli(max(UpdatedAt)))               AS LastUpdatedAt,
         toString(toUnixTimestamp64Milli(max(CreatedAt)))               AS LastRunAt,
         toString(toUnixTimestamp64Milli(
-          minIf(UpdatedAt, Status IN ('SUCCESS','FAILED','FAILURE','ERROR','CANCELLED'))
+          minIf(UpdatedAt, Status IN (${statusList(SIMULATION_TERMINAL_STATUSES)}))
         )) AS FirstCompletedAt,
         toString(toUnixTimestamp64Milli(
-          maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
+          maxIf(UpdatedAt, Status IN (${statusList(SIMULATION_TERMINAL_STATUSES)}))
         )) AS AllCompletedAt,
         toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
         toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt
@@ -429,7 +494,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: dateFilter.whereClause })}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY LastRunAt DESC, BatchRunId ASC
@@ -504,7 +569,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       fallback: "none",
       isEmpty: (rows) => rows.length === 0,
       run: (window) => {
-        const startedAtWindow = buildStartedAtWindowClause(window);
+        const startedAtWindow = buildStartedAtWindowClause({ window });
         return this.queryRows<PreviewItemRow>(
           `SELECT ${PREVIEW_COLUMNS}
        FROM ${TABLE_NAME}
@@ -513,7 +578,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND BatchRunId IN ({batchRunIds:Array(String)})
          AND ArchivedAt IS NULL
          ${startedAtWindow.whereClause}
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: startedAtWindow.whereClause })}
        ORDER BY CreatedAt ASC`,
           {
             tenantId: projectId,
@@ -533,7 +598,6 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       itemsByBatch.set(row.BatchRunId, list);
     }
 
-    const now = Date.now();
     let globalLastUpdatedAt = 0;
 
     const batches: BatchHistoryItem[] = pageRows.map((b) => {
@@ -542,21 +606,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         globalLastUpdatedAt = lastUpdatedAt;
 
       const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
-        const baseStatus = mapStatus(r.Status);
         const durationMs =
           r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
-        const perRunUpdatedAt = Number(r.UpdatedAt);
-        const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
-        const resolvedStatus = resolveRunStatus({
-          finishedStatus: hasFinished ? baseStatus : undefined,
-          lastEventTimestamp: perRunUpdatedAt,
-          now,
-        });
         return {
           scenarioRunId: r.ScenarioRunId,
           name: r.Name,
           description: r.Description,
-          status: resolvedStatus,
+          status: mapStatus(r.Status),
           durationInMs: durationMs,
           messagePreview: (r.MessagePreviewRoles ?? []).map((role, i) => ({
             role,
@@ -565,15 +621,29 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         };
       });
 
+      // STALLED is a stored status since ADR-073 step 2, so a stalled run is
+      // already outside RunningCount's IN_PROGRESS/PENDING set. Subtracting it
+      // again — which is what the read-time derivation required — would take
+      // the same run off the count twice.
       const stalledCount = items.filter((i) => i.status === "STALLED").length;
-      const runningCount = Number(b.RunningCount) - stalledCount;
+      const runningCount = Number(b.RunningCount);
 
       const firstCompletedAt = Number(b.FirstCompletedAt);
       const allCompletedAt = Number(b.AllCompletedAt);
 
+      // Named apart from the outer `totalCount` (the distinct-batch count for
+      // pagination), which this callback would otherwise shadow.
+      const batchRunCount = Number(b.TotalCount);
+      // 0 means the batch predates the denominator; count the rows instead.
+      const expectedCount = Math.max(
+        Number(b.ExpectedCount) || 0,
+        batchRunCount,
+      );
+
       return {
         batchRunId: b.BatchRunId,
-        totalCount: Number(b.TotalCount),
+        totalCount: batchRunCount,
+        expectedCount,
         passCount: Number(b.PassCount),
         failCount: Number(b.FailCount),
         runningCount: Math.max(0, runningCount),
@@ -609,18 +679,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     | { changed: false; lastUpdatedAt: number }
     | { changed: true; lastUpdatedAt: number; runs: ScenarioRunData[] }
   > {
+    let watermark: number | null = null;
     if (sinceTimestamp !== undefined) {
-      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
-        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND BatchRunId = {batchRunId:String}
-           AND ArchivedAt IS NULL`,
-        { tenantId: projectId, batchRunId },
-      );
-      const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
-      if (lastUpdatedAt <= sinceTimestamp) {
-        return { changed: false, lastUpdatedAt };
+      watermark = await this.findBatchWatermark({ projectId, batchRunId });
+      if (watermark <= sinceTimestamp) {
+        return { changed: false, lastUpdatedAt: watermark };
       }
     }
 
@@ -631,14 +694,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
          AND t.BatchRunId = {batchRunId:String}
          AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-             AND BatchRunId = {batchRunId:String}
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", alias: "t" })}
        ORDER BY CreatedAt ASC`,
       {
         tenantId: projectId,
@@ -647,13 +703,56 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       },
     );
 
-    const now = Date.now();
-    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
-    const lastUpdatedAt = runs.reduce(
-      (max, r) => Math.max(max, r.timestamp),
-      0,
+    const runs = rows.map((row) => mapClickHouseRowToScenarioRunData(row));
+    // The watermark, when we have one, is what the caller must poll with next:
+    // it accounts for runs that left the list (archived), whose UpdatedAt is by
+    // definition absent from `runs`. Reporting only the max over the surviving
+    // runs would leave the caller polling with a value below the watermark, so
+    // every subsequent poll would re-report `changed: true` forever.
+    const lastUpdatedAt = Math.max(
+      watermark ?? 0,
+      runs.reduce((max, r) => Math.max(max, r.timestamp), 0),
     );
     return { changed: true, lastUpdatedAt, runs };
+  }
+
+  /**
+   * Latest-version UpdatedAt across every version ever written for `batchRunId`,
+   * archived ones included.
+   *
+   * `simulation_runs` is `ReplacingMergeTree(UpdatedAt)` and the version column
+   * only increases, so the maximum over all versions already equals the maximum
+   * over latest versions — no dedup subquery, no heavy columns (the same
+   * reasoning {@link findLastUpdatedAt} documents).
+   *
+   * The one thing that must stay out is `ArchivedAt IS NULL`, which this probe
+   * used to carry. Applied to the raw `ReplacingMergeTree` it excludes the
+   * archived latest version, and `max(UpdatedAt)` falls back to the run's own
+   * superseded non-archived version — a value at or below the caller's
+   * `sinceTimestamp`, so the caller is told nothing changed and the archive
+   * never reaches the UI. Archival is precisely the kind of change a poll has
+   * to see, so the watermark spans archived runs and the `ArchivedAt IS NULL`
+   * narrowing belongs only to the read that follows it.
+   *
+   * `BatchRunId` is a plain equality filter here rather than a post-dedup
+   * `argMax`: this is a watermark, not a listing, and the run whose newest
+   * version lost its batch id drops out of the read below for the same reason.
+   */
+  private async findBatchWatermark({
+    projectId,
+    batchRunId,
+  }: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<number> {
+    const rows = await this.queryRows<{ LastUpdatedAt: string }>(
+      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         AND BatchRunId = {batchRunId:String}`,
+      { tenantId: projectId, batchRunId },
+    );
+    return Number(rows[0]?.LastUpdatedAt ?? "0");
   }
 
   async getBatchRunCountForScenarioSet({
@@ -676,7 +775,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: dateFilter.whereClause })}`,
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
@@ -699,20 +798,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
          AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", alias: "t" })}
        ORDER BY BatchRunId ASC, CreatedAt ASC
        LIMIT 10000`,
       { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
     );
 
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 
   async getRunDataForScenarioSet({
@@ -731,6 +823,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     endDate?: number;
   }): Promise<{
     runs: ScenarioRunData[];
+    expectedCounts: Record<string, number>;
     nextCursor?: string;
     hasMore: boolean;
   }> {
@@ -751,16 +844,22 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const batchRows = await this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
+      ExpectedCount: string;
+      MinStartedAt: string;
+      MaxStartedAt: string;
     }>(
       `SELECT
         BatchRunId,
-        toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt
+        toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
+        toString(max(BatchTotal))                        AS ExpectedCount,
+        toString(toUnixTimestamp64Milli(min(StartedAt))) AS MinStartedAt,
+        toString(toUnixTimestamp64Milli(max(StartedAt))) AS MaxStartedAt
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: dateFilter.whereClause })}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -780,7 +879,12 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const pageRows = hasMore ? batchRows.slice(0, validatedLimit) : batchRows;
 
     if (pageRows.length === 0) {
-      return { runs: [], nextCursor: undefined, hasMore: false };
+      return {
+        runs: [],
+        expectedCounts: {},
+        nextCursor: undefined,
+        hasMore: false,
+      };
     }
 
     const lastRow = pageRows[pageRows.length - 1];
@@ -795,9 +899,15 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       projectId,
       batchRunIds,
       scenarioSetId,
+      startedAtBounds: startedAtBoundsForPage(pageRows),
     });
 
-    return { runs, nextCursor, hasMore };
+    return {
+      runs,
+      expectedCounts: expectedCountsForPage(pageRows),
+      nextCursor,
+      hasMore,
+    };
   }
 
   async getRunDataForAllSuites({
@@ -821,22 +931,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         lastUpdatedAt: number;
         runs: ScenarioRunData[];
         scenarioSetIds: Record<string, string>;
+        expectedCounts: Record<string, number>;
         nextCursor?: string;
         hasMore: boolean;
       }
   > {
-    // Cheap timestamp check: skip heavy query if nothing changed
+    // Cheap timestamp check: skip the heavy query if nothing changed.
+    let watermark: number | null = null;
     if (sinceTimestamp !== undefined) {
-      const tsRows = await this.queryRows<{ LastUpdatedAt: string }>(
-        `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
-         FROM ${TABLE_NAME}
-         WHERE TenantId = {tenantId:String}
-           AND ArchivedAt IS NULL`,
-        { tenantId: projectId },
-      );
-      const lastUpdatedAt = Number(tsRows[0]?.LastUpdatedAt ?? "0");
-      if (lastUpdatedAt <= sinceTimestamp) {
-        return { changed: false, lastUpdatedAt };
+      watermark = await this.findTenantWatermark({ projectId });
+      if (watermark <= sinceTimestamp) {
+        return { changed: false, lastUpdatedAt: watermark };
       }
     }
 
@@ -862,16 +967,22 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       BatchRunId: string;
       MaxCreatedAt: string;
       NormalizedSetId: string;
+      ExpectedCount: string;
+      MinStartedAt: string;
+      MaxStartedAt: string;
     }>(
       `SELECT
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
-        any(IF(ScenarioSetId = '', 'default', ScenarioSetId)) AS NormalizedSetId -- Must match DEFAULT_SET_ID from internal-set-id.ts
+        any(IF(ScenarioSetId = '', 'default', ScenarioSetId)) AS NormalizedSetId, -- Must match DEFAULT_SET_ID from internal-set-id.ts
+        toString(max(BatchTotal))                        AS ExpectedCount,
+        toString(toUnixTimestamp64Milli(min(StartedAt))) AS MinStartedAt,
+        toString(toUnixTimestamp64Milli(max(StartedAt))) AS MaxStartedAt
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: dateFilter.whereClause })}
        GROUP BY BatchRunId
        ${combinedHaving}
        ORDER BY MaxCreatedAt DESC, BatchRunId ASC
@@ -892,9 +1003,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     if (pageRows.length === 0) {
       return {
         changed: true,
-        lastUpdatedAt: 0,
+        // The watermark, not 0: an empty page after an archive is exactly the
+        // case where the poll must still advance, or the caller keeps asking
+        // with a timestamp the watermark already passed and is told `changed`
+        // on every poll forever.
+        lastUpdatedAt: watermark ?? 0,
         runs: [],
         scenarioSetIds: {},
+        expectedCounts: {},
         nextCursor: undefined,
         hasMore: false,
       };
@@ -911,10 +1027,17 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.getRunsForBatchIds({ projectId, batchRunIds });
-    const lastUpdatedAt = runs.reduce(
-      (max, r) => Math.max(max, r.timestamp),
-      0,
+    const runs = await this.getRunsForBatchIds({
+      projectId,
+      batchRunIds,
+      startedAtBounds: startedAtBoundsForPage(pageRows),
+    });
+    // See getRunDataForBatchRun: the watermark covers runs that left the page
+    // (archived), whose UpdatedAt no longer appears in `runs`, so polling with
+    // the page maximum alone would report `changed: true` on every poll.
+    const lastUpdatedAt = Math.max(
+      watermark ?? 0,
+      runs.reduce((max, r) => Math.max(max, r.timestamp), 0),
     );
 
     return {
@@ -922,9 +1045,33 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       lastUpdatedAt,
       runs,
       scenarioSetIds,
+      expectedCounts: expectedCountsForPage(pageRows),
       nextCursor,
       hasMore,
     };
+  }
+
+  /**
+   * Latest-version UpdatedAt across every run in the tenant, archived included.
+   *
+   * `simulation_runs` is `ReplacingMergeTree(UpdatedAt)` and the version column
+   * only increases, so the maximum over all versions already is the maximum
+   * over latest versions — no dedup subquery, no heavy columns. The one thing
+   * that must stay out is an `ArchivedAt IS NULL` filter; see
+   * {@link findBatchWatermark} for why it silently lowers the watermark.
+   */
+  private async findTenantWatermark({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<number> {
+    const rows = await this.queryRows<{ LastUpdatedAt: string }>(
+      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}`,
+      { tenantId: projectId },
+    );
+    return Number(rows[0]?.LastUpdatedAt ?? "0");
   }
 
   async findLastUpdatedAt({
@@ -1049,7 +1196,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            WHERE TenantId = {tenantId:String}
              ${wherePredicate}
              ${dateFilter.whereClause}
-             ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${wherePredicate} ${dateFilter.whereClause}`)}
+             ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: dateFilter.whereClause })}
          )
          WHERE ArchivedAt IS NULL
          GROUP BY NormalizedSetId, BatchRunId
@@ -1092,9 +1239,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
               WHERE TenantId = {tenantId:String}
                 AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
                 AND ArchivedAt IS NULL
-                ${simulationRunDedupPredicate(
-                  "TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})",
-                )}
+                ${simulationRunDedupPredicate({ tenantIdParam: "tenantId" })}
               LIMIT ${RUN_ID_CAP}`,
       query_params: { tenantId: projectId, scenarioSetIds },
       format: "JSONEachRow",
@@ -1128,18 +1273,26 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     // (latest ArchivedAt = NULL) would otherwise be ignored and the run would
     // look archived. The `IS NULL` expression is non-nullable, so the fold
     // reads the true latest version.
+    //
+    // The fold groups on the engine key `(TenantId, ScenarioRunId)`, and both
+    // ScenarioSetId and the internal-prefix test are resolved from the latest
+    // version (argMax / an outer predicate) rather than from whichever version
+    // the row happened to be read from. ScenarioSetId is fold-written and starts
+    // as '', so grouping by it — or filtering on it before the fold — would both
+    // split a run's versions into separate groups and let a pre-started version
+    // report the run under the default set.
     const rows = await this.queryRows<{ ScenarioSetId: string }>(
-      `SELECT DISTINCT IF(ScenarioSetId = '', '${DEFAULT_SET_ID}', ScenarioSetId) AS ScenarioSetId
+      `SELECT DISTINCT IF(LatestSetId = '', '${DEFAULT_SET_ID}', LatestSetId) AS ScenarioSetId
        FROM (
          SELECT
-           ScenarioSetId,
-           argMax(ArchivedAt IS NULL, UpdatedAt) AS latestIsActive
+           argMax(ScenarioSetId, UpdatedAt) AS LatestSetId,
+           argMax(ArchivedAt IS NULL, UpdatedAt) AS LatestIsActive
          FROM ${TABLE_NAME}
          WHERE TenantId IN ({projectIds:Array(String)})
-           AND NOT startsWith(ScenarioSetId, '${INTERNAL_SET_PREFIX}')
-         GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+         GROUP BY TenantId, ScenarioRunId
        )
-       WHERE latestIsActive`,
+       WHERE LatestIsActive
+         AND NOT startsWith(LatestSetId, '${INTERNAL_SET_PREFIX}')`,
       { tenantId: firstProjectId, projectIds },
     );
 
@@ -1175,23 +1328,47 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
   // ---- Batch helper ----
 
+  /**
+   * Reads the page's runs at their latest version, with `Messages.Content` and
+   * the rest of {@link LIST_COLUMNS}.
+   *
+   * `startedAtBounds` is the [min, max] StartedAt of the batches on the page,
+   * aggregated by the caller's own batch query over the same deduped,
+   * latest-version rows this read returns — the same hint
+   * {@link startedAtBoundsForPage} builds for the batch-history preview, and
+   * safe for the same reason: every page run's latest StartedAt lies inside the
+   * bounds by construction, so bounding cannot drop a row. Without it this
+   * read — the heaviest on the table, since it materialises message content —
+   * opened every weekly partition including cold storage to serve one page.
+   * Both callers have the bounds, so both pass them; `null` means the page had
+   * no usable StartedAt and the read runs unbounded, as it always did.
+   */
   private async getRunsForBatchIds({
     projectId,
     batchRunIds,
     scenarioSetId,
+    startedAtBounds,
   }: {
     projectId: string;
     batchRunIds: string[];
     scenarioSetId?: string;
+    startedAtBounds?: { minMs: number; maxMs: number } | null;
   }): Promise<ScenarioRunData[]> {
     if (batchRunIds.length === 0) return [];
 
     const setFilter = scenarioSetId
       ? "AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})"
       : "";
-    const innerSetFilter = scenarioSetId
-      ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
-      : "";
+    const window = startedAtBounds
+      ? { fromMs: startedAtBounds.minMs, toMs: startedAtBounds.maxMs }
+      : null;
+    // Same bounds, same params, rendered twice: qualified for the aliased outer
+    // scope, bare for the dedup subquery (which has no alias to qualify).
+    const outerStartedAtWindow = buildStartedAtWindowClause({
+      window,
+      alias: "t",
+    });
+    const innerStartedAtWindow = buildStartedAtWindowClause({ window });
 
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
       `SELECT ${LIST_COLUMNS}
@@ -1200,14 +1377,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND t.BatchRunId IN ({batchRunIds:Array(String)})
          ${setFilter}
          AND t.ArchivedAt IS NULL
-         AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
-           SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
-           FROM ${TABLE_NAME}
-           WHERE TenantId = {tenantId:String}
-             AND BatchRunId IN ({batchRunIds:Array(String)})
-             ${innerSetFilter}
-           GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-         )
+         ${outerStartedAtWindow.whereClause}
+         ${simulationRunDedupPredicate({ tenantIdParam: "tenantId", partitionFilters: innerStartedAtWindow.whereClause, alias: "t" })}
        ORDER BY CreatedAt ASC
        LIMIT 5000`,
       {
@@ -1216,10 +1387,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         ...(scenarioSetId
           ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
           : {}),
+        ...outerStartedAtWindow.params,
       },
     );
 
-    const now = Date.now();
-    return rows.map((row) => mapClickHouseRowToScenarioRunData(row, now));
+    return rows.map((row) => mapClickHouseRowToScenarioRunData(row));
   }
 }

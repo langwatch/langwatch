@@ -74,9 +74,7 @@ export function fireSignupNurturingCalls({
       primary_intent: primaryIntent?.toLowerCase(),
     }),
     has_traces: false,
-    has_evaluations: false,
     has_prompts: false,
-    has_simulations: false,
     has_subscription: false,
     createdAt: new Date().toISOString(),
   };

@@ -25,11 +25,16 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deleteEvaluationRunsByTenant } from "~/server/analytics/clickhouse/__tests__/test-utils/clickhouse-cleanup";
 import type { TimeseriesResult } from "~/server/analytics/types";
+import { tenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import {
+  type AppClickHouseClient,
+  createAppClickHouseClient,
+} from "~/server/app-layer/clients/clickhouseClient.factory";
 import {
   cleanupTestData,
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { buildSeriesName } from "../repositories/_timeseries-row-parser";
 import { ClickHouseLegacyAnalyticsShim } from "../repositories/legacy.shim";
 
@@ -44,7 +49,17 @@ const DAY_2 = "2026-07-13";
 const DAY_3 = "2026-07-14";
 const PII_DAY = "2026-07-16";
 
+/**
+ * Two clients on the same container, deliberately.
+ *
+ * `ch` is the driver, and it only ever seeds and cleans up — the fixture rows
+ * are input to the test, not the thing under test. `app` is the client the shim
+ * reads through, because the read path is what this file is about and it has to
+ * be the real one: the wire format, the 64-bit decoding and the settings all
+ * live there.
+ */
 let ch: ClickHouseClient;
+let app: AppClickHouseClient;
 let shim: ClickHouseLegacyAnalyticsShim;
 
 interface SeededEvaluation {
@@ -146,7 +161,13 @@ function bucketFor(result: TimeseriesResult, day: string) {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  shim = new ClickHouseLegacyAnalyticsShim(async () => ch);
+  app = createAppClickHouseClient({ url: containers.clickHouseUrl });
+  shim = new ClickHouseLegacyAnalyticsShim(async (projectId) =>
+    tenantClickHouseClient({
+      client: app.resolveClient(projectId),
+      tenantId: projectId,
+    }),
+  );
 
   // The other evaluator creates activity (and therefore day buckets) on three
   // days: 1/10 passed, then 90/90, then 2/4. PII runs only on the fourth day:
@@ -196,6 +217,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await cleanupTestData(tenantId);
   await deleteEvaluationRunsByTenant({ client: ch, tenantId });
+  await app.close();
   await stopTestContainers();
 });
 

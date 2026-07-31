@@ -8,9 +8,10 @@
 
 Automations today notify through two channels — **Email** (`SEND_EMAIL`) and
 **Slack** (`SEND_SLACK_MESSAGE`). Both are `category: "notify"` providers
-(`packages/automations/src/providers/` + per-side registries, ADR-037), render a customer-authored Liquid
-template (ADR-036), and ride the ADR-052 automation process managers on the
-trace path and graph-alert dispatch helper on the alert path.
+(`packages/automations/src/providers/` + per-side registries), render a
+customer-authored Liquid template (ADR-036), and ride the automation process
+managers on the trace path and graph-alert dispatch helper on the alert path
+(ADR-098, successor to the retired ADR-037 and ADR-052).
 
 Customers want to drive their *own* systems off an automation: page PagerDuty,
 open a Jira ticket, kick a CI job, push into a warehouse, fan out through an
@@ -24,14 +25,15 @@ network endpoint**. Every existing outbound goes to infrastructure we or the
 customer's SaaS vendor control: SES for email, `hooks.slack.com` for Slack
 (host-pinned by `slackWebhookGuard.ts`). A user-supplied URL fired from our
 worker fleet is a Server-Side Request Forgery (SSRF) and third-party-DDoS
-primitive unless fenced. ADR-030 foreshadowed exactly this work:
+primitive unless fenced. ADR-095 (retired 2026-07-30; its ground is ADR-098)
+foreshadowed exactly this work:
 
 > "The moment a customer-defined webhook URL lands as a trigger
 > destination, the framework needs SSRF blocking, HMAC request signing,
 > payload size caps, per-destination secret encryption at rest. These are
 > framework concerns — every future customer-webhook-like dispatch should
 > share one outbound utility rather than each `dispatch` reinventing them."
-> — ADR-030 Consequences
+> — ADR-095 Consequences
 
 The framework mostly exists; the job is to *compose* it, not invent it:
 
@@ -48,7 +50,7 @@ The framework mostly exists; the job is to *compose* it, not invent it:
   `ProjectSecret.encryptedValue` (`prisma/schema.prisma:1035`) and
   `LangyGithubToken.encryptedRefreshToken`.
 - **Process-manager retry / backoff / dead-letter state**
-  (`ProcessManagerOutbox`; ADR-052).
+  (`ProcessManagerOutbox`; ADR-098).
 - **Fire history** (`TriggerSent` + `TriggerFireHistoryService`, in
   `ViewAutomationDrawer.tsx`).
 
@@ -295,7 +297,7 @@ atomic `ssrfSafeFetch`), the primitive `httpProxy.ts:187` already ships to prod.
 `src/server/app-layer/automations/delivery/sendWebhook.ts` (sibling to `sendSlackWebhook.ts`), wrapping
 `ssrfProtection` + signing + size/timeout caps + `DispatchError` classification
 (`toDispatchError`, `sendSlackWebhook.ts:143`). This is the "one outbound utility
-every future customer-webhook dispatch shares" ADR-030 asked for.
+every future customer-webhook dispatch shares" ADR-095 (retired; ADR-098) asked for.
 
 ---
 
@@ -306,7 +308,7 @@ every future customer-webhook dispatch shares" ADR-030 asked for.
 attempt as a `WebhookDelivery` row (§6); do not hand-roll a second attempt
 loop.** The process outbox provides bounded exponential backoff,
 `maxAttempts: 8`, leasing, and dead-letter state. The sender throws the typed
-`DispatchError` (ADR-027); terminal failures complete as logged drops while
+`DispatchError` (ADR-027, retired; folded into ADR-045); terminal failures complete as logged drops while
 retryable failures are re-attempted, with `Retry-After` as a backoff floor.
 Per-attempt HTTP detail (status, snippet, latency) lives in `WebhookDelivery`.
 
@@ -390,7 +392,7 @@ enum WebhookDeliveryOutcome { success  retryable  terminal  pending }
   an operator see "the receiver said `{"error":"bad schema"}`" without re-firing.
 - **Retention / pruning.** Postgres is outside the ClickHouse retention sweep, so
   `WebhookDelivery` needs its own prune — a scheduled delete of rows older than 30
-  days (align with the ADR-030 `dispatched` window). Note it alongside the
+  days (align with the ADR-098 `dispatched` window). Note it alongside the
   `LangyConversation` PII-purge concern so it isn't forgotten.
 - **Rendering.** Extend the drawer's "Recent fires" panel (`ViewAutomationDrawer.tsx`,
   backed by `TriggerFireHistoryService.getAllRecentFiresForTrigger`) so a webhook
@@ -491,7 +493,7 @@ path" rule.
   entry** — minimal blast radius; the notify/persist exhaustiveness test forces
   classification at introduction.
 - **One shared outbound utility (`sendWebhook.ts`)** becomes the home every future
-  customer-endpoint dispatch reuses — the ADR-030 ask, discharged.
+  customer-endpoint dispatch reuses — the ADR-095 (retired; ADR-098) ask, discharged.
 - **`ssrfProtection.ts` grows a webhook-tuned validator config and (ideally)
   response-size + timeout + port options** usable by other callers (`httpProxy.ts`
   too).
@@ -501,7 +503,8 @@ path" rule.
   (`graphAlertActionDispatch.ts:241`) — a required edit, since graph alerts now
   have a third valid channel.
 - **`DispatchError` may gain a `retryAfterMs` hint** so outbox backoff can honor
-  receiver `Retry-After` — a small ADR-027 contract extension.
+  receiver `Retry-After` — a small extension to the (retired) ADR-027 contract,
+  now part of ADR-045.
 - **Shipped dark behind `release_webhook_automations`**; GA is a later PostHog
   rollout + default flip.
 - **Deferred to fast-follow:** OAuth client-credentials, mTLS, dual-secret rotation,
@@ -567,7 +570,8 @@ plaintext with a bounded lifetime (30-day prune). This matches the
 industry-baseline shape (GitHub/Stripe webhook delivery logs). A `getWebhookDeliveries` read procedure feeds
 the drawer's "Recent deliveries" drill-down, and a 30-day prune runs as the
 daily `webhookDeliveryPrune` scheduled process manager on the worker
-(ADR-052); the K8s cron cleanup route + chart CronJob were removed along with
+(ADR-098, successor to the retired ADR-052); the K8s cron cleanup route +
+chart CronJob were removed along with
 the rest of the automations cron machinery.
 
 > **Known design debt / future direction.** `WebhookDelivery` is a
@@ -585,27 +589,30 @@ and the `ProjectSecret`-ref auth union — the only remaining Phase 2 gap.
 > **Note (2026-07):** the "cron parity" webhook action this ADR's migration
 > plan describes (§7, `pages/api/cron/triggers/actions/sendWebhookRequest.ts`)
 > was removed shortly after, when the K8s graph-alert cron itself was retired
-> (ADR-034 — the event-sourced path is now the sole graph-alert path). Webhook
+> (ADR-034, retired; its ground is ADR-099 — the event-sourced path is now the sole graph-alert path). Webhook
 > dispatch rides only the outbox + `dispatchGraphAlertAction` now; the
 > planning references to a cron action above are historical.
 
 ## References
 
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) —
-  transactional outbox this dispatch rides; its Consequences foreshadow this
-  webhook work (SSRF, HMAC, size caps, secret encryption).
+- [ADR-098](./098-event-sourcing-core.md) — successor to three retired ADRs
+  this doc cited: ADR-095 (transactional outbox this dispatch rides; its
+  Consequences foreshadow this webhook work — SSRF, HMAC, size caps, secret
+  encryption), ADR-037 (the authoring drawer / fire-history surface the
+  delivery report extends), and ADR-052 (the automation process-manager
+  substrate).
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid engine +
   `matches[]` contract the JSON body renders against.
-- [ADR-037](./037-automation-operator-surfaces.md) — the authoring drawer /
-  fire-history surface the delivery report extends.
 - [ADR-031](./031-trigger-email-abuse-protections.md) — the abuse-cap pattern
   (`rateLimit.ts`, per-project caps) the webhook rate limit mirrors; its Slack
   exemption reasoning informs why webhook still needs SSRF.
-- [ADR-027](./027-typed-dispatcherror-contract.md) — `DispatchError` contract the
-  sender throws (and would extend with `retryAfterMs`).
-- [ADR-034](./034-event-sourced-analytics-materialization.md) / **PR #5015**
+- [ADR-045](./045-domain-errors-handled-boundary.md) — successor to the
+  retired ADR-027; `DispatchError` contract the sender throws (and would
+  extend with `retryAfterMs`).
+- [ADR-099](./099-projection-storage-and-table-definition.md) / **PR #5015**
   (`feat(automations): graph alerts in automations drawer + Liquid template
-  wiring`) — the graph-alert dispatch path this channel plugs a third branch into.
+  wiring`) — successor to the retired ADR-034; the graph-alert dispatch path
+  this channel plugs a third branch into.
 - `src/utils/ssrfProtection.ts` / `src/utils/ssrfConstants.ts` — the
   outbound-fetch guard webhook dispatch reuses.
 - `src/server/api/routers/httpProxy.ts` — existing SSRF-fenced HTTP client with the

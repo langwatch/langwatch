@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { ClickHouseOrphanedRunFinder } from "../orphaned-run-reconciliation.clickhouse";
 import { STALL_THRESHOLD_MS } from "../stall-detection";
 
@@ -46,7 +46,6 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     TotalCost: null,
     RoleCosts: {},
     RoleLatencies: {},
-    TraceMetricsJson: "",
     StartedAt: minutesAgo(60),
     QueuedAt: null,
     CreatedAt: minutesAgo(60),

@@ -11,13 +11,19 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createClickHouseClient } from "@langwatch/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../../event-sourcing/__tests__/integration/testContainers";
+  startTestContainers,
+} from "~/test-utils/integration/testContainers";
 import { fetchCountsFromClickHouse } from "../clustering";
 
 const TENANT_ID = `topic-counts-test-${nanoid(6)}`;
@@ -67,12 +73,23 @@ function traceRow(opts: {
 }
 
 describe("fetchCountsFromClickHouse integration", () => {
+  /** The driver client, used only to seed rows. */
   let ch: ClickHouseClient;
+  /** What the code under test now takes. */
+  let clickhouse: TenantClickHouseClient;
+  let packageClient: ReturnType<typeof createClickHouseClient>;
 
   beforeAll(async () => {
     const raw = getTestClickHouseClient();
     if (!raw) throw new Error("ClickHouse client not available");
     ch = wrapWithDefaultSettings(raw);
+
+    const containers = await startTestContainers();
+    packageClient = createClickHouseClient({ url: containers.clickHouseUrl });
+    clickhouse = tenantClickHouseClient({
+      client: packageClient,
+      tenantId: TENANT_ID,
+    });
 
     const now = Date.now();
     const rows: TraceRow[] = [
@@ -139,13 +156,14 @@ describe("fetchCountsFromClickHouse integration", () => {
 
   afterAll(async () => {
     await cleanupTestData(TENANT_ID);
+    await packageClient?.close();
   });
 
   describe("given traces across recency, assignment, and version dimensions", () => {
     describe("when counting total / recent / assigned", () => {
       it("counts each trace once at its latest version", async () => {
         const counts = await fetchCountsFromClickHouse({
-          clickhouse: ch,
+          clickhouse,
           projectId: TENANT_ID,
         });
 

@@ -1,0 +1,204 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/**
+ * `governanceOcsfEvents` — the audit stream as a pre-built map (ADR-107
+ * decision 17). Keyed on the span id, so replaying the log reproduces and
+ * repairs it without duplicating an already-recorded entry.
+ */
+
+import {
+  OCSF_ACTIVITY,
+  OCSF_SEVERITY,
+} from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { canonicalSpan } from "~/server/event-sourcing/trace-processing/__tests__/fixtures";
+import {
+  createGovernanceOcsfEventsMap,
+  deriveGovernanceOcsfEvent,
+} from "../governanceOcsfEvents.mapProjection";
+
+const TENANT_ID = "gov-project-1";
+
+const GOVERNANCE_ATTRS = {
+  "langwatch.origin.kind": "ingestion_source",
+  "langwatch.ingestion_source.id": "is-1",
+  "langwatch.ingestion_source.source_type": "claude_compliance",
+} as const;
+
+function governanceSpan(overrides: Parameters<typeof canonicalSpan>[0] = {}) {
+  return canonicalSpan({
+    tenantId: TENANT_ID,
+    startTimeUnixMs: 1_700_000_000_500,
+    occurredAt: 1_700_000_000_500,
+    ...overrides,
+    attributes: { ...GOVERNANCE_ATTRS, ...(overrides.attributes ?? {}) },
+  });
+}
+
+function mapOne(overrides: Parameters<typeof canonicalSpan>[0] = {}) {
+  return deriveGovernanceOcsfEvent({
+    tenantId: TENANT_ID,
+    span: governanceSpan(overrides),
+  });
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("deriveGovernanceOcsfEvent", () => {
+  it("derives one row carrying actor, action, target, time and severity", () => {
+    const row = mapOne({
+      spanId: "bbbb0000000000a1",
+      name: "chat.completion",
+      attributes: {
+        "langwatch.user.id": "user-42",
+        "user.email": "engineer@acme.example.com",
+        "enduser.id": "enduser-99",
+        "tool.name": "search_logs",
+        "gen_ai.request.model": "claude-sonnet-4",
+      },
+    });
+
+    expect(row).not.toBeNull();
+    expect(row!.tenantId).toBe(TENANT_ID);
+    expect(row!.sourceId).toBe("is-1");
+    expect(row!.sourceType).toBe("claude_compliance");
+    expect(row!.actorUserId).toBe("user-42");
+    expect(row!.actorEmail).toBe("engineer@acme.example.com");
+    expect(row!.actorEnduserId).toBe("enduser-99");
+    expect(row!.actionName).toBe("search_logs");
+    expect(row!.targetName).toBe("claude-sonnet-4");
+    expect(row!.activityId).toBe(OCSF_ACTIVITY.INVOKE);
+    expect(row!.severityId).toBe(OCSF_SEVERITY.INFO);
+    expect(row!.eventTime.getTime()).toBe(1_700_000_000_500);
+  });
+
+  it("keys the row on the span id, which folds.feature declares as event_id", () => {
+    expect(mapOne({ spanId: "bbbb0000000000a1" })!.eventId).toBe(
+      "bbbb0000000000a1",
+    );
+  });
+
+  it("elevates severity when an anomaly alert id is stamped on the span", () => {
+    const row = mapOne({
+      attributes: {
+        "langwatch.governance.anomaly_alert_id": "alert-anomaly-123",
+      },
+    });
+    expect(row!.severityId).toBe(OCSF_SEVERITY.MEDIUM);
+    expect(row!.anomalyAlertId).toBe("alert-anomaly-123");
+  });
+
+  it("reads the legacy langwatch.user_id actor key so unmigrated sources keep attribution", () => {
+    expect(
+      mapOne({ attributes: { "langwatch.user_id": "legacy-user" } })!
+        .actorUserId,
+    ).toBe("legacy-user");
+  });
+
+  it("falls back the action to the span's own name when no tool was invoked", () => {
+    expect(mapOne({ name: "chat.completion" })!.actionName).toBe(
+      "chat.completion",
+    );
+  });
+
+  it("emits OCSF v1.1 API Activity JSON naming the span it derives from", () => {
+    const parsed = JSON.parse(
+      mapOne({ spanId: "bbbb0000000000a1" })!.rawOcsfJson,
+    );
+    expect(parsed.class_uid).toBe(6003);
+    expect(parsed.category_uid).toBe(6);
+    expect(parsed.type_uid).toBe(6003 * 100 + OCSF_ACTIVITY.INVOKE);
+    expect(parsed.metadata.extension.span_id).toBe("bbbb0000000000a1");
+  });
+
+  describe("given a span with no governance origin", () => {
+    it("derives nothing — application traces never reach the audit stream", () => {
+      const span = canonicalSpan({
+        tenantId: TENANT_ID,
+        attributes: { "gen_ai.request.model": "gpt-5-mini" },
+      });
+      expect(
+        deriveGovernanceOcsfEvent({ tenantId: TENANT_ID, span }),
+      ).toBeNull();
+    });
+
+    it("derives nothing when origin.kind names a non-governance origin", () => {
+      const span = canonicalSpan({
+        tenantId: TENANT_ID,
+        attributes: { "langwatch.origin.kind": "personal_workspace" },
+      });
+      expect(
+        deriveGovernanceOcsfEvent({ tenantId: TENANT_ID, span }),
+      ).toBeNull();
+    });
+
+    it("derives nothing when the receiver stamped no ingestion source id", () => {
+      const span = canonicalSpan({
+        tenantId: TENANT_ID,
+        attributes: { "langwatch.origin.kind": "ingestion_source" },
+      });
+      expect(
+        deriveGovernanceOcsfEvent({ tenantId: TENANT_ID, span }),
+      ).toBeNull();
+    });
+  });
+
+  describe("given the derivation is run twice at different wall-clock times", () => {
+    it("produces identical rows, so a rebuild cannot alter what the audit says", () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+      const first = mapOne({ spanId: "bbbb0000000000a1" });
+      vi.setSystemTime(new Date("2027-06-30T12:34:56Z"));
+      const second = mapOne({ spanId: "bbbb0000000000a1" });
+      expect(second).toEqual(first);
+    });
+  });
+});
+
+describe("createGovernanceOcsfEventsMap", () => {
+  it("writes one row per governance span in a single batch", async () => {
+    const writeBatch = vi.fn().mockResolvedValue(undefined);
+    const map = createGovernanceOcsfEventsMap({
+      store: { kind: "append", writeBatch },
+    });
+
+    const result = await map.apply({
+      tenantId: TENANT_ID,
+      events: [
+        {
+          type: "lw.obs.trace.span_received",
+          data: governanceSpan({ spanId: "bbbb0000000000a1" }),
+        },
+        {
+          type: "lw.obs.trace.span_received",
+          data: governanceSpan({ spanId: "bbbb0000000000a2" }),
+        },
+      ],
+    });
+
+    expect(result).toEqual({ written: 2 });
+    expect(writeBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes nothing for a non-governance span", async () => {
+    const writeBatch = vi.fn().mockResolvedValue(undefined);
+    const map = createGovernanceOcsfEventsMap({
+      store: { kind: "append", writeBatch },
+    });
+
+    const result = await map.apply({
+      tenantId: TENANT_ID,
+      events: [
+        {
+          type: "lw.obs.trace.span_received",
+          data: canonicalSpan({ tenantId: TENANT_ID, attributes: {} }),
+        },
+      ],
+    });
+
+    expect(result).toEqual({ written: 0 });
+    expect(writeBatch).not.toHaveBeenCalled();
+  });
+});

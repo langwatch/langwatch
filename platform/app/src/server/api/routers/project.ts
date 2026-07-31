@@ -444,12 +444,15 @@ export const projectRouter = createTRPCRouter({
             reason: "already_running" as const,
           };
         }
-        await app.topicClustering.requestClustering({
-          tenantId: input.projectId,
-          occurredAt: Date.now(),
-          trigger: "manual",
-          requestedByUserId: ctx.session.user.id,
-        });
+        await app.topicClustering.requestClustering(
+          {
+            projectId: input.projectId,
+            occurredAt: Date.now(),
+            trigger: "manual",
+            requestedByUserId: ctx.session.user.id,
+          },
+          { tenantId: input.projectId },
+        );
         return { started: true as const };
       } catch (error) {
         captureException(toError(error), {

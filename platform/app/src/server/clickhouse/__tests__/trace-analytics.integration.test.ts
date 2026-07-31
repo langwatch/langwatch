@@ -29,18 +29,14 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
+import type { TraceAnalyticsRow } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { TRACE_ANALYTICS_STATE_VERSION } from "~/server/event-sourcing/trace-processing/traceAnalytics.projection";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  projectAnalyticsStateToRow,
-  TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
-  type TraceAnalyticsData,
-  type TraceAnalyticsRow,
-} from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+} from "~/test-utils/integration/testContainers";
 
 let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;
@@ -58,8 +54,7 @@ function makeAnalyticsRow(
   return {
     tenantId: "tenant-default",
     traceId: "trace-default",
-    version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
-    hasSignal: true,
+    version: TRACE_ANALYTICS_STATE_VERSION,
     occurredAtMs: baseMs,
     createdAtMs: baseMs,
     updatedAtMs: baseMs,
@@ -350,40 +345,37 @@ describe("trace_analytics slim fold (integration)", () => {
       // needed here for slim, but trace_summaries' upsert is async — flush
       // after both writes so the read sees both rows.
       await summaryRepo.upsertBatch([{ data: state, tenantId }]);
-      // Build a slim state mirroring the same canonical inputs the trace
-      // summary carries. Slim's state type is the subset of fields slim's
-      // handlers need; the cross-check is over the hoisted dim columns, which
-      // are read from these fields on both folds.
-      const slimState: TraceAnalyticsData = {
+      // The slim row mirroring the same canonical inputs: the hoisted dim
+      // columns the cross-check compares are read off the trace summary's own
+      // state and attribute map, which is where the slim fold reads them from.
+      const slimRow = makeAnalyticsRow({
+        tenantId,
         traceId: state.traceId,
+        occurredAtMs: state.occurredAt,
+        earliestSpanStartMs: state.occurredAt,
+        createdAtMs: state.createdAt,
+        updatedAtMs: state.updatedAt,
+        lastEventOccurredAt: state.LastEventOccurredAt,
         spanCount: state.spanCount,
+        traceName: state.traceName,
         topicId: state.topicId,
         subTopicId: state.subTopicId,
-        traceName: state.traceName,
         models: state.models,
-        // The trace-summary state has no anchor of its own — the slim fold
-        // freezes it on the first contribution — so mirror the summary's
-        // occurred-at, which for this in-order fixture is the same instant.
-        storageAnchorMs: state.occurredAt,
-        occurredAt: state.occurredAt,
-        totalDurationMs: state.totalDurationMs,
+        origin: state.attributes["langwatch.origin"] ?? "",
+        userId: state.attributes["langwatch.user_id"] ?? null,
+        conversationId: state.attributes["gen_ai.conversation.id"] ?? null,
+        labels: JSON.parse(
+          state.attributes["langwatch.labels"] ?? "[]",
+        ) as string[],
         totalCost: state.totalCost,
         nonBilledCost: state.nonBilledCost,
-        totalPromptTokenCount: state.totalPromptTokenCount,
-        totalCompletionTokenCount: state.totalCompletionTokenCount,
+        totalDurationMs: state.totalDurationMs,
         timeToFirstTokenMs: state.timeToFirstTokenMs,
         tokensPerSecond: state.tokensPerSecond,
-        containsErrorStatus: state.containsErrorStatus,
+        promptTokens: state.totalPromptTokenCount,
+        completionTokens: state.totalCompletionTokenCount,
+        hasError: state.containsErrorStatus,
         annotationIds: state.annotationIds,
-        attributes: state.attributes,
-        createdAt: state.createdAt,
-        updatedAt: state.updatedAt,
-        LastEventOccurredAt: state.LastEventOccurredAt,
-      };
-      const slimRow = projectAnalyticsStateToRow({
-        state: slimState,
-        tenantId,
-        version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
       });
       await analyticsRepo.upsertBatch([{ row: slimRow }]);
       await flushAsyncInserts();

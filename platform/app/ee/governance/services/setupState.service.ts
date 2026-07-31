@@ -19,7 +19,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { clickHouseForOrganization } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { PROJECT_KIND } from "./governanceProject.service";
 
 export interface GovernanceSetupState {
@@ -70,7 +70,7 @@ export class GovernanceSetupStateService {
       }),
       // Persona-3 detection: any application-kind project that has ever
       // received its first message (firstMessage flag is set by the
-      // collectorWorker + projectMetadata reactor on the first ingested
+      // projectMetadata event subscriber on the first ingested
       // span). Excludes internal_governance projects so a freshly-minted
       // Gov Project alone does not flip persona-3 to true.
       this.prisma.project.count({
@@ -139,12 +139,13 @@ export class GovernanceSetupStateService {
     });
     if (!govProject) return false;
 
-    const ch = await getClickHouseClientForOrganization(organizationId);
+    const ch = clickHouseForOrganization(organizationId);
     if (!ch) return false;
 
     const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const result = await ch.query({
-      query: `
+    const rows = await ch.query<{ hit: number }>({
+      table: "trace_summaries",
+      sql: `
         SELECT 1 AS hit
         FROM trace_summaries ts
         WHERE ts.TenantId = {tenantId:String}
@@ -152,10 +153,8 @@ export class GovernanceSetupStateService {
           AND ts.Attributes['langwatch.origin.kind'] = 'ingestion_source'
         LIMIT 1
       `,
-      query_params: { tenantId: govProject.id, since },
-      format: "JSONEachRow",
+      params: { tenantId: govProject.id, since },
     });
-    const rows = (await result.json()) as Array<{ hit: number }>;
     return rows.length > 0;
   }
 }

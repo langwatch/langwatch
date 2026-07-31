@@ -6,53 +6,54 @@
  * the ORDER BY parser cannot drift between them and quietly stop proving the
  * tiebreak in one suite while still proving it in the other.
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { WriteTarget } from "@langwatch/clickhouse";
 import { register } from "prom-client";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 
 export interface CapturedQuery {
-  query: string;
-  query_params?: Record<string, unknown>;
+  sql: string;
+  params?: Record<string, unknown>;
+  table?: string;
 }
 
 export interface CapturedInsert {
   table?: string;
-  values?: unknown;
-  format?: string;
-  clickhouse_settings?: Record<string, unknown>;
+  rows?: unknown;
+  target?: WriteTarget;
+  settings?: Record<string, unknown>;
 }
 
 /**
  * A client that records the parameters of every `insert` and does nothing else.
  *
- * `wrapWithDefaultSettings` proxies only `.query`, so nothing injects settings
- * into an insert on the way past — whatever the repository passes is exactly
- * what reaches ClickHouse. That is why the settings have to be asserted here on
- * the caller's own params rather than trusted to a wrapper.
+ * The durability settings are no longer the repository's to pass — the package
+ * client merges them last and refuses to let a caller weaken them — so what is
+ * observable here is the write TARGET, which is what decides whether a failed
+ * insert may be re-sent.
  */
 export function capturingInsertClient(): {
-  client: ClickHouseClient;
+  client: TenantClickHouseClient;
   inserts: CapturedInsert[];
 } {
   const inserts: CapturedInsert[] = [];
   const client = {
     insert: async (params: CapturedInsert) => {
       inserts.push(params);
-      return { executed: true };
     },
-  } as unknown as ClickHouseClient;
+  } as unknown as TenantClickHouseClient;
   return { client, inserts };
 }
 
 /**
- * A client that returns one fixed record — the wire shape ClickHouse produces
- * for JSONEachRow, where DateTime64 columns arrive as strings.
+ * A client that returns one fixed record — the decoded, column-named row shape
+ * the tenant client hands back, where DateTime64 columns arrive as strings.
  */
 export function clientReturning(
   record: Record<string, unknown>,
-): ClickHouseClient {
+): TenantClickHouseClient {
   return {
-    query: async () => ({ json: async () => [record] }),
-  } as unknown as ClickHouseClient;
+    query: async () => [record],
+  } as unknown as TenantClickHouseClient;
 }
 
 /**
@@ -68,16 +69,16 @@ export function clientReturning(
  * `<column> ASC|DESC` and `length(<column>) DESC` keys, then LIMIT 1.
  */
 export function orderingClient(rows: Array<Record<string, unknown>>): {
-  client: ClickHouseClient;
+  client: TenantClickHouseClient;
   seen: CapturedQuery[];
 } {
   const seen: CapturedQuery[] = [];
   const client = {
     query: async (params: CapturedQuery) => {
       seen.push(params);
-      return { json: async () => applyOrderBy(rows, params.query).slice(0, 1) };
+      return applyOrderBy(rows, params.sql).slice(0, 1);
     },
-  } as unknown as ClickHouseClient;
+  } as unknown as TenantClickHouseClient;
   return { client, seen };
 }
 

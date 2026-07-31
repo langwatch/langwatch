@@ -1,5 +1,5 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import { describe, expect, it, vi } from "vitest";
+import type { ClickHouseClient } from "@langwatch/clickhouse";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClickHouseLangyAnalyticsEventRepository } from "../langy-analytics-event.clickhouse.repository";
 import type { LangyAnalyticsEventRecord } from "../langy-analytics-event.repository";
 
@@ -20,54 +20,87 @@ const record: LangyAnalyticsEventRecord = {
   acceptedAtMs: 1_100,
 };
 
+const COLUMN_NAMES = [
+  "TenantId",
+  "EventId",
+  "EventType",
+  "EventVersion",
+  "AggregateId",
+  "TurnId",
+  "UserId",
+  "Role",
+  "ToolName",
+  "Outcome",
+  "Model",
+  "DurationMs",
+  "OccurredAt",
+  "AcceptedAt",
+  "ProjectedAt",
+  "_retention_days",
+];
+
+const rowFor = (
+  overrides: Partial<{
+    eventId: string;
+    aggregateId: string;
+    retentionDays: number;
+  }>,
+): unknown[] => [
+  "project_1",
+  overrides.eventId ?? "event_1",
+  "lw.langy_conversation.agent_responded",
+  "2026-07-10",
+  overrides.aggregateId ?? "conversation_1",
+  "turn_1",
+  null,
+  "assistant",
+  null,
+  "completed",
+  null,
+  "123",
+  "1970-01-01 00:00:01.000",
+  "1970-01-01 00:00:01.100",
+  "2026-01-01 00:00:00.000",
+  overrides.retentionDays ?? 45,
+];
+
+const setUp = () => {
+  const insert = vi.fn().mockResolvedValue(undefined);
+  const resolveClient = vi
+    .fn()
+    .mockReturnValue({ insert } as unknown as ClickHouseClient);
+  const repository = new ClickHouseLangyAnalyticsEventRepository(resolveClient);
+  return { repository, resolveClient, insert };
+};
+
 describe("ClickHouseLangyAnalyticsEventRepository", () => {
-  it("writes one tenant-scoped event-grain row without reading first", async () => {
-    const insert = vi.fn().mockResolvedValue(undefined);
-    const resolveClient = vi
-      .fn()
-      .mockResolvedValue({ insert } as unknown as ClickHouseClient);
-    const repository = new ClickHouseLangyAnalyticsEventRepository(
-      resolveClient,
-    );
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("writes one tenant-scoped event-grain row through the positional codec", async () => {
+    const { repository, resolveClient, insert } = setUp();
 
     await repository.insert(record, 45);
 
     expect(resolveClient).toHaveBeenCalledWith("project_1");
     expect(insert).toHaveBeenCalledTimes(1);
     expect(insert).toHaveBeenCalledWith({
+      tenantId: "project_1",
       table: "langy_analytics_events",
-      values: [
-        {
-          TenantId: "project_1",
-          EventId: "event_1",
-          EventType: "lw.langy_conversation.agent_responded",
-          EventVersion: "2026-07-10",
-          AggregateId: "conversation_1",
-          TurnId: "turn_1",
-          UserId: null,
-          Role: "assistant",
-          ToolName: null,
-          Outcome: "completed",
-          Model: null,
-          DurationMs: "123",
-          OccurredAt: new Date(1_000),
-          AcceptedAt: new Date(1_100),
-          _retention_days: 45,
-        },
-      ],
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
+      rows: [rowFor({})],
+      columns: COLUMN_NAMES,
+      target: { kind: "replacing" },
     });
   });
 
   it("writes replay records as one acknowledged tenant batch", async () => {
-    const insert = vi.fn().mockResolvedValue(undefined);
-    const resolveClient = vi
-      .fn()
-      .mockResolvedValue({ insert } as unknown as ClickHouseClient);
-    const repository = new ClickHouseLangyAnalyticsEventRepository(
-      resolveClient,
-    );
+    const { repository, resolveClient, insert } = setUp();
 
     await repository.insertBatch(
       [
@@ -79,31 +112,24 @@ describe("ClickHouseLangyAnalyticsEventRepository", () => {
 
     expect(resolveClient).toHaveBeenCalledOnce();
     expect(insert).toHaveBeenCalledOnce();
-    expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        table: "langy_analytics_events",
-        values: [
-          expect.objectContaining({
-            EventId: "event_1",
-            AggregateId: "conversation_1",
-            _retention_days: 90,
-          }),
-          expect.objectContaining({
-            EventId: "event_2",
-            AggregateId: "conversation_2",
-            _retention_days: 90,
-          }),
-        ],
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      }),
-    );
+    expect(insert).toHaveBeenCalledWith({
+      tenantId: "project_1",
+      table: "langy_analytics_events",
+      rows: [
+        rowFor({ retentionDays: 90 }),
+        rowFor({
+          eventId: "event_2",
+          aggregateId: "conversation_2",
+          retentionDays: 90,
+        }),
+      ],
+      columns: COLUMN_NAMES,
+      target: { kind: "replacing" },
+    });
   });
 
   it("rejects a mixed-tenant batch before resolving a client", async () => {
-    const resolveClient = vi.fn();
-    const repository = new ClickHouseLangyAnalyticsEventRepository(
-      resolveClient,
-    );
+    const { repository, resolveClient } = setUp();
 
     await expect(
       repository.insertBatch(
@@ -115,10 +141,7 @@ describe("ClickHouseLangyAnalyticsEventRepository", () => {
   });
 
   it("does not resolve a client for an empty batch", async () => {
-    const resolveClient = vi.fn();
-    const repository = new ClickHouseLangyAnalyticsEventRepository(
-      resolveClient,
-    );
+    const { repository, resolveClient } = setUp();
 
     await repository.insertBatch([], 90);
 

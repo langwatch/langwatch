@@ -1,6 +1,6 @@
+import { DispatchError } from "@langwatch/event-sourcing";
 import { AlertType } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { Trace } from "~/server/tracer/types";
 
 const { sendMock } = vi.hoisted(() => ({ sendMock: vi.fn() }));
@@ -48,6 +48,7 @@ describe("sendSlackWebhook", () => {
   });
 
   describe("when the webhook post succeeds", () => {
+    /** @scenario "A successful Slack post returns without raising" */
     it("returns without raising", async () => {
       sendMock.mockResolvedValue(undefined);
       await expect(callSlack()).resolves.toBeUndefined();
@@ -66,6 +67,7 @@ describe("sendSlackWebhook", () => {
   });
 
   describe("when the webhook was revoked", () => {
+    /** @scenario "A revoked Slack webhook is terminal" */
     it("raises a non-retryable DispatchError", async () => {
       sendMock.mockRejectedValue({
         original: { response: { status: 404 } },
@@ -190,6 +192,7 @@ describe("sendSlackWebhook", () => {
   });
 
   describe("when the post fails with a transport error", () => {
+    /** @scenario "A failing Slack webhook no longer swallows the error" */
     it("raises a retryable DispatchError by default", async () => {
       sendMock.mockRejectedValue({ code: "ECONNREFUSED" });
       const err = await callSlack().catch((e: unknown) => e);
@@ -205,6 +208,7 @@ describe("sendRenderedSlackMessage", () => {
   });
 
   describe("when the webhook post succeeds", () => {
+    /** @scenario "An automation delivers through an incoming webhook" */
     it("posts the rendered payload without raising", async () => {
       sendMock.mockResolvedValue(undefined);
       await expect(callRendered()).resolves.toBeUndefined();

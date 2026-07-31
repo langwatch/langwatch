@@ -1,4 +1,7 @@
-import { EvaluatorConfigError } from "~/server/app-layer/evaluations/errors";
+import {
+  EvaluatorConfigError,
+  EvaluatorExecutionError,
+} from "~/server/app-layer/evaluations/errors";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
 import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
@@ -85,7 +88,7 @@ const buildThreadData = async (
   }
 
   // #4991: evaluators score against content, so the thread read must resolve
-  // the FULL offloaded IO (ADR-022), not the ≤64KB preview.
+  // the FULL offloaded IO (ADR-022, retired; ground now ADR-099), not the ≤64KB preview.
   const traceService = TraceService.create(
     undefined,
     buildTraceBlobResolutionDeps(),
@@ -274,7 +277,7 @@ export const runEvaluationForTrace = async ({
   workflowId?: string | null;
 }): Promise<EvaluationResultWithThreadId> => {
   // #4991: the trace being evaluated is read content-first — resolve the
-  // FULL offloaded IO (ADR-022) so the evaluator never scores a preview.
+  // FULL offloaded IO (ADR-022, retired; ground now ADR-099) so the evaluator never scores a preview.
   const traceService = TraceService.create(
     undefined,
     buildTraceBlobResolutionDeps(),
@@ -553,7 +556,16 @@ export const runEvaluation = async ({
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes("fetch failed")) {
-      throw new Error("Evaluator cannot be reached");
+      // The same failure as the langevals HTTP client's, and it gets the same
+      // treatment: a named handled error carrying copy the reader can act on.
+      // As a bare `Error` this one degraded to a generic "unknown", which is
+      // the one outcome we know is wrong — we know exactly what happened.
+      throw new EvaluatorExecutionError(
+        "Could not reach the evaluation service. It may be restarting — " +
+          "retry, and if this keeps happening it isn't running for this " +
+          "deployment.",
+        { meta: { evaluatorType: builtInEvaluatorType } },
+      );
     }
     throw error;
   }

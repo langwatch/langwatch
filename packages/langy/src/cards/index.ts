@@ -33,14 +33,9 @@
  * which the CLI has no use for and should not pay to load.
  */
 
-export * from "./primitives.js";
 export * from "./cliJson.js";
-export * from "./schemas.js";
 export * from "./derived-safe.js";
-export * from "./registry.js";
 export * from "./digest.js";
-export * from "./tool-result.js";
-
 /**
  * The handled-error reading is zod-free and also importable on its own
  * (`@langwatch/langy/cards/handled-error`) — the CLI's hot path takes that
@@ -49,3 +44,7 @@ export * from "./tool-result.js";
  * for the app, which has zod loaded already.
  */
 export * from "./handled-error.js";
+export * from "./primitives.js";
+export * from "./registry.js";
+export * from "./schemas.js";
+export * from "./tool-result.js";

@@ -18,11 +18,11 @@ Feature: Invitation Approval Workflow
   # batch / non-admin / email-failure edge cases.
   #
   # The Playwright e2e specs under
-  # `tests/agentic-e2e/tests/members/*.spec.ts` now RUN and PASS in CI
+  # `dev/tests/agentic-e2e/tests/members/*.spec.ts` now RUN and PASS in CI
   # (#1802): the three ADMIN `@e2e` scenarios below (immediate invite,
   # approve, reject) are live tests. They keep the `@unimplemented` tag
   # only because `check-feature-parity.ts` does not scan
-  # `tests/agentic-e2e/` and these specs carry no `@scenario` binding,
+  # `dev/tests/agentic-e2e/` and these specs carry no `@scenario` binding,
   # so parity cannot map them (extending the checker is a follow-up).
   # The remaining `@e2e` scenario (a non-admin MEMBER creating a
   # request) and the display-list scenarios (admin/non-admin

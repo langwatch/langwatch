@@ -1,144 +1,115 @@
-Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-sourced)
-  Once admins author AnomalyRules
-  (specs/ai-gateway/governance/anomaly-rules.feature) the detection
-  reactor evaluates each active rule **as new events arrive** through
-  the activity-monitor event-sourcing pipeline (modeled on PR #3351's
-  alertTrigger pattern — event sourcing is the one true way per
-  rchaves's 2026-04-27 directive). NO cron polling, NO worker —
-  evaluation is reactive: receiver appends `ActivityEventReceived`
-  to event_log → activity-monitor pipeline projects to
-  `gateway_activity_events` and folds rolling windows → anomaly
-  reactor reads fold state, evaluates active rules, persists
-  `AnomalyAlert` and dispatches.
+Feature: Anomaly detection — a rule's threshold breach surfaces as an alert
+  As an organization admin
+  I want a rule's threshold breach to surface as an alert I can review or route
+  So that unusual spend or activity does not go unnoticed
 
-  Triggered rules persist to `AnomalyAlert` so the admin oversight
-  dashboard (`api.activityMonitor.recentAnomalies`) shows real
-  detections. Dispatch reuses the shared trigger-action dispatch
-  pattern (`pipelines/shared/triggerActionDispatch.ts`).
-
-  v1 scope: two rule types — `spend_spike` and `after_hours` —
-  both map cleanly to existing `gateway_activity_events` fields
-  (CostUSD, Actor, EventTimestamp). Generic webhook + log-only
-  dispatch. Slack / PagerDuty / SIEM / email destinations ship in
-  follow-up dispatcher slices.
-
-  Sliced delivery (per @master_orchestrator's C0/C1/C2/C3):
-    - C0: this spec + activity-monitor event-sourcing architecture note
-    - C1: receiver → event_log append → projection reactor → CH row
-    - C2: AnomalyAlert schema + anomaly reactor for ONE rule type
-    - C3: dispatch destinations beyond log-only
-
-  Spec: this file
-  Pairs with: anomaly-rules.feature (configuration entity)
-              docs/ai-gateway/governance/architecture.md
-              (Activity-monitor event sourcing section)
-  Backend: platform/app/src/server/event-sourcing/pipelines/activity-monitor-processing/
+  # Scope: this file owns firing semantics and alert shape — when a rule
+  # fires and what the resulting alert says. Rule authoring (the settings
+  # page, CRUD) is anomaly-rules.feature. Destination routing and delivery
+  # (webhook retry, payload signing) is c3-alert-dispatch.feature. How a
+  # rule gets evaluated — on an event, on a timer, or any other means — is
+  # not this file's concern and must not appear in it: a customer cares
+  # that a breach is found, not what noticed it.
 
   Background:
     Given the org admin has authored at least one active AnomalyRule
-      (via api.anomalyRules.create from the /settings/governance/anomaly-rules UI)
-    And the IngestionSource for that rule's scope has been emitting
-      events for the past 30 days
 
-  Scenario: spend_spike rule fires when ratio exceeds threshold
-    Given an active rule "Daily spend spike" with:
-      | severity         | warning                                     |
-      | ruleType         | spend_spike                                 |
-      | scope            | source                                      |
-      | scopeId          | <ingestion source id>                       |
-      | thresholdConfig  | {windowSec: 86400, ratioVsBaseline: 2.0,   |
-      |                  |  minBaselineUsd: 10}                        |
-    When the windowed spend (last 24h) exceeds the trailing-7d
-      same-window baseline by 2.0× AND baseline >= USD 10
-    Then a new AnomalyAlert row is inserted with state="open",
-      severity="warning", ruleId set, triggerSpendUsd populated
-    And the alert appears in `api.activityMonitor.recentAnomalies` for the org
-    And the rule's destinationConfig.webhook (if set) receives a POST
-      with the OCSF-style alert payload
-    And duplicate alerts for the same window are deduplicated by
-      (ruleId, triggerWindowStart) so a re-evaluation in the same
-      window updates the existing row rather than creating a second
+  # ---------------------------------------------------------------------------
+  # spend_spike: the only rule type currently evaluated
+  # ---------------------------------------------------------------------------
 
-  Scenario: after_hours rule fires on out-of-window activity
-    Given an active rule "Off-hours surge" with:
-      | severity         | critical                                       |
-      | ruleType         | after_hours                                    |
-      | scope            | organization                                   |
-      | scopeId          | <organization id>                              |
-      | thresholdConfig  | {startHour: 18, endHour: 6, timezone: "UTC",  |
-      |                  |  requestsThreshold: 100, windowSec: 3600}      |
-    When the rolling 1h request count outside business hours (18:00 → 06:00 UTC)
-      exceeds 100
-    Then a new AnomalyAlert is inserted with severity="critical"
-    And the alert detail includes the contributing actors list (top 5)
-    And `recentAnomalies` returns the alert ordered by detectedAt DESC
+  @unit @unimplemented
+  Scenario: a spend spike crossing the rule's threshold surfaces an anomaly
+    Given an active spend_spike rule with a baseline large enough to be meaningful
+    When spend in the current window exceeds the rule's threshold over its recent baseline
+    Then an anomaly alert is recorded for the rule
+    And the alert names the window and the spend that triggered it
+    And the alert surfaces within the detection window
 
-  Scenario: dispatched generic webhook payload has the canonical shape
-    Given a rule with destinationConfig.webhook = { url: "https://hooks.example/anomaly", authHeader: "Bearer s3cr3t" }
+  @unit @unimplemented
+  Scenario: a spend spike against a baseline too small to be meaningful does not surface an anomaly
+    Given an active spend_spike rule whose recent baseline spend is smaller than the rule considers meaningful
+    When spend in the current window would otherwise cross the ratio threshold
+    Then no anomaly alert is recorded
+    # A ratio alone can't tell real growth from noise on an account that
+    # barely spends yet — the rule declines to fire rather than false-alarm.
+
+  @unit @unimplemented
+  Scenario: spend under the threshold does not surface an anomaly
+    Given an active spend_spike rule with a meaningful baseline
+    When spend in the current window stays under the rule's threshold
+    Then no anomaly alert is recorded
+
+  @unit @unimplemented
+  Scenario: a rule does not surface a second anomaly for a window it already flagged
+    Given a spend_spike rule already has an open alert covering the current window
+    When the rule is evaluated again for that same window
+    Then no second alert is recorded
+
+  # ---------------------------------------------------------------------------
+  # A rule type an admin can author today that nothing yet evaluates
+  # ---------------------------------------------------------------------------
+
+  @unit @unimplemented
+  Scenario: an after_hours rule can be authored but does not yet fire
+    Given an admin authors an active after_hours rule
+    When activity matching its configured hours and threshold occurs
+    Then no anomaly alert is recorded
+    # after_hours is a valid ruleType in the authoring UI and the schema,
+    # but nothing evaluates it yet. This is a real gap, not a spec error —
+    # see anomaly-rules.feature for what authoring one looks like today.
+
+  # ---------------------------------------------------------------------------
+  # A disabled or archived rule stops firing on data that would otherwise trip it
+  # ---------------------------------------------------------------------------
+
+  @unit @unimplemented
+  Scenario: a disabled rule does not fire
+    Given a rule with status "disabled"
+    When activity occurs that would otherwise trigger it
+    Then no anomaly alert is recorded
+
+  # ---------------------------------------------------------------------------
+  # Tenant isolation
+  # ---------------------------------------------------------------------------
+
+  @integration @unimplemented
+  Scenario: alerts are visible only within the organization that owns the rule
+    Given two organizations each have a spend_spike rule that fires
+    When an admin of one organization reviews its anomalies
+    Then only that organization's alerts are visible
+    And no alert belonging to the other organization is ever returned
+
+  # ---------------------------------------------------------------------------
+  # The alert is the durable record — routing is a separate, best-effort concern
+  # ---------------------------------------------------------------------------
+
+  @integration @unimplemented
+  Scenario: a fired alert is visible on the dashboard even with no destination configured
+    Given a rule with no destinations configured
     When the rule fires
-    Then a POST to the webhook URL is sent with:
-      | header               | value                          |
-      | Authorization        | Bearer s3cr3t                  |
-      | Content-Type         | application/json               |
-    And the body is JSON with fields:
-      | type             | anomaly_alert                  |
-      | alertId          | <AnomalyAlert.id>              |
-      | ruleId           | <AnomalyRule.id>               |
-      | ruleName         | <AnomalyRule.name>             |
-      | severity         | <AnomalyRule.severity>         |
-      | ruleType         | <AnomalyRule.ruleType>         |
-      | organizationId   | <org id>                       |
-      | scope            | <AnomalyRule.scope>            |
-      | scopeId          | <AnomalyRule.scopeId>          |
-      | triggerWindowStart | ISO8601                      |
-      | triggerWindowEnd   | ISO8601                      |
-      | triggerSpendUsd  | numeric                        |
-      | triggerEventCount| integer                        |
-      | detail           | { ... per-rule-type ... }      |
-    And dispatch failures (4xx/5xx/timeout) record `destinationStatus`
-      = { lastAttemptIso, lastError, attemptCount } on the alert row
-    And dispatch failures don't roll back the alert's persistence
-      (we still want it in the dashboard)
+    Then the alert is recorded and visible on the admin oversight dashboard
+    # Destination routing and delivery are c3-alert-dispatch.feature's
+    # contract, not this file's.
 
-  Scenario: log-only dispatch when no destination is configured
-    Given a rule with destinationConfig = {} (no webhook / Slack / etc)
-    When the rule fires
-    Then the alert is persisted (still visible in `recentAnomalies`)
-    And a structured log line is written at WARN level with the alert payload
-    And no external dispatch attempt is made
+  @integration @unimplemented
+  Scenario: a fired alert stays visible on the dashboard even when delivery to its destination fails
+    Given a rule with a destination configured
+    When the rule fires and delivery to that destination fails
+    Then the alert is still recorded and visible on the admin oversight dashboard
+    # Dispatch is best-effort; the alert row is authoritative regardless of
+    # delivery outcome.
 
-  Scenario: api.anomalyRules.evaluateNow is a test/dogfood harness only
-    Given an admin wants to test their newly-authored rule without
-      waiting for a real event to arrive
-    When they call `api.anomalyRules.evaluateNow({ id: <ruleId> })`
-    Then a synthetic ActivityEventReceived event is appended to event_log
-      against the rule's scope (the production code path — the reactor
-      processes it identically to a real ingest)
-    And the call returns { triggered: boolean, alertId?: string }
-    And subsequent UI poll of `recentAnomalies` reflects the result
-    And this is explicitly NOT the production architecture: production
-      evaluation is reactor-on-event-append, never poller-on-cron.
+  # ---------------------------------------------------------------------------
+  # Detection is independent of the governance UI
+  # ---------------------------------------------------------------------------
 
-  Scenario: disabled rules are not evaluated
-    Given a rule with status="disabled"
-    When the anomaly-detection reactor fires for an event in the rule's scope
-    Then the rule is skipped during the in-memory active-rules loop
-    And no alert is generated even if the underlying data would trigger
-
-  Scenario: Tenant isolation — alerts are scoped to one org
-    Given two orgs both have spend_spike rules that fire concurrently
-    When acme-corp's admin queries `recentAnomalies`
-    Then only acme-corp's alerts are returned
-    And no cross-org alert leakage at any layer (PG WHERE OrganizationId,
-      CH WHERE OrganizationId on the spend query)
-
-  Scenario: Backend keeps evaluating when UI is gated off
-    Given a customer org doesn't have the governance preview flag enabled
-    When their AnomalyRules still have status="active"
-    Then the anomaly-detection reactor still fires on every
-      ActivityEventReceived event
-    And alerts persist as usual
-    And dispatch destinations still receive notifications
-    And the alerts surface the moment the org enables the flag
-    (Same gating contract as activity ingestion: backend always-on,
-     UI-gated only.)
+  @integration @unimplemented
+  Scenario: alerts keep firing while the governance preview flag is off for an org
+    Given a customer org does not have the governance preview flag enabled
+    And their AnomalyRules are still active
+    When activity occurs that would trigger a rule
+    Then an anomaly alert is still recorded
+    And it surfaces the moment the org enables the flag
+    # Same gating contract as the rest of governance ingestion: detection
+    # is always on, the UI is what's flagged.

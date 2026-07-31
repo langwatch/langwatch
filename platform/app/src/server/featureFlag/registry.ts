@@ -82,7 +82,7 @@ export const FEATURE_FLAGS = [
     scope: "SYSTEM",
     defaultValue: false,
     description:
-      "Disables the per-event evaluator causality-loop guard in the trace-processing reactor. Emergency only; bypasses the safeguard that stopped the 2026-05 outage.",
+      "Disables the per-event evaluator causality-loop guard in the trace-processing evaluation-trigger process manager. Emergency only; bypasses the safeguard that stopped the 2026-05 outage.",
     family: "Event sourcing",
     legacyEnvVar: "LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD",
   },
@@ -98,7 +98,8 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
-  // Kill switch for the evaluation-inputs offload (ADR-040). The offload is ON
+  // Kill switch for the evaluation-inputs offload (ADR-096, retired; ground
+  // now ADR-098). The offload is ON
   // by default: oversized evaluator inputs go to the durable stored-objects
   // service and the event/row carry a bounded marker instead of the full
   // payload. Flipping this ON keeps inputs inline (only the unconditional
@@ -109,7 +110,7 @@ export const FEATURE_FLAGS = [
     scope: "SYSTEM",
     defaultValue: false,
     description:
-      "Disables the oversized evaluator-inputs offload to durable object storage (ADR-040). While on, inputs flow inline and only the unconditional 8 MiB repository cap bounds the ClickHouse row. Emergency operator override for object-storage trouble.",
+      "Disables the oversized evaluator-inputs offload to durable object storage (ADR-096). While on, inputs flow inline and only the unconditional 8 MiB repository cap bounds the ClickHouse row. Emergency operator override for object-storage trouble.",
     family: "Event sourcing",
   },
   // Per-span token estimation kill switches. Hardcoded raw keys before;
@@ -142,7 +143,8 @@ export const FEATURE_FLAGS = [
     description:
       "Surfaces the AI Gateway menu in the project sidebar. Default flipped to on: operators can hide the surface per project via a PostHog rule or operator-store row.",
   },
-  // Per-project gate for trace blob offload (#4215 / ADR-022). Checked ONCE per
+  // Per-project gate for trace blob offload (#4215 / ADR-022, retired;
+  // ground now ADR-099). Checked ONCE per
   // ingestion request (not per span) via the postgres-cached store, so the
   // hot-path cost is one cached lookup. When on, over-threshold spans get
   // routed via the transient S3 spool at the edge (ADR-022). Off = today's
@@ -187,7 +189,7 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via PostHog or the operator store to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
-  // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
+  // ADR-034 (retired; ground now ADR-099) Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
   // when the query shape allows. OFF (default) = legacy trace_summaries reads
   // unchanged. The router (`pickAnalyticsTable`) is the SINGLE place that
@@ -199,7 +201,7 @@ export const FEATURE_FLAGS = [
     description:
       "Routes analytics getTimeseries reads to the slim trace_analytics / rollup trace_analytics_rollup tables (ADR-034 Phases 1+2) when the query shape allows. Off = legacy trace_summaries reads unchanged.",
   },
-  // ADR-034 Phase 3 tripwire — when ON, runs both the routed query AND the
+  // ADR-034 (retired; ground now ADR-099) Phase 3 tripwire — when ON, runs both the routed query AND the
   // legacy `trace_summaries` query in parallel and logs a structured warning
   // on divergence beyond a small numeric tolerance. Returns the routed result
   // either way; thin wrapper, no read-path duplication beyond the comparison.
@@ -211,7 +213,8 @@ export const FEATURE_FLAGS = [
     description:
       "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
   },
-  // NOTE: `release_es_graph_triggers_firing` (ADR-034 Phase 5) was retired —
+  // NOTE: `release_es_graph_triggers_firing` (ADR-034, retired; ground now
+  // ADR-099, Phase 5) was retired —
   // the event-sourced graph-alert path is now unconditional and the K8s cron
   // was removed, so there is no longer a cron/ES choice to gate.
   // SYSTEM on purpose despite being a product surface: the Langy rollout is
@@ -259,13 +262,18 @@ export const FEATURE_FLAGS = [
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [
-  // Event-sourcing pipeline component kill switches. Names generated by
-  // generateKillSwitchKey() in src/server/event-sourcing/utils/killSwitch.ts
-  // as `es-<aggregate>-<componentType>-<componentName>-killswitch`. Default
+  // Event-sourcing pipeline component kill switches, named
+  // `es-<aggregate>-<componentType>-<componentName>-killswitch`. Default
   // is false (component runs) so absence of a row means "let it run".
   // This family is the one that drove the 2026-05 PostHog billing
   // spike: each new (tenant × component) combination minted a fresh
   // cache key.
+  //
+  // The generator that minted these keys was retired with the deleted
+  // event-sourcing tree — the engine now consults one `enabled?(lane)`
+  // predicate per ADR-108 §13 instead of a per-component switch — so this
+  // family may be entirely vestigial. Left as-is pending confirmation from
+  // whoever owns the engine's port wiring; not touched by this repoint.
   {
     keyPrefix: "es-",
     keySuffix: "-killswitch",

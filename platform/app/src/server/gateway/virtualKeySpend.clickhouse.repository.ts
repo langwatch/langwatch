@@ -22,7 +22,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 
 const TRACE_SUMMARIES_TABLE = "trace_summaries";
 const VK_ATTRIBUTE = "langwatch.virtual_key_id";
@@ -85,8 +85,14 @@ export class GatewayVirtualKeySpendRepository {
 
     try {
       const client = await this.resolveClient(tenantIds[0]!);
-      const result = await client.query({
-        query: `
+      type Row = {
+        VirtualKeyId: string;
+        SpentUSD: string;
+        Requests: number | string;
+      };
+      const rows = await client.query<Row>({
+        table: TRACE_SUMMARIES_TABLE,
+        sql: `
           SELECT
             VirtualKeyId,
             toString(sum(TraceCost)) AS SpentUSD,
@@ -106,15 +112,8 @@ export class GatewayVirtualKeySpendRepository {
           )
           GROUP BY VirtualKeyId
         `,
-        query_params: params,
-        format: "JSONEachRow",
+        params,
       });
-      type Row = {
-        VirtualKeyId: string;
-        SpentUSD: string;
-        Requests: number | string;
-      };
-      const rows = (await result.json()) as Row[];
       return rows.map((r) => ({
         virtualKeyId: r.VirtualKeyId,
         spentUsd: r.SpentUSD,
@@ -168,8 +167,17 @@ export class GatewayVirtualKeySpendRepository {
 
     try {
       const client = await this.resolveClient(tenantIds[0]!);
-      const result = await client.query({
-        query: `
+      type Row = {
+        virtualKeyId: string;
+        model: string;
+        day: string;
+        totalUsd: string;
+        requests: number | string;
+        blockedRequests: number | string;
+      };
+      const rows = await client.query<Row>({
+        table: TRACE_SUMMARIES_TABLE,
+        sql: `
           SELECT
             VirtualKeyId AS virtualKeyId,
             Model AS model,
@@ -199,18 +207,8 @@ export class GatewayVirtualKeySpendRepository {
           )
           GROUP BY VirtualKeyId, Model, Day
         `,
-        query_params: params,
-        format: "JSONEachRow",
+        params,
       });
-      type Row = {
-        virtualKeyId: string;
-        model: string;
-        day: string;
-        totalUsd: string;
-        requests: number | string;
-        blockedRequests: number | string;
-      };
-      const rows = (await result.json()) as Row[];
       return rows.map((r) => ({
         virtualKeyId: r.virtualKeyId,
         model: r.model,
@@ -267,8 +265,21 @@ export class GatewayVirtualKeySpendRepository {
 
     try {
       const client = await this.resolveClient(tenantIds[0]!);
-      const result = await client.query({
-        query: `
+      type Row = {
+        traceId: string;
+        virtualKeyId: string;
+        costUsd: string;
+        models: string[];
+        occurredAtMs: string | number;
+        promptTokens: string | number;
+        completionTokens: string | number;
+        durationMs: string | number;
+        hasError: boolean | number;
+        blocked: boolean | number;
+      };
+      const rows = await client.query<Row>({
+        table: TRACE_SUMMARIES_TABLE,
+        sql: `
           SELECT
             TraceId AS traceId,
             VirtualKeyId AS virtualKeyId,
@@ -303,22 +314,8 @@ export class GatewayVirtualKeySpendRepository {
           ORDER BY occurredAtMs DESC
           LIMIT {limit:UInt32}
         `,
-        query_params: params,
-        format: "JSONEachRow",
+        params,
       });
-      type Row = {
-        traceId: string;
-        virtualKeyId: string;
-        costUsd: string;
-        models: string[];
-        occurredAtMs: string | number;
-        promptTokens: string | number;
-        completionTokens: string | number;
-        durationMs: string | number;
-        hasError: boolean | number;
-        blocked: boolean | number;
-      };
-      const rows = (await result.json()) as Row[];
       return rows.map((r) => ({
         traceId: r.traceId,
         virtualKeyId: r.virtualKeyId,

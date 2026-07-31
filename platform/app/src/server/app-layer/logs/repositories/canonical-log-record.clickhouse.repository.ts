@@ -1,13 +1,13 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import {
   type StoredLogRecordRow,
   TRACE_LOG_READ_CAP,
 } from "~/server/app-layer/traces/repositories/log-record-storage.repository";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { CanonicalLogRecord } from "~/server/event-sourcing/log-processing/schema";
 import type { CanonicalLogRecordRepository } from "./canonical-log-record.repository";
 
 const logger = createLogger(
@@ -20,7 +20,7 @@ function dedupVersion(acceptedAt: number): string {
 }
 
 function validate(record: CanonicalLogRecord, operation: string) {
-  EventUtils.validateTenantId({ tenantId: record.tenantId }, operation);
+  validateTenantId({ tenantId: record.tenantId }, operation);
   if (!/^[a-f0-9]{64}$/.test(record.recordId)) {
     throw new SecurityError(operation, "invalid RecordId", record.tenantId);
   }
@@ -142,17 +142,15 @@ export class CanonicalLogRecordClickHouseRepository
       try {
         await client.insert({
           table: "log_records",
-          values: tenantRecords.map((record) =>
+          rows: tenantRecords.map((record) =>
             toLogRecordRow({ record, retentionDays }),
           ),
-          format: "JSONEachRow",
-          clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+          target: writeTargetFor("log_records"),
         });
         await client.insert({
           table: "log_usage_estimates",
-          values: tenantRecords.map((record) => toUsageEstimateRow(record)),
-          format: "JSONEachRow",
-          clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+          rows: tenantRecords.map((record) => toUsageEstimateRow(record)),
+          target: writeTargetFor("log_usage_estimates"),
         });
       } catch (error) {
         logger.error(
@@ -192,14 +190,24 @@ export class CanonicalLogRecordClickHouseRepository
     occurredAtMs?: number;
     limit?: number;
   }): Promise<StoredLogRecordRow[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "CanonicalLogRecordClickHouseRepository.getLogsByTraceId",
     );
     const client = await this.resolveClient(tenantId);
     const { from, to } = this.window(occurredAtMs);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      TraceId: string;
+      SpanId: string;
+      TimeUnixMs: number | string;
+      BodyText: string | null;
+      AttributesFlatJson: string;
+      ResourceAttributesFlatJson: string;
+      ScopeName: string;
+      ScopeVersion: string;
+    }>({
+      table: "log_records",
+      sql: `
         SELECT
           CorrelationTraceId AS TraceId,
           CorrelationSpanId AS SpanId,
@@ -220,19 +228,8 @@ export class CanonicalLogRecordClickHouseRepository
         ORDER BY TimeUnixNano ASC, RecordId ASC
         LIMIT {limit:UInt64}
       `,
-      query_params: { tenantId, traceId, from, to, limit },
-      format: "JSONEachRow",
+      params: { tenantId, traceId, from, to, limit },
     });
-    const rows = await result.json<{
-      TraceId: string;
-      SpanId: string;
-      TimeUnixMs: number | string;
-      BodyText: string | null;
-      AttributesFlatJson: string;
-      ResourceAttributesFlatJson: string;
-      ScopeName: string;
-      ScopeVersion: string;
-    }>();
     if (rows.length >= limit) {
       logger.warn(
         { tenantId, traceId, limit },

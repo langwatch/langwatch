@@ -20,7 +20,7 @@ import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
 import type { BlobStore } from "../blob-store.service";
 import { BlobNotFoundError } from "../blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "../lean-for-projection";

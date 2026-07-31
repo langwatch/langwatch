@@ -1,6 +1,7 @@
 /**
  * Integration-flavored tests for TraceService.getTracesWithSpans with blob
- * resolution wired in (ADR-022). Uses a fake BlobStore (getFromEventLog stub)
+ * resolution wired in (ADR-022, retired; ground now ADR-099). Uses a fake
+ * BlobStore (getFromEventLog stub)
  * and the real TraceIOExtractionService to verify that the resolution pipeline
  * accepts the updated deps shape and delegates correctly.
  *

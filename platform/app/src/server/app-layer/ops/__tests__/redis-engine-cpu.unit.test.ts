@@ -13,6 +13,7 @@ const prev = (overrides: Partial<RedisCpuSample> = {}): RedisCpuSample => ({
 
 describe("computeEngineCpuPercent", () => {
   describe("given there is no previous sample", () => {
+    /** @scenario "Engine CPU percent is null on the first collection cycle" */
     it("returns null on the first cycle", () => {
       const result = computeEngineCpuPercent({
         prev: null,
@@ -25,6 +26,7 @@ describe("computeEngineCpuPercent", () => {
   });
 
   describe("given two samples 1000ms apart", () => {
+    /** @scenario "Engine CPU percent is derived from two successive INFO snapshots" */
     it("returns 40 when 0.3s user + 0.1s sys CPU was used", () => {
       const result = computeEngineCpuPercent({
         prev: prev({ userSec: 100, sysSec: 50, sampledAt: 1_000_000 }),
@@ -35,6 +37,7 @@ describe("computeEngineCpuPercent", () => {
       expect(result).toBeCloseTo(40, 1);
     });
 
+    /** @scenario "Engine CPU percent stays at 0 when no CPU time elapsed between samples" */
     it("returns 0 when CPU counters did not advance at all", () => {
       const result = computeEngineCpuPercent({
         prev: prev({ userSec: 100, sysSec: 50, sampledAt: 1_000_000 }),
@@ -45,6 +48,7 @@ describe("computeEngineCpuPercent", () => {
       expect(result).toBe(0);
     });
 
+    /** @scenario "Engine CPU percent is rounded to one decimal" */
     it("rounds the result to one decimal place", () => {
       // 0.12349s of CPU over 1.0s wall = 12.349% → rounded to 12.3
       const result = computeEngineCpuPercent({
@@ -58,6 +62,7 @@ describe("computeEngineCpuPercent", () => {
   });
 
   describe("given the cumulative CPU counter went backwards", () => {
+    /** @scenario "Engine CPU resets cleanly when Redis restarts and counters go backwards" */
     it("returns null because Redis was restarted between samples", () => {
       const result = computeEngineCpuPercent({
         prev: prev({ userSec: 1000, sysSec: 500, sampledAt: 1_000_000 }),
@@ -68,6 +73,7 @@ describe("computeEngineCpuPercent", () => {
       expect(result).toBeNull();
     });
 
+    /** @scenario "Engine CPU resets cleanly when Redis restarts and counters go backwards" */
     it("resumes computing percent on the cycle after the rewind", () => {
       // Cycle N: prev=1000, next=5  → returns null (rewind detected)
       // Cycle N+1: prev=5, next=5.4 → returns 40

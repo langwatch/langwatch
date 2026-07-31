@@ -206,6 +206,7 @@ describe("reportWindowMs", () => {
 
 describe("dispatchScheduledReport", () => {
   describe("given a Slack report is due", () => {
+    /** @scenario "A trace-query report sends the traces that matched" */
     it("renders the report default and posts to the webhook with a view link", async () => {
       const { deps, sendSlack } = makeDeps(makeReportTrigger());
       await dispatchScheduledReport({ deps, fire });
@@ -236,6 +237,7 @@ describe("dispatchScheduledReport", () => {
   });
 
   describe("given a traceQuery report is due", () => {
+    /** @scenario "A trace-query report sends the traces that matched" */
     it("queries the schedule window and renders the matching traces into Slack", async () => {
       const { deps, sendSlack, listReportTraces } = makeDeps(
         makeReportTrigger(),
@@ -265,6 +267,7 @@ describe("dispatchScheduledReport", () => {
     });
 
     describe("when the author wrote a search query", () => {
+      /** @scenario "A trace-query report sends the traces that matched" */
       it("scopes the report to it, so 'top matching traces' actually matches", async () => {
         const { deps, listReportTraces } = makeDeps(
           makeReportTrigger({
@@ -281,6 +284,7 @@ describe("dispatchScheduledReport", () => {
     });
 
     describe("when the author wrote no query", () => {
+      /** @scenario "A trace-query report without a query sends the window's traces" */
       it("passes an empty query, meaning the whole window", async () => {
         const { deps, listReportTraces } = makeDeps(makeReportTrigger());
         await dispatchScheduledReport({ deps, fire });
@@ -289,6 +293,7 @@ describe("dispatchScheduledReport", () => {
     });
 
     describe("when nothing matched", () => {
+      /** @scenario "A report whose source has no data still delivers" */
       it("still delivers, saying there was nothing to show", async () => {
         const { deps, sendSlack } = makeDeps(makeReportTrigger(), {
           traces: [],
@@ -302,6 +307,7 @@ describe("dispatchScheduledReport", () => {
   });
 
   describe("given a MONTHLY report is due", () => {
+    /** @scenario "A monthly report covers the month, not the trailing week" */
     it("summarises the whole month, not the trailing week", async () => {
       const { deps, listReportTraces } = makeDeps(
         makeReportTrigger({
@@ -327,6 +333,7 @@ describe("dispatchScheduledReport", () => {
   });
 
   describe("given a customGraph report is due", () => {
+    /** @scenario "A custom-graph report sends the graph" */
     it("loads the graph's charts instead of traces", async () => {
       const { deps, sendSlack, listReportTraces, loadReportCharts } = makeDeps(
         makeReportTrigger({
@@ -353,6 +360,7 @@ describe("dispatchScheduledReport", () => {
   });
 
   describe("given a dashboard report is due", () => {
+    /** @scenario "A dashboard report sends every panel on the dashboard" */
     it("loads every panel on the dashboard", async () => {
       const { deps, loadReportCharts } = makeDeps(
         makeReportTrigger({
@@ -375,6 +383,7 @@ describe("dispatchScheduledReport", () => {
   });
 
   describe("given the trigger is inactive or gone", () => {
+    /** @scenario "A report whose automation is inactive or gone sends nothing" */
     it("skips without sending", async () => {
       const { deps, sendSlack } = makeDeps(
         makeReportTrigger({ active: false }),
@@ -389,6 +398,7 @@ describe("dispatchScheduledReport", () => {
   });
 
   describe("given the report is delivered", () => {
+    /** @scenario "A delivered report records that it ran" */
     it("records the fire, so the automations page can show it ran", async () => {
       const { deps, recordFire } = makeDeps(makeReportTrigger());
 
@@ -403,6 +413,7 @@ describe("dispatchScheduledReport", () => {
     });
 
     describe("when recording the fire fails", () => {
+      /** @scenario "Failing to record the fire does not fail a report already delivered" */
       it("does not fail the dispatch — the report already reached the customer", async () => {
         const { deps, recordFire, sendSlack } = makeDeps(makeReportTrigger());
         recordFire.mockRejectedValueOnce(new Error("postgres is down"));
@@ -416,6 +427,7 @@ describe("dispatchScheduledReport", () => {
   });
 
   describe("given the report delivers nothing", () => {
+    /** @scenario "A report that reached nobody records no fire" */
     it("records no fire for a Slack report with no destination", async () => {
       const { deps, sendSlack, recordFire } = makeDeps(
         makeReportTrigger({
@@ -434,6 +446,7 @@ describe("dispatchScheduledReport", () => {
       expect(recordFire).not.toHaveBeenCalled();
     });
 
+    /** @scenario "A report that reached nobody records no fire" */
     it("records no fire for an email report whose recipients are all suppressed", async () => {
       const { deps, sendEmail, recordFire } = makeDeps(
         makeReportTrigger({

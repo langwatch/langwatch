@@ -82,8 +82,8 @@ export type LangyMessageDto = z.infer<typeof langyMessageSchema>;
  *
  * Design note (perceived-latency optimization): rather than a pure id-only
  * "go refetch" signal, this carries the low-sensitivity OPERATIONAL spine
- * (status, counts, activity, running-flag) that the worker reactor already
- * holds in the fold state — so the client applies it in place with
+ * (status, counts, activity, running-flag) the Langy conversation projection
+ * already holds — so the client applies it in place with
  * `setQueryData` and skips a ClickHouse round-trip. It deliberately omits
  * every content-derived field (title, messages): the broadcast is tenant-wide
  * (all project members) but a Langy conversation is private to its owner, so
@@ -110,7 +110,8 @@ export const langyConversationUpdateSignalSchema = z.object({
   titleChanged: z.boolean().optional(),
   /**
    * The conversation projection's position when this signal was published
-   * (ADR-059): compare with the local fold's cursor and fetch the event tail
+   * (ADR-059, retired; ground now ADR-098): compare with the local fold's
+   * cursor and fetch the event tail
    * (`conversationEventsAfter`) only when behind. A cursor is inert — the
    * signal still carries no conversation content. Optional so signals from
    * older server builds keep parsing.

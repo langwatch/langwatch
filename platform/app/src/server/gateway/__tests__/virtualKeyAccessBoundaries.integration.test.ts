@@ -23,7 +23,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "~/server/api/root";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { prisma } from "~/server/db";
-import { startTestContainers } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { startTestContainers } from "~/test-utils/integration/testContainers";
 import { resolveTraceProject } from "../scopeResolver";
 
 const suffix = nanoid(8)

@@ -6,7 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { Ksuid } from "@langwatch/ksuid";
 import { z } from "zod";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 
 export interface S3ClientResolution {
   s3Client: S3Client;
@@ -107,7 +107,7 @@ const spanAttributeSchema = z.object({
 /**
  * Parsed EventPayload structure (ADR-022: full event as stored by the command worker).
  *
- * EventPayload IS event.data (stored as `event.data ?? {}` by eventToRecord).
+ * EventPayload IS event.data — the legacy writer stored `event.data ?? {}`.
  * The span write shape from recordSpanCommand is `{ span, resource, instrumentationScope }`
  * with the span at the TOP level — there is NO outer `data` wrapper. Log-record events
  * instead carry the (full) log body at the top-level `body`, which `leanForProjection`
@@ -256,8 +256,9 @@ export class BlobStore {
         : {};
 
     // TenantId MUST be the first predicate in the WHERE clause (ADR-022 cross-tenant denial).
-    const result = await clickHouseClient.query({
-      query: `
+    const rawRows = await clickHouseClient.query<unknown>({
+      table: "event_log",
+      sql: `
         SELECT EventPayload
         FROM event_log
         WHERE TenantId = {tenantId:String}
@@ -267,7 +268,7 @@ export class BlobStore {
           ${occurredAtPredicate}
         LIMIT 1
       `,
-      query_params: {
+      params: {
         tenantId,
         aggregateType,
         aggregateId,
@@ -276,10 +277,7 @@ export class BlobStore {
       },
     });
 
-    const response = await result.json<unknown>();
-    const rawRows = (response as { data?: unknown[] } | null)?.data;
-
-    if (!rawRows || rawRows.length === 0) {
+    if (rawRows.length === 0) {
       throw new BlobNotFoundError(eventId, field, tenantId);
     }
 

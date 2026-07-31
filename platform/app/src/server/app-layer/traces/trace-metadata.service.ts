@@ -1,6 +1,7 @@
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/trace-processing/schema";
 import type {
   CustomMetadata,
   ReservedTraceMetadata,
@@ -81,30 +82,52 @@ export async function updateTraceMetadata({
   const nowNano = String(now * 1_000_000);
   const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
-  await getApp().traces.recordSpan({
-    tenantId: projectId,
-    span: {
-      traceId,
-      spanId,
-      traceState: null,
-      parentSpanId: null,
-      name: "langwatch.metadata_update",
-      kind: 1,
-      startTimeUnixNano: nowNano,
-      endTimeUnixNano: nowNano,
-      attributes: [
-        { key: "langwatch.span.type", value: { stringValue: "span" } },
+  // Through the collection service, not the command: normalization,
+  // canonicalisation and the age gate all live upstream of `recordSpan`.
+  const result = await getApp().traces.collection.handleOtlpTraceRequest(
+    projectId,
+    {
+      resourceSpans: [
+        {
+          resource,
+          scopeSpans: [
+            {
+              scope: { name: "langwatch.api.metadata_update" },
+              spans: [
+                {
+                  traceId,
+                  spanId,
+                  traceState: null,
+                  parentSpanId: null,
+                  name: "langwatch.metadata_update",
+                  kind: 1,
+                  startTimeUnixNano: nowNano,
+                  endTimeUnixNano: nowNano,
+                  attributes: [
+                    {
+                      key: "langwatch.span.type",
+                      value: { stringValue: "span" },
+                    },
+                  ],
+                  events: [],
+                  links: [],
+                  status: { code: 1 },
+                  droppedAttributesCount: 0,
+                  droppedEventsCount: 0,
+                  droppedLinksCount: 0,
+                },
+              ],
+            },
+          ],
+        },
       ],
-      events: [],
-      links: [],
-      status: { code: 1 },
-      droppedAttributesCount: 0,
-      droppedEventsCount: 0,
-      droppedLinksCount: 0,
-    },
-    resource,
-    instrumentationScope: { name: "langwatch.api.metadata_update" },
-    piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-    occurredAt: now,
-  });
+    } as unknown as IExportTraceServiceRequest,
+    DEFAULT_PII_REDACTION_LEVEL,
+  );
+
+  if (result.rejectedSpans > 0) {
+    throw new Error(
+      `metadata update span was rejected: ${result.errorMessage}`,
+    );
+  }
 }

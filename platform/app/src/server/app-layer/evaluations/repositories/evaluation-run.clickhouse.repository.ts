@@ -1,10 +1,12 @@
+import { validateTenantId } from "@langwatch/clickhouse";
+import { getEnvironment, Instance, Ksuid } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { createHash } from "crypto";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
-import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import { capSerializedInputs, capText } from "../evaluation-column-caps";
 import type { EvalSummary, EvaluationRunData } from "../types";
@@ -15,9 +17,39 @@ import type {
 
 const TABLE_NAME = "evaluation_runs" as const;
 
+/** `evaluation_runs.Version`, calendar-versioned. One shape has ever shipped. */
+const EVALUATION_RUN_ROW_VERSION = "2025-01-14" as const;
+
 const logger = createLogger(
   "langwatch:app-layer:evaluations:evaluation-run-repository",
 );
+
+/**
+ * `ProjectionId` is derived, never minted: the same (tenant, evaluation) pair
+ * must produce the same KSUID on every re-upsert or the ReplacingMergeTree
+ * keeps both rows. The tenant/evaluation hash supplies the instance bytes and
+ * the scheduled-at supplies the k-sortable timestamp.
+ */
+function deterministicEvaluationRunId(
+  tenantId: string,
+  evaluationId: string,
+  timestampMs: number,
+): string {
+  const hash = createHash("sha256")
+    .update(`${tenantId}:${evaluationId}`)
+    .digest();
+  const instance = new Instance(
+    Instance.schemes.RANDOM,
+    new Uint8Array(hash.subarray(0, 8)),
+  );
+  return new Ksuid(
+    getEnvironment(),
+    KSUID_RESOURCES.EVALUATION,
+    Math.floor(timestampMs / 1000),
+    instance,
+    0,
+  ).toString();
+}
 
 interface ClickHouseEvaluationRunRecord {
   ProjectionId: string;
@@ -70,13 +102,10 @@ export class EvaluationRunClickHouseRepository
     tenantId: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): Promise<void> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "EvaluationRunClickHouseRepository.upsert",
-    );
+    validateTenantId({ tenantId }, "EvaluationRunClickHouseRepository.upsert");
 
     const projectionId = data.scheduledAt
-      ? IdUtils.generateDeterministicEvaluationRunId(
+      ? deterministicEvaluationRunId(
           tenantId,
           data.evaluationId,
           data.scheduledAt,
@@ -89,15 +118,14 @@ export class EvaluationRunClickHouseRepository
         data,
         tenantId,
         projectionId,
-        EVALUATION_PROJECTION_VERSIONS.STATE,
+        EVALUATION_RUN_ROW_VERSION,
         retentionDays,
       );
 
       await client.insert({
         table: TABLE_NAME,
-        values: [record],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: [record],
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       const errorMessage =
@@ -129,7 +157,7 @@ export class EvaluationRunClickHouseRepository
       const records = entries.map(
         ({ data, tenantId: tid, retentionDays: rd }) => {
           const projectionId = data.scheduledAt
-            ? IdUtils.generateDeterministicEvaluationRunId(
+            ? deterministicEvaluationRunId(
                 tid,
                 data.evaluationId,
                 data.scheduledAt,
@@ -139,7 +167,7 @@ export class EvaluationRunClickHouseRepository
             data,
             tid,
             projectionId,
-            EVALUATION_PROJECTION_VERSIONS.STATE,
+            EVALUATION_RUN_ROW_VERSION,
             rd,
           );
         },
@@ -147,9 +175,8 @@ export class EvaluationRunClickHouseRepository
 
       await client.insert({
         table: TABLE_NAME,
-        values: records,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: records,
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       const errorMessage =
@@ -179,19 +206,18 @@ export class EvaluationRunClickHouseRepository
     evaluationId: string,
   ): Promise<number | undefined> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      scheduledAtMs: string | number | null;
+    }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND EvaluationId = {evaluationId:String}
       `,
-      query_params: { tenantId, evaluationId },
-      format: "JSONEachRow",
+      params: { tenantId, evaluationId },
     });
-    const rows = (await result.json()) as Array<{
-      scheduledAtMs: string | number | null;
-    }>;
     const raw = rows[0]?.scheduledAtMs;
     if (raw === null || raw === undefined) return undefined;
     // argMax over no matching rows yields the epoch default (0); treat that —
@@ -205,7 +231,7 @@ export class EvaluationRunClickHouseRepository
     evaluationId,
     hints,
   }: GetByEvaluationIdParams): Promise<EvaluationRunData | null> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "EvaluationRunClickHouseRepository.getByEvaluationId",
     );
@@ -257,8 +283,9 @@ export class EvaluationRunClickHouseRepository
           ? "AND ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
           : "";
 
-      const result = await client.query({
-        query: `
+      const rows = await client.query<ClickHouseEvaluationRunRecord>({
+        table: TABLE_NAME,
+        sql: `
           SELECT
             t.ProjectionId AS ProjectionId,
             t.TenantId AS TenantId,
@@ -300,7 +327,7 @@ export class EvaluationRunClickHouseRepository
             ${partitionPredicate}
           LIMIT 1
         `,
-        query_params:
+        params:
           scheduledAtMs !== undefined
             ? {
                 tenantId,
@@ -309,10 +336,8 @@ export class EvaluationRunClickHouseRepository
                 scheduledAtTo: scheduledAtMs + slackMs,
               }
             : { tenantId, evaluationId },
-        format: "JSONEachRow",
       });
 
-      const rows = await result.json<ClickHouseEvaluationRunRecord>();
       const row = rows[0];
       if (!row) return null;
 
@@ -332,15 +357,16 @@ export class EvaluationRunClickHouseRepository
     tenantId: string,
     traceId: string,
   ): Promise<EvaluationRunData[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "EvaluationRunClickHouseRepository.findByTraceId",
     );
 
     try {
       const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
+      const rows = await client.query<ClickHouseEvaluationRunRecord>({
+        table: TABLE_NAME,
+        sql: `
           SELECT
             ProjectionId,
             TenantId,
@@ -382,11 +408,9 @@ export class EvaluationRunClickHouseRepository
             )
           ORDER BY UpdatedAt DESC
         `,
-        query_params: { tenantId, traceId },
-        format: "JSONEachRow",
+        params: { tenantId, traceId },
       });
 
-      const rows = await result.json<ClickHouseEvaluationRunRecord>();
       // Dedup is enforced by the IN-tuple subquery on (EvaluationId, max(UpdatedAt))
       // — heavy columns (Inputs/Details/ErrorDetails) are only materialized for
       // the surviving rows, not for every duplicate.
@@ -409,15 +433,29 @@ export class EvaluationRunClickHouseRepository
   ): Promise<Record<string, EvalSummary[]>> {
     if (traceIds.length === 0) return {};
 
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "EvaluationRunClickHouseRepository.findSummariesByTraceIds",
     );
 
     try {
+      interface SlimRow {
+        EvaluationId: string;
+        EvaluatorId: string;
+        EvaluatorType: string;
+        EvaluatorName: string | null;
+        TraceId: string | null;
+        IsGuardrail: number;
+        Status: string;
+        Score: number | null;
+        Passed: number | null;
+        Label: string | null;
+      }
+
       const client = await this.resolveClient(tenantId);
-      const result = await client.query({
-        query: `
+      const rows = await client.query<SlimRow>({
+        table: TABLE_NAME,
+        sql: `
           SELECT
             EvaluationId,
             EvaluatorId,
@@ -443,24 +481,8 @@ export class EvaluationRunClickHouseRepository
             )
           ORDER BY UpdatedAt DESC
         `,
-        query_params: { tenantId, traceIds, since },
-        format: "JSONEachRow",
+        params: { tenantId, traceIds, since },
       });
-
-      interface SlimRow {
-        EvaluationId: string;
-        EvaluatorId: string;
-        EvaluatorType: string;
-        EvaluatorName: string | null;
-        TraceId: string | null;
-        IsGuardrail: number;
-        Status: string;
-        Score: number | null;
-        Passed: number | null;
-        Label: string | null;
-      }
-
-      const rows = await result.json<SlimRow>();
 
       const byTrace: Record<string, EvalSummary[]> = {};
 
@@ -542,7 +564,7 @@ export class EvaluationRunClickHouseRepository
     version: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): ClickHouseEvaluationRunWriteRecord {
-    // Belt-and-braces write caps (ADR-040): unconditional, flag-independent,
+    // Belt-and-braces write caps (ADR-096): unconditional, flag-independent,
     // last line of defence that keeps the part merge-safe even if the offload
     // path is off, failed open, or a different writer inserted a fat payload.
     // With offload on, `Inputs` is already a small marker object so these are

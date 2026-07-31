@@ -5,7 +5,7 @@ import type { FilterParam } from "~/hooks/useFilterParams";
 import {
   cleanupTestData,
   getTestClickHouseClient,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { generateClickHouseFilterConditions } from "../clickhouse/filter-conditions";
 import type { FilterField } from "../types";
 

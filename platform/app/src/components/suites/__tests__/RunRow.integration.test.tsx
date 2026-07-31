@@ -191,52 +191,13 @@ describe("<RunRow/>", () => {
     });
   });
 
-  describe("when expectedJobCount is provided", () => {
-    describe("when not all jobs are done", () => {
-      it("displays progress indicator next to status counts", () => {
-        render(
-          <RunRow
-            batchRun={makeBatchRun()}
-            summary={makeSummary({ totalCount: 2 })}
-            isExpanded={false}
-            onToggle={vi.fn()}
-            resolveTargetName={() => "Prod Agent"}
-            onScenarioRunClick={vi.fn()}
-            expectedJobCount={6}
-          />,
-          { wrapper: Wrapper },
-        );
-
-        expect(screen.getByText("2 of 6")).toBeInTheDocument();
-      });
-    });
-
-    describe("when all jobs are done", () => {
-      it("does not display progress indicator", () => {
-        render(
-          <RunRow
-            batchRun={makeBatchRun()}
-            summary={makeSummary({ totalCount: 6 })}
-            isExpanded={false}
-            onToggle={vi.fn()}
-            resolveTargetName={() => "Prod Agent"}
-            onScenarioRunClick={vi.fn()}
-            expectedJobCount={6}
-          />,
-          { wrapper: Wrapper },
-        );
-
-        expect(screen.queryByText(/of 6/)).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("when expectedJobCount is not provided", () => {
-    it("does not display progress indicator", () => {
+  describe("when the batch expected more runs than it got", () => {
+    /** @scenario "A partly dispatched batch reports a shortfall" */
+    it("tells the user how many of the expected runs started", () => {
       render(
         <RunRow
           batchRun={makeBatchRun()}
-          summary={makeSummary({ totalCount: 2 })}
+          summary={makeSummary({ totalCount: 5, expectedCount: 6 })}
           isExpanded={false}
           onToggle={vi.fn()}
           resolveTargetName={() => "Prod Agent"}
@@ -245,7 +206,44 @@ describe("<RunRow/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.queryByText(/of \d+/)).not.toBeInTheDocument();
+      expect(screen.getByText("5 of 6 started")).toBeInTheDocument();
+    });
+  });
+
+  describe("when every run the batch expected started", () => {
+    it("says nothing about the count", () => {
+      render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary({ totalCount: 6, expectedCount: 6 })}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByTestId("batch-shortfall")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the batch predates the expected total", () => {
+    /** @scenario "A batch from before the total was recorded counts its runs" */
+    it("says nothing about the count rather than claiming a shortfall", () => {
+      render(
+        <RunRow
+          batchRun={makeBatchRun()}
+          summary={makeSummary({ totalCount: 2, expectedCount: 2 })}
+          isExpanded={false}
+          onToggle={vi.fn()}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByTestId("batch-shortfall")).not.toBeInTheDocument();
     });
   });
 

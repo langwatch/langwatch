@@ -10,22 +10,26 @@ Feature: DispatchError contract for dispatch endpoints
   outbox worker can choose between scheduling a backoff retry and surfacing
   the row to an operator as dead.
 
-  See dev/docs/adr/027-typed-dispatcherror-contract.md.
+  See dev/docs/adr/045-domain-errors-handled-boundary.md (successor to the
+  retired ADR-027 — DispatchError itself is unchanged and still live).
 
   # Classification policy (shared across all dispatch endpoints)
 
+  @unit
   Scenario: Rate-limit and server errors are retryable
     Given a dispatch fails with HTTP 429, a 5xx status, or a network timeout
     When the failure is classified
     Then a DispatchError is raised
     And it is marked retryable
 
+  @unit
   Scenario: Client errors are terminal
     Given a dispatch fails with a 4xx status other than 429
     When the failure is classified
     Then a DispatchError is raised
     And it is marked not retryable
 
+  @unit
   Scenario: Unclassifiable failures default to retryable
     Given a dispatch fails with an error that carries no recognizable status
     When the failure is classified
@@ -34,17 +38,20 @@ Feature: DispatchError contract for dispatch endpoints
 
   # Slack webhook endpoint
 
+  @unit
   Scenario: A failing Slack webhook no longer swallows the error
     Given a Slack webhook post that fails
     When the Slack dispatch endpoint runs
     Then it raises a DispatchError instead of logging and returning
     And the retryable flag reflects the webhook's failure status
 
+  @unit
   Scenario: A revoked Slack webhook is terminal
     Given a Slack webhook that responds 404 because it was revoked
     When the Slack dispatch endpoint runs
     Then it raises a DispatchError that is not retryable
 
+  @unit
   Scenario: A successful Slack post returns without raising
     Given a Slack webhook post that succeeds
     When the Slack dispatch endpoint runs
@@ -52,16 +59,19 @@ Feature: DispatchError contract for dispatch endpoints
 
   # Trigger email endpoint
 
+  @unit
   Scenario: A throttled email send is retryable
     Given an email provider that rejects the send with a throttling/5xx response
     When the email dispatch endpoint runs
     Then it raises a retryable DispatchError
 
+  @unit
   Scenario: A rejected email address is terminal
     Given an email provider that rejects the send with a 4xx response
     When the email dispatch endpoint runs
     Then it raises a DispatchError that is not retryable
 
+  @unit
   Scenario: A successful email send returns without raising
     Given an email provider that accepts the send
     When the email dispatch endpoint runs

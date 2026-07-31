@@ -14,18 +14,14 @@
  * Real logic follows once the service layer for VirtualKey / Budget lands.
  */
 
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
-
 import { createLogger } from "@langwatch/observability";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { prisma } from "~/server/db";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
@@ -379,7 +375,9 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
   });
 
   // Fire-and-forget last-used bump. Failures here must not deny the request.
-  void service.touchUsage(vk.id).catch(() => {});
+  void service.touchUsage(vk.id).catch(() => {
+    // Best-effort: a failed bump must never deny the request.
+  });
 
   return c.json({
     jwt,
@@ -506,7 +504,7 @@ secured.access(gatewayPolicy()).get("/config/:vk_id", async (c) => {
   // stale `GatewayBudget.spentUsd` PG column that no writer updates.
   const chRepo = isClickHouseEnabled()
     ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-        const client = await getClickHouseClientForProject(projectId);
+        const client = await clickHouseForProject(projectId);
         if (!client) {
           throw new Error(
             `ClickHouse enabled but no client for project ${projectId}`,
@@ -658,14 +656,16 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
   // DB blip doesn't deny the request.
   if (!vk.lastUsedAt || Date.now() - vk.lastUsedAt.getTime() > 60 * 1000) {
     const vkService = VirtualKeyService.create(prisma);
-    void vkService.touchUsage(vk.id).catch(() => {});
+    void vkService.touchUsage(vk.id).catch(() => {
+      // Best-effort: a failed bump must never deny the request.
+    });
   }
 
   const service = GatewayBudgetService.create(
     prisma,
     isClickHouseEnabled()
       ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-          const client = await getClickHouseClientForProject(projectId);
+          const client = await clickHouseForProject(projectId);
           if (!client) {
             throw new Error(
               `ClickHouse enabled but no client for project ${projectId}`,
@@ -717,9 +717,10 @@ secured.access(gatewayPolicy()).post("/budget/check", async (c) => {
 });
 
 // §4.5 — `/budget/debit` is removed. Cost recording is now driven by the
-// trace-fold reactor on the trace-processing pipeline
-// (platform/app/src/server/event-sourcing/pipelines/trace-processing/reactors/
-// gatewayBudgetSync.reactor.ts), which folds OTel span usage attributes
+// gateway budget debits map projection on the trace-processing pipeline
+// (`createGatewayBudgetDebitsProjection` in
+// platform/app/ee/governance/projections/governanceProjections.composition.ts,
+// mounted by pipelineRegistry.ts), which folds OTel span usage attributes
 // into the ClickHouse `gateway_budget_ledger_events` table. Single source
 // of truth, no PG dual-write — see CLAUDE.md & the migration
 // 00017_create_gateway_budget_ledger.sql for the CH schema.

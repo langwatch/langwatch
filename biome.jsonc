@@ -1,0 +1,49 @@
+{
+  // Scoped to `packages/**` only. The application has its own config at
+  // platform/app/biome.jsonc; without this file a root-run biome found no
+  // config at all and silently reformatted the packages to its tab defaults.
+  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "files": {
+    // `packages/server` is excluded deliberately: it is tab-indented by its own
+    // established convention, and this config is space-indented to match the
+    // event-sourcing / clickhouse / groupqueue packages it exists for.
+    "includes": [
+      "packages/**/*.ts",
+      "packages/**/*.tsx",
+      "!packages/server/**",
+      "!**/node_modules/**",
+      "!**/dist/**"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 80
+  },
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "always",
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "bracketSameLine": false,
+      "bracketSpacing": true,
+      "quoteProperties": "asNeeded",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  }
+}

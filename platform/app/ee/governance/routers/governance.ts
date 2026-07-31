@@ -41,7 +41,7 @@ import {
 } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { requireClickHouse } from "~/server/app-layer/clients/clickhouse/shared";
 import { featureFlagService } from "~/server/featureFlag";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 
@@ -284,14 +284,16 @@ export const governanceRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("governance:view"))
     .mutation(async ({ ctx, input }) => {
+      // ADR-104: resolve through the composition root's client, not a
+      // second one built here.
+      // The repository takes the pool directly because it encodes rows through
+      // its own `defineTable` codec and passes the tenant per call. The pool
+      // comes from the module accessor rather than off `App`: a datastore
+      // client is a repository's dependency, and hanging one on the
+      // application makes it reachable from every service that should have
+      // asked a repository instead.
       const ocsfRepository = new GovernanceOcsfEventsClickHouseRepository(
-        async (tenantId) => {
-          const client = await getClickHouseClientForProject(tenantId);
-          if (!client) {
-            throw new Error(`ClickHouse not available for tenant ${tenantId}`);
-          }
-          return client;
-        },
+        (tenantId) => requireClickHouse().resolveClient(tenantId),
       );
       const service = AdminWorkspaceViewAuditService.create({
         prisma: ctx.prisma,

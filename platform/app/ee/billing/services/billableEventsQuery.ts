@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import {
-  getClickHouseClientForOrganization,
-  getClickHouseClientForProject,
-} from "../../../src/server/clickhouse/clickhouseClient";
+  clickHouseForOrganization,
+  clickHouseForProject,
+} from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 
 const logger = createLogger("langwatch:billing:billableEventsQuery");
 
@@ -51,7 +51,7 @@ export async function queryBillableEventsTotal({
   organizationId: string;
   billingMonth: string;
 }): Promise<number | null> {
-  const client = await getClickHouseClientForOrganization(organizationId);
+  const client = clickHouseForOrganization(organizationId);
   if (!client) {
     logger.warn(
       { organizationId },
@@ -62,21 +62,19 @@ export async function queryBillableEventsTotal({
 
   const [startDate, endDate] = billingMonthDateRange(billingMonth);
 
-  const result = await client.query({
-    query: `
+  const rows = await client.query<{ total: string }>({
+    table: "billable_events",
+    sql: `
       SELECT countDistinct(DeduplicationKeyHash) as total
       FROM billable_events
       WHERE OrganizationId = {organizationId:String}
         AND EventTimestamp >= {startDate:DateTime64(3)}
         AND EventTimestamp < {endDate:DateTime64(3)}
     `,
-    query_params: { organizationId, startDate, endDate },
-    format: "JSONEachRow",
+    params: { organizationId, startDate, endDate },
   });
 
-  const jsonResult = await result.json();
-  const rows = Array.isArray(jsonResult) ? jsonResult : [];
-  const firstRow = rows[0] as { total: string } | undefined;
+  const firstRow = rows[0];
   return parseInt(firstRow?.total ?? "0", 10);
 }
 
@@ -91,7 +89,7 @@ export async function queryBillableEventsTotalUniq({
   organizationId: string;
   billingMonth: string;
 }): Promise<number | null> {
-  const client = await getClickHouseClientForOrganization(organizationId);
+  const client = clickHouseForOrganization(organizationId);
   if (!client) {
     logger.warn(
       { organizationId },
@@ -102,21 +100,19 @@ export async function queryBillableEventsTotalUniq({
 
   const [startDate, endDate] = billingMonthDateRange(billingMonth);
 
-  const result = await client.query({
-    query: `
+  const rows = await client.query<{ total: string }>({
+    table: "billable_events",
+    sql: `
       SELECT uniq(DeduplicationKeyHash) as total
       FROM billable_events
       WHERE OrganizationId = {organizationId:String}
         AND EventTimestamp >= {startDate:DateTime64(3)}
         AND EventTimestamp < {endDate:DateTime64(3)}
     `,
-    query_params: { organizationId, startDate, endDate },
-    format: "JSONEachRow",
+    params: { organizationId, startDate, endDate },
   });
 
-  const jsonResult = await result.json();
-  const rows = Array.isArray(jsonResult) ? jsonResult : [];
-  const firstRow = rows[0] as { total: string } | undefined;
+  const firstRow = rows[0];
   return parseInt(firstRow?.total ?? "0", 10);
 }
 
@@ -135,7 +131,7 @@ export async function queryTraceSummariesTotalUniq({
     return 0;
   }
 
-  const client = await getClickHouseClientForProject(projectIds[0]!);
+  const client = await clickHouseForProject(projectIds[0]!);
   if (!client) {
     logger.warn(
       { projectIds },
@@ -146,21 +142,19 @@ export async function queryTraceSummariesTotalUniq({
 
   const [startDate, endDate] = billingMonthDateRange(billingMonth);
 
-  const result = await client.query({
-    query: `
+  const rows = await client.query<{ total: string }>({
+    table: "trace_summaries",
+    sql: `
       SELECT uniq(TraceId) as total
       FROM trace_summaries
       WHERE TenantId IN {tenantIds:Array(String)}
         AND CreatedAt >= {startDate:DateTime64(3)}
         AND CreatedAt < {endDate:DateTime64(3)}
     `,
-    query_params: { tenantIds: projectIds, startDate, endDate },
-    format: "JSONEachRow",
+    params: { tenantIds: projectIds, startDate, endDate },
   });
 
-  const jsonResult = await result.json();
-  const rows = Array.isArray(jsonResult) ? jsonResult : [];
-  const firstRow = rows[0] as { total: string } | undefined;
+  const firstRow = rows[0];
   return parseInt(firstRow?.total ?? "0", 10);
 }
 
@@ -175,7 +169,7 @@ export async function queryBillableEventsByProjectApprox({
   organizationId: string;
   billingMonth: string;
 }): Promise<Array<{ projectId: string; count: number }>> {
-  const client = await getClickHouseClientForOrganization(organizationId);
+  const client = clickHouseForOrganization(organizationId);
   if (!client) {
     logger.warn(
       { organizationId },
@@ -186,8 +180,9 @@ export async function queryBillableEventsByProjectApprox({
 
   const [startDate, endDate] = billingMonthDateRange(billingMonth);
 
-  const result = await client.query({
-    query: `
+  const rows = await client.query<{ projectId: string; total: string }>({
+    table: "billable_events",
+    sql: `
       SELECT TenantId as projectId, uniq(DeduplicationKeyHash) as total
       FROM billable_events
       WHERE OrganizationId = {organizationId:String}
@@ -195,13 +190,10 @@ export async function queryBillableEventsByProjectApprox({
         AND EventTimestamp < {endDate:DateTime64(3)}
       GROUP BY TenantId
     `,
-    query_params: { organizationId, startDate, endDate },
-    format: "JSONEachRow",
+    params: { organizationId, startDate, endDate },
   });
 
-  const jsonResult = await result.json();
-  const rows = Array.isArray(jsonResult) ? jsonResult : [];
-  return (rows as Array<{ projectId: string; total: string }>).map((row) => ({
+  return rows.map((row) => ({
     projectId: row.projectId,
     count: parseInt(row.total, 10),
   }));
@@ -218,7 +210,7 @@ export async function queryBillableEventsByProject({
   organizationId: string;
   billingMonth: string;
 }): Promise<Array<{ projectId: string; count: number }>> {
-  const client = await getClickHouseClientForOrganization(organizationId);
+  const client = clickHouseForOrganization(organizationId);
   if (!client) {
     logger.warn(
       { organizationId },
@@ -229,8 +221,9 @@ export async function queryBillableEventsByProject({
 
   const [startDate, endDate] = billingMonthDateRange(billingMonth);
 
-  const result = await client.query({
-    query: `
+  const rows = await client.query<{ projectId: string; total: string }>({
+    table: "billable_events",
+    sql: `
       SELECT TenantId as projectId, countDistinct(DeduplicationKeyHash) as total
       FROM billable_events
       WHERE OrganizationId = {organizationId:String}
@@ -238,13 +231,10 @@ export async function queryBillableEventsByProject({
         AND EventTimestamp < {endDate:DateTime64(3)}
       GROUP BY TenantId
     `,
-    query_params: { organizationId, startDate, endDate },
-    format: "JSONEachRow",
+    params: { organizationId, startDate, endDate },
   });
 
-  const jsonResult = await result.json();
-  const rows = Array.isArray(jsonResult) ? jsonResult : [];
-  return (rows as Array<{ projectId: string; total: string }>).map((row) => ({
+  return rows.map((row) => ({
     projectId: row.projectId,
     count: parseInt(row.total, 10),
   }));

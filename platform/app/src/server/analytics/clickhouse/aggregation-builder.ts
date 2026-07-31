@@ -5,7 +5,7 @@
  * into complete ClickHouse SQL queries.
  */
 
-import { MAX_PROCESSED_SPANS } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import { MAX_PROCESSED_SPANS } from "~/server/event-sourcing/trace-processing/spanDerivation";
 import { snakeCase } from "../../../utils/stringCasing";
 import type { FilterField } from "../../filters/types";
 import { isZeroWhenAbsentSeries, type SeriesInputType } from "../registry";
@@ -704,7 +704,7 @@ function getGroupByExpression(
  * round trips and allows the database to optimize the scan across both date ranges.
  */
 export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
-  // ADR-034 Phase 3: routing to `trace_analytics_rollup` /
+  // ADR-034 (retired; ground now ADR-099) Phase 3: routing to `trace_analytics_rollup` /
   // `trace_analytics` lives in `~/server/app-layer/analytics` now — the
   // service there decides which destination to use and calls the dedicated
   // builders directly. This function only emits the legacy

@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  *
- * ADR-059's authorization half, end to end across the two paths a member can
+ * ADR-059's (retired; ground now ADR-098) authorization half, end to end
+ * across the two paths a member can
  * learn about a conversation: the tenant-wide freshness signal and the
  * authorized catch-up read.
  *
@@ -58,8 +59,8 @@ import { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service
 import { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
 import { PrismaLangyConversationRepository } from "~/server/app-layer/langy/repositories/langy-conversation.prisma.repository";
 import { createLangyConversationUpdateBroadcastSubscriber } from "~/server/app-layer/langy/subscribers/langy-conversation-update-broadcast.subscriber";
+import type { LangyConversationProcessingEvent } from "~/server/app-layer/langy/subscribers/langyConversationProcessingEvent";
 import { prisma } from "~/server/db";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { createInnerTRPCContext } from "../../trpc";
 import { langyRouter } from "../langy";
 

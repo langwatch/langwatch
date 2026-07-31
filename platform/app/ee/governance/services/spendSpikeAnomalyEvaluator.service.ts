@@ -32,10 +32,10 @@
  * follow-up (per the license-split decision — alert destinations
  * are ee/-only).
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import type { AnomalyRule, Prisma, PrismaClient } from "@prisma/client";
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForOrganization } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";
 import { safeParseSpendSpikeThresholdConfig } from "./activity-monitor/thresholdConfig.schema";
 import { PROJECT_KIND } from "./governanceProject.service";
@@ -245,7 +245,7 @@ export class SpendSpikeAnomalyEvaluator {
       };
     }
 
-    const ch = await getClickHouseClientForOrganization(rule.organizationId);
+    const ch = clickHouseForOrganization(rule.organizationId);
     if (!ch) {
       return {
         ruleId: rule.id,
@@ -305,38 +305,107 @@ export class SpendSpikeAnomalyEvaluator {
     return project?.id ?? null;
   }
 
+  /**
+   * Sums SpendUsd out of the `governance_kpis` ReplacingMergeTree, deduping at
+   * read time.
+   *
+   * The dedup is not optional. `governance_kpis` is a ReplacingMergeTree, so
+   * until a background merge runs, every re-derivation of a contribution sits
+   * in the table as an extra row under the same sorting key. A bare
+   * `sumIf(SpendUsd, …)` adds all of them together, and the number it produces
+   * feeds a customer-facing anomaly alert — measured against a local
+   * ClickHouse, two unmerged copies of one $10 contribution report $20, and two
+   * firings of a pre-cutover trace-grain row carrying running totals of $3 then
+   * $7 report $10 where the merged truth is $7.
+   *
+   * Migration 00063 moved the key to event grain, which makes re-derived rows
+   * byte-identical rather than divergent, but byte-identical duplicates still
+   * SUM. It narrows the error, it does not remove it, and rows written before
+   * that cutover remain at trace grain with divergent totals under one key.
+   *
+   * Shape notes, since this is not the IN-tuple form CLAUDE.md prescribes:
+   *
+   *   - IN-tuple does not work here. It excludes OLDER versions; it does not
+   *     collapse versions that TIE on the version column. Both cases above tie
+   *     — a re-derived span re-stamps the same `LastEventOccurredAt`, and
+   *     00063's own header records that the value is constant across firings
+   *     for trace-grain rows. Every tied row satisfies the tuple and every one
+   *     of them is summed, so the pattern is a no-op against this defect
+   *     (verified: still $20 of the $10).  IN-tuple is a pattern for fetching
+   *     one ROW; deduping an AGGREGATE needs `GROUP BY key` with a per-key
+   *     pick, which is what this does. `argMax(value, version)` over
+   *     `max(version)` is the same rule CLAUDE.md already states for pagination
+   *     cursors.
+   *   - `FINAL` is not used: it forces a merge-on-read across the whole scan.
+   *   - No heavy columns exist on this table, so the inner scope reading the
+   *     value directly costs nothing the IN-tuple form would have saved.
+   *   - The version column is TIED far more often than it is not, so the
+   *     tie-break is part of the answer rather than an edge case, and it is
+   *     spelled out: `argMax(SpendUsd, (LastEventOccurredAt, SpendUsd))` picks
+   *     the LARGEST tied contribution. `argMax(SpendUsd, LastEventOccurredAt)`
+   *     alone picks an arbitrary one, and arbitrary is not stable — the same
+   *     unchanged rows can answer $10 on one read and $7.50 on the next,
+   *     which is a customer-facing spend figure and an alert threshold moving
+   *     because a query re-ran.
+   *
+   *     Post-00063 the tied rows are byte-identical, so the tie-break cannot
+   *     change the number; it only makes it repeatable. Pre-00063 trace-grain
+   *     rows tie on a constant version while carrying the trace's RUNNING
+   *     totals, so the largest tied row IS the trace's final total — the
+   *     complete figure rather than a partial one caught mid-flight.
+   *
+   *     What this deliberately does NOT claim is agreement with the survivor a
+   *     background merge elects. A ReplacingMergeTree tie is broken by
+   *     insertion order, which no column here records, so no read can
+   *     reproduce it without a schema change (an insertion-sequence column, or
+   *     a version that is strictly monotonic per write). For the legacy
+   *     running-total rows the merge's arbitrary pick can therefore be a
+   *     partial total where this read reports the complete one; that
+   *     disagreement is in the direction of the truth, and it stops mattering
+   *     as the pre-cutover partitions age out of the baseline window.
+   *   - `HourBucket` is bounded in the dedup scope, not only outside it. That
+   *     is safe here and required for partition pruning: `HourBucket` is part
+   *     of the sorting key, so a row's versions cannot straddle the bound and
+   *     the ADR-071 (retired; ground now ADR-099) movable-column trap does
+   *     not apply.
+   */
   private async queryGovernanceKpis(input: {
-    ch: ClickHouseClient;
+    ch: TenantClickHouseClient;
     tenantId: string;
     windowStart: Date;
     windowEnd: Date;
     baselineStart: Date;
     sourceFilter: { sql: string; params: Record<string, unknown> };
   }): Promise<{ currentSpend: number; baselineSpend: number }> {
-    const result = await input.ch.query({
-      query: `
+    const rows = await input.ch.query<{
+      currentSpend: number | string | null;
+      baselineSpend: number | string | null;
+    }>({
+      table: "governance_kpis",
+      sql: `
         SELECT
           sumIf(SpendUsd, HourBucket >= fromUnixTimestamp64Milli({windowStartMs:UInt64})) AS currentSpend,
           sumIf(SpendUsd, HourBucket < fromUnixTimestamp64Milli({windowStartMs:UInt64}) AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})) AS baselineSpend
-        FROM governance_kpis
-        WHERE TenantId = {tenantId:String}
-          AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})
-          AND HourBucket < fromUnixTimestamp64Milli({windowEndMs:UInt64})
-          ${input.sourceFilter.sql}
+        FROM (
+          SELECT
+            HourBucket,
+            argMax(SpendUsd, (LastEventOccurredAt, SpendUsd)) AS SpendUsd
+          FROM governance_kpis
+          WHERE TenantId = {tenantId:String}
+            AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})
+            AND HourBucket < fromUnixTimestamp64Milli({windowEndMs:UInt64})
+            ${input.sourceFilter.sql}
+          GROUP BY TenantId, SourceId, HourBucket, TraceId, EventId
+        )
       `,
-      query_params: {
+      params: {
         tenantId: input.tenantId,
         windowStartMs: input.windowStart.getTime(),
         windowEndMs: input.windowEnd.getTime(),
         baselineStartMs: input.baselineStart.getTime(),
         ...input.sourceFilter.params,
       },
-      format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
-      currentSpend: number | string | null;
-      baselineSpend: number | string | null;
-    }>;
     const row = rows[0];
     return {
       currentSpend: Number(row?.currentSpend ?? 0),

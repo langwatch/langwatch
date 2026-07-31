@@ -9,6 +9,7 @@
  * Call once per request — construction is lightweight; drivers are stateless.
  */
 import { env } from "~/env.mjs";
+import { requireClickHouse } from "~/server/app-layer/clients/clickhouse/shared";
 import { AzureBlobDriver } from "./azure-blob-driver";
 import { LocalFilesystemDriver } from "./local-filesystem-driver";
 import { S3Driver } from "./s3-driver";
@@ -67,7 +68,13 @@ export function createStoredObjectsService({
 }: {
   projectId: string;
 }): StoredObjectsService {
-  const repository = new StoredObjectsRepository();
+  // The repository takes the pool directly: it decodes through its own
+  // `createRowCodec`, which reads `size_bytes` as a `bigint`, and passes the
+  // tenant per call. The closure defers resolution to call time so this
+  // factory stays safe to import in a process that has no ClickHouse.
+  const repository = new StoredObjectsRepository((tenantId) =>
+    requireClickHouse().resolveClient(tenantId),
+  );
   return new StoredObjectsService(
     repository,
     createStorageRegistry({ projectId }),

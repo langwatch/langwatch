@@ -1,5 +1,5 @@
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import { validateTenantId } from "@langwatch/clickhouse";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import type { FacetQuery } from "../facet-registry";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
@@ -106,7 +106,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async findAll(query: TraceListQuery): Promise<TraceListPage> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: query.tenantId },
       "TraceListClickHouseRepository.findAll",
     );
@@ -163,9 +163,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // breaks the comparison. It also lists explicit columns (no `SELECT *`) so
     // ClickHouse skips reading the full `Attributes` Map; only a fixed set
     // of keys flow through to the list mapper (see `mapToTraceListItem`).
-    const [result, countResult] = await Promise.all([
-      client.query({
-        query: `
+    const [rows, countRows] = await Promise.all([
+      client.query<ClickHouseSummaryRow>({
+        table: TABLE_NAME,
+        sql: `
         SELECT
           TraceId,
           TenantId,
@@ -295,7 +296,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           LIMIT {limit:UInt32}
         )
       `,
-        query_params: {
+        params: {
           ...params,
           limit: query.limit,
           offset: query.offset ?? 0,
@@ -306,22 +307,19 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               }
             : {}),
         },
-        format: "JSONEachRow",
       }),
-      client.query({
-        query: `
+      client.query<{ totalHits: number | string }>({
+        table: TABLE_NAME,
+        sql: `
         SELECT count() AS totalHits
         FROM ${TABLE_NAME}
         WHERE ${whereClause}
           AND ${dedupFilter}
       `,
-        query_params: { ...params },
-        format: "JSONEachRow",
+        params: { ...params },
       }),
     ]);
 
-    const rows = await result.json<ClickHouseSummaryRow>();
-    const countRows = await countResult.json<{ totalHits: number | string }>();
     const totalHits =
       countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
@@ -337,7 +335,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     facetExpression: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<FacetCountResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findFacetCounts",
     );
@@ -349,8 +347,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     );
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{ facet_value: string; cnt: number }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT
           ${params.facetExpression} AS facet_value,
           count() AS cnt
@@ -367,11 +366,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         ORDER BY cnt DESC
         LIMIT 100
       `,
-      query_params: queryParams,
-      format: "JSONEachRow",
+      params: queryParams,
     });
 
-    const rows = await result.json<{ facet_value: string; cnt: number }>();
     const values: Record<string, number> = {};
     for (const row of rows) {
       values[row.facet_value] = Number(row.cnt);
@@ -385,7 +382,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     column: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<{ min: number; max: number }> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findRangeStats",
     );
@@ -397,8 +394,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     );
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{ min_val: number; max_val: number }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT
           min(${params.column}) AS min_val,
           max(${params.column}) AS max_val
@@ -411,11 +409,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             GROUP BY TenantId, TraceId
           )
       `,
-      query_params: queryParams,
-      format: "JSONEachRow",
+      params: queryParams,
     });
 
-    const rows = await result.json<{ min_val: number; max_val: number }>();
     const row = rows[0];
     return { min: Number(row?.min_val ?? 0), max: Number(row?.max_val ?? 0) };
   }
@@ -426,7 +422,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     since: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<number> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findCount",
     );
@@ -451,8 +447,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     );
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{ cnt: number }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT count() AS cnt
         FROM ${TABLE_NAME}
         WHERE ${whereClause}
@@ -465,11 +462,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             GROUP BY TenantId, TraceId
           )
       `,
-      query_params: { ...queryParams, since: params.since },
-      format: "JSONEachRow",
+      params: { ...queryParams, since: params.since },
     });
 
-    const rows = await result.json<{ cnt: number }>();
     return Number(rows[0]?.cnt ?? 0);
   }
 
@@ -479,7 +474,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     prefix: string;
     limit: number;
   }): Promise<string[]> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findDistinctValues",
     );
@@ -491,8 +486,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const fromMs = Date.now() - SUGGEST_WINDOW_MS;
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{ val: string }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT DISTINCT ${params.column} AS val
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
@@ -507,16 +503,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           )
         LIMIT {limit:UInt32}
       `,
-      query_params: {
+      params: {
         tenantId: params.tenantId,
         fromMs,
         prefix: `${params.prefix}%`,
         limit: params.limit,
       },
-      format: "JSONEachRow",
     });
 
-    const rows = await result.json<{ val: string }>();
     return rows.map((r) => r.val);
   }
 
@@ -530,7 +524,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     offset: number;
     prefix?: string;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findCategoricalFacet",
     );
@@ -561,8 +555,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       : "";
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<FacetRow>({
+      table: params.table,
+      sql: `
         SELECT
           ${params.facetExpression} AS facet_value,
           count() AS cnt,
@@ -576,16 +571,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         ORDER BY cnt DESC
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
-      query_params: {
+      params: {
         ...queryParams,
         limit: params.limit,
         offset: params.offset,
         ...(params.prefix ? { prefix: params.prefix } : {}),
       },
-      format: "JSONEachRow",
     });
 
-    const rows = await result.json<FacetRow>();
     return mapFacetRows(rows);
   }
 
@@ -597,7 +590,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     column: string;
     limit: number;
   }): Promise<DiscreteFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findDiscreteValues",
     );
@@ -621,8 +614,13 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       : "";
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      discrete_value: number;
+      cnt: number;
+      total_distinct: number;
+    }>({
+      table: params.table,
+      sql: `
         SELECT
           ${params.column} AS discrete_value,
           count() AS cnt,
@@ -635,15 +633,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         ORDER BY discrete_value ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: { ...queryParams, limit: params.limit },
-      format: "JSONEachRow",
+      params: { ...queryParams, limit: params.limit },
     });
 
-    const rows = await result.json<{
-      discrete_value: number;
-      cnt: number;
-      total_distinct: number;
-    }>();
     return {
       values: rows.map((r) => ({
         value: Number(r.discrete_value),
@@ -659,24 +651,22 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     tenantId: string;
     query: FacetQuery;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findCategoricalFacetRaw",
     );
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: params.query.sql,
-      query_params: params.query.params,
+    const rows = await client.query<FacetRow>({
+      // No `table` label: the registry hands over the whole statement and does
+      // not say which table it reads, so anything named here would be a guess.
+      sql: params.query.sql,
+      params: params.query.params,
       // Per-query guard (e.g. the key-discovery facets' memory ceiling); absent
       // for facets that don't set one.
-      ...(params.query.settings
-        ? { clickhouse_settings: params.query.settings }
-        : {}),
-      format: "JSONEachRow",
+      ...(params.query.settings ? { settings: params.query.settings } : {}),
     });
 
-    const rows = await result.json<FacetRow>();
     return mapFacetRows(rows);
   }
 
@@ -687,7 +677,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     timeColumn: string;
     column: string;
   }): Promise<{ min: number; max: number }> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findRangeStatsForTable",
     );
@@ -714,8 +704,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       : "";
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{ min_val: number; max_val: number }>({
+      table: params.table,
+      sql: `
         SELECT
           min(${params.column}) AS min_val,
           max(${params.column}) AS max_val
@@ -723,11 +714,9 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         WHERE ${whereClause}
           ${dedupFilter}
       `,
-      query_params: queryParams,
-      format: "JSONEachRow",
+      params: queryParams,
     });
 
-    const rows = await result.json<{ min_val: number; max_val: number }>();
     const row = rows[0];
     return { min: Number(row?.min_val ?? 0), max: Number(row?.max_val ?? 0) };
   }
@@ -741,7 +730,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
   }): Promise<BatchedFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findBatchedFacets",
     );
@@ -780,7 +769,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               )
               .join(", ");
 
-            const query = `
+            const sql = `
               SELECT facet_key, facet_value, cnt, total_distinct FROM (
                 SELECT
                   facet_key,
@@ -805,18 +794,16 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               LIMIT {topN:UInt32} BY facet_key
             `;
 
-            const result = await client.query({
-              query,
-              query_params: { ...queryParams, topN: params.topN },
-              format: "JSONEachRow",
-            });
-
-            const rows = await result.json<{
+            const rows = await client.query<{
               facet_key: string;
               facet_value: string;
               cnt: number;
               total_distinct: number;
-            }>();
+            }>({
+              table: params.table,
+              sql,
+              params: { ...queryParams, topN: params.topN },
+            });
 
             const out: Record<string, CategoricalFacetResult> = {};
             for (const spec of params.categoricalSpecs) {
@@ -847,20 +834,19 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               ])
               .join(", ");
 
-            const query = `
+            const sql = `
               SELECT ${aggClauses}
               FROM ${params.table}
               WHERE ${whereClause}
                 ${dedupFilter}
             `;
 
-            const result = await client.query({
-              query,
-              query_params: queryParams,
-              format: "JSONEachRow",
+            const rows = await client.query<Record<string, number | null>>({
+              table: params.table,
+              sql,
+              params: queryParams,
             });
 
-            const rows = await result.json<Record<string, number | null>>();
             const row = rows[0] ?? {};
             const out: Record<string, { min: number; max: number }> = {};
             for (let i = 0; i < params.rangeSpecs.length; i += 1) {
@@ -900,7 +886,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     limit: number;
     offset: number;
   }): Promise<CategoricalFacetResult> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "TraceListClickHouseRepository.findAttributeValues",
     );
@@ -946,9 +932,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     `;
 
     const client = await this.resolveClient(params.tenantId);
-    const result = await client.query({
-      query: sql,
-      query_params: {
+    const rows = await client.query<FacetRow>({
+      table: TABLE_NAME,
+      sql,
+      params: {
         tenantId: params.tenantId,
         timeFrom: params.timeRange.from,
         timeTo: params.timeRange.to,
@@ -958,10 +945,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
         sampleRows: ATTR_VALUE_SAMPLE_ROWS,
         ...(params.prefix ? { prefix: params.prefix } : {}),
       },
-      format: "JSONEachRow",
     });
 
-    const rows = await result.json<FacetRow>();
     return mapFacetRows(rows);
   }
 

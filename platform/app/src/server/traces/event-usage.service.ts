@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { isClickHouseEnabled } from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
 import {
   getBillingMonth,
   queryBillableEventsByProjectApprox,

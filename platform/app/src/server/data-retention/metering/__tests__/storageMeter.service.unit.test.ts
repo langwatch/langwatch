@@ -11,9 +11,7 @@ import { StorageMeterService } from "../storageMeter.service";
  */
 describe("StorageMeterService memory guard", () => {
   function makeService() {
-    const query = vi.fn().mockResolvedValue({
-      json: async () => [{ total: "42" }],
-    });
+    const query = vi.fn().mockResolvedValue([{ total: 42 }]);
     const client = { query } as const;
     const service = new StorageMeterService({
       resolveClickHouseClient: async () => client as any,
@@ -21,14 +19,12 @@ describe("StorageMeterService memory guard", () => {
     return { service, query };
   }
 
-  function assertGuarded(call: {
-    clickhouse_settings?: Record<string, unknown>;
-  }) {
-    expect(call.clickhouse_settings).toBeDefined();
-    expect(call.clickhouse_settings!.max_threads).toBe(2);
+  function assertGuarded(call: { settings?: Record<string, unknown> }) {
+    expect(call.settings).toBeDefined();
+    expect(call.settings!.max_threads).toBe(2);
     // A coarse guardrail so a runaway byteSize recompute can't grind for a
     // minute; a materialized read finishes in seconds, well under this.
-    expect(call.clickhouse_settings!.max_execution_time).toBe(45);
+    expect(call.settings!.max_execution_time).toBe(45);
   }
 
   describe("when computing the per-category storage breakdown", () => {
@@ -43,12 +39,11 @@ describe("StorageMeterService memory guard", () => {
       }
     });
 
+    /** @scenario "Per-tenant storage query sums across all tables" */
     it("meters Langy analytics into the traces category", async () => {
-      const query = vi.fn(async ({ query }: { query: string }) => ({
-        json: async () => [
-          { total: query.includes("FROM langy_analytics_events") ? "17" : "0" },
-        ],
-      }));
+      const query = vi.fn(async ({ sql }: { sql: string }) => [
+        { total: sql.includes("FROM langy_analytics_events") ? 17 : 0 },
+      ]);
       const service = new StorageMeterService({
         resolveClickHouseClient: async () => ({ query }) as any,
       });
@@ -61,7 +56,7 @@ describe("StorageMeterService memory guard", () => {
       expect(breakdown.totalBytes).toBe(17);
       expect(
         query.mock.calls.some(([request]) =>
-          request.query.includes("FROM langy_analytics_events"),
+          request.sql.includes("FROM langy_analytics_events"),
         ),
       ).toBe(true);
     });
@@ -86,11 +81,9 @@ describe("StorageMeterService memory guard", () => {
       const resolver = vi.fn(async (tenantId: string) => {
         if (failing.has(tenantId)) throw new Error("cluster unreachable");
         return {
-          query: vi.fn(async (arg: { query_params: { tenantId: string } }) => ({
-            json: async () => [
-              { total: String(totals[arg.query_params.tenantId] ?? 0) },
-            ],
-          })),
+          query: vi.fn(async (arg: { params: { tenantId: string } }) => [
+            { total: totals[arg.params.tenantId] ?? 0 },
+          ]),
         } as any;
       });
       return {
@@ -162,7 +155,7 @@ describe("StorageMeterService memory guard", () => {
       const query = vi.fn(async () => {
         const total = totals[Math.min(call, totals.length - 1)]!;
         call += 1;
-        return { json: async () => [{ total: String(total) }] };
+        return [{ total }];
       });
       const service = new StorageMeterService({
         resolveClickHouseClient: async () => ({ query }) as any,
@@ -172,6 +165,7 @@ describe("StorageMeterService memory guard", () => {
     }
 
     describe("when the cached value is still fresh", () => {
+      /** @scenario "Storage size is cached in Redis" */
       it("returns it without recomputing", async () => {
         const { service, query, advance } = makeClockService([42]);
 
@@ -225,9 +219,7 @@ describe("StorageMeterService memory guard", () => {
         // (cluster unreachable) propagates. Seed succeeds, the refresh fails.
         let t = 0;
         let resolverCall = 0;
-        const query = vi.fn(async () => ({
-          json: async () => [{ total: "42" }],
-        }));
+        const query = vi.fn(async () => [{ total: 42 }]);
         const resolver = vi.fn(async () => {
           resolverCall += 1;
           if (resolverCall >= 2) throw new Error("cluster unreachable");
@@ -256,9 +248,7 @@ describe("StorageMeterService memory guard", () => {
       it("degrades to 0 and self-heals on the next read", async () => {
         const t = 0;
         let resolverCall = 0;
-        const query = vi.fn(async () => ({
-          json: async () => [{ total: "77" }],
-        }));
+        const query = vi.fn(async () => [{ total: 77 }]);
         const resolver = vi.fn(async () => {
           resolverCall += 1;
           if (resolverCall === 1) throw new Error("cluster unreachable");
@@ -290,13 +280,13 @@ describe("StorageMeterService memory guard", () => {
         // sum of the per-table subtotals rather than failing the whole metric.
         const query = vi
           .fn()
-          .mockImplementation(async (arg: { query: string }) => {
-            if (arg.query.includes("UNION ALL")) {
+          .mockImplementation(async (arg: { sql: string }) => {
+            if (arg.sql.includes("UNION ALL")) {
               throw new Error(
                 "Code: 241. DB::Exception: memory limit exceeded",
               );
             }
-            return { json: async () => [{ total: "10" }] };
+            return [{ total: 10 }];
           });
         const client = { query } as const;
         const service = new StorageMeterService({
@@ -312,9 +302,7 @@ describe("StorageMeterService memory guard", () => {
         expect(query).toHaveBeenCalledTimes(
           1 + PRODUCTION_STORAGE_METER_TABLES.length,
         );
-        const queries = query.mock.calls
-          .map((call) => call[0].query)
-          .join("\n");
+        const queries = query.mock.calls.map((call) => call[0].sql).join("\n");
         expect(queries).not.toContain("metric_data_points");
         expect(queries).not.toContain("metric_series");
         expect(queries).not.toContain("metric_time_rollups");

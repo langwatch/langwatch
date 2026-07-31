@@ -77,9 +77,10 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // reference. Audited: no delete/update/truncate on stored_objects.
   /^src\/server\/tracer\/types\.ts$/,
   // evaluation-inputs-offload.ts stores and resolves oversized evaluator
-  // inputs through StoredObjectsService (ADR-040). Audited: write + read
+  // inputs through StoredObjectsService (ADR-096, retired; ground now
+  // ADR-098). Audited: write + read
   // only; deletion happens solely via the existing project-delete cascade.
-  // Known gap (accepted in ADR-040, follow-up noted there): an offloaded
+  // Known gap (accepted in the retired ADR-096, ground now ADR-098, follow-up noted there): an offloaded
   // evaluation-input object outlives its evaluation row's retention TTL - the
   // row is GC'd on the normal data-retention schedule, but its stored object is
   // only reclaimed by the project-delete cascade, so it can linger past the
@@ -101,6 +102,21 @@ const SCAN_ALLOWLIST: ReadonlyArray<RegExp> = [
   // delete/update/truncate on the table.
   /^src\/server\/storage\.ts$/,
   /^src\/server\/datasets\/dataset-storage\.ts$/,
+  // write-targets.ts lists stored_objects in the static table -> merge-engine
+  // map that decides whether a failed INSERT may be re-sent (ADR-109). Audited:
+  // a lookup table of literals, consulted by the client's insert path only. It
+  // issues no statement of its own, and nothing in it can delete a row — the
+  // entry's whole content is "this table is a ReplacingMergeTree".
+  /^src\/server\/app-layer\/clients\/clickhouse\/write-targets\.ts$/,
+  // migrationDdl.ts and schema-catalogue.ts name stored_objects among the
+  // tables whose deployed shape is checked against its declaration. Audited:
+  // both are describe-and-compare only — they read `system.tables` /
+  // `system.columns` and the migration files, and neither issues a
+  // delete/update/truncate against the table. These two predate this
+  // allowlist's last update and were failing this test before the ClickHouse
+  // client migration; they are listed now rather than left red.
+  /^src\/server\/clickhouse\/migrationDdl\.ts$/,
+  /^src\/server\/clickhouse\/schema-catalogue\.ts$/,
 ];
 
 function isAllowlisted(rel: string): boolean {

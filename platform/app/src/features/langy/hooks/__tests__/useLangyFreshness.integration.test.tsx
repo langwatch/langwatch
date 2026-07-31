@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Snapshot-then-fold-the-tail (ADR-059 §2/§3) driven through the REAL
+ * Snapshot-then-fold-the-tail (ADR-059 §2/§3, retired; ground now ADR-098)
+ * driven through the REAL
  * coordinator: the Zustand store, the shared `@langwatch/langy` reducers and
  * the dev log all run for real — only the tRPC boundary
  * (`langy.conversationEventsAfter`, `langy.messages`) and the SSE listener are

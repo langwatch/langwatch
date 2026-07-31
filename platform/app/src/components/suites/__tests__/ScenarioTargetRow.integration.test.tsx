@@ -9,7 +9,13 @@
  * @see specs/suites/suite-workflow.feature - "Expand run to see scenario x target breakdown"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -27,6 +33,19 @@ vi.mock("../usePrefetchRunState", () => ({
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
+
+/**
+ * The coloured dot that sits immediately before a row's status label — the
+ * first thing in the status group a reader's eye lands on.
+ */
+function statusIndicator(statusLabel: string): HTMLElement {
+  const group = screen.getByText(statusLabel).parentElement;
+  const indicator = group?.firstElementChild;
+  if (!(indicator instanceof HTMLElement)) {
+    throw new Error(`No status indicator found beside "${statusLabel}"`);
+  }
+  return indicator;
+}
 
 describe("<ScenarioTargetRow/>", () => {
   afterEach(() => {
@@ -307,6 +326,158 @@ describe("<ScenarioTargetRow/>", () => {
       );
 
       expect(prefetchMock).toHaveBeenCalledWith("run_hover");
+    });
+  });
+
+  describe("given a run whose status is terminal", () => {
+    /** @scenario List row shows colored status circle instead of icon */
+    it("marks a passed run with a green dot rather than a checkmark icon", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const indicator = statusIndicator("Passed (1/1)");
+      expect(indicator.tagName).toBe("DIV");
+      expect(indicator.querySelector("svg")).toBeNull();
+      expect(getComputedStyle(indicator).background).toContain("green-500");
+    });
+
+    /** @scenario List row shows status label with latency and cost */
+    it("shows a passed run's label in green next to its latency and cost", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+            durationInMs: 1200,
+            totalCost: 0.003,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const label = screen.getByText("Passed");
+      expect(getComputedStyle(label).color).toContain("green");
+      expect(getComputedStyle(label).fontWeight).toContain("semibold");
+      expect(screen.getByText("1.2s")).toBeInTheDocument();
+      expect(screen.getByText("$0.003000")).toBeInTheDocument();
+    });
+
+    /** @scenario Failed list row shows red styling */
+    it("shows a failed run's dot and label in red next to its latency", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+            results: null,
+            durationInMs: 5400,
+            totalCost: null,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(getComputedStyle(statusIndicator("Failed")).background).toContain(
+        "red-500",
+      );
+      const label = screen.getByText("Failed");
+      expect(getComputedStyle(label).color).toContain("red");
+      expect(getComputedStyle(label).fontWeight).toContain("semibold");
+      expect(screen.getByText("5.4s")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a run recorded before cost and duration were captured", () => {
+    /** @scenario List row without metrics shows only status label */
+    it("shows the status label with no latency or cost beside it", () => {
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+            durationInMs: 0,
+            totalCost: null,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("Passed")).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain("$");
+      expect(screen.queryByText(/\ds$|ms$/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the user hovers a run's metrics", () => {
+    /** @scenario List row tooltip breaks cost and latency down by role */
+    it("breaks the cost and latency down by the roles that produced them", async () => {
+      const user = userEvent.setup();
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+            durationInMs: 4500,
+            totalCost: 0.024,
+            roleCosts: {
+              agent: [0.012, 0.006],
+              judge: [0.004],
+              user_simulator: [0.002],
+            },
+            roleLatencies: {
+              agent: [2000, 1000],
+              judge: [800],
+              user_simulator: [700],
+            },
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.hover(screen.getByText("4.5s"));
+
+      await waitFor(() =>
+        expect(screen.getByText("Duration")).toBeInTheDocument(),
+      );
+
+      // Totals for the whole run…
+      expect(
+        within(screen.getByText("Duration").parentElement!).getByText("4.5s"),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByText("Total Cost").parentElement!).getByText(
+          "$0.0240",
+        ),
+      ).toBeInTheDocument();
+
+      // …then one latency and one cost line per contributing role.
+      for (const role of ["agent", "judge", "user_simulator"]) {
+        const lines = screen.getAllByText(role);
+        expect(lines).toHaveLength(2);
+      }
+      // agent: mean of 2000 and 1000, then the sum of its two costs.
+      const [agentLatencyRow, agentCostRow] = screen.getAllByText("agent");
+      expect(
+        within(agentLatencyRow!.parentElement!).getByText("1.5s"),
+      ).toBeInTheDocument();
+      expect(
+        within(agentCostRow!.parentElement!).getByText("$0.0180"),
+      ).toBeInTheDocument();
     });
   });
 });

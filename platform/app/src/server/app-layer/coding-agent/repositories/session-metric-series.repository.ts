@@ -1,9 +1,9 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { SessionMetricSeriesRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/sessionMetricSeries.mapProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { SessionMetricSeriesRecord } from "~/server/event-sourcing/coding-agent-processing/schema";
 
 const TABLE_NAME = "session_metric_series" as const;
 
@@ -59,7 +59,12 @@ export class NullSessionMetricSeriesRepository
   }
 }
 
-interface ClickHouseWriteRecord {
+/**
+ * A type alias rather than an interface: only an anonymous object type gets an
+ * implicit index signature, and without one it cannot be passed as the client's
+ * `rows`.
+ */
+type ClickHouseWriteRecord = {
   TenantId: string;
   SessionId: string;
   SeriesId: string;
@@ -72,7 +77,7 @@ interface ClickHouseWriteRecord {
   AsOf: Date;
   UpdatedAt: Date;
   _retention_days: number;
-}
+};
 
 export class SessionMetricSeriesClickHouseRepository
   implements SessionMetricSeriesRepository
@@ -86,7 +91,7 @@ export class SessionMetricSeriesClickHouseRepository
     if (records.length === 0) return;
 
     const tenantId = records[0]!.tenantId;
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SessionMetricSeriesClickHouseRepository.ensure",
     );
@@ -104,7 +109,7 @@ export class SessionMetricSeriesClickHouseRepository
     }
 
     const now = new Date();
-    const values: ClickHouseWriteRecord[] = records.map((record) => ({
+    const rows: ClickHouseWriteRecord[] = records.map((record) => ({
       TenantId: record.tenantId,
       SessionId: record.sessionId,
       SeriesId: record.seriesId,
@@ -123,9 +128,8 @@ export class SessionMetricSeriesClickHouseRepository
     try {
       await client.insert({
         table: TABLE_NAME,
-        values,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows,
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       logger.error(
@@ -154,7 +158,7 @@ export class SessionMetricSeriesClickHouseRepository
     toMs: number;
   }): Promise<SessionMetricTotal[]> {
     if (sessionIds.length === 0) return [];
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "SessionMetricSeriesClickHouseRepository.findTotalsBySessionIds",
     );
@@ -166,8 +170,14 @@ export class SessionMetricSeriesClickHouseRepository
     // sharing the winning AsOf, both pass the filter, and a plain sum counts
     // the unit twice. UpdatedAt breaks AsOf ties so a same-timestamp
     // correction converges on the newest write instead of an arbitrary row.
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      SessionId: string;
+      MetricName: string;
+      Bucket: string;
+      Total: number;
+    }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT
           SessionId,
           MetricName,
@@ -187,16 +197,9 @@ export class SessionMetricSeriesClickHouseRepository
         )
         GROUP BY SessionId, MetricName, Bucket
       `,
-      query_params: { tenantId, sessionIds, from: fromMs, to: toMs },
-      format: "JSONEachRow",
+      params: { tenantId, sessionIds, from: fromMs, to: toMs },
     });
 
-    const rows = await result.json<{
-      SessionId: string;
-      MetricName: string;
-      Bucket: string;
-      Total: number;
-    }>();
     return rows.map((row) => ({
       sessionId: row.SessionId,
       metricName: row.MetricName,

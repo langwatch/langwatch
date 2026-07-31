@@ -1,9 +1,9 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
+import type { TraceAnalyticsRollupRow } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.repository";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
@@ -79,7 +79,7 @@ export class TraceAnalyticsRollupClickHouseRepository
     row: TraceAnalyticsRollupRow,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): Promise<void> {
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: row.tenantId },
       "TraceAnalyticsRollupClickHouseRepository.insertRow",
     );
@@ -88,9 +88,8 @@ export class TraceAnalyticsRollupClickHouseRepository
       const client = await this.resolveClient(row.tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: [toClickHouseRecord(row, retentionDays)],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: [toClickHouseRecord(row, retentionDays)],
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       logger.error(
@@ -111,7 +110,7 @@ export class TraceAnalyticsRollupClickHouseRepository
     if (rows.length === 0) return;
 
     for (const row of rows) {
-      EventUtils.validateTenantId(
+      validateTenantId(
         { tenantId: row.tenantId },
         "TraceAnalyticsRollupClickHouseRepository.insertRows",
       );
@@ -136,9 +135,8 @@ export class TraceAnalyticsRollupClickHouseRepository
       const client = await this.resolveClient(tenantId);
       await client.insert({
         table: TABLE_NAME,
-        values: rows.map((row) => toClickHouseRecord(row, retentionDays)),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows: rows.map((row) => toClickHouseRecord(row, retentionDays)),
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       logger.error(

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import type { ClickHouseFilterQueryParams } from "../clickhouse";
 import { FilterService, type GetFilterOptionsInput } from "../filter.service";
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: vi.fn(),
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: vi.fn(),
 }));
 
 const extractedOptions = [{ field: "opt-1", label: "Option 1", count: 3 }];
@@ -43,7 +43,7 @@ vi.mock("../clickhouse", () => ({
   },
 }));
 
-const mockedGetClient = vi.mocked(getClickHouseClientForProject);
+const mockedGetClient = vi.mocked(clickHouseForProject);
 
 function makeInput(
   overrides: Partial<GetFilterOptionsInput> = {},
@@ -57,9 +57,10 @@ function makeInput(
   };
 }
 
+/** The seam hands back decoded rows directly — no ResultSet, no `.json()`. */
 function makeClient(rows: unknown[] = []) {
   return {
-    query: vi.fn().mockResolvedValue({ json: async () => rows }),
+    query: vi.fn().mockResolvedValue(rows),
   };
 }
 
@@ -145,7 +146,7 @@ describe("FilterService.getFilterOptions", () => {
 
       expect(client.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query_params: expect.objectContaining({
+          params: expect.objectContaining({
             tenantId: "project-1",
             key: "foo.bar",
             subkey: "a.b",

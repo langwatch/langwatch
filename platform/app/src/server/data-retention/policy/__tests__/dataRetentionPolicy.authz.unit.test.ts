@@ -111,6 +111,7 @@ describe("assertCanWriteRetentionScope", () => {
   });
 
   describe("given an ORGANIZATION scope", () => {
+    /** @scenario "A project admin cannot set an organization-wide override" */
     it("checks organization:manage", async () => {
       rbacMocks.hasOrganizationPermission.mockResolvedValue(true);
 
@@ -152,6 +153,7 @@ describe("assertCanDisableRetention", () => {
   });
 
   describe("given a platform admin whose email is in ADMIN_EMAILS", () => {
+    /** @scenario "A platform admin can disable retention for a scope" */
     it("allows disabling retention", () => {
       process.env.ADMIN_EMAILS = "ops@langwatch.ai,admin@langwatch.ai";
       const adminCtx = {
@@ -163,6 +165,8 @@ describe("assertCanDisableRetention", () => {
   });
 
   describe("given an org admin who is not in ADMIN_EMAILS", () => {
+    /** @scenario "An organization admin who is not a platform admin cannot disable retention" */
+    /** @scenario "Keep-forever stays a platform-admin capability on every plan" */
     it("throws FORBIDDEN with platform-administrator wording", () => {
       process.env.ADMIN_EMAILS = "ops@langwatch.ai";
       const orgAdminCtx = {

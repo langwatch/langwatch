@@ -20,7 +20,7 @@ import { prisma } from "~/server/db";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import {
   app,
   buildGatewayCanonicalString,

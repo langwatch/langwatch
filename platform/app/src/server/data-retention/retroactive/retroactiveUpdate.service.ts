@@ -1,5 +1,7 @@
-import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type {
+  ClickHouseClientResolver,
+  TenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionCategory,
@@ -41,10 +43,22 @@ export class RetroactiveMutationInProgressError extends Error {
 // system.mutations.command so we only see mutations for this tenant.
 // Using position() instead of LIKE avoids `_` / `%` matching weirdness for
 // project ids that contain underscores (e.g. "project_xyz"). The search
-// needle is built in app code and passed via query_params — building it
+// needle is built in app code and passed as a query parameter — building it
 // inside ClickHouse with concat() ran into double-vs-single-quote escaping
 // (CH treats "..." as identifier names).
 const TENANT_FILTER_SQL = "position(command, {tenantFilterNeedle:String}) > 0";
+
+/** Metrics label for the `system.mutations` reads. */
+const MUTATIONS_TABLE_LABEL = "system.mutations";
+
+/** One `system.mutations` row, as the aliases in the SELECT name it. */
+interface MutationRow {
+  mutationId: string;
+  table: string;
+  isDone: number;
+  partsToDo: number;
+  createTime: string;
+}
 
 /**
  * Mirrors the way ClickHouse renders a string literal into
@@ -95,16 +109,17 @@ export class RetroactiveUpdateService {
     }
 
     // ALTER TABLE cannot parametrize the table identifier, but the tenant and
-    // the retention value can — and must — flow through query_params so we
+    // the retention value can — and must — flow through query parameters so we
     // don't reinvent string escaping for ClickHouse SQL.
     for (const table of tables) {
       await client.command({
-        query:
+        table,
+        sql:
           `ALTER TABLE ${table} ` +
           `UPDATE _retention_days = {retentionDays:UInt16} ` +
           `WHERE TenantId = {tenantId:String} ` +
           `AND _retention_days != {retentionDays:UInt16}`,
-        query_params: {
+        params: {
           tenantId: projectId,
           retentionDays: newRetentionDays,
         },
@@ -122,8 +137,9 @@ export class RetroactiveUpdateService {
     if (!this.resolveClickHouseClient) return [];
 
     const client = await this.resolveClickHouseClient(projectId);
-    const result = await client.query({
-      query: `
+    const rows = await client.query<MutationRow>({
+      table: MUTATIONS_TABLE_LABEL,
+      sql: `
         SELECT
           mutation_id AS mutationId,
           table AS table,
@@ -136,17 +152,8 @@ export class RetroactiveUpdateService {
           AND is_done = 0
         ORDER BY create_time DESC
       `,
-      query_params: tenantFilterParams(projectId),
-      format: "JSONEachRow",
+      params: tenantFilterParams(projectId),
     });
-
-    const rows = (await result.json()) as Array<{
-      mutationId: string;
-      table: string;
-      isDone: number;
-      partsToDo: number;
-      createTime: string;
-    }>;
 
     return rows.map(this.toMutationProgress);
   }
@@ -162,10 +169,11 @@ export class RetroactiveUpdateService {
 
     const client = await this.resolveClickHouseClient(projectId);
     await client.command({
-      query:
+      table: MUTATIONS_TABLE_LABEL,
+      sql:
         `KILL MUTATION WHERE mutation_id = {mutationId:String} ` +
         `AND ${TENANT_FILTER_SQL}`,
-      query_params: { mutationId, ...tenantFilterParams(projectId) },
+      params: { mutationId, ...tenantFilterParams(projectId) },
     });
   }
 
@@ -174,12 +182,13 @@ export class RetroactiveUpdateService {
     projectId,
     tables,
   }: {
-    client: ClickHouseClient;
+    client: TenantClickHouseClient;
     projectId: string;
     tables: string[];
   }): Promise<MutationProgress[]> {
-    const result = await client.query({
-      query: `
+    const rows = await client.query<MutationRow>({
+      table: MUTATIONS_TABLE_LABEL,
+      sql: `
         SELECT
           mutation_id AS mutationId,
           table AS table,
@@ -192,28 +201,13 @@ export class RetroactiveUpdateService {
           AND ${TENANT_FILTER_SQL}
           AND is_done = 0
       `,
-      query_params: { tables, ...tenantFilterParams(projectId) },
-      format: "JSONEachRow",
+      params: { tables, ...tenantFilterParams(projectId) },
     });
-
-    const rows = (await result.json()) as Array<{
-      mutationId: string;
-      table: string;
-      isDone: number;
-      partsToDo: number;
-      createTime: string;
-    }>;
 
     return rows.map(this.toMutationProgress);
   }
 
-  private toMutationProgress = (r: {
-    mutationId: string;
-    table: string;
-    isDone: number;
-    partsToDo: number;
-    createTime: string;
-  }): MutationProgress => ({
+  private toMutationProgress = (r: MutationRow): MutationProgress => ({
     mutationId: r.mutationId,
     table: r.table,
     isDone: r.isDone === 1,

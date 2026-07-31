@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InitiateToolCallCommand } from "~/server/event-sourcing/pipelines/langy-conversation-processing/commands";
+import { initiateToolCall } from "~/server/event-sourcing/langy-conversation-processing/initiateToolCall.command";
 import { langyRelayFrameSchema } from "../langyRelayFrame";
 
 /**
@@ -135,29 +135,29 @@ describe("langy tool call id", () => {
   describe("given a tool call whose id carried a provider signature", () => {
     describe("when its start is recorded as a durable milestone", () => {
       /** @scenario A tool call's durable key is built from the normalised id */
-      it("builds the event's idempotency key from the normalised id", async () => {
+      it("carries only the normalised id into the recorded milestone", async () => {
         const frame = langyRelayFrameSchema.parse(
           toolFrame({ id: POLLUTED_ID }),
         );
         if (frame.type !== "tool") throw new Error("expected a tool frame");
 
-        const [event] = await new InitiateToolCallCommand().handle({
-          type: "langy.conversation.initiate_tool_call",
-          tenantId: "project-1",
-          data: {
-            tenantId: "project-1",
-            occurredAt: 1_000,
-            conversationId: "langyconv_1",
-            turnId: "langyturn_1",
-            toolCallId: frame.id,
-            toolName: frame.name,
-          },
-        } as never);
+        // The engine derives an event's idempotency key by hashing this
+        // payload, so the payload's tool call id is what decides whether two
+        // deliveries of the same call collapse.
+        const [event] = await initiateToolCall({
+          occurredAt: 1_000,
+          conversationId: "langyconv_1",
+          turnId: "langyturn_1",
+          toolCallId: frame.id,
+          toolName: frame.name,
+        });
+        if (event?.type !== "toolCallInitiated") {
+          throw new Error("expected a toolCallInitiated event");
+        }
 
-        expect(event!.idempotencyKey).toBe(
-          `project-1:langyconv_1:tool-start:${REAL_ID}`,
-        );
-        expect(event!.idempotencyKey!.length).toBeLessThan(200);
+        expect(event.data.toolCallId).toBe(REAL_ID);
+        expect(JSON.stringify(event)).not.toContain("_ts_");
+        expect(JSON.stringify(event)).not.toContain(SIGNATURE.slice(0, 32));
       });
     });
   });

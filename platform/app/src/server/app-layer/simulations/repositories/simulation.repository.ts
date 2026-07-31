@@ -29,6 +29,29 @@ export interface SimulationRepository {
     scenarioRunId: string;
   }): Promise<ScenarioRunData | null>;
 
+  /**
+   * The run's stored status alone, from the latest version of its row —
+   * `null` when no row has landed for it yet.
+   *
+   * Exists separately from {@link getScenarioRunData} because it answers a
+   * different question, for a caller that cannot tolerate a stale answer:
+   * "has anything already reached this run?", asked before a durable dispatch
+   * executes it. A run whose execution is already under way and reads back as
+   * `QUEUED` gets executed a second time, at the customer's expense, so this
+   * is a fresh read of the stored row every time — never a cache, and never a
+   * projection held in memory.
+   *
+   * Deliberately not filtered on `ArchivedAt`: an archived run still has a
+   * status, and hiding it would answer `null` — "nothing is known about this
+   * run" — for a run that has already been executed.
+   *
+   * @see specs/scenarios/queued-run-dispatch.feature
+   */
+  findRunStatus(params: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<string | null>;
+
   getBatchHistoryForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
@@ -130,6 +153,12 @@ export class NullSimulationRepository implements SimulationRepository {
   }
 
   async getScenarioRunData(): Promise<ScenarioRunData | null> {
+    return null;
+  }
+
+  /** Nothing is stored, so nothing is known — which lets a dispatch proceed
+   *  rather than stranding every run on a deployment with no run store. */
+  async findRunStatus(): Promise<string | null> {
     return null;
   }
 

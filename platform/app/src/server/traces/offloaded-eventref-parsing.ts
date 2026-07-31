@@ -1,12 +1,14 @@
 /**
  * Shared parsing of `langwatch.reserved.eventref.*` pointers off a span's flat
- * spanAttributes (ADR-022 read path). Used by BOTH the per-trace resolver
+ * spanAttributes (ADR-022, retired; ground now ADR-099, read path). Used by
+ * BOTH the per-trace resolver
  * ({@link ./resolve-offloaded-traces}) and the bulk batch resolver
  * ({@link ./resolve-offloaded-traces-batch}) so the eventref shape is decoded
  * in exactly one place.
  */
+
+import type { NormalizedAttributes } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
-import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 /** One decoded eventref pointer ready to fetch from event_log. */
 export interface EventRefEntry {

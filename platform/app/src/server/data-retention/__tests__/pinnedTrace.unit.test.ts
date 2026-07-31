@@ -38,6 +38,8 @@ describe("PinnedTraceService", () => {
   describe("given an unpinned trace", () => {
     describe("when pin() is called", () => {
       /** @scenario Pinning a trace does not change retention */
+      /** @scenario "Pin a trace" */
+      /** @scenario "A manual pin does not exempt its trace from retention" */
       it("creates a PinnedTrace row and issues no ClickHouse commands", async () => {
         const repository = new PinnedTraceRepository(
           createPinnedTracePrisma() as any,
@@ -61,6 +63,7 @@ describe("PinnedTraceService", () => {
     });
 
     describe("when autoPin() is called", () => {
+      /** @scenario "Auto-pin on trace share" */
       it("creates a PinnedTrace row marked as share and issues no ClickHouse commands", async () => {
         const repository = new PinnedTraceRepository(
           createPinnedTracePrisma() as any,
@@ -84,6 +87,7 @@ describe("PinnedTraceService", () => {
 
   describe("given a pinned trace", () => {
     describe("when unpin() is called", () => {
+      /** @scenario "Unpin a trace" */
       it("deletes the PinnedTrace row and issues no ClickHouse commands", async () => {
         const repository = new PinnedTraceRepository(
           createPinnedTracePrisma() as any,
@@ -197,6 +201,7 @@ describe("PinnedTraceService", () => {
   describe("given an auto-share pin promoted to manual", () => {
     describe("when autoUnpin() runs after share is removed", () => {
       /** @scenario Manual pin survives unsharing an auto-shared trace */
+      /** @scenario "Unshare does not unpin manually pinned trace" */
       it("keeps the trace pinned", async () => {
         const repository = new PinnedTraceRepository(
           createPinnedTracePrisma() as any,

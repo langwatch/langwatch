@@ -1,6 +1,6 @@
 # Numeric facet modes — Range slider vs Discrete value picker
 #
-# Design: dev/docs/adr/028-trace-facet-sidebar-presentation-and-perspectives.md
+# Design: dev/docs/adr/093-trace-facet-sidebar-presentation-and-perspectives.md
 #
 # Implementation:
 #   platform/app/src/server/app-layer/traces/facet-registry.ts        (RangeFacetDef: integer flag + default mode)

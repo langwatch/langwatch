@@ -2,12 +2,17 @@ import {
   CADENCE_WINDOW_MS,
   NOTIFICATION_CADENCES,
 } from "@langwatch/automations/cadences";
+import { isDispatchError } from "@langwatch/event-sourcing";
 import { TriggerAction } from "@prisma/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { InvalidAnnotatorReferenceError } from "~/server/annotations/errors";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   computeScheduledFor,
+  dispatchTriggerAction,
   NOTIFY_TRIGGER_ACTIONS,
   PERSIST_TRIGGER_ACTIONS,
+  type TriggerActionDispatchDeps,
   triggerReadsEvaluations,
 } from "../triggerActionDispatch";
 
@@ -188,6 +193,88 @@ describe("computeScheduledFor", () => {
       });
       expect(early).toEqual(late);
       expect(early).toEqual(new Date("2026-05-29T12:05:00.000Z"));
+    });
+  });
+});
+
+describe("dispatchTriggerAction on the annotation-queue action", () => {
+  const annotationQueueTrigger = {
+    id: "trigger_1",
+    action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+    actionParams: {
+      createdByUserId: "creator_1",
+      annotators: [{ id: "nonsense-annotator", name: "Stale" }],
+    },
+  } as unknown as Parameters<typeof dispatchTriggerAction>[0]["trigger"];
+
+  const createDeps = (
+    addToAnnotationQueue: TriggerActionDispatchDeps["addToAnnotationQueue"],
+  ) =>
+    ({
+      projects: { getById: vi.fn().mockResolvedValue({ id: "project_1" }) },
+      triggers: { updateLastRunAt: vi.fn().mockResolvedValue(undefined) },
+      traceById: vi.fn().mockResolvedValue(undefined),
+      addToAnnotationQueue,
+      addToDataset: vi.fn().mockResolvedValue(undefined),
+    }) as unknown as TriggerActionDispatchDeps;
+
+  const dispatch = (deps: TriggerActionDispatchDeps) =>
+    dispatchTriggerAction({
+      deps,
+      trigger: annotationQueueTrigger,
+      traceId: "trace_1",
+      tenantId: "project_1",
+      foldState: {} as TraceSummaryData,
+    });
+
+  describe("when the stored annotator names neither a queue nor a person", () => {
+    /** @scenario "A stored automation's unusable annotator retires instead of retrying" */
+    it("fails terminally rather than asking the outbox to retry", async () => {
+      const deps = createDeps(
+        vi
+          .fn()
+          .mockRejectedValue(
+            new InvalidAnnotatorReferenceError("nonsense-annotator"),
+          ),
+      );
+
+      const error = await dispatch(deps).catch((caught: unknown) => caught);
+
+      expect(isDispatchError(error)).toBe(true);
+      expect((error as { retryable: boolean }).retryable).toBe(false);
+      expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the write fails for a reason waiting could fix", () => {
+    it("leaves the failure retryable", async () => {
+      const poolExhausted = new Error("Timed out fetching a connection");
+      const deps = createDeps(vi.fn().mockRejectedValue(poolExhausted));
+
+      const error = await dispatch(deps).catch((caught: unknown) => caught);
+
+      expect(error).toBe(poolExhausted);
+      expect(isDispatchError(error)).toBe(false);
+    });
+  });
+
+  describe("when the annotators are usable", () => {
+    it("assigns the trace and records the run", async () => {
+      const addToAnnotationQueue = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps(addToAnnotationQueue);
+
+      await dispatch(deps);
+
+      expect(addToAnnotationQueue).toHaveBeenCalledWith({
+        traceIds: ["trace_1"],
+        projectId: "project_1",
+        annotators: ["nonsense-annotator"],
+        userId: "creator_1",
+      });
+      expect(deps.triggers.updateLastRunAt).toHaveBeenCalledWith(
+        "trigger_1",
+        "project_1",
+      );
     });
   });
 });

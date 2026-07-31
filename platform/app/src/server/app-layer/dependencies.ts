@@ -3,13 +3,16 @@ import type { NotificationService } from "../../../ee/billing/notifications/noti
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { AnnotationService } from "../annotations/annotation.service";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import type { EventSourcing } from "../event-sourcing/eventSourcing";
-import type { AppCommands } from "../event-sourcing/pipelineRegistry";
+import type {
+  AppCommands,
+  createEventSourcingRegistry,
+} from "../event-sourcing/registry";
 import type { ExperimentService } from "../experiments/experiment.service";
 import type { EmailSuppressionService } from "./automations/emailSuppression.service";
 import type { TriggerService } from "./automations/trigger.service";
@@ -127,6 +130,7 @@ export interface AppDependencies {
     feedbackPrompt: LangyFeedbackPromptService;
   };
   experiments: ExperimentService;
+  annotations: AnnotationService;
   triggers: TriggerService;
   /** Wraps `testFireTrigger(deps, input)` with the composition-time
    *  `{baseHost, notifier}` bag already bound — the router only needs
@@ -156,8 +160,27 @@ export interface AppDependencies {
   commands: AppCommands;
   ops?: OpsDependencies;
 
+  /*
+   * There is deliberately no ClickHouse client here.
+   *
+   * A datastore client is a repository's dependency, not the application's. It
+   * used to sit on `App` as `newClickHouseClient` so that callers outside the
+   * composition root could "resolve through the same pool" — but what that
+   * bought was a global handle to the database reachable from anywhere,
+   * including from services, which then read rows instead of asking a
+   * repository for them. Repositories take a `ClickHouseClientResolver` in
+   * their constructor; services take repositories. Nothing takes a pool.
+   *
+   * The two things that genuinely have no composition root to hand them
+   * anything — a worker booting outside the request path, the metrics
+   * collector — reach for the module accessors in
+   * `./clients/clickhouse/shared.ts` and `./clients/clickhouse/tenant-resolver.ts`
+   * instead. Those are ambient by construction and say so; putting them on
+   * `App` only disguised that.
+   */
+
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
-  _eventSourcing?: EventSourcing;
+  _eventSourcing?: ReturnType<typeof createEventSourcingRegistry>;
 
   /** Internal — resources to gracefully close on shutdown. */
   _gracefulCloseables?: Array<{ name: string; close: () => Promise<void> }>;

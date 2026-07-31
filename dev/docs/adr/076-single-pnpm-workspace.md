@@ -205,7 +205,7 @@ one command and a security pin that reaches every project.
 - The application's package name changes. Anything filtering it by name needs
   `@langwatch/web`; path-based invocation (`pnpm -C platform/app`) is unaffected.
 - The tarball grows by every member `package.json` it did not previously carry
-  (`packages/server`, `sdks/typescript`, `tests/agentic-e2e`) — a few kilobytes —
+  (`packages/server`, `sdks/typescript`, `dev/tests/agentic-e2e`) — a few kilobytes —
   and by the root lockfile. In exchange it stops carrying a second lockfile that
   could drift from the one the repo develops against.
 - `npx @langwatch/server` installs from `app/` inside the tarball — the staged

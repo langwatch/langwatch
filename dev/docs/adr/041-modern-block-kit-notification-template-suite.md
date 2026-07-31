@@ -67,7 +67,7 @@ Add a **third, default tier: "Template" (guided)** — the author picks a curate
 
 - **Pick by outcome, not syntax.** The author chooses *what they want to see* — "Pie chart", "Trend chart", "History table", "Incident card", "Rich trace card", "Digest table" — and we select the best-fitting preset. For graph alerts the chart type drives the choice: Pie/Bar/Line → the `data_visualization` template; Table → `table`; Card → `graph_alert_incident`. For trace data the presets surface the useful fields (I/O, evaluations, metadata, cost, latency) without the author assembling them.
 - **Progressive disclosure — three escape hatches, in order of power:**
-  1. **Synced preview** (read-only) — renders the chosen preset against real recent-match or example data (the ADR-037 pane), no code shown.
+  1. **Synced preview** (read-only) — renders the chosen preset against real recent-match or example data (the ADR-098 pane), no code shown.
   2. **"Customise / edit the template"** — reveals the generated Liquid Block Kit in the editor, switching the draft to `block_kit` mode with the preset's source pre-filled. One-way: hand-edits are custom (the picker highlights nothing, as `findTemplateOptionBySource` handles — `registry.ts:201-205`).
   3. **"Switch to plain text"** — drops to `'string'` mode for the minimalists.
 - **Copywriting** (per `dev/docs/best_practices/copywriting.md`): the guided tier says *what the message will contain* ("A trend chart of the metric with the breach highlighted"), never *how it is built*. "Liquid" / "Block Kit" jargon appears only once the author opts into the code editor.
@@ -173,7 +173,7 @@ order for user-controlled values.
 ## References
 
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid templates + Block Kit allowlist v1 (this ADR extends its allowlist)
-- [ADR-037](./037-automation-operator-surfaces.md) — authoring drawer / live preview that renders these templates
+- [ADR-098](./098-event-sourcing-core.md) — successor to the retired ADR-037; authoring drawer / live preview that renders these templates
 - [ADR-040](./040-webhook-http-request-automation-channel.md) — the generic webhook channel, adjacent automation surface
 - PR #5015 — graph-alert Slack templates + `GraphAlertTemplateContext` (the `graphAlert` kind this suite builds on)
 - Slack Block Kit reference — https://docs.slack.dev/reference/block-kit/blocks/ (`table`, `rich-text`, `data-visualization`, `section`, `markdown` block pages)

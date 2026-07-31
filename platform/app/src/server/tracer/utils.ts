@@ -167,6 +167,21 @@ export const decodeBase64OpenTelemetryId = (id: unknown): string | null => {
   return decodeOpenTelemetryId(id);
 };
 
+/**
+ * Whether a decoded id is a usable W3C trace id: 32 hex digits and not
+ * all-zero. The all-zero id is what an SDK emits for "no trace", so a
+ * correlation built on it would attach a record to a span that does not exist.
+ *
+ * Case-insensitive because callers reach this from both directions — some
+ * lowercase the decoded id first, some pass it through verbatim.
+ */
+export const isValidTraceId = (value: string): boolean =>
+  /^[a-f0-9]{32}$/i.test(value) && !/^0+$/.test(value);
+
+/** Span-id counterpart of {@link isValidTraceId} — 16 hex digits, not all-zero. */
+export const isValidSpanId = (value: string): boolean =>
+  /^[a-f0-9]{16}$/i.test(value) && !/^0+$/.test(value);
+
 export const convertFromUnixNano = (timeUnixNano: unknown): number => {
   let unixNano: number;
 

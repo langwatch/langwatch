@@ -27,10 +27,10 @@
  *   - specs/ai-gateway/governance/architecture-invariants.feature
  *     (single trace store, reserved namespaces)
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
 
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForOrganization } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
@@ -308,8 +308,8 @@ export class ActivityMonitorService {
 
   private async getClickhouse(
     organizationId: string,
-  ): Promise<ClickHouseClient | null> {
-    return await getClickHouseClientForOrganization(organizationId);
+  ): Promise<TenantClickHouseClient | null> {
+    return clickHouseForOrganization(organizationId);
   }
 
   async summary(input: {
@@ -339,8 +339,13 @@ export class ActivityMonitorService {
     const thisWindowStart = now - windowMs;
     const previousWindowStart = now - 2 * windowMs;
 
-    const result = await ch.query({
-      query: `
+    const rows = await ch.query<{
+      thisSpend: number | string | null;
+      prevSpend: number | string | null;
+      thisUsers: number | string | null;
+    }>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           sumIf(coalesce(ts.TotalCost, 0), ts.OccurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})) AS thisSpend,
           sumIf(coalesce(ts.TotalCost, 0), ts.OccurredAt < fromUnixTimestamp64Milli({thisStart:UInt64})) AS prevSpend,
@@ -361,7 +366,7 @@ export class ActivityMonitorService {
             GROUP BY TenantId, TraceId
           )
       `,
-      query_params: {
+      params: {
         tenantId: govProjectId,
         thisStart: thisWindowStart,
         prevStart: previousWindowStart,
@@ -369,13 +374,7 @@ export class ActivityMonitorService {
         originValue: ORIGIN_KIND_VALUE,
         userKey: ATTR_USER_ID,
       },
-      format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
-      thisSpend: number | string | null;
-      prevSpend: number | string | null;
-      thisUsers: number | string | null;
-    }>;
     const row = rows[0];
     const thisSpend = Number(row?.thisSpend ?? 0);
     const prevSpend = Number(row?.prevSpend ?? 0);
@@ -445,8 +444,15 @@ export class ActivityMonitorService {
     // ILLEGAL_TYPE_OF_ARGUMENT (43). Aliasing the outer string to a
     // disjoint name (`spendUsdStr`) keeps the ORDER BY referring to the
     // subquery's Float64 spendUsd column.
-    const result = await ch.query({
-      query: `
+    const rows = await ch.query<{
+      actor: string;
+      spendUsdStr: string;
+      requests: string;
+      lastActivityMs: string;
+      mostUsedTarget: string | null;
+    }>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           actor,
           toString(sum(spendUsd)) AS spendUsdStr,
@@ -476,7 +482,7 @@ export class ActivityMonitorService {
         ORDER BY ${orderExpr} ${orderDir}
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
-      query_params: {
+      params: {
         tenantId: govProjectId,
         windowStart: now - windowMs,
         originKey: ATTR_ORIGIN_KIND,
@@ -485,15 +491,7 @@ export class ActivityMonitorService {
         limit,
         offset,
       },
-      format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
-      actor: string;
-      spendUsdStr: string;
-      requests: string;
-      lastActivityMs: string;
-      mostUsedTarget: string | null;
-    }>;
     return rows.map((r) => ({
       actor: r.actor,
       spendUsd: Number(r.spendUsdStr),
@@ -557,8 +555,15 @@ export class ActivityMonitorService {
     const now = Date.now();
     const windowStart = now - input.windowDays * 24 * 60 * 60 * 1000;
 
-    const result = await ch.query({
-      query: `
+    const rows = await ch.query<{
+      projectId: string;
+      actor: string;
+      spendUsdStr: string;
+      requests: string;
+      lastActivityMs: string;
+    }>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           ts.TenantId AS projectId,
           ts.Attributes[{userKey:String}] AS actor,
@@ -577,20 +582,12 @@ export class ActivityMonitorService {
           )
         GROUP BY projectId, actor
       `,
-      query_params: {
+      params: {
         tenantIds,
         windowStart,
         userKey: ATTR_USER_ID,
       },
-      format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
-      projectId: string;
-      actor: string;
-      spendUsdStr: string;
-      requests: string;
-      lastActivityMs: string;
-    }>;
 
     const acc = new Map<
       string,
@@ -742,8 +739,15 @@ export class ActivityMonitorService {
     const sortDir = input.sortDir ?? "desc";
 
     const previousWindowStart = now - 2 * windowMs;
-    const result = await ch.query({
-      query: `
+    const sourceRows = await ch.query<{
+      sourceId: string;
+      thisSpendStr: string;
+      prevSpendStr: string;
+      thisRequests: string;
+      lastActivityMs: string;
+    }>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           sourceId,
           toString(sumIf(spendUsd, occurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64}))) AS thisSpendStr,
@@ -770,7 +774,7 @@ export class ActivityMonitorService {
         )
         GROUP BY sourceId
       `,
-      query_params: {
+      params: {
         tenantId: govProjectId,
         thisStart: now - windowMs,
         prevStart: previousWindowStart,
@@ -778,16 +782,8 @@ export class ActivityMonitorService {
         originValue: ORIGIN_KIND_VALUE,
         sourceKey: ATTR_INGESTION_SOURCE_ID,
       },
-      format: "JSONEachRow",
     });
 
-    const sourceRows = (await result.json()) as Array<{
-      sourceId: string;
-      thisSpendStr: string;
-      prevSpendStr: string;
-      thisRequests: string;
-      lastActivityMs: string;
-    }>;
     if (sourceRows.length === 0) return [];
 
     const sourceIds = sourceRows
@@ -933,8 +929,13 @@ export class ActivityMonitorService {
     //   `toUnixTimestamp64Milli(toStartOfDay(toDateTime64(OccurredAt/1000, 3)))`
     //     → divides ms-precision by 1000 then re-wraps, double-shifting
     //     every bucket far outside the window
-    const result = await ch.query({
-      query: `
+    const rows = await ch.query<{
+      bucketMs: string;
+      groupKey: string | null;
+      spendUsdStr: string;
+    }>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           toString(toUnixTimestamp(toStartOfDay(ts.OccurredAt)) * 1000) AS bucketMs,
           ${groupExpr} AS groupKey,
@@ -953,7 +954,7 @@ export class ActivityMonitorService {
         GROUP BY bucketMs, groupKey
         ORDER BY bucketMs ASC
       `,
-      query_params: {
+      params: {
         tenantId: govProjectId,
         windowStart,
         originKey: ATTR_ORIGIN_KIND,
@@ -961,13 +962,7 @@ export class ActivityMonitorService {
         sourceKey: ATTR_INGESTION_SOURCE_ID,
         userKey: ATTR_USER_ID,
       },
-      format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
-      bucketMs: string;
-      groupKey: string | null;
-      spendUsdStr: string;
-    }>;
 
     let labelByKey: Map<string, { key: string; label: string }>;
     let rolledRows: Array<{ bucketMs: number; key: string; spendUsd: number }>;
@@ -1063,7 +1058,8 @@ export class ActivityMonitorService {
   }
 
   /**
-   * Recent anomaly alerts produced by the anomaly-detection reactor.
+   * Recent anomaly alerts produced by `SpendSpikeAnomalyEvaluator` on the
+   * spend-spike anomaly worker's tick.
    * Read-only snapshot of `prisma.anomalyAlert` rows for the org,
    * sorted by detectedAt DESC. Returns `[]` for orgs with no alerts
    * - callers render the empty-state in the dashboard.
@@ -1119,9 +1115,10 @@ export class ActivityMonitorService {
     if (ch && govProjectId) {
       const sourceIds = sources.map((s) => s.id);
       const since = Date.now() - 24 * 60 * 60 * 1000;
-      const [traceCounts, logCounts] = await Promise.all([
-        ch.query({
-          query: `
+      const [traceRows, logRows] = await Promise.all([
+        ch.query<{ sourceId: string; c: string }>({
+          table: "trace_summaries",
+          sql: `
             SELECT ts.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
             FROM trace_summaries ts
             WHERE ts.TenantId = {tenantId:String}
@@ -1137,7 +1134,7 @@ export class ActivityMonitorService {
               )
             GROUP BY sourceId
           `,
-          query_params: {
+          params: {
             tenantId: govProjectId,
             since,
             originKey: ATTR_ORIGIN_KIND,
@@ -1145,10 +1142,10 @@ export class ActivityMonitorService {
             sourceKey: ATTR_INGESTION_SOURCE_ID,
             sourceIds,
           },
-          format: "JSONEachRow",
         }),
-        ch.query({
-          query: `
+        ch.query<{ sourceId: string; c: string }>({
+          table: "stored_log_records",
+          sql: `
             SELECT lr.Attributes[{sourceKey:String}] AS sourceId, toString(count()) AS c
             FROM stored_log_records lr
             WHERE lr.TenantId = {tenantId:String}
@@ -1157,7 +1154,7 @@ export class ActivityMonitorService {
               AND lr.Attributes[{sourceKey:String}] IN ({sourceIds:Array(String)})
             GROUP BY sourceId
           `,
-          query_params: {
+          params: {
             tenantId: govProjectId,
             since,
             originKey: ATTR_ORIGIN_KIND,
@@ -1165,17 +1162,8 @@ export class ActivityMonitorService {
             sourceKey: ATTR_INGESTION_SOURCE_ID,
             sourceIds,
           },
-          format: "JSONEachRow",
         }),
       ]);
-      const traceRows = (await traceCounts.json()) as Array<{
-        sourceId: string;
-        c: string;
-      }>;
-      const logRows = (await logCounts.json()) as Array<{
-        sourceId: string;
-        c: string;
-      }>;
       for (const row of [...traceRows, ...logRows]) {
         eventsBySource.set(
           row.sourceId,
@@ -1214,8 +1202,19 @@ export class ActivityMonitorService {
     // Pull recent traces for the source. Webhook log_records are out of
     // scope for this endpoint (the per-source detail page renders trace
     // shape; the log shape gets its own viewer in 3b).
-    const result = await ch.query({
-      query: `
+    const rows = await ch.query<{
+      eventId: string;
+      eventType: string;
+      actor: string;
+      target: string | null;
+      costUsd: number | string;
+      tokensInput: number | string;
+      tokensOutput: number | string;
+      occurredMs: string;
+      createdMs: string;
+    }>({
+      table: "trace_summaries",
+      sql: `
         SELECT
           ts.TraceId AS eventId,
           ts.Attributes[{sourceTypeKey:String}] AS eventType,
@@ -1240,7 +1239,7 @@ export class ActivityMonitorService {
         ORDER BY ts.OccurredAt DESC, ts.TraceId DESC
         LIMIT {limit:UInt32}
       `,
-      query_params: {
+      params: {
         tenantId: govProjectId,
         beforeMs,
         originKey: ATTR_ORIGIN_KIND,
@@ -1251,19 +1250,7 @@ export class ActivityMonitorService {
         sourceId: input.sourceId,
         limit,
       },
-      format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{
-      eventId: string;
-      eventType: string;
-      actor: string;
-      target: string | null;
-      costUsd: number | string;
-      tokensInput: number | string;
-      tokensOutput: number | string;
-      occurredMs: string;
-      createdMs: string;
-    }>;
     return rows.map((r) => ({
       eventId: r.eventId,
       eventType: r.eventType ?? "",
@@ -1297,9 +1284,15 @@ export class ActivityMonitorService {
     const day = 24 * 60 * 60 * 1000;
     const since30d = now - 30 * day;
 
-    const [traceResult, logResult] = await Promise.all([
-      ch.query({
-        query: `
+    const [traceRows, logRows] = await Promise.all([
+      ch.query<{
+        c24: number | string;
+        c7: number | string;
+        c30: number | string;
+        lastMs: string | null;
+      }>({
+        table: "trace_summaries",
+        sql: `
           SELECT
             countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
             countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
@@ -1318,7 +1311,7 @@ export class ActivityMonitorService {
               GROUP BY TenantId, TraceId
             )
         `,
-        query_params: {
+        params: {
           tenantId: govProjectId,
           since24h: now - day,
           since7d: now - 7 * day,
@@ -1328,10 +1321,15 @@ export class ActivityMonitorService {
           sourceKey: ATTR_INGESTION_SOURCE_ID,
           sourceId: input.sourceId,
         },
-        format: "JSONEachRow",
       }),
-      ch.query({
-        query: `
+      ch.query<{
+        c24: number | string;
+        c7: number | string;
+        c30: number | string;
+        lastMs: string | null;
+      }>({
+        table: "stored_log_records",
+        sql: `
           SELECT
             countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
             countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
@@ -1343,7 +1341,7 @@ export class ActivityMonitorService {
             AND lr.Attributes[{originKey:String}] = {originValue:String}
             AND lr.Attributes[{sourceKey:String}] = {sourceId:String}
         `,
-        query_params: {
+        params: {
           tenantId: govProjectId,
           since24h: now - day,
           since7d: now - 7 * day,
@@ -1353,21 +1351,8 @@ export class ActivityMonitorService {
           sourceKey: ATTR_INGESTION_SOURCE_ID,
           sourceId: input.sourceId,
         },
-        format: "JSONEachRow",
       }),
     ]);
-    const traceRows = (await traceResult.json()) as Array<{
-      c24: number | string;
-      c7: number | string;
-      c30: number | string;
-      lastMs: string | null;
-    }>;
-    const logRows = (await logResult.json()) as Array<{
-      c24: number | string;
-      c7: number | string;
-      c30: number | string;
-      lastMs: string | null;
-    }>;
     const t = traceRows[0];
     const l = logRows[0];
 

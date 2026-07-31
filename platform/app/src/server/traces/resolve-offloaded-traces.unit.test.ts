@@ -1,6 +1,7 @@
 /**
  * Unit tests for the resolveOffloadedTraces helper — per-trace span-level
- * eventref resolution and TraceIO recompute (read-resolution half of ADR-022).
+ * eventref resolution and TraceIO recompute (read-resolution half of
+ * ADR-022, retired; ground now ADR-099).
  * Each test covers one assertion.
  *
  * BDD structure: given/when nested describes, action-based it() names.
@@ -21,13 +22,13 @@ vi.mock("langwatch", () => ({
 
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
 // ---------------------------------------------------------------------------

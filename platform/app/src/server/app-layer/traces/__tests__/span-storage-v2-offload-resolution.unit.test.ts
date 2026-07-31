@@ -38,16 +38,16 @@ vi.mock("@langwatch/observability", () => ({
 
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import {
-  type NormalizedSpan,
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 // ---------------------------------------------------------------------------
 // Helpers

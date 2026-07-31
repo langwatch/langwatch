@@ -26,7 +26,7 @@
  */
 import * as z from "zod/v4";
 import { parseCliJson } from "./cliJson.js";
-import { resolveTotal, type Pagination } from "./primitives.js";
+import { type Pagination, resolveTotal } from "./primitives.js";
 import { CARDS_BY_RESOURCE, cardKindFor } from "./registry.js";
 
 /** How many ids a digest carries at most — a reference, not an export. */
@@ -84,10 +84,9 @@ const RUN_ID_KEYS = ["runId", "run_id", "batchRunId", "batch_run_id"];
 function singularIdKeys(resource: string): string[] {
   const words = resource.split("-").filter(Boolean);
   const snake = `${words.join("_")}_id`;
-  const camel =
-    words
-      .map((word, i) => (i === 0 ? word : word[0]!.toUpperCase() + word.slice(1)))
-      .join("") + "Id";
+  const camel = `${words
+    .map((word, i) => (i === 0 ? word : word[0]?.toUpperCase() + word.slice(1)))
+    .join("")}Id`;
   return [snake, camel];
 }
 
@@ -103,7 +102,8 @@ function idKeysFor({
   verb: string;
 }): string[] {
   const hinted = CARDS_BY_RESOURCE[resource]?.ref?.idKeys ?? [];
-  const runKeys = cardKindFor({ resource, verb }) === "evalRun" ? RUN_ID_KEYS : [];
+  const runKeys =
+    cardKindFor({ resource, verb }) === "evalRun" ? RUN_ID_KEYS : [];
   return [...hinted, "id", "slug", ...singularIdKeys(resource), ...runKeys];
 }
 
@@ -113,7 +113,8 @@ function idOf(row: unknown, idKeys: string[]): string | undefined {
   for (const key of idKeys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value;
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    if (typeof value === "number" && Number.isFinite(value))
+      return String(value);
   }
   return undefined;
 }
@@ -139,9 +140,9 @@ function collectionRowsOf(document: unknown): unknown[] | null {
   const raw = Array.isArray(document)
     ? document
     : document && typeof document === "object"
-      ? COLLECTION_KEYS.map(
+      ? (COLLECTION_KEYS.map(
           (key) => (document as Record<string, unknown>)[key],
-        ).find(Array.isArray) ?? null
+        ).find(Array.isArray) ?? null)
       : null;
   if (!raw) return null;
   return raw.filter((row) => !!row && typeof row === "object");

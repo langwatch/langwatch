@@ -18,8 +18,8 @@ import { createLogger } from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
+import type { NormalizedSpan } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import type { ResolvedTraceSpans } from "../resolve-offloaded-traces";
@@ -39,9 +39,8 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: () => Promise.resolve({ query: mockClickHouseQuery }),
 }));
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
@@ -143,38 +142,27 @@ function buildService(blobStore: BlobStore): ClickHouseTraceService {
 function setupGetAllWithSpansMocks() {
   mockClickHouseQuery
     // fetchTracesWithPagination: count, IDs, data
-    .mockResolvedValueOnce({ json: () => Promise.resolve([{ total: "1" }]) })
-    .mockResolvedValueOnce({
-      json: () => Promise.resolve([{ TraceId: TRACE_ID }]),
-    })
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve([
-          makeSummaryRow(TRACE_ID, {
-            computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
-          }),
-        ]),
-    })
+    .mockResolvedValueOnce([{ total: "1" }])
+    .mockResolvedValueOnce([{ TraceId: TRACE_ID }])
+    .mockResolvedValueOnce([
+      makeSummaryRow(TRACE_ID, {
+        computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
+      }),
+    ])
     // enrichTracesWithSpans -> fetchTracesWithSpansJoined: summary, spans
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve([
-          makeSummaryRow(TRACE_ID, {
-            computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
-          }),
-        ]),
-    })
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve([
-          makeSpanRowWithEventRef(TRACE_ID, "span-1", {
-            tenantId: PROJECT_ID,
-            previewOutput: PREVIEW_OUTPUT,
-          }),
-        ]),
-    })
+    .mockResolvedValueOnce([
+      makeSummaryRow(TRACE_ID, {
+        computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
+      }),
+    ])
+    .mockResolvedValueOnce([
+      makeSpanRowWithEventRef(TRACE_ID, "span-1", {
+        tenantId: PROJECT_ID,
+        previewOutput: PREVIEW_OUTPUT,
+      }),
+    ])
     // fetchEvaluationRows
-    .mockResolvedValueOnce({ json: () => Promise.resolve([]) });
+    .mockResolvedValueOnce([]);
 }
 
 /**
@@ -189,34 +177,23 @@ function setupGetAllWithSpansMocks() {
 function setupThreadMocks() {
   mockClickHouseQuery
     // SELECT DISTINCT TraceId (JSONEachRow → result.json())
-    .mockResolvedValueOnce({
-      json: () => Promise.resolve([{ TraceId: TRACE_ID }]),
-    })
+    .mockResolvedValueOnce([{ TraceId: TRACE_ID }])
     // resolveOccurredAtRange: min/max OccurredAt for partition pruning (#5231)
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve([
-          { fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 },
-        ]),
-    })
+    .mockResolvedValueOnce([
+      { fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 },
+    ])
     // fetchTracesWithSpansJoined: summary, spans
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve([
-          makeSummaryRow(TRACE_ID, {
-            computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
-          }),
-        ]),
-    })
-    .mockResolvedValueOnce({
-      json: () =>
-        Promise.resolve([
-          makeSpanRowWithEventRef(TRACE_ID, "span-1", {
-            tenantId: PROJECT_ID,
-            previewOutput: PREVIEW_OUTPUT,
-          }),
-        ]),
-    });
+    .mockResolvedValueOnce([
+      makeSummaryRow(TRACE_ID, {
+        computedOutput: `{"type":"text","value":${JSON.stringify(PREVIEW_OUTPUT)}}`,
+      }),
+    ])
+    .mockResolvedValueOnce([
+      makeSpanRowWithEventRef(TRACE_ID, "span-1", {
+        tenantId: PROJECT_ID,
+        previewOutput: PREVIEW_OUTPUT,
+      }),
+    ]);
 }
 
 beforeEach(() => {
@@ -329,24 +306,21 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
     function setupTwoTraceMocks() {
       mockClickHouseQuery
         // fetchTracesWithSpansJoined: summary rows
-        .mockResolvedValueOnce({
-          json: () =>
-            Promise.resolve([makeSummaryRow(TRACE_A), makeSummaryRow(TRACE_B)]),
-        })
+        .mockResolvedValueOnce([
+          makeSummaryRow(TRACE_A),
+          makeSummaryRow(TRACE_B),
+        ])
         // fetchTracesWithSpansJoined: span rows
-        .mockResolvedValueOnce({
-          json: () =>
-            Promise.resolve([
-              makeSpanRowWithEventRef(TRACE_A, "span-a", {
-                tenantId: PROJECT_ID,
-                previewOutput: PREVIEW_OUTPUT,
-              }),
-              makeSpanRowWithEventRef(TRACE_B, "span-b", {
-                tenantId: PROJECT_ID,
-                previewOutput: PREVIEW_OUTPUT,
-              }),
-            ]),
-        });
+        .mockResolvedValueOnce([
+          makeSpanRowWithEventRef(TRACE_A, "span-a", {
+            tenantId: PROJECT_ID,
+            previewOutput: PREVIEW_OUTPUT,
+          }),
+          makeSpanRowWithEventRef(TRACE_B, "span-b", {
+            tenantId: PROJECT_ID,
+            previewOutput: PREVIEW_OUTPUT,
+          }),
+        ]);
     }
 
     describe("when a resolveBlobs read runs", () => {
@@ -379,22 +353,16 @@ describe("ClickHouseTraceService — batch-resolver contract", () => {
         // Two summary rows, but span rows for TRACE_A only — so TRACE_B enters
         // the resolver with an empty spans array, exactly as production would.
         mockClickHouseQuery
-          .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([
-                makeSummaryRow(TRACE_A),
-                makeSummaryRow(TRACE_B),
-              ]),
-          })
-          .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([
-                makeSpanRowWithEventRef(TRACE_A, "span-a", {
-                  tenantId: PROJECT_ID,
-                  previewOutput: PREVIEW_OUTPUT,
-                }),
-              ]),
-          });
+          .mockResolvedValueOnce([
+            makeSummaryRow(TRACE_A),
+            makeSummaryRow(TRACE_B),
+          ])
+          .mockResolvedValueOnce([
+            makeSpanRowWithEventRef(TRACE_A, "span-a", {
+              tenantId: PROJECT_ID,
+              previewOutput: PREVIEW_OUTPUT,
+            }),
+          ]);
 
         const service = buildServiceWithBatchResolver((_projectId, spans) =>
           // Right count (2 for 2), transposed: TRACE_A's index gets the span-less
@@ -459,28 +427,19 @@ describe("ClickHouseTraceService.getTracesByThreadId — ordering contract", () 
 
         mockClickHouseQuery
           // SELECT DISTINCT TraceId
-          .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([{ TraceId: LATE }, { TraceId: EARLY }]),
-          })
+          .mockResolvedValueOnce([{ TraceId: LATE }, { TraceId: EARLY }])
           // resolveOccurredAtRange (hint-less thread read)
-          .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([
-                { fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 },
-              ]),
-          })
+          .mockResolvedValueOnce([
+            { fromMs: 1_700_000_000_000, toMs: 1_700_000_100_000 },
+          ])
           // joined summary rows — deliberately LATE first, as a trace-id-ordered
           // read may well return them.
-          .mockResolvedValueOnce({
-            json: () =>
-              Promise.resolve([
-                makeSummaryRow(LATE, { occurredAt: 1_700_000_090_000 }),
-                makeSummaryRow(EARLY, { occurredAt: 1_700_000_010_000 }),
-              ]),
-          })
+          .mockResolvedValueOnce([
+            makeSummaryRow(LATE, { occurredAt: 1_700_000_090_000 }),
+            makeSummaryRow(EARLY, { occurredAt: 1_700_000_010_000 }),
+          ])
           // joined span rows
-          .mockResolvedValueOnce({ json: () => Promise.resolve([]) });
+          .mockResolvedValueOnce([]);
 
         const { blobStore } = makeEventRefBlobStore();
         const service = buildService(blobStore);

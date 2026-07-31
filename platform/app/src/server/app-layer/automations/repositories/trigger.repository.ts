@@ -70,8 +70,9 @@ export interface TriggerRepository {
    * TriggerSent row using the unique (triggerId, traceId) constraint.
    * Returns true iff this caller is the first to claim the pair —
    * at-most-once dispatch is built on top of this guarantee. Concurrent
-   * reactors (trace-processing + evaluation-processing) racing on the
-   * same trigger/trace will each see exactly one `true`.
+   * dispatches of the same trigger/trace — a match recorded from
+   * trace-processing and one from evaluation-processing both reach the
+   * `triggerSettlement` process — will see exactly one `true` between them.
    */
   claimSend(params: {
     triggerId: string;

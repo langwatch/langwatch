@@ -265,7 +265,9 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
             ? telemetry.traceId
             : undefined,
       traceUrl:
-        typeof serialized.traceUrl === "string" ? serialized.traceUrl : undefined,
+        typeof serialized.traceUrl === "string"
+          ? serialized.traceUrl
+          : undefined,
       logsUrl:
         typeof serialized.logsUrl === "string" ? serialized.logsUrl : undefined,
       reasons: asReasons(serialized.reasons),
@@ -505,9 +507,7 @@ export const parseHandledError = ({
     // generic code when it fell over, so anything more specific than that is a
     // failure it chose to name — which is exactly what a domain error is.
     isHandled:
-      status > 0
-        ? status < SERVER_ERROR_STATUS
-        : !isGenericCode(parsed.code),
+      status > 0 ? status < SERVER_ERROR_STATUS : !isGenericCode(parsed.code),
   };
 };
 
@@ -543,7 +543,9 @@ export interface CliErrorDocument {
 }
 
 /** Build the `--format json` failure document. */
-export const toCliErrorDocument = (error: CliHandledError): CliErrorDocument => ({
+export const toCliErrorDocument = (
+  error: CliHandledError,
+): CliErrorDocument => ({
   ok: false,
   error: { ...error, terminal: isTerminalFailure(error) },
 });

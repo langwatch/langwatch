@@ -7,16 +7,84 @@
  * and status categorization in run accordion headers.
  *
  * @see specs/features/suites/sidebar-summary-status.feature
+ * @see specs/scenarios/suites-page-metrics-display.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
+import type { MetricStats } from "~/components/shared/MetricStatsTooltip";
 import { RunMetricsSummary } from "../RunMetricsSummary";
 import { makeSummary } from "./test-helpers";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
+
+const agentLatencyStats: MetricStats = {
+  min: 800,
+  avg: 1600,
+  median: 1500,
+  p75: 2100,
+  p90: 2600,
+  p95: 3100,
+  p99: 3600,
+  max: 4200,
+  total: 12800,
+  count: 8,
+};
+
+const agentCostStats: MetricStats = {
+  min: 0.001,
+  avg: 0.003,
+  median: 0.0025,
+  p75: 0.0035,
+  p90: 0.004,
+  p95: 0.0045,
+  p99: 0.0048,
+  max: 0.005,
+  total: 0.024,
+  count: 8,
+};
+
+/** A finished group of 8 runs: 6 passed, 2 failed, with metrics on every run. */
+function groupWithMetrics() {
+  return makeSummary({
+    passRate: 75,
+    passedCount: 6,
+    failedCount: 2,
+    completedCount: 8,
+    totalCount: 8,
+    expectedCount: 8,
+    totalDurationMs: 3200,
+    totalCost: 0.024,
+    averageAgentLatencyMs: 1600,
+    averageAgentCost: 0.003,
+    agentLatencyStats,
+    agentCostStats,
+  });
+}
+
+/**
+ * The tooltip renders in a portal, and some of its labels ("Pass") also appear
+ * on the pill itself. Resolve a tooltip row by taking the match that is NOT
+ * inside the pill — the row a reader sees in the popover.
+ */
+function tooltipRow(label: string): HTMLElement {
+  const pill = screen.getByTestId("run-metrics-summary");
+  const match = screen.getAllByText(label).find((el) => !pill.contains(el));
+  if (!match?.parentElement) {
+    throw new Error(`No tooltip row found for "${label}"`);
+  }
+  return match.parentElement;
+}
 
 describe("<RunMetricsSummary/>", () => {
   afterEach(() => {
@@ -142,6 +210,107 @@ describe("<RunMetricsSummary/>", () => {
       expect(screen.getByText("1/3")).toBeInTheDocument();
       expect(screen.getByText("Pass")).toBeInTheDocument();
       expect(screen.getByText("33%")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the group has a total duration and a total cost", () => {
+    /** @scenario Accordion header shows pass rate circle with duration and cost */
+    it("shows the pass rate alongside the duration and cost labels", () => {
+      render(<RunMetricsSummary summary={groupWithMetrics()} />, {
+        wrapper: Wrapper,
+      });
+
+      const pill = screen.getByTestId("run-metrics-summary");
+      expect(within(pill).getByText("75%")).toBeInTheDocument();
+      expect(within(pill).getByText("3.2s")).toBeInTheDocument();
+      expect(within(pill).getByText("$0.0240")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the user hovers the summary pill", () => {
+    /** @scenario Accordion header tooltip breaks the group down by pass, latency and cost */
+    it("breaks the group down by pass, completion, latency and cost", async () => {
+      const user = userEvent.setup();
+      render(<RunMetricsSummary summary={groupWithMetrics()} />, {
+        wrapper: Wrapper,
+      });
+
+      await user.hover(screen.getByTestId("run-metrics-summary"));
+
+      await waitFor(() =>
+        expect(screen.getByText("Completed")).toBeInTheDocument(),
+      );
+
+      for (const [label, value] of [
+        ["Pass", "75%"],
+        ["Completed", "8/8"],
+        ["Avg Agent Latency", "1.6s"],
+        ["Avg Agent Cost", "$0.003000"],
+        ["Total Duration", "3.2s"],
+        ["Total Cost", "$0.0240"],
+      ] as const) {
+        expect(within(tooltipRow(label)).getByText(value)).toBeInTheDocument();
+      }
+
+      // The per-role split (agent / judge / user simulator) is a property of an
+      // individual run row, not of the group header — see ScenarioTargetRow.
+      expect(screen.queryByText(/user simulator/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/judge/i)).not.toBeInTheDocument();
+    });
+
+    /** @scenario Accordion header tooltip expands agent latency into a percentile distribution */
+    it("expands the agent latency row into a percentile distribution", async () => {
+      const user = userEvent.setup();
+      render(<RunMetricsSummary summary={groupWithMetrics()} />, {
+        wrapper: Wrapper,
+      });
+
+      await user.hover(screen.getByTestId("run-metrics-summary"));
+      await waitFor(() =>
+        expect(screen.getByText("Avg Agent Latency")).toBeInTheDocument(),
+      );
+
+      // The nested tooltip opens on pointer movement over the row, which is
+      // what a real cursor travelling into it produces.
+      fireEvent.pointerMove(tooltipRow("Avg Agent Latency"), {
+        pointerType: "mouse",
+      });
+
+      await waitFor(() => expect(screen.getByText("p95")).toBeInTheDocument());
+      // The distribution, not the single average already shown on the row.
+      expect(
+        within(screen.getByText("Median (p50)").parentElement!).getByText(
+          "1.5s",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByText("p95").parentElement!).getByText("3.1s"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("when the group predates the metrics migration", () => {
+    /** @scenario Accordion header shows only pass rate when no cost/latency data */
+    it("shows the pass rate and no latency or cost label", () => {
+      render(
+        <RunMetricsSummary
+          summary={makeSummary({
+            passRate: 75,
+            passedCount: 6,
+            failedCount: 2,
+            completedCount: 8,
+            totalCount: 8,
+            expectedCount: 8,
+            totalDurationMs: null,
+            totalCost: null,
+          })}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const pill = screen.getByTestId("run-metrics-summary");
+      expect(within(pill).getByText("75%")).toBeInTheDocument();
+      expect(pill.textContent).toBe("Pass75%");
     });
   });
 

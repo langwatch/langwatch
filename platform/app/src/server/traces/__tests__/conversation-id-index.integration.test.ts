@@ -19,7 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 
 let ch: ClickHouseClient;
 const tag = nanoid();

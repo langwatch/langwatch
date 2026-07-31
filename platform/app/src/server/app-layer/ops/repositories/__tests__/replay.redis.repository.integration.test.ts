@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { ReplayRedisRepository } from "../replay.redis.repository";
 
 // Exercises the refreshLock Lua check-and-extend script against a real Redis,

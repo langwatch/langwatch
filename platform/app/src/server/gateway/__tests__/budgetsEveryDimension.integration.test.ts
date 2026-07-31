@@ -13,16 +13,20 @@
  *       specs/ai-gateway/virtual-key-creation.feature
  *       specs/ai-gateway/provider-routing.feature
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { getSharedAppClickHouseClient } from "~/server/app-layer/clients/clickhouse/shared";
+import {
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { GatewayBudgetClickHouseRepository } from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
 import {
@@ -32,6 +36,21 @@ import {
 import { GatewayConfigMaterialiser } from "../config.materialiser";
 import { VirtualKeyRepository } from "../virtualKey.repository";
 import { VirtualKeyService } from "../virtualKey.service";
+
+/**
+ * The test container's ClickHouse, bound to whichever tenant the repository
+ * asks for. `CLICKHOUSE_URL` is pointed at the same container (and the same
+ * database) `getTestClickHouseClient` connects to — see
+ * `test-utils/integration/setup.ts` and `setupEnv.ts`.
+ */
+function testTenantClient(tenantId: string): TenantClickHouseClient {
+  const app = getSharedAppClickHouseClient();
+  if (!app) throw new Error("no ClickHouse client in test environment");
+  return tenantClickHouseClient({
+    client: app.resolveClient(tenantId),
+    tenantId,
+  });
+}
 
 const suffix = nanoid(8);
 const ORG_ID = `org-nxn-${suffix}`;
@@ -337,8 +356,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("creates a GROUP budget when the ClickHouse spend path is wired, per member", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
+      const chRepo = new GatewayBudgetClickHouseRepository(async (tenantId) =>
+        testTenantClient(tenantId),
       );
       const service = GatewayBudgetService.create(prisma, chRepo);
       const row = await service.create({
@@ -380,9 +399,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
           slug: `foreign-eng-${suffix}`,
         },
       });
-      const ch = getTestClickHouseClient();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
+      const chRepo = new GatewayBudgetClickHouseRepository(async (tenantId) =>
+        testTenantClient(tenantId),
       );
       const service = GatewayBudgetService.create(prisma, chRepo);
       await expect(
@@ -422,8 +440,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("keeps a filtered and an unfiltered budget on the same target apart", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
+      const chRepo = new GatewayBudgetClickHouseRepository(async (tenantId) =>
+        testTenantClient(tenantId),
       );
 
       const resolved = await resolveApplicableBudgets(prisma, {
@@ -532,8 +550,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("ships the member's own bucket spend, not the group total", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
+      const chRepo = new GatewayBudgetClickHouseRepository(async (tenantId) =>
+        testTenantClient(tenantId),
       );
 
       // Two members spend against the same GROUP budget row, each in their
@@ -580,8 +598,8 @@ describe("budgets on every dimension (real PG + real CH)", () => {
     it("keeps a provider-filtered group budget and its unfiltered sibling out of each other's totals", async () => {
       const ch = getTestClickHouseClient();
       expect(ch).not.toBeNull();
-      const chRepo = new GatewayBudgetClickHouseRepository(
-        async () => ch as ClickHouseClient,
+      const chRepo = new GatewayBudgetClickHouseRepository(async (tenantId) =>
+        testTenantClient(tenantId),
       );
 
       const filteredBudgetId = `gb-nxn-grp-openai-${suffix}`;

@@ -17,24 +17,21 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { generate, Ksuid } from "@langwatch/ksuid";
 import { describe, expect, it, vi } from "vitest";
+import { legacyLoggedEvent } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "~/server/app-layer/traces/ingest/constants";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
 import {
   EVENTREF_ATTR_PREFIX,
   IO_PREVIEW_BYTES,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type { SpanReceivedEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import {
-  type NormalizedSpan,
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { eventToRecord } from "~/server/event-sourcing/stores/eventStoreUtils";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import {
   resolveOffloadedTraces,
   type WarnLogger,
@@ -78,20 +75,16 @@ function makeMockChClient({
       .fn()
       .mockImplementation(
         async ({
-          query,
-          query_params,
+          sql,
+          params,
         }: {
-          query: string;
-          query_params?: Record<string, unknown>;
+          sql: string;
+          params?: Record<string, unknown>;
         }) => {
-          sqlCaptures.push(query);
-          paramCaptures.push(query_params ?? {});
-          // ClickHouse client's result.json<T>() returns ResponseJSON<T> with shape
-          // { data: T[], meta, rows, statistics, ... }. Match the real shape here so
-          // production code's `response.data` access works.
-          return {
-            json: async () => ({ data: rows, meta: [], rows: rows.length }),
-          };
+          sqlCaptures.push(sql);
+          paramCaptures.push(params ?? {});
+          // The tenant client hands back decoded, column-named rows directly.
+          return rows;
         },
       ),
   };
@@ -486,32 +479,31 @@ describe("given an S3 GetObject that returns a response with no Body", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * CONTRACT REGRESSION: read path must match the real write path (eventToRecord).
+ * CONTRACT REGRESSION: the read path must match the legacy write shape.
  *
  * Bug: `getFromEventLog` was reading `EventPayload.data.span.attributes` but
- * `eventToRecord` stores `EventPayload = event.data` — so the real path is
+ * The legacy writer stored `EventPayload = event.data` — so the real path is
  * `EventPayload.span.attributes` (no extra `.data` wrapper).
  *
- * This test derives the CH-mock EventPayload from the ACTUAL `eventToRecord`
- * call rather than hand-writing the fixture, so ANY drift in either the write
- * shape (`eventToRecord`) or the read shape (`getFromEventLog`) will cause this
- * test to fail immediately.
+ * This test derives the CH-mock EventPayload straight from the event's `data`,
+ * which is what the legacy row carried, so drift in the read shape
+ * (`getFromEventLog`) fails it immediately.
  *
- * Failure mode: if `eventToRecord` is changed to add a `data` wrapper, the
- * mock row will no longer match the schema `getFromEventLog` parses, and the
- * test will throw `BlobFieldNotFoundError`. If `getFromEventLog` regresses to
+ * Failure mode: if a `data` wrapper is introduced, the mock row will no longer
+ * match the schema `getFromEventLog` parses, and the test will throw
+ * `BlobFieldNotFoundError`. If `getFromEventLog` regresses to
  * reading `.data.span.attributes`, `attr` will be undefined and the same error
  * is thrown. Either side's drift is caught.
  */
-describe("given a SpanReceivedEvent written through eventToRecord (real write path)", () => {
+describe("given a span event stored in the legacy event_log shape", () => {
   describe("when getFromEventLog is called with matching ids and the oversize field name", () => {
     it("returns the field value — proving the read path matches the write path", async () => {
-      // Build a minimal but realistic SpanReceivedEvent whose data matches the
+      // Build a minimal but realistic span event whose data matches the
       // real write shape used in recordSpanCommand.ts:281-290.
-      const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>({
+      const spanReceivedEvent = legacyLoggedEvent({
         aggregateType: "trace",
         aggregateId: AGGREGATE_ID,
-        tenantId: createTenantId(TENANT_A),
+        tenantId: TENANT_A,
         type: SPAN_RECEIVED_EVENT_TYPE,
         version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
         data: {
@@ -543,12 +535,8 @@ describe("given a SpanReceivedEvent written through eventToRecord (real write pa
       });
 
       // Derive the EventPayload exactly as the write path does.
-      // eventToRecord sets `EventPayload = event.data ?? {}`, so
-      // record.EventPayload IS spanReceivedEvent.data — no extra wrapper.
-      const record = eventToRecord(spanReceivedEvent);
-
       const { client, sqlCaptures } = makeMockChClient({
-        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
+        rows: [{ EventPayload: JSON.stringify(spanReceivedEvent.data) }],
       });
 
       const blobStore = new BlobStore(
@@ -630,7 +618,7 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
  * { intValue: "100" }) used to fail the strict whole-array parse, degrading every
  * > 64 KB read to the 64 KB preview.
  *
- * This test feeds the REAL stored OTLP shape — derived from `eventToRecord` exactly
+ * This test feeds the REAL stored OTLP shape — the event's own `data` exactly
  * like the read-vs-write contract test above — with mixed-type siblings present, and
  * proves the FULL value comes back. It FAILS on the pre-fix strict schema
  * (`value: { stringValue: z.string() }` + `z.array(spanAttributeSchema)`), which
@@ -642,16 +630,16 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
   const BIG_OUTPUT = "y".repeat(100 * 1024) + "🧪out";
 
   /**
-   * Builds a SpanReceivedEvent whose span.attributes mix the offloaded IO fields
+   * Builds a span event whose span.attributes mix the offloaded IO fields
    * (stringValue) with non-string siblings the OLD schema rejected. Cast through
    * `unknown` because the offloaded values plus the heterogeneous sibling shapes
    * are the REAL stored OTLP payload, not the clean string-only shape.
    */
   function makeMixedTypeSpanEvent() {
-    return EventUtils.createEvent<SpanReceivedEvent>({
+    return legacyLoggedEvent({
       aggregateType: "trace",
       aggregateId: AGGREGATE_ID,
-      tenantId: createTenantId(TENANT_A),
+      tenantId: TENANT_A,
       type: SPAN_RECEIVED_EVENT_TYPE,
       version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
       data: {
@@ -693,9 +681,8 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
     it("returns the FULL >64KB value despite non-string sibling attributes", async () => {
       const spanReceivedEvent = makeMixedTypeSpanEvent();
       // EventPayload IS event.data — derive it exactly as the write path does.
-      const record = eventToRecord(spanReceivedEvent);
       const { client } = makeMockChClient({
-        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
+        rows: [{ EventPayload: JSON.stringify(spanReceivedEvent.data) }],
       });
 
       const blobStore = new BlobStore(
@@ -722,9 +709,8 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
   describe("when getFromEventLog is called for the offloaded output field", () => {
     it("returns the FULL >64KB value for langwatch.output despite non-string sibling attributes", async () => {
       const spanReceivedEvent = makeMixedTypeSpanEvent();
-      const record = eventToRecord(spanReceivedEvent);
       const { client } = makeMockChClient({
-        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
+        rows: [{ EventPayload: JSON.stringify(spanReceivedEvent.data) }],
       });
 
       const blobStore = new BlobStore(
@@ -757,7 +743,7 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
 /**
  * END-TO-END (#4888): drives the customer-facing `resolveOffloadedTraces` read
  * orchestrator with a REAL `BlobStore` (NOT a mocked getFromEventLog), whose CH
- * client returns the REAL mixed-type EventPayload produced by `eventToRecord`.
+ * client returns the REAL mixed-type EventPayload the legacy writer stored.
  * This is the path that degraded in production: a leaned span carrying the
  * preview + a `langwatch.reserved.eventref.langwatch.input` pointer is resolved
  * back to the FULL value, and the reserved namespace is stripped.
@@ -773,10 +759,10 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
     it("restores the FULL langwatch.input into spanAttributes and strips the reserved eventref key", async () => {
       // The FULL event the command worker writes to event_log, with mixed-type
       // siblings present alongside the offloaded IO field.
-      const fullEvent = EventUtils.createEvent<SpanReceivedEvent>({
+      const fullEvent = legacyLoggedEvent({
         aggregateType: "trace",
         aggregateId: AGGREGATE_ID,
-        tenantId: createTenantId(TENANT_A),
+        tenantId: TENANT_A,
         type: SPAN_RECEIVED_EVENT_TYPE,
         version: SPAN_RECEIVED_EVENT_VERSION_LATEST,
         data: {
@@ -813,9 +799,8 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
         },
       });
 
-      const record = eventToRecord(fullEvent);
       const { client } = makeMockChClient({
-        rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
+        rows: [{ EventPayload: JSON.stringify(fullEvent.data) }],
       });
 
       const blobStore = new BlobStore(

@@ -23,9 +23,17 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { LoggedEvent } from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { maybeSpool } from "~/server/app-layer/traces/edge-spool";
+import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/app-layer/traces/ingest/constants";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/app-layer/traces/ingest/normalizedSpan";
+import type { RecordSpanCommandData } from "~/server/app-layer/traces/ingest/recordSpanCommand";
 import {
   COMMAND_INLINE_THRESHOLD,
   EVENTREF_ATTR_PREFIX,
@@ -33,14 +41,6 @@ import {
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { Event } from "~/server/event-sourcing";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import {
-  type NormalizedSpan,
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   resolveOffloadedTraces,
   type WarnLogger,
@@ -179,7 +179,7 @@ function makeSpoolBlobStore(): {
  * Builds a synthetic SpanReceived event whose langwatch.output is set to `output`.
  * This simulates the event written to event_log by the command worker.
  */
-function makeSpanReceivedEvent({ output }: { output: string }): Event {
+function makeSpanReceivedEvent({ output }: { output: string }): LoggedEvent {
   return {
     type: SPAN_RECEIVED_EVENT_TYPE,
     id: "evt-1",
@@ -208,14 +208,14 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
       resource: { attributes: [] },
       instrumentationScope: { name: "test" },
     },
-  } as unknown as Event;
+  } as unknown as LoggedEvent;
 }
 
 /**
  * Extracts span attributes from a lean event (post-leanForProjection) into
  * the Record<string, string> format that NormalizedSpan.spanAttributes uses.
  */
-function extractSpanAttrs(event: Event): Record<string, string> {
+function extractSpanAttrs(event: LoggedEvent): Record<string, string> {
   const data = event.data as {
     span?: {
       attributes?: Array<{ key: string; value: { stringValue?: string } }>;
@@ -274,7 +274,7 @@ function makeNormalizedSpan(
  * @scenario event_log carries the full event content; projection queue carries the lean shape
  */
 describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYTES)", () => {
-  let leanEvent: Event;
+  let leanEvent: LoggedEvent;
   let leanAttrs: Record<string, string>;
 
   beforeEach(() => {
@@ -379,7 +379,7 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
 describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-threshold)", () => {
   const SMALL_OUTPUT = "small output value";
 
-  let leanEvent: Event;
+  let leanEvent: LoggedEvent;
   let leanAttrs: Record<string, string>;
 
   beforeEach(() => {

@@ -36,7 +36,8 @@ type chatRequest struct {
 	// checks its own `validate:"required"` fields (see domain.Credentials).
 	Credentials   domain.Credentials `json:"credentials"`
 	ModelOverride string             `json:"modelOverride,omitempty"`
-	// ResumeToken (ADR-048) is an opaque, worker-authored checkpoint from a
+	// ResumeToken (ADR-048, retired; ground now
+	// dev/docs/adr/098-event-sourcing-core.md) is an opaque, worker-authored checkpoint from a
 	// prior turn that handed off on shutdown. The control plane sets it on the
 	// next turn's /chat body when it found a pending handoff for the
 	// conversation; the manager forwards it verbatim into the worker, never
@@ -44,7 +45,8 @@ type chatRequest struct {
 	ResumeToken string `json:"resumeToken,omitempty"`
 	// TurnID is the control plane's per-turn idempotency key. The agent echoes it
 	// back on the durable final POST. Not required: an older control plane omits
-	// it, and the agent then skips the durable final (relay + reactor still run).
+	// it, and the agent then skips the durable final (relay + liveness
+	// subscriber still run).
 	TurnID string `json:"turnId,omitempty"`
 	// RunToken is the per-conversation secret (frameauth) the manager SIGNS every
 	// pushed output frame with. Minted server-only at conversation_started,

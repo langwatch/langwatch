@@ -65,6 +65,7 @@ describe("AddOverrideDrawer", () => {
       expect(screen.getByRole("button", { name: "Save changes" })).toBeTruthy();
     });
 
+    /** @scenario "Editing a policy from the row overflow menu changes only its value" */
     it("locks the scope to a read-only readout instead of the picker", () => {
       renderDrawer({ editTarget });
       expect(screen.getByText("Acme")).toBeTruthy();

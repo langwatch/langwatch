@@ -19,8 +19,25 @@ func TestRun(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr.String())
 		}
-		if got, want := stdout.String(), "Migrations are in order against main.\n"; got != want {
+		if got, want := stdout.String(), "Migrations pass every check against main.\n"; got != want {
 			t.Errorf("stdout = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("exits 1 and names the rollback note when a Down block ships live SQL", func(t *testing.T) {
+		root := initRepo(t)
+		commitMigration(t, root, "00040_a.sql")
+		gitIn(t, root, "checkout", "-q", "-b", "feature")
+		commitMigrationBody(t, root, "00041_mine.sql", liveDown)
+
+		var stdout, stderr strings.Builder
+		code := migrationorder.Run([]string{"-root", root, "-base", "main"}, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("exit code = %d, want 1; stdout: %s", code, stdout.String())
+		}
+		if !strings.Contains(stderr.String(), "00041_mine.sql") ||
+			!strings.Contains(stderr.String(), "uncomment and run manually") {
+			t.Errorf("stderr = %q, want the entry and what to do about it", stderr.String())
 		}
 	})
 
@@ -41,6 +58,7 @@ func TestRun(t *testing.T) {
 		}
 	})
 
+	// @scenario "A migration numbered below the newest on main fails"
 	t.Run("exits 1 and prints the finding and fix when out of order", func(t *testing.T) {
 		root := initRepo(t)
 		commitMigration(t, root, "00040_a.sql")

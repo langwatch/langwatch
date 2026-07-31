@@ -144,7 +144,12 @@ export function BatchEvaluationResults({
   // Determine if selected run is finished
   const isFinished = useMemo(() => {
     if (!selectedRun) return false;
-    return isRunFinished(selectedRun.timestamps);
+    return isRunFinished({
+      finishedAt: selectedRun.timestamps.finishedAt,
+      stoppedAt: selectedRun.timestamps.stoppedAt,
+      progress: selectedRun.progress,
+      total: selectedRun.total,
+    });
   }, [selectedRun]);
 
   // Track when the run finished and reset when run changes or becomes not finished
@@ -191,7 +196,13 @@ export function BatchEvaluationResults({
   // Update isSomeRunning state
   useEffect(() => {
     const hasRunning = runsQuery.data?.runs.some(
-      (r) => !isRunFinished(r.timestamps),
+      (r) =>
+        !isRunFinished({
+          finishedAt: r.timestamps.finishedAt,
+          stoppedAt: r.timestamps.stoppedAt,
+          progress: r.progress,
+          total: r.total,
+        }),
     );
     setIsSomeRunning(!!hasRunning);
   }, [runsQuery.data?.runs]);

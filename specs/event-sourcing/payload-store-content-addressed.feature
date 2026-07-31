@@ -8,8 +8,8 @@ Feature: GroupQueue content-addressed tiered payload store
   queue survives crashes without leaking payloads indefinitely,
   and offload is decided by size alone, not by command-vs-job provenance.
 
-  # Builds on ADR-026's GQ1 envelope (specs/event-sourcing/payload-envelope.feature).
-  # Supersedes ADR-026's blob-lifecycle scenarios: random blob ids become content
+  # Builds on ADR-090's GQ1 envelope (specs/event-sourcing/payload-envelope.feature).
+  # Supersedes ADR-090's blob-lifecycle scenarios: random blob ids become content
   # hashes; best-effort-delete + 7-day pure-backstop TTL becomes renewable
   # per-holder leases + a 4-day refreshed backstop. The GQ1 envelope/header/routing/two-phase
   # rollout decisions carry forward unchanged.
@@ -399,7 +399,7 @@ Feature: GroupQueue content-addressed tiered payload store
     Then the blob is still readable
     And the runner reports it as eligible for reclaim
 
-  @scheduled @track6
+  @unit @scheduled @track6
   Scenario: The runner is driven by the schedule, not by a request
     Given the reclaim runner is on its cleanup schedule
     When a cleanup interval comes due
@@ -441,7 +441,7 @@ Feature: GroupQueue content-addressed tiered payload store
   #     -> An access refreshes the blob and lease so a long-dwell job keeps its payload
   #   AC3.6 "Orphaned blob expires via the backstop"
   #     -> An orphaned blob with no leases expires via its TTL backstop
-  #   AC3.7 "Missing blob is a fail-safe, not a wedge" (carried from ADR-026)
+  #   AC3.7 "Missing blob is a fail-safe, not a wedge" (carried from ADR-090)
   #     -> A missing blob completes the slot without wedging the group
   #   AC3.8 "Blob survives dispatch through lease renewal"
   #     -> A blob survives dispatch through lease renewal

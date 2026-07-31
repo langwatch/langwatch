@@ -1,8 +1,9 @@
 import atexit
 import os
 import logging
+import signal
 import threading
-from typing import List, Optional, Sequence, ClassVar
+from typing import Any, List, Optional, Sequence, ClassVar
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
@@ -58,6 +59,10 @@ class Client(LangWatchClientProtocol):
     # explicitly keep that value across trace boundaries.
     _disable_sending_user_baseline: ClassVar[bool] = False
     _flush_on_exit: ClassVar[bool] = True
+    # SIGTERM's previous disposition, so we can restore it and re-raise
+    # rather than leave our own handler in place forever.
+    _sigterm_previous_handler: ClassVar[Any] = None
+    _sigterm_handler_installed: ClassVar[bool] = False
     _span_exclude_rules: ClassVar[List[SpanProcessingExcludeRule]] = []  # type: ignore[misc]
     _ignore_global_tracer_provider_override_warning: ClassVar[bool] = False
     _skip_open_telemetry_setup: ClassVar[bool] = False
@@ -389,6 +394,8 @@ class Client(LangWatchClientProtocol):
         cls._disable_sending_refcount = 0
         cls._disable_sending_user_baseline = False
         cls._flush_on_exit = True
+        cls._sigterm_previous_handler = None
+        cls._sigterm_handler_installed = False
         cls._span_exclude_rules = []
         cls._ignore_global_tracer_provider_override_warning = False
         cls._skip_open_telemetry_setup = False
@@ -556,6 +563,7 @@ class Client(LangWatchClientProtocol):
                 atexit.unregister(self._tracer_provider.force_flush)
             except ValueError:
                 pass  # atexit handler was never registered or already unregistered
+            self.__restore_sigterm_handler()
 
         force_flush = getattr(self._tracer_provider, "force_flush", None)
         if callable(force_flush):
@@ -569,6 +577,44 @@ class Client(LangWatchClientProtocol):
             Client._exporter_attached_providers.discard(id(Client._tracer_provider))
             Client._tracer_provider.shutdown()
         Client._tracer_provider = None
+
+    def __register_sigterm_flush(self, provider: TracerProvider) -> None:
+        """CPython has no default SIGTERM handler, so atexit never runs on
+        it — only SIGINT does, by raising KeyboardInterrupt. Install one that
+        flushes, then restores whatever SIGTERM's disposition was before us
+        and re-raises the signal, rather than returning: returning would
+        leave our handler as the permanent disposition, so the process would
+        stop dying to SIGTERM at all — worse than the missing flush it fixes.
+        """
+        if threading.current_thread() is not threading.main_thread():
+            return  # signal.signal only works on the main thread
+
+        previous_handler = signal.getsignal(signal.SIGTERM)
+
+        def handle_sigterm(signum: int, frame: Any) -> None:
+            try:
+                provider.force_flush()
+            finally:
+                signal.signal(signal.SIGTERM, previous_handler)
+                os.kill(os.getpid(), signal.SIGTERM)
+
+        try:
+            signal.signal(signal.SIGTERM, handle_sigterm)
+        except ValueError:
+            return  # not actually the main thread (e.g. interpreter shutdown race)
+
+        Client._sigterm_previous_handler = previous_handler
+        Client._sigterm_handler_installed = True
+
+    def __restore_sigterm_handler(self) -> None:
+        if not Client._sigterm_handler_installed:
+            return
+        try:
+            signal.signal(signal.SIGTERM, Client._sigterm_previous_handler)
+        except ValueError:
+            pass
+        Client._sigterm_handler_installed = False
+        Client._sigterm_previous_handler = None
 
     def __detach_langwatch_processor(self) -> None:
         """Remove and shut down only our processor from a user-owned provider."""
@@ -679,6 +725,7 @@ class Client(LangWatchClientProtocol):
                     "Registering atexit handler to flush tracer provider on exit"
                 )
                 atexit.register(provider.force_flush)
+                self.__register_sigterm_flush(provider)
 
             if Client._debug:
                 logger.info(

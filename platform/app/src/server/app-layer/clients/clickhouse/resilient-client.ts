@@ -1,11 +1,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import {
   incrementClickHouseQueryCount,
+  incrementConventionViolation,
   observeClickHouseQueryDuration,
 } from "~/server/clickhouse/metrics";
-import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
-import { detectColdScan } from "./cold-scan-detector";
+import { enforceConventions } from "./convention-gate";
 import {
   TRANSIENT_NETWORK_CODES,
   translateClickHouseQueryError,
@@ -228,42 +229,49 @@ function logSuccess({
     const roundedMs = Math.round(durationMs);
     const meta = safeQueryMeta(params);
 
-    // A SELECT against a time-partitioned table with no predicate on its time
-    // column cannot prune partitions, so it walks the whole history including
-    // the cold tier on S3 - a burst of S3 GET requests per call. Worth warning
-    // even when fast, because the cost is request count, not latency.
-    const coldScanTable =
-      operation === "query" ? detectColdScan(extractRawQuery(params)) : null;
+    queryLogger.debug(
+      {
+        source: "clickhouse",
+        operation,
+        durationMs: roundedMs,
+        queryId: meta.queryId,
+      },
+      `ClickHouse ${operation} succeeded`,
+    );
+  } catch (loggingError) {
+    logger.error({ loggingError }, "Failed to log ClickHouse query success");
+  }
+}
 
-    if (coldScanTable !== null) {
+/**
+ * The gate check for the LEGACY driver funnel, BEFORE the query is sent.
+ *
+ * The new packages client gets the same gate injected at construction; this
+ * path exists for the driver-based clients that have not migrated yet. One
+ * decision function serves both — see enforceConventions.
+ */
+function countConventionViolations(params: unknown): void {
+  const query = extractRawQuery(params);
+  enforceConventions(query, {
+    onViolation: ({ table, rule }) => incrementConventionViolation(table, rule),
+    warn: (violations) => {
+      const meta = safeQueryMeta(params);
       queryLogger.warn(
         {
           source: "clickhouse",
-          operation,
-          durationMs: roundedMs,
+          operation: "query",
           queryId: meta.queryId,
           table: meta.table,
           paramKeys: meta.paramKeys,
           query: extractQueryPreview(params),
-          coldScan: true,
-          coldScanTable,
+          conventionViolations: violations,
         },
-        `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`,
+        `ClickHouse convention violation: ${violations
+          .map(({ table, rule }) => `${table} ${rule}`)
+          .join(", ")}`,
       );
-    } else {
-      queryLogger.debug(
-        {
-          source: "clickhouse",
-          operation,
-          durationMs: roundedMs,
-          queryId: meta.queryId,
-        },
-        `ClickHouse ${operation} succeeded`,
-      );
-    }
-  } catch (loggingError) {
-    logger.error({ loggingError }, "Failed to log ClickHouse query success");
-  }
+    },
+  });
 }
 
 /**
@@ -285,6 +293,7 @@ export function createResilientClickHouseClient({
   wrapper.query = async (params) => {
     const queryType = extractQueryType(params);
     const table = extractTableName(params);
+    countConventionViolations(params);
     const start = performance.now();
     try {
       const result = await withTransientRetry(

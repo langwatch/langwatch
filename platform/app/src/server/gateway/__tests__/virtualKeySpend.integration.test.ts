@@ -20,12 +20,14 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { getSharedAppClickHouseClient } from "~/server/app-layer/clients/clickhouse/shared";
+import { tenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { prisma } from "~/server/db";
 import {
   getTestClickHouseClient,
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { GatewayUsageService } from "../usage.service";
 import {
   GatewayVirtualKeySpendRepository,
@@ -94,12 +96,17 @@ async function insertGatewayTrace(args: {
 }
 
 function usageService(): GatewayUsageService {
-  const ch = getTestClickHouseClient();
-  if (!ch) throw new Error("test ClickHouse client not available");
   return GatewayUsageService.create({
     prisma,
     chRepo: undefined,
-    spendRepo: new GatewayVirtualKeySpendRepository(async () => ch),
+    spendRepo: new GatewayVirtualKeySpendRepository(async (tenantId) => {
+      const app = getSharedAppClickHouseClient();
+      if (!app) throw new Error("test ClickHouse client not available");
+      return tenantClickHouseClient({
+        client: app.resolveClient(tenantId),
+        tenantId,
+      });
+    }),
   });
 }
 

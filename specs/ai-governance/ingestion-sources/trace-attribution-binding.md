@@ -25,7 +25,7 @@ API key → environment; Langfuse / Helicone API key → project).
 
 | Path | Auth credential | Stamps applied | Resolved `TenantId` |
 |---|---|---|---|
-| Gateway VK (`langwatch claude/codex/cursor/gemini` wrappers) | `vk-lw-*` (project + owner-scoped) | `langwatch.virtual_key_id`, `langwatch.user.id` | `VK.projectId` (resolved at reactor side) |
+| Gateway VK (`langwatch claude/codex/cursor/gemini` wrappers) | `vk-lw-*` (project + owner-scoped) | `langwatch.virtual_key_id`, `langwatch.user.id` | `VK.projectId` (resolved during ingestion) |
 | Direct OTLP push (legacy SDK) | Project-scoped OTLP auth token | none required (token IS scope) | `token.projectId` |
 | Pull-mode IngestionSource (`s3_custom`, `copilot_studio`, `openai_compliance`, `claude_compliance`, `workato`, `claude_cowork`, `http_custom`) | `IngestionSource.ingestSecretHash` (puller-side) | n/a — event source already credentialed at the puller | `ensureHiddenGovernanceProject(orgId).id` |
 | OTel-direct push IngestionSource (`otel_generic`) | `IngestionSource.ingestSecretHash` HMAC | event tagged with `IngestionSource.id` | `ensureHiddenGovernanceProject(orgId).id` |
@@ -59,7 +59,7 @@ API key → environment; Langfuse / Helicone API key → project).
   fields.
 - **Quarantine fill rate observability.** When traffic lands in the hidden
   Governance project at high rate, that's typically a misconfigured ingest.
-  A reactor that counts spans/min into the quarantine and surfaces an admin
+  A periodic check that counts spans/min into the quarantine and surfaces an admin
   Alert at `>N spans/min within window` is the warning surface.
 - **Cross-bind guard for personal-user IngestionSource creators.** When
   introducing per-user IngestionSource scoping in the future, the service
@@ -74,7 +74,7 @@ go through one of the two scoped-credential paths:
 
 1. **Gateway VK** — issue a personal VK via `langwatch claude` (or
    equivalent), fire requests through the gateway. Gateway stamps
-   `langwatch.virtual_key_id`; reactor resolves to the personal project's
+   `langwatch.virtual_key_id`; ingestion resolves to the personal project's
    `TenantId`. **This is the primary path.**
 2. **Direct OTLP push to the personal project's OTLP endpoint** — the
    project's OTLP auth token carries the scope. Same `TenantId` resolution

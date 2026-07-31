@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { getPrivateClickHouseUrls } from "../server/clickhouse/clickhouseClient";
+import { parsePrivateClickHouseUrls } from "../server/app-layer/clients/clickhouse/private-endpoints";
 import { runMigrations } from "../server/clickhouse/goose";
 import { reconcileTTL } from "../server/clickhouse/ttlReconciler";
 
@@ -10,8 +10,11 @@ export default async function execute() {
   await runMigrations({ verbose: true });
   await reconcileTTL({ verbose: true });
 
-  // Run migrations on all private instances
-  const privateUrls = getPrivateClickHouseUrls();
+  // Run migrations on all private instances. Enumerated from the env vars
+  // rather than from the client's `knownTargets()`: goose and the TTL
+  // reconciler both connect by URL and neither takes a client, so the targets
+  // would have to be re-assembled back into URLs to be handed over.
+  const privateUrls = parsePrivateClickHouseUrls();
   for (const [orgId, url] of privateUrls) {
     logger.info({ orgId }, "Running migrations on private ClickHouse instance");
     try {

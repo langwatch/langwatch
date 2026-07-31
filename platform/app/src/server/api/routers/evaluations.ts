@@ -116,34 +116,37 @@ export const evaluationsRouter = createTRPCRouter({
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
         try {
           const app = getApp();
-          await app.evaluations.reportEvaluation({
-            tenantId: input.projectId,
-            evaluationId,
-            evaluatorId: input.evaluatorType,
-            evaluatorType: input.evaluatorType,
-            traceId: input.traceId,
-            status: result.status,
-            score:
-              result.status === "processed" && typeof result.score === "number"
-                ? result.score
-                : undefined,
-            passed:
-              result.status === "processed"
-                ? (result.passed ?? undefined)
-                : undefined,
-            label:
-              result.status === "processed"
-                ? (result.label ?? undefined)
-                : undefined,
-            details:
-              result.status === "error"
-                ? result.details
-                : result.status === "processed"
-                  ? (result.details ?? undefined)
+          await app.evaluations.report(
+            {
+              evaluationId,
+              evaluatorId: input.evaluatorType,
+              evaluatorType: input.evaluatorType,
+              traceId: input.traceId,
+              status: result.status,
+              score:
+                result.status === "processed" &&
+                typeof result.score === "number"
+                  ? result.score
                   : undefined,
-            error: result.status === "error" ? result.details : undefined,
-            occurredAt: Date.now(),
-          });
+              passed:
+                result.status === "processed"
+                  ? (result.passed ?? undefined)
+                  : undefined,
+              label:
+                result.status === "processed"
+                  ? (result.label ?? undefined)
+                  : undefined,
+              details:
+                result.status === "error"
+                  ? result.details
+                  : result.status === "processed"
+                    ? (result.details ?? undefined)
+                    : undefined,
+              error: result.status === "error" ? result.details : undefined,
+              occurredAt: Date.now(),
+            },
+            { tenantId: input.projectId },
+          );
         } catch (error) {
           logger.warn(
             { error, evaluationId, evaluatorType: input.evaluatorType },

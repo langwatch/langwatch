@@ -6,14 +6,12 @@
  * the returned state props.
  */
 
-import { generate } from "@langwatch/ksuid";
 import type { SimulationSuite } from "@prisma/client";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { toaster } from "../ui/toaster";
 import { showSuiteRunError } from "./showSuiteRunError";
 
@@ -92,10 +90,11 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
         });
       }
 
-      optionsRef.current.onRunScheduled?.(
-        variables.id,
-        variables.batchRunId ?? result.batchRunId,
-      );
+      // The server's id, always. It derives the batch from the active set, so
+      // a client-minted id could name a batch whose denominator the server
+      // never agreed to — see `deriveBatchRunId`.
+      setPendingBatchRunId(result.batchRunId);
+      optionsRef.current.onRunScheduled?.(variables.id, result.batchRunId);
     },
     onError: (err, variables) => {
       setPendingSuite(null);
@@ -121,13 +120,10 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
 
   const confirmRun = useCallback(() => {
     if (!project || !pendingSuite || runMutation.isPending) return;
-    const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
-    setPendingBatchRunId(batchRunId);
     runMutation.mutate({
       projectId: project.id,
       id: pendingSuite.id,
       idempotencyKey: crypto.randomUUID(),
-      batchRunId,
     });
   }, [project, pendingSuite, runMutation]);
 

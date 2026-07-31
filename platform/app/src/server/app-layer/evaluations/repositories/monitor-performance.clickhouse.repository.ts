@@ -1,9 +1,9 @@
+import { validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import { AnalyticsClientUnavailableError } from "~/server/app-layer/analytics/errors";
 import { validateTimeZone } from "~/server/app-layer/analytics/query-builders/_shared";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import type {
   FindMonitorPerformanceParams,
   MonitorPerformanceBucket,
@@ -105,7 +105,7 @@ export class MonitorPerformanceClickHouseRepository
     params: FindMonitorPerformanceParams,
   ): Promise<MonitorPerformanceBucket[]> {
     if (params.evaluatorIds.length === 0) return [];
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId: params.tenantId },
       "MonitorPerformanceClickHouseRepository.findBuckets",
     );
@@ -116,22 +116,23 @@ export class MonitorPerformanceClickHouseRepository
     }
 
     try {
-      const result = await client.query({
-        query: queryForTimeZone(params.timeZone),
-        query_params: {
+      const rows = await client.query<ClickHouseMonitorPerformanceRow>({
+        // The read joins `trace_summaries` onto `evaluation_runs`; the metric
+        // is labelled with the table this repository is about.
+        table: "evaluation_runs",
+        sql: queryForTimeZone(params.timeZone),
+        params: {
           tenantId: params.tenantId,
           evaluatorIds: params.evaluatorIds,
           previousStart: new Date(params.previousStartMs),
           currentStart: new Date(params.currentStartMs),
           end: new Date(params.endMs),
         },
-        format: "JSONEachRow",
-        clickhouse_settings: {
+        settings: {
           ...ANALYTICS_CLICKHOUSE_SETTINGS,
           max_execution_time: 15,
         },
       });
-      const rows = await result.json<ClickHouseMonitorPerformanceRow>();
       return rows.map(toPerformanceBucket);
     } catch (error) {
       logger.error(

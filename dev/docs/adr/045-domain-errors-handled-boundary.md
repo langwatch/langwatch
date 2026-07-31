@@ -438,8 +438,9 @@ by luck.
   `cmd/herrgen` (Go codes → `packages/handled-error/src/codes.generated.ts`).
 - Code (Go): `pkg/herr/herr.go` (`E`, `New`), `pkg/herr/http.go`
   (`WriteHTTP`, code→status registry).
-- Related ADRs: [027](./027-typed-dispatcherror-contract.md) (typed
-  `DispatchError` contract — a domain-specific precedent for this pattern).
+- Related history: ADR-027 (typed `DispatchError` contract) was an earlier,
+  domain-specific precedent for this pattern — retired 2026-07-30 once its
+  `.withOutbox`-reactor substrate was deleted; its ground is this ADR.
 - Specs: `specs/features/domain-error-contract.feature` (the boundary),
   `specs/features/handled-error-presentation.feature` (what the customer reads),
   `specs/ci/herr-codes-generation.feature` (Go code generation).

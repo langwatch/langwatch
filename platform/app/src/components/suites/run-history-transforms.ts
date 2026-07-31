@@ -53,6 +53,16 @@ export type RunGroup = {
   groupType: RunGroupType;
   timestamp: number;
   scenarioRuns: ScenarioRunData[];
+  /**
+   * How many runs the batch set out to queue (ADR-072, retired; ground now
+   * ADR-103).
+   *
+   * Only batch groups carry one — a scenario or target group is a slice across
+   * batches, so there is no single number it could be. Absent for batches
+   * queued before the total was recorded, in which case the summary counts the
+   * runs it can see instead.
+   */
+  expectedCount?: number;
 };
 
 /** A batch run groups all scenario runs that share the same batchRunId. Extends RunGroup for backward compatibility. */
@@ -72,6 +82,13 @@ export type RunGroupSummary = {
   /** Runs with an actual verdict: passed + failed (SUCCESS + FAILED + ERROR). */
   completedCount: number;
   totalCount: number;
+  /**
+   * The denominator to show the user: how many runs the group was meant to
+   * have. Equal to `totalCount` for a group that got everything it asked for,
+   * and larger when part of a batch never started — the difference between
+   * "this run was five scenarios" and "this run lost one of six".
+   */
+  expectedCount: number;
   inProgressCount: number;
   queuedCount: number;
   totalCost: number | null;
@@ -169,9 +186,11 @@ function sortByTimestampDesc<T extends RunGroup>(groups: T[]): T[] {
 export function groupRunsByBatchId({
   runs,
   scenarioSetIds,
+  expectedCounts,
 }: {
   runs: ScenarioRunData[];
   scenarioSetIds?: Record<string, string>;
+  expectedCounts?: Record<string, number>;
 }): BatchRun[] {
   const batchMap = new Map<string, ScenarioRunData[]>();
 
@@ -196,6 +215,7 @@ export function groupRunsByBatchId({
       timestamp,
       scenarioRuns,
       scenarioSetId,
+      expectedCount: expectedCounts?.[batchRunId],
     });
   }
 
@@ -354,6 +374,11 @@ export function computeGroupSummary({
   const settledCount =
     passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
+  // The group's own total when it has one, and never below the runs actually
+  // in hand: a group with no recorded total (queued before it was recorded, or
+  // a scenario/target slice that spans batches) must count its runs rather than
+  // report a denominator of zero.
+  const expectedCount = Math.max(group.expectedCount ?? 0, totalCount);
   const passRate =
     settledCount > 0
       ? (passedCount / settledCount) * 100
@@ -389,6 +414,7 @@ export function computeGroupSummary({
     cancelledCount,
     completedCount,
     totalCount,
+    expectedCount,
     inProgressCount,
     queuedCount,
     totalCost: totalCost > 0 ? totalCost : null,

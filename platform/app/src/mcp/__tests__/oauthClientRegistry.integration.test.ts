@@ -12,12 +12,11 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
+import { connection as redis } from "~/server/redis";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redis } from "~/server/redis";
+} from "~/test-utils/integration/testContainers";
 
 import { getOAuthClient, registerOAuthClient } from "../oauthClientRegistry";
 

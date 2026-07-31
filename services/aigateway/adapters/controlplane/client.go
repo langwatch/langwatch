@@ -155,7 +155,7 @@ type Change struct {
 }
 
 // Change kinds — keep in sync with the control-plane ChangeEventKind enum
-// in langwatch/src/server/gateway/changeEvent.repository.ts.
+// in platform/app/src/server/gateway/changeEvent.repository.ts.
 const (
 	ChangeKindProviderBindingUpdated = "MODEL_PROVIDER_UPDATED"
 	ChangeKindBudgetCreated          = "BUDGET_CREATED"

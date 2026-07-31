@@ -1,5 +1,6 @@
 /**
- * The browser's LOCAL turn projection (ADR-059 §2/§3) — the whole
+ * The browser's LOCAL turn projection (ADR-059 §2/§3, retired; ground now
+ * ADR-098) — the whole
  * snapshot-then-tail state machine in one pure module, mirroring how
  * `turnPhase.ts` holds the whole send/stop machine.
  *
@@ -114,7 +115,5 @@ export function isLangyTurnProjectionTerminal(
   state: LangyTurnProjectionState,
 ): boolean {
   const status = state.turn?.Status;
-  return (
-    status === "completed" || status === "failed" || status === "stopped"
-  );
+  return status === "completed" || status === "failed" || status === "stopped";
 }

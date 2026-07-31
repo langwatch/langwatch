@@ -1,9 +1,9 @@
+import { SecurityError, validateTenantId } from "@langwatch/clickhouse";
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { writeTargetFor } from "~/server/app-layer/clients/clickhouse/write-targets";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { CodingAgentTraceSessionRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentTraceSessions.mapProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { CodingAgentTraceSession } from "~/server/event-sourcing/coding-agent-processing/schema";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
 
@@ -18,7 +18,7 @@ const logger = createLogger(
  */
 export interface CodingAgentTraceSessionRepository {
   ensure(
-    records: CodingAgentTraceSessionRecord[],
+    records: CodingAgentTraceSession[],
     retentionDays?: number,
   ): Promise<void>;
 
@@ -26,7 +26,7 @@ export interface CodingAgentTraceSessionRepository {
   findByTraceId(params: {
     tenantId: string;
     traceId: string;
-  }): Promise<CodingAgentTraceSessionRecord | null>;
+  }): Promise<CodingAgentTraceSession | null>;
 }
 
 /** No-op store for deployments without ClickHouse. */
@@ -37,19 +37,24 @@ export class NullCodingAgentTraceSessionRepository
     // no-op
   }
 
-  async findByTraceId(): Promise<CodingAgentTraceSessionRecord | null> {
+  async findByTraceId(): Promise<CodingAgentTraceSession | null> {
     return null;
   }
 }
 
-interface ClickHouseWriteRecord {
+/**
+ * A type alias rather than an interface: only an anonymous object type gets an
+ * implicit index signature, and without one it cannot be passed as the client's
+ * `rows`.
+ */
+type ClickHouseWriteRecord = {
   TenantId: string;
   TraceId: string;
   SessionId: string;
   OccurredAt: Date;
   UpdatedAt: Date;
   _retention_days: number;
-}
+};
 
 export class CodingAgentTraceSessionClickHouseRepository
   implements CodingAgentTraceSessionRepository
@@ -57,13 +62,13 @@ export class CodingAgentTraceSessionClickHouseRepository
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async ensure(
-    records: CodingAgentTraceSessionRecord[],
+    records: CodingAgentTraceSession[],
     retentionDays?: number,
   ): Promise<void> {
     if (records.length === 0) return;
 
     const tenantId = records[0]!.tenantId;
-    EventUtils.validateTenantId(
+    validateTenantId(
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.ensure",
     );
@@ -81,11 +86,11 @@ export class CodingAgentTraceSessionClickHouseRepository
     }
 
     const now = new Date();
-    const values: ClickHouseWriteRecord[] = records.map((record) => ({
+    const rows: ClickHouseWriteRecord[] = records.map((record) => ({
       TenantId: record.tenantId,
       TraceId: record.traceId,
       SessionId: record.sessionId,
-      OccurredAt: new Date(record.occurredAtMs),
+      OccurredAt: new Date(record.occurredAt),
       UpdatedAt: now,
       _retention_days: retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     }));
@@ -94,9 +99,8 @@ export class CodingAgentTraceSessionClickHouseRepository
     try {
       await client.insert({
         table: TABLE_NAME,
-        values,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        rows,
+        target: writeTargetFor(TABLE_NAME),
       });
     } catch (error) {
       logger.error(
@@ -131,15 +135,20 @@ export class CodingAgentTraceSessionClickHouseRepository
   }: {
     tenantId: string;
     traceId: string;
-  }): Promise<CodingAgentTraceSessionRecord | null> {
-    EventUtils.validateTenantId(
+  }): Promise<CodingAgentTraceSession | null> {
+    validateTenantId(
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
     );
     const client = await this.resolveClient(tenantId);
 
-    const result = await client.query({
-      query: `
+    const rows = await client.query<{
+      TraceId: string;
+      SessionId: string;
+      OccurredAt: string;
+    }>({
+      table: TABLE_NAME,
+      sql: `
         SELECT TraceId, SessionId, OccurredAt
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
@@ -154,22 +163,16 @@ export class CodingAgentTraceSessionClickHouseRepository
         ORDER BY SessionId != TraceId DESC, OccurredAt DESC, SessionId ASC
         LIMIT 1
       `,
-      query_params: { tenantId, traceId },
-      format: "JSONEachRow",
+      params: { tenantId, traceId },
     });
 
-    const rows = await result.json<{
-      TraceId: string;
-      SessionId: string;
-      OccurredAt: string;
-    }>();
     const first = rows[0];
     if (!first) return null;
     return {
       tenantId,
       traceId: first.TraceId,
       sessionId: first.SessionId,
-      occurredAtMs: new Date(first.OccurredAt).getTime(),
+      occurredAt: new Date(first.OccurredAt).getTime(),
     };
   }
 }

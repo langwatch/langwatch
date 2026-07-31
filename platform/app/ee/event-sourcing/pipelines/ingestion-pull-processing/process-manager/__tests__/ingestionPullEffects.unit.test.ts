@@ -1,13 +1,11 @@
+import type { HandlerContext } from "@langwatch/event-sourcing";
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";
 
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-
 import {
-  createIngestionPullRunHandler,
   type IngestionPullOutcomeCommands,
+  ingestionPullIntents,
 } from "../ingestionPullEffects";
-import { INGESTION_PULL_PROCESS_NAME } from "../ingestionPullProcess.types";
 
 async function metricValue({
   name,
@@ -33,14 +31,7 @@ const intent = {
   cursor: "cursor-1",
 };
 
-const context = (attempt: number): IntentContext => ({
-  processName: INGESTION_PULL_PROCESS_NAME,
-  projectId: "gov-project",
-  processKey: "source-1",
-  tenantId: "gov-project",
-  messageKey: "process:source-1:pull:run-1",
-  attempt,
-});
+const ctx: HandlerContext = { now: 200, tenantId: "gov-project" };
 
 function commandsStub(
   overrides: Partial<IngestionPullOutcomeCommands> = {},
@@ -52,146 +43,148 @@ function commandsStub(
   };
 }
 
-describe("ingestion pull outbox effect", () => {
+describe("the ingestion pull run intent", () => {
   it("records a durable completion with the returned cursor", async () => {
     const recordRunCompleted = vi.fn();
-    const handler = createIngestionPullRunHandler({
+    const intents = ingestionPullIntents({
       runPort: {
         run: vi
           .fn()
           .mockResolvedValue({ nextCursor: "cursor-2", eventCount: 3 }),
       },
-      commands: () => commandsStub({ recordRunCompleted }),
+      commands: commandsStub({ recordRunCompleted }),
       clock: () => 200,
     });
-    await handler(intent, context(1));
-    expect(recordRunCompleted).toHaveBeenCalledWith({
-      tenantId: "gov-project",
-      occurredAt: 200,
-      sourceId: "source-1",
-      runId: "run-1",
-      scheduledFor: 100,
-      nextCursor: "cursor-2",
-      eventCount: 3,
-    });
-  });
 
-  it("rethrows before the final attempt so the outbox retries", async () => {
-    const handler = createIngestionPullRunHandler({
-      runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
-      commands: () => commandsStub(),
-    });
-    await expect(handler(intent, context(1))).rejects.toThrow("provider down");
-  });
+    await intents.run.deliver(intent, ctx);
 
-  it("records a durable failure on the final attempt", async () => {
-    const recordRunFailed = vi.fn();
-    const handler = createIngestionPullRunHandler({
-      runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
-      commands: () => commandsStub({ recordRunFailed }),
-      clock: () => 200,
-    });
-    await handler(intent, context(3));
-    expect(recordRunFailed).toHaveBeenCalledWith(
-      expect.objectContaining({
+    expect(recordRunCompleted).toHaveBeenCalledWith(
+      {
+        occurredAt: 200,
         sourceId: "source-1",
         runId: "run-1",
-        error: "provider down",
-        errorCode: "pull_failed",
-        // The final failure must not claim a retry is coming — retries are
-        // exhausted; only the next scheduled run follows.
-        retryable: false,
-      }),
+        scheduledFor: 100,
+        nextCursor: "cursor-2",
+        eventCount: 3,
+      },
+      { tenantId: "gov-project" },
     );
+  });
+
+  describe("when the provider fails", () => {
+    it("records a durable failure the next cron wake retries past", async () => {
+      const recordRunFailed = vi.fn();
+      const intents = ingestionPullIntents({
+        runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
+        commands: commandsStub({ recordRunFailed }),
+        clock: () => 200,
+      });
+
+      await intents.run.deliver(intent, ctx);
+
+      expect(recordRunFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceId: "source-1",
+          runId: "run-1",
+          error: "provider down",
+          errorCode: "pull_failed",
+          // Nothing retries THIS run; only the next scheduled one follows.
+          retryable: false,
+        }),
+        { tenantId: "gov-project" },
+      );
+    });
   });
 
   it("does not translate a completion-command failure into a pull failure", async () => {
     const recordRunFailed = vi.fn();
-    const handler = createIngestionPullRunHandler({
+    const intents = ingestionPullIntents({
       runPort: {
         run: vi.fn().mockResolvedValue({ nextCursor: null, eventCount: 1 }),
       },
-      commands: () =>
-        commandsStub({
-          recordRunCompleted: vi
-            .fn()
-            .mockRejectedValue(new Error("event log unavailable")),
-          recordRunFailed,
-        }),
+      commands: commandsStub({
+        recordRunCompleted: vi
+          .fn()
+          .mockRejectedValue(new Error("event log unavailable")),
+        recordRunFailed,
+      }),
     });
 
-    await expect(handler(intent, context(3))).rejects.toThrow(
+    await expect(intents.run.deliver(intent, ctx)).rejects.toThrow(
       "event log unavailable",
     );
     expect(recordRunFailed).not.toHaveBeenCalled();
   });
+
+  describe("given two runs of the same source", () => {
+    it("keys each dispatch on its own run so neither collapses onto the other", () => {
+      const intents = ingestionPullIntents({
+        runPort: { run: vi.fn() },
+        commands: commandsStub(),
+      });
+
+      expect(intents.run.messageKey(intent)).toBe("pull:source-1:run-1");
+      expect(intents.run.messageKey({ ...intent, runId: "run-2" })).toBe(
+        "pull:source-1:run-2",
+      );
+    });
+  });
 });
 
 describe("pull outcome metrics (ADR-054)", () => {
-  describe("when the final attempt fails", () => {
+  describe("when a pull fails", () => {
     it("counts a failed_final pull so the alert rule has a signal", async () => {
       const before = await metricValue({
         name: "ingestion_pull_total",
-        labels: {
-          outcome: "failed_final",
-        },
+        labels: { outcome: "failed_final" },
       });
-      const handler = createIngestionPullRunHandler({
+      const intents = ingestionPullIntents({
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
-        commands: () => commandsStub(),
+        commands: commandsStub(),
         clock: () => 200,
       });
 
-      await handler(intent, context(3));
+      await intents.run.deliver(intent, ctx);
 
-      const after = await metricValue({
-        name: "ingestion_pull_total",
-        labels: {
-          outcome: "failed_final",
-        },
-      });
-      expect(after).toBe(before + 1);
+      expect(
+        await metricValue({
+          name: "ingestion_pull_total",
+          labels: { outcome: "failed_final" },
+        }),
+      ).toBe(before + 1);
     });
   });
 
-  describe("when an attempt below the cap fails", () => {
-    it("counts it as failed_retryable, never as a final failure", async () => {
-      const beforeRetryable = await metricValue({
+  describe("when a pull lands", () => {
+    it("counts it as completed and never as a failure", async () => {
+      const beforeCompleted = await metricValue({
         name: "ingestion_pull_total",
-        labels: {
-          outcome: "failed_retryable",
-        },
+        labels: { outcome: "completed" },
       });
       const beforeFinal = await metricValue({
         name: "ingestion_pull_total",
-        labels: {
-          outcome: "failed_final",
-        },
+        labels: { outcome: "failed_final" },
       });
-      const handler = createIngestionPullRunHandler({
-        runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
-        commands: () => commandsStub(),
+      const intents = ingestionPullIntents({
+        runPort: {
+          run: vi.fn().mockResolvedValue({ nextCursor: null, eventCount: 0 }),
+        },
+        commands: commandsStub(),
         clock: () => 200,
       });
 
-      await expect(handler(intent, context(1))).rejects.toThrow(
-        "provider down",
-      );
+      await intents.run.deliver(intent, ctx);
 
       expect(
         await metricValue({
           name: "ingestion_pull_total",
-          labels: {
-            outcome: "failed_retryable",
-          },
+          labels: { outcome: "completed" },
         }),
-      ).toBe(beforeRetryable + 1);
+      ).toBe(beforeCompleted + 1);
       expect(
         await metricValue({
           name: "ingestion_pull_total",
-          labels: {
-            outcome: "failed_final",
-          },
+          labels: { outcome: "failed_final" },
         }),
       ).toBe(beforeFinal);
     });

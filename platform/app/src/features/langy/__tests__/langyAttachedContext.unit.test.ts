@@ -28,6 +28,7 @@ describe("attachContext", () => {
   });
 
   describe("given a surface attaches a piece of context", () => {
+    /** @scenario "A surface attaches a piece of context" */
     it("lists exactly that item", () => {
       useLangyStore.getState().attachContext(traceItem);
       expect(useLangyStore.getState().attachedContext).toEqual([traceItem]);
@@ -35,6 +36,7 @@ describe("attachContext", () => {
   });
 
   describe("when the same id is attached again", () => {
+    /** @scenario "Attaching the same id twice does not duplicate it" */
     it("refreshes it in place rather than stacking a duplicate", () => {
       useLangyStore.getState().attachContext(traceItem);
       useLangyStore
@@ -48,6 +50,7 @@ describe("attachContext", () => {
   });
 
   describe("when one of several items is detached", () => {
+    /** @scenario "Detaching removes only the named item" */
     it("removes only the named item", () => {
       useLangyStore.getState().attachContext(traceItem);
       useLangyStore
@@ -63,6 +66,7 @@ describe("attachContext", () => {
   });
 
   describe("when the store resets for a new project", () => {
+    /** @scenario "Attached context is cleared when the active project changes" */
     it("clears attached context so it cannot bleed across projects", () => {
       useLangyStore.getState().attachContext(traceItem);
       // A genuinely different project — a same-project re-announcement is a

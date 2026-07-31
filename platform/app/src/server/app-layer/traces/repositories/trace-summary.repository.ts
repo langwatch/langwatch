@@ -40,6 +40,27 @@ export interface TraceSummaryRepository {
     traceId: string,
     options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null>;
+
+  /**
+   * The same read as {@link findByTraceId}, plus the projection version stamped
+   * on the row it decoded.
+   *
+   * The fold's read-back path needs it (ADR-066): the decoded state is only
+   * trustworthy on a row THIS build wrote, and the row's `Version` column is the
+   * only thing that says which build that was. Answering with the state alone
+   * gives the caller no way to tell a current row from one whose absent columns
+   * decoded as ClickHouse defaults, which is how a fold silently continues onto
+   * fabricated state. Deciding WHETHER a stamp may be decoded is the store's
+   * job, not the repository's — see `TraceSummaryStore.getWithApplied`.
+   *
+   * Null when no row exists. `findByTraceId` is this read with the stamp
+   * dropped, for callers that render a summary rather than fold onto it.
+   */
+  findByTraceIdWithVersion(
+    tenantId: string,
+    traceId: string,
+    options?: FindByTraceIdOptions,
+  ): Promise<{ state: TraceSummaryData; version: string } | null>;
 }
 
 export class NullTraceSummaryRepository implements TraceSummaryRepository {
@@ -50,6 +71,14 @@ export class NullTraceSummaryRepository implements TraceSummaryRepository {
     _traceId: string,
     _options?: FindByTraceIdOptions,
   ): Promise<TraceSummaryData | null> {
+    return null;
+  }
+
+  async findByTraceIdWithVersion(
+    _tenantId: string,
+    _traceId: string,
+    _options?: FindByTraceIdOptions,
+  ): Promise<{ state: TraceSummaryData; version: string } | null> {
     return null;
   }
 }

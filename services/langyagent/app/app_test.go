@@ -564,7 +564,8 @@ func TestApp_ReadyStatus_WarmRotationVariesByTurn(t *testing.T) {
 	}
 }
 
-// A turn resuming from a shutdown handoff (ADR-048) says it is picking the
+// A turn resuming from a shutdown handoff (ADR-048, retired; ground now
+// dev/docs/adr/098-event-sourcing-core.md) says it is picking the
 // checkpointed turn back up, not cold-starting.
 func TestApp_Turn_ResumeFromHandoffEmitsPickingUpStatus(t *testing.T) {
 	worker := &fakeWorker{claimOK: true, streamWrites: true}

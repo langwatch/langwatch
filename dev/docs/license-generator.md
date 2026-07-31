@@ -137,7 +137,10 @@ row exists for the org (or all rows are expired).
 - `LANGWATCH_DEV_FORCE_ENTERPRISE` env var — gone from `env-create.mjs`,
   the four call sites that read it (`usage-stats.service.ts`,
   `presets.ts`, `composite-plan-provider.ts`, `enterprise.ts`),
-  `.env.example`, and the previous ADR-018 documenting the pattern.
+  `.env.example`, and the ADR that documented the pattern — "Plan
+  resolution bypass symmetry", deleted in the same change and replaced
+  by this document. Cite it by title, not by number: it held 018, and
+  018 was reassigned to an unrelated ADR in that very commit.
   Removed in `c9498004c` (5 files, +7 / −92, orphaned `PLAN_LIMITS`
   and `PlanTypes` imports also swept).
 - The composite-plan-provider bypass that the env var threaded through

@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/trace-processing/table";
 import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
 import { buildSlimTimeseriesQuery } from "../query-builders/slim-timeseries-query";
 

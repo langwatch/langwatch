@@ -1,5 +1,6 @@
 /**
- * Read-time recompute of offloaded trace event refs (ADR-022).
+ * Read-time recompute of offloaded trace event refs (ADR-022, retired;
+ * ground now ADR-099).
  *
  * When the `release_trace_blob_offload` flag is on at ingestion time, the
  * live pipeline writes the FULL event to event_log and dispatches a leaned
@@ -27,11 +28,11 @@ import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
+import type { NormalizedSpan } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import type {
   ExtractedIO,
   TraceIOExtractionService,
 } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
@@ -151,7 +152,7 @@ export async function resolveOffloadedTraces({
         };
       }
 
-      // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
+      // ADR-022 (retired; ground now ADR-099): aggregateId for the trace-processing pipeline IS the traceId.
       // The eventref carries the eventId, written by leanForProjection from
       // event.id at lean time — see lean-for-projection.ts:120.
       const aggregateId = span.traceId;

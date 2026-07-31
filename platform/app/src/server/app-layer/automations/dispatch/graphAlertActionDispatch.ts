@@ -6,6 +6,7 @@ import {
 } from "@langwatch/automations/templating/renderSlack";
 import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
 import type { GraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
+import { DispatchError } from "@langwatch/event-sourcing";
 import { createLogger } from "@langwatch/observability";
 import type { Project, Trigger } from "@prisma/client";
 import { createHash } from "crypto";
@@ -20,7 +21,6 @@ import {
   decryptWebhookHeaders,
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
-import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 
 const logger = createLogger("langwatch:graph-alert-action-dispatch");
@@ -253,9 +253,10 @@ export interface GraphAlertDispatchResult {
  * (`sendRenderedTriggerEmail` / `sendRenderedSlackMessage`) — same ones
  * the trace cadence dispatcher uses; sender signatures are unchanged.
  *
- * The event-sourced evaluator (real-time reactor + heartbeat) is the sole
- * caller — the K8s cron that used to share this dispatcher was removed once
- * every project cut over (ADR-034).
+ * The event-sourced evaluator is the sole caller — the `graphTriggerActivity`
+ * subscriber in real time and the `graphAlertSweep` process on its 30s wake.
+ * The K8s cron that used to share this dispatcher was removed once every
+ * project cut over (ADR-034).
  */
 export async function dispatchGraphAlertAction({
   deps,
@@ -320,7 +321,7 @@ export async function dispatchGraphAlertAction({
       };
     }
     // ADR-031: the two hard email caps, consumed HERE — inside the shared
-    // dispatcher — so the real-time reactor and heartbeat callers cannot
+    // dispatcher — so the real-time subscriber and the sweep process cannot
     // drift. Both claims are keyed on the fire digest, so an outbox retry of
     // THIS fire re-reads the count instead of burning a second slot, and the
     // next incident (new digest) gets a fresh slot.

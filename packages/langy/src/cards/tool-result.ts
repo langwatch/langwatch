@@ -7,22 +7,22 @@
  * layer guessing whether `{ value: "..." }` is traces, analytics, or neither.
  */
 import * as z from "zod/v4";
+import { CARD_PROBES, cardKindFor, promoteCard } from "./registry.js";
 import {
   dashboardCardSchema,
   datasetCardSchema,
   evalRunCardSchema,
   evaluatorConfigCardSchema,
   metricsCardSchema,
-  timeseriesCardSchema,
   promptDiffCardSchema,
   resourceCardSchema,
+  SCHEMA_BY_CARD_KIND,
   scenarioCardSchema,
   spendCardSchema,
+  timeseriesCardSchema,
   traceCardSchema,
   tracesCardSchema,
-  SCHEMA_BY_CARD_KIND,
 } from "./schemas.js";
-import { CARD_PROBES, cardKindFor, promoteCard } from "./registry.js";
 
 /**
  * The card's own verdict on whether the thing it describes actually happened.
@@ -117,7 +117,10 @@ export function toCliToolResult({
   // has to SAY the outcome is unconfirmed, and it cannot say anything if the
   // call is demoted to an anonymous JSON receipt. So the card survives and
   // carries the verdict with it. See `namesCreatedResource`.
-  if (card === "resourceCreated" && resourceCardSchema.safeParse(payload).success) {
+  if (
+    card === "resourceCreated" &&
+    resourceCardSchema.safeParse(payload).success
+  ) {
     return {
       kind: "card",
       card,

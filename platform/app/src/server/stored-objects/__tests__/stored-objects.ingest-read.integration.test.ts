@@ -39,7 +39,7 @@ import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import {
   startTestContainers,
   stopTestContainers,
-} from "../../event-sourcing/__tests__/integration/testContainers";
+} from "~/test-utils/integration/testContainers";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";

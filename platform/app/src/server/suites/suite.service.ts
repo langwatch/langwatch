@@ -275,7 +275,13 @@ export class SuiteService {
     suite: SimulationSuite;
     projectId: string;
     organizationId: string;
-    idempotencyKey: string;
+    /**
+     * Optional. When supplied, the batch and run ids are derived from it, so
+     * resubmitting the same key re-dispatches identical `queueRun` commands
+     * and the event store collapses them instead of queueing a second set of
+     * runs. Omitted, every submit is a fresh run.
+     */
+    idempotencyKey?: string;
     batchRunId?: string;
   }): Promise<SuiteRunResult> {
     return tracer.withActiveSpan(
@@ -309,8 +315,8 @@ export class SuiteService {
           activeTargets: resolved.activeTargets,
           repeatCount: suite.repeatCount,
           skippedArchived: resolved.skippedArchived,
-          idempotencyKey: params.idempotencyKey,
           batchRunId: params.batchRunId,
+          idempotencyKey: params.idempotencyKey,
         });
 
         span.setAttribute("suite.batch_run_id", result.batchRunId);

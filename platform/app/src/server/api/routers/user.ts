@@ -8,16 +8,14 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
@@ -779,7 +777,7 @@ export const userRouter = createTRPCRouter({
 
       const chRepo = isClickHouseEnabled()
         ? new GatewayBudgetClickHouseRepository(async (projectId) => {
-            const client = await getClickHouseClientForProject(projectId);
+            const client = await clickHouseForProject(projectId);
             if (!client) {
               throw new Error(
                 `ClickHouse enabled but no client for project ${projectId}`,

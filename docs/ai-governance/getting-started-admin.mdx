@@ -120,14 +120,14 @@ The deep reference for budget shape, fallback semantics, and the WARN response t
 
 ## Step 8: Write your first anomaly rule
 
-Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The reactor evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) is honest about which is which).
+Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach. `spend_spike` rules are evaluated today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) is honest about which is which).
 
 Write a starter `spend_spike` rule:
 
 1. Navigate to **Settings → AI Governance → Anomaly Rules** (`/settings/governance/anomaly-rules`).
 2. Click **+ New anomaly rule**.
 3. Fill in:
-   - **Name**: `Daily spend doubles vs last week`
+   - **Name**: `Daily spend doubles vs the recent norm`
    - **Severity**: `warning`
    - **Rule type**: `spend_spike`
    - **Scope**: `organization`
@@ -135,14 +135,13 @@ Write a starter `spend_spike` rule:
      ```json
      {
        "windowSec": 86400,
-       "baselineOffsetSec": 604800,
        "ratioVsBaseline": 2.0,
        "minBaselineUsd": 1.0
      }
      ```
 4. Click **Create rule**.
 
-The reactor will start evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the reactor writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
+The rule joins the next detection sweep, which runs every few minutes. When today's 24h spend exceeds 2× the average of the previous six days (and that average was at least \$1, to avoid noise on quiet days), LangWatch writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
 
 ## Where to next
 

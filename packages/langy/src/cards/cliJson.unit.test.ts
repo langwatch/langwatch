@@ -4,9 +4,9 @@ import { parseCliJson } from "./cliJson.js";
 describe("parseCliJson", () => {
   describe("given stdout that is exactly the JSON document", () => {
     it("parses the object", () => {
-      expect(parseCliJson('{"traces":[],"pagination":{"totalHits":0}}')).toEqual(
-        { traces: [], pagination: { totalHits: 0 } },
-      );
+      expect(
+        parseCliJson('{"traces":[],"pagination":{"totalHits":0}}'),
+      ).toEqual({ traces: [], pagination: { totalHits: 0 } });
     });
 
     it("parses a top-level array", () => {
@@ -43,7 +43,7 @@ describe("parseCliJson", () => {
     });
 
     it("skips a brace that opens no valid document", () => {
-      expect(parseCliJson("hint: use {curly} braces\n{\"ok\":true}")).toEqual({
+      expect(parseCliJson('hint: use {curly} braces\n{"ok":true}')).toEqual({
         ok: true,
       });
     });

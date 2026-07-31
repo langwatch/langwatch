@@ -83,9 +83,18 @@ export class LangEvalsHttpClient implements LangEvalsClient {
       }
       if (error instanceof Error && error.message.includes("fetch failed")) {
         logger.error({ error, url }, "Evaluator cannot be reached");
-        throw new EvaluatorExecutionError("Evaluator cannot be reached", {
-          meta: { evaluatorType, url },
-        });
+        // This message is persisted as the run's `details` and rendered
+        // verbatim in the result popover, so it has to say what happened AND
+        // what to do — "Evaluator cannot be reached" told the reader only that
+        // something failed, and left them with no next step. The URL stays in
+        // the log line above and out of `meta`: `meta` is a client contract,
+        // and nothing in the UI renders an internal service address.
+        throw new EvaluatorExecutionError(
+          "Could not reach the evaluation service. It may be restarting — " +
+            "retry, and if this keeps happening it isn't running for this " +
+            "deployment.",
+          { meta: { evaluatorType } },
+        );
       }
       throw error;
     } finally {

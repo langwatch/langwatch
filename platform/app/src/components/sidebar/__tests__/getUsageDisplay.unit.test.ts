@@ -4,6 +4,7 @@ import { getUsageDisplay } from "../UsageIndicator";
 
 describe("getUsageDisplay()", () => {
   describe("given self-hosted (isSaaS = false)", () => {
+    /** @scenario "Self-hosted deployment always shows the usage bar" */
     it("returns visible with the provided usage unit", () => {
       const result = getUsageDisplay({
         isSaaS: false,
@@ -15,6 +16,7 @@ describe("getUsageDisplay()", () => {
       expect(result).toEqual({ visible: true, unitLabel: "traces" });
     });
 
+    /** @scenario "The unit label is whatever the usage API reports, not what the plan implies" */
     it("returns visible with events usage unit", () => {
       const result = getUsageDisplay({
         isSaaS: false,
@@ -30,6 +32,7 @@ describe("getUsageDisplay()", () => {
   describe("given SaaS (isSaaS = true)", () => {
     describe("given TIERED pricing model", () => {
       describe("when plan is free", () => {
+        /** @scenario "SaaS on the tiered pricing model shows the usage bar on a free plan" */
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
@@ -43,6 +46,7 @@ describe("getUsageDisplay()", () => {
       });
 
       describe("when plan is paid", () => {
+        /** @scenario "SaaS on the tiered pricing model shows the usage bar on a paid plan" */
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
@@ -58,6 +62,7 @@ describe("getUsageDisplay()", () => {
 
     describe("given SEAT_EVENT pricing model", () => {
       describe("when plan is free", () => {
+        /** @scenario "SaaS on the seat and event pricing model shows the usage bar on a free plan" */
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,
@@ -71,6 +76,7 @@ describe("getUsageDisplay()", () => {
       });
 
       describe("when plan is paid", () => {
+        /** @scenario "SaaS on the seat and event pricing model hides the usage bar on a paid plan" */
         it("returns not visible", () => {
           const result = getUsageDisplay({
             isSaaS: true,
@@ -86,6 +92,7 @@ describe("getUsageDisplay()", () => {
 
     describe("given no pricing model", () => {
       describe("when pricingModel is undefined", () => {
+        /** @scenario "An organization with no pricing model still sees its usage bar" */
         it("returns visible with the provided usage unit", () => {
           const result = getUsageDisplay({
             isSaaS: true,

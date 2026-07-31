@@ -19,10 +19,13 @@
  * singletons beyond a small per-project S3 client memo) precisely so they can
  * be lifted into `App` later with no rewrite.
  */
+import { constants as fsConstants } from "node:fs";
+import fs from "node:fs/promises";
 import type { Readable } from "node:stream";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { AzureDatasetStorage } from "./azure-dataset-storage";
 import type { ChunkOffset, DatasetChunk } from "./dataset-chunking";
+import { StorageNotWritableError } from "./errors";
 import { LocalDatasetStorage } from "./local-dataset-storage";
 import { S3DatasetStorage } from "./s3-dataset-storage";
 
@@ -173,4 +176,34 @@ export const getDatasetStorage = async (
   if (destination.kind === "s3") return new S3DatasetStorage();
   if (destination.kind === "azure") return new AzureDatasetStorage();
   return new LocalDatasetStorage(destination.root);
+};
+
+/**
+ * Preflight: can this project's dataset bytes be written at all?
+ *
+ * Called BEFORE a write path commits anything, so a deployment with no writable
+ * backend is refused up front instead of failing at the first byte — which is
+ * how an upload used to leave a pending row behind with no object to finalize.
+ * The whole point is that it runs before the row exists.
+ *
+ * Only the local-FS backend is probed. S3 and Azure carry their own credentials
+ * and fail per-request; reaching out to them on every preflight would trade a
+ * cheap local check for a network round trip on the common path.
+ */
+export const assertDatasetStorageWritable = async (
+  projectId: string,
+): Promise<void> => {
+  const destination = await resolveProjectStorageDestination(projectId);
+  if (destination.kind !== "file") return;
+
+  // Any failure to prepare the root — missing and uncreatable, present and
+  // unwritable — means the same thing to a caller about to upload, so they
+  // collapse into the one error rather than a taxonomy nobody can act on
+  // differently.
+  try {
+    await fs.mkdir(destination.root, { recursive: true });
+    await fs.access(destination.root, fsConstants.W_OK);
+  } catch {
+    throw new StorageNotWritableError({ root: destination.root });
+  }
 };

@@ -53,7 +53,7 @@
     "pnpm-workspace.yaml",
     "pnpm-lock.yaml",
     "packages/server/package.json",
-    "tests/agentic-e2e/package.json"
+    "dev/tests/agentic-e2e/package.json"
   ],
   "scripts": {
     "dev": "pnpm --filter @langwatch/web dev",
@@ -73,8 +73,10 @@
     "test:sdk": "pnpm --filter langwatch test",
     "typecheck": "pnpm --filter @langwatch/web typecheck",
     "typecheck:all": "pnpm --filter @langwatch/web typecheck:all",
-    "lint": "pnpm --filter @langwatch/web lint",
-    "lint:fix": "pnpm --filter @langwatch/web lint:fix",
+    "lint": "pnpm run lint:app && pnpm run lint:packages",
+    "lint:app": "pnpm --filter @langwatch/web lint",
+    "lint:packages": "./platform/app/node_modules/.bin/biome check packages",
+    "lint:fix": "pnpm --filter @langwatch/web lint:fix && ./platform/app/node_modules/.bin/biome check --write packages",
     "format": "pnpm --filter @langwatch/web format",
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "prisma:migrate": "pnpm --filter @langwatch/web prisma:migrate",

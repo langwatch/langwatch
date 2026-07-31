@@ -40,7 +40,10 @@ export const initialTurnPhaseState: TurnPhaseState = {
  * A turn was dispatched (the transport adopted its ids): adopt it, go `active`,
  * and forget the previous turn's settle marker + fold confirmation.
  */
-export function beginTurn(_state: TurnPhaseState, turnId: string): TurnPhaseState {
+export function beginTurn(
+  _state: TurnPhaseState,
+  turnId: string,
+): TurnPhaseState {
   return {
     turnPhase: "active",
     activeTurnId: turnId,

@@ -65,6 +65,7 @@ function makeGroupSummary(
     cancelledCount: 0,
     completedCount: 2,
     totalCount: 2,
+    expectedCount: 2,
     inProgressCount: 0,
     queuedCount: 0,
     totalCost: null,

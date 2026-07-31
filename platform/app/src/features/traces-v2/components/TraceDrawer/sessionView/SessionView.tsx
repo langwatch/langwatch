@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { formatCost } from "../../../utils/formatters";
 import {
   type ContextHealthTone,
@@ -11,6 +10,7 @@ import {
   contextWindowCeiling,
 } from "./contextHealth";
 import {
+  type CodingAgentSessionRow,
   deriveSessionSignals,
   formatCompact,
   formatShortDuration,
@@ -28,7 +28,8 @@ import { deriveTokenTimeline, findCacheRebuilds } from "./tokenTimeline";
  * answer "was this session healthy, and what did it cost me". This is the other
  * half — the same session, folded.
  *
- * Everything here comes from one pre-folded row (ADR-056), so the screen costs a
+ * Everything here comes from one pre-folded row (ADR-056, retired; ground
+ * now ADR-105), so the screen costs a
  * single point read rather than re-walking 800 spans in the browser.
  */
 
@@ -36,7 +37,8 @@ interface SessionViewProps {
   session: CodingAgentSessionRow;
   /**
    * The session's transcript entries, for the per-call token timeline. The
-   * fold above is a bounded aggregate (ADR-056) — it has the SUM of cache
+   * fold above is a bounded aggregate (ADR-056, retired; ground now
+   * ADR-105) — it has the SUM of cache
    * reused/rebuilt but not the "where". Optional: without it the timeline
    * section is simply omitted rather than the whole tab failing.
    */

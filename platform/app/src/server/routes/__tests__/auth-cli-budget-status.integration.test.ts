@@ -13,7 +13,7 @@
  *
  * The 402 (budget_exceeded) case requires a ClickHouse-backed budget
  * ledger entry showing actual spend; that lives in the existing
- * gatewayBudgetSync.reactor integration test which exercises the
+ * budgetEnforcement integration test which exercises the
  * same `GatewayBudgetService.check()` code path.
  *
  * Spec: specs/ai-gateway/governance/budget-exceeded.feature
@@ -24,11 +24,11 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
+import { connection as redisConnection } from "~/server/redis";
 import {
   startTestContainers,
   stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
+} from "~/test-utils/integration/testContainers";
 
 import { app } from "../auth-cli";
 
@@ -163,6 +163,6 @@ describe("GET /api/auth/cli/budget/status", () => {
   // That path is exhaustively covered by personalVirtualKey.service
   // integration tests; here we focus on the budget/status endpoint
   // contract itself. The hard_block / 402 path is exercised end-to-end
-  // by gatewayBudgetSync.reactor.integration.test.ts which uses the
+  // by budgetEnforcement.integration.test.ts which uses the
   // same GatewayBudgetService.check() code path.
 });

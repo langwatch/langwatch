@@ -1,0 +1,38 @@
+{
+  "name": "@langwatch/event-sourcing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The event-sourcing core: aggregate definitions, projection execution, the dispatch-plane group key, and the projection store contracts. Imports no application code \u2014 infrastructure arrives through ports declared here. Pipelines and composition live in the application (ADR-102).",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@langwatch/observability": "workspace:*",
+    "zod-compiler": "^1.15.0"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.9",
+    "zod": "^3.25.76"
+  }
+}

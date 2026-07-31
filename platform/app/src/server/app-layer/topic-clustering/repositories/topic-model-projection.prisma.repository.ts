@@ -2,15 +2,12 @@ import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 import type {
-  ProjectedTopic,
-  TopicModelData,
-} from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicModel.foldProjection";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+  LegacyProjectionStoreContext,
+  LegacyStateProjectionStore,
+  LegacyStoredProjection,
+} from "~/server/app-layer/_shared/legacyProjectionStore.types";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import type { ProjectedTopic, TopicModelData } from "./topicModel.types";
 
 /**
  * Write-through store for the topic model projection: the cursor lives in
@@ -21,14 +18,14 @@ import { KSUID_RESOURCES } from "~/utils/constants";
  * duplicating.
  */
 export class PrismaTopicModelProjectionRepository
-  implements StateProjectionStore<TopicModelData>
+  implements LegacyStateProjectionStore<TopicModelData>
 {
   constructor(private readonly prisma: PrismaClient) {}
 
   async load(
     _projectionKey: string,
-    context: ProjectionStoreContext,
-  ): Promise<StoredProjection<TopicModelData> | null> {
+    context: LegacyProjectionStoreContext,
+  ): Promise<LegacyStoredProjection<TopicModelData> | null> {
     const projectId = String(context.tenantId);
     const cursor = await this.prisma.topicModelProjection.findUnique({
       where: { projectId },
@@ -71,8 +68,8 @@ export class PrismaTopicModelProjectionRepository
   }
 
   async store(
-    projection: StoredProjection<TopicModelData>,
-    context: ProjectionStoreContext,
+    projection: LegacyStoredProjection<TopicModelData>,
+    context: LegacyProjectionStoreContext,
   ): Promise<void> {
     const projectId = String(context.tenantId);
     const topics = projection.state.Topics;

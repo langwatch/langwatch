@@ -1,7 +1,9 @@
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-inputs-offload";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { QueryMemoryExceededError } from "~/server/app-layer/traces/errors";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { Protections } from "~/server/traces/protections";
 import { safeJsonParse } from "~/utils/safeJsonParse";
@@ -10,7 +12,8 @@ import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappe
 import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
- * Resolves an offloaded-inputs marker (ADR-040) back to the full inputs at the
+ * Resolves an offloaded-inputs marker (ADR-096, retired; ground now
+ * ADR-098) back to the full inputs at the
  * read boundary. The production default builds a per-project stored-objects
  * service and streams the durable object; a plain (non-marker) object passes
  * through unchanged. Injected so tests can supply a stub without standing up
@@ -66,10 +69,33 @@ const EVAL_COLUMNS_LIGHT = [
 const EVAL_COLUMNS_WITH_INPUTS = `${EVAL_COLUMNS_LIGHT}, Inputs`;
 
 /**
- * ClickHouse raises this when a query would exceed `max_memory_usage`.
- * We match on the stable prefix rather than the (variable) GiB figures.
+ * Whether a read failed because it would exceed ClickHouse's
+ * `max_memory_usage` — the signal that the retry below should drop `Inputs`
+ * and fetch the light projection instead.
+ *
+ * Checks the error's `code` first, and only then falls back to matching the
+ * raw driver text. This used to be message-matching alone, against
+ * `/memory limit\s*(exceeded|.*exceeded)/i`, which never matched what the
+ * client actually throws: the read path translates a memory limit into
+ * `QueryMemoryExceededError`, whose message is "Query exceeded its memory
+ * limit and was aborted" — no "memory limit exceeded" substring anywhere in
+ * it. The retry has therefore been unreachable in production, and its tests
+ * stayed green only because the double threw the raw driver string. Asserting
+ * on `code` is the repo's rule for exactly this reason: a message is copy and
+ * changes, and it had already changed here.
+ *
+ * The raw driver error still rides along in `reasons`, so the fallback covers
+ * an error that reaches this function untranslated — from a caller that holds
+ * a raw client, or from a `command` path, neither of which is translated.
  */
 function isMemoryLimitError(error: unknown): boolean {
+  if (error instanceof QueryMemoryExceededError) return true;
+
+  if (HandledError.isHandled(error)) {
+    if (error.code === "query_memory_exceeded") return true;
+    if ((error.reasons ?? []).some(isMemoryLimitError)) return true;
+  }
+
   const message = error instanceof Error ? error.message : String(error);
   return /memory limit\s*(exceeded|.*exceeded)/i.test(message);
 }
@@ -130,7 +156,7 @@ export class EvaluationService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await clickHouseForProject(projectId);
         if (!clickHouseClient) {
           throw new Error(
             `ClickHouse client unavailable for project ${projectId}`,
@@ -141,9 +167,10 @@ export class EvaluationService {
           return {};
         }
 
-        const runQuery = async (columns: string) => {
-          const result = await clickHouseClient.query({
-            query: `
+        const runQuery = async (columns: string) =>
+          await clickHouseClient.query<ClickHouseEvaluationRunRow>({
+            table: "evaluation_runs",
+            sql: `
               SELECT ${columns}
               FROM evaluation_runs
               WHERE TenantId = {tenantId:String}
@@ -156,11 +183,8 @@ export class EvaluationService {
                   GROUP BY TenantId, EvaluationId
                 )
             `,
-            query_params: { tenantId: projectId, traceIds },
-            format: "JSONEachRow",
+            params: { tenantId: projectId, traceIds },
           });
-          return (await result.json()) as ClickHouseEvaluationRunRow[];
-        };
 
         const groupByTrace = (
           rows: ClickHouseEvaluationRunRow[],
@@ -250,29 +274,28 @@ export class EvaluationService {
         },
       },
       async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        const clickHouseClient = await clickHouseForProject(projectId);
         if (!clickHouseClient) {
           return null;
         }
 
         try {
-          const result = await clickHouseClient.query({
-            query: `
+          const rows = await clickHouseClient.query<{ Inputs: string | null }>({
+            table: "evaluation_runs",
+            sql: `
               SELECT argMax(Inputs, UpdatedAt) AS Inputs
               FROM evaluation_runs
               WHERE TenantId = {tenantId:String}
                 AND EvaluationId = {evaluationId:String}
             `,
-            query_params: { tenantId: projectId, evaluationId },
-            format: "JSONEachRow",
+            params: { tenantId: projectId, evaluationId },
           });
-          const rows = (await result.json()) as { Inputs: string | null }[];
           const parsed = safeJsonParse(rows[0]?.Inputs ?? null);
           const inputs =
             parsed && typeof parsed === "object" && !Array.isArray(parsed)
               ? (parsed as Record<string, unknown>)
               : null;
-          // ADR-040: when inputs were offloaded, `parsed` is a stored-object
+          // ADR-096 (retired; ground now ADR-098): when inputs were offloaded, `parsed` is a stored-object
           // marker. Resolve it to the full inputs here - the natural lazy seam
           // the UI already fetches through - so the caller cannot tell whether
           // the inputs were inline or offloaded. Non-markers pass through.

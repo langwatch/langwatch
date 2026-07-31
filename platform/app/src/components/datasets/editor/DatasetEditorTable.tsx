@@ -927,11 +927,16 @@ export function SaveStatusChip({
     );
   }
   if (state === "error") {
+    // Show the reason, not just the fact. "Failed to save" told the user only
+    // what they already knew; the resolved copy names the cause and what to do,
+    // and the tooltip carries it in full when the chip has to truncate.
     return (
       <Tooltip content={error ?? "Unknown error"}>
         <HStack gap={1} color="red.fg" data-testid="save-status-error">
           <X size={13} />
-          <Text fontSize="12px">Failed to save</Text>
+          <Text fontSize="12px" truncate maxWidth="320px">
+            {error ?? "Failed to save"}
+          </Text>
         </HStack>
       </Tooltip>
     );

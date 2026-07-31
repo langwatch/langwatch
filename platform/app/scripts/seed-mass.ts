@@ -28,8 +28,9 @@ import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import { seedDemoPlatform } from "../prisma/seed-demo-platform";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
+import { createCanonicalSpanRecorder } from "../src/server/app-layer/traces/ingest/canonicalSpanRecorder";
 import { getClickHouseClientForProject } from "../src/server/clickhouse/clickhouseClient";
-import { DEFAULT_PII_REDACTION_LEVEL } from "../src/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "../src/server/event-sourcing/trace-processing/schema";
 import { getSuiteSetId } from "../src/server/suites/suite-set-id";
 import {
   type CustomMetadata,
@@ -78,10 +79,10 @@ assertLocalUrl("CLICKHOUSE_URL", process.env.CLICKHOUSE_URL);
  * REST collector route runs, then enqueues through the production producer.
  */
 async function dispatchDeepTrace({
-  app,
+  recordSpan,
   trace,
 }: {
-  app: ReturnType<typeof initializeDefaultApp>;
+  recordSpan: ReturnType<typeof createCanonicalSpanRecorder>;
   trace: TraceFixture;
 }): Promise<void> {
   const payload = buildCollectorPayload({
@@ -106,7 +107,7 @@ async function dispatchDeepTrace({
   });
   for (const rawSpan of payload.spans) {
     const span = spanValidatorSchema.parse(rawSpan);
-    await app.traces.recordSpan({
+    await recordSpan({
       tenantId: PROJECT_ID,
       span: CollectorSpanUtils.convertSpanToOtlp(span),
       resource,
@@ -130,140 +131,158 @@ async function dispatchTimeline({
   for (const run of timeline.scenarioRuns) {
     const scenario = SCENARIO_FIXTURES[run.scenarioIndex]!;
     const variant = run.passed ? "improved" : "baseline";
-    await app.simulations.startRun({
-      tenantId: PROJECT_ID,
-      occurredAt: run.startedAt,
-      scenarioRunId: run.runId,
-      scenarioId: scenario.scenarioId,
-      batchRunId: run.batchRunId,
-      scenarioSetId: suiteSetId,
-      name: scenario.name,
-      description: "Support Regression Suite — scheduled history",
-      metadata: {
-        suiteId: DEMO_PLATFORM_IDS.suite,
-        variant,
-        model: run.passed ? "gpt-5-mini" : "gpt-4.1-mini",
-      },
-    });
-    await app.simulations.messageSnapshot({
-      tenantId: PROJECT_ID,
-      occurredAt: run.startedAt + 1_000,
-      scenarioRunId: run.runId,
-      messages: [
-        { id: `${run.runId}-user`, role: "user", content: scenario.user },
-        {
-          id: `${run.runId}-assistant`,
-          role: "assistant",
-          content: scenario[variant],
-          trace_id: run.trace.traceId,
+    await app.simulations.startRun(
+      {
+        occurredAt: run.startedAt,
+        scenarioRunId: run.runId,
+        scenarioId: scenario.scenarioId,
+        batchRunId: run.batchRunId,
+        scenarioSetId: suiteSetId,
+        name: scenario.name,
+        description: "Support Regression Suite — scheduled history",
+        metadata: {
+          suiteId: DEMO_PLATFORM_IDS.suite,
+          variant,
+          model: run.passed ? "gpt-5-mini" : "gpt-4.1-mini",
         },
-      ],
-      traceIds: [run.trace.traceId],
-      status: "IN_PROGRESS",
-    });
-    await app.simulations.finishRun({
-      tenantId: PROJECT_ID,
-      occurredAt: run.startedAt + run.latencyMs,
-      scenarioRunId: run.runId,
-      durationMs: run.latencyMs,
-      status: run.passed ? "SUCCESS" : "FAILURE",
-      results: {
-        verdict: run.passed ? "success" : "failure",
-        reasoning: run.passed
-          ? "The response stayed within policy and supplied a safe next step."
-          : "The response made an unsupported promise or invented a fact.",
-        metCriteria: run.passed
-          ? [...scenario.criteria]
-          : [scenario.criteria[0]],
-        unmetCriteria: run.passed ? [] : scenario.criteria.slice(1),
       },
-    });
-    await app.evaluations.reportEvaluation({
-      tenantId: PROJECT_ID,
-      occurredAt: run.startedAt + run.latencyMs + 500,
-      evaluationId: `mass-eval-${run.runId}`,
-      evaluatorId:
-        run.scenarioIndex === 1
-          ? DEMO_PLATFORM_IDS.evaluators.groundedness
-          : DEMO_PLATFORM_IDS.evaluators.quality,
-      evaluatorType:
-        run.scenarioIndex === 1 ? "ragas/faithfulness" : "langevals/llm_score",
-      evaluatorName:
-        run.scenarioIndex === 1
-          ? "Documentation Groundedness"
-          : "Support Answer Quality",
-      traceId: run.trace.traceId,
-      status: "processed",
-      score: run.score,
-      passed: run.passed,
-      label: run.passed ? "acceptable" : "needs work",
-      details: `Scheduled history evaluation scored ${Math.round(run.score * 100)}%.`,
-    });
+      { tenantId: PROJECT_ID },
+    );
+    await app.simulations.snapshotMessages(
+      {
+        occurredAt: run.startedAt + 1_000,
+        scenarioRunId: run.runId,
+        messages: [
+          { id: `${run.runId}-user`, role: "user", content: scenario.user },
+          {
+            id: `${run.runId}-assistant`,
+            role: "assistant",
+            content: scenario[variant],
+            trace_id: run.trace.traceId,
+          },
+        ],
+        traceIds: [run.trace.traceId],
+        status: "IN_PROGRESS",
+      },
+      { tenantId: PROJECT_ID },
+    );
+    await app.simulations.finishRun(
+      {
+        occurredAt: run.startedAt + run.latencyMs,
+        scenarioRunId: run.runId,
+        durationMs: run.latencyMs,
+        status: run.passed ? "SUCCESS" : "FAILURE",
+        results: {
+          verdict: run.passed ? "success" : "failure",
+          reasoning: run.passed
+            ? "The response stayed within policy and supplied a safe next step."
+            : "The response made an unsupported promise or invented a fact.",
+          metCriteria: run.passed
+            ? [...scenario.criteria]
+            : [scenario.criteria[0]],
+          unmetCriteria: run.passed ? [] : scenario.criteria.slice(1),
+        },
+      },
+      { tenantId: PROJECT_ID },
+    );
+    await app.evaluations.report(
+      {
+        occurredAt: run.startedAt + run.latencyMs + 500,
+        evaluationId: `mass-eval-${run.runId}`,
+        evaluatorId:
+          run.scenarioIndex === 1
+            ? DEMO_PLATFORM_IDS.evaluators.groundedness
+            : DEMO_PLATFORM_IDS.evaluators.quality,
+        evaluatorType:
+          run.scenarioIndex === 1
+            ? "ragas/faithfulness"
+            : "langevals/llm_score",
+        evaluatorName:
+          run.scenarioIndex === 1
+            ? "Documentation Groundedness"
+            : "Support Answer Quality",
+        traceId: run.trace.traceId,
+        status: "processed",
+        score: run.score,
+        passed: run.passed,
+        label: run.passed ? "acceptable" : "needs work",
+        details: `Scheduled history evaluation scored ${Math.round(run.score * 100)}%.`,
+      },
+      { tenantId: PROJECT_ID },
+    );
   }
 
   for (const exp of timeline.experimentRuns) {
-    await app.experimentRuns.startExperimentRun({
-      tenantId: PROJECT_ID,
-      occurredAt: exp.startedAt,
-      runId: exp.runId,
-      experimentId: DEMO_PLATFORM_IDS.experiment,
-      total: EXPERIMENT_ROWS.length,
-      targets: [
-        {
-          id: "demo-target-support-agent",
-          name: "Support Copilot",
-          type: "agent",
-          agentId: DEMO_PLATFORM_IDS.agents.support,
-          model: exp.variant === "baseline" ? "gpt-4.1-mini" : "gpt-5-mini",
-          metadata: { release: exp.variant },
-        },
-      ],
-    });
+    await app.experimentRuns.startExperimentRun(
+      {
+        occurredAt: exp.startedAt,
+        runId: exp.runId,
+        experimentId: DEMO_PLATFORM_IDS.experiment,
+        total: EXPERIMENT_ROWS.length,
+        targets: [
+          {
+            id: "demo-target-support-agent",
+            name: "Support Copilot",
+            type: "agent",
+            agentId: DEMO_PLATFORM_IDS.agents.support,
+            model: exp.variant === "baseline" ? "gpt-4.1-mini" : "gpt-5-mini",
+            metadata: { release: exp.variant },
+          },
+        ],
+      },
+      { tenantId: PROJECT_ID },
+    );
     for (const [index, row] of EXPERIMENT_ROWS.entries()) {
       const occurredAt = exp.startedAt + (index + 1) * 60_000;
-      await app.experimentRuns.recordTargetResult({
-        tenantId: PROJECT_ID,
-        occurredAt,
-        runId: exp.runId,
-        experimentId: DEMO_PLATFORM_IDS.experiment,
-        index,
-        targetId: "demo-target-support-agent",
-        entry: { input: row.input, expected_output: row.expected },
-        predicted: { output: exp.outputs[index]! },
-        cost: 0.003,
-        duration: 1_400 + index * 120,
-      });
+      await app.experimentRuns.recordTargetResult(
+        {
+          occurredAt,
+          runId: exp.runId,
+          experimentId: DEMO_PLATFORM_IDS.experiment,
+          index,
+          targetId: "demo-target-support-agent",
+          entry: { input: row.input, expected_output: row.expected },
+          predicted: { output: exp.outputs[index]! },
+          cost: 0.003,
+          duration: 1_400 + index * 120,
+        },
+        { tenantId: PROJECT_ID },
+      );
       const score = exp.scores[index]!;
-      await app.experimentRuns.recordEvaluatorResult({
-        tenantId: PROJECT_ID,
-        occurredAt: occurredAt + 500,
+      await app.experimentRuns.recordEvaluatorResult(
+        {
+          occurredAt: occurredAt + 500,
+          runId: exp.runId,
+          experimentId: DEMO_PLATFORM_IDS.experiment,
+          index,
+          targetId: "demo-target-support-agent",
+          evaluatorId: DEMO_PLATFORM_IDS.evaluators.quality,
+          evaluatorName: "Support Answer Quality",
+          status: "processed",
+          score,
+          passed: score >= 0.7,
+          label:
+            score >= 0.85
+              ? "excellent"
+              : score >= 0.7
+                ? "acceptable"
+                : "needs work",
+          details: `Weekly regression scored ${Math.round(score * 100)}%.`,
+          duration: 420 + index * 35,
+          cost: 0.0008,
+        },
+        { tenantId: PROJECT_ID },
+      );
+    }
+    await app.experimentRuns.completeExperimentRun(
+      {
+        occurredAt: exp.startedAt + 9 * 60_000,
         runId: exp.runId,
         experimentId: DEMO_PLATFORM_IDS.experiment,
-        index,
-        targetId: "demo-target-support-agent",
-        evaluatorId: DEMO_PLATFORM_IDS.evaluators.quality,
-        evaluatorName: "Support Answer Quality",
-        status: "processed",
-        score,
-        passed: score >= 0.7,
-        label:
-          score >= 0.85
-            ? "excellent"
-            : score >= 0.7
-              ? "acceptable"
-              : "needs work",
-        details: `Weekly regression scored ${Math.round(score * 100)}%.`,
-        duration: 420 + index * 35,
-        cost: 0.0008,
-      });
-    }
-    await app.experimentRuns.completeExperimentRun({
-      tenantId: PROJECT_ID,
-      occurredAt: exp.startedAt + 9 * 60_000,
-      runId: exp.runId,
-      experimentId: DEMO_PLATFORM_IDS.experiment,
-      finishedAt: exp.startedAt + 9 * 60_000,
-    });
+        finishedAt: exp.startedAt + 9 * 60_000,
+      },
+      { tenantId: PROJECT_ID },
+    );
   }
 }
 
@@ -397,8 +416,19 @@ async function main(): Promise<void> {
     );
 
     const app = initializeDefaultApp({ processRole: "web" });
+    // Not `ingestNormalizedSpan`: that seam stamps occurredAt with the wall
+    // clock and backdating is the whole point of this path. What it shares is
+    // the canonicalising recorder — the command takes a `CanonicalSpan`, and an
+    // envelope handed over verbatim leaves the event's trace id unresolved, so
+    // every seeded span commits with an empty aggregate id and no fold can key
+    // a row.
+    const recordSpan = createCanonicalSpanRecorder({
+      recordSpan: async (span) => {
+        await app.traces.recordSpan(span, { tenantId: span.tenantId });
+      },
+    });
     for (const trace of deep) {
-      await dispatchDeepTrace({ app, trace });
+      await dispatchDeepTrace({ recordSpan, trace });
     }
     console.log("   deep trace history dispatched as pipeline commands");
     await dispatchTimeline({ app, timeline });

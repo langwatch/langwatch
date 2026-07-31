@@ -6,6 +6,7 @@ import {
   CODING_AGENT_ORIGIN,
   enrichCodingAgentSpansFromLogs,
 } from "~/server/app-layer/traces/claude-code-log-enrichment";
+import type { NormalizedSpan } from "~/server/app-layer/traces/ingest/normalizedSpan";
 import {
   createDefaultLogRecordStorageService,
   type LogRecordStorageService,
@@ -14,7 +15,6 @@ import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-i
 import { prisma as defaultPrisma } from "~/server/db";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
@@ -95,7 +95,7 @@ import type {
 
 /**
  * Optional blob-offload resolution dependencies injected into TraceService
- * (ADR-022: read-time recompute via event_log).
+ * (ADR-022, retired; ground now ADR-099: read-time recompute via event_log).
  *
  * When provided, every read path that returns `Trace[]` with spans passes
  * each trace's normalized spans through `resolveOffloadedTraces` to
@@ -105,7 +105,7 @@ import type {
  *
  * When omitted (e.g. in tests or when S3 is not configured) the service
  * falls back to the preview values from trace_summaries — identical to
- * pre-ADR-022 behavior.
+ * pre-ADR-022 (retired; ground now ADR-099) behavior.
  */
 export interface BlobResolutionDeps {
   blobStore: BlobStore;
@@ -115,12 +115,13 @@ export interface BlobResolutionDeps {
 /**
  * Builds the per-trace resolver callback from BlobResolutionDeps.
  *
- * Encapsulates the ADR-022 read-path wiring: given a projectId and the
+ * Encapsulates the ADR-022 (retired; ground now ADR-099) read-path wiring: given a projectId and the
  * NormalizedSpan array for a single trace, calls `resolveOffloadedTraces`
  * and returns the resolved spans + recomputed IO.
  *
  * Returned as `undefined` when `deps` is absent so that ClickHouseTraceService
- * falls back to the preview values from trace_summaries (pre-ADR-022 behavior).
+ * falls back to the preview values from trace_summaries (pre-ADR-022,
+ * retired; ground now ADR-099, behavior).
  */
 class OffloadedSpanResolver {
   constructor(
@@ -560,7 +561,8 @@ export class TraceService {
    *   into per call: the eval path (thread-mapped evaluators) and the
    *   content-consuming thread tRPC both pass `{ full: true }` with deps. A
    *   caller that omits it — or a deps-free TraceService — stays on the ≤64 KB
-   *   preview and issues zero event_log reads (#4888 / ADR-022).
+   *   preview and issues zero event_log reads (#4888 / ADR-022, retired;
+   *   ground now ADR-099).
    * @returns Array of traces
    */
   async getTracesWithSpansByThreadIds(

@@ -17,13 +17,12 @@
  *                          model just reads the words.
  */
 import * as z from "zod/v4";
-
-import { langyChoiceSelectionSchema } from "./choices";
 import {
   DERIVED_SAFE_CARD_KINDS,
-  langyDerivedCardSchema,
   langyCardHintSchema,
+  langyDerivedCardSchema,
 } from "../cards/derived-safe.js";
+import { langyChoiceSelectionSchema } from "./choices";
 
 export const LANGY_CARD_PART_TYPE = "langy-card";
 export const LANGY_CARD_FAILED_PART_TYPE = "langy-card-failed";
@@ -40,7 +39,8 @@ export const langyCardPartSchema = z
     hints: z.array(langyCardHintSchema).optional(),
   })
   .refine(
-    (part) => part.kind === part.card.kind && part.blockId === part.card.blockId,
+    (part) =>
+      part.kind === part.card.kind && part.blockId === part.card.blockId,
     { message: "part identity must match the stamped card" },
   );
 export type LangyCardPart = z.infer<typeof langyCardPartSchema>;

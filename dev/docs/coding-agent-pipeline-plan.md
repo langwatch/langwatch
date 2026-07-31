@@ -1,14 +1,15 @@
 # Build plan: coding-agent pipeline + session aggregate
 
-Status: **plan of record** · ADR: `dev/docs/adr/056-coding-agent-pipeline-session-aggregate.md`
+Status: **plan of record** · ADR: `dev/docs/adr/105-defining-a-pipeline.md`
+(successor to the retired ADR-056)
 · Specs: `specs/coding-agent/*.feature` · Supersedes PR #5708 (branch
 `feat/claude-code-enhanced-telemetry-beta`, head `f2aca082db` — the **port
 source** for everything below; never rebase or force-push that branch, close
 it when slice 8 lands).
 
-This document is the implementation hand-off. It assumes ADR-056 has been
-read. Facts here were verified against live telemetry and the old branch —
-do not re-derive them.
+This document is the implementation hand-off. It assumes ADR-105 (successor
+to the retired ADR-056) has been read. Facts here were verified against live
+telemetry and the old branch — do not re-derive them.
 
 ## Non-negotiables carried from investigation
 
@@ -35,7 +36,7 @@ do not re-derive them.
 
 ## Slices (each lands green on its own)
 
-0. **Plan docs** — this commit (ADR-056 + specs + this plan).
+0. **Plan docs** — this commit (ADR-105, formerly ADR-056, + specs + this plan).
 1. **Pipeline scaffold.** `pipelines/coding-agent-processing/`: schemas
    (session key, contribution payloads with the lifted scalar vocabulary),
    `withAggregateType("coding_agent_session")`, contribution commands
@@ -54,7 +55,8 @@ do not re-derive them.
    (TenantId, TraceId → SessionId) in the same migration.
 3. **Metric contributor.** Subscriber on metric-processing lifting
    session-keyed series; `session_metric_series` table
-   (`00052`, Replacing, converged totals per ADR-056 §5) + map projection.
+   (`00052`, Replacing, converged totals per the retired ADR-056 §5, now
+   ADR-105) + map projection.
    Fold overlays metric-fed fields (LOC/commits/PRs/edit decisions/
    active-time) into the session row via contributions — the read-time
    rollup scan from #5708 is not ported.
@@ -78,10 +80,12 @@ do not re-derive them.
    parse-accepted; derive `derived_from` from `ProviderKind`).
 7. **Personal usage.** `/me` card off `listByUser` (+ the
    `PersonalTracesEmptyState` / `IngestionTemplateInstallDrawer` diffs).
-8. **Retire legacy + aftercare.** Delete from main:
-   `claudeCodeSpanSync.reactor.ts`, `claude-code-log-to-span.ts`, their
-   pipeline registration + tests, `specs/traces-v2/claude-code-log-conversion.feature`,
-   and any `CLAUDE_CODE_LOG_RETENTION_DAYS` floor. Port dogfood matrix
+8. **Retire legacy + aftercare.** ✅ **the deletions are done** —
+   `claudeCodeSpanSync.reactor.ts` went with the reactor concept itself
+   (ADR-075, retired; ground now ADR-098), and `claude-code-log-to-span.ts`,
+   `specs/traces-v2/claude-code-log-conversion.feature` and the
+   `CLAUDE_CODE_LOG_RETENTION_DAYS` floor are all gone from main. Remaining:
+   port dogfood matrix
    (`dev/scripts/dogfood/coding-agent-matrix.sh`, `e2e/capture-coding-agent-matrix.ts`)
    and run it end-to-end. Release note: log-only installs must re-run
    `langwatch claude`. Close #5708, delete its branch.
@@ -162,11 +166,17 @@ files. Full dogfood only at slice 8.
 - the legacy raw-log dual path in the session fold
   (`handleTraceLogRecordReceived`) — the new pipeline consumes canonical
   contributions only
-- old branch's `dev/docs/claude-code-*-plan.md` + draft ADR-041 (superseded
-  by ADR-056 + this plan)
+- old branch's `dev/docs/claude-code-*-plan.md` + that branch's own draft
+  numbered ADR-041 (a different, never-merged document — unrelated to this
+  series' current ADR-041) (superseded by ADR-105, formerly ADR-056, + this
+  plan)
 
-### DELETE from main (slice 8)
-- `trace-processing/reactors/claudeCodeSpanSync.reactor.ts` (+ registration, tests)
-- `app-layer/traces/claude-code-log-to-span.ts`
-- `specs/traces-v2/claude-code-log-conversion.feature`
-- any remaining `CLAUDE_CODE_LOG_RETENTION_DAYS` floor
+### DELETE from main (slice 8) — ✅ all done
+- ~~`trace-processing/reactors/claudeCodeSpanSync.reactor.ts` (+ registration,
+  tests)~~ — removed with the whole `reactors/` directory by the (now
+  retired) ADR-075, which retired the reactor as a concept — ground now
+  ADR-098. This is why "No reactors in the new
+  pipeline" above is now a statement about main, not just about this plan.
+- ~~`app-layer/traces/claude-code-log-to-span.ts`~~
+- ~~`specs/traces-v2/claude-code-log-conversion.feature`~~
+- ~~any remaining `CLAUDE_CODE_LOG_RETENTION_DAYS` floor~~

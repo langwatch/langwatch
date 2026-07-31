@@ -21,13 +21,13 @@
  *
  * Pairs with:
  *   - specs/ai-gateway/governance/folds.feature §"governance_ocsf_events"
- *   - GovernanceOcsfEventsSyncReactor (the producer)
+ *   - GovernanceOcsfEventsMapProjection (the producer)
  *   - migration 00023_create_governance_ocsf_events.sql
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
 
-import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForOrganization } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { PROJECT_KIND } from "./governanceProject.service";
 
 export interface GovernanceOcsfExportRow {
@@ -124,8 +124,9 @@ export class GovernanceOcsfExportService {
       return { events: [], nextCursor: null, nextCursorCompound: null };
     }
 
-    const result = await ch.query({
-      query: `
+    const rows = await ch.query<CHRow>({
+      table: "governance_ocsf_events",
+      sql: `
         SELECT
           EventId,
           OcsfSchemaVersion,
@@ -158,16 +159,14 @@ export class GovernanceOcsfExportService {
         ORDER BY EventTime ASC, EventId ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: {
+      params: {
         tenantId: govProjectId,
         sinceMs: input.sinceMs,
         sinceEventId: input.sinceEventId ?? "",
         limit: input.limit,
       },
-      format: "JSONEachRow",
     });
 
-    const rows = (await result.json()) as CHRow[];
     const events: GovernanceOcsfExportRow[] = rows.map((r) => ({
       eventId: r.EventId,
       ocsfSchemaVersion: r.OcsfSchemaVersion,
@@ -215,7 +214,7 @@ export class GovernanceOcsfExportService {
 
   private async getClickhouse(
     organizationId: string,
-  ): Promise<ClickHouseClient | null> {
-    return await getClickHouseClientForOrganization(organizationId);
+  ): Promise<TenantClickHouseClient | null> {
+    return clickHouseForOrganization(organizationId);
   }
 }

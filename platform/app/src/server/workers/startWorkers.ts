@@ -43,25 +43,42 @@ async function verifyDatabaseReady(): Promise<void> {
 }
 
 // ClickHouse storage-stats collection (feeds the Ops storage metrics).
+//
+// Reads `system.parts` / `system.disks` / `system.backup_log` — facts about the
+// deployment, not about any tenant — so it takes the infrastructure client
+// rather than a resolver. The tenant wrapper is what turns the package client's
+// positional rows back into the named rows this collector's SQL is written
+// against, and what converts the UInt64 byte/row counts back to numbers.
 async function bootStorageStatsCollection(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { getSharedClickHouseClient } = await import(
-    "~/server/clickhouse/clickhouseClient"
+  const { getInfrastructureClickHouseClient } = await import(
+    "~/server/app-layer/clients/clickhouse/shared"
+  );
+  const { tenantClickHouseClient } = await import(
+    "~/server/app-layer/clients/clickhouse/tenant-client"
   );
   const { startStorageStatsCollection, stopStorageStatsCollection } =
     await import("~/server/clickhouse/metrics");
-  const clickHouseClient = getSharedClickHouseClient();
+  const clickHouseClient = getInfrastructureClickHouseClient();
   if (clickHouseClient) {
-    startStorageStatsCollection(clickHouseClient);
+    startStorageStatsCollection(
+      tenantClickHouseClient({
+        client: clickHouseClient,
+        // Matches no organisation, so routing resolves it to the shared
+        // endpoint — the one whose parts and disks these gauges describe.
+        tenantId: "__infrastructure__",
+      }),
+    );
     shutdownHandles.push(() => stopStorageStatsCollection());
     logger.info("storage stats collection ready");
   }
 }
 
-// Scenario simulation executor: an in-process pool late-bound into the
-// scenarioExecution reactor (runIn: ["worker"]). Without this the reactor
-// fires with no pool wired and simulations never execute.
+// Scenario simulation executor: the registry of child processes this worker
+// holds, late-bound into the `scenarioExecution` process outbox. Until it is
+// bound, dispatches for this worker stay pending and are retried rather than
+// dropped (ADR-073 step 2, retired; ground now ADR-103).
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
@@ -74,12 +91,7 @@ async function bootScenarioProcessor(
   const { startScenarioProcessor } = await import(
     "~/server/scenarios/scenario.processor"
   );
-  const { SCENARIO_WORKER } = await import(
-    "~/server/scenarios/scenario.constants"
-  );
-  const scenarioPool = new ScenarioExecutionPool({
-    concurrency: SCENARIO_WORKER.CONCURRENCY,
-  });
+  const scenarioPool = new ScenarioExecutionPool();
   getScenarioExecutionHandle()?.setPool(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor(scenarioPool);
   if (scenarioProcessor) {
@@ -269,7 +281,7 @@ export async function startWorkers(
   try {
     // Ingestion pulls self-drive through durable process wakes and the
     // transactional process outbox; there is no BullMQ worker to boot.
-    // Topic clustering self-drives (ADR-051): the process wake worker and
+    // Topic clustering self-drives (ADR-051, retired; ground now ADR-098): the process wake worker and
     // process outbox in the event-sourcing runtime own scheduling and
     // execution; there is no BullMQ worker to boot.
     await bootStorageStatsCollection(shutdownHandles);

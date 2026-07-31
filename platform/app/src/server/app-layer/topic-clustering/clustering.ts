@@ -1,21 +1,20 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import { env } from "../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { getProjectEmbeddingsModel } from "../../embeddings";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import { getPayloadSizeHistogram } from "../../metrics";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { getApp } from "../app";
+import type { TenantClickHouseClient } from "../clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "../clients/clickhouse/tenant-resolver";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -25,6 +24,7 @@ import type {
   TopicClusteringTrace,
 } from "./clustering.types";
 import { CLUSTERING_ERROR_CODES, ClusteringError } from "./clustering-error";
+import { clusteringErrorExcerpt } from "./clustering-error-excerpt";
 import { seedProjectTopicModel } from "./seedTopicModel";
 
 const logger = createLogger("langwatch:topicClustering");
@@ -56,6 +56,20 @@ const CLUSTERING_MODE_WINDOW_DAYS = 365;
  * unaffected.
  */
 const CLUSTERING_FETCH_WINDOW_DAYS = 49;
+
+/**
+ * The lease must OUTLIVE the slowest healthy clustering page, or a second
+ * dispatcher re-leases the row mid-flight and re-runs the same page
+ * concurrently. A page is up to 2000 traces through langevals batch
+ * clustering (embeddings + LLM naming) — minutes, not seconds — so a
+ * generic 30s default is unsafe here. Mirrors the outbox lease the topic
+ * clustering process manager claims with; the two must not drift apart.
+ *
+ * Belongs on `event-sourcing/topic-clustering-processing` next to
+ * `TOPIC_CLUSTERING_STALE_RUN_MS`, not here — parked in app-layer only
+ * because that pipeline directory is out of scope for this repoint.
+ */
+export const TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS = 20 * 60 * 1000;
 
 /**
  * Hard deadline on a single langevals clustering call, DERIVED from the outbox
@@ -114,8 +128,12 @@ export const clusterTopicsForProject = async (
     throw new Error("Project not found");
   }
 
-  const clickhouse = await getClickHouseClientForProject(projectId);
-
+  // This runs on a worker, outside the composition root, so it takes the
+  // ambient accessor rather than an injected resolver (ADR-104). It already
+  // resolves the project's organisation to pick the endpoint and binds the
+  // project as the tenant, so there is nothing to wrap here. `null` means only
+  // that this process has no ClickHouse at all.
+  const clickhouse = await clickHouseForProject(projectId);
   if (!clickhouse) {
     throw new Error(`ClickHouse client not available for project ${projectId}`);
   }
@@ -286,7 +304,7 @@ export async function fetchCountsFromClickHouse({
   clickhouse,
   projectId,
 }: {
-  clickhouse: ClickHouseClient;
+  clickhouse: TenantClickHouseClient;
   projectId: string;
 }): Promise<TraceCounts> {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -309,8 +327,13 @@ export async function fetchCountsFromClickHouse({
   // version cleared its topic (latest TopicId = NULL) would otherwise fold to
   // an older non-null TopicId and be over-counted. The boolean expression is
   // non-nullable, so the fold reads the true latest version.
-  const result = await clickhouse.query({
-    query: `
+  const rows = await clickhouse.query<{
+    total: string;
+    recent: string;
+    assigned: string;
+  }>({
+    table: "trace_summaries",
+    sql: `
       SELECT
         toString(count(*)) AS total,
         toString(countIf(latestOccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
@@ -325,15 +348,9 @@ export async function fetchCountsFromClickHouse({
         GROUP BY TenantId, TraceId
       )
     `,
-    query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
-    format: "JSONEachRow",
+    params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
   });
 
-  const rows = (await result.json()) as Array<{
-    total: string;
-    recent: string;
-    assigned: string;
-  }>;
   const row = rows[0];
 
   return {
@@ -344,7 +361,7 @@ export async function fetchCountsFromClickHouse({
 }
 
 export async function fetchTracesFromClickHouse(
-  clickhouse: ClickHouseClient,
+  clickhouse: TenantClickHouseClient,
   projectId: string,
   isIncrementalProcessing: boolean,
   topicIds: string[],
@@ -418,8 +435,15 @@ export async function fetchTracesFromClickHouse(
     ? `HAVING ${pageHaving.join(" AND ")}`
     : "";
 
-  const result = await clickhouse.query({
-    query: `
+  const rawRows = await clickhouse.query<{
+    TraceId: string;
+    ComputedInput: string;
+    TopicId: string | null;
+    SubTopicId: string | null;
+    OccurredAtMs: string;
+  }>({
+    table: "trace_summaries",
+    sql: `
       WITH page AS (
         SELECT TraceId
         FROM trace_summaries
@@ -451,7 +475,7 @@ export async function fetchTracesFromClickHouse(
           GROUP BY TenantId, TraceId
         )
     `,
-    query_params: {
+    params: {
       tenantId: projectId,
       fetchWindowStartMs,
       topicIds: topicIds.length > 0 ? topicIds : ["__none__"],
@@ -460,7 +484,6 @@ export async function fetchTracesFromClickHouse(
         ? { lastTs: searchAfter[0], lastTraceId: searchAfter[1] }
         : {}),
     },
-    format: "JSONEachRow",
     // The outer query reads ComputedInput (a potentially large payload) for the
     // page of <=2000 traces. Even though rows stream (no outer sort/LIMIT), the
     // dedup still resolves the latest version per trace, and peak memory scales
@@ -469,16 +492,8 @@ export async function fetchTracesFromClickHouse(
     // (MEMORY_LIMIT_EXCEEDED). This is a background clustering batch, not a
     // latency-critical path, so cap the read streams to keep peak memory well
     // under the per-query limit; the returned rows are unchanged.
-    clickhouse_settings: { max_threads: 2 },
+    settings: { max_threads: 2 },
   });
-
-  const rawRows = (await result.json()) as Array<{
-    TraceId: string;
-    ComputedInput: string;
-    TopicId: string | null;
-    SubTopicId: string | null;
-    OccurredAtMs: string;
-  }>;
 
   // Reapply the page ordering (OccurredAt DESC, TraceId ASC) in JS. The query
   // dropped its outer ORDER BY to avoid the top-N memory buffer (see above), so
@@ -767,38 +782,46 @@ export const storeResults = async (
     // no-op once the projection owns the model.
     await seedProjectTopicModel({
       prisma,
-      recordTopics: (args) => getApp().topicClustering.recordTopics(args),
+      recordTopics: async ({ tenantId, ...data }) => {
+        await getApp().topicClustering.recordTopics(
+          { ...data, projectId: tenantId },
+          { tenantId },
+        );
+      },
       projectId,
     });
-    await getApp().topicClustering.recordTopics({
-      tenantId: projectId,
-      occurredAt: Date.now(),
-      mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
-      source: "clustering",
-      dedupeKey: runContext
-        ? `run:${runContext.runId}:page-${runContext.page}`
-        : `adhoc:${Date.now()}`,
-      topics: [
-        ...topics.map((topic) => ({
-          id: topic.id,
-          name: topic.name,
-          parentId: null,
-          embeddingsModel: embeddingsModel.model,
-          centroid: topic.centroid,
-          p95Distance: topic.p95_distance,
-          automaticallyGenerated: true,
-        })),
-        ...subtopics.map((subtopic) => ({
-          id: subtopic.id,
-          name: subtopic.name,
-          parentId: subtopic.parent_id,
-          embeddingsModel: embeddingsModel.model,
-          centroid: subtopic.centroid,
-          p95Distance: subtopic.p95_distance,
-          automaticallyGenerated: true,
-        })),
-      ],
-    });
+    await getApp().topicClustering.recordTopics(
+      {
+        projectId,
+        occurredAt: Date.now(),
+        mode: !isIncremental && topics.length > 0 ? "replace" : "merge",
+        source: "clustering",
+        dedupeKey: runContext
+          ? `run:${runContext.runId}:page-${runContext.page}`
+          : `adhoc:${Date.now()}`,
+        topics: [
+          ...topics.map((topic) => ({
+            id: topic.id,
+            name: topic.name,
+            parentId: null,
+            embeddingsModel: embeddingsModel.model,
+            centroid: topic.centroid,
+            p95Distance: topic.p95_distance,
+            automaticallyGenerated: true,
+          })),
+          ...subtopics.map((subtopic) => ({
+            id: subtopic.id,
+            name: subtopic.name,
+            parentId: subtopic.parent_id,
+            embeddingsModel: embeddingsModel.model,
+            centroid: subtopic.centroid,
+            p95Distance: subtopic.p95_distance,
+            automaticallyGenerated: true,
+          })),
+        ],
+      },
+      { tenantId: projectId },
+    );
   }
 
   // Emit TopicAssignedEvents via command queue
@@ -813,18 +836,20 @@ export const storeResults = async (
       // Send commands in parallel (queue handles batching internally)
       await Promise.all(
         tracesToAssign.map(({ trace_id, topic_id, subtopic_id }) =>
-          app.traces.assignTopic({
-            tenantId: projectId,
-            traceId: trace_id,
-            topicId: topic_id,
-            topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
-            subtopicId: subtopic_id,
-            subtopicName: subtopic_id
-              ? (subtopicNameMap.get(subtopic_id) ?? null)
-              : null,
-            isIncremental,
-            occurredAt: Date.now(),
-          }),
+          app.traces.assignTopic(
+            {
+              traceId: trace_id,
+              topicId: topic_id,
+              topicName: topic_id ? (topicNameMap.get(topic_id) ?? null) : null,
+              subtopicId: subtopic_id,
+              subtopicName: subtopic_id
+                ? (subtopicNameMap.get(subtopic_id) ?? null)
+                : null,
+              isIncremental,
+              occurredAt: Date.now(),
+            },
+            { tenantId: projectId },
+          ),
         ),
       );
 
@@ -866,7 +891,7 @@ export const storeResults = async (
 
 /**
  * Topic clustering runs on langevals (the workspace member at
- * services/langevals/evaluators/topic_clustering — see contract.md §11). Returns
+ * langevals/evaluators/topic_clustering — see contract.md §11). Returns
  * the base URL, or `null` if LANGEVALS_ENDPOINT is unset, in which case
  * the caller warns and skips.
  */
@@ -974,15 +999,12 @@ const postToTopicClustering = async (opts: {
     });
 
     if (!response.ok) {
-      let body = await response.text();
-      try {
-        body = JSON.stringify(JSON.parse(body), null, 2)
-          .split("\n")
-          .slice(0, 10)
-          .join("\n");
-      } catch {
-        /* this is just a safe json parse fallback */
-      }
+      // Bounded in BYTES and with the request echo stripped, because this
+      // message is logged AND recorded on the run's failure event. A pydantic
+      // 422 quotes the value it rejected — which for us is a trace's own
+      // text — and the previous line-bound let a single long line through
+      // whole. See clustering-error-excerpt.ts.
+      const body = clusteringErrorExcerpt(await response.text());
       // Ours by default. The body often quotes an upstream provider error,
       // but quoting is not evidence — attributing a 5xx to the customer's
       // credentials on the strength of the text inside it is how this used to

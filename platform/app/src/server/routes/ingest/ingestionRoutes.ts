@@ -38,6 +38,7 @@ import {
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { transformOttlPayload } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { stripReservedOriginAttrs } from "@ee/governance/services/reservedOriginAttrs";
 import { createLogger } from "@langwatch/observability";
 import type {
   IExportLogsServiceRequest,
@@ -49,12 +50,10 @@ import type { IngestionSource } from "@prisma/client";
 import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import { prisma } from "~/server/db";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/trace-processing/schema";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
@@ -94,27 +93,20 @@ function buildOriginAttrs(source: IngestionSource) {
   ];
 }
 
-const RESERVED_ORIGIN_PREFIXES = [
-  "langwatch.origin.",
-  "langwatch.ingestion_source.",
-] as const;
-
 /**
  * Receiver-authoritative origin attributes REPLACE any the payload supplied
  * under a reserved key. Appending would leave two entries under one key and
  * make governance attribution depend on which one a downstream flattener
  * happens to keep — i.e. let a payload forge its own origin.
+ *
+ * The strip itself is shared with the general OTLP route, which applies it
+ * without re-stamping: see `@ee/governance/services/reservedOriginAttrs`.
  */
 function withOriginAttrs(
   existing: IKeyValue[] | undefined,
   source: IngestionSource,
 ): IKeyValue[] {
-  const caller = (existing ?? []).filter(
-    (attribute) =>
-      !RESERVED_ORIGIN_PREFIXES.some((prefix) =>
-        attribute.key?.startsWith(prefix),
-      ),
-  );
+  const caller = stripReservedOriginAttrs(existing) ?? [];
   return [...caller, ...buildOriginAttrs(source)];
 }
 
@@ -692,7 +684,7 @@ secured
             const budgetRepo = new GatewayBudgetRepository(prisma);
             const budgetCHRepo = new GatewayBudgetClickHouseRepository(
               async (projectId) => {
-                const client = await getClickHouseClientForProject(projectId);
+                const client = await clickHouseForProject(projectId);
                 if (!client) {
                   throw new Error(
                     `ClickHouse enabled but no client for project ${projectId}`,

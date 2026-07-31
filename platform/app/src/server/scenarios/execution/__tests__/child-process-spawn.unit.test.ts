@@ -54,6 +54,7 @@ describe("resolveChildProcessSpawn", () => {
         vi.mocked(fs.existsSync).mockReturnValue(true);
       });
 
+      /** @scenario "Processor spawns child process using the pre-compiled bundle in production" */
       it("invokes node with the path to the compiled bundle", () => {
         const result = resolveChildProcessSpawn({
           packageRoot: PACKAGE_ROOT,
@@ -98,6 +99,7 @@ describe("resolveChildProcessSpawn", () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
       });
 
+      /** @scenario "Processor falls back to tsx with loud logging when bundle is missing in production" */
       it("falls back to tsx instead of crashing", () => {
         const result = resolveChildProcessSpawn({
           packageRoot: PACKAGE_ROOT,
@@ -140,6 +142,7 @@ describe("resolveChildProcessSpawn", () => {
   });
 
   describe("when NODE_ENV is development", () => {
+    /** @scenario "Processor spawns child process using tsx in development" */
     it("invokes pnpm exec tsx with the TypeScript source file", () => {
       const result = resolveChildProcessSpawn({
         packageRoot: PACKAGE_ROOT,

@@ -126,9 +126,7 @@ export function renderLangyChoiceSelectionText({
   selection: LangyChoiceSelection;
   optionLabelById: ReadonlyMap<string, string>;
 }): string {
-  const labels = selection.optionIds.map(
-    (id) => optionLabelById.get(id) ?? id,
-  );
+  const labels = selection.optionIds.map((id) => optionLabelById.get(id) ?? id);
   if (selection.otherText !== undefined && selection.otherText.trim() !== "") {
     labels.push(selection.otherText.trim());
   }

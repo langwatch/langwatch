@@ -43,25 +43,3 @@ export interface MonitorRepository {
     projectId: string;
   }): Promise<Monitor[]>;
 }
-
-export class NullMonitorRepository implements MonitorRepository {
-  async getEnabledOnMessageMonitors(
-    _projectId: string,
-  ): Promise<MonitorSummary[]> {
-    return [];
-  }
-
-  async getMonitorById(_params: {
-    projectId: string;
-    monitorId: string;
-  }): Promise<MonitorWithEvaluator | null> {
-    return null;
-  }
-
-  async findAllByIds(_params: {
-    monitorIds: string[];
-    projectId: string;
-  }): Promise<Monitor[]> {
-    return [];
-  }
-}

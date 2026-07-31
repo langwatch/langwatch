@@ -202,103 +202,114 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
 
   for (const [variantIndex, variant] of EXPERIMENT_VARIANTS.entries()) {
     const runStartedAt = BASE_TIME + variantIndex * 60 * 60_000;
-    await app.experimentRuns.startExperimentRun({
-      tenantId: PROJECT_ID,
-      occurredAt: runStartedAt,
-      runId: variant.runId,
-      experimentId: DEMO_PLATFORM_IDS.experiment,
-      total: EXPERIMENT_ROWS.length,
-      targets: [
-        {
-          id: "demo-target-support-agent",
-          name: "Support Copilot",
-          type: "agent",
-          agentId: DEMO_PLATFORM_IDS.agents.support,
-          model: variant.name === "baseline" ? "gpt-4.1-mini" : "gpt-5-mini",
-          metadata: { release: variant.name },
-        },
-      ],
-    });
+    await app.experimentRuns.startExperimentRun(
+      {
+        occurredAt: runStartedAt,
+        runId: variant.runId,
+        experimentId: DEMO_PLATFORM_IDS.experiment,
+        total: EXPERIMENT_ROWS.length,
+        targets: [
+          {
+            id: "demo-target-support-agent",
+            name: "Support Copilot",
+            type: "agent",
+            agentId: DEMO_PLATFORM_IDS.agents.support,
+            model: variant.name === "baseline" ? "gpt-4.1-mini" : "gpt-5-mini",
+            metadata: { release: variant.name },
+          },
+        ],
+      },
+      { tenantId: PROJECT_ID },
+    );
 
     for (const [index, row] of EXPERIMENT_ROWS.entries()) {
       const traceId = `demo-platform-exp-${variant.name}-${index + 1}`;
       const occurredAt = runStartedAt + (index + 1) * 60_000;
-      await app.experimentRuns.recordTargetResult({
-        tenantId: PROJECT_ID,
-        occurredAt,
-        runId: variant.runId,
-        experimentId: DEMO_PLATFORM_IDS.experiment,
-        index,
-        targetId: "demo-target-support-agent",
-        entry: {
-          input: row.input,
-          expected_output: row.expected,
-          category: [
-            "billing",
-            "onboarding",
-            "documentation",
-            "incident",
-            "escalation",
-          ][index],
+      await app.experimentRuns.recordTargetResult(
+        {
+          occurredAt,
+          runId: variant.runId,
+          experimentId: DEMO_PLATFORM_IDS.experiment,
+          index,
+          targetId: "demo-target-support-agent",
+          entry: {
+            input: row.input,
+            expected_output: row.expected,
+            category: [
+              "billing",
+              "onboarding",
+              "documentation",
+              "incident",
+              "escalation",
+            ][index],
+          },
+          predicted: { output: variant.outputs[index]! },
+          cost: traces.find((trace) => trace.traceId === traceId)?.cost ?? null,
+          duration:
+            traces.find((trace) => trace.traceId === traceId)?.latencyMs ??
+            null,
+          traceId,
         },
-        predicted: { output: variant.outputs[index]! },
-        cost: traces.find((trace) => trace.traceId === traceId)?.cost ?? null,
-        duration:
-          traces.find((trace) => trace.traceId === traceId)?.latencyMs ?? null,
-        traceId,
-      });
+        { tenantId: PROJECT_ID },
+      );
       const score = variant.scores[index]!;
-      await app.experimentRuns.recordEvaluatorResult({
-        tenantId: PROJECT_ID,
-        occurredAt: occurredAt + 500,
-        runId: variant.runId,
-        experimentId: DEMO_PLATFORM_IDS.experiment,
-        index,
-        targetId: "demo-target-support-agent",
-        evaluatorId: DEMO_PLATFORM_IDS.evaluators.quality,
-        evaluatorName: "Support Answer Quality",
-        status: "processed",
-        score,
-        passed: score >= 0.7,
-        label:
-          score >= 0.85
-            ? "excellent"
-            : score >= 0.7
-              ? "acceptable"
-              : "needs work",
-        details: `Seeded quality review scored ${Math.round(score * 100)}%.`,
-        duration: 420 + index * 35,
-        cost: 0.0008,
-      });
-      await app.evaluations.reportEvaluation({
-        tenantId: PROJECT_ID,
-        occurredAt: occurredAt + 750,
-        evaluationId: `demo-trace-eval-${variant.name}-${index + 1}`,
-        evaluatorId: DEMO_PLATFORM_IDS.evaluators.quality,
-        evaluatorType: "langevals/llm_score",
-        evaluatorName: "Support Answer Quality",
-        traceId,
-        status: "processed",
-        score,
-        passed: score >= 0.7,
-        label:
-          score >= 0.85
-            ? "excellent"
-            : score >= 0.7
-              ? "acceptable"
-              : "needs work",
-        details:
-          "Evaluation emitted through the canonical event-sourcing command.",
-      });
+      await app.experimentRuns.recordEvaluatorResult(
+        {
+          occurredAt: occurredAt + 500,
+          runId: variant.runId,
+          experimentId: DEMO_PLATFORM_IDS.experiment,
+          index,
+          targetId: "demo-target-support-agent",
+          evaluatorId: DEMO_PLATFORM_IDS.evaluators.quality,
+          evaluatorName: "Support Answer Quality",
+          status: "processed",
+          score,
+          passed: score >= 0.7,
+          label:
+            score >= 0.85
+              ? "excellent"
+              : score >= 0.7
+                ? "acceptable"
+                : "needs work",
+          details: `Seeded quality review scored ${Math.round(score * 100)}%.`,
+          duration: 420 + index * 35,
+          cost: 0.0008,
+        },
+        { tenantId: PROJECT_ID },
+      );
+      await app.evaluations.report(
+        {
+          occurredAt: occurredAt + 750,
+          evaluationId: `demo-trace-eval-${variant.name}-${index + 1}`,
+          evaluatorId: DEMO_PLATFORM_IDS.evaluators.quality,
+          evaluatorType: "langevals/llm_score",
+          evaluatorName: "Support Answer Quality",
+          traceId,
+          status: "processed",
+          score,
+          passed: score >= 0.7,
+          label:
+            score >= 0.85
+              ? "excellent"
+              : score >= 0.7
+                ? "acceptable"
+                : "needs work",
+          details:
+            "Evaluation emitted through the canonical event-sourcing command.",
+        },
+        { tenantId: PROJECT_ID },
+      );
     }
 
-    await app.experimentRuns.completeExperimentRun({
-      tenantId: PROJECT_ID,
-      occurredAt: runStartedAt + 8 * 60_000,
-      runId: variant.runId,
-      experimentId: DEMO_PLATFORM_IDS.experiment,
-      finishedAt: runStartedAt + 8 * 60_000,
-    });
+    await app.experimentRuns.completeExperimentRun(
+      {
+        occurredAt: runStartedAt + 8 * 60_000,
+        runId: variant.runId,
+        experimentId: DEMO_PLATFORM_IDS.experiment,
+        finishedAt: runStartedAt + 8 * 60_000,
+      },
+      { tenantId: PROJECT_ID },
+    );
   }
 
   const suiteSetId = getSuiteSetId(DEMO_PLATFORM_IDS.suite);
@@ -314,69 +325,79 @@ async function dispatchEventLifecycles(traces: TraceFixture[]): Promise<void> {
         (3 + variantIndex) * 60 * 60_000 +
         scenarioIndex * 5 * 60_000;
       const passed = variant === "improved";
-      await app.simulations.startRun({
-        tenantId: PROJECT_ID,
-        occurredAt: startedAt,
-        scenarioRunId: runId,
-        scenarioId: scenario.scenarioId,
-        batchRunId,
-        scenarioSetId: suiteSetId,
-        name: scenario.name,
-        description: `Support Regression Suite — ${variant}`,
-        metadata: {
-          suiteId: DEMO_PLATFORM_IDS.suite,
-          variant,
-          model: variant === "baseline" ? "gpt-4.1-mini" : "gpt-5-mini",
-        },
-      });
-      await app.simulations.messageSnapshot({
-        tenantId: PROJECT_ID,
-        occurredAt: startedAt + 1_000,
-        scenarioRunId: runId,
-        messages: [
-          { id: `${runId}-user`, role: "user", content: scenario.user },
-          {
-            id: `${runId}-assistant`,
-            role: "assistant",
-            content: scenario[variant],
-            trace_id: traceId,
+      await app.simulations.startRun(
+        {
+          occurredAt: startedAt,
+          scenarioRunId: runId,
+          scenarioId: scenario.scenarioId,
+          batchRunId,
+          scenarioSetId: suiteSetId,
+          name: scenario.name,
+          description: `Support Regression Suite — ${variant}`,
+          metadata: {
+            suiteId: DEMO_PLATFORM_IDS.suite,
+            variant,
+            model: variant === "baseline" ? "gpt-4.1-mini" : "gpt-5-mini",
           },
-        ],
-        traceIds: [traceId],
-        status: "IN_PROGRESS",
-      });
-      await app.simulations.finishRun({
-        tenantId: PROJECT_ID,
-        occurredAt: startedAt + 2_000,
-        scenarioRunId: runId,
-        durationMs: traces.find((trace) => trace.traceId === traceId)
-          ?.latencyMs,
-        status: passed ? "SUCCESS" : "FAILURE",
-        results: {
-          verdict: passed ? "success" : "failure",
-          reasoning: passed
-            ? "The response stayed within policy and supplied a safe next step."
-            : "The response made an unsupported promise or invented a fact.",
-          metCriteria: passed ? [...scenario.criteria] : [scenario.criteria[0]],
-          unmetCriteria: passed ? [] : scenario.criteria.slice(1),
         },
-      });
-      await app.evaluations.reportEvaluation({
-        tenantId: PROJECT_ID,
-        occurredAt: startedAt + 2_500,
-        evaluationId: `demo-scenario-eval-${scenarioIndex + 1}-${variant}`,
-        evaluatorId: DEMO_PLATFORM_IDS.evaluators.groundedness,
-        evaluatorType: "ragas/faithfulness",
-        evaluatorName: "Documentation Groundedness",
-        traceId,
-        status: "processed",
-        score: passed ? 0.94 : 0.31,
-        passed,
-        label: passed ? "grounded" : "unsupported claim",
-        details: passed
-          ? "No unsupported account action or numeric limit was asserted."
-          : "The answer asserted a fact not present in the available context.",
-      });
+        { tenantId: PROJECT_ID },
+      );
+      await app.simulations.snapshotMessages(
+        {
+          occurredAt: startedAt + 1_000,
+          scenarioRunId: runId,
+          messages: [
+            { id: `${runId}-user`, role: "user", content: scenario.user },
+            {
+              id: `${runId}-assistant`,
+              role: "assistant",
+              content: scenario[variant],
+              trace_id: traceId,
+            },
+          ],
+          traceIds: [traceId],
+          status: "IN_PROGRESS",
+        },
+        { tenantId: PROJECT_ID },
+      );
+      await app.simulations.finishRun(
+        {
+          occurredAt: startedAt + 2_000,
+          scenarioRunId: runId,
+          durationMs: traces.find((trace) => trace.traceId === traceId)
+            ?.latencyMs,
+          status: passed ? "SUCCESS" : "FAILURE",
+          results: {
+            verdict: passed ? "success" : "failure",
+            reasoning: passed
+              ? "The response stayed within policy and supplied a safe next step."
+              : "The response made an unsupported promise or invented a fact.",
+            metCriteria: passed
+              ? [...scenario.criteria]
+              : [scenario.criteria[0]],
+            unmetCriteria: passed ? [] : scenario.criteria.slice(1),
+          },
+        },
+        { tenantId: PROJECT_ID },
+      );
+      await app.evaluations.report(
+        {
+          occurredAt: startedAt + 2_500,
+          evaluationId: `demo-scenario-eval-${scenarioIndex + 1}-${variant}`,
+          evaluatorId: DEMO_PLATFORM_IDS.evaluators.groundedness,
+          evaluatorType: "ragas/faithfulness",
+          evaluatorName: "Documentation Groundedness",
+          traceId,
+          status: "processed",
+          score: passed ? 0.94 : 0.31,
+          passed,
+          label: passed ? "grounded" : "unsupported claim",
+          details: passed
+            ? "No unsupported account action or numeric limit was asserted."
+            : "The answer asserted a fact not present in the available context.",
+        },
+        { tenantId: PROJECT_ID },
+      );
     }
   }
 }

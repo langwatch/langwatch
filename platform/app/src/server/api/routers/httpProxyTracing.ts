@@ -8,7 +8,7 @@
 
 import crypto from "node:crypto";
 import { getApp } from "../../app-layer/app";
-import { DEFAULT_PII_REDACTION_LEVEL } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import { DEFAULT_PII_REDACTION_LEVEL } from "../../event-sourcing/trace-processing/schema";
 import type { CustomMetadata, Span } from "../../tracer/types";
 import { CollectorSpanUtils } from "../../traces/collectorSpan.utils";
 
@@ -221,14 +221,26 @@ export async function createAgentTestTrace({
     expectedOutput: null,
   });
 
-  await getApp().traces.recordSpan({
+  // The shared ingest seam, the same one the OTLP and REST collectors use — not
+  // the pipeline command underneath it. The command accepts a `CanonicalSpan`;
+  // dispatching this OTLP envelope straight at it left the event's trace id
+  // unresolved (it sits at `span.traceId`, not `traceId`), so every agent-test
+  // span committed with an empty aggregate id and reached no read model.
+  // `ingestNormalizedSpan` canonicalises, takes the (tenant, trace, span) dedup
+  // lock, and runs the edge offload hooks.
+  const ingestion = await getApp().traces.collection.ingestNormalizedSpan({
     tenantId: projectId,
     span: CollectorSpanUtils.convertSpanToOtlp(span),
     resource,
     instrumentationScope: { name: "langwatch.agent_test" },
     piiRedactionLevel,
-    occurredAt: now,
   });
+
+  // It resolves with the failure rather than rejecting; the proxy's own caller
+  // logs and carries on, so keep throwing the way the command call did.
+  if (ingestion.status === "failed") {
+    throw new Error(ingestion.error ?? "agent test span ingestion failed");
+  }
 
   return { traceId };
 }

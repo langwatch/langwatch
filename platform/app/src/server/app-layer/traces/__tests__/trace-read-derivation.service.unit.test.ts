@@ -24,7 +24,7 @@ class CountingReader implements NormalizedSpanReader {
   }
 }
 
-// One coalesced batch: every per-event reactor observes the same final fold
+// One coalesced batch: every per-event subscriber observes the same final fold
 // state, so foldVersion (spanCount) is identical across the batch.
 const BATCH_PARAMS = {
   tenantId: "t1",
@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe("TraceReadDerivationService", () => {
-  describe("given several reactor invocations derive trace data for the same trace at one fold version", () => {
+  describe("given several subscriber invocations derive trace data for the same trace at one fold version", () => {
     describe("when they run within one coalesced batch", () => {
       /** @scenario Repeated trace-level derivations within one fold version read stored spans once */
       it("reads the stored events once, not once per invocation", async () => {

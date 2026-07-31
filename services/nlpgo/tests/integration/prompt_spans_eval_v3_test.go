@@ -12,7 +12,7 @@
 // per row; these tests pin the per-dispatch engine contract. The
 // app-side forwarding that makes the eval-v3 target node actually carry
 // configId / handle / versionMetadata is covered by
-// langwatch/src/server/experiments-v3/execution/__tests__/workflowBuilder.test.ts.
+// platform/app/src/server/experiments-v3/execution/__tests__/workflowBuilder.test.ts.
 
 package integration_test
 

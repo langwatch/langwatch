@@ -1,5 +1,6 @@
 /**
- * Unit tests for the ClickHouseTraceService → blob-resolution seam (ADR-022).
+ * Unit tests for the ClickHouseTraceService → blob-resolution seam
+ * (ADR-022, retired; ground now ADR-099).
  *
  * Mocks only the lowest-level CH driver (getClickHouseClientForProject) and
  * wires a real BlobStore (via getFromEventLog stub) + real TraceIOExtractionService
@@ -25,9 +26,8 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForProject: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-resolver", () => ({
+  clickHouseForProject: () => Promise.resolve({ query: mockClickHouseQuery }),
 }));
 
 vi.mock("~/server/db", () => ({
@@ -166,15 +166,9 @@ function makeEventRefBlobStore(contents: Record<string, string>): BlobStore {
  * (min/max OccurredAt) for the hint-less path, then the summary and span reads.
  */
 function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
-  const resolveResult = {
-    json: () => Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
-  };
-  const summaryResult = {
-    json: () => Promise.resolve([makeSummaryRow(traceId)]),
-  };
-  const spansResult = {
-    json: () => Promise.resolve([makeSpanRowWithEventRef(traceId, spanId)]),
-  };
+  const resolveResult = [{ fromMs: 1_000_000, toMs: 2_000_000 }];
+  const summaryResult = [makeSummaryRow(traceId)];
+  const spansResult = [makeSpanRowWithEventRef(traceId, spanId)];
   mockClickHouseQuery
     .mockResolvedValueOnce(resolveResult)
     .mockResolvedValueOnce(summaryResult)

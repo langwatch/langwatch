@@ -224,6 +224,7 @@ describe("useOpenTargetEditor", () => {
       );
     });
 
+    /** @scenario Editing the target opens a mapping drawer, not a dead end */
     it("opens agentWorkflowTargetEditor drawer for a workflow agent target", async () => {
       // A workflow-type agent has no code of its own to edit inline — the
       // drawer shows the linked workflow as a card (with a link to open the

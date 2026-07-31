@@ -86,6 +86,7 @@ describe("slack Block Kit template registry", () => {
 
   describe("when filtering options for a report draft", () => {
     describe("when the report sends matching traces", () => {
+      /** @scenario "A report is offered only layouts that fit its source" */
       it("offers only layouts that render the traces", () => {
         const options = templateOptionsFor({
           cadence: "immediate",
@@ -101,6 +102,7 @@ describe("slack Block Kit template registry", () => {
     });
 
     describe("when the report sends a custom graph", () => {
+      /** @scenario "A report is offered only layouts that fit its source" */
       it("offers only chart layouts — a table of traces has no rows to show", () => {
         const options = templateOptionsFor({
           cadence: "immediate",
@@ -115,6 +117,7 @@ describe("slack Block Kit template registry", () => {
     });
 
     describe("when the report sends a dashboard", () => {
+      /** @scenario "A dashboard report needs no layout choice" */
       it("offers no layouts at all — the panels map straight to the message", () => {
         expect(
           templateOptionsFor({
@@ -129,6 +132,7 @@ describe("slack Block Kit template registry", () => {
       });
     });
 
+    /** @scenario "A report is offered the same layouts whichever cadence it runs on" */
     it("offers the same layouts at either cadence — a report runs on a schedule", () => {
       const immediate = templateOptionsFor({
         cadence: "immediate",

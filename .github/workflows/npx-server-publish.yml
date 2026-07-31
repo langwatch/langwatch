@@ -254,7 +254,7 @@ jobs:
           done
           # The remaining members carry no source into the tarball, only the
           # manifest the workspace needs to stay coherent.
-          for member in sdks/typescript tests/agentic-e2e; do
+          for member in sdks/typescript dev/tests/agentic-e2e; do
             required+=("package/app/$member/package.json")
           done
           forbidden=(

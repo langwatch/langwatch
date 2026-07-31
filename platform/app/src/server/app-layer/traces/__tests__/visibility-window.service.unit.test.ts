@@ -53,6 +53,7 @@ const makeSpan = (overrides: Partial<Span> = {}): Span =>
 
 describe("given the teaser truncation rule", () => {
   describe("when the text is long", () => {
+    /** @scenario "Teaser keeps short content legible and never exceeds the cap" */
     it("caps the teaser at TEASER_MAX_CHARS", () => {
       expect(teaserOf("a".repeat(5000))).toHaveLength(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
@@ -75,6 +76,7 @@ describe("given the teaser truncation rule", () => {
   });
 
   describe("when the text length equals the floor boundary", () => {
+    /** @scenario "Teased values carry a truncation ellipsis in the payload itself" */
     it("keeps TEASER_MIN_CHARS plus the ellipsis for a 60-char text", () => {
       expect(teaserOf("d".repeat(60))).toHaveLength(
         TEASER_MIN_CHARS + TEASER_ELLIPSIS.length,
@@ -137,6 +139,7 @@ describe("given a span beyond the visibility window", () => {
       );
     });
 
+    /** @scenario "Error and parameter payloads count as content" */
     it("truncates string param values but keeps non-string params", () => {
       const redacted = redactSpanContent(makeSpan());
       const params = redacted.params as Record<string, unknown>;
@@ -252,6 +255,7 @@ describe("given the visibility window service", () => {
   };
 
   describe("when the plan has no visibility window", () => {
+    /** @scenario "Paid org is never redacted regardless of trace age" */
     it("returns null so nothing is redacted", async () => {
       const service = makeService({ free: false, visibilityDays: null });
       await expect(

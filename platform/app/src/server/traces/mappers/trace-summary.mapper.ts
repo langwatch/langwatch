@@ -2,7 +2,7 @@ import {
   extractLastUserMessageText,
   extractMessageContentText,
 } from "~/server/app-layer/traces/canonicalisation/extractors/_messages";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type {
   ErrorCapture,
   Event,

@@ -379,14 +379,35 @@ export class DatasetChunkCountMissingError extends Error {
 /**
  * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on-
  * storage made a writable backend mandatory, so this is a deployment-config
- * error, not a transient failure. Typed (vs a bare `Error`) so the upload route
- * can surface its actionable message to the client (configure S3 / set
- * `LANGWATCH_LOCAL_STORAGE_PATH`) instead of letting it collapse into a generic
- * 500 that the browser then mistakes for "no object storage".
+ * error, not a transient failure.
+ *
+ * Handled (`dataset_storage_not_writable`, 503, fault `platform`): the write
+ * failed on our side and someone can actually fix it, which is exactly the
+ * shape that must not collapse into a generic "unknown error" — as a bare
+ * `Error` it did, and every dataset edit and upload on a deployment with no
+ * writable backend reported itself as an unexplained 500.
+ *
+ * The root path and the env vars that fix it are OPERATOR detail: they live on
+ * `operatorDetail` for the log line and never enter `message`, which the REST
+ * boundary ships to the client. The customer-facing words are in the
+ * presentation registry, keyed by the code.
  */
-export class StorageNotWritableError extends Error {
-  constructor(message: string) {
-    super(message);
+export class StorageNotWritableError extends HandledError {
+  declare readonly code: "dataset_storage_not_writable";
+
+  readonly root: string;
+  readonly operatorDetail: string;
+
+  constructor({ root }: { root: string }) {
+    super("dataset_storage_not_writable", "Dataset storage is not writable", {
+      httpStatus: 503,
+      fault: "platform",
+    });
     this.name = "StorageNotWritableError";
+    this.root = root;
+    this.operatorDetail =
+      `Dataset storage path "${root}" is not writable. ` +
+      "Configure object storage (set S3_BUCKET_NAME) or point " +
+      "LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.";
   }
 }

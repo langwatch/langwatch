@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CodingAgentSessionRow } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import {
+  type CodingAgentSessionRow,
   deriveSessionSignals,
   formatCompact,
   formatShortDuration,

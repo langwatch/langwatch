@@ -12,7 +12,7 @@ import {
  * lazy-loaded on first use — we render plain "text" until its grammar
  * resolves, then re-render highlighted. Non-bundled languages stay "text",
  * so Shiki never throws "Language X not found". See
- * dev/docs/adr/027-trace-drawer-code-highlighting.md
+ * dev/docs/adr/092-trace-drawer-code-highlighting.md
  */
 function useResolvedShikiLang(language: string): string {
   const canonical = normalizeShikiLang(language);

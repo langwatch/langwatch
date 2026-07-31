@@ -239,7 +239,8 @@ func (w *Worker) LastLLMError() (herr.E, bool) {
 // provider caches stays byte-stable turn over turn. The flag flips only on a
 // SUCCESSFUL post, so a failed first delivery seeds again on the retry.
 //
-// resumeToken (ADR-048) is the opaque checkpoint from a prior turn that handed
+// resumeToken (ADR-048, retired; ground now
+// dev/docs/adr/098-event-sourcing-core.md) is the opaque checkpoint from a prior turn that handed
 // off on shutdown; empty on a normal cold start. It is forwarded verbatim to
 // opencode, never parsed by the manager.
 func (w *Worker) PostMessage(ctx context.Context, system, prompt, historySeed, resumeToken string) error {

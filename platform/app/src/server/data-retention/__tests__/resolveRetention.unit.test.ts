@@ -28,6 +28,7 @@ describe("resolveRetention", () => {
   });
 
   describe("given overrides at every tier for one category", () => {
+    /** @scenario "A project override beats an organization override" */
     it("the project tier wins (most specific)", () => {
       const resolved = resolveRetention({
         rows: [
@@ -42,6 +43,7 @@ describe("resolveRetention", () => {
   });
 
   describe("given a team override but no project override", () => {
+    /** @scenario "A team override sits between organization and project" */
     it("the team tier sits between org and project", () => {
       const resolved = resolveRetention({
         rows: [
@@ -55,6 +57,7 @@ describe("resolveRetention", () => {
   });
 
   describe("given only an organization override", () => {
+    /** @scenario "An organization override applies to every project in the org" */
     it("the org value applies when no closer override exists", () => {
       const resolved = resolveRetention({
         rows: [row("ORGANIZATION", "org-1", "scenarios", 45)],
@@ -65,6 +68,7 @@ describe("resolveRetention", () => {
   });
 
   describe("given categories overridden at different tiers", () => {
+    /** @scenario "Categories resolve independently across tiers" */
     it("resolves each category independently", () => {
       const resolved = resolveRetention({
         rows: [
@@ -79,6 +83,7 @@ describe("resolveRetention", () => {
   });
 
   describe("given no row for a category", () => {
+    /** @scenario "A project with no override resolves to the platform default" */
     it("falls back to the platform default", () => {
       const resolved = resolveRetention({
         rows: [row("PROJECT", "proj-1", "traces", 91)],

@@ -120,8 +120,9 @@ secured.access(requires("scenarios:create")).post(
     }
 
     // Broadcast START/END directly so the frontend gets them immediately
-    // (the reactor's debounced broadcast is too slow and causes CONTENT
-    // deltas to be dropped). Works regardless of event-sourcing flag.
+    // (the `snapshotUpdateBroadcast` subscriber's debounced broadcast is too
+    // slow and causes CONTENT deltas to be dropped). Works regardless of
+    // event-sourcing flag.
     if (
       event.type === ScenarioEventType.TEXT_MESSAGE_START ||
       event.type === ScenarioEventType.TEXT_MESSAGE_END
@@ -303,59 +304,90 @@ async function dispatchSimulationEvent(
     occurredAt: event.timestamp ?? Date.now(),
   };
 
+  // Where the run sits. Every inbound SDK event carries it
+  // (`baseScenarioEventSchema`), so it is forwarded onto the commands whose
+  // events accept it rather than only onto the run's first. A consumer reading
+  // one of those events alone — with no fold to look the run up in — otherwise
+  // cannot tell which set the update belongs to, and the set-filtered panels
+  // stop matching it. The fields stay optional on the event schemas because
+  // `finishRun` also fires from the failure handler and the cancellation router,
+  // neither of which passes them today, and because every event committed before
+  // they existed still has to parse.
+  const placement = {
+    batchRunId: event.batchRunId,
+    scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
+  };
+
   if (event.type === ScenarioEventType.RUN_STARTED) {
-    await getApp().simulations.startRun({
-      ...basePayload,
-      scenarioId: event.scenarioId,
-      batchRunId: event.batchRunId,
-      scenarioSetId: event.scenarioSetId || DEFAULT_SET_ID,
-      name: event.metadata?.name,
-      description: event.metadata?.description,
-      metadata: event.metadata,
-    });
+    await getApp().simulations.startRun(
+      {
+        ...basePayload,
+        ...placement,
+        scenarioId: event.scenarioId,
+        name: event.metadata?.name,
+        description: event.metadata?.description,
+        metadata: event.metadata,
+      },
+      { tenantId: projectId },
+    );
   } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
     const messages = event.messages ?? [];
-    await getApp().simulations.messageSnapshot({
-      ...basePayload,
-      messages: messages as Array<{
-        trace_id?: string;
-        [key: string]: unknown;
-      }>,
-      traceIds: messages
-        .map((m: { trace_id?: string }) => m.trace_id)
-        .filter((id): id is string => typeof id === "string"),
-    });
+    await getApp().simulations.snapshotMessages(
+      {
+        ...basePayload,
+        ...placement,
+        messages: messages as Array<{
+          trace_id?: string;
+          [key: string]: unknown;
+        }>,
+        traceIds: messages
+          .map((m: { trace_id?: string }) => m.trace_id)
+          .filter((id): id is string => typeof id === "string"),
+      },
+      { tenantId: projectId },
+    );
   } else if (event.type === ScenarioEventType.TEXT_MESSAGE_START) {
-    await getApp().simulations.textMessageStart({
-      ...basePayload,
-      messageId: event.messageId,
-      role: event.role,
-      messageIndex: event.messageIndex,
-    });
+    await getApp().simulations.startTextMessage(
+      {
+        ...basePayload,
+        messageId: event.messageId,
+        role: event.role,
+        messageIndex: event.messageIndex,
+      },
+      { tenantId: projectId },
+    );
   } else if (event.type === ScenarioEventType.TEXT_MESSAGE_END) {
-    await getApp().simulations.textMessageEnd({
-      ...basePayload,
-      messageId: event.messageId,
-      role: event.role,
-      content: event.content ?? "",
-      message: event.message,
-      traceId: event.traceId,
-      messageIndex: event.messageIndex,
-    });
+    await getApp().simulations.endTextMessage(
+      {
+        ...basePayload,
+        ...placement,
+        messageId: event.messageId,
+        role: event.role,
+        content: event.content ?? "",
+        message: event.message,
+        traceId: event.traceId,
+        messageIndex: event.messageIndex,
+      },
+      { tenantId: projectId },
+    );
   } else if (event.type === ScenarioEventType.RUN_FINISHED) {
-    await getApp().simulations.finishRun({
-      ...basePayload,
-      results: event.results
-        ? {
-            verdict: event.results.verdict,
-            reasoning: event.results.reasoning,
-            metCriteria: event.results.metCriteria,
-            unmetCriteria: event.results.unmetCriteria,
-            error: event.results.error,
-          }
-        : undefined,
-      status: event.status,
-    });
+    await getApp().simulations.finishRun(
+      {
+        ...basePayload,
+        ...placement,
+        results: event.results
+          ? {
+              verdict: event.results.verdict,
+              reasoning: event.results.reasoning,
+              metCriteria: event.results.metCriteria,
+              unmetCriteria: event.results.unmetCriteria,
+              error: event.results.error,
+            }
+          : undefined,
+        status: event.status,
+      },
+      { tenantId: projectId },
+    );
   }
 }
 
@@ -405,11 +437,18 @@ export async function archiveScenarioSetRuns({
     concurrency: 8,
     fn: async (id) => {
       try {
-        await getApp().simulations.deleteRun({
-          tenantId: projectId,
-          scenarioRunId: id,
-          occurredAt: now,
-        });
+        await getApp().simulations.deleteRun(
+          {
+            scenarioRunId: id,
+            // The set is the whole subject of this request, so the archive push
+            // can say which set emptied. `batchRunId` is genuinely unknown here —
+            // a set spans many batches and the run-id lookup returns ids alone —
+            // so it stays absent rather than being guessed.
+            scenarioSetId,
+            occurredAt: now,
+          },
+          { tenantId: projectId },
+        );
         archived++;
       } catch (err) {
         failed++;

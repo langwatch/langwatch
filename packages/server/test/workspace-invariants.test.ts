@@ -121,7 +121,7 @@ describe("the repo is a single pnpm workspace", () => {
 				"sdks/typescript",
 				"mcp/typescript",
 				"skills",
-				"tests/agentic-e2e",
+				"dev/tests/agentic-e2e",
 			]) {
 				expect(members).toContain(project);
 			}

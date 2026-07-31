@@ -18,7 +18,7 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
 
   | Path | Auth credential | Stamps | TenantId resolved at |
   | --- | --- | --- | --- |
-  | Gateway VK (`langwatch claude/codex/cursor/gemini`) | `vk-lw-*` (project + owner-scoped) | `langwatch.virtual_key_id`, `langwatch.user.id` | `VK.projectId` (resolved at reactor) |
+  | Gateway VK (`langwatch claude/codex/cursor/gemini`) | `vk-lw-*` (project + owner-scoped) | `langwatch.virtual_key_id`, `langwatch.user.id` | `VK.projectId` (resolved during ingestion) |
   | Direct OTLP push (legacy SDK / project-scoped agents) | Project-scoped OTLP auth token | none required (token IS scope) | `token.projectId` |
   | Pull-mode IngestionSource (S3 / copilot_studio / openai_compliance / claude_compliance / workato / cowork / s3_custom / http_custom) | `IngestionSource.ingestSecretHash` | event source already credentialed at puller | `ensureHiddenGovernanceProject(orgId).id` (single org-wide hidden Gov project) |
   | OTel-direct push-mode IngestionSource (`otel_generic`) | `IngestionSource.ingestSecretHash` HMAC | event tagged with `IngestionSource.id` | `ensureHiddenGovernanceProject(orgId).id` |
@@ -43,7 +43,7 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
     - specs/ai-gateway/governance/architecture-invariants.feature      (TenantId scoping)
 
   Implementation lives at:
-    - platform/app/src/server/governance/activity-monitor/                (reactor + stamping)
+    - platform/app/src/server/governance/activity-monitor/                (ingestion + stamping)
     - platform/app/ee/governance/services/governanceProject.service.ts    (hidden Gov)
     - platform/app/src/server/routes/ingest/                              (receivers)
     - platform/app/src/server/governance/ingestion/ottl/                  (OTTL transforms — guard scope)
@@ -202,7 +202,7 @@ Feature: Ingestion attribution invariant — credential is authoritative; payloa
     When future work needs to push the same signal to OCSF for SIEM
         consumption (downstream alerting / pager integration / external
         audit feed)
-    Then an OCSF reactor adopting the polling evaluator's signal is
+    Then an OCSF map projection adopting the polling evaluator's signal is
         the canonical extension point — fires
         `category=ingestion class=quarantine_fill_threshold_exceeded
          severity=warning` with the same `metadata` shape as the

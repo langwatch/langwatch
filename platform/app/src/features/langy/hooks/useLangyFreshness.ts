@@ -39,7 +39,8 @@ export function useLangyFreshness(activeConversationId: string | null): void {
   const trpcUtils = api.useContext();
 
   /**
-   * The OPEN conversation's live path (ADR-059): the signal carries the
+   * The OPEN conversation's live path (ADR-059, retired; ground now
+   * ADR-098): the signal carries the
    * projection's CURSOR; compare it with the local fold's and, when behind,
    * fetch the durable event tail and fold it in place — turn state lands
    * event-by-event without re-downloading the projection. Message CONTENT

@@ -20,14 +20,36 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
-const mockGetClickHouseClientForOrganization = vi.fn();
+const mockResolveClient = vi.fn();
+const mockGetSharedAppClickHouseClient = vi.fn();
 
-vi.mock("~/server/clickhouse/clickhouseClient", () => ({
-  getClickHouseClientForOrganization: (...args: unknown[]) =>
-    mockGetClickHouseClientForOrganization(...args),
+vi.mock("~/server/app-layer/clients/clickhouse/shared", () => ({
+  getSharedAppClickHouseClient: () => mockGetSharedAppClickHouseClient(),
+}));
+
+// The wrapper itself is covered by its own tests; here it only has to record
+// which endpoint was resolved and which tenant the client was bound to.
+const mockTenantClickHouseClient = vi.fn(
+  ({ tenantId }: { tenantId: string }) => ({
+    tenantId,
+    query: mockClickHouseQuery,
+  }),
+);
+
+vi.mock("~/server/app-layer/clients/clickhouse/tenant-client", () => ({
+  tenantClickHouseClient: (args: { client: unknown; tenantId: string }) =>
+    mockTenantClickHouseClient(args),
 }));
 
 import { prisma } from "~/server/db";
+
+/** A configured deployment whose shared client resolves any routing key. */
+function givenClickHouseConfigured() {
+  mockResolveClient.mockReturnValue({ endpoint: "shared" });
+  mockGetSharedAppClickHouseClient.mockReturnValue({
+    resolveClient: mockResolveClient,
+  });
+}
 
 describe("collectUsageStats", () => {
   beforeEach(() => {
@@ -45,12 +67,13 @@ describe("collectUsageStats", () => {
   describe("when organization has zero projects", () => {
     it("returns zero for traces and scenarios", async () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([]);
-      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
+      givenClickHouseConfigured();
 
       const result = await collectUsageStats("inst__org-1");
 
       expect(result.totalTraces).toBe(0);
       expect(result.totalScenarioEvents).toBe(0);
+      expect(mockClickHouseQuery).not.toHaveBeenCalled();
     });
   });
 
@@ -59,32 +82,48 @@ describe("collectUsageStats", () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([
         { id: "proj-1" },
       ] as any);
-      mockGetClickHouseClientForOrganization.mockResolvedValue({
-        query: mockClickHouseQuery,
-      } as any);
+      givenClickHouseConfigured();
 
       mockClickHouseQuery
-        .mockResolvedValueOnce({
-          json: () => Promise.resolve([{ Total: "200" }]),
-        })
-        .mockResolvedValueOnce({
-          json: () => Promise.resolve([{ Total: "75" }]),
-        });
+        .mockResolvedValueOnce([{ Total: "200" }])
+        .mockResolvedValueOnce([{ Total: "75" }]);
 
       const result = await collectUsageStats("inst__org-1");
 
       expect(result.totalTraces).toBe(200);
       expect(result.totalScenarioEvents).toBe(75);
       expect(mockClickHouseQuery).toHaveBeenCalledTimes(2);
+      expect(mockClickHouseQuery.mock.calls[0]![0].params).toEqual({
+        projectIds: ["proj-1"],
+      });
+    });
+
+    // The organization owns the endpoint a private instance is pinned to, so it
+    // is what the client routes on — a project id here would land an org with
+    // its own ClickHouse back on the shared one.
+    it("routes on the organization and binds it as the tenant", async () => {
+      vi.mocked(prisma.project.findMany).mockResolvedValue([
+        { id: "proj-1" },
+      ] as any);
+      givenClickHouseConfigured();
+      mockClickHouseQuery.mockResolvedValue([{ Total: "0" }]);
+
+      await collectUsageStats("inst__org-1");
+
+      expect(mockResolveClient).toHaveBeenCalledWith("org-1");
+      expect(mockTenantClickHouseClient).toHaveBeenCalledWith({
+        client: { endpoint: "shared" },
+        tenantId: "org-1",
+      });
     });
   });
 
-  describe("when CH client is null", () => {
+  describe("when no ClickHouse is configured", () => {
     it("returns zero counts", async () => {
       vi.mocked(prisma.project.findMany).mockResolvedValue([
         { id: "proj-1" },
       ] as any);
-      mockGetClickHouseClientForOrganization.mockResolvedValue(null);
+      mockGetSharedAppClickHouseClient.mockReturnValue(null);
 
       const result = await collectUsageStats("inst__org-1");
 

@@ -7,21 +7,22 @@ import {
 
 const logger = createLogger("langwatch:governance:ingestion-pull-lifecycle");
 
+/** Tenant identity travels in the dispatch context, never in the payload. */
 export interface IngestionPullLifecycleCommands {
-  configure(args: {
-    tenantId: string;
-    occurredAt: number;
-    sourceId: string;
-    cron: string;
-    configVersion: string;
-    cursor: string | null;
-  }): Promise<void>;
-  disable(args: {
-    tenantId: string;
-    occurredAt: number;
-    sourceId: string;
-    configVersion: string;
-  }): Promise<void>;
+  configure(
+    input: {
+      occurredAt: number;
+      sourceId: string;
+      cron: string;
+      configVersion: string;
+      cursor: string | null;
+    },
+    ctx: { readonly tenantId: string },
+  ): Promise<unknown>;
+  disable(
+    input: { occurredAt: number; sourceId: string; configVersion: string },
+    ctx: { readonly tenantId: string },
+  ): Promise<unknown>;
 }
 
 function cursorOf(
@@ -50,21 +51,21 @@ export async function syncIngestionPullSource(params: {
     source.archivedAt === null &&
     (source.status === "active" || source.status === "awaiting_first_event");
   if (enabled && source.pullSchedule) {
-    await params.commands.configure({
-      tenantId: project.id,
-      occurredAt,
-      sourceId: source.id,
-      cron: source.pullSchedule,
-      configVersion,
-      cursor: cursorOf(source),
-    });
+    await params.commands.configure(
+      {
+        occurredAt,
+        sourceId: source.id,
+        cron: source.pullSchedule,
+        configVersion,
+        cursor: cursorOf(source),
+      },
+      { tenantId: project.id },
+    );
   } else {
-    await params.commands.disable({
-      tenantId: project.id,
-      occurredAt,
-      sourceId: source.id,
-      configVersion,
-    });
+    await params.commands.disable(
+      { occurredAt, sourceId: source.id, configVersion },
+      { tenantId: project.id },
+    );
   }
 }
 

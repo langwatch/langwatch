@@ -67,7 +67,8 @@ type Config struct {
 	ReadinessTimeoutMS int64  `env:"LANGY_READINESS_TIMEOUT_MS" validate:"gt=0"`
 	SessionsRoot       string `env:"SESSIONS_ROOT" validate:"required"`
 
-	// ShutdownHandoffDeadlineMS (ADR-048) is the wall-clock budget the manager
+	// ShutdownHandoffDeadlineMS (ADR-048, retired; ground now
+	// dev/docs/adr/098-event-sourcing-core.md) is the wall-clock budget the manager
 	// gives each live worker to checkpoint on SIGTERM before the process-group
 	// kill. The `deadline` posted to a worker is now + this. MUST leave room for
 	// the drain: LoadConfig fails closed if

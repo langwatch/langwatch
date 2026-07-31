@@ -1131,13 +1131,15 @@ cronjobs:
   # future first-party sweep drops straight back in.
   jobs: {}
   # Topic clustering scheduling moved into the app's event-sourcing
-  # runtime (ADR-051: per-project process wakes) — no CronJob needed.
-  # Existing projects are seeded by a background pass on worker boot, not a
-  # deploy-time hook Job (topic-clustering-processing ADR-051).
+  # runtime (ADR-051, retired; ground now ADR-098: per-project process
+  # wakes) — no CronJob needed. Existing projects are seeded by a
+  # background pass on worker boot, not a deploy-time hook Job
+  # (topic-clustering-processing, same ADR).
 
   # NOTE: the automation CronJobs are gone. The alertTriggers CronJob
   # (`/api/cron/triggers`) was removed — custom-graph threshold alerts now
-  # fire from the event-sourced worker path (ADR-034) — and the webhook
+  # fire from the event-sourced worker path (ADR-034, retired; ground now
+  # ADR-099) — and the webhook
   # delivery-log prune runs as a daily scheduled process manager on the
   # same worker path (ADR-040 §6), so neither needs a cron sweep. The
   # workers Deployment (workers.enabled) is what runs them now.

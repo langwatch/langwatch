@@ -30,9 +30,7 @@ describe("parseLangyCardPart", () => {
 
   describe("given a part whose identity disagrees with its card", () => {
     it("refuses a kind mismatch", () => {
-      expect(
-        parseLangyCardPart({ ...stampedPart, kind: "table" }),
-      ).toBeNull();
+      expect(parseLangyCardPart({ ...stampedPart, kind: "table" })).toBeNull();
     });
 
     it("refuses a blockId mismatch", () => {

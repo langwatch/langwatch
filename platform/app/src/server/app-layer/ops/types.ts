@@ -1,105 +1,57 @@
-export interface GroupInfo {
-  groupId: string;
+/**
+ * One lane as the operator console sees it.
+ *
+ * A lane is the unit the dispatch plane serialises on, so it is also the unit
+ * an operator recovers: it is what gets leased, what backs off, and what gets
+ * parked. `laneId` is the rendered group key, which parses back to the tenant,
+ * lane and scope that produced it.
+ */
+export interface LaneInfo {
+  laneId: string;
+  tenantId: string;
+  laneKind: string;
+  /** Null only for the aggregate-serialised command lane, which carries no name. */
+  laneName: string | null;
   pendingJobs: number;
-  score: number;
-  hasActiveJob: boolean;
-  activeJobId: string | null;
-  isBlocked: boolean;
-  oldestJobMs: number | null;
-  newestJobMs: number | null;
-  isStaleBlock: boolean;
-  pipelineName: string | null;
-  jobType: string | null;
-  jobName: string | null;
-  errorMessage: string | null;
-  errorStack: string | null;
-  errorTimestamp: number | null;
-  retryCount: number | null;
-  activeKeyTtlSec: number | null;
-  processingDurationMs: number | null;
+  /** Ordering key of the head job; null when the lane is empty. */
+  headOrderingKey: number | null;
+  /** A live lease's remaining ms; null when nothing holds the lane. */
+  leaseRemainingMs: number | null;
+  /** A parked lane stops being claimable until an operator unparks it. */
+  isParked: boolean;
+  /** Why the consumer parked it. */
+  parkReason: string | null;
+  /** A retry's backoff deadline in epoch ms; null when claimable now. */
+  readyAtMs: number | null;
+  /** Highest attempt across the lane's staged jobs. */
+  attempts: number;
 }
 
-export interface QueueInfo {
+export interface LaneKindInfo {
   name: string;
   displayName: string;
-  pendingGroupCount: number;
-  blockedGroupCount: number;
-  activeGroupCount: number;
+  laneCount: number;
+  parkedLaneCount: number;
+  leasedLaneCount: number;
   totalPendingJobs: number;
-  dlqCount: number;
-  // Groups a tenant soft-cap parked OUT of the ready scan because the tenant is
-  // at its in-flight cap. Surfaced so a parking spike (the over-cap ZADD storm
-  // root) or a parked-group strand is visible instead of invisible backlog.
-  parkedGroupCount: number;
-  groups: GroupInfo[];
+  lanes: LaneInfo[];
 }
 
-export interface QueueSummaryInfo {
-  name: string;
-  displayName: string;
-  pendingGroupCount: number;
-  blockedGroupCount: number;
-  activeGroupCount: number;
-  totalPendingJobs: number;
-  dlqCount: number;
-  parkedGroupCount: number;
-}
+export type LaneKindSummary = Omit<LaneKindInfo, "lanes">;
 
 export interface ThroughputPoint {
   timestamp: number;
-  ingestedPerSec: number;
-  completedPerSec: number;
-  failedPerSec: number;
   pendingCount: number;
-  blockedCount: number;
   parkedCount: number;
-}
-
-export interface PhaseMetrics {
-  pending: number;
-  active: number;
-  completedPerSec: number;
-  failedPerSec: number;
-  latencyP50Ms: number;
-  latencyP99Ms: number;
-  peakCompletedPerSec: number;
-  peakFailedPerSec: number;
-  peakLatencyP50Ms: number;
-  peakLatencyP99Ms: number;
-}
-
-export interface JobNameMetrics {
-  jobName: string;
-  pipelineName: string;
-  phase: "commands" | "projections" | "reactions";
-  pending: number;
-  active: number;
-  completedPerSec: number;
-  failedPerSec: number;
-  latencyP50Ms: number;
-  latencyP99Ms: number;
-  peakCompletedPerSec: number;
-  peakFailedPerSec: number;
-  peakLatencyP50Ms: number;
-  peakLatencyP99Ms: number;
-}
-
-export interface PipelineNode {
-  name: string;
-  pending: number;
-  active: number;
-  blocked: number;
-  children: PipelineNode[];
+  leasedCount: number;
 }
 
 export interface ErrorCluster {
   normalizedMessage: string;
   sampleMessage: string;
-  sampleStack: string | null;
   count: number;
-  pipelineName: string | null;
-  queueName: string;
-  sampleGroupIds: string[];
+  laneKind: string;
+  sampleLaneIds: string[];
 }
 
 export interface RedisInfo {
@@ -116,21 +68,20 @@ export interface RedisInfo {
   usedCpuSysMainThreadSeconds: number;
 }
 
+/**
+ * What the dashboard can read straight off Redis.
+ *
+ * Depth, lease and park state are lane keys, so they are answerable here.
+ * Throughput, latency and failure rates are not: the dispatch plane reports
+ * those through its `Metrics` port (ADR-108), which is scraped, not stored in
+ * Redis — reading them back out of the keyspace would mean inventing counters
+ * nothing writes.
+ */
 export interface DashboardData {
-  totalGroups: number;
-  blockedGroups: number;
-  parkedGroups: number;
+  totalLanes: number;
+  parkedLanes: number;
+  leasedLanes: number;
   totalPendingJobs: number;
-  // counter − ground-truth drift from the last reconcile cycle (0 = healthy); see #4683
-  pendingDrift: number;
-  throughputIngestedPerSec: number;
-  totalCompleted: number;
-  totalFailed: number;
-  completedPerSec: number;
-  failedPerSec: number;
-  peakCompletedPerSec: number;
-  peakFailedPerSec: number;
-  peakIngestedPerSec: number;
   redisMemoryUsedBytes: number;
   redisMemoryPeakBytes: number;
   redisMemoryMaxBytes: number;
@@ -143,20 +94,8 @@ export interface DashboardData {
   processMemoryUsedMb: number;
   processMemoryTotalMb: number;
   throughputHistory: ThroughputPoint[];
-  pipelineTree: PipelineNode[];
-  queues: QueueSummaryInfo[];
-  latencyP50Ms: number;
-  latencyP99Ms: number;
-  peakLatencyP50Ms: number;
-  peakLatencyP99Ms: number;
-  phases: {
-    commands: PhaseMetrics;
-    projections: PhaseMetrics;
-    reactions: PhaseMetrics;
-  };
-  jobNameMetrics: JobNameMetrics[];
-  pausedKeys: string[];
-  topErrors: ErrorCluster[];
+  laneKinds: LaneKindSummary[];
+  topParkReasons: ErrorCluster[];
 }
 
 export type SSEEvent =
@@ -171,32 +110,19 @@ export type SSEEvent =
  * references it, never what is inside it.
  */
 export interface OpsBlobSummary {
-  queueName: string;
+  /** The spool namespaces by tenant, which in this app is the project. */
   projectId: string;
   hash: string;
-  /** Serialized size in bytes. */
+  /** Bytes resident in Redis; zero for a body spooled to the durable store. */
   sizeBytes: number;
+  tier: "redis" | "durable";
   /** Seconds until expiry; null when the key carries no expiry at all. */
   ttlSeconds: number | null;
-  /** Lease holders whose deadline has not passed. */
-  liveLeases: number;
-  /** Mirrored holder tokens, excluding the rolling-deploy sentinel. */
-  holderTokens: number;
   /**
-   * Earliest deadline in the lease set, in Redis-time ms; null when no lease
-   * member remains at all.
-   *
-   * When this is in the past it dates the blob's oldest LAPSED lease — i.e. how
-   * long ago the holder that should have released it stopped renewing. That is
-   * the sharpest available signal for "a worker died here", which is what
-   * strands blobs in the first place.
+   * Holders that put the blob and have not released it. Zero means the spool's
+   * own grace TTL is already running it down — the reclaimable set.
    */
-  earliestLeaseDeadlineMs: number | null;
-  /**
-   * What a sweep would decide for this blob right now, so the browser and the
-   * runner can never tell an operator two different stories.
-   */
-  sweepOutcome: string;
+  holders: number;
 }
 
 /**
@@ -215,16 +141,14 @@ export const OPS_BLOB_SORTS = [
   /** Biggest payloads first — what is actually occupying the instance. */
   "largest",
   /**
-   * Least recently touched first. Every access re-arms the blob to the full
-   * backstop, so a LOW remaining TTL means nothing has read or staged it in a
-   * long time. This is the closest thing to "oldest" the store can answer:
-   * blobs carry no creation timestamp.
+   * Least recently touched first. Every put re-arms the blob to the full
+   * backstop, so a LOW remaining TTL means nothing has staged it in a long
+   * time. This is the closest thing to "oldest" the store can answer: blobs
+   * carry no creation timestamp.
    */
   "stalest",
-  /** Nothing holds a live lease — the reclaimable set, biggest first. */
+  /** Nothing holds it — the reclaimable set, biggest first. */
   "unreferenced",
-  /** Longest-lapsed lease first: where a holder most likely died mid-flight. */
-  "oldest_lapsed_lease",
 ] as const;
 
 export type OpsBlobSort = (typeof OPS_BLOB_SORTS)[number];
@@ -243,12 +167,9 @@ export interface OpsBlobPage {
 }
 
 export interface OpsBlobStoreStats {
-  queues: Array<{
-    queueName: string;
-    /** Sampled, not exact: a full count of a multi-million-key keyspace is not a request-time operation. */
-    sampledBlobs: number;
-    sampledBytes: number;
-    unreferenced: number;
-    truncated: boolean;
-  }>;
+  /** Sampled, not exact: a full count of a multi-million-key keyspace is not a request-time operation. */
+  sampledBlobs: number;
+  sampledBytes: number;
+  unreferenced: number;
+  truncated: boolean;
 }

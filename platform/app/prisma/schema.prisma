@@ -251,7 +251,8 @@ model Organization {
   /// created in ANY project of this org, and existing links stop resolving —
   /// the org toggle is the global switch, the per-project
   /// `Project.traceSharingEnabled` scopes the kill to a single project (mirrors
-  /// `presenceEnabled`). Effective sharing = org AND project. ADR-039.
+  /// `presenceEnabled`). Effective sharing = org AND project. ADR-039
+  /// (retired; ground now ADR-098).
   traceSharingEnabled    Boolean              @default(true)
   /// Org-configurable contact surfaced to users in CLI "contact your
   /// admin" messages and the in-app budget-exceeded banner. Free text:
@@ -580,13 +581,37 @@ model Cost {
   updatedAt     DateTime          @default(now()) @updatedAt
   extraInfo     Json?
 
+  /// Natural key of the unit of work that produced this row, for writers that
+  /// run under at-least-once delivery. Rows are money — every one of them is
+  /// summed by `license-enforcement.repository.ts` for limit enforcement and
+  /// reported by `api/routers/costs.ts` — so a redelivered job must land on
+  /// the SAME row rather than a second one.
+  ///
+  /// Deliberately NOT a unique over the business columns
+  /// (projectId, referenceType, referenceId, costType, extraInfo->trace_id).
+  /// Three of the four writers legitimately produce many rows under one such
+  /// tuple: `topic-clustering/clustering.ts` writes one CLUSTERING/PROJECT row
+  /// per clustering run against the same projectId, `evaluations-legacy.ts`
+  /// writes one BATCH_EVALUATION/BATCH row per datapoint against the same
+  /// experiment, and the legacy single-evaluation route can be called
+  /// repeatedly for the same (evaluator, trace). Constraining those columns
+  /// would reject legitimate writes and would also be blocked outright by the
+  /// duplicates already in the table.
+  ///
+  /// NULL means "this writer makes no idempotency claim". Postgres treats NULLs
+  /// as distinct in a unique index, so the three writers above are unaffected
+  /// and no historical row can block the index being built.
+  idempotencyKey String?
+
+  @@unique([projectId, idempotencyKey])
   @@index([referenceType, referenceId])
   @@index([costType])
   @@index([projectId])
   @@index([projectId, createdAt])
 }
 
-/// PROJECTION of the topic-clustering event stream (ADR-051): topics are
+/// PROJECTION of the topic-clustering event stream (ADR-051, retired;
+/// ground now ADR-098): topics are
 /// `topics_recorded` events; this table is written ONLY by
 /// TopicModelFoldProjection (cursor: TopicModelProjection) and is
 /// rebuildable by replay. Kept named `Topic` because it is the domain
@@ -819,10 +844,12 @@ model Trigger {
   slackTemplate        String?
   emailSubjectTemplate String?
   emailBodyTemplate    String?
-  // Per-trigger digest cadence (ADR-026). Ignored for persist actions.
+  // Per-trigger digest cadence (ADR-026, retired; ground now ADR-098).
+  // Ignored for persist actions.
   // Values: 'immediate' | '5min_digest' | '15min_digest' | 'hourly_digest'.
   notificationCadence  String        @default("immediate")
-  // Per-trigger trace-readiness debounce in ms (ADR-026). The column
+  // Per-trigger trace-readiness debounce in ms (ADR-026, retired; ground
+  // now ADR-098). The column
   // applies to every action class — a persist row captured before the
   // trace settles diverges from the trace UI permanently. Today only
   // notify-class triggers actually read this (they route through the
@@ -1149,7 +1176,7 @@ model LangyConversationProjection {
   /// The turn in flight, or null when idle (busy guard reads this).
   CurrentTurnId        String?                    @map("currentTurnId")
   LastError            String?                    @map("lastError")
-  /// ADR-048 shutdown-handoff resume token (opaque, worker-authored).
+  /// ADR-048 (retired; ground now ADR-098) shutdown-handoff resume token (opaque, worker-authored).
   PendingHandoffToken  String?                    @map("pendingHandoffToken")
   PendingHandoffTurnId String?                    @map("pendingHandoffTurnId")
   /// Per-conversation HMAC key for worker stream frames; server-side only.
@@ -1440,7 +1467,7 @@ model AnnotationQueueItem {
 model ShareLink {
   id           String            @id @default(nanoid())
   // Secret capability. A bare 32-char high-entropy nanoid for new links —
-  // deliberately unprefixed, see ADR-039; legacy rows carry their old
+  // deliberately unprefixed, see ADR-039 (retired; ground now ADR-098); legacy rows carry their old
   // bare-nanoid id here (see migration backfill). The token — not the
   // resource id — is what authorizes an anonymous read.
   token        String            @unique
@@ -2738,10 +2765,10 @@ model AnomalyRule {
   @@index([status])
 }
 
-/// Persisted anomaly detection. Inserted by the anomaly-detection
-/// reactor (event-sourcing pipeline; modeled on PR #3351's
-/// alertTrigger pattern) when a rule's threshold trips while
-/// processing a freshly-arrived ActivityEventReceived event.
+/// Persisted anomaly detection. Inserted by SpendSpikeAnomalyEvaluator
+/// (ee/governance/services/spendSpikeAnomalyEvaluator.service.ts) on the
+/// spendSpikeAnomalyWorker tick, when a rule's threshold trips against
+/// the governance_kpis projection.
 /// Read by api.activityMonitor.recentAnomalies for the admin dashboard.
 ///
 /// Dedup: (ruleId, triggerWindowStart) - re-evaluating the same
@@ -3206,6 +3233,11 @@ model ProcessManagerInstance {
   userId      String?
   state       Json
   revision    Int
+  /// The fold's state-schema hash a row was last written under (ADR-107 §11).
+  /// Nullable because no previous implementation ever stamped one: NULL means
+  /// a legacy row, which the store accepts as a normal read (not a version
+  /// mismatch) and stamps for real on its next write.
+  stateVersion String?
   nextWakeAt  DateTime? @db.Timestamptz(3)
   updatedAt   DateTime  @db.Timestamptz(3)
 
@@ -3279,7 +3311,8 @@ model ProcessManagerOutbox {
   @@index([status, nextAttemptAt, leasedUntil])
 }
 
-/// Per-project topic clustering run status (ADR-051): the rebuildable
+/// Per-project topic clustering run status (ADR-051, retired; ground now
+/// ADR-098): the rebuildable
 /// operational read model behind the settings page. One row per project;
 /// folded from run_completed/run_failed events, never written directly.
 model TopicClusteringRunProjection {
@@ -3321,7 +3354,8 @@ model TopicClusteringRunProjection {
   @@unique([projectId])
 }
 
-/// Cursor row for the topic-model projection (ADR-051). The model itself is
+/// Cursor row for the topic-model projection (ADR-051, retired; ground now
+/// ADR-098). The model itself is
 /// the `Topic` table, written through by the projection; this row only
 /// records how far the fold has applied the event log.
 model TopicModelProjection {
@@ -3341,7 +3375,8 @@ model TopicModelProjection {
   @@unique([projectId])
 }
 
-/// Per-project topic clustering run history (audit read model, ADR-051).
+/// Per-project topic clustering run history (audit read model, ADR-051,
+/// retired; ground now ADR-098).
 /// One row per project; `runs` is the bounded newest-first entry list.
 /// Rebuildable by replaying the event log.
 model TopicClusteringRunHistoryProjection {
@@ -3398,7 +3433,7 @@ model IngestionPullRunProjection {
 // Langy assistant
 // ============================================================================
 // The Langy conversation SPINE moved off Postgres onto the event-sourcing
-// framework (ADR-046). The conversation is now a projection of an event stream:
+// framework (ADR-046, retired; ground now ADR-098). The conversation is now a projection of an event stream:
 // its spine lives in the ClickHouse `langy_conversations` fold table and its
 // messages in `langy_messages`. The old `LangyConversation` Postgres model was
 // deleted; see migration `..._drop_langy_conversation`.

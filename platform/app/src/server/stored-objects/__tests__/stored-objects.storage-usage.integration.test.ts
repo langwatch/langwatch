@@ -2,7 +2,8 @@
  * @vitest-environment node
  * @integration
  *
- * Integration test for the storage-accounting byte ledger (ADR-040):
+ * Integration test for the storage-accounting byte ledger (ADR-096,
+ * retired; ground now ADR-098):
  * StoredObjectsService.getStorageUsageByProject sums size_bytes of a project's
  * live objects, deduped across ReplacingMergeTree versions and optionally
  * scoped to one purpose. Real ClickHouse + LocalFilesystemDriver; only
@@ -16,7 +17,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
-import { getTestClickHouseClient } from "../../event-sourcing/__tests__/integration/testContainers";
+import { getTestClickHouseClient } from "~/test-utils/integration/testContainers";
 import { LocalFilesystemDriver } from "../local-filesystem-driver";
 import { StorageRegistry } from "../storage-registry";
 import { StoredObjectsRepository } from "../stored-objects.repository";

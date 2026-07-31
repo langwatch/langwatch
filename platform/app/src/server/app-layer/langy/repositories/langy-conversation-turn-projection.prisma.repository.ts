@@ -9,11 +9,11 @@ import {
 } from "@langwatch/langy";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+  LegacyProjectionStoreContext,
+  LegacyStateProjectionStore,
+  LegacyStoredProjection,
+} from "~/server/app-layer/_shared/legacyProjectionStore.types";
 
 /**
  * The status values this column accepts, derived from the ONE definition rather
@@ -57,7 +57,7 @@ type ConversationTurnProjectionPrismaClient = {
   };
 };
 
-function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
+function fromRow(row: Row): LegacyStoredProjection<LangyConversationTurnData> {
   const {
     id: _id,
     projectId: _projectId,
@@ -96,7 +96,7 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
 
 /** Postgres row I/O for the type-aware turn projection. */
 export class PrismaLangyConversationTurnProjectionRepository
-  implements StateProjectionStore<LangyConversationTurnData>
+  implements LegacyStateProjectionStore<LangyConversationTurnData>
 {
   constructor(
     private readonly prisma: ConversationTurnProjectionPrismaClient,
@@ -104,8 +104,8 @@ export class PrismaLangyConversationTurnProjectionRepository
 
   async load(
     key: string,
-    context: ProjectionStoreContext,
-  ): Promise<StoredProjection<LangyConversationTurnData> | null> {
+    context: LegacyProjectionStoreContext,
+  ): Promise<LegacyStoredProjection<LangyConversationTurnData> | null> {
     const projectId = String(context.tenantId);
     const { conversationId: ConversationId, turnId: TurnId } =
       parseConversationTurnKey(key);
@@ -125,8 +125,8 @@ export class PrismaLangyConversationTurnProjectionRepository
   }
 
   async store(
-    projection: StoredProjection<LangyConversationTurnData>,
-    context: ProjectionStoreContext,
+    projection: LegacyStoredProjection<LangyConversationTurnData>,
+    context: LegacyProjectionStoreContext,
   ): Promise<void> {
     const projectId = String(context.tenantId);
     const key = context.key ?? context.aggregateId;

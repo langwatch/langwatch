@@ -6,10 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  cardKindFor,
-  cliVerbTone,
   CLI_COLLECTION_VERBS,
   CLI_SUBRESOURCE_VERBS,
+  cardKindFor,
+  cliVerbTone,
 } from "./registry.js";
 
 describe("cardKindFor, given a CLI resource and verb", () => {

@@ -8,7 +8,7 @@ Feature: Project becomes integrated after first trace ingestion
   # in `platform/app/src/server/event-sourcing/pipelines/trace-processing/`
   # for the project.firstMessage projection.
 
-  @integration
+  @unit
   Scenario: Project marks as integrated after first trace ingestion
     Given a project with firstMessage set to false
     And the project uses event-sourcing ingestion
@@ -66,6 +66,6 @@ Feature: Project becomes integrated after first trace ingestion
     Then the messages page renders the trace list instead of the welcome screen
     # Page-level gating lives in src/pages/[project]/messages.tsx via
     # api.project.getHasFirstMessage; project.firstMessage is set by the
-    # projectMetadata reactor on first trace ingestion (no separate
+    # projectMetadata subscriber on first trace ingestion (no separate
     # featureEventSourcingTraceIngestion / disableElasticSearchTraceWriting
     # flags exist in the codebase as of 2026-05-01).

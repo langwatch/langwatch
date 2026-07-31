@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
 func TestStripFlag(t *testing.T) {
@@ -411,4 +413,98 @@ func TestWorkersInProcessOneDoesNotBlockUp(t *testing.T) {
 			})
 		})
 	})
+}
+
+// `haven switch` exists to be used inside `cd "$(haven switch)"`, where stdout
+// is a pipe by construction. Reading that pipe as "no human is watching" —
+// which is right for every other command — would turn the one command whose
+// answer is meant to be captured into the one command that can never show a
+// picker.
+//
+// @scenario "Switching to a worktree without knowing its name"
+func TestAgentModeIsAskedForSeparatelyFromAPipedStdout(t *testing.T) {
+	t.Run("given nothing set", func(t *testing.T) {
+		t.Setenv("HAVEN_AGENT", "")
+		t.Setenv("NO_COLOR", "")
+		if agentWasAsked(false) {
+			t.Error("agent mode was reported as asked for when nothing asked for it")
+		}
+		if !agentWasAsked(true) {
+			t.Error("--agent did not count as asking")
+		}
+	})
+
+	for _, knob := range []string{"HAVEN_AGENT", "NO_COLOR"} {
+		t.Run("given "+knob+" set", func(t *testing.T) {
+			t.Setenv("HAVEN_AGENT", "")
+			t.Setenv("NO_COLOR", "")
+			t.Setenv(knob, "1")
+			if !agentWasAsked(false) {
+				t.Errorf("%s did not count as asking for agent mode", knob)
+			}
+		})
+	}
+
+	t.Run("given a piped stdout and a terminal on stdin and stderr", func(t *testing.T) {
+		t.Setenv("HAVEN_AGENT", "")
+		t.Setenv("NO_COLOR", "")
+		t.Setenv("FORCE_COLOR", "") // else a developer's own shell decides the outcome
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("os.Pipe: %v", err)
+		}
+		defer func() { _ = r.Close(); _ = w.Close() }()
+		saved := os.Stdout
+		os.Stdout = w
+		defer func() { os.Stdout = saved }()
+
+		if !resolveAgent() {
+			t.Fatal("a piped stdout was not read as agent mode; the rest of this cannot mean anything")
+		}
+		if agentWasAsked(false) {
+			t.Error("a piped stdout was read as ASKING for agent mode — the switch picker would never open")
+		}
+	})
+}
+
+// A pipe is not a terminal, whichever stream it is on.
+func TestTerminalAttachedIgnoresStdout(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer func() { _ = r.Close(); _ = w.Close() }()
+
+	if isCharDevice(w) {
+		t.Error("a pipe was reported as a terminal")
+	}
+
+	saved := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = saved }()
+	if terminalAttached() {
+		t.Error("a piped stderr was reported as a terminal to draw a picker on")
+	}
+}
+
+// The plain list an agent or a pipe gets: up stacks first, marked, each with
+// the directory the picker would have printed.
+//
+// @scenario "Switching to a worktree without knowing its name"
+func TestPrintSwitchTargets(t *testing.T) {
+	var b strings.Builder
+	printSwitchTargets(&b, []app.SwitchTarget{
+		{Name: "feat-x", Dir: "/repo/worktrees/feat-x", IsUp: true},
+		{Name: "idle", Dir: "/repo/worktrees/idle"},
+	})
+	out := b.String()
+
+	for _, want := range []string{"feat-x", "/repo/worktrees/feat-x", "idle", "shell-init"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("the plain list is missing %q:\n%s", want, out)
+		}
+	}
+	if !strings.Contains(out, "● feat-x") {
+		t.Errorf("the live stack is not marked:\n%s", out)
+	}
 }

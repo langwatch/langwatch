@@ -54,7 +54,7 @@ export function emptyFormState(): CacheRuleFormState {
  *
  * `field` is the input the complaint is about, or `null` when it is about the
  * relationship between several — "at least one matcher", "both a key and a
- * value". ADR-018 splits the surface on exactly that line: a complaint with
+ * value". ADR-087 splits the surface on exactly that line: a complaint with
  * one home is marked there, and only the ones with no single home toast.
  * Before this the validator returned a bare string, so every complaint took
  * the toast and the user was left to work out which input it meant.

@@ -8,10 +8,6 @@ import type { EvalSummary, EvaluationRunData } from "./types";
 export class EvaluationRunService {
   constructor(readonly repository: EvaluationRunRepository) {}
 
-  async upsert(data: EvaluationRunData, tenantId: string): Promise<void> {
-    await this.repository.upsert(data, tenantId);
-  }
-
   async getByEvaluationId(
     params: GetByEvaluationIdParams,
   ): Promise<EvaluationRunData> {

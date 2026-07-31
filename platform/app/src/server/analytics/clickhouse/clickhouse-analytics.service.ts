@@ -5,13 +5,11 @@
  * This is the CH equivalent of the ES-based timeseries.ts logic.
  */
 
-import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "../../clickhouse/clickhouseClient";
+import { isClickHouseEnabled } from "~/server/app-layer/clients/clickhouse/shared";
+import type { TenantClickHouseClient } from "~/server/app-layer/clients/clickhouse/tenant-client";
+import { clickHouseForProject } from "~/server/app-layer/clients/clickhouse/tenant-resolver";
 import type { FilterField } from "../../filters/types";
 import type { ElasticSearchEvent } from "../../tracer/types";
 import type {
@@ -37,10 +35,31 @@ import {
  * max_bytes_before_external_group_by: When GROUP BY intermediate state exceeds
  * this threshold (500 MB), ClickHouse spills to disk instead of failing with OOM.
  * This acts as a safety net for large GROUP BY operations under concurrent load.
+ *
+ * Still passed explicitly at every analytics call site (as `settings:`) even
+ * though the app-layer client now carries the same spill threshold as its own
+ * default. Analytics owns this number — it is the one read path that reliably
+ * groups over a whole date range — and passing it keeps it a stated property of
+ * the analytics query rather than something analytics happens to inherit and
+ * would silently lose if the shared default were ever tuned for a different
+ * caller. The client merges the caller's settings on top of its defaults, so an
+ * analytics-specific value always wins.
  */
 export const ANALYTICS_CLICKHOUSE_SETTINGS: Record<string, number> = {
   max_bytes_before_external_group_by: 500_000_000,
 };
+
+/**
+ * Metric/log label for the three reads below.
+ *
+ * All three drive from `trace_summaries` — `getDataForFilter` on every field
+ * variant, and the documents + feedbacks queries before they join into
+ * `stored_spans` / `evaluation_runs`. Labelling by the driving table is what
+ * makes `clickhouse_query_duration_seconds{table}` comparable across them; the
+ * joined tables are reported per-table by the convention gate, which reads the
+ * SQL itself rather than this label.
+ */
+const DRIVING_TABLE = "trace_summaries";
 
 // Re-export types for backward compatibility
 export type {
@@ -63,11 +82,15 @@ export class ClickHouseAnalyticsService {
 
   /**
    * Resolve the ClickHouse client for a given project.
+   *
+   * `null` only when this deployment has no ClickHouse at all; a project that
+   * resolves to no organisation still throws, because falling back to the
+   * shared endpoint there would be a cross-tenant read.
    */
   private async resolveClient(
     projectId: string,
-  ): Promise<ClickHouseClient | null> {
-    return getClickHouseClientForProject(projectId);
+  ): Promise<TenantClickHouseClient | null> {
+    return clickHouseForProject(projectId);
   }
 
   /**
@@ -120,18 +143,16 @@ export class ClickHouseAnalyticsService {
         this.logger.debug({ sql, params }, "Executing dataForFilter query");
 
         try {
-          const result = await clickHouseClient.query({
-            query: sql,
-            query_params: params,
-            format: "JSONEachRow",
-            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-          });
-
-          const rows = (await result.json()) as Array<{
+          const rows = await clickHouseClient.query<{
             field: string;
             label: string;
             count: string | number;
-          }>;
+          }>({
+            table: DRIVING_TABLE,
+            sql,
+            params,
+            settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+          });
 
           span.setAttribute("result.count", rows.length);
 
@@ -202,31 +223,25 @@ export class ClickHouseAnalyticsService {
           const [topDocsSql, totalSql] = parts;
 
           // Execute both queries
-          const [topDocsResult, totalResult] = await Promise.all([
-            clickHouseClient.query({
-              query: topDocsSql,
-              query_params: params,
-              format: "JSONEachRow",
-              clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+          const [topDocs, totalRows] = await Promise.all([
+            clickHouseClient.query<{
+              documentId: string;
+              count: string | number;
+              traceId: string;
+              content?: string;
+            }>({
+              table: DRIVING_TABLE,
+              sql: topDocsSql,
+              params,
+              settings: ANALYTICS_CLICKHOUSE_SETTINGS,
             }),
-            clickHouseClient.query({
-              query: totalSql,
-              query_params: params,
-              format: "JSONEachRow",
-              clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+            clickHouseClient.query<{ total: string | number }>({
+              table: DRIVING_TABLE,
+              sql: totalSql,
+              params,
+              settings: ANALYTICS_CLICKHOUSE_SETTINGS,
             }),
           ]);
-
-          const topDocs = (await topDocsResult.json()) as Array<{
-            documentId: string;
-            count: string | number;
-            traceId: string;
-            content?: string;
-          }>;
-
-          const totalRows = (await totalResult.json()) as Array<{
-            total: string | number;
-          }>;
 
           const total = totalRows[0]?.total ?? 0;
 
@@ -291,20 +306,18 @@ export class ClickHouseAnalyticsService {
         this.logger.debug({ sql, params }, "Executing feedbacks query");
 
         try {
-          const result = await clickHouseClient.query({
-            query: sql,
-            query_params: params,
-            format: "JSONEachRow",
-            clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
-          });
-
-          const rows = (await result.json()) as Array<{
+          const rows = await clickHouseClient.query<{
             trace_id: string;
             event_id: string;
             started_at: string | number;
             event_type: string;
             attributes: Record<string, string>;
-          }>;
+          }>({
+            table: DRIVING_TABLE,
+            sql,
+            params,
+            settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+          });
 
           // Convert to ElasticSearchEvent format
           const events: ElasticSearchEvent[] = rows.map((row) => {

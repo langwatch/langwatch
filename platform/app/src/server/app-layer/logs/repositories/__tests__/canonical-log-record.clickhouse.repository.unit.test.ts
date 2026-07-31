@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
+import type { CanonicalLogRecord } from "~/server/event-sourcing/log-processing/schema";
 import { CanonicalLogRecordClickHouseRepository } from "../canonical-log-record.clickhouse.repository";
 
 function record(): CanonicalLogRecord {
@@ -54,7 +54,7 @@ function record(): CanonicalLogRecord {
 describe("CanonicalLogRecordClickHouseRepository", () => {
   it("writes the authoritative row before the payload-free usage estimate", async () => {
     const insert = vi.fn<
-      (args: { table: string; values: unknown[] }) => Promise<void>
+      (args: { table: string; rows: unknown[] }) => Promise<void>
     >(async () => undefined);
     const repository = new CanonicalLogRecordClickHouseRepository(
       async () => ({ insert }) as never,
@@ -66,7 +66,7 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
       "log_records",
       "log_usage_estimates",
     ]);
-    const raw = insert.mock.calls[0]![0].values[0] as Record<string, unknown>;
+    const raw = insert.mock.calls[0]![0].rows[0] as Record<string, unknown>;
     expect(raw).toMatchObject({
       TenantId: "project_test",
       RecordId: "a".repeat(64),
@@ -75,7 +75,7 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
       _size_bytes: 2,
     });
     expect(raw).not.toHaveProperty("OrganizationId");
-    const usage = insert.mock.calls[1]![0].values[0] as Record<string, unknown>;
+    const usage = insert.mock.calls[1]![0].rows[0] as Record<string, unknown>;
     expect(usage).toMatchObject({
       OrganizationId: "organization_test",
       TenantId: "project_test",
@@ -89,7 +89,7 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
   describe("given a coding-agent log record", () => {
     it("stamps it on the caller's retention like any other", async () => {
       const insert = vi.fn<
-        (args: { table: string; values: unknown[] }) => Promise<void>
+        (args: { table: string; rows: unknown[] }) => Promise<void>
       >(async () => undefined);
       const repository = new CanonicalLogRecordClickHouseRepository(
         async () => ({ insert }) as never,
@@ -102,14 +102,14 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
       // converter is retired (ADR-056): the record IS the Terminal
       // transcript's content, so nothing here shortens its retention — it
       // rides the caller's, exactly like every other log.
-      const raw = insert.mock.calls[0]![0].values[0] as Record<string, unknown>;
+      const raw = insert.mock.calls[0]![0].rows[0] as Record<string, unknown>;
       expect(raw._retention_days).toBe(49);
     });
   });
 
   it("writes a same-tenant batch with two ClickHouse inserts total", async () => {
     const insert = vi.fn<
-      (args: { table: string; values: unknown[] }) => Promise<void>
+      (args: { table: string; rows: unknown[] }) => Promise<void>
     >(async () => undefined);
     const repository = new CanonicalLogRecordClickHouseRepository(
       async () => ({ insert }) as never,
@@ -122,17 +122,17 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
     await repository.ensureLogRecords([record(), second], 49);
 
     expect(insert).toHaveBeenCalledTimes(2);
-    expect(insert.mock.calls[0]![0].values).toHaveLength(2);
-    expect(insert.mock.calls[1]![0].values).toHaveLength(2);
+    expect(insert.mock.calls[0]![0].rows).toHaveLength(2);
+    expect(insert.mock.calls[1]![0].rows).toHaveLength(2);
   });
 
   it("bounds a trace's log read by time and limit", async () => {
     const query = vi.fn<
       (args: {
-        query: string;
-        query_params: Record<string, unknown>;
-      }) => Promise<{ json: () => Promise<unknown[]> }>
-    >(async () => ({ json: async () => [] }));
+        sql: string;
+        params: Record<string, unknown>;
+      }) => Promise<unknown[]>
+    >(async () => []);
     const repository = new CanonicalLogRecordClickHouseRepository(
       async () => ({ query }) as never,
     );
@@ -145,10 +145,10 @@ describe("CanonicalLogRecordClickHouseRepository", () => {
     });
 
     const request = query.mock.calls[0]![0];
-    expect(request.query).toContain("FROM log_records FINAL");
-    expect(request.query).toContain("TimeUnixMs >=");
-    expect(request.query).toContain("TimeUnixMs <=");
-    expect(request.query).toContain("LIMIT {limit:UInt64}");
-    expect(request.query_params).toMatchObject({ limit: 101 });
+    expect(request.sql).toContain("FROM log_records FINAL");
+    expect(request.sql).toContain("TimeUnixMs >=");
+    expect(request.sql).toContain("TimeUnixMs <=");
+    expect(request.sql).toContain("LIMIT {limit:UInt64}");
+    expect(request.params).toMatchObject({ limit: 101 });
   });
 });

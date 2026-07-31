@@ -143,10 +143,6 @@ const presentations = {
     describe: () =>
       "Narrow the time range, add a filter, or select fewer fields.",
   },
-  time_range_too_wide: {
-    title: "Time range is too wide",
-    describe: () => "Pick a shorter range and try again.",
-  },
   filter_parse_error: {
     title: "This filter isn't valid",
     describe: () => "Check the syntax and try again.",
@@ -712,6 +708,16 @@ const presentations = {
     describe: () =>
       "Reload to pick up the current columns, then make your change again.",
   },
+  dataset_storage_not_writable: {
+    // fault: platform. Nothing was saved, and the reader cannot fix this by
+    // retrying — someone has to configure storage. Say both, and name neither
+    // the path nor the env vars (that detail is in the log line, for whoever
+    // runs the deployment).
+    title: "Dataset storage isn't set up for writing",
+    describe: () =>
+      "Your change wasn't saved. Storage has to be configured before datasets " +
+      "can be edited or uploaded — ask whoever administers this deployment.",
+  },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
     // copy has to say nothing was changed — an export that half-worked is the
@@ -831,6 +837,14 @@ const presentations = {
   missing_annotator: {
     title: "No annotator assigned",
     describe: () => "Add at least one annotator to the queue.",
+  },
+  invalid_annotator_reference: {
+    // Raised on two surfaces — the bulk "send to queue" dialog and an
+    // automation replaying its saved annotators — so the copy names neither.
+    // The annotator itself stays out of it: the string is unusable precisely
+    // because it identifies nothing a person would recognise.
+    title: "That annotator can't be used",
+    describe: () => "Pick the queue or person again, then try once more.",
   },
   notification_delivery_error: {
     title: "We couldn't deliver that notification",

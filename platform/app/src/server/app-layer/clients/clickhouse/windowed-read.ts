@@ -103,8 +103,11 @@ function fallbackFragment(
  *   - Any attempt that throws: outcome `error`, and the error is rethrown —
  *     every logical read emits exactly one outcome, failures included.
  *
- * The caller's `run` closure issues each attempt against its own resilient
- * client, so retries and error translation apply per attempt.
+ * The caller's `run` closure issues each attempt against its own tenant client,
+ * so error translation applies per attempt. Nothing here retries: a read is
+ * never re-issued by the client (ADR-109 decision 4), and the second attempt a
+ * widened fallback makes is a different, wider query rather than a repeat of
+ * the one that came back empty.
  */
 export async function queryWindowed<T>(
   opts: QueryWindowedOptions<T>,

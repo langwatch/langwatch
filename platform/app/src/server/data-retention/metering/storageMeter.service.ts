@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { ClickHouseClientResolver } from "~/server/app-layer/clients/clickhouse/tenant-client";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {
   PRODUCTION_STORAGE_METER_TABLES,
@@ -228,13 +228,12 @@ export class StorageMeterService {
 
     for (const table of PRODUCTION_STORAGE_METER_TABLES) {
       try {
-        const result = await client.query({
-          query: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
-          query_params: { tenantId },
-          format: "JSONEachRow",
-          clickhouse_settings: METERING_CLICKHOUSE_SETTINGS,
+        const rows = await client.query<{ total: number }>({
+          table,
+          sql: `SELECT sum(_size_bytes) AS total FROM ${table} WHERE TenantId = {tenantId:String}`,
+          params: { tenantId },
+          settings: METERING_CLICKHOUSE_SETTINGS,
         });
-        const rows = (await result.json()) as Array<{ total: string }>;
         const tableBytes = Number(rows[0]?.total ?? 0);
         const category = RETENTION_TABLE_CATEGORY_MAP[table]!;
         byCategory[category] += tableBytes;
@@ -279,13 +278,14 @@ export class StorageMeterService {
     ).join("\n  UNION ALL\n  ");
 
     try {
-      const result = await client.query({
-        query: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
-        query_params: { tenantId },
-        format: "JSONEachRow",
-        clickhouse_settings: METERING_CLICKHOUSE_SETTINGS,
+      // No `table` label: the read spans every metered table, so naming one of
+      // them in the metric would be a lie. It stays "unknown", which is what the
+      // driver path reported for this query too.
+      const rows = await client.query<{ total: number }>({
+        sql: `SELECT sum(t) AS total FROM (\n  ${unions}\n)`,
+        params: { tenantId },
+        settings: METERING_CLICKHOUSE_SETTINGS,
       });
-      const rows = (await result.json()) as Array<{ total: string }>;
       return Number(rows[0]?.total ?? 0);
     } catch (error) {
       logger.warn(

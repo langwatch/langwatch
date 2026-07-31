@@ -3038,4 +3038,201 @@ describe("opentelemetry traces receiver", () => {
     expect(span.type).toBe("tool");
     expect(span.name).toBe("get_weather");
   });
+
+  describe("given a reported metric of exactly zero", () => {
+    describe("when gen_ai.usage.input_tokens is 0", () => {
+      /** @scenario "A zero input-token count from an older SDK reaches the span's metrics" */
+      it("records prompt_tokens as zero instead of dropping it", async () => {
+        const request: DeepPartial<IExportTraceServiceRequest> = {
+          resourceSpans: [
+            {
+              resource: { attributes: [] },
+              scopeSpans: [
+                {
+                  scope: { name: "org.springframework.boot", version: "3.4.0" },
+                  spans: [
+                    {
+                      traceId: "zeroinputtokens0000000000000000",
+                      spanId: "zeroinputtokens",
+                      name: "chat gpt-5",
+                      kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                      startTimeUnixNano: "1748353030869334708",
+                      endTimeUnixNano: "1748353033397302125",
+                      status: {},
+                      attributes: [
+                        {
+                          key: "gen_ai.usage.input_tokens",
+                          value: {
+                            intValue: Long.fromString("0") as unknown as number,
+                          },
+                        },
+                        {
+                          key: "gen_ai.usage.output_tokens",
+                          value: {
+                            intValue: Long.fromString(
+                              "13",
+                            ) as unknown as number,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+
+        const traces =
+          await openTelemetryTraceRequestToTracesForCollection(request);
+        const span = traces[0]!.spans[0]!;
+
+        expect(span.metrics?.prompt_tokens).toBe(0);
+        expect(span.metrics?.completion_tokens).toBe(13);
+      });
+    });
+
+    describe("when gen_ai.usage.output_tokens is 0", () => {
+      /** @scenario "A zero output-token count from an older SDK reaches the span's metrics" */
+      it("records completion_tokens as zero instead of dropping it", async () => {
+        const request: DeepPartial<IExportTraceServiceRequest> = {
+          resourceSpans: [
+            {
+              resource: { attributes: [] },
+              scopeSpans: [
+                {
+                  scope: { name: "org.springframework.boot", version: "3.4.0" },
+                  spans: [
+                    {
+                      traceId: "zerooutputtokens000000000000000",
+                      spanId: "zerooutputtokens",
+                      name: "chat gpt-5",
+                      kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                      startTimeUnixNano: "1748353030869334708",
+                      endTimeUnixNano: "1748353033397302125",
+                      status: {},
+                      attributes: [
+                        {
+                          key: "gen_ai.usage.input_tokens",
+                          value: {
+                            intValue: Long.fromString(
+                              "11",
+                            ) as unknown as number,
+                          },
+                        },
+                        {
+                          key: "gen_ai.usage.output_tokens",
+                          value: {
+                            intValue: Long.fromString("0") as unknown as number,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+
+        const traces =
+          await openTelemetryTraceRequestToTracesForCollection(request);
+        const span = traces[0]!.spans[0]!;
+
+        expect(span.metrics?.prompt_tokens).toBe(11);
+        expect(span.metrics?.completion_tokens).toBe(0);
+      });
+    });
+
+    describe("when llm.is_streaming is false", () => {
+      /** @scenario "A streaming flag reported as false is recorded as false" */
+      it("records stream as false instead of dropping it", async () => {
+        const request: DeepPartial<IExportTraceServiceRequest> = {
+          resourceSpans: [
+            {
+              resource: { attributes: [] },
+              scopeSpans: [
+                {
+                  scope: {
+                    name: "opentelemetry.instrumentation.openai.v1",
+                    version: "0.26.4",
+                  },
+                  spans: [
+                    {
+                      traceId: "nonstreamingcall0000000000000000",
+                      spanId: "nonstreamingcall",
+                      name: "openai.chat",
+                      kind: "SPAN_KIND_CLIENT" as unknown as ESpanKind,
+                      startTimeUnixNano: "1722866602559872000",
+                      endTimeUnixNano: "1722866604545023000",
+                      status: {},
+                      attributes: [
+                        {
+                          key: "llm.request.type",
+                          value: { stringValue: "chat" },
+                        },
+                        {
+                          key: "llm.is_streaming",
+                          value: { boolValue: false },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+
+        const traces =
+          await openTelemetryTraceRequestToTracesForCollection(request);
+        const span = traces[0]!.spans[0]!;
+
+        expect(span.params?.stream).toBe(false);
+      });
+    });
+
+    describe("when gen_ai.server.time_to_first_token is 0", () => {
+      /** @scenario "A time to first token of zero is recorded rather than discarded" */
+      it("records first_token_at as the span start instead of dropping it", async () => {
+        const request: DeepPartial<IExportTraceServiceRequest> = {
+          resourceSpans: [
+            {
+              resource: { attributes: [] },
+              scopeSpans: [
+                {
+                  scope: { name: "strands-agents", version: "1.14.0" },
+                  spans: [
+                    {
+                      traceId: "instantfirsttoken00000000000000",
+                      spanId: "instantfirsttoken",
+                      name: "chat gpt-5",
+                      kind: "SPAN_KIND_CLIENT" as unknown as ESpanKind,
+                      startTimeUnixNano: "1722866602559872000",
+                      endTimeUnixNano: "1722866604545023000",
+                      status: {},
+                      attributes: [
+                        {
+                          key: "gen_ai.server.time_to_first_token",
+                          value: {
+                            intValue: Long.fromString("0") as unknown as number,
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+
+        const traces =
+          await openTelemetryTraceRequestToTracesForCollection(request);
+        const span = traces[0]!.spans[0]!;
+
+        expect(span.timestamps.first_token_at).toBe(span.timestamps.started_at);
+      });
+    });
+  });
 });

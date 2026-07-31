@@ -1,29 +1,22 @@
+import { blobKeys, blobRef } from "@langwatch/groupqueue";
 import type { Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-} from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { createTenantId } from "../../../../event-sourcing/domain/tenantId";
-import { LEGACY_HOLDER_LEASE_GUARD } from "../../../../event-sourcing/queues/groupQueue/blobConstants";
-import {
-  blobHolderSetKey,
-  blobLeaseSetKey,
-  redisBlobKey,
-} from "../../../../event-sourcing/queues/groupQueue/blobKeys";
+} from "~/test-utils/integration/testContainers";
 import { BlobStoreRedisRepository } from "../../repositories/blob-store.redis.repository";
 
 const hasTestcontainers = !!(process.env.REDIS_URL || process.env.CI_REDIS_URL);
 
-const QUEUE = "{test/blobrepo}";
 const PROJECT = "project-blobrepo";
 const HASH = "blobrepohash01";
 
 /**
  * The operator delete path against a live Redis. The point under test is the
- * lease guard: it lives inside the delete script, so a job that acquires a
- * reference between "is it referenced?" and "delete it" is refused by the same
+ * holder guard: it lives inside the delete script, so a job that puts this exact
+ * content between "is it referenced?" and "delete it" is refused by the same
  * eval that would have removed the blob — the check-then-act race a Node-side
  * guard would leave open.
  */
@@ -31,20 +24,10 @@ describe.skipIf(!hasTestcontainers)("BlobStoreRedisRepository delete", () => {
   let redis: Redis;
   let repo: BlobStoreRedisRepository;
 
-  const tenant = createTenantId(PROJECT);
-  const keyArgs = { queueName: QUEUE, projectId: tenant, hash: HASH };
-  const blobKey = redisBlobKey(keyArgs);
-  const leaseKey = blobLeaseSetKey(keyArgs);
-  const holderKey = blobHolderSetKey(keyArgs);
-
-  const nowMs = async () => {
-    const [seconds, micros] = await redis.time();
-    return Number(seconds) * 1000 + Math.floor(Number(micros) / 1000);
-  };
+  const keys = blobKeys(blobRef(PROJECT, HASH));
 
   const clearKeys = async () => {
-    const keys = await redis.keys(`${QUEUE}*`);
-    if (keys.length > 0) await redis.del(...keys);
+    await redis.del(keys.meta, keys.data);
   };
 
   beforeAll(async () => {
@@ -60,89 +43,90 @@ describe.skipIf(!hasTestcontainers)("BlobStoreRedisRepository delete", () => {
     await stopTestContainers();
   });
 
-  describe("given a blob nothing references", () => {
+  describe("given a blob nothing holds", () => {
     describe("when an operator deletes it", () => {
       it("removes the bytes and reports the delete", async () => {
-        await redis.set(blobKey, "body", "EX", 3600);
+        await redis.hset(keys.meta, "refcount", 0, "tier", "redis");
+        await redis.set(keys.data, "body");
 
         const result = await repo.deleteOne({
-          queueName: QUEUE,
           projectId: PROJECT,
           hash: HASH,
         });
 
-        expect(result).toEqual({ deleted: true, refusedLiveLeases: 0 });
-        expect(await redis.exists(blobKey)).toBe(0);
+        expect(result).toEqual({ deleted: true, refusedHolders: 0 });
+        expect(await redis.exists(keys.data)).toBe(0);
+        expect(await redis.exists(keys.meta)).toBe(0);
       });
     });
   });
 
-  describe("given a blob a live lease still references", () => {
+  describe("given a blob a holder still references", () => {
     describe("when an operator deletes it", () => {
       it("refuses atomically and leaves the bytes in place", async () => {
-        await redis.set(blobKey, "body", "EX", 3600);
-        // A live lease: a member whose deadline is in the future.
-        await redis.zadd(leaseKey, (await nowMs()) + 60_000, "holder-a");
-        await redis.sadd(holderKey, LEGACY_HOLDER_LEASE_GUARD, "holder-a");
+        await redis.hset(keys.meta, "refcount", 2, "tier", "redis");
+        await redis.set(keys.data, "body");
 
         const result = await repo.deleteOne({
-          queueName: QUEUE,
           projectId: PROJECT,
           hash: HASH,
         });
 
-        expect(result).toEqual({ deleted: false, refusedLiveLeases: 1 });
-        expect(await redis.exists(blobKey)).toBe(1);
-      });
-    });
-  });
-
-  describe("given a blob whose only lease deadline has already lapsed", () => {
-    describe("when an operator deletes it", () => {
-      it("prunes the dead lease and deletes, because a lapsed member is not a reference", async () => {
-        await redis.set(blobKey, "body", "EX", 3600);
-        await redis.zadd(leaseKey, (await nowMs()) - 60_000, "holder-dead");
-
-        const result = await repo.deleteOne({
-          queueName: QUEUE,
-          projectId: PROJECT,
-          hash: HASH,
-        });
-
-        expect(result).toEqual({ deleted: true, refusedLiveLeases: 0 });
-        expect(await redis.exists(blobKey)).toBe(0);
+        expect(result).toEqual({ deleted: false, refusedHolders: 2 });
+        expect(await redis.exists(keys.data)).toBe(1);
       });
     });
   });
 
   describe("given a blob that has already expired", () => {
     describe("when an operator deletes it", () => {
-      it("reports no delete without claiming a lease refusal", async () => {
+      it("reports no delete without claiming a holder refusal", async () => {
         const result = await repo.deleteOne({
-          queueName: QUEUE,
           projectId: PROJECT,
           hash: HASH,
         });
 
-        expect(result).toEqual({ deleted: false, refusedLiveLeases: 0 });
+        expect(result).toEqual({ deleted: false, refusedHolders: 0 });
       });
     });
   });
 
-  describe("given a described blob", () => {
+  describe("given a spooled blob", () => {
     describe("when it is fetched by id", () => {
-      it("carries the sweep verdict the runner would reach for it", async () => {
-        // Unreferenced with a long backstop: the sweep would shorten it.
-        await redis.set(blobKey, "body", "EX", 4 * 24 * 3600);
+      it("reports its tier, holders and remaining backstop", async () => {
+        await redis.hset(keys.meta, "refcount", 1, "tier", "redis");
+        await redis.expire(keys.meta, 3600);
+        await redis.set(keys.data, "body");
 
         const summary = await repo.findById({
-          queueName: QUEUE,
           projectId: PROJECT,
           hash: HASH,
         });
 
-        expect(summary?.sweepOutcome).toBe("repaired");
-        expect(summary?.liveLeases).toBe(0);
+        expect(summary).toMatchObject({
+          projectId: PROJECT,
+          hash: HASH,
+          tier: "redis",
+          holders: 1,
+          sizeBytes: 4,
+        });
+        expect(summary?.ttlSeconds).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("given a blob whose body was offloaded to the durable store", () => {
+    describe("when it is fetched by id", () => {
+      it("reports the durable tier rather than a zero-byte redis blob", async () => {
+        await redis.hset(keys.meta, "refcount", 1, "tier", "durable");
+
+        const summary = await repo.findById({
+          projectId: PROJECT,
+          hash: HASH,
+        });
+
+        expect(summary?.tier).toBe("durable");
+        expect(summary?.sizeBytes).toBe(0);
       });
     });
   });

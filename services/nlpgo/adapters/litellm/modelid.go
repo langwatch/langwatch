@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Anthropic alias expansions, mirrored from langwatch/src/server/modelProviders/modelIdBoundary.ts.
+// Anthropic alias expansions, mirrored from platform/app/src/server/modelProviders/modelIdBoundary.ts.
 // These MUST stay in sync with the TS source — the migration spec freezes the
 // model id semantics for v1, so any new alias added on the TS side must be
 // added here too. (The TS file has a deliberate "duplicated in Python" note

@@ -130,6 +130,8 @@ func TestResolveSwitchFindsAWorktreeByName(t *testing.T) {
 // A directory that is both a git worktree and a registered stack is one place,
 // and switch offers it once — under the stack's slug, which is the name the
 // developer sees everywhere else in haven.
+//
+// @scenario "Switching to a worktree without knowing its name"
 func TestSwitchTargetsDeduplicateAndPreferRunningStacks(t *testing.T) {
 	store := &fakeStore{stacks: []domain.Stack{
 		{Slug: "otel-haven", WorktreeDir: "/repo/worktrees/otel-haven", LauncherPID: 7},

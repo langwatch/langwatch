@@ -373,7 +373,10 @@ const addOpenTelemetrySpanAsSpan = (
           }
         }
 
-        if (started_at && attributesMap.gen_ai?.server?.time_to_first_token) {
+        if (
+          started_at &&
+          attributesMap.gen_ai?.server?.time_to_first_token != null
+        ) {
           first_token_at =
             started_at +
             parseInt(
@@ -382,7 +385,7 @@ const addOpenTelemetrySpanAsSpan = (
             );
         }
 
-        if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
+        if (started_at && attributesMap.ai?.response?.msToFirstChunk != null) {
           first_token_at =
             started_at +
             parseInt((attributesMap as any).ai.response.msToFirstChunk, 10);
@@ -969,7 +972,7 @@ const addOpenTelemetrySpanAsSpan = (
           }
           // Spring AI
           if (
-            attributesMap.gen_ai.usage.input_tokens &&
+            attributesMap.gen_ai.usage.input_tokens != null &&
             !isNaN(Number(attributesMap.gen_ai.usage.input_tokens))
           ) {
             metrics.prompt_tokens = Number(
@@ -977,7 +980,7 @@ const addOpenTelemetrySpanAsSpan = (
             );
           }
           if (
-            attributesMap.gen_ai.usage.output_tokens &&
+            attributesMap.gen_ai.usage.output_tokens != null &&
             !isNaN(Number(attributesMap.gen_ai.usage.output_tokens))
           ) {
             metrics.completion_tokens = Number(
@@ -1023,7 +1026,7 @@ const addOpenTelemetrySpanAsSpan = (
           delete attributesMap.llm.invocation_parameters;
         }
 
-        if (attributesMap.llm?.is_streaming) {
+        if (attributesMap.llm?.is_streaming != null) {
           params = {
             ...params,
             stream:

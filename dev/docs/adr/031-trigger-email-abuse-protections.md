@@ -6,7 +6,7 @@
 
 ## Context
 
-Trigger notifications (ADR-026/028/030) send customer-authored email to
+Trigger notifications (ADR-036/098) send customer-authored email to
 recipient lists the customer types in freely. Three abuse/cost surfaces are
 currently unprotected:
 
@@ -179,9 +179,10 @@ get. Removing the input eliminates the vector instead of throttling it.
   into a silent forever: the operator must notice and re-enable, and the
   trigger misses real alerts after the storm passes.
 - **Drop + error log** is the simplest mechanism with self-healing semantics:
-  the cap resets on the hour, the error log feeds the operator-facing
-  automation health surface (ADR-037), and the trigger's configuration is
-  never mutated behind the operator's back.
+  the cap resets on the hour, the trigger's configuration is never mutated
+  behind the operator's back, and the error log is meant to feed an
+  operator-facing automation health surface (ADR-098) — specified, never
+  built; today the error log is the only trace of a drop.
 
 The matches a dropped email would have announced still exist as traces in the
 product; the email was the redundant artifact.
@@ -238,9 +239,11 @@ price, bounded by the hourly cap.
   multiplies by recipient-list size. Each recipient gets their own envelope
   (recipient in BCC, hashed no-reply in From/To) so recipients never see each
   other.
-- **Dropped sends are visible, not silent.** `logger.error` + a counter the
-  ADR-037 health surface can read. Operators of high-volume immediate
-  triggers should switch to a digest cadence — the error message says so.
+- **Dropped sends are visible, not silent — to an engineer, not yet an
+  operator.** `logger.error` + a counter; the ADR-098 health surface that
+  would put this in front of an operator was specified, never built.
+  Operators of high-volume immediate triggers should switch to a digest
+  cadence — the error message says so.
 - **Two caps: per-trigger hourly + per-project daily.** The hourly cap
   (§2) bounds a single noisy trigger; the daily cap (§2b,
   `TRIGGER_EMAIL_TENANT_DAILY_CAP`, default 10000 recipient-emails) bounds the
@@ -259,9 +262,7 @@ price, bounded by the hourly cap.
 
 ## References
 
-- [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence/digest mechanics the cap composes with
 - [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — template rendering the footer wraps
-- [ADR-037](./037-automation-operator-surfaces.md) — health surface that displays cap drops
-- [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — dispatcher stage carrying the cap check
+- [ADR-098](./098-event-sourcing-core.md) — cadence/digest mechanics the cap composes with, the dispatcher stage carrying the cap check, and the health surface that would display cap drops but was never built (successor to the retired ADR-026, ADR-037 and ADR-095)
 - `src/server/rateLimit.ts` — sliding-window limiter reused for test fire
 - `src/server/mailer/triggerNoReply.ts` — existing HMAC keyed-hash pattern the unsubscribe token follows

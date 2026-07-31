@@ -1,0 +1,187 @@
+/**
+ * Integration test setup file.
+ *
+ * This file reads container info from globalSetup and connects to containers.
+ * CI environment variables are handled in vitest.integration.config.ts which
+ * runs earlier (at config load time, before modules are parsed).
+ */
+
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+const CONTAINER_INFO_FILE = path.join(
+  os.tmpdir(),
+  "langwatch-test-containers.json",
+);
+
+try {
+  if (fs.existsSync(CONTAINER_INFO_FILE)) {
+    const content = fs.readFileSync(CONTAINER_INFO_FILE, "utf-8");
+    const info = JSON.parse(content) as {
+      clickHouseUrl: string;
+      redisUrl: string;
+      databaseUrl?: string;
+    };
+
+    // Set the standard env vars so application code (redis.ts, etc.) can use them
+    // These MUST be set before redis.ts is imported
+    process.env.REDIS_URL = info.redisUrl;
+    process.env.CLICKHOUSE_URL = info.clickHouseUrl;
+
+    // Native local-services mode also pins Postgres to the dedicated test
+    // database so suites never write into the dev one
+    if (info.databaseUrl) {
+      process.env.DATABASE_URL = info.databaseUrl;
+    }
+
+    // Set test-prefixed var for ClickHouse (used by isUsingGlobalSetupContainers())
+    process.env.TEST_CLICKHOUSE_URL = info.clickHouseUrl;
+
+    // Unset BUILD_TIME to allow redis.ts to create a connection
+    // BUILD_TIME is used during Next.js build to skip env validation,
+    // but for integration tests we need actual Redis connections
+    delete process.env.BUILD_TIME;
+  }
+} catch {
+  // Silently ignore - containers may be started another way (CI, local testcontainers)
+}
+
+// === END ENV SETUP ===
+
+// Now safe to import application code
+import { afterAll, beforeAll } from "vitest";
+import { startTestContainers, stopTestContainers } from "./testContainers";
+
+/**
+ * Global setup for integration tests.
+ * Connects to containers (env vars already set at module load time).
+ */
+export async function setup(): Promise<void> {
+  try {
+    await startTestContainers();
+  } catch (error) {
+    throw error;
+  }
+  // Don't clean up all data here - each test uses unique tenant IDs
+  // and cleans up its own data in afterEach
+  await unrefAppRedisSingleton();
+}
+
+/**
+ * The dump on 91df42da1 narrowed the leaking handle at the last file of
+ * integration shard 4 down to a single Socket to ::1:6379, the app-layer
+ * ioredis singleton. ioredis auto-reconnects each time we close it
+ * (BullMQ requires maxRetriesPerRequest:null, which also keeps reconnect
+ * attempts uncapped), so quit() / disconnect() can't actually keep the
+ * socket down. The cure that works is to unref the underlying socket so
+ * it stops pinning the event loop. ioredis still works for any test that
+ * sends commands, but a hung loop at shard end no longer has a reason to
+ * stay up.
+ *
+ * Walk process._getActiveHandles() rather than poking at ioredis
+ * internals: the dump already proved we can find the socket that way,
+ * and it's resilient across ioredis versions. Re-running on every
+ * connect / ready event of the redis module catches reconnects.
+ */
+async function unrefAppRedisSingleton(): Promise<void> {
+  unrefRedisSockets();
+  try {
+    const redisMod = await import("../../server/redis");
+    const conn = redisMod.connection as
+      | {
+          on?: (event: string, cb: () => void) => void;
+        }
+      | undefined;
+    if (!conn) return;
+    conn.on?.("connect", unrefRedisSockets);
+    conn.on?.("ready", unrefRedisSockets);
+    conn.on?.("reconnecting", unrefRedisSockets);
+  } catch {
+    // No redis module loaded; nothing to attach.
+  }
+}
+
+function unrefRedisSockets(): void {
+  try {
+    const proc = process as unknown as {
+      _getActiveHandles?: () => Array<{
+        remoteAddress?: string;
+        remotePort?: number;
+        unref?: () => void;
+        constructor?: { name?: string };
+      }>;
+    };
+    const handles = proc._getActiveHandles?.() ?? [];
+    for (const h of handles) {
+      const name = h?.constructor?.name;
+      if (name !== "Socket" && name !== "TLSSocket") continue;
+      if (h.remotePort !== 6379) continue;
+      try {
+        h.unref?.();
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // _getActiveHandles is an internal API; tolerate runtime variation
+  }
+}
+
+/**
+ * Per-file teardown for integration tests.
+ * Closes connections but does NOT flush Redis.
+ *
+ * Important: We don't call cleanupTestData() here because:
+ * 1. Each test uses unique tenant IDs and pipeline names for isolation
+ * 2. Each test's afterEach already cleans up its own data via cleanupTestDataForTenant()
+ * 3. Calling cleanupTestData() without tenantId triggers FLUSHALL which races with
+ *    BullMQ workers that may still be completing (causes "Missing key for job" errors)
+ */
+export async function teardown(): Promise<void> {
+  await stopTestContainers();
+  await closeAppRuntimeSingletons();
+}
+
+/**
+ * Closes the application-layer Prisma and Redis singletons that any test in
+ * the shard instantiated by importing the server modules. Without this, their
+ * open sockets keep the vitest worker process alive past the last test, the
+ * reporter never prints the summary line, and the CI step times out at the
+ * job cap.
+ *
+ * Dynamic-imported so the modules' top-level connection-bootstrap code runs
+ * only if/when a real test already pulled them in.
+ */
+async function closeAppRuntimeSingletons(): Promise<void> {
+  try {
+    const dbMod = await import("../../server/db");
+    await Promise.race([
+      dbMod.prisma.$disconnect(),
+      new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+    ]);
+  } catch {
+    // No prisma client ever constructed, or already disconnected.
+  }
+  try {
+    const redisMod = await import("../../server/redis");
+    const conn = redisMod.connection;
+    if (conn) {
+      await Promise.race([
+        Promise.resolve(conn.quit()).catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+      ]);
+      try {
+        conn.disconnect();
+      } catch {
+        // already disconnected
+      }
+    }
+  } catch {
+    // Redis was never instantiated in this shard, or already disconnected.
+  }
+}
+
+// Register global setup/teardown hooks
+beforeAll(setup, 60000); // 60 second timeout for container startup
+afterAll(teardown, 30000); // 30 second timeout for cleanup

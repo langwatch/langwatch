@@ -195,3 +195,33 @@ Feature: Knowable failures reach the customer as themselves
     When a per-member budget is requested
     Then the refusal is attributed to the platform
     And the copy does not name the storage engine
+
+  # ---------------------------------------------------------------------------
+  # Naming the right thing as missing
+  #
+  # A knowable failure can reach the customer as itself and still be wrong, if
+  # what it names is not what went missing. The single-span read answered a
+  # span it could not find with the code for a missing TRACE, and put the span
+  # id in the trace slot — so the drawer reported that a trace still drawn on
+  # screen had been deleted, and the remediation told the customer to check a
+  # trace id that was never at fault.
+  #
+  # A span id arrives from the `drawer.span` URL parameter, so a shared or
+  # bookmarked link reaches this path directly; so does a span the viewer's
+  # visibility window hides, which the storage service reports as the same
+  # absence.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: A span that cannot be found is not reported as a missing trace
+    Given a trace whose detail is on screen
+    When a span of it is requested and no such span can be read
+    Then the refusal carries the code for a missing span
+    And it does not claim the trace is missing
+
+  @integration
+  Scenario: The refusal names the span it could not find
+    Given a trace whose detail is on screen
+    When a span of it is requested and no such span can be read
+    Then the refusal carries the requested span id as a span id
+    And it leaves the trace id out rather than filling it with the span id

@@ -12,16 +12,27 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { createClickHouseClient } from "@langwatch/clickhouse";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getTestClickHouseClient } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import {
+  type TenantClickHouseClient,
+  tenantClickHouseClient,
+} from "~/server/app-layer/clients/clickhouse/tenant-client";
+import {
+  getTestClickHouseClient,
+  startTestContainers,
+} from "~/test-utils/integration/testContainers";
 import type { EvaluationRunData } from "../../types";
 import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";
 
 const tenantId = `test-eval-resolve-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
+/** The driver client, kept for the `ALTER TABLE ... DELETE` cleanup only. */
 let ch: ClickHouseClient;
+let packageClient: ReturnType<typeof createClickHouseClient>;
+let tenantClient: TenantClickHouseClient;
 let repo: EvaluationRunClickHouseRepository;
 
 function makeEval(
@@ -59,7 +70,10 @@ beforeAll(async () => {
   const rawClient = getTestClickHouseClient();
   if (!rawClient) throw new Error("ClickHouse test container not available");
   ch = rawClient;
-  repo = new EvaluationRunClickHouseRepository(async () => ch);
+  const containers = await startTestContainers();
+  packageClient = createClickHouseClient({ url: containers.clickHouseUrl });
+  tenantClient = tenantClickHouseClient({ client: packageClient, tenantId });
+  repo = new EvaluationRunClickHouseRepository(async () => tenantClient);
 
   // Two versions of the same evaluation: the dedup must return the latest
   // (v2), and the ScheduledAt resolve (argMax over UpdatedAt) must pick v2's
@@ -86,6 +100,7 @@ afterAll(async () => {
       query_params: { tenantId },
     });
   }
+  await packageClient?.close();
 });
 
 describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", () => {
@@ -101,19 +116,19 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
 
   it("resolves ScheduledAt and bounds the heavy read to the eval's partition", async () => {
     const queries: string[] = [];
-    const recordingClient = new Proxy(ch, {
+    const recordingClient = new Proxy(tenantClient, {
       get(target, prop, receiver) {
         if (prop === "query") {
-          return (args: { query: string; query_params?: unknown }) => {
-            if (args.query.includes("evaluation_runs")) {
-              queries.push(args.query);
+          return (args: { sql: string; params?: unknown }) => {
+            if (args.sql.includes("evaluation_runs")) {
+              queries.push(args.sql);
             }
-            return (target as ClickHouseClient).query(args as never);
+            return (target as TenantClickHouseClient).query(args as never);
           };
         }
         return Reflect.get(target, prop, receiver);
       },
-    }) as ClickHouseClient;
+    }) as TenantClickHouseClient;
     const recordingRepo = new EvaluationRunClickHouseRepository(
       async () => recordingClient,
     );
@@ -136,19 +151,19 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
 
   it("returns null and stays unbounded for an evaluation that does not exist", async () => {
     const queries: string[] = [];
-    const recordingClient = new Proxy(ch, {
+    const recordingClient = new Proxy(tenantClient, {
       get(target, prop, receiver) {
         if (prop === "query") {
-          return (args: { query: string; query_params?: unknown }) => {
-            if (args.query.includes("evaluation_runs")) {
-              queries.push(args.query);
+          return (args: { sql: string; params?: unknown }) => {
+            if (args.sql.includes("evaluation_runs")) {
+              queries.push(args.sql);
             }
-            return (target as ClickHouseClient).query(args as never);
+            return (target as TenantClickHouseClient).query(args as never);
           };
         }
         return Reflect.get(target, prop, receiver);
       },
-    }) as ClickHouseClient;
+    }) as TenantClickHouseClient;
     const recordingRepo = new EvaluationRunClickHouseRepository(
       async () => recordingClient,
     );

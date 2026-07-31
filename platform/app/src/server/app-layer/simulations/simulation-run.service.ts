@@ -40,6 +40,17 @@ export class SimulationRunService {
     return this.repository.getScenarioRunData(params);
   }
 
+  /**
+   * The run's stored status, read fresh. The dispatch guard's question — see
+   * {@link SimulationRepository.findRunStatus}.
+   */
+  async getRunStatus(params: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<string | null> {
+    return this.repository.findRunStatus(params);
+  }
+
   async getBatchHistoryForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
@@ -69,6 +80,8 @@ export class SimulationRunService {
     endDate?: number;
   }): Promise<{
     runs: ScenarioRunData[];
+    /** Per batch, how many runs it set out to queue (ADR-072). */
+    expectedCounts: Record<string, number>;
     nextCursor?: string;
     hasMore: boolean;
   }> {

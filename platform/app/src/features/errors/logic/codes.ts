@@ -51,6 +51,7 @@ export const APP_ERROR_CODES = [
   "dataset_name_taken",
   "dataset_not_ready",
   "dataset_stale_columns",
+  "dataset_storage_not_writable",
   "dspy_step_not_found",
   "evaluation_not_found",
   "evaluator_config_error",
@@ -75,6 +76,7 @@ export const APP_ERROR_CODES = [
   // code for an unhandled failure, so the scan sees it here too.
   "internal_error",
   "invalid_action_params",
+  "invalid_annotator_reference",
   "invalid_email_recipient",
   "invalid_experiment_configuration",
   "langy_agent_at_capacity",
@@ -176,7 +178,6 @@ export const APP_ERROR_CODES = [
   "template_not_found",
   "template_validation_error",
   "test_fire_unavailable",
-  "time_range_too_wide",
   "trace_not_evaluatable",
   "trace_not_found",
   "trace_sharing_disabled",

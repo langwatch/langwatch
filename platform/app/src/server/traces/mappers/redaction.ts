@@ -1,9 +1,9 @@
+import type { DerivedTraceEvent } from "~/server/app-layer/traces/trace-event";
 import {
   redactSpanContent,
   redactTraceContent,
 } from "~/server/app-layer/traces/visibility-window.service";
 import { PRIVACY_DROPPED_MARKER_ATTR } from "~/server/data-privacy/dropKeyCatalog";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type {
   Event,
   Span,

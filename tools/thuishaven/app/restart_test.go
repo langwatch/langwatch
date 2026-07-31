@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -472,5 +473,170 @@ func TestSelectionIsPerWorktree(t *testing.T) {
 				}
 			})
 		})
+	})
+}
+
+// @scenario "Restarting is one verb with three scopes"
+func TestUnhealthyTargets(t *testing.T) {
+	targets := []restartTarget{
+		{Name: "app", Port: 9000},
+		{Name: "gateway", Port: 9001},
+		{Name: "api", Port: 9100},
+	}
+
+	t.Run("given some ports answering and some not", func(t *testing.T) {
+		up := map[int]bool{9000: true, 9100: true}
+		got := unhealthyTargets(targets, func(p int) bool { return up[p] })
+		if len(got) != 1 || got[0].Name != "gateway" {
+			t.Errorf("unhealthyTargets = %v, want just the silent gateway", got)
+		}
+	})
+
+	t.Run("given every port answering", func(t *testing.T) {
+		if got := unhealthyTargets(targets, func(int) bool { return true }); len(got) != 0 {
+			t.Errorf("unhealthyTargets = %v, want nothing bounced on a healthy stack", got)
+		}
+	})
+
+	// A target with no port cannot be probed, so calling it unhealthy would be a
+	// guess — and the guess bounces a working service.
+	t.Run("given a target with no port to probe", func(t *testing.T) {
+		got := unhealthyTargets([]restartTarget{{Name: "mystery"}}, func(int) bool { return false })
+		if len(got) != 0 {
+			t.Errorf("unhealthyTargets = %v, want an unprobeable target left alone", got)
+		}
+	})
+}
+
+// @scenario "Restarting is one verb with three scopes"
+func TestRestartUnhealthy(t *testing.T) {
+	ctx := context.Background()
+	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
+
+	newFixture := func(portsUp map[int]bool) (*fakeSystem, *Orchestrator) {
+		store := &fakeStore{
+			stacks:    []domain.Stack{restartStack()},
+			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+		}
+		sys := &fakeSystem{
+			alive:      map[int]bool{42: true},
+			portsUp:    portsUp,
+			pidsByPort: map[int][]int{9000: {100}, 9001: {101}, 9100: {102}, 9200: {103}},
+		}
+		return sys, restartOrch(store, sys)
+	}
+
+	t.Run("given a stack where one service stopped answering", func(t *testing.T) {
+		// app, api and workers answer; gateway does not.
+		sys, o := newFixture(map[int]bool{9000: true, 9100: true, 9200: true})
+
+		t.Run("when the unhealthy ones are restarted", func(t *testing.T) {
+			bounced, err := o.RestartUnhealthy(ctx, params)
+			if err != nil {
+				t.Fatalf("RestartUnhealthy: %v", err)
+			}
+
+			t.Run("only that service's group is terminated", func(t *testing.T) {
+				if len(sys.groupTerminated) != 1 || sys.groupTerminated[0] != 101 {
+					t.Errorf("terminated %v, want only gateway's group", sys.groupTerminated)
+				}
+			})
+
+			t.Run("it names what it bounced, so the caller can follow those logs", func(t *testing.T) {
+				if len(bounced) != 1 || bounced[0] != "gateway" {
+					t.Errorf("bounced = %v, want [gateway]", bounced)
+				}
+			})
+		})
+	})
+
+	t.Run("given a stack where everything answers", func(t *testing.T) {
+		sys, o := newFixture(map[int]bool{9000: true, 9001: true, 9100: true, 9200: true})
+
+		t.Run("when the unhealthy ones are restarted", func(t *testing.T) {
+			bounced, err := o.RestartUnhealthy(ctx, params)
+			if err != nil {
+				t.Fatalf("RestartUnhealthy: %v", err)
+			}
+
+			t.Run("nothing is touched", func(t *testing.T) {
+				if len(sys.groupTerminated) != 0 {
+					t.Errorf("terminated %v on a healthy stack", sys.groupTerminated)
+				}
+				if len(bounced) != 0 {
+					t.Errorf("bounced = %v, want nothing", bounced)
+				}
+			})
+		})
+	})
+
+	// A baseline fallback is another worktree's process and the shared database
+	// servers are machine-wide; neither is ours to bounce, however dead its port
+	// looks from here.
+	t.Run("given a stack whose fallback and shared servers are down", func(t *testing.T) {
+		sys, o := newFixture(map[int]bool{9000: true, 9001: true, 9100: true, 9200: true})
+
+		t.Run("when the unhealthy ones are restarted", func(t *testing.T) {
+			if _, err := o.RestartUnhealthy(ctx, params); err != nil {
+				t.Fatalf("RestartUnhealthy: %v", err)
+			}
+			if len(sys.groupTerminated) != 0 {
+				t.Errorf("terminated %v — a fallback or shared server was treated as ours", sys.groupTerminated)
+			}
+		})
+	})
+
+	t.Run("given a stack whose launcher is gone", func(t *testing.T) {
+		store := &fakeStore{
+			stacks:    []domain.Stack{restartStack()},
+			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+		}
+		o := restartOrch(store, &fakeSystem{alive: map[int]bool{}})
+
+		t.Run("when the unhealthy ones are restarted, it refuses and names the fix", func(t *testing.T) {
+			_, err := o.RestartUnhealthy(ctx, params)
+			if err == nil {
+				t.Fatal("RestartUnhealthy on a dead stack should refuse — nothing would bring the children back")
+			}
+			if !strings.Contains(err.Error(), "haven up") {
+				t.Errorf("error %q does not name the command that fixes it", err)
+			}
+		})
+	})
+}
+
+// Bare `haven` opens the attached view when the worktree's own stack is live,
+// and the fleet hub otherwise. "Live" is the launcher still running: a
+// registered stack whose launcher died has nothing to attach to.
+// @scenario "Bare haven opens this worktree's stack when it is up"
+func TestLiveStackForWorktree(t *testing.T) {
+	params := UpParams{WorktreeDir: "/wt/feat-x", IsLinkedWorktree: true}
+	store := func() *fakeStore {
+		return &fakeStore{
+			stacks:    []domain.Stack{restartStack()},
+			slugCache: map[string]string{"/wt/feat-x": "feat-x"},
+		}
+	}
+
+	t.Run("given this worktree's stack is up", func(t *testing.T) {
+		o := restartOrch(store(), &fakeSystem{alive: map[int]bool{42: true}})
+		slug, live := o.LiveStackForWorktree(params)
+		if !live || slug != "feat-x" {
+			t.Errorf("LiveStackForWorktree = (%q, %v), want (feat-x, true)", slug, live)
+		}
+	})
+
+	t.Run("given the stack is registered but its launcher has died", func(t *testing.T) {
+		o := restartOrch(store(), &fakeSystem{alive: map[int]bool{}})
+		if _, live := o.LiveStackForWorktree(params); live {
+			t.Error("a dead launcher was reported live — bare haven would attach to nothing")
+		}
+	})
+
+	t.Run("given no stack is registered for this worktree", func(t *testing.T) {
+		o := restartOrch(&fakeStore{}, &fakeSystem{})
+		if _, live := o.LiveStackForWorktree(UpParams{WorktreeDir: "/wt/other", IsLinkedWorktree: true}); live {
+			t.Error("an unregistered worktree was reported live")
+		}
 	})
 }

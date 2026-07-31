@@ -32,6 +32,7 @@ function triggersById(triggers: EnhancedTrigger[]) {
 
 describe("toActivityEntries", () => {
   describe("given a trace automation fired", () => {
+    /** @scenario "Reviewing recent activity across everything" */
     it("reads as a match", () => {
       const entries = toActivityEntries({
         fires: [makeFire({})],
@@ -44,6 +45,7 @@ describe("toActivityEntries", () => {
   });
 
   describe("given a report was sent", () => {
+    /** @scenario "History distinguishes what kind of thing happened" */
     it("reads as sent, not as a match", () => {
       const entries = toActivityEntries({
         fires: [
@@ -63,6 +65,7 @@ describe("toActivityEntries", () => {
   });
 
   describe("given a graph alert opened and later recovered", () => {
+    /** @scenario "History distinguishes what kind of thing happened" */
     it("becomes two moments — the alert starting and the alert recovering", () => {
       const entries = toActivityEntries({
         fires: [
@@ -88,6 +91,7 @@ describe("toActivityEntries", () => {
   });
 
   describe("given a graph alert that is still firing", () => {
+    /** @scenario "An alert that is still open shows only when it started" */
     it("shows only the moment it started", () => {
       const entries = toActivityEntries({
         fires: [makeFire({ customGraphId: "graph-1", resolvedAt: null })],
@@ -98,6 +102,7 @@ describe("toActivityEntries", () => {
   });
 
   describe("when the automation behind a fire has since been deleted", () => {
+    /** @scenario "A fire outlives the automation that produced it" */
     it("still shows the fire rather than quietly rewriting history", () => {
       const entries = toActivityEntries({
         fires: [makeFire({ triggerId: "gone" })],
@@ -109,6 +114,7 @@ describe("toActivityEntries", () => {
   });
 
   describe("given fires from several automations", () => {
+    /** @scenario "Reviewing recent activity across everything" */
     it("orders every moment newest first", () => {
       const entries = toActivityEntries({
         fires: [

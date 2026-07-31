@@ -380,7 +380,7 @@ the OTel trace the gateway already emits for every request. The flow:
 2. The trace-processing pipeline's `OtlpSpanCostEnrichmentService` computes
    cost from the pricing catalog (matching on `gen_ai.request.model` +
    per-project custom costs) and stamps it onto the span.
-3. The `gatewayBudgetSync` reactor reads the enriched span, resolves the
+3. The `gatewayBudgetSync` map projection reads the enriched span, resolves the
    applicable budgets (VK, project, team, org, principal and group
    scopes), and writes one row per applicable budget to the ClickHouse table
    `gateway_budget_ledger_events`, keyed by `(TenantId, BudgetId, GatewayRequestId)`.
