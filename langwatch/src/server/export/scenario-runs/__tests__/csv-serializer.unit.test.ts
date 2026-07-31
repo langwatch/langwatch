@@ -196,10 +196,8 @@ describe("scenario run CSV serializers", () => {
       expect(parse(csv)[0]!.run_total_cost).toBe("");
     });
 
-    /**
-     * @scenario Every row reports both the run's status and its category
-     * @scenario Statuses that mean failure are categorised together but still distinguishable
-     */
+    /** @scenario Every row reports both the run's status and its category */
+    /** @scenario Statuses that mean failure are categorised together but still distinguishable */
     it("reports the run status alongside its outcome category", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
@@ -233,9 +231,8 @@ describe("scenario run CSV serializers", () => {
      * reader gets. For a run still going it is elapsed-so-far, and the category
      * is what says so — read on its own the number would look like a run that
      * finished quickly.
-     *
-     * @scenario An in-flight run reports elapsed time, not a final duration
      */
+    /** @scenario An in-flight run reports elapsed time, not a final duration */
     it("pairs an unfinished run's elapsed time with an in-progress category", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
@@ -258,9 +255,8 @@ describe("scenario run CSV serializers", () => {
      * The stated reason there is no third, one-row-per-run mode: every
      * run-level column is repeated on every message row, so a spreadsheet's
      * "remove duplicates" gives that file for free.
-     *
-     * @scenario One row per run is a de-duplication away
      */
+    /** @scenario One row per run is a de-duplication away */
     it("repeats run columns so de-duplicating leaves one intact row per run", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
@@ -530,9 +526,8 @@ describe("scenario run CSV serializers", () => {
      * The whole reason criteria mode exists: one row per (run, criterion) is
      * what makes "which rule do we break most often?" a group-and-count rather
      * than a manual read of every transcript.
-     *
-     * @scenario Criteria mode makes the failing-criteria ranking a spreadsheet pivot
      */
+    /** @scenario Criteria mode makes the failing-criteria ranking a spreadsheet pivot */
     it("lets one criterion's failures be counted across many runs", () => {
       const terse = "Langy is terse";
       const runs = Array.from({ length: 18 }, (_, index) =>
@@ -566,10 +561,8 @@ describe("scenario run CSV serializers", () => {
   });
 
   describe("when exporting a conversation in full mode", () => {
-    /**
-     * @scenario Full CSV writes one row per conversation message
-     * @scenario Full rows repeat the run fields on every message row
-     */
+    /** @scenario Full CSV writes one row per conversation message */
+    /** @scenario Full rows repeat the run fields on every message row */
     it("writes one row per message with run fields repeated", () => {
       const csv = serializeRunsToFullCsv({
         runs: [

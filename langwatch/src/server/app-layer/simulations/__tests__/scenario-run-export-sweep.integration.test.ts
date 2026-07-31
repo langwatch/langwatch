@@ -234,9 +234,8 @@ describe("scenario run export sweep (integration)", () => {
      * TenantId is the only id unique across projects — ScenarioRunId is not —
      * so this is the predicate that stops one customer's export containing
      * another's transcripts.
-     *
-     * @scenario Export is scoped to my own project
      */
+    /** @scenario Export is scoped to my own project */
     it("never returns another project's runs", async () => {
       const runs = await sweep({ projectId: tenantId, limit: 100 });
       expect(runs.map((run) => run.scenarioRunId)).not.toContain(
@@ -256,9 +255,8 @@ describe("scenario run export sweep (integration)", () => {
      * stored — so the export only agrees with the run history if it reads
      * through the same mapper. If it ever read the raw Status column instead,
      * this run would export as IN_PROGRESS while the screen said stalled.
-     *
-     * @scenario A run that stalled exports as stalled
      */
+    /** @scenario A run that stalled exports as stalled */
     it("exports it as stalled, the same as the run history shows it", async () => {
       const stalledRunId = `run-stalled-${nanoid()}`;
       const lastEvent = new Date(now - STALL_THRESHOLD_MS - 60_000);

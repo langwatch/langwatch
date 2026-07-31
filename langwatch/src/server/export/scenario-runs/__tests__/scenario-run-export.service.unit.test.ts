@@ -60,32 +60,33 @@ type FindCall = Parameters<SimulationRepository["findRunsForExport"]>[0];
  * that ignores the cursor loops forever and a caller that stops early is
  * visible in `calls`.
  */
-class PagingRepositoryStub extends NullSimulationRepository {
-  readonly calls: FindCall[] = [];
+function pagingRepository(pages: ExportableRun[][]): {
+  repository: SimulationRepository;
+  calls: FindCall[];
+} {
+  const calls: FindCall[] = [];
+  // Layered over the Null implementation rather than subclassing it: its
+  // `findRunsForExport()` declares no parameters, so an override that reads
+  // them is a signature mismatch — and reading them is the entire point here.
+  const repository: SimulationRepository = Object.assign(
+    new NullSimulationRepository(),
+    {
+      countRunsForExport: async () => pages.flat().length,
+      findRunsForExport: async (params: FindCall) => {
+        calls.push(params);
+        const index = params.cursor ? Number(params.cursor) : 0;
+        const runs = pages[index] ?? [];
+        const hasMore = index < pages.length - 1;
+        return {
+          runs,
+          hasMore,
+          ...(hasMore ? { nextCursor: String(index + 1) } : {}),
+        };
+      },
+    },
+  );
 
-  constructor(private readonly pages: ExportableRun[][]) {
-    super();
-  }
-
-  override async countRunsForExport(): Promise<number> {
-    return this.pages.flat().length;
-  }
-
-  override async findRunsForExport(params: FindCall): Promise<{
-    runs: ExportableRun[];
-    nextCursor?: string;
-    hasMore: boolean;
-  }> {
-    this.calls.push(params);
-    const index = params.cursor ? Number(params.cursor) : 0;
-    const runs = this.pages[index] ?? [];
-    const hasMore = index < this.pages.length - 1;
-    return {
-      runs,
-      hasMore,
-      ...(hasMore ? { nextCursor: String(index + 1) } : {}),
-    };
-  }
+  return { repository, calls };
 }
 
 function request(
@@ -123,11 +124,10 @@ describe("ScenarioRunExportService", () => {
      * file assembled from several pages must not repeat it. Asserted on the
      * assembled file rather than on the flag, because the flag being right and
      * the file being wrong is the failure worth catching.
-     *
-     * @scenario The header row is written once
      */
+    /** @scenario The header row is written once */
     it("writes the header on the first batch only", async () => {
-      const repository = new PagingRepositoryStub([
+      const { repository } = pagingRepository([
         [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
       ]);
@@ -148,11 +148,9 @@ describe("ScenarioRunExportService", () => {
       ]);
     });
 
-    /**
-     * @scenario Progress is shown while a large export streams
-     */
+    /** @scenario Progress is shown while a large export streams */
     it("reports runs visited against the total, reaching it at the end", async () => {
-      const repository = new PagingRepositoryStub([
+      const { repository } = pagingRepository([
         [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
       ]);
@@ -174,11 +172,10 @@ describe("ScenarioRunExportService", () => {
      * Without the signal the sweep keeps paging ClickHouse long after nobody is
      * reading: `controller.enqueue` only throws on the *next* chunk, so a large
      * export would run to exhaustion for a download already abandoned.
-     *
-     * @scenario Cancelling an in-flight export stops it
      */
+    /** @scenario Cancelling an in-flight export stops it */
     it("stops asking the repository for more pages", async () => {
-      const repository = new PagingRepositoryStub([
+      const { repository, calls } = pagingRepository([
         [buildRun({ scenarioRunId: "a" })],
         [buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
@@ -192,13 +189,13 @@ describe("ScenarioRunExportService", () => {
       });
 
       await generator.next();
-      expect(repository.calls).toHaveLength(1);
+      expect(calls).toHaveLength(1);
 
       controller.abort();
       const afterAbort = await generator.next();
 
       expect(afterAbort.done).toBe(true);
-      expect(repository.calls).toHaveLength(1);
+      expect(calls).toHaveLength(1);
     });
   });
 
@@ -207,16 +204,27 @@ describe("ScenarioRunExportService", () => {
      * Applied after mapping, not in SQL: STALLED is derived from timestamps by
      * resolveRunStatus rather than stored, so only a post-mapping filter can
      * reproduce what the list on screen shows.
-     *
-     * @scenario Export honours the pass/fail filter
      */
+    /** @scenario Export honours the pass/fail filter */
     it("keeps only the runs in the requested outcome category", async () => {
-      const repository = new PagingRepositoryStub([
+      const { repository } = pagingRepository([
         [
-          buildRun({ scenarioRunId: "passed", status: ScenarioRunStatus.SUCCESS }),
-          buildRun({ scenarioRunId: "failed", status: ScenarioRunStatus.FAILED }),
-          buildRun({ scenarioRunId: "errored", status: ScenarioRunStatus.ERROR }),
-          buildRun({ scenarioRunId: "stalled", status: ScenarioRunStatus.STALLED }),
+          buildRun({
+            scenarioRunId: "passed",
+            status: ScenarioRunStatus.SUCCESS,
+          }),
+          buildRun({
+            scenarioRunId: "failed",
+            status: ScenarioRunStatus.FAILED,
+          }),
+          buildRun({
+            scenarioRunId: "errored",
+            status: ScenarioRunStatus.ERROR,
+          }),
+          buildRun({
+            scenarioRunId: "stalled",
+            status: ScenarioRunStatus.STALLED,
+          }),
         ],
       ]);
       const service = new ScenarioRunExportService(repository);
@@ -240,8 +248,13 @@ describe("ScenarioRunExportService", () => {
      * file a spreadsheet will open, not a zero-byte download.
      */
     it("still writes a header when every run is filtered out", async () => {
-      const repository = new PagingRepositoryStub([
-        [buildRun({ scenarioRunId: "passed", status: ScenarioRunStatus.SUCCESS })],
+      const { repository } = pagingRepository([
+        [
+          buildRun({
+            scenarioRunId: "passed",
+            status: ScenarioRunStatus.SUCCESS,
+          }),
+        ],
       ]);
       const service = new ScenarioRunExportService(repository);
 
@@ -264,7 +277,7 @@ describe("ScenarioRunExportService", () => {
      * than the user was looking at.
      */
     it("passes the whole scope through to the repository", async () => {
-      const repository = new PagingRepositoryStub([[buildRun()]]);
+      const { repository, calls } = pagingRepository([[buildRun()]]);
       const service = new ScenarioRunExportService(repository);
 
       await collect(
@@ -278,7 +291,7 @@ describe("ScenarioRunExportService", () => {
         }),
       );
 
-      expect(repository.calls[0]).toMatchObject({
+      expect(calls[0]).toMatchObject({
         projectId: "project_1",
         scenarioSetId: "set_7",
         scenarioId: "scenario_3",
