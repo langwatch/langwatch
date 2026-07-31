@@ -67,17 +67,14 @@ describe("parseTraceSearchCommand", () => {
 
       it("keeps an escaped space inside an unquoted value", () => {
         expect(
-          parseTraceSearchCommand(
-            "langwatch trace search -q checkout\\ failed",
-          ).query,
+          parseTraceSearchCommand("langwatch trace search -q checkout\\ failed")
+            .query,
         ).toBe("checkout failed");
       });
 
       it("unescapes a doubled backslash inside double quotes", () => {
         expect(
-          parseTraceSearchCommand(
-            'langwatch trace search -q "a\\\\b"',
-          ).query,
+          parseTraceSearchCommand('langwatch trace search -q "a\\\\b"').query,
         ).toBe("a\\b");
       });
 
@@ -292,9 +289,9 @@ describe("buildExplorerQuery", () => {
     });
 
     it("drops whitespace-only entries instead of emitting an empty facet", () => {
-      expect(
-        buildExplorerQuery({ origins: ["  ", " simulation "] }),
-      ).toBe("origin:simulation");
+      expect(buildExplorerQuery({ origins: ["  ", " simulation "] })).toBe(
+        "origin:simulation",
+      );
     });
   });
 
