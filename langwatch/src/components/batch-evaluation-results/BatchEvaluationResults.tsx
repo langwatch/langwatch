@@ -32,6 +32,7 @@ import {
   ColumnVisibilityButton,
   DEFAULT_HIDDEN_COLUMNS,
   FieldsButton,
+  GroupRowsButton,
   RowHeightButton,
 } from "./BatchEvaluationResultsTable";
 import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
@@ -47,6 +48,7 @@ import {
 import { useComparisonMode } from "./useComparisonMode";
 import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
 import { useResultDisplayPreferences } from "./useResultDisplayPreferences";
+import { useResultsGrouping } from "./useResultsGrouping";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -61,6 +63,27 @@ type BatchEvaluationResultsProps = {
 
 /** Grace period after run finishes to continue refetching for final results */
 const REFETCH_GRACE_PERIOD_MS = 3000; // 3 seconds
+
+type RouterQuery = Record<string, string | string[] | undefined>;
+
+/**
+ * The router query that applying `groupBy` would produce, or `null` when
+ * it would be a no-op — replacing the URL with an identical query still
+ * costs a navigation, and in Next that re-runs every `router.query`
+ * effect on the page.
+ */
+const queryWithGroupBy = (
+  query: RouterQuery,
+  groupBy: string | null,
+): RouterQuery | null => {
+  if (groupBy) {
+    if (query.groupBy === groupBy) return null;
+    return { ...query, groupBy };
+  }
+  if (!("groupBy" in query)) return null;
+  const { groupBy: _dropped, ...rest } = query;
+  return rest;
+};
 
 export function BatchEvaluationResults({
   project,
@@ -288,6 +311,41 @@ export function BatchEvaluationResults({
     return undefined;
   }, [router.query.compare]);
 
+  // Group-by-metadata URL sync. The dropdown lives inside ComparisonTable
+  // but the URL contract is shared state, so we own it here. `null`
+  // means "no grouping" (URL param absent).
+  const queryGroupBy = useMemo(() => {
+    const value = router.query.groupBy;
+    if (typeof value === "string" && value.length > 0) return value;
+    return null;
+  }, [router.query.groupBy]);
+
+  // In controlled mode a parent owns the URL, so grouping is held here
+  // instead. Returning early without this would leave the dropdown rendered
+  // but inert — ComparisonTable shows it whenever the data has groupable
+  // keys, and it has no way to know the parent swallowed the change.
+  const [localGroupBy, setLocalGroupBy] = useState<string | null>(null);
+
+  const handleGroupByChange = useCallback(
+    (next: string | null) => {
+      // Apply locally first, always. Routing to read the answer back out of
+      // the URL put ~4s between the click and the table regrouping, which
+      // reads as the grouping itself being slow rather than as a round-trip.
+      // The URL is still the source of truth on load and still what a shared
+      // link carries — it just no longer gates the render.
+      setLocalGroupBy(next);
+      if (onSelectRunId) return;
+      const newQuery = queryWithGroupBy(router.query, next);
+      if (!newQuery) return;
+      void router.replace(
+        { pathname: router.pathname, query: newQuery },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [onSelectRunId, router],
+  );
+
   // Handle comparison mode URL sync
   const handleComparisonChange = useCallback(
     (isComparing: boolean, comparedRunIds: string[]) => {
@@ -405,6 +463,13 @@ export function BatchEvaluationResults({
   ]);
 
   // Chart data to display - either comparison data or single run data
+  // Derived here so the toolbar button and the table agree on which keys
+  // exist; ComparisonTable derives the same set for its own rendering.
+  const { availableKeys: groupableKeys } = useResultsGrouping({
+    source: "dataset-entry",
+    comparisonData,
+  });
+
   const chartDisplayData = compareMode ? comparisonData : singleRunChartData;
 
   // Target colors from charts (when X-axis is "target")
@@ -511,6 +576,11 @@ export function BatchEvaluationResults({
             <>
               <RowHeightButton value={rowHeight} onChange={setRowHeight} />
               <FieldsButton fields={fields} onToggle={toggleField} />
+              <GroupRowsButton
+                availableKeys={groupableKeys}
+                value={localGroupBy ?? queryGroupBy}
+                onChange={handleGroupByChange}
+              />
             </>
           )}
           {transformedData && transformedData.datasetColumns.length > 0 && (
@@ -596,6 +666,7 @@ export function BatchEvaluationResults({
                   showEvaluations={fields.scores}
                   showCostAndLatency={fields.costAndLatency}
                   rowHeight={rowHeight}
+                  groupBy={localGroupBy ?? queryGroupBy}
                 />
               </Card.Body>
             </Card.Root>
