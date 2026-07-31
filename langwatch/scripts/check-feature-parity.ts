@@ -538,11 +538,18 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-library.feature",
   "specs/scenarios/stalled-scenario-runs.feature",
   "specs/secrets/secrets-manager.feature",
+  // Helm chart behaviour. Cannot be bound: the tests that verify these
+  // scenarios are charts/langwatch/tests/e2e-overlays.sh, which the checker
+  // does not scan — it reads .bats files under DEFAULT_BATS_TEST_ROOTS, and
+  // these are .sh under charts/. Binding them means either porting those
+  // suites to bats or teaching the checker a shell-test root; until then a
+  // deny-list entry is honest and an "all bound ✓" is not.
+  "specs/security/helm-strict-admission.feature",
+  "specs/security/ingress-internal-path-block.feature",
   "specs/security/org-level-tenancy-enforcement.feature",
   "specs/security/tenant-aware-egress-isolation.feature",
   "specs/server/metrics-collection.feature",
   "specs/server/spa-fallback.feature",
-  "specs/server/worker-liveness-probe.feature",
   "specs/settings/decompose-model-provider-form-hook.feature",
   "specs/settings/settings-table-responsiveness.feature",
   "specs/setup/docker-dev-worktree-isolation.feature",
