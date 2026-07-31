@@ -100,7 +100,7 @@ function boundedTable({
 interface RangeBound {
   table: string;
   column: string;
-  qualified: boolean;
+  isQualified: boolean;
 }
 
 /**
@@ -125,7 +125,7 @@ function boundOf({
   const table = boundedTable({ qualifier, scope });
   if (!table) return null;
 
-  return { table, column, qualified: Boolean(qualifier) };
+  return { table, column, isQualified: Boolean(qualifier) };
 }
 
 /** Record `FROM <table> <alias>`, ignoring the keywords that are not aliases. */
@@ -156,7 +156,7 @@ function rangeBounds(sql: string): RangeBound[] {
       scope: { enclosingTable, knownTables, aliasToTable },
     });
     if (bound) {
-      bounds.set(`${bound.table}.${bound.column}.${bound.qualified}`, bound);
+      bounds.set(`${bound.table}.${bound.column}.${bound.isQualified}`, bound);
     }
     match = RANGE_BOUND_OR_TABLE.exec(sql);
   }
@@ -187,7 +187,7 @@ function rangeBoundColumnsByTable(sql: string): Map<string, Set<string>> {
 function partitionBoundViolations(sql: string): string[] {
   const violations: string[] = [];
 
-  for (const { table, column, qualified } of rangeBounds(sql)) {
+  for (const { table, column, isQualified } of rangeBounds(sql)) {
     const partitionColumns = (
       TIME_PARTITIONED_TABLES as Record<string, readonly string[] | undefined>
     )[table];
@@ -199,7 +199,7 @@ function partitionBoundViolations(sql: string): string[] {
     ];
     if (prunable.includes(column)) continue;
 
-    const consequence = qualified
+    const consequence = isQualified
       ? `${table}.${column} is pinned to ${table}, so the bound prunes nothing`
       : `ClickHouse resolves the bare ${column} against the outer trace_summaries scope instead of failing`;
     violations.push(
