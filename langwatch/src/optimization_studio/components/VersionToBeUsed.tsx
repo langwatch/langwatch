@@ -108,6 +108,13 @@ export function NewVersionFields({
 
   const userEditedCommitMessage = useRef(false);
   const hasTriggeredGeneration = useRef(false);
+  // The generation is one-shot, so the effect that schedules it never re-arms
+  // on a re-run. The handle therefore lives on a ref and is only dropped on
+  // unmount; clearing it per effect run would swallow the generation whenever
+  // the deps changed before the timeout fired.
+  const generateCommitMessageTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   const generateCommitMessageCallback = useCallback(
     (prevDsl: Workflow, newDsl: Workflow, options?: { force?: boolean }) => {
@@ -162,7 +169,8 @@ export function NewVersionFields({
         shouldDirty: true,
       });
       if (isModelConfigured) {
-        setTimeout(() => {
+        generateCommitMessageTimerRef.current = setTimeout(() => {
+          generateCommitMessageTimerRef.current = null;
           debouncedGenerateCommitMessage(previousVersion.dsl!, getWorkflow());
         }, 0);
       }
@@ -179,6 +187,15 @@ export function NewVersionFields({
     resolvedDefault.isFetched,
     isModelConfigured,
   ]);
+
+  useEffect(
+    () => () => {
+      if (generateCommitMessageTimerRef.current) {
+        clearTimeout(generateCommitMessageTimerRef.current);
+      }
+    },
+    [],
+  );
 
   // Only redden the fields once the user has actually attempted to submit.
   // The description is required and starts empty, so keying the ring on the

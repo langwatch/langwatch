@@ -26,6 +26,7 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
   };
 });
 
+import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 import { blankTemplate } from "../../../../optimization_studio/templates/blank";
 import type {
   LLMConfig,
@@ -128,31 +129,26 @@ describe("workflow.create node LLM materialization", () => {
   });
 
   afterAll(async () => {
-    // beforeAll assigns these four ids in sequence and Vitest runs afterAll
-    // even when beforeAll throws, so a failure partway through leaves the
-    // later ones undefined. Prisma drops an undefined `where` key rather than
-    // matching nothing, which would turn each deleteMany below into "delete
-    // every row in the table". Setup is all-or-nothing, so teardown is too:
-    // bail before a single filter is built.
-    if (!organizationId || !teamId || !projectId || !userId) return;
-
     // Detach the required CurrentVersion/LatestVersion relations before
-    // deleting versions, or the deleteMany violates the FK.
+    // deleting versions, or the deleteMany violates the FK. The update has
+    // the same collapse as a delete, so it is anchored the same way.
     await prisma.workflow.updateMany({
-      where: { projectId },
+      where: {
+        projectId: requireAssigned({ value: projectId, name: "projectId" }),
+      },
       data: { currentVersionId: null, latestVersionId: null },
     });
-    await prisma.workflowVersion.deleteMany({ where: { projectId } });
-    await prisma.workflow.deleteMany({ where: { projectId } });
-    await prisma.modelDefaultConfig.deleteMany({
-      where: { organizationId },
-    });
-    await prisma.teamUser.deleteMany({ where: { teamId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.project.delete({ where: { id: projectId } });
-    await prisma.team.delete({ where: { id: teamId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
-    await prisma.user.delete({ where: { id: userId } });
+    await cleanupTestRows(prisma, [
+      ["workflowVersion", { projectId }],
+      ["workflow", { projectId }],
+      ["modelDefaultConfig", { organizationId }],
+      ["teamUser", { teamId }],
+      ["organizationUser", { organizationId }],
+      ["project", { id: projectId }],
+      ["team", { id: teamId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: userId }],
+    ]);
   });
 
   /** @scenario Creating a workflow on a fresh install starts it with a ready-to-use model */

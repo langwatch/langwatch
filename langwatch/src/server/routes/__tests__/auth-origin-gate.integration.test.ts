@@ -17,6 +17,7 @@ import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 const { loggers } = vi.hoisted(() => ({ loggers: new Map<string, any>() }));
 
@@ -119,16 +120,16 @@ describe("given a dev checkout running on a non-default port", () => {
   });
 
   afterAll(async () => {
-    if (userId) {
-      await prisma.account.deleteMany({ where: { userId } });
-      await prisma.session.deleteMany({ where: { userId } });
-      await prisma.user.delete({ where: { id: userId } });
-    }
     for (const [name, value] of Object.entries(envBackup)) {
       if (value === void 0) delete process.env[name];
       else process.env[name] = value;
     }
     vi.resetModules();
+    await cleanupTestRows(prisma, [
+      ["account", { userId }],
+      ["session", { userId }],
+    ]);
+    await prisma.user.delete({ where: { id: userId } });
   });
 
   /** @scenario The address the app checks against follows the port it was started on */

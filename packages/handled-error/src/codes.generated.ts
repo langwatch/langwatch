@@ -343,6 +343,16 @@ export const goErrorCodes = {
    */
   unsupported_node_kind: { service: "nlpgo", httpStatus: 501 },
   /**
+   * ErrUnsupportedParameter — means the parameter policy refused a request
+   * parameter for the target lane: either the request depends on it
+   * functionally and the lane cannot honor it, or drop_tuning_params is false
+   * and the lane has no mapping for it. The code matches OpenAI's own
+   * parameter rejections so SDK error handling stays familiar.
+   *
+   * @source services/aigateway/domain/errors.go
+   */
+  unsupported_parameter: { service: "aigateway", httpStatus: 400 },
+  /**
    * ErrUpstreamHTTP — signals a non-2xx from an HTTP block's upstream.
    *
    * Also produced as a workflow NodeError type, so this one entry is the copy

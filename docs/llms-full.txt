@@ -1881,6 +1881,7 @@ Errors (like successes) always carry:
 | `circuit_open` | `503` | Repeated upstream 5xx/timeout/network failures opened the credential's circuit breaker, so the gateway declined to dial the provider for this request. Retryable; the breaker probes the upstream again after its cooldown. Answered 4xx (rate limits, quota, bad requests) never open the breaker. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
+| `unsupported_parameter` | `400` | The parameter policy refused a request parameter for the target lane: either the request depends on it functionally and the lane cannot honor it, or `drop_tuning_params` is `false` and the lane has no mapping for it. The message names the parameter, the lane, and why. See [Parameter mapping](/ai-gateway/parameter-mapping). |
 | `payload_too_large` | `413` | Request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB). Rejected at the edge, before auth, resolve-key, or any upstream dispatch, so a 1 GB drive-by scan never pressures the pod memory limit. Declared `Content-Length` above the cap returns 413 immediately without draining the socket; chunked unknown-length bodies trip a `*http.MaxBytesError` at the cap. |
 | `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Request-Id` is how we trace it. |
 
@@ -8294,6 +8295,97 @@ The gateway and the existing LangWatch SDK live in the same project: the VK you 
 3. **[CLI Integrations](/ai-gateway/cli/overview)**: Claude Code, Codex, opencode, Cursor, Aider.
 4. **[Self-Hosting](/ai-gateway/self-hosting/helm)**: ship the gateway with your LangWatch Helm chart.
 5. **[AI Governance](/ai-governance/overview)**: once the gateway is in place, layer on org-wide controls: anomaly detection, OCSF/SIEM export, per-user workspaces, IngestionSources for non-gateway telemetry.
+
+---
+
+# FILE: ./ai-gateway/parameter-mapping.mdx
+
+---
+title: "Parameter mapping"
+description: "How every OpenAI chat-completions parameter behaves on each provider lane, and how to control dropping with drop_tuning_params."
+sidebarTitle: "Parameter mapping"
+---
+
+The gateway speaks the OpenAI chat-completions wire format to every provider. OpenAI-compatible targets (OpenAI, Azure OpenAI, self-hosted vLLM and other custom OpenAI-compatible endpoints) bypass the policy on this page entirely: the request body is forwarded byte-for-byte apart from the gateway-only `drop_tuning_params` field, which is consumed before forwarding, so whatever the provider accepts, you get. For the translated lanes (Anthropic, Bedrock, Gemini, Vertex) the gateway builds the provider-native request itself, and every parameter follows an explicit policy:
+
+- **mapped**: translated faithfully to the provider's native field.
+- **dropped**: a tuning parameter with no equivalent on the lane. By default it is removed, the request proceeds, and the drop is signaled (see below). It is never silently ignored.
+- **refused**: the request depends on the parameter functionally; honoring the request without it would change what you observably get. These always fail with a clear `400 unsupported_parameter` error naming the parameter, the lane, and why.
+
+## drop_tuning_params
+
+Send `"drop_tuning_params": false` in the request body to opt into strict mode: any parameter the lane cannot map then refuses instead of dropping. The default is `true`. The field itself is consumed by the gateway and never reaches a provider.
+
+```json
+{
+  "model": "anthropic/claude-haiku-4-5",
+  "messages": [{"role": "user", "content": "hi"}],
+  "seed": 42,
+  "drop_tuning_params": false
+}
+```
+
+```json
+{
+  "error": {
+    "type": "unsupported_parameter",
+    "code": "unsupported_parameter",
+    "message": "refusing to drop 'seed' for anthropic/claude-haiku-4-5: drop_tuning_params is false and Anthropic has no sampling seed. Remove it, set drop_tuning_params to true, or use a model that supports it"
+  }
+}
+```
+
+## Drop signals
+
+When a parameter is dropped, the drop is visible in three places:
+
+- Response body: `extra_fields.params_dropped` lists the dropped parameter names (on streams, on the final usage-bearing chunk).
+- Response header: `X-LangWatch-Params-Dropped` carries the same list, comma separated.
+- Trace: the gateway span records `langwatch.gateway.params_dropped`.
+
+## The table
+
+{/* param-table:begin generated from paramPolicyTable, kept in sync by TestParamPolicyDocsInSync */}
+
+| Parameter | anthropic | bedrock | gemini / vertex | Notes |
+|---|---|---|---|---|
+| `audio` | dropped | dropped | dropped |  |
+| `frequency_penalty` | dropped | dropped | mapped |  |
+| `function_call` | refused | refused | refused |  |
+| `functions` | refused | refused | refused |  |
+| `logit_bias` | dropped | dropped | dropped |  |
+| `logprobs` | refused | refused | mapped |  |
+| `metadata` | dropped | dropped | dropped |  |
+| `modalities` | dropped | dropped | dropped |  |
+| `n` | dropped | dropped | dropped | n: 1 passes; n > 1 is reduced to one completion and signaled |
+| `parallel_tool_calls` | dropped | dropped | dropped |  |
+| `prediction` | dropped | dropped | dropped |  |
+| `presence_penalty` | dropped | dropped | mapped |  |
+| `prompt_cache_key` | dropped | dropped | dropped |  |
+| `prompt_cache_retention` | dropped | dropped | dropped |  |
+| `reasoning_effort` | mapped | mapped | mapped | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only |
+| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only; gemini: json_object and json_schema both enforced |
+| `safety_identifier` | dropped | dropped | dropped |  |
+| `seed` | dropped | dropped | dropped |  |
+| `service_tier` | dropped | dropped | dropped | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped |
+| `stop` | mapped | mapped | mapped |  |
+| `store` | dropped | dropped | dropped |  |
+| `stream_options` | mapped | mapped | mapped |  |
+| `temperature` | mapped | mapped | mapped |  |
+| `tool_choice` | mapped | mapped | mapped | anthropic: none/auto/required/named mapped; named must exist in tools; allowed_tools refused; bedrock: none maps by removing tools (Converse has no none mode); named must exist in tools; allowed_tools refused; gemini: none/auto/required/named mapped; named must exist in tools; allowed_tools refused |
+| `tools` | mapped | mapped | mapped |  |
+| `top_logprobs` | refused | refused | mapped |  |
+| `top_p` | mapped | mapped | mapped | anthropic: dropped with a signal when temperature is also set (Anthropic models reject the pair); bedrock: dropped with a signal when temperature is also set on Anthropic models (they reject the pair); other families take both |
+| `user` | dropped | dropped | dropped |  |
+| `verbosity` | dropped | dropped | dropped |  |
+| `web_search_options` | dropped | dropped | dropped |  |
+| any other key | dropped | dropped | dropped | vendor params with no mapping on translated lanes |
+
+{/* param-table:end */}
+
+## reasoning_effort budgets
+
+On lanes that map `reasoning_effort` to a thinking budget (Anthropic models without adaptive thinking, on both the anthropic and bedrock lanes), the budget is derived from your output cap: `budget = 1024 + ratio x (max_tokens - 1024)` with ratios `minimal 0.025`, `low 0.15`, `medium 0.425`, `high 0.80`, `xhigh 0.92`, `max 1.0`. Claude Opus and Sonnet 4.6+ use the provider's adaptive thinking with your effort passed through (`minimal` maps to `low`). Gemini thinking models receive the effort natively. Thinking tokens count inside `usage.completion_tokens`.
 
 ---
 

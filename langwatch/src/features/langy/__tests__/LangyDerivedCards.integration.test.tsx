@@ -302,7 +302,48 @@ describe("given a derived timeseries with hints", () => {
       ]),
     );
     expect(derivedFrames()).toHaveLength(1);
-    expect(screen.getByText("Open in Traces")).toBeDefined();
+    const link = screen.getByText("Open in Traces").closest("a");
+    // A derived hint carries no dates and makes no claim about when its data is
+    // from, so the link must NOT stamp the CLI's 24h default on it — that would
+    // point a card summarising older data at a one-day window and show nothing.
+    expect(link?.getAttribute("href")).toBe(
+      "/demo/traces#all-traces?q=%22checkout%22",
+    );
+  });
+
+  it("binds an explore hint narrowed only by origin, no free text", () => {
+    // `origin` is a real field the model is told about (fieldCatalogue.ts),
+    // so a hint naming only one is a genuine narrowing, not an empty query —
+    // it must earn a link the same way a free-text hint does.
+    renderMessage(
+      assistantMessage([
+        {
+          type: "langy-card",
+          blockId: "ts3",
+          kind: "timeseries",
+          provenance: "derived",
+          card: {
+            kind: "timeseries",
+            blockId: "ts3",
+            title: "Cost per day",
+            series: [
+              {
+                name: "cost",
+                points: [
+                  { t: "d1", v: 1 },
+                  { t: "d2", v: 2 },
+                ],
+              },
+            ],
+          },
+          hints: [{ type: "explore", query: { origin: "evaluation" } }],
+        },
+      ]),
+    );
+    const link = screen.getByText("Open in Traces").closest("a");
+    expect(link?.getAttribute("href")).toBe(
+      "/demo/traces#all-traces?q=origin%3Aevaluation",
+    );
   });
 
   it("drops an explore hint the platform cannot validate, card intact", () => {

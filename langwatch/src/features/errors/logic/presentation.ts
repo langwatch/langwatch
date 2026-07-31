@@ -1537,6 +1537,11 @@ const presentations = {
     title: "The run couldn't be set up",
     describe: () => "Check the workflow and its dataset, then try again.",
   },
+  unsupported_parameter: {
+    title: "That provider can't honor one of your parameters",
+    describe: () =>
+      "Remove the parameter named in the message, or pick a model that supports it.",
+  },
 } satisfies Record<
   AppErrorCode | GoErrorCode | NodeErrorCode,
   ErrorPresentation

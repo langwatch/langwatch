@@ -29,6 +29,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 import type { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { createInnerTRPCContext } from "../../../trpc";
 import { onboardingRouter } from "../onboarding.router";
 
@@ -112,13 +113,15 @@ describe("onboarding.initializeOrganization personal workspace", () => {
           where: { projectId: { in: projectIds } },
         });
       }
-      await prisma.project.deleteMany({ where: { team: { organizationId } } });
-      await prisma.aiToolEntry.deleteMany({ where: { organizationId } });
-      await prisma.roleBinding.deleteMany({ where: { organizationId } });
-      await prisma.teamUser.deleteMany({ where: { team: { organizationId } } });
-      await prisma.team.deleteMany({ where: { organizationId } });
-      await prisma.organizationUser.deleteMany({ where: { organizationId } });
-      await prisma.organization.deleteMany({ where: { id: organizationId } });
+      await cleanupTestRows(prisma, [
+        ["project", { team: { organizationId } }],
+        ["aiToolEntry", { organizationId }],
+        ["roleBinding", { organizationId }],
+        ["teamUser", { team: { organizationId } }],
+        ["team", { organizationId }],
+        ["organizationUser", { organizationId }],
+        ["organization", { id: organizationId }],
+      ]);
     }
     await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
     await resetApp();

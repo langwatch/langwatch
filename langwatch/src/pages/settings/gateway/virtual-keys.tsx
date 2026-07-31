@@ -17,6 +17,7 @@ import {
   Eye,
   Gauge,
   KeyRound,
+  LineChart,
   MoreVertical,
   Pencil,
   Plus,
@@ -44,6 +45,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+
+/** Deep link from a key's spend to its Usage view over the same window. */
+function usageHrefForKey(virtualKeyId: string): string {
+  return `/settings/gateway/usage?vk=${virtualKeyId}&days=mtd`;
+}
 
 type ScopeEntry = {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -412,31 +418,50 @@ function VirtualKeysPage() {
                               cursor="default"
                             >
                               <Link
-                                href={`/settings/gateway/usage?vk=${vk.id}&days=mtd`}
+                                className="group"
+                                href={usageHrefForKey(vk.id)}
                                 data-testid={`vk-spend-${vk.id}`}
                                 aria-label={`Usage for ${vk.name}, this month`}
+                                width="full"
                               >
-                                <Text
-                                  fontSize="sm"
-                                  fontVariantNumeric="tabular-nums"
-                                  color={
-                                    spendByKeyId.get(vk.id) &&
-                                    Number.parseFloat(
-                                      spendByKeyId.get(vk.id)!,
-                                    ) > 0
-                                      ? "fg"
-                                      : "fg.muted"
-                                  }
-                                  _hover={{ textDecoration: "underline" }}
+                                <HStack
+                                  gap={1}
+                                  justify="space-between"
+                                  width="full"
                                 >
-                                  {spendQuery.isLoading
-                                    ? "…"
-                                    : spendQuery.isError
-                                      ? "n/a"
-                                      : formatBudgetUsd(
-                                          spendByKeyId.get(vk.id) ?? "0",
-                                        )}
-                                </Text>
+                                  <Text
+                                    fontSize="sm"
+                                    fontVariantNumeric="tabular-nums"
+                                    color={
+                                      spendByKeyId.get(vk.id) &&
+                                      Number.parseFloat(
+                                        spendByKeyId.get(vk.id)!,
+                                      ) > 0
+                                        ? "fg"
+                                        : "fg.muted"
+                                    }
+                                    _groupHover={{
+                                      textDecoration: "underline",
+                                    }}
+                                  >
+                                    {spendQuery.isLoading
+                                      ? "…"
+                                      : spendQuery.isError
+                                        ? "n/a"
+                                        : formatBudgetUsd(
+                                            spendByKeyId.get(vk.id) ?? "0",
+                                          )}
+                                  </Text>
+                                  <Box
+                                    as="span"
+                                    data-testid={`vk-spend-chart-${vk.id}`}
+                                    color="fg.muted"
+                                    aria-hidden
+                                    _groupHover={{ color: "fg" }}
+                                  >
+                                    <LineChart size={14} />
+                                  </Box>
+                                </HStack>
                               </Link>
                             </Table.Cell>
                             <Table.Cell>

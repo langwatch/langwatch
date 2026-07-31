@@ -11,18 +11,22 @@ import { LuCheck, LuCopy } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
+import {
+  COLLAPSED_CELL_HEIGHT_PX,
+  DEFAULT_ROW_HEIGHT,
+  type RowHeight,
+} from "./tableUtils";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
-
-// Max height for collapsed output - used in CSS
-const CELL_MAX_HEIGHT = 180;
 
 type ExpandableDatasetCellProps = {
   /** The value to display */
   value: unknown;
   /** Optional column name for test IDs */
   columnName?: string;
+  /** How much of the collapsed value to show before it needs expanding */
+  rowHeight?: RowHeight;
 };
 
 /**
@@ -37,7 +41,9 @@ const stringify = (value: unknown): string => {
 export function ExpandableDatasetCell({
   value,
   columnName = "dataset",
+  rowHeight = DEFAULT_ROW_HEIGHT,
 }: ExpandableDatasetCellProps) {
+  const cellMaxHeight = COLLAPSED_CELL_HEIGHT_PX[rowHeight];
   // State for expanded view
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
@@ -131,7 +137,8 @@ export function ExpandableDatasetCell({
     return (
       <Box position="relative">
         <Box
-          maxHeight={`${CELL_MAX_HEIGHT}px`}
+          maxHeight={`${cellMaxHeight}px`}
+          data-row-height={rowHeight}
           overflow="hidden"
           cursor={isLikelyOverflowing ? "pointer" : undefined}
           onClick={isLikelyOverflowing ? handleExpand : undefined}

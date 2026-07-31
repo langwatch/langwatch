@@ -35,14 +35,18 @@ export function UndoRedo() {
 
   // Fix for initial state
   useEffect(() => {
+    let resumeTimeout: ReturnType<typeof setTimeout> | undefined;
     if (workflow.isFetched) {
-      setTimeout(() => {
+      resumeTimeout = setTimeout(() => {
         resume();
         clear();
       }, 1000);
     } else {
       pause();
     }
+    return () => {
+      if (resumeTimeout) clearTimeout(resumeTimeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workflow.isFetched]);
 

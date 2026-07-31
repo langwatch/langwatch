@@ -18,6 +18,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 import { createHandle } from "./helpers";
@@ -140,18 +141,14 @@ describe("Prompts API", () => {
 
   afterEach(async () => {
     // Clean up test data
-    await prisma.llmPromptConfig.deleteMany({
-      where: { projectId: testProjectId },
-    });
-
-    await prisma.modelDefaultConfigScope.deleteMany({
-      where: { scopeType: "PROJECT", scopeId: testProjectId },
-    });
-    if (testDefaultConfigId) {
-      await prisma.modelDefaultConfig.deleteMany({
-        where: { id: testDefaultConfigId },
-      });
-    }
+    await cleanupTestRows(prisma, [
+      ["llmPromptConfig", { projectId: testProjectId }],
+      [
+        "modelDefaultConfigScope",
+        { scopeType: "PROJECT", scopeId: testProjectId },
+      ],
+      ["modelDefaultConfig", { id: testDefaultConfigId }],
+    ]);
 
     await prisma.project.delete({
       where: { id: testProjectId },
@@ -212,9 +209,9 @@ describe("Prompts API", () => {
 
       afterEach(async () => {
         // Clean up configs
-        await prisma.llmPromptConfig.deleteMany({
-          where: { projectId: testProjectId },
-        });
+        await cleanupTestRows(prisma, [
+          ["llmPromptConfig", { projectId: testProjectId }],
+        ]);
       });
 
       it("gets all prompts for a project", async () => {
@@ -315,9 +312,12 @@ describe("Prompts API", () => {
         describe("when there are versions for a prompt", () => {
           afterEach(async () => {
             // Clean up versions
-            await prisma.llmPromptConfigVersion.deleteMany({
-              where: { configId: config.id, projectId: testProjectId },
-            });
+            await cleanupTestRows(prisma, [
+              [
+                "llmPromptConfigVersion",
+                { configId: config.id, projectId: testProjectId },
+              ],
+            ]);
           });
 
           it("gets all versions for a prompt", async () => {
@@ -341,9 +341,12 @@ describe("Prompts API", () => {
         describe("when there are no versions for a prompt", () => {
           beforeEach(async () => {
             // Delete all versions for the config
-            await prisma.llmPromptConfigVersion.deleteMany({
-              where: { configId: config.id, projectId: testProjectId },
-            });
+            await cleanupTestRows(prisma, [
+              [
+                "llmPromptConfigVersion",
+                { configId: config.id, projectId: testProjectId },
+              ],
+            ]);
           });
 
           it("gets empty array for a prompt with no versions", async () => {
@@ -383,7 +386,7 @@ describe("Prompts API", () => {
         // Remove the seeded default: a prompt that specifies its model,
         // like every prompt pushed by `langwatch prompt sync`, must not
         // depend on the project having a default model.
-        await prisma.modelDefaultConfig.deleteMany({
+        await prisma.modelDefaultConfig.delete({
           where: { id: testDefaultConfigId },
         });
 
@@ -400,7 +403,7 @@ describe("Prompts API", () => {
       });
 
       it("still reports the missing model when none is provided", async () => {
-        await prisma.modelDefaultConfig.deleteMany({
+        await prisma.modelDefaultConfig.delete({
           where: { id: testDefaultConfigId },
         });
 

@@ -22,6 +22,7 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { batchScopePermissions, hasProjectPermission } from "../../api/rbac";
 import { prisma } from "../../db";
 import { getDefaultModelsSnapshot } from "../modelDefaults.read";
@@ -124,19 +125,15 @@ describe("Default Models visibility for role-binding-only members (real DB)", ()
   });
 
   afterAll(async () => {
-    await prisma.modelDefaultConfig.deleteMany({
-      where: { id: { in: configIds } },
-    });
-    await prisma.roleBinding.deleteMany({ where: { organizationId } });
-    await prisma.organizationUser.deleteMany({ where: { organizationId } });
-    await prisma.user.deleteMany({ where: { id: bindingMemberUserId } });
-    await prisma.project.deleteMany({
-      where: { id: { in: [projectAId, projectBId, otherTeamProjectId] } },
-    });
-    await prisma.team.deleteMany({
-      where: { id: { in: [teamId, otherTeamId] } },
-    });
-    await prisma.organization.deleteMany({ where: { id: organizationId } });
+    await cleanupTestRows(prisma, [
+      ["modelDefaultConfig", { id: { in: configIds } }],
+      ["roleBinding", { organizationId }],
+      ["organizationUser", { organizationId }],
+      ["user", { id: bindingMemberUserId }],
+      ["project", { id: { in: [projectAId, projectBId, otherTeamProjectId] } }],
+      ["team", { id: { in: [teamId, otherTeamId] } }],
+      ["organization", { id: organizationId }],
+    ]);
   });
 
   function memberCtx() {

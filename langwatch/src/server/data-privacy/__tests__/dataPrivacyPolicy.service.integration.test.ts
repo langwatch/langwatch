@@ -8,6 +8,7 @@
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
 import { getTestProject } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "../dataPrivacy.types";
@@ -50,20 +51,20 @@ describe("DataPrivacyPolicyService integration", () => {
   });
 
   beforeEach(async () => {
-    await prisma.dataPrivacyPolicy.deleteMany({ where: { organizationId } });
-    await prisma.dataPrivacyPolicy.deleteMany({
-      where: { organizationId: otherOrganizationId },
-    });
+    await cleanupTestRows(prisma, [
+      ["dataPrivacyPolicy", { organizationId }],
+      ["dataPrivacyPolicy", { organizationId: otherOrganizationId }],
+    ]);
     // Fresh cache per test so a previous test's resolved entries never leak in.
     cache = new DataPrivacyPolicyCache(repository);
     service = new DataPrivacyPolicyService(repository, cache);
   });
 
   afterAll(async () => {
-    await prisma.dataPrivacyPolicy.deleteMany({ where: { organizationId } });
-    await prisma.dataPrivacyPolicy.deleteMany({
-      where: { organizationId: otherOrganizationId },
-    });
+    await cleanupTestRows(prisma, [
+      ["dataPrivacyPolicy", { organizationId }],
+      ["dataPrivacyPolicy", { organizationId: otherOrganizationId }],
+    ]);
   });
 
   describe("given a project in an organization", () => {

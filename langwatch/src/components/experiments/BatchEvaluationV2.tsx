@@ -16,7 +16,13 @@ import type { Experiment, Project } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Download, ExternalLink } from "react-feather";
 import { useRouter } from "~/utils/compat/next-router";
 import { Link } from "../../components/ui/link";
@@ -166,6 +172,48 @@ export function BatchEvaluationV2({
   );
 }
 
+/**
+ * Polls as fast as the query allows while a selected run is missing from the
+ * fetched list, and gives up after a deadline.
+ *
+ * The deadline is armed once per wait, on a ref, rather than on every re-run:
+ * the run list churns while we wait, and re-arming on each change would push
+ * the deadline out for as long as the churn lasts, which is exactly the case
+ * it exists to stop.
+ */
+function useKeepFetchingWhileRunIsMissing({
+  isRunMissing,
+  setKeepFetching,
+}: {
+  isRunMissing: boolean;
+  setKeepFetching: (isKeepFetching: boolean) => void;
+}) {
+  const deadlineRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!isRunMissing) {
+      setKeepFetching(false);
+      return;
+    }
+    setKeepFetching(true);
+    if (!deadlineRef.current) {
+      deadlineRef.current = setTimeout(() => {
+        deadlineRef.current = null;
+        setKeepFetching(false);
+      }, 5_000);
+    }
+  }, [isRunMissing, setKeepFetching]);
+
+  useEffect(
+    () => () => {
+      if (deadlineRef.current) {
+        clearTimeout(deadlineRef.current);
+      }
+    },
+    [],
+  );
+}
+
 export const useBatchEvaluationState = ({
   project,
   experiment,
@@ -205,16 +253,10 @@ export const useBatchEvaluationState = ({
     return { selectedRunId_, selectedRun };
   }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
 
-  useEffect(() => {
-    if (selectedRunId && !selectedRun) {
-      setKeepFetching(true);
-      setTimeout(() => {
-        setKeepFetching(false);
-      }, 5_000);
-    } else {
-      setKeepFetching(false);
-    }
-  }, [batchEvaluationRuns.data?.runs, selectedRunId, selectedRun]);
+  useKeepFetchingWhileRunIsMissing({
+    isRunMissing: !!selectedRunId && !selectedRun,
+    setKeepFetching,
+  });
 
   const setSelectedRunId_ = useCallback(
     (runId: string) => {

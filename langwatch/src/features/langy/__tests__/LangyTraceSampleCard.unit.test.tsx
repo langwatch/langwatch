@@ -71,6 +71,7 @@ function renderCard({
 describe("LangyTraceSampleCard", () => {
   describe("given a search that matched far more traces than it returned", () => {
     describe("when the card renders", () => {
+      /** @scenario The sample never pretends to be the whole result */
       it("says how many were found AND how many it is showing", () => {
         renderCard({ totalHits: 34, count: 25 });
 
@@ -83,6 +84,7 @@ describe("LangyTraceSampleCard", () => {
         expect(screen.getAllByText(/^question trace_/)).toHaveLength(3);
       });
 
+      /** @scenario The sample never pretends to be the whole result */
       it("points at the rest rather than pretending they aren't there", () => {
         renderCard({ totalHits: 34, count: 25 });
 

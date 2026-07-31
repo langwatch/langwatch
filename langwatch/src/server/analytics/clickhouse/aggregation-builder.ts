@@ -79,19 +79,44 @@ const SPAN_TIME_FILTER_START_END =
   "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
   "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
 
-/**
- * The same envelope for `evaluation_runs`, whose partition column is
- * `OccurredAt`. Its JOIN took no bound at all until now, so every query
- * carrying an evaluation metric or filter cold-scanned the table twice — the
- * outer read plus the dedup's full-table GROUP BY. One constant per caller date
- * regime, mirroring the span pair above.
- */
+// Partition-pruning bounds for the evaluation_runs JOIN subquery. The query
+// windows on trace OccurredAt, but evaluation_runs is partitioned by
+// ScheduledAt per the migrations (and by UpdatedAt on long-lived deployments
+// that predate that DDL), so an OccurredAt filter prunes nothing there —
+// without these bounds the JOIN's dedup subquery walks the tenant's entire
+// history across every weekly partition, including the S3-tiered cold ones.
+//
+// Lower bounds only, on BOTH candidate partition columns, so pruning works on
+// either partitioning scheme. Safe as a superset: an evaluation joined to an
+// in-window trace is scheduled at/after that trace occurs, and every row
+// version's UpdatedAt >= its ScheduledAt, so both columns are >= the window
+// start minus scheduling skew — far inside the 7-day margin (partitions are
+// weekly, so the margin costs at most one extra partition). No upper bound:
+// a re-evaluation updates rows long after the window, and the IN-tuple dedup
+// must still see that latest version.
+//
+// UpdatedAt is table-qualified. trace_summaries (the outer scope) also has an
+// UpdatedAt column, and ClickHouse resolves a bare identifier the inner table
+// lacks against the OUTER scope instead of failing — the hazard
+// `join-time-bound-partition-column.unit.test.ts` guards against. Qualifying
+// pins the reference to evaluation_runs' own column so neither ClickHouse nor
+// the guard has to guess. ScheduledAt stays bare: it is evaluation_runs' own
+// partition column per the migrations and does not exist on trace_summaries.
+//
+// The ScheduledAt bound is NULL-safe. On the unified schema (00002) the column
+// is `DateTime64(3) DEFAULT now64(3)` and the IS NULL branch is statically
+// false, so partition pruning is unaffected. But long-lived deployments that
+// predate the unified DDL carry `ScheduledAt Nullable(DateTime64(3))`, where a
+// bare `ScheduledAt >= x` evaluates to NULL for NULL rows and silently DROPS
+// those evaluations from every graph — a correctness regression, not a missed
+// optimisation. NULL rows on such deployments are still bounded by the
+// UpdatedAt predicate, which is their actual partition column anyway.
 const EVAL_TIME_FILTER_BOTH_PERIODS =
-  "AND OccurredAt >= {previousStart:DateTime64(3)} - INTERVAL 2 DAY " +
-  "AND OccurredAt < {currentEnd:DateTime64(3)} + INTERVAL 2 DAY";
+  "AND (ScheduledAt IS NULL OR ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY) " +
+  "AND evaluation_runs.UpdatedAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY";
 const EVAL_TIME_FILTER_START_END =
-  "AND OccurredAt >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
-  "AND OccurredAt < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
+  "AND (ScheduledAt IS NULL OR ScheduledAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY) " +
+  "AND evaluation_runs.UpdatedAt >= {startDate:DateTime64(3)} - INTERVAL 7 DAY";
 
 /**
  * Returns a deduped FROM-clause expression for trace_summaries.
@@ -797,8 +822,9 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const joinClauses = Array.from(allJoins)
     .map((table) => {
       const requiredColumns = resolveRequiredColumns(table, allExpressions);
-      // Both-periods regime: bound the stored_spans JOIN to the same StartTime
-      // envelope as the outer OccurredAt filter so it prunes partitions.
+      // Both-periods regime: bound the stored_spans / evaluation_runs JOINs to
+      // the same date envelope as the outer OccurredAt filter so they prune
+      // partitions.
       return buildJoinClause({
         table,
         requiredColumns,
@@ -2288,7 +2314,8 @@ function buildDateBucketedPipelineQuery({
     const simpleJoinClauses = Array.from(simpleJoins)
       .map((table) => {
         const requiredColumns = resolveRequiredColumns(table, allSimpleExprs);
-        // Both-periods regime: bound the stored_spans JOIN to the date envelope.
+        // Both-periods regime: bound the stored_spans / evaluation_runs JOINs
+        // to the date envelope.
         return buildJoinClause({
           table,
           requiredColumns,
@@ -2740,7 +2767,8 @@ export function buildDataForFilterQuery(
   const filterJoins = Array.from(filterTranslation.requiredJoins)
     .map((table) => {
       const requiredColumns = resolveRequiredColumns(table, filterExpressions);
-      // Start/end regime: bound the stored_spans JOIN to the date envelope.
+      // Start/end regime: bound the stored_spans / evaluation_runs JOINs to
+      // the date envelope.
       return buildJoinClause({
         table,
         requiredColumns,
@@ -2842,7 +2870,6 @@ export function buildDataForFilterQuery(
         table: "stored_spans",
         requiredColumns: new Set(["SpanAttributes"]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
-        evalTimeFilter: EVAL_TIME_FILTER_START_END,
       });
       sql = `
         SELECT
@@ -2869,7 +2896,6 @@ export function buildDataForFilterQuery(
         table: "stored_spans",
         requiredColumns: new Set(["SpanAttributes"]),
         spanTimeFilter: SPAN_TIME_FILTER_START_END,
-        evalTimeFilter: EVAL_TIME_FILTER_START_END,
       });
       sql = `
         SELECT

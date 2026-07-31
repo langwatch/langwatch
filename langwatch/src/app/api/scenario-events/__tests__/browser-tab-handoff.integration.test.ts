@@ -23,6 +23,7 @@ import {
 } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 const { mockBroadcastToTenant } = vi.hoisted(() => ({
   mockBroadcastToTenant: vi.fn().mockResolvedValue(undefined),
@@ -157,16 +158,11 @@ afterAll(async () => {
     registered.map((entry) => scenarioTabRegistry.unregister(entry)),
   );
 
-  try {
-    await prisma.project.deleteMany({
-      where: { id: { in: [projectId, otherProjectId] } },
-    });
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.organization.deleteMany({ where: { id: orgId } });
-  } catch {
-    // Cleanup only — the integration schema does not always carry every
-    // related table, and a teardown error must not mask a test failure.
-  }
+  await cleanupTestRows(prisma, [
+    ["project", { id: { in: [projectId, otherProjectId] } }],
+    ["team", { id: teamId }],
+    ["organization", { id: orgId }],
+  ]);
 
   if (previousBaseHost === void 0) delete process.env.BASE_HOST;
   else process.env.BASE_HOST = previousBaseHost;

@@ -41,9 +41,36 @@ export function isOrgScopedPermission(permission: Permission): boolean {
 }
 
 /**
- * Ambient team for organization-level work, in order of preference: a shared
- * team that already holds a project, then any shared team, then whatever is
- * left.
+ * Whether the caller holds a membership on this team.
+ *
+ * `organization.getAll` returns every team in the organization but narrows
+ * `team.members` to the caller's own row, synthesizing one from a RoleBinding
+ * when the legacy TeamUser row is absent.
+ *
+ * Shared with `DashboardLayout`, which gates the page body on it: the team the
+ * ambient resolution picks and the team the chrome will render for have to be
+ * decided the same way, or the app resolves a context it then refuses.
+ */
+export function userBelongsToTeam<T extends { members?: { userId: string }[] }>(
+  team: T,
+  userId: string,
+): boolean {
+  return team.members?.some((member) => member.userId === userId) ?? false;
+}
+/**
+ * Ambient team for organization-level work.
+ *
+ * Membership decides first. The teams list carries the whole organization,
+ * not just the caller's corner of it, so any preference expressed purely as
+ * "the first team shaped like X" hands members a team they are not on the
+ * moment an organization has more than one. The chrome then refuses the page
+ * outright with "You are not part of any team in this organization", and the
+ * settings surfaces that write against the ambient project aim at a project
+ * in someone else's team.
+ *
+ * Within the teams the caller does belong to, the order of preference is: a
+ * shared team that already holds a project, then any shared team, then
+ * whatever is left.
  *
  * Personal workspaces sort last because they are a private context — one
  * project, owned by one person — while everything the app scopes to the
@@ -55,19 +82,31 @@ export function isOrgScopedPermission(permission: Permission): boolean {
  * sorts first.
  *
  * An organization whose only team is personal still resolves to it, so a solo
- * user is never left without a context.
+ * user is never left without a context. Someone who belongs to no team at all
+ * falls through to the same preference order over every team, which keeps the
+ * chrome on a resolved context so it can render the refusal instead of
+ * hanging on a loading screen forever.
  *
  * @internal Exported for testing only
  */
 export function selectAmbientTeam<
-  T extends { isPersonal?: boolean | null; projects: unknown[] },
->(teams: T[]): T | undefined {
-  return (
-    teams.find((team) => !team.isPersonal && team.projects.length > 0) ??
-    teams.find((team) => !team.isPersonal) ??
-    teams.find((team) => team.projects.length > 0) ??
-    teams[0]
-  );
+  T extends {
+    isPersonal?: boolean | null;
+    projects: unknown[];
+    members?: { userId: string }[];
+  },
+>(teams: T[], userId?: string): T | undefined {
+  const byPreference = (candidates: T[]) =>
+    candidates.find((team) => !team.isPersonal && team.projects.length > 0) ??
+    candidates.find((team) => !team.isPersonal) ??
+    candidates.find((team) => team.projects.length > 0) ??
+    candidates[0];
+
+  const own = userId
+    ? teams.filter((team) => userBelongsToTeam(team, userId))
+    : teams;
+
+  return byPreference(own) ?? byPreference(teams);
 }
 
 /** @internal Exported for testing only */
@@ -109,6 +148,7 @@ export const useOrganizationTeamProject = (
   },
 ) => {
   const session = useRequiredSession();
+  const userId = session.data?.user.id;
 
   const router = useRouter();
   const publicEnv = usePublicEnv();
@@ -264,15 +304,32 @@ export const useOrganizationTeamProject = (
       ),
   );
 
-  // The slug that resolved a personal workspace off the persisted selection
-  // rather than off the URL is stickiness, not intent: it survives from the
-  // last visit to /[personal-slug]/* into every organization-scoped page that
-  // carries no project of its own. Drop it there and let the ambient
-  // resolution below pick a shared team, which also re-persists the shared
-  // project so the stale selection heals itself.
-  const slugMatch = projectsTeamsOrganizationsMatchingSlug?.[0];
-  const resolvedSlugMatch =
-    slugMatch?.team.isPersonal && !isAddressedBySlug ? undefined : slugMatch;
+  // A slug can name a project in more than one team, so prefer a match on a
+  // team the caller is on before falling back to the first one.
+  const slugMatches = projectsTeamsOrganizationsMatchingSlug ?? [];
+  const slugMatch =
+    (userId
+      ? slugMatches.find((match) => userBelongsToTeam(match.team, userId))
+      : undefined) ?? slugMatches[0];
+
+  // A slug that resolved off the persisted selection rather than off the URL
+  // is stickiness, not intent: it survives from the last visit to
+  // /[some-slug]/* into every organization-scoped page that carries no project
+  // of its own. Two kinds have to be dropped there. A personal workspace is a
+  // private context the caller never asked to work in, and a team the caller
+  // does not belong to is one the chrome refuses outright. Both let the
+  // ambient resolution below pick again, which also re-persists what it picks
+  // so the stale selection heals itself.
+  //
+  // A slug named in the address bar keeps resolving exactly as before,
+  // including into a team the caller is not on: the refusal that follows is
+  // the honest answer to typing someone else's project into the URL.
+  const stickySlugIsUnusable =
+    !!slugMatch &&
+    !isAddressedBySlug &&
+    (!!slugMatch.team.isPersonal ||
+      (!!userId && !userBelongsToTeam(slugMatch.team, userId)));
+  const resolvedSlugMatch = stickySlugIsUnusable ? undefined : slugMatch;
 
   // For demo mode, find the organization that contains the demo project
   // (backend returns all user orgs + demo org, so we need to find the one with demo project)
@@ -314,24 +371,34 @@ export const useOrganizationTeamProject = (
   const isPersonalScopeRoute = router.pathname.startsWith("/me");
   const ownPersonalTeam = isPersonalScopeRoute
     ? organization?.teams.find(
-        (team) => team.isPersonal && team.ownerUserId === session.data?.user.id,
+        (team) => team.isPersonal && team.ownerUserId === userId,
       )
     : undefined;
+
+  // The remembered selection carries the same membership requirement as the
+  // ambient pick below. Without it a persisted team id keeps resolving a team
+  // the caller is not on, long after the resolution itself stopped producing
+  // one: the selection is written from whatever last resolved, so a bad pick
+  // outlives the page that made it.
+  const rememberedTeam = organization?.teams.find(
+    (team) =>
+      team.id == localStorageTeamId &&
+      !team.isPersonal &&
+      (!userId || userBelongsToTeam(team, userId)),
+  );
 
   const team = isDemo
     ? (organization?.teams.find((t) =>
         t.projects.some(
           (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
         ),
-      ) ?? selectAmbientTeam(organization?.teams ?? [])) // The team holding the demo project, else the ambient one
+      ) ?? selectAmbientTeam(organization?.teams ?? [], userId)) // The team holding the demo project, else the ambient one
     : resolvedSlugMatch
       ? resolvedSlugMatch.team
       : ownPersonalTeam
         ? ownPersonalTeam
         : organization
-          ? (organization.teams.find(
-              (team) => team.id == localStorageTeamId && !team.isPersonal,
-            ) ?? selectAmbientTeam(organization.teams))
+          ? (rememberedTeam ?? selectAmbientTeam(organization.teams, userId))
           : undefined;
 
   // For demo mode, find the project with the demo slug

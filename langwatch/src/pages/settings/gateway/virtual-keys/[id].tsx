@@ -53,7 +53,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 function VirtualKeyDetailPage() {
-  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const { organization, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const vkId = typeof router.query.id === "string" ? router.query.id : "";
   const orgId = organization?.id ?? "";
@@ -97,12 +97,12 @@ function VirtualKeyDetailPage() {
   const usageWindow = useRollingWindow(30);
   const usageQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
     {
-      projectId: project?.id ?? "",
+      organizationId: orgId,
       virtualKeyId: vkId,
       fromDate: usageWindow.fromIso,
       toDate: usageWindow.toIso,
     },
-    { enabled: !!project?.id && !!vkId },
+    { enabled: !!orgId && !!vkId },
   );
   const utils = api.useContext();
   const rotateMutation = api.virtualKeys.rotate.useMutation({

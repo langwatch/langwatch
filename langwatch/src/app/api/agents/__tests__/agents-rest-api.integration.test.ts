@@ -9,6 +9,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -113,11 +114,7 @@ describe("Feature: Agent REST API", () => {
   });
 
   afterEach(async () => {
-    if (!testProjectId) return;
-
-    await prisma.agent.deleteMany({
-      where: { projectId: testProjectId },
-    });
+    await cleanupTestRows(prisma, [["agent", { projectId: testProjectId }]]);
     await prisma.project.delete({
       where: { id: testProjectId },
     });

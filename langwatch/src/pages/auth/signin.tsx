@@ -49,19 +49,25 @@ export default function SignIn() {
       return;
     }
 
+    let signInTimeout: ReturnType<typeof setTimeout> | undefined;
+
     // Don't auto-redirect back to the identity provider on a stable failure
     // (wrong method / account collision): the IdP still holds a live session
     // for the failing identity, so re-initiating sign-in silently re-auths it
     // and traps the user in a loop. Those errors render SignInError with a
     // federated-logout recovery instead.
     if (!isStableAuthError(error) && isSocialProvider) {
-      setTimeout(
+      signInTimeout = setTimeout(
         () => {
           void signIn(isAuthProvider, { callbackUrl });
         },
         error ? 2000 : 0,
       );
     }
+
+    return () => {
+      if (signInTimeout) clearTimeout(signInTimeout);
+    };
   }, [
     publicEnv.data,
     session,

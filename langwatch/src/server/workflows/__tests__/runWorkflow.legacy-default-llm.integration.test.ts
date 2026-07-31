@@ -21,6 +21,7 @@ vi.mock("../../nlpgo/nlpgoFetch", () => ({
   nlpgoFetch: (...args: unknown[]) => nlpgoFetchMock(...args),
 }));
 
+import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 import type {
   LLMConfig,
   Workflow,
@@ -188,29 +189,28 @@ describe("runWorkflow with a pre-1.5 published version", () => {
   });
 
   afterAll(async () => {
-    // beforeAll assigns these four ids in sequence and Vitest runs afterAll
-    // even when beforeAll throws, so a failure partway through leaves the
-    // later ones undefined. Prisma drops an undefined `where` key rather than
-    // matching nothing, which would turn each deleteMany below into "delete
-    // every row in the table". Setup is all-or-nothing, so teardown is too:
-    // bail before a single filter is built.
-    if (!organizationId || !teamId || !projectId || !userId) return;
-
+    // The version pointers are required relations, so they are detached
+    // before the versions go. The update has the same collapse as a delete,
+    // so it is anchored the same way.
     await prisma.workflow.updateMany({
-      where: { projectId },
+      where: {
+        projectId: requireAssigned({ value: projectId, name: "projectId" }),
+      },
       data: {
         currentVersionId: null,
         latestVersionId: null,
         publishedId: null,
       },
     });
-    await prisma.workflowVersion.deleteMany({ where: { projectId } });
-    await prisma.workflow.deleteMany({ where: { projectId } });
-    await prisma.modelProvider.deleteMany({ where: { organizationId } });
-    await prisma.project.delete({ where: { id: projectId } });
-    await prisma.team.delete({ where: { id: teamId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
-    await prisma.user.delete({ where: { id: userId } });
+    await cleanupTestRows(prisma, [
+      ["workflowVersion", { projectId }],
+      ["workflow", { projectId }],
+      ["modelProvider", { organizationId }],
+      ["project", { id: projectId }],
+      ["team", { id: teamId }],
+      ["organization", { id: organizationId }],
+      ["user", { id: userId }],
+    ]);
   });
 
   /** @scenario Published workflows saved before the change still run with their old model */

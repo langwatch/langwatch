@@ -493,6 +493,14 @@ export function getTableAlias(table: CHTable): string {
  *   on `TenantId` only and cold-scans every weekly partition (incl. S3-tiered
  *   ones). The caller passes the fragment matching its date regime; the referenced
  *   params are bound by the outer query. Ignored for non-`stored_spans` tables.
+ * @param evalTimeFilter - Optional SQL fragment bounding the `evaluation_runs`
+ *   subquery's partition column (e.g. `AND ScheduledAt >= {startDate} - INTERVAL
+ *   7 DAY AND UpdatedAt >= {startDate} - INTERVAL 7 DAY`). Same disease as
+ *   `spanTimeFilter`: without it the subquery — and its IN-tuple dedup inner —
+ *   filter on `TenantId` only and walk the tenant's entire history across every
+ *   partition. Applied to BOTH the outer subquery and the dedup inner, since the
+ *   inner GROUP BY is the scan that actually walks the partitions. Ignored for
+ *   non-`evaluation_runs` tables.
  */
 export function buildJoinClause({
   table,
@@ -520,24 +528,14 @@ export function buildJoinClause({
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, EVALUATION_IDENTITY_COLUMNS)
         : EVALUATION_ANALYTICS_COLUMNS;
-      // `evaluation_runs` is PARTITION BY the same OccurredAt envelope the outer
-      // read is already bounded to, so without a predicate here BOTH scopes walk
-      // every partition — the outer read and, more expensively, the dedup's
-      // full-table GROUP BY. Rendered into both so they prune identically.
-      //
-      // The bound goes on the dedup too, which windows "latest version" to the
-      // frame rather than all of history: an evaluation whose newest row landed
-      // outside it reads back one version stale. That is a read-only analytics
-      // path — stale numbers, never a wrong write — and the ±2-day cushion the
-      // caller supplies covers the drift this table actually exhibits.
-      const timeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
+      const evalTimeBound = evalTimeFilter ? ` ${evalTimeFilter}` : "";
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
-        WHERE TenantId = {tenantId:String}${timeBound}
+        WHERE TenantId = {tenantId:String}${evalTimeBound}
           AND (TenantId, EvaluationId, UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM evaluation_runs
-            WHERE TenantId = {tenantId:String}${timeBound}
+            WHERE TenantId = {tenantId:String}${evalTimeBound}
             GROUP BY TenantId, EvaluationId
           )
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;

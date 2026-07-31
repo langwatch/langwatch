@@ -30,6 +30,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import { runIngestionPull } from "../pullerWorker";
 
@@ -164,16 +165,12 @@ afterAll(async () => {
       })
       .catch(() => {});
   }
-  await prisma.ingestionSource
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
-  await prisma.project
-    .deleteMany({ where: { team: { organizationId } } })
-    .catch(() => {});
-  await prisma.team.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.organization
-    .deleteMany({ where: { id: organizationId } })
-    .catch(() => {});
+  await cleanupTestRows(prisma, [
+    ["ingestionSource", { organizationId }],
+    ["project", { team: { organizationId } }],
+    ["team", { organizationId }],
+    ["organization", { id: organizationId }],
+  ]);
 });
 
 describe("PullerAdapter framework — end-to-end with real CH + real fetch", () => {
