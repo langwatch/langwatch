@@ -113,6 +113,20 @@ export function HeadlineMetrics({
  * immediate. The confidence band is drawn at the same scale so a thin
  * sample reads as a wide, hesitant smear rather than a crisp number.
  */
+const asWidth = (value: number) => `${Math.min(100, value * 100)}%`;
+
+// Markers are positioned by their left edge inside an overflow-hidden
+// track, so at 100% an unclamped marker sits entirely in the clipped
+// region and a perfect judge shows no marker at all. Cap the offset so
+// the marker's full width stays inside the track.
+const asMarkerInset = ({
+  value,
+  markerWidthPx,
+}: {
+  value: number;
+  markerWidthPx: number;
+}) => `min(${asWidth(value)}, calc(100% - ${markerWidthPx}px))`;
+
 export function AgreementBar({
   accuracy,
   interval,
@@ -122,18 +136,6 @@ export function AgreementBar({
   interval: ConfidenceInterval | null;
   chance: number | null;
 }) {
-  const asWidth = (value: number) => `${Math.min(100, value * 100)}%`;
-  // Markers are positioned by their left edge inside an overflow-hidden
-  // track, so at 100% an unclamped marker sits entirely in the clipped
-  // region and a perfect judge shows no marker at all. Cap the offset so
-  // the marker's full width stays inside the track.
-  const asMarkerInset = ({
-    value,
-    markerWidthPx,
-  }: {
-    value: number;
-    markerWidthPx: number;
-  }) => `min(${asWidth(value)}, calc(100% - ${markerWidthPx}px))`;
   const clearsChance = chance !== null && accuracy > chance;
 
   return (

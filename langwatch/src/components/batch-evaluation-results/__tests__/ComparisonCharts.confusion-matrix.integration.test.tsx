@@ -55,13 +55,8 @@ const TARGETS = [
   { id: "target-2", name: "billing-agent" },
 ];
 
-const traceIdFor = ({
-  targetId,
-  index,
-}: {
-  targetId: string;
-  index: number;
-}) => `trace-${targetId}-${index}`;
+const traceIdFor = ({ targetId, index }: { targetId: string; index: number }) =>
+  `trace-${targetId}-${index}`;
 
 const makeRows = ({
   count,
@@ -152,7 +147,10 @@ const setFetchedAnnotations = (annotations: AnnotationByTrace[]) => {
   ];
 };
 
-const EXACT_MATCH = { evaluatorId: "exact_match", evaluatorName: "Exact Match" };
+const EXACT_MATCH = {
+  evaluatorId: "exact_match",
+  evaluatorName: "Exact Match",
+};
 const ANSWER_MATCH = {
   evaluatorId: "llm_answer_match",
   evaluatorName: "LLM Answer Match",
