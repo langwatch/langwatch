@@ -12,6 +12,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ConfusionMatrixDrawer } from "../../ConfusionMatrixDrawer";
@@ -79,6 +80,7 @@ describe("ConfusionMatrixDrawer", () => {
   afterEach(cleanup);
 
   describe("given the drawer was restored from a link, so complexProps are gone", () => {
+    /** @scenario The expanded view opened from a link explains itself instead of breaking */
     it("explains where to reopen it from instead of throwing", () => {
       expect(() => renderDrawer({})).not.toThrow();
 
@@ -88,6 +90,7 @@ describe("ConfusionMatrixDrawer", () => {
   });
 
   describe("given no row has both a judge verdict and an agreed annotation", () => {
+    /** @scenario A run with no comparable rows says so rather than showing an empty matrix */
     it("says there is nothing to compare rather than drawing a matrix of zeroes", () => {
       renderDrawer({ coverage: coverageWith([]), rows: [makeRow(0)] });
 
@@ -97,20 +100,62 @@ describe("ConfusionMatrixDrawer", () => {
   });
 
   describe("given resolved judge/reviewer pairs", () => {
+    const fullMatrix = {
+      coverage: coverageWith([
+        { rowIndex: 0, predicted: true, actual: true },
+        {
+          rowIndex: 1,
+          predicted: true,
+          actual: false,
+          comment: "Wrong refund",
+        },
+        { rowIndex: 2, predicted: false, actual: true },
+        { rowIndex: 3, predicted: false, actual: false },
+      ]),
+      rows: [makeRow(0), makeRow(1), makeRow(2), makeRow(3)],
+    };
+
     it("draws the matrix", () => {
-      renderDrawer({
-        coverage: coverageWith([
-          { rowIndex: 0, predicted: true, actual: true },
-          { rowIndex: 1, predicted: true, actual: false },
-          { rowIndex: 2, predicted: false, actual: true },
-          { rowIndex: 3, predicted: false, actual: false },
-        ]),
-        rows: [makeRow(0), makeRow(1), makeRow(2), makeRow(3)],
-      });
+      renderDrawer(fullMatrix);
 
       expect(screen.getByText("Judge: Pass")).toBeDefined();
       expect(screen.getByText("Judge: Fail")).toBeDefined();
       expect(screen.queryByText("Nothing to show yet")).toBeNull();
+    });
+
+    /** @scenario The reader is told the annotated rows may not be representative */
+    it("warns that the annotated rows may not stand in for the run", () => {
+      renderDrawer(fullMatrix);
+
+      expect(
+        screen.getByText(/Figures describe the annotated rows only/),
+      ).toBeDefined();
+      expect(screen.getByText(/will not reflect the full run/)).toBeDefined();
+    });
+
+    describe("when a matrix cell is clicked", () => {
+      /** @scenario Clicking a matrix cell drills into the underlying rows */
+      it("lists that cell's rows with the reviewer's comment", async () => {
+        const user = userEvent.setup();
+        renderDrawer(fullMatrix);
+
+        // The cell's caption is "False Positive · 25%", so match its start.
+        await user.click(
+          screen.getByText(/^False Positive ·/).closest("button")!,
+        );
+
+        // Row 1 is the only judge-pass/reviewer-thumbs-down pair, so the
+        // drill-down must show it and nothing else.
+        expect(
+          screen.getByText(
+            /False Positive — judge said Pass, reviewer said 👎 \(1 row\)/,
+          ),
+        ).toBeDefined();
+        expect(screen.getByText("Row 2")).toBeDefined();
+        expect(screen.getByText("output 1")).toBeDefined();
+        expect(screen.getByText(/Reviewer: Wrong refund/)).toBeDefined();
+        expect(screen.queryByText("Row 1")).toBeNull();
+      });
     });
   });
 

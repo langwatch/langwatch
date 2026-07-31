@@ -126,6 +126,7 @@ describe("buildJudgeAnnotationPairs", () => {
   });
 
   describe("when a row has a trace id but no annotation", () => {
+    /** @scenario Unannotated rows are excluded, not treated as a verdict */
     it("is excluded from pairs, not treated as a negative verdict", () => {
       const rows = [makeRow({ index: 0, traceId: "trace-a", passed: false })];
       const result = buildJudgeAnnotationPairs({
@@ -171,6 +172,7 @@ describe("buildJudgeAnnotationPairs", () => {
   });
 
   describe("when a trace has multiple reviewers who disagree", () => {
+    /** @scenario A trace with conflicting annotations from multiple reviewers is excluded */
     it("excludes the row from pairs and counts it as conflicting", () => {
       const rows = [makeRow({ index: 0, traceId: "trace-a", passed: true })];
       const annotations = toMap([
@@ -328,6 +330,7 @@ describe("buildJudgeAnnotationPairs", () => {
       );
     });
 
+    /** @scenario A note left without a verdict is not shown as the reviewer's reasoning */
     it("ignores a comment from an annotation that carries no verdict", () => {
       const rows = [makeRow({ index: 0, traceId: "trace-a", passed: true })];
       const annotations = toMap([
@@ -356,6 +359,7 @@ describe("buildJudgeAnnotationPairs", () => {
       expect(result.pairs[0]?.comment).toBe("Refund amount is right.");
     });
 
+    /** @scenario A note left without a verdict is not shown as the reviewer's reasoning */
     it("omits the comment when only verdict-less annotations carry one", () => {
       const rows = [makeRow({ index: 0, traceId: "trace-a", passed: true })];
       const annotations = toMap([

@@ -25,6 +25,7 @@ describe("computeConfusionMatrix", () => {
       })),
     ];
 
+    /** @scenario Matrix cells count judge verdict against reviewer verdict */
     it("counts each quadrant correctly", () => {
       const result = computeConfusionMatrix(pairs);
       expect(result.truePositive).toBe(5);
@@ -34,21 +35,25 @@ describe("computeConfusionMatrix", () => {
       expect(result.total).toBe(12);
     });
 
+    /** @scenario Derived metrics accompany the raw matrix */
     it("computes accuracy as (TP + TN) / total", () => {
       const result = computeConfusionMatrix(pairs);
       expect(result.accuracy).toBeCloseTo(9 / 12, 5);
     });
 
+    /** @scenario Derived metrics accompany the raw matrix */
     it("computes precision as TP / (TP + FP)", () => {
       const result = computeConfusionMatrix(pairs);
       expect(result.precision).toBeCloseTo(5 / 6, 5);
     });
 
+    /** @scenario Derived metrics accompany the raw matrix */
     it("computes recall as TP / (TP + FN)", () => {
       const result = computeConfusionMatrix(pairs);
       expect(result.recall).toBeCloseTo(5 / 7, 5);
     });
 
+    /** @scenario Derived metrics accompany the raw matrix */
     it("computes F1 as the harmonic mean of precision and recall", () => {
       const result = computeConfusionMatrix(pairs);
       const precision = 5 / 6;
@@ -204,6 +209,7 @@ describe("computeConfusionMatrix statistical honesty", () => {
       trueNegative: 3,
     });
 
+    /** @scenario Accuracy is reported with the range it could plausibly be */
     it("reports an accuracy interval wide enough to show the sample is thin", () => {
       const result = computeConfusionMatrix(pairs);
       expect(result.accuracy).toBeCloseTo(0.75, 5);
@@ -237,6 +243,7 @@ describe("computeConfusionMatrix statistical honesty", () => {
       expect(computeConfusionMatrix(pairs).accuracy).toBeCloseTo(0.9, 5);
     });
 
+    /** @scenario A judge that only matches the base rate scores zero agreement */
     it("scores zero kappa, exposing that accuracy as chance", () => {
       expect(computeConfusionMatrix(pairs).cohensKappa).toBeCloseTo(0, 5);
     });
@@ -273,6 +280,7 @@ describe("computeConfusionMatrix statistical honesty", () => {
   describe("when both judge and reviewer marked every row the same way", () => {
     // Chance agreement is 100%, so the correction divides by zero —
     // kappa genuinely is not defined here, and saying "1.0" would lie.
+    /** @scenario Undefined agreement is reported as undefined, not as perfect */
     it("returns null kappa rather than a fabricated perfect score", () => {
       const pairs = pairsFromCounts({
         truePositive: 10,

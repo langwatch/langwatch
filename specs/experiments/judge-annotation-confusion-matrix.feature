@@ -26,6 +26,7 @@ Feature: Judge-vs-annotation confusion matrix
     And each row's target execution has a real trace id
     And a human reviewer has left a thumbs up/down annotation on 12 of those traces
 
+  @unimplemented
   Scenario: Confusion matrix mounts only once enough rows are annotated
     Given fewer than 5 of the 20 rows have an annotation
     When I view the results page Metrics
@@ -34,12 +35,14 @@ Feature: Judge-vs-annotation confusion matrix
     # mirrors the BT leaderboard's low-sample-size framing rather than
     # inventing a new threshold philosophy.
 
+  @unimplemented
   Scenario: Confusion matrix mounts once the annotation floor is met
     Given 12 of the 20 rows have an annotation
     When I view the results page Metrics
     Then the "Exact Match — agreement with reviewers" chart is offered
     And enabling it shows a compact 2x2 matrix card next to the other evaluator charts
 
+  @unit
   Scenario: Matrix cells count judge verdict against reviewer verdict
     Given 12 annotated rows: 5 judge-pass/reviewer-thumbsup, 1 judge-pass/reviewer-thumbsdown,
       2 judge-fail/reviewer-thumbsup, 4 judge-fail/reviewer-thumbsdown
@@ -47,24 +50,28 @@ Feature: Judge-vs-annotation confusion matrix
     Then I see "True Positive: 5", "False Positive: 1", "False Negative: 2", "True Negative: 4"
     And I see the row/column headers labeled "Judge: Pass / Fail" and "Reviewer: 👍 / 👎"
 
+  @unit
   Scenario: Unannotated rows are excluded, not treated as a verdict
     Given 8 of the 20 rows have no annotation at all
     When I open the expanded confusion matrix
     Then those 8 rows are not counted in any matrix cell
     And a coverage note reads "12 of 20 rows annotated"
 
+  @unit
   Scenario: A trace with conflicting annotations from multiple reviewers is excluded
     Given one annotated trace has two annotations that disagree (one thumbs up, one thumbs down)
     When I open the expanded confusion matrix
     Then that row is excluded from every matrix cell
     And the coverage note counts it separately as "1 row has conflicting reviewer annotations"
 
+  @unit
   Scenario: Derived metrics accompany the raw matrix
     Given the matrix in the prior scenario (5 TP, 1 FP, 2 FN, 4 TN)
     When I open the expanded confusion matrix
     Then I see "Accuracy: 75%", "Precision: 83%", "Recall: 71%", "F1: 77%"
     # (5+4)/12=75%, 5/(5+1)=83%, 5/(5+2)=71%, 2*.83*.71/(.83+.71)=77%
 
+  @unit
   Scenario: A judge that only matches the base rate scores zero agreement
     Given 10 annotated rows where the reviewer marked 9 as thumbs up
     And the judge answered "pass" on every one of them
@@ -76,6 +83,7 @@ Feature: Judge-vs-annotation confusion matrix
     # learned nothing scores 90% on this set purely off the base rate;
     # accuracy alone would call that a success.
 
+  @unit
   Scenario: Accuracy is reported with the range it could plausibly be
     Given 8 annotated rows of which the judge got 6 right
     When I open the expanded confusion matrix
@@ -87,6 +95,7 @@ Feature: Judge-vs-annotation confusion matrix
     # chart already refuses to mount below its own row floor, so a
     # count-based warning could never fire.
 
+  @unimplemented
   Scenario: Agreement is shown against the level chance alone would reach
     Given any matrix with enough annotated rows to mount
     When I open the expanded confusion matrix
@@ -96,6 +105,7 @@ Feature: Judge-vs-annotation confusion matrix
     # swallowed by the chance floor, and a thin sample should read as a
     # wide smear rather than a crisp number.
 
+  @unit
   Scenario: Undefined agreement is reported as undefined, not as perfect
     Given every annotated row was marked thumbs up by the reviewer
     And the judge answered "pass" on every one of them
@@ -105,6 +115,7 @@ Feature: Judge-vs-annotation confusion matrix
     # Chance agreement is already total here, so the correction divides by
     # zero. Reporting 1.00 would dress a degenerate case up as a triumph.
 
+  @integration
   Scenario: The reader is told the annotated rows may not be representative
     Given the annotated rows were chosen by reviewers browsing for problems
     When I open the expanded confusion matrix
@@ -115,12 +126,14 @@ Feature: Judge-vs-annotation confusion matrix
     # annotated set skews toward suspicious rows. No confidence interval
     # fixes a biased sample; the honest move is to say so on the surface.
 
+  @integration
   Scenario: Clicking a matrix cell drills into the underlying rows
     Given the expanded confusion matrix is showing
     When I click the "False Positive" cell
     Then I see the list of rows where the judge said pass but the reviewer marked thumbs down
     And each row shows the target output and the reviewer's annotation comment, if any
 
+  @unit
   Scenario: A note left without a verdict is not shown as the reviewer's reasoning
     Given an annotated trace also carries an annotation with a comment but no thumbs up/down
     When I drill into the cell containing that row
@@ -129,6 +142,7 @@ Feature: Judge-vs-annotation confusion matrix
     # reviewer's rationale for the thumbs up/down in the matrix, and presenting
     # it as one puts words in their mouth.
 
+  @integration
   Scenario: The expanded view opened from a link explains itself instead of breaking
     Given I paste a link to the expanded confusion matrix into a fresh tab
     When the page loads
@@ -137,6 +151,7 @@ Feature: Judge-vs-annotation confusion matrix
     # The drawer is URL-routed but its data travels in memory, so the ids
     # survive a reload and the data does not.
 
+  @integration
   Scenario: A run with no comparable rows says so rather than showing an empty matrix
     Given no row has both a resolved judge verdict and an agreed reviewer annotation
     When I open the expanded confusion matrix
@@ -145,16 +160,19 @@ Feature: Judge-vs-annotation confusion matrix
     # Four cells reading "0 · 0%" present the absence of a measurement as a
     # measurement.
 
+  @unimplemented
   Scenario: Each pass/fail evaluator with enough annotation coverage gets its own matrix
     Given the experiment also has a second pass/fail evaluator "LLM Answer Match" with its own runs and annotations meeting the floor
     When I view the results page Metrics
     Then I see both "Exact Match — agreement with reviewers" and "LLM Answer Match — agreement with reviewers" as separate chart options
 
+  @unimplemented
   Scenario: Feature flag gates the whole surface
     Given the "release_ui_judge_annotation_confusion_matrix_enabled" flag is off
     When I view the results page Metrics
     Then no confusion-matrix chart option is offered regardless of annotation coverage
 
+  @unimplemented
   Scenario: Comparison evaluators are not offered a confusion matrix
     Given the experiment also has a 3-variant Comparison evaluator
     When I view the results page Metrics
