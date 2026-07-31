@@ -35,6 +35,13 @@ import {
   type BudgetScope,
   GatewayBudgetService,
 } from "~/server/gateway/budget.service";
+import {
+  budgetPeriodFloorMs,
+} from "~/server/gateway/budget.clickhouse.repository";
+import {
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
+} from "~/server/gateway/budgetResolution.service";
 import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import {
   chRepoOrUndefined,
@@ -310,6 +317,11 @@ const budgetScopeTypeSchema = z.enum([
   "GROUP",
   "ATTRIBUTED_USER",
 ]);
+
+const resetBudgetSchema = z.object({
+  /** Free-text operator note, audit-logged with the reset. */
+  reason: z.string().max(500).optional(),
+});
 
 const createBudgetSchema = z.object({
   scope: z.discriminatedUnion("kind", [
@@ -1297,6 +1309,165 @@ secured.access(apiKeyPermission("gatewayBudgets:delete")).delete(
         actorUserId,
       });
       return c.json({ budget: toBudgetDto(row) });
+    } catch (error) {
+      return trpcErrorResponse(c, error);
+    }
+  },
+);
+
+secured.access(apiKeyPermission("gatewayBudgets:update")).post(
+  "/budgets/:id/reset",
+  describeRoute({
+    summary: "Reset budget period",
+    description:
+      "Moves the budget's period boundary to now and recomputes the next reset; recorded spend is NEVER mutated (the ledger and every emitted billing event are immutable, so reconciliation is unaffected). On calendar windows this truncates the running period and the next boundary stays calendar; on MANUAL windows the new period stays open until the next reset. For attributed-user templates, `end_user_id` resets ONE end-user bucket's boundary and leaves the template period untouched.",
+    tags: ["Budgets"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Reset",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ budget: budgetDtoSchema })),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const endUserId = c.req.query("end_user_id") ?? null;
+    const body = resetBudgetSchema.safeParse(
+      await c.req.json().catch(() => ({})),
+    );
+    if (!body.success) return validationErrorResponse(c, body.error);
+    const organizationId = await orgIdForProject(project.id);
+    const { actorUserId } = actorForRequest(c);
+    const service = GatewayBudgetService.create(prisma, chRepoOrUndefined());
+    try {
+      const row = await service.reset({
+        id,
+        organizationId,
+        actorUserId,
+        endUserId,
+        reason: body.data.reason ?? null,
+      });
+      const memberCounts = await groupMemberCounts([row]);
+      return c.json({
+        budget: toBudgetDto(row, memberCounts.get(row.scopeId)),
+      });
+    } catch (error) {
+      return trpcErrorResponse(c, error);
+    }
+  },
+);
+
+secured.access(apiKeyPermission("gatewayBudgets:view")).get(
+  "/end-users/:end_user_id/spend",
+  describeRoute({
+    summary: "End-user spend",
+    description:
+      "Current spend and the applicable per-end-user cap for one external end-user id, resolved against the attributed-user templates the caller's organization runs. The pair a rebilling platform polls at period close or renders in its own UI. `anchor_virtual_key_id` narrows to one template when several anchors carry one.",
+    tags: ["Budgets"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Spend and cap",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                data: z.array(
+                  z.object({
+                    budget_id: z.string(),
+                    anchor_id: z.string(),
+                    window: z.string(),
+                    on_breach: z.enum(["BLOCK", "WARN"]),
+                    limit_usd: z.string(),
+                    spent_usd: z.string(),
+                    period_started_at: z.string(),
+                  }),
+                ),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const endUserId = c.req.param("end_user_id");
+    const anchorFilter = c.req.query("anchor_virtual_key_id") ?? null;
+    const organizationId = await orgIdForProject(project.id);
+    const chRepo = chRepoOrUndefined();
+    const templates = await prisma.gatewayBudget.findMany({
+      where: {
+        organizationId,
+        scopeType: "ATTRIBUTED_USER",
+        archivedAt: null,
+        ...(anchorFilter ? { scopeId: anchorFilter } : {}),
+      },
+    });
+    if (templates.length === 0 || !chRepo) {
+      return c.json({ data: [] });
+    }
+    const projects = await prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    const boundaries = await prisma.gatewayBudgetBucketBoundary.findMany({
+      where: { budgetId: { in: templates.map((t) => t.id) } },
+    });
+    const boundaryByKey = new Map(
+      boundaries.map((b) => [`${b.budgetId}:${b.bucketScopeId}`, b]),
+    );
+    const targets = templates.map((t) => {
+      const bucketScopeId = bucketScopeIdFor(
+        t,
+        attributedUserBucketScopeId(t.scopeId, endUserId),
+      );
+      const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
+      const floors = [
+        budgetPeriodFloorMs(t),
+        bucketBoundary?.periodStartedAt.getTime(),
+      ].filter((n): n is number => typeof n === "number");
+      return {
+        budgetId: t.id,
+        scope: t.scopeType,
+        scopeId: bucketScopeId,
+        window: t.window,
+        match: "exact" as const,
+        periodFloorMs: floors.length > 0 ? Math.max(...floors) : undefined,
+      };
+    });
+    try {
+      const spends = await chRepo.getSpendForTargetsAcrossTenants(
+        projects.map((p) => p.id),
+        targets,
+      );
+      const spentByBudget = new Map(spends.map((sp) => [sp.budgetId, sp.spentUsd]));
+      return c.json({
+        data: templates.map((t) => {
+          const bucketScopeId = bucketScopeIdFor(
+            t,
+            attributedUserBucketScopeId(t.scopeId, endUserId),
+          );
+          const bucketBoundary = boundaryByKey.get(`${t.id}:${bucketScopeId}`);
+          const periodStart =
+            bucketBoundary?.periodStartedAt ?? t.currentPeriodStartedAt;
+          return {
+            budget_id: t.id,
+            anchor_id: t.scopeId,
+            window: t.window,
+            on_breach: t.onBreach,
+            limit_usd: t.limitUsd.toString(),
+            spent_usd: spentByBudget.get(t.id) ?? "0",
+            period_started_at: periodStart.toISOString(),
+          };
+        }),
+      });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }

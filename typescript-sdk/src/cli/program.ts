@@ -1817,6 +1817,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     gatewayBudgetsCmd
+      .command("reset <id>")
+      .description("Move a budget's period boundary to now (never mutates recorded spend)")
+      .option("--end-user <id>", "Reset only this end user's bucket (attributed-user templates)")
+      .option("--reason <text>", "Audit-logged note for the reset")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { endUser?: string; reason?: string }) => {
+      const { resetGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/reset.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    gatewayBudgetsCmd
       .command("update <id>")
       .description("Update a budget's name/description/limit/on-breach/timezone")
       .option("--name <name>", "New display name")

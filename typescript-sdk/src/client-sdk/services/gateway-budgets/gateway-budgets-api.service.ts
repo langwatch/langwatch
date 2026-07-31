@@ -11,7 +11,7 @@ export type BudgetScopeKind =
   | "PRINCIPAL"
   | "GROUP";
 
-export type BudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL";
+export type BudgetWindow = "MINUTE" | "HOUR" | "DAY" | "WEEK" | "MONTH" | "TOTAL" | "MANUAL";
 export type BudgetOnBreach = "BLOCK" | "WARN";
 
 export interface GatewayBudget {
@@ -174,6 +174,29 @@ export class GatewayBudgetsApiService {
       `archive gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
       { method: "DELETE" },
+    );
+    return budget;
+  }
+
+  /**
+   * Move the budget's period boundary to now. Recorded spend is never
+   * mutated; with `endUserId` only that end-user bucket's boundary moves.
+   */
+  async reset(
+    id: string,
+    options: { endUserId?: string; reason?: string } = {},
+  ): Promise<GatewayBudget> {
+    const query = options.endUserId
+      ? `?end_user_id=${encodeURIComponent(options.endUserId)}`
+      : "";
+    const { budget } = await this.request<{ budget: GatewayBudget }>(
+      `reset gateway budget "${id}"`,
+      `/api/gateway/v1/budgets/${encodeURIComponent(id)}/reset${query}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(options.reason ? { reason: options.reason } : {}),
+      },
     );
     return budget;
   }
