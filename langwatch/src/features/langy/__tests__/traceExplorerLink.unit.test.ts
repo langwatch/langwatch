@@ -282,6 +282,22 @@ describe("buildExplorerQuery", () => {
     });
   });
 
+  describe("given origins carrying surrounding whitespace", () => {
+    it("trims them, so the facet value can actually match", () => {
+      // Filtering on the trimmed value while quoting the untrimmed one emitted
+      // `origin:" evaluation "` — padding included, matching nothing.
+      expect(buildExplorerQuery({ origins: [" evaluation "] })).toBe(
+        "origin:evaluation",
+      );
+    });
+
+    it("drops whitespace-only entries instead of emitting an empty facet", () => {
+      expect(
+        buildExplorerQuery({ origins: ["  ", " simulation "] }),
+      ).toBe("origin:simulation");
+    });
+  });
+
   describe("given an origin value the query language would otherwise misparse", () => {
     it("quotes it the way the Explorer's own filter sidebar quotes a facet value", () => {
       expect(buildExplorerQuery({ origins: ["my origin"] })).toBe(

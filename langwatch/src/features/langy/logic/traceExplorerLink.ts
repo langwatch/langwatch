@@ -209,7 +209,15 @@ export function buildExplorerQuery(search: TraceSearchQuery): string | null {
   // filter sidebar spells a multi-value facet — `(origin:a OR origin:b)` — via
   // the same `escapeValue` it uses, so a value needing quotes gets them by the
   // Explorer's rule rather than by a second one invented here.
-  const origins = search.origins?.filter((origin) => origin.trim() !== "");
+  // Trim before use, not just before the emptiness test: this is a public
+  // function and callers can hand it a raw array. Filtering on `origin.trim()`
+  // while quoting the untrimmed value let `" evaluation "` through as
+  // `origin:" evaluation "` — a padded facet value that matches nothing, which
+  // is the one direction this module must never fail in (a lost filter widens
+  // the result set; an unmatchable one empties it).
+  const origins = search.origins
+    ?.map((origin) => origin.trim())
+    .filter((origin) => origin !== "");
   if (origins && origins.length > 0) {
     const group = origins
       .map((origin) => `origin:${escapeValue(origin)}`)
