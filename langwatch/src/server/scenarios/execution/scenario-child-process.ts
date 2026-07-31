@@ -26,21 +26,15 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
-import { RED_TEAM_DEFAULT_TURNS, type ChildProcessJobData } from "./types";
-import { parseChildProcessJobData } from "./child-process-payload";
-import { createModelFromParams } from "./model.factory";
-import { createAdapter } from "./serialized-adapter.registry";
-import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
-import { createTraceApiSpanQuery } from "./trace-api-span-query";
-import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
 import { bridgeTraceIdFromAdapterToJudge } from "./bridge-trace-id";
 import { createChildProcessLogger } from "./child-logger";
+import { parseChildProcessJobData } from "./child-process-payload";
 import { createModelFromParams } from "./model.factory";
 import { RemoteSpanJudgeAgent } from "./remote-span-judge-agent";
 import { createAdapter } from "./serialized-adapter.registry";
 import { SerializedHttpAgentAdapter } from "./serialized-adapters/http-agent.adapter";
 import { createTraceApiSpanQuery } from "./trace-api-span-query";
-import { RED_TEAM_DEFAULT_TURNS, type ChildProcessJobData } from "./types";
+import { type ChildProcessJobData, RED_TEAM_DEFAULT_TURNS } from "./types";
 
 const logger = createChildProcessLogger("langwatch:scenarios:child");
 

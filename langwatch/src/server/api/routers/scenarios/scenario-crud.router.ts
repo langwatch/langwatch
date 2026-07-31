@@ -6,7 +6,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
-import { type RedTeamConfig } from "~/server/scenarios/execution/types";
+import type { RedTeamConfig } from "~/server/scenarios/execution/types";
 import {
   mergeRedTeamState,
   normalizeRedTeamWrite,
@@ -66,7 +66,10 @@ export const scenarioCrudRouter = createTRPCRouter({
       const input = normalizeRedTeamWrite(rawInput);
       const createIssue = redTeamStateIssue(input);
       if (createIssue) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: createIssue.message });
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: createIssue.message,
+        });
       }
 
       const { redTeamConfig, ...rest } = input;

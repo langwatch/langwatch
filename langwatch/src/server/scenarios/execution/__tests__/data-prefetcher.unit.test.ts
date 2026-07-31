@@ -24,10 +24,10 @@ import {
   type WorkflowVersionFetcher,
 } from "../data-prefetcher";
 import {
-  RED_TEAM_MAX_TURNS,
   type ExecutionContext,
-  type TargetConfig,
   type LiteLLMParams,
+  RED_TEAM_MAX_TURNS,
+  type TargetConfig,
 } from "../types";
 
 /**
@@ -165,7 +165,6 @@ describe("prefetchScenarioData", () => {
       maxTokens: 1000,
     };
 
-
     // This is the seam that carries a stored attack into the run. If it
     // dropped a field the symptom would be an attack quietly running on SDK
     // defaults — no error, and a verdict that still reads as a pass. The
@@ -187,7 +186,10 @@ describe("prefetchScenarioData", () => {
             }),
           },
         });
-        const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
 
         const result = await prefetchScenarioData(defaultContext, target, deps);
 
@@ -217,7 +219,10 @@ describe("prefetchScenarioData", () => {
             }),
           },
         });
-        const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
 
         const result = await prefetchScenarioData(defaultContext, target, deps);
 
@@ -252,7 +257,10 @@ describe("prefetchScenarioData", () => {
             }),
           },
         });
-        const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
 
         const result = await prefetchScenarioData(defaultContext, target, deps);
 
@@ -289,7 +297,10 @@ describe("prefetchScenarioData", () => {
             }),
           },
         });
-        const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
 
         const result = await prefetchScenarioData(defaultContext, target, deps);
 

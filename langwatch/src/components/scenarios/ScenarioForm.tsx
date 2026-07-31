@@ -39,22 +39,28 @@ import { SectionHeader } from "./ui/SectionHeader";
  * Zod schema for scenario form validation.
  * Colocated with the form component it validates.
  */
-export const scenarioFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  situation: z.string(),
-  criteria: z.array(z.string()),
-  labels: z.array(z.string()),
-  // Red-team configuration. Null strategy = a standard scenario; the form
-  // shows the attack section only once a strategy is picked.
-  //
-  // The schemas come from the execution contract rather than being written out
-  // again here. A re-declared copy is a copy that drifts: the editor would go
-  // on accepting a value the API had started rejecting, and the only symptom
-  // is a save that fails after the user has finished typing.
-  redTeamStrategy: RedTeamStrategySchema.nullish(),
-  redTeamTarget: z.string().nullish(),
-  redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
-  redTeamConfig: RedTeamConfigSchema.nullish(),
+export const scenarioFormSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    situation: z.string(),
+    criteria: z.array(z.string()),
+    labels: z.array(z.string()),
+    // Red-team configuration. Null strategy = a standard scenario; the form
+    // shows the attack section only once a strategy is picked.
+    //
+    // The schemas come from the execution contract rather than being written out
+    // again here. A re-declared copy is a copy that drifts: the editor would go
+    // on accepting a value the API had started rejecting, and the only symptom
+    // is a save that fails after the user has finished typing.
+    redTeamStrategy: RedTeamStrategySchema.nullish(),
+    redTeamTarget: z.string().nullish(),
+    redTeamTotalTurns: z
+      .number()
+      .int()
+      .min(1)
+      .max(RED_TEAM_MAX_TURNS)
+      .nullish(),
+    redTeamConfig: RedTeamConfigSchema.nullish(),
   })
   .superRefine((values, ctx) => {
     // Same rule the API enforces, surfaced on the field rather than as a
@@ -73,7 +79,7 @@ export const scenarioFormSchema = z.object({
         message: issue.message,
       });
     }
-});
+  });
 
 export type ScenarioFormData = z.infer<typeof scenarioFormSchema>;
 
@@ -280,7 +286,10 @@ export function ScenarioForm({
           drives the conversation changes, so this is a mode on the same form
           rather than a separate creation flow. */}
       {showTypeSelector && (
-        <ScenarioTypeSelector isRedTeam={isRedTeam} onSelect={handleTypeSelect} />
+        <ScenarioTypeSelector
+          isRedTeam={isRedTeam}
+          onSelect={handleTypeSelect}
+        />
       )}
 
       {/* SCENARIO Section */}

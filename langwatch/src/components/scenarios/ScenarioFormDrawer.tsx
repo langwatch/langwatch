@@ -9,7 +9,11 @@ import {
 import { generate } from "@langwatch/ksuid";
 import type { Scenario } from "@prisma/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type FieldErrors, type UseFormReturn, useWatch } from "react-hook-form";
+import {
+  type FieldErrors,
+  type UseFormReturn,
+  useWatch,
+} from "react-hook-form";
 import {
   applyHandledErrorToForm,
   FormServerError,
@@ -30,6 +34,7 @@ import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import type { TypedAgent } from "../../server/agents/agent.repository";
+import { withApplicableRedTeamConfig } from "../../server/scenarios/red-team-input";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -40,7 +45,6 @@ import { TagList } from "../ui/TagList";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
-import { withApplicableRedTeamConfig } from "../../server/scenarios/red-team-input";
 import {
   ScenarioForm,
   type ScenarioFormData,
@@ -435,20 +439,17 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
    * can be scrolled off, or inside the collapsed Advanced section, so the
    * press needs an answer of its own.
    */
-  const reportInvalid = useCallback(
-    (errors: FieldErrors<ScenarioFormData>) => {
-      const messages = Object.values(errors)
-        .map((error) => (error as { message?: string } | undefined)?.message)
-        .filter((message): message is string => !!message);
-      toaster.create({
-        title: "Check the highlighted fields",
-        description: messages[0] ?? "Some values need fixing before saving.",
-        type: "warning",
-        meta: { closable: true },
-      });
-    },
-    [],
-  );
+  const reportInvalid = useCallback((errors: FieldErrors<ScenarioFormData>) => {
+    const messages = Object.values(errors)
+      .map((error) => (error as { message?: string } | undefined)?.message)
+      .filter((message): message is string => !!message);
+    toaster.create({
+      title: "Check the highlighted fields",
+      description: messages[0] ?? "Some values need fixing before saving.",
+      type: "warning",
+      meta: { closable: true },
+    });
+  }, []);
 
   const confirmRunWithModels = useCallback(async () => {
     const form = formInstance;
@@ -548,7 +549,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             ? redTeamStrategy
             : null,
         redTeamConfig:
-          redTeamConfig && typeof redTeamConfig === "object" &&
+          redTeamConfig &&
+          typeof redTeamConfig === "object" &&
           !Array.isArray(redTeamConfig)
             ? (redTeamConfig as ScenarioFormData["redTeamConfig"])
             : null,
@@ -642,7 +644,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           clearFlowCallbacks();
         }}
       />
-
 
       {/* Prompt Creation Drawer */}
       <PromptEditorDrawer

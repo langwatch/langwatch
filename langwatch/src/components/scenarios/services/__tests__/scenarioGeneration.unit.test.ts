@@ -31,10 +31,10 @@ describe("generateScenarioWithAI()", () => {
       });
 
       const result = await generateScenarioWithAI({
-         prompt: "test prompt",
-         projectId: "project-123",
-         currentScenario: null,
-       });
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      });
 
       expect(result).toEqual(mockScenario);
     });
@@ -119,10 +119,10 @@ describe("generateScenarioWithAI()", () => {
 
     it("does not leak a raw JSON.parse error to the caller", async () => {
       const error = await generateScenarioWithAI({
-         prompt: "test prompt",
-         projectId: "project-123",
-         currentScenario: null,
-       }).catch((e: unknown) => e);
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      }).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).not.toMatch(
@@ -132,10 +132,10 @@ describe("generateScenarioWithAI()", () => {
 
     it("surfaces the HTTP status so the failure is actionable", async () => {
       const error = await generateScenarioWithAI({
-         prompt: "test prompt",
-         projectId: "project-123",
-         currentScenario: null,
-       }).catch((e: unknown) => e);
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      }).catch((e: unknown) => e);
 
       expect((error as Error).message).toContain("502");
     });
@@ -150,10 +150,10 @@ describe("generateScenarioWithAI()", () => {
 
       await expect(
         generateScenarioWithAI({
-        prompt: "test prompt",
-        projectId: "project-123",
-        currentScenario: null,
-      })
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Custom error message");
     });
 
@@ -165,10 +165,10 @@ describe("generateScenarioWithAI()", () => {
 
       await expect(
         generateScenarioWithAI({
-        prompt: "test prompt",
-        projectId: "project-123",
-        currentScenario: null,
-      })
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Failed to generate scenario");
     });
   });
@@ -189,10 +189,10 @@ describe("generateScenarioWithAI()", () => {
       });
 
       const error = await generateScenarioWithAI({
-         prompt: "test prompt",
-         projectId: "project-123",
-         currentScenario: null,
-       }).catch((e: unknown) => e);
+        prompt: "test prompt",
+        projectId: "project-123",
+        currentScenario: null,
+      }).catch((e: unknown) => e);
 
       expect(error).toBeInstanceOf(ScenarioGenerationError);
       expect((error as ScenarioGenerationError).kind).toBe("missing_provider");
@@ -211,10 +211,10 @@ describe("generateScenarioWithAI()", () => {
 
       await expect(
         generateScenarioWithAI({
-        prompt: "test prompt",
-        projectId: "project-123",
-        currentScenario: null,
-      })
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Invalid response: missing scenario data");
     });
 
@@ -235,10 +235,10 @@ describe("generateScenarioWithAI()", () => {
 
       await expect(
         generateScenarioWithAI({
-        prompt: "test prompt",
-        projectId: "project-123",
-        currentScenario: null,
-      })
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Invalid scenario data");
     });
 
@@ -255,10 +255,10 @@ describe("generateScenarioWithAI()", () => {
 
       await expect(
         generateScenarioWithAI({
-        prompt: "test prompt",
-        projectId: "project-123",
-        currentScenario: null,
-      })
+          prompt: "test prompt",
+          projectId: "project-123",
+          currentScenario: null,
+        }),
       ).rejects.toThrow("Invalid scenario data");
     });
   });
