@@ -376,6 +376,23 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
       403,
     );
   }
+  if (vk.status === "DISABLED") {
+    // Distinct from revoked AND from a bad key: a disabled tenant must be
+    // able to tell "we turned you off" from "your credential is wrong",
+    // and the platform's own tooling branches on this code.
+    logAuthDecision(c, "virtual_key_disabled", 403, { vkId: vk.id });
+    return c.json(
+      {
+        error: {
+          type: "virtual_key_disabled",
+          code: "virtual_key_disabled",
+          message:
+            "virtual key is disabled; it can be re-enabled by an administrator",
+        },
+      },
+      403,
+    );
+  }
 
   // Resolve the trace project for OTLP routing. PROJECT-scoped VK with
   // exactly one PROJECT scope -> that project; otherwise -> the org's

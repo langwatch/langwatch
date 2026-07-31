@@ -570,6 +570,109 @@ export class VirtualKeyService {
     });
   }
 
+  /**
+   * Reversible stop. Unlike revoke: budgets stay active, rotation-grace
+   * state stays intact, and the key material never changes, so enable
+   * restores service exactly as it was. The distinct DISABLED status (and
+   * its distinct auth error) is the whole point: a platform's kill switch
+   * must be un-throwable and must never masquerade as a bad key.
+   */
+  async disable(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+    reason?: string | null;
+  }): Promise<VirtualKeyWithScopes> {
+    const existing = await this.requireOwn(input.id, input.organizationId);
+    if (existing.status === "DISABLED") return existing;
+    if (existing.status === "REVOKED") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "A revoked key cannot be disabled; revocation is terminal.",
+      });
+    }
+    const before = serialiseForAudit(existing);
+    return this.prisma.$transaction(async (tx) => {
+      const vk = await this.repository.setDisabled(
+        input.id,
+        input.organizationId,
+        true,
+        input.reason ?? null,
+        tx,
+      );
+      await this.changeEvents.append(
+        {
+          organizationId: input.organizationId,
+          kind: "VK_DISABLED",
+          virtualKeyId: vk.id,
+        },
+        tx,
+      );
+      await this.auditLog.append(
+        {
+          organizationId: input.organizationId,
+          projectId: null,
+          actorUserId: input.actorUserId,
+          action: "gateway.virtual_key.disabled",
+          targetKind: "virtual_key",
+          targetId: vk.id,
+          before,
+          after: serialiseForAudit(vk),
+        },
+        tx,
+      );
+      return vk;
+    });
+  }
+
+  /** Reverse of disable: restores ACTIVE without touching anything else. */
+  async enable(input: {
+    id: string;
+    organizationId: string;
+    actorUserId: string;
+  }): Promise<VirtualKeyWithScopes> {
+    const existing = await this.requireOwn(input.id, input.organizationId);
+    if (existing.status === "ACTIVE") return existing;
+    if (existing.status === "REVOKED") {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "A revoked key cannot be enabled; mint a new key instead.",
+      });
+    }
+    const before = serialiseForAudit(existing);
+    return this.prisma.$transaction(async (tx) => {
+      const vk = await this.repository.setDisabled(
+        input.id,
+        input.organizationId,
+        false,
+        null,
+        tx,
+      );
+      await this.changeEvents.append(
+        {
+          organizationId: input.organizationId,
+          kind: "VK_ENABLED",
+          virtualKeyId: vk.id,
+        },
+        tx,
+      );
+      await this.auditLog.append(
+        {
+          organizationId: input.organizationId,
+          projectId: null,
+          actorUserId: input.actorUserId,
+          action: "gateway.virtual_key.enabled",
+          targetKind: "virtual_key",
+          targetId: vk.id,
+          before,
+          after: serialiseForAudit(vk),
+        },
+        tx,
+      );
+      return vk;
+    });
+  }
+
   /** Advance `lastUsedAt` — called from resolve-key hot path. */
   async touchUsage(id: string): Promise<void> {
     await this.repository.recordUsage(id, new Date());

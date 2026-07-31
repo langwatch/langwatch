@@ -204,6 +204,29 @@ export class VirtualKeysApiService {
     return virtual_key;
   }
 
+  /** Reversible stop; enable() restores the key exactly as it was. */
+  async disable(id: string, options: { reason?: string } = {}): Promise<VirtualKey> {
+    const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
+      `disable virtual key "${id}"`,
+      `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/disable`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(options.reason ? { reason: options.reason } : {}),
+      },
+    );
+    return virtual_key;
+  }
+
+  async enable(id: string): Promise<VirtualKey> {
+    const { virtual_key } = await this.request<{ virtual_key: VirtualKey }>(
+      `enable virtual key "${id}"`,
+      `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/enable`,
+      { method: "POST" },
+    );
+    return virtual_key;
+  }
+
   /**
    * Aggregate spend for one key. Defaults to the current UTC calendar
    * month server-side. Reads the same cost path the dashboard reads, so

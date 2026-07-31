@@ -318,6 +318,11 @@ const budgetScopeTypeSchema = z.enum([
   "ATTRIBUTED_USER",
 ]);
 
+const disableVkSchema = z.object({
+  /** Operator note, audit-logged and shown in the key's detail view. */
+  reason: z.string().max(500).optional(),
+});
+
 const resetBudgetSchema = z.object({
   /** Free-text operator note, audit-logged with the reset. */
   reason: z.string().max(500).optional(),
@@ -966,6 +971,99 @@ secured.access(apiKeyPermission("virtualKeys:rotate")).post(
         actorUserId,
       });
       return c.json({ virtual_key: toVkDto(virtualKey), secret });
+    } catch (error) {
+      return trpcErrorResponse(c, error);
+    }
+  },
+);
+
+secured.access(apiKeyPermission("virtualKeys:update")).post(
+  "/virtual-keys/:id/disable",
+  describeRoute({
+    summary: "Disable virtual key",
+    description:
+      "Reversible stop: requests on the key are rejected with the distinct `virtual_key_disabled` error until it is enabled again. Budgets, scopes, key material, and any rotation grace stay intact. The change propagates through the gateway's change-event feed. Idempotent.",
+    tags: ["Virtual Keys"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Disabled",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const body = disableVkSchema.safeParse(
+      await c.req.json().catch(() => ({})),
+    );
+    if (!body.success) return validationErrorResponse(c, body.error);
+    const organizationId = await orgIdForProject(project.id);
+    const { actor, actorUserId } = actorForRequest(c);
+    const service = VirtualKeyService.create(prisma);
+    try {
+      const existing = await requireExistingVk(service, id, organizationId);
+      await assertActorCanOperateOnAnyScope(
+        { prisma, actor },
+        existing.scopes,
+        "virtualKeys:update",
+      );
+      const updated = await service.disable({
+        id,
+        organizationId,
+        actorUserId,
+        reason: body.data.reason ?? null,
+      });
+      return c.json({ virtual_key: toVkDto(updated) });
+    } catch (error) {
+      return trpcErrorResponse(c, error);
+    }
+  },
+);
+
+secured.access(apiKeyPermission("virtualKeys:update")).post(
+  "/virtual-keys/:id/enable",
+  describeRoute({
+    summary: "Enable virtual key",
+    description:
+      "Reverses disable: the key returns to ACTIVE exactly as it was, including any rotation grace that was running. Idempotent.",
+    tags: ["Virtual Keys"],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Enabled",
+        content: {
+          "application/json": {
+            schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const id = c.req.param("id");
+    const organizationId = await orgIdForProject(project.id);
+    const { actor, actorUserId } = actorForRequest(c);
+    const service = VirtualKeyService.create(prisma);
+    try {
+      const existing = await requireExistingVk(service, id, organizationId);
+      await assertActorCanOperateOnAnyScope(
+        { prisma, actor },
+        existing.scopes,
+        "virtualKeys:update",
+      );
+      const updated = await service.enable({
+        id,
+        organizationId,
+        actorUserId,
+      });
+      return c.json({ virtual_key: toVkDto(updated) });
     } catch (error) {
       return trpcErrorResponse(c, error);
     }
