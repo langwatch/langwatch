@@ -15,6 +15,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { STABLE_EMPTY_QUERY_RESULTS } from "~/test-utils/stableEmptyQueryResults";
+
 // ComparisonCharts reads the leaderboard rollout flag, which reaches for the
 // organization context and tRPC. Neither is mounted here, and none of these
 // tests are about the leaderboard.
@@ -28,12 +30,8 @@ import type { ComparisonRunData } from "../types";
 // ComparisonCharts reads annotations through tRPC's `useQueries`, which
 // touches the tRPC context unconditionally — an `enabled: false` guard does
 // not spare it, so rendering under a bare ChakraProvider would throw
-// "Cannot destructure property 'ssrState'".
-//
-// The single shared constant is load-bearing, not tidiness: returning a fresh
-// array here would hand the component a new reference every render, and that
-// cascades through the memo chain into a setState effect and spins forever.
-const STABLE_EMPTY_QUERY_RESULTS: never[] = [];
+// "Cannot destructure property 'ssrState'". See the fixture for why the
+// result array must be one constant.
 vi.mock("~/utils/api", () => ({
   api: {
     useQueries: vi.fn(() => STABLE_EMPTY_QUERY_RESULTS),

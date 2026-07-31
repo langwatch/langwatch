@@ -22,14 +22,14 @@ import {
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { ChartTooltip } from "../analytics/ChartTooltip";
 import { ComparisonLeaderboardChart } from "./ComparisonLeaderboardChart";
+import { buildJudgeAnnotationPairs } from "./buildJudgeAnnotationPairs";
+import { ConfusionMatrixChart } from "./ConfusionMatrixChart";
 import {
   axisLabelProps,
   buildAxisLabels,
   chartHeightFor,
   truncateLabel,
 } from "./chartAxisLabels";
-import { buildJudgeAnnotationPairs } from "./buildJudgeAnnotationPairs";
-import { ConfusionMatrixChart } from "./ConfusionMatrixChart";
 import type {
   BatchComparisonColumn,
   BatchEvaluationData,
@@ -1029,7 +1029,6 @@ export const ComparisonCharts = ({
     comparisonData,
   ]);
 
-
   const confusionMatrixTraceIds = useMemo(() => {
     if (passFailTargets.length === 0) return EMPTY_TRACE_IDS;
     const targetIds = new Set(passFailTargets.map((t) => t.targetId));
@@ -1081,11 +1080,19 @@ export const ComparisonCharts = ({
     // that was actually checked, and mark it so the drawer can say so.
     const truncated =
       confusionMatrixTraceIds.length >= CONFUSION_MATRIX_MAX_TRACES;
+    // Trace ids are collected once per DISTINCT target, so the cap divides by
+    // the target count — not by `passFailTargets.length`, which counts every
+    // (target, evaluator) candidate. Five judges on two targets would
+    // otherwise score 50 rows out of the 250 actually fetched, inventing a
+    // thin-sample warning or hiding a chart that qualified.
+    const distinctTargetCount = new Set(
+      passFailTargets.map((candidate) => candidate.targetId),
+    ).size;
     const scoredRows = truncated
       ? confusionMatrixRows.slice(
           0,
           Math.ceil(
-            CONFUSION_MATRIX_MAX_TRACES / Math.max(1, passFailTargets.length),
+            CONFUSION_MATRIX_MAX_TRACES / Math.max(1, distinctTargetCount),
           ),
         )
       : confusionMatrixRows;
@@ -1094,12 +1101,12 @@ export const ComparisonCharts = ({
       .map((candidate) => ({
         ...candidate,
         coverage: {
-          ...buildJudgeAnnotationPairs(
-            scoredRows,
-            candidate.targetId,
-            candidate.evaluatorId,
+          ...buildJudgeAnnotationPairs({
+            rows: scoredRows,
+            targetId: candidate.targetId,
+            evaluatorId: candidate.evaluatorId,
             annotationsByTraceId,
-          ),
+          }),
           truncated,
         },
       }))

@@ -124,14 +124,19 @@ def model_to_dspy_lm(model: str) -> dspy.LM:
 
     if "gpt-5" in model:
         llm_params["temperature"] = 1.0
-    elif "claude-sonnet-5" in model or "claude-opus-4" in model or "claude-haiku-4-5" in model:
-        # Newer Claude (5th-gen) models reject any explicit `temperature`
-        # value outright ("temperature is deprecated for this model") as a
-        # hard 400 from Anthropic's own API — drop_params=True only covers
-        # params litellm can strip client-side, not this server-side
-        # rejection, so the fix is to never send the key at all rather than
-        # relying on drop_params to save us (mirrors the gpt-5 case above,
-        # which needs a specific forced value instead of omission).
+    elif (
+        "claude-sonnet-5" in model
+        or "claude-opus-4" in model
+        or "claude-haiku-4-5" in model
+    ):
+        # Claude Sonnet 5, Opus 4 and Haiku 4.5 reject any explicit
+        # `temperature` value outright ("temperature is deprecated for this
+        # model") as a hard 400 from Anthropic's own API — drop_params=True
+        # only covers params litellm can strip client-side, not this
+        # server-side rejection, so the fix is to never send the key at all
+        # rather than relying on drop_params to save us (mirrors the gpt-5
+        # case above, which needs a specific forced value instead of
+        # omission). Extend this list as further model families join them.
         pass
     else:
         llm_params["temperature"] = 0

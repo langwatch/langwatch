@@ -15,11 +15,12 @@ import { Box, Grid, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { LuMaximize2 } from "react-icons/lu";
 
 import { useDrawer } from "~/hooks/useDrawer";
+import type { JudgeAnnotationCoverage } from "./buildJudgeAnnotationPairs";
 import {
   computeConfusionMatrix,
   kappaAgreementLabel,
 } from "./computeConfusionMatrix";
-import type { JudgeAnnotationCoverage } from "./buildJudgeAnnotationPairs";
+import { ERROR_CELL_BG } from "./confusionMatrixDisplay";
 import type { BatchResultRow } from "./types";
 
 export type ConfusionMatrixChartProps = {
@@ -33,16 +34,6 @@ export type ConfusionMatrixChartProps = {
   /** Matched to the sibling cost/latency/win-rate charts in ComparisonCharts. */
   chartHeight: number;
 };
-
-/**
- * Semantic agree/disagree coloring, not a magnitude heatmap: a controlled
- * 483-participant study (CMU, CSCW 2020) on binary confusion matrices found
- * that neutral-for-correct / flagged-for-error coloring communicates faster
- * than a sequential color scale, which — with only four cells — carries
- * almost no information anyway. Only the two error cells get a color; the
- * two agreement cells stay neutral regardless of their count.
- */
-const ERROR_CELL_BG = "red.subtle";
 
 export function ConfusionMatrixChart({
   evaluatorId,

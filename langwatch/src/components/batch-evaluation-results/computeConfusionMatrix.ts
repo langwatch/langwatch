@@ -113,7 +113,7 @@ export const wilsonInterval = ({
  * daily.
  */
 export const kappaAgreementLabel = (kappa: number): string => {
-  if (kappa < 0.01) return "none";
+  if (kappa <= 0) return "none";
   if (kappa <= 0.2) return "slight";
   if (kappa <= 0.4) return "fair";
   if (kappa <= 0.6) return "moderate";
@@ -143,7 +143,8 @@ export const computeConfusionMatrix = (
   const actualPositive = truePositive + falseNegative;
   const actualNegative = falsePositive + trueNegative;
 
-  const precision = predictedPositive > 0 ? truePositive / predictedPositive : null;
+  const precision =
+    predictedPositive > 0 ? truePositive / predictedPositive : null;
   const recall = actualPositive > 0 ? truePositive / actualPositive : null;
   const f1 =
     precision !== null && recall !== null && precision + recall > 0

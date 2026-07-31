@@ -76,9 +76,15 @@ export function useAnnotationsByTraceIds({
   //
   // Key on a content signature instead. `dataUpdatedAt` changes exactly when a
   // chunk's data changes, and `status` covers the loading/error transitions, so
-  // this recomputes when the contents actually move and not otherwise.
+  // this recomputes when the contents actually move and not otherwise. The
+  // chunk's own ids go in too: swap `traceIds` for a different, already-cached
+  // set of the same size and every chunk can settle on the same millisecond,
+  // leaving the timestamps identical and the memo serving the previous run's
+  // annotations.
   const dataSignature = results
-    .map((r) => `${r.dataUpdatedAt}:${r.status}`)
+    .map(
+      (r, i) => `${chunks[i]?.join(",") ?? ""}:${r.dataUpdatedAt}:${r.status}`,
+    )
     .join("|");
 
   const data = useMemo(

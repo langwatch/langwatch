@@ -121,6 +121,30 @@ Feature: Judge-vs-annotation confusion matrix
     Then I see the list of rows where the judge said pass but the reviewer marked thumbs down
     And each row shows the target output and the reviewer's annotation comment, if any
 
+  Scenario: A note left without a verdict is not shown as the reviewer's reasoning
+    Given an annotated trace also carries an annotation with a comment but no thumbs up/down
+    When I drill into the cell containing that row
+    Then the comment shown is the one left alongside the verdict being scored
+    # A verdict-less note ("parking this, will look again tomorrow") is not the
+    # reviewer's rationale for the thumbs up/down in the matrix, and presenting
+    # it as one puts words in their mouth.
+
+  Scenario: The expanded view opened from a link explains itself instead of breaking
+    Given I paste a link to the expanded confusion matrix into a fresh tab
+    When the page loads
+    Then I am told the view is built from the run on the results page and to reopen it from there
+    And no matrix is drawn
+    # The drawer is URL-routed but its data travels in memory, so the ids
+    # survive a reload and the data does not.
+
+  Scenario: A run with no comparable rows says so rather than showing an empty matrix
+    Given no row has both a resolved judge verdict and an agreed reviewer annotation
+    When I open the expanded confusion matrix
+    Then I am told there is nothing to compare yet
+    And no 2x2 table of zeroes is drawn
+    # Four cells reading "0 · 0%" present the absence of a measurement as a
+    # measurement.
+
   Scenario: Each pass/fail evaluator with enough annotation coverage gets its own matrix
     Given the experiment also has a second pass/fail evaluator "LLM Answer Match" with its own runs and annotations meeting the floor
     When I view the results page Metrics

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  type ConfusionMatrixCounts,
   computeConfusionMatrix,
+  type JudgeAnnotationPair,
   kappaAgreementLabel,
   wilsonInterval,
-  type ConfusionMatrixCounts,
-  type JudgeAnnotationPair,
 } from "../computeConfusionMatrix";
 
 describe("computeConfusionMatrix", () => {
@@ -291,6 +291,8 @@ describe("kappaAgreementLabel", () => {
   describe("given kappa values across the Landis & Koch bands", () => {
     it("labels each band", () => {
       expect(kappaAgreementLabel(-0.2)).toBe("none");
+      expect(kappaAgreementLabel(0)).toBe("none");
+      expect(kappaAgreementLabel(0.005)).toBe("slight");
       expect(kappaAgreementLabel(0.1)).toBe("slight");
       expect(kappaAgreementLabel(0.3)).toBe("fair");
       expect(kappaAgreementLabel(0.5)).toBe("moderate");
