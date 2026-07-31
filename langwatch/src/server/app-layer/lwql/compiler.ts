@@ -45,6 +45,18 @@ import {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Formats an instant the way ClickHouse parses `DateTime64(3)`:
+ * `YYYY-MM-DD HH:MM:SS.mmm`, no `T`, no trailing `Z`.
+ *
+ * ISO-8601 is rejected outright — ClickHouse reports "only 23 of 24 bytes was
+ * parsed" and the whole query fails. Since every LWQL query carries a time
+ * bound, getting this wrong breaks every query, and no amount of asserting on
+ * the generated SQL string reveals it.
+ */
+const toClickHouseDateTime = (epochMs: number): string =>
+  new Date(epochMs).toISOString().replace("T", " ").replace("Z", "");
+
 export interface CompileOptions {
   /** RBAC-checked tenant scope. The only source of tenant identity. */
   projectId: string;
@@ -137,7 +149,7 @@ const coerce = (
       }
       return value;
     case "timestamp":
-      if (typeof value === "number") return new Date(value).toISOString();
+      if (typeof value === "number") return toClickHouseDateTime(value);
       if (typeof value === "string") {
         const parsed = Date.parse(value);
         if (Number.isNaN(parsed)) {
@@ -147,7 +159,7 @@ const coerce = (
             { hint: "Use an ISO-8601 timestamp or epoch milliseconds." },
           );
         }
-        return new Date(parsed).toISOString();
+        return toClickHouseDateTime(parsed);
       }
       throw new LwqlError(
         "type_mismatch",
@@ -453,8 +465,8 @@ export const compile = (
   }
 
   const timePredicate =
-    `${entity.timeColumn} >= ${bind(ctx, new Date(from).toISOString(), "DateTime64(3)")}` +
-    ` AND ${entity.timeColumn} <= ${bind(ctx, new Date(requestedTo).toISOString(), "DateTime64(3)")}`;
+    `${entity.timeColumn} >= ${bind(ctx, toClickHouseDateTime(from), "DateTime64(3)")}` +
+    ` AND ${entity.timeColumn} <= ${bind(ctx, toClickHouseDateTime(requestedTo), "DateTime64(3)")}`;
 
   const userPredicate = normaliseWhere(query.where);
   const userSql = userPredicate ? compilePredicate(ctx, userPredicate, 0) : undefined;

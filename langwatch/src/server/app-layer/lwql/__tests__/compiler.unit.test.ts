@@ -224,6 +224,41 @@ describe("safety limits", () => {
   });
 });
 
+describe("timestamp binding", () => {
+  // Regression guard. ISO-8601 compiles fine and reads fine; ClickHouse then
+  // rejects it at runtime ("only 23 of 24 bytes was parsed") because of the
+  // trailing Z. Every query carries a time bound, so that broke every query
+  // while all 33 unit tests stayed green — the integration suite caught it.
+  const timestampParams = (params: Record<string, unknown>) =>
+    Object.values(params).filter(
+      (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v),
+    ) as string[];
+
+  it("binds the default time window in ClickHouse's DateTime64 format", () => {
+    const { params } = compileText("SELECT trace_id FROM traces");
+    const stamps = timestampParams(params);
+
+    expect(stamps).toHaveLength(2);
+    for (const stamp of stamps) {
+      expect(stamp).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+      expect(stamp).not.toContain("T");
+      expect(stamp).not.toContain("Z");
+    }
+  });
+
+  it("binds a caller-supplied timestamp comparison in the same format", () => {
+    const { params } = compileQuery({
+      from: "traces",
+      select: [{ field: "trace_id" }],
+      where: [{ field: "started_at", op: ">", value: "2026-07-30T12:00:00Z" }],
+    });
+
+    for (const stamp of timestampParams(params)) {
+      expect(stamp).not.toMatch(/[TZ]/);
+    }
+  });
+});
+
 describe("aggregation correctness", () => {
   it("unnests Models for grouping but uses has() for filtering", () => {
     const { sql } = compileText(
