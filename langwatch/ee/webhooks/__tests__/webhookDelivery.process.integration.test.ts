@@ -527,7 +527,7 @@ describe("webhook delivery via the transactional inbox", () => {
       endpointId,
     });
     // Batch ids are content hashes now; the newest row is this test's batch.
-    const row = deliveries[0];
+    const row = deliveries.deliveries[0];
     expect(row).toMatchObject({
       outcome: "retryable",
       responseStatus: 503,

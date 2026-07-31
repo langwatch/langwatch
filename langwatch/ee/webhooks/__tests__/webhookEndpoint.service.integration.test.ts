@@ -209,11 +209,11 @@ describe("webhook endpoint service", () => {
       error: "HTTP 502",
       response: { body: "bad gateway" },
     });
-    const deliveries = await service.getDeliveries({
+    const page = await service.getDeliveries({
       organizationId: organization.id,
       endpointId: endpoint.id,
     });
-    expect(deliveries[0]).toMatchObject({
+    expect(page.deliveries[0]).toMatchObject({
       dispatchId: "batch-log",
       attempt: 1,
       eventCount: 3,
@@ -222,5 +222,49 @@ describe("webhook endpoint service", () => {
       latencyMs: 123,
       error: "HTTP 502",
     });
+  });
+
+  /** @scenario The delivery log is cursor-paginated newest-first */
+  it("cursor-paginates the delivery log newest-first", async () => {
+    const { endpoint } = await createEndpoint();
+    const base = new Date("2026-07-31T00:00:00.000Z").getTime();
+    for (let i = 0; i < 5; i++) {
+      await service.recordDeliveryAttempt({
+        organizationId: organization.id,
+        endpointId: endpoint.id,
+        dispatchId: `pageable-${i}`,
+        attempt: 1,
+        eventCount: 1,
+        outcome: "success",
+        responseStatus: 200,
+        latencyMs: 10,
+        now: new Date(base + i * 1000),
+      });
+    }
+
+    const first = await service.getDeliveries({
+      organizationId: organization.id,
+      endpointId: endpoint.id,
+      limit: 2,
+    });
+    expect(first.deliveries).toHaveLength(2);
+    // Newest first: the last-recorded attempt leads.
+    expect(first.deliveries[0]!.dispatchId).toBe("pageable-4");
+    expect(first.deliveries[1]!.dispatchId).toBe("pageable-3");
+    expect(first.nextCursor).not.toBeNull();
+
+    const second = await service.getDeliveries({
+      organizationId: organization.id,
+      endpointId: endpoint.id,
+      limit: 2,
+      cursor: first.nextCursor!,
+    });
+    expect(second.deliveries.map((d) => d.dispatchId)).toEqual([
+      "pageable-2",
+      "pageable-1",
+    ]);
+    // No overlap across the page boundary.
+    const firstIds = first.deliveries.map((d) => d.id);
+    expect(second.deliveries.every((d) => !firstIds.includes(d.id))).toBe(true);
   });
 });

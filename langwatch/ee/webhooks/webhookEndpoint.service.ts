@@ -612,8 +612,10 @@ export class WebhookEndpointService {
     organizationId: string;
     endpointId: string;
     limit?: number;
-  }): Promise<
-    Array<{
+    /** Resume after this row: the previous page's last (firedAt, id). */
+    cursor?: { firedAt: Date; id: string };
+  }): Promise<{
+    deliveries: Array<{
       id: string;
       dispatchId: string;
       attempt: number;
@@ -623,28 +625,51 @@ export class WebhookEndpointService {
       latencyMs: number | null;
       error: string | null;
       firedAt: Date;
-    }>
-  > {
+    }>;
+    nextCursor: { firedAt: Date; id: string } | null;
+  }> {
     await this.requireEndpoint(params);
+    const limit = Math.min(params.limit ?? 25, 200);
     const rows = await this.deps.prisma.webhookEndpointDelivery.findMany({
       where: {
         organizationId: params.organizationId,
         endpointId: params.endpointId,
+        // Strictly after the cursor row in (firedAt desc, id desc) order,
+        // so a page boundary stays stable while new attempts land above.
+        ...(params.cursor
+          ? {
+              OR: [
+                { firedAt: { lt: params.cursor.firedAt } },
+                {
+                  firedAt: params.cursor.firedAt,
+                  id: { lt: params.cursor.id },
+                },
+              ],
+            }
+          : {}),
       },
-      orderBy: { firedAt: "desc" },
-      take: Math.min(params.limit ?? 50, 200),
+      orderBy: [{ firedAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
     });
-    return rows.map((r) => ({
-      id: r.id,
-      dispatchId: r.dispatchId,
-      attempt: r.attempt,
-      eventCount: r.eventCount,
-      outcome: r.outcome,
-      responseStatus: r.responseStatus,
-      latencyMs: r.latencyMs,
-      error: r.error,
-      firedAt: r.firedAt,
-    }));
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return {
+      deliveries: page.map((r) => ({
+        id: r.id,
+        dispatchId: r.dispatchId,
+        attempt: r.attempt,
+        eventCount: r.eventCount,
+        outcome: r.outcome,
+        responseStatus: r.responseStatus,
+        latencyMs: r.latencyMs,
+        error: r.error,
+        firedAt: r.firedAt,
+      })),
+      nextCursor:
+        rows.length > limit && last
+          ? { firedAt: last.firedAt, id: last.id }
+          : null,
+    };
   }
 
   /** The health strip: streak, last success, disabled state. */

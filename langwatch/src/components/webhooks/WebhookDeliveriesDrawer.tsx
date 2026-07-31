@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Heading,
   HStack,
   Spinner,
@@ -8,9 +9,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { api, type RouterOutputs } from "~/utils/api";
+
+const DELIVERIES_PAGE_SIZE = 25;
 
 type EndpointView = RouterOutputs["webhookEndpoints"]["list"][number];
 
@@ -50,11 +54,19 @@ export function WebhookDeliveriesDrawer({
   endpoint: EndpointView | null;
   onClose: () => void;
 }) {
+  const [cursor, setCursor] = useState<
+    { firedAt: Date; id: string } | undefined
+  >(undefined);
+  // A fresh endpoint resets pagination to the first page.
+  useEffect(() => {
+    setCursor(undefined);
+  }, [endpoint?.id]);
   const deliveries = api.webhookEndpoints.deliveries.useQuery(
     {
       organizationId,
       endpointId: endpoint?.id ?? "",
-      limit: 100,
+      limit: DELIVERIES_PAGE_SIZE,
+      cursor,
     },
     { enabled: endpoint !== null },
   );
@@ -175,12 +187,14 @@ export function WebhookDeliveriesDrawer({
             )}
 
             {deliveries.isLoading && <Spinner size="sm" />}
-            {deliveries.data && deliveries.data.length === 0 && (
-              <Text fontSize="sm" color="fg.muted">
-                No deliveries recorded in the last 30 days.
-              </Text>
-            )}
-            {deliveries.data && deliveries.data.length > 0 && (
+            {deliveries.data &&
+              deliveries.data.deliveries.length === 0 &&
+              !cursor && (
+                <Text fontSize="sm" color="fg.muted">
+                  No deliveries recorded in the last 30 days.
+                </Text>
+              )}
+            {deliveries.data && deliveries.data.deliveries.length > 0 && (
               <Box width="full" overflowX="auto">
                 <Table.Root size="sm">
                   <Table.Header>
@@ -195,7 +209,7 @@ export function WebhookDeliveriesDrawer({
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {deliveries.data.map((d) => (
+                    {deliveries.data.deliveries.map((d) => (
                       <Table.Row key={d.id}>
                         <Table.Cell whiteSpace="nowrap">
                           {formatWhen(d.firedAt)}
@@ -220,6 +234,20 @@ export function WebhookDeliveriesDrawer({
                     ))}
                   </Table.Body>
                 </Table.Root>
+                {deliveries.data.nextCursor && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    marginTop={2}
+                    loading={deliveries.isFetching}
+                    onClick={() =>
+                      setCursor(deliveries.data?.nextCursor ?? undefined)
+                    }
+                    data-testid="webhook-deliveries-load-more"
+                  >
+                    Load more
+                  </Button>
+                )}
               </Box>
             )}
           </VStack>

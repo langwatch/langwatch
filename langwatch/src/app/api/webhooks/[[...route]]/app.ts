@@ -20,7 +20,7 @@ import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseCli
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { ForbiddenError } from "../../shared/errors";
+import { BadRequestError, ForbiddenError } from "../../shared/errors";
 import { handleWebhookApiError } from "./error-handler";
 
 patchZodOpenapi();
@@ -85,6 +85,7 @@ const updateEndpointSchema = z.object({
 });
 
 const deliveriesQuerySchema = z.object({
+  cursor: z.string().max(500).optional(),
   limit: z.coerce.number().int().positive().max(200).optional().default(50),
 });
 
@@ -381,13 +382,27 @@ secured.access(requires("webhookEndpoints:view")).get(
   async (c) => {
     const organization = c.get("organization") as Organization;
     const { limit } = c.req.valid("query");
-    const rows = await endpoints.getDeliveries({
+    const cursorParam = c.req.valid("query").cursor;
+    let cursor: { firedAt: Date; id: string } | undefined;
+    if (cursorParam) {
+      const [firedAtMs, id] = cursorParam.split("~");
+      const parsedMs = Number(firedAtMs);
+      if (!Number.isInteger(parsedMs) || !id) {
+        throw new BadRequestError("invalid cursor");
+      }
+      cursor = { firedAt: new Date(parsedMs), id };
+    }
+    const page = await endpoints.getDeliveries({
       organizationId: organization.id,
       endpointId: c.req.param("id"),
       limit,
+      cursor,
     });
     return c.json({
-      data: rows.map((r) => ({
+      next_cursor: page.nextCursor
+        ? `${page.nextCursor.firedAt.getTime()}~${page.nextCursor.id}`
+        : null,
+      data: page.deliveries.map((r) => ({
         id: r.id,
         dispatch_id: r.dispatchId,
         attempt: r.attempt,

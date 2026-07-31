@@ -282,3 +282,31 @@ Feature: Webhook endpoints, signed outbound event delivery
       When a key lifecycle event is delivered
       Then the spend-only endpoint receives nothing
       And the lifecycle and family subscriptions receive it
+
+  Rule: The delivery log is paginated and management is entitlement-gated
+
+    @integration
+    Scenario: The delivery log is cursor-paginated newest-first
+      Given an endpoint with more deliveries than one page
+      When the deliveries are read a page at a time
+      Then each page is newest-first and the pages do not overlap
+
+    @integration
+    Scenario: The delivery log paginates with a Load more control
+      Given a deliveries page that reports a next cursor
+      Then a load-more control is shown
+
+    @integration
+    Scenario: The deliveries drawer loads more on demand
+      Given a deliveries page that reports a next cursor
+      Then a load-more control passes that cursor back for the next page
+
+    @integration
+    Scenario: No Load more when the page is the last
+      Given a deliveries page with no next cursor
+      Then no load-more control is shown
+
+    @unit
+    Scenario: Webhook management is an organization-scoped permission
+      Given a user with an organization admin role
+      Then the webhook and spend permissions resolve against the org role

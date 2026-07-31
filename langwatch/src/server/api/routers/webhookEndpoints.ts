@@ -91,6 +91,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
     .input(
       endpointInput.extend({
         limit: z.number().int().min(1).max(200).optional(),
+        cursor: z
+          .object({ firedAt: z.coerce.date(), id: z.string() })
+          .optional(),
       }),
     )
     .use(checkOrganizationPermission("webhookEndpoints:view"))
@@ -101,6 +104,7 @@ export const webhookEndpointsRouter = createTRPCRouter({
           organizationId: input.organizationId,
           endpointId: input.endpointId,
           limit: input.limit,
+          cursor: input.cursor,
         }),
       ),
     ),
