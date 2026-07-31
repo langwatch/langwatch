@@ -188,6 +188,7 @@ describe("buildTrustChecks", () => {
   });
 
   describe("when no candidate shares the judge's family", () => {
+    /** @scenario "An independent judge is confirmed rather than left silent" */
     it("confirms independence rather than leaving it unsaid", () => {
       const check = find(build(), "Judge independence");
 
@@ -273,6 +274,7 @@ describe("buildTrustChecks — what a count across pairs does not promise", () =
 
 describe("buildTrustChecks — margins of error built from unsettled fits", () => {
   describe("given many resamples did not settle", () => {
+    /** @scenario "Margins of error built from unsettled fits say so" */
     it("reports the margins as approximate", () => {
       // Distinct from the ranking's own convergence: the intervals come from
       // a thousand OTHER fits, and a run can settle cleanly while they did not.
@@ -322,6 +324,7 @@ describe("buildTrustChecks — margins of error built from unsettled fits", () =
 
 describe("buildTrustChecks — reasons that must be the actual reason", () => {
   describe("given the run produced no leader to compare lengths against", () => {
+    /** @scenario "A run with no leader says so rather than blaming missing text" */
     it("says that, rather than claiming no text was recorded", () => {
       // leaderRatio is null when there is no leader OR when no text was
       // captured, and the panel reported the second reason for both. On a
@@ -360,6 +363,7 @@ describe("buildTrustChecks — reasons that must be the actual reason", () => {
   });
 
   describe("given the judge shares a family with a variant that is not leading", () => {
+    /** @scenario "A judge sharing a family with a variant that is not leading" */
     it("does not tell the reader to discount a lead it does not have", () => {
       // Self-preference inflates that variant's score wherever it sits. Only
       // when it is the leader is there a lead to discount.
@@ -397,6 +401,7 @@ describe("buildTrustChecks — the sample-size threshold the product actually sh
   const THIN = 5;
 
   describe("given a variant with far fewer matchups than the shipped threshold", () => {
+    /** @scenario "A sample size too small to trust is called out" */
     it("warns, using the default rather than a value the test chose", () => {
       const checks = build({
         leaderboard: leaderboard({ minMatchups: THIN }),

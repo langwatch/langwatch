@@ -10,6 +10,7 @@ import { winMatrixHasPairwiseDetail } from "../computeWinMatrixShape";
 
 describe("winMatrixHasPairwiseDetail", () => {
   describe("given every verdict judged the whole field", () => {
+    /** @scenario "A matrix with no pairwise information says so" */
     it("reports no pairwise detail", () => {
       // The real shape: one four-way verdict per row, so a winner beats all
       // three others at once and its row is the same number repeated.
@@ -48,6 +49,7 @@ describe("winMatrixHasPairwiseDetail", () => {
   });
 
   describe("given verdicts over differing subsets", () => {
+    /** @scenario "A matrix built from differing candidate sets keeps its pairwise reading" */
     it("reports pairwise detail", () => {
       const comparisons = [
         // A dominates B but splits with C — a real head-to-head difference.

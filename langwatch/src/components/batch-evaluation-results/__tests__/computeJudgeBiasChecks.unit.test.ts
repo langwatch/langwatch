@@ -31,6 +31,7 @@ const row = (
 
 describe("computeVerbosityProfile", () => {
   describe("given the leader writes far more than the rest", () => {
+    /** @scenario "How much longer the winner's answers were is reported" */
     it("reports the ratio of the leader's length to the field's", () => {
       const profile = computeVerbosityProfile({
         variantIds: ["a", "b", "c"],
@@ -56,6 +57,7 @@ describe("computeVerbosityProfile", () => {
   });
 
   describe("given every variant writes about the same amount", () => {
+    /** @scenario "Answer length is reported even when nothing is unusual" */
     it("reports a ratio near one rather than nothing", () => {
       const profile = computeVerbosityProfile({
         variantIds: ["a", "b"],
@@ -131,6 +133,7 @@ describe("modelFamily", () => {
 
 describe("computeJudgeIndependence", () => {
   describe("given a candidate on the judge's own family", () => {
+    /** @scenario "A judge that shares a model family with a candidate is disclosed" */
     it("names that candidate", () => {
       const result = computeJudgeIndependence({
         judgeModel: "openai/gpt-5",

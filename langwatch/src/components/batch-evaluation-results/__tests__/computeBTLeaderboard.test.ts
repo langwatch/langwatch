@@ -41,6 +41,7 @@ describe("computeBTLeaderboard", () => {
     expect(result.didConverge).toBe(true);
   });
 
+  /** @scenario "The compact card ranks variants by Bradley-Terry score" */
   it("ranks three variants by transitive dominance (no degenerate)", () => {
     // A clearly > B > C, with cross-pair evidence on every edge.
     const data: PairwiseComparison[] = [
@@ -84,6 +85,7 @@ describe("computeBTLeaderboard", () => {
     expect(result.entries[0]!.strength).toBeCloseTo(1, 6);
   });
 
+  /** @scenario "Ties count as half a win and half a loss" */
   it("treats ties as 0.5 win + 0.5 loss (LMSYS convention)", () => {
     // Pure ties between A and B → identical scores, half-wins recorded.
     const result = computeBTLeaderboard({
@@ -101,6 +103,7 @@ describe("computeBTLeaderboard", () => {
     expect(result.winMatrix.B!.A).toBe(10);
   });
 
+  /** @scenario "A variant that always wins is flagged, not left to break the math" */
   it("flags variants with no losses as degenerate and still ranks them", () => {
     // A wins every match against B and C; no upsets.
     const data: PairwiseComparison[] = [
@@ -143,6 +146,7 @@ describe("computeBTLeaderboard", () => {
     expect(result.comparisonCount).toBe(3);
   });
 
+  /** @scenario "A skipped row contributes no evidence either way" */
   it("skips rows with winner=null (pending/error)", () => {
     const data: PairwiseComparison[] = [
       { candidates: ["A", "B"], winner: "A" },
@@ -157,6 +161,7 @@ describe("computeBTLeaderboard", () => {
     expect(result.comparisonCount).toBe(1);
   });
 
+  /** @scenario "The leaderboard table shows a confidence interval per variant" */
   it("produces deterministic bootstrap CIs for a fixed seed", () => {
     const data: PairwiseComparison[] = [
       ...wins("A", ["B"], 8),
@@ -237,6 +242,7 @@ describe("computeBTLeaderboard", () => {
     expect(result.entries[1]!.scoreCI).toBeNull();
   });
 
+  /** @scenario "Sample size gating matters more as variants grow" */
   it("exposes minMatchups for sample-size gating", () => {
     // A: 10 matchups, B: 10, C: 4. UI should warn (C < 30).
     const data: PairwiseComparison[] = [
@@ -281,6 +287,7 @@ describe("computeBTLeaderboard", () => {
     expect(aEntry.wins + bEntry.wins).toBe(1);
   });
 
+  /** @scenario "A three-way tie row is not counted in the leaderboard" */
   it("drops N>2 'tie' rows (semantics ambiguous)", () => {
     const data: PairwiseComparison[] = [
       { candidates: ["A", "B", "C"], winner: "tie" },

@@ -43,8 +43,11 @@ import {
   ZAxis,
 } from "recharts";
 
-import type { BTLeaderboard } from "./computeBTLeaderboard";
-import { computeParetoDominance } from "./computeParetoDominance";
+import type { BTLeaderboard, BTLeaderboardEntry } from "./computeBTLeaderboard";
+import {
+  computeParetoDominance,
+  type ParetoDominance,
+} from "./computeParetoDominance";
 import type { VariantMetrics } from "./computeVariantMetrics";
 import { VARIANT_COLORS } from "./WinRateChart";
 
@@ -69,6 +72,156 @@ const SIZE_RANGE: [number, number] = [70, 420];
 /** Every point the same size, for when the third metric has no data. */
 const FLAT_SIZE_RANGE: [number, number] = [110, 110];
 
+/**
+ * Both interval arms, styled identically on purpose: they are the same kind of
+ * statement — a 95% bootstrap interval for where the true value lies — and
+ * styling them differently would imply otherwise.
+ */
+const INTERVAL_BAR_STYLE = {
+  width: 4,
+  strokeWidth: 1.5,
+  stroke: "var(--chakra-colors-fg-muted)",
+} as const;
+
+const metricTitle = (metric: ParetoAxis): string =>
+  metric === "cost" ? "Avg cost" : "Avg duration";
+
+const formatterFor = (metric: ParetoAxis): ((value: number) => string) =>
+  metric === "cost" ? formatCost : formatDuration;
+
+/** Which metric sits on which channel, plus every label and formatter for it. */
+type AxisConfig = {
+  xAxisMetric: ParetoAxis;
+  sizeMetric: ParetoAxis;
+  formatX: (value: number) => string;
+  formatSize: (value: number) => string;
+  /** Sentence case, for the axis name and the tooltip: "Avg cost". */
+  xLabel: string;
+  /** Lower case, for mid-sentence prose: "avg cost". */
+  sizeLabel: string;
+};
+
+const axisConfigFor = (xAxisMetric: ParetoAxis): AxisConfig => {
+  const sizeMetric: ParetoAxis = xAxisMetric === "cost" ? "duration" : "cost";
+  return {
+    xAxisMetric,
+    sizeMetric,
+    formatX: formatterFor(xAxisMetric),
+    formatSize: formatterFor(sizeMetric),
+    xLabel: metricTitle(xAxisMetric),
+    sizeLabel: metricTitle(sizeMetric).toLowerCase(),
+  };
+};
+
+/** One plotted variant. `x` is non-null by construction — see `buildParetoPoints`. */
+type ParetoPoint = {
+  variantId: string;
+  name: string;
+  score: number;
+  x: number;
+  xOffsets: [number, number] | undefined;
+  xCI: [number, number] | null;
+  size: number | null;
+  dominated: boolean;
+  ciOffsets: [number, number] | undefined;
+  color: string;
+};
+
+/**
+ * A bootstrap over a handful of rows can return an unbounded interval, and
+ * there is no bar to draw for one. Drawing nothing is the honest rendering.
+ */
+const finiteCI = (
+  ci: [number, number] | null | undefined,
+): [number, number] | null =>
+  ci?.every((bound) => Number.isFinite(bound)) ? ci : null;
+
+const readAvg = ({
+  metrics,
+  metric,
+}: {
+  metrics: VariantMetrics | undefined;
+  metric: ParetoAxis;
+}): number | null => {
+  const stats = metric === "cost" ? metrics?.costStats : metrics?.durationStats;
+  return stats?.avg ?? null;
+};
+
+const readMeanCI = ({
+  metrics,
+  metric,
+}: {
+  metrics: VariantMetrics | undefined;
+  metric: ParetoAxis;
+}): [number, number] | null =>
+  finiteCI(metric === "cost" ? metrics?.costMeanCI : metrics?.durationMeanCI);
+
+/**
+ * Offsets, not bounds — recharts draws the bar relative to the point.
+ *
+ * `clampAtZero` is for the x arm: on a skewed cost distribution the resampled
+ * mean can land below the point estimate by more than the point estimate
+ * itself, and a negative arm renders as a bar pointing the wrong way.
+ */
+const offsetsAround = ({
+  value,
+  ci,
+  clampAtZero = false,
+}: {
+  value: number;
+  ci: [number, number] | null;
+  clampAtZero?: boolean;
+}): [number, number] | undefined => {
+  if (!ci) return undefined;
+  const low = value - ci[0];
+  const high = ci[1] - value;
+  return clampAtZero ? [Math.max(0, low), Math.max(0, high)] : [low, high];
+};
+
+const buildParetoPoints = ({
+  entries,
+  variantMetrics,
+  variantNames,
+  targetColors,
+  axis,
+  dominance,
+}: {
+  entries: BTLeaderboardEntry[];
+  variantMetrics: Record<string, VariantMetrics>;
+  variantNames: Record<string, string>;
+  targetColors: Record<string, string> | undefined;
+  axis: AxisConfig;
+  dominance: ParetoDominance;
+}): ParetoPoint[] =>
+  entries
+    .map((entry, index): ParetoPoint | null => {
+      const metrics = variantMetrics[entry.variantId];
+      const x = readAvg({ metrics, metric: axis.xAxisMetric });
+      // No reading for the x metric means no position on this chart, so the
+      // variant is dropped rather than drawn at zero.
+      if (x === null) return null;
+
+      const xCI = readMeanCI({ metrics, metric: axis.xAxisMetric });
+      return {
+        variantId: entry.variantId,
+        name: variantNames[entry.variantId] ?? entry.variantId,
+        score: entry.score,
+        x,
+        xOffsets: offsetsAround({ value: x, ci: xCI, clampAtZero: true }),
+        xCI,
+        size: readAvg({ metrics, metric: axis.sizeMetric }),
+        dominated: (dominance.dominatedBy[entry.variantId]?.length ?? 0) > 0,
+        ciOffsets: offsetsAround({
+          value: entry.score,
+          ci: finiteCI(entry.scoreCI),
+        }),
+        color:
+          targetColors?.[entry.variantId] ??
+          VARIANT_COLORS[index % VARIANT_COLORS.length]!,
+      };
+    })
+    .filter((point): point is ParetoPoint => point !== null);
+
 export function ParetoScatterChart({
   leaderboard,
   variantMetrics,
@@ -77,7 +230,7 @@ export function ParetoScatterChart({
   chartHeight = 260,
 }: ParetoScatterChartProps) {
   const [xAxisMetric, setXAxisMetric] = useState<ParetoAxis>("cost");
-  const sizeMetric: ParetoAxis = xAxisMetric === "cost" ? "duration" : "cost";
+  const axis = useMemo(() => axisConfigFor(xAxisMetric), [xAxisMetric]);
 
   // Recomputed here rather than passed down. It is O(n²) over the ranked
   // variants — single digits in practice — so unlike the bootstrap fit there
@@ -88,108 +241,33 @@ export function ParetoScatterChart({
     [leaderboard, variantMetrics],
   );
 
-  const data = useMemo(() => {
-    const readMetric = (variantId: string, metric: ParetoAxis) => {
-      const metrics = variantMetrics[variantId];
-      const stats =
-        metric === "cost" ? metrics?.costStats : metrics?.durationStats;
-      return stats?.avg ?? null;
-    };
-
-    const readMeanCI = (variantId: string, metric: ParetoAxis) => {
-      const metrics = variantMetrics[variantId];
-      const ci =
-        metric === "cost" ? metrics?.costMeanCI : metrics?.durationMeanCI;
-      return ci?.every((bound) => Number.isFinite(bound)) ? ci : null;
-    };
-
-    return leaderboard.entries
-      .map((entry, index) => {
-        // Offsets, not bounds — recharts draws the bar relative to the point.
-        // A non-finite bound means there is no interval to draw, and drawing
-        // nothing is the honest rendering of that. Bound as a value rather
-        // than a boolean so the reader below can index it.
-        const ci = entry.scoreCI;
-        const scoreCI = ci?.every((bound) => Number.isFinite(bound))
-          ? ci
-          : null;
-
-        const x = readMetric(entry.variantId, xAxisMetric);
-        const xCI = readMeanCI(entry.variantId, xAxisMetric);
-
-        return {
-          variantId: entry.variantId,
-          name: variantNames[entry.variantId] ?? entry.variantId,
-          score: entry.score,
-          x,
-          // Same offset form as the y bar. Clamped at zero because the
-          // resampled mean can land below the point estimate by more than the
-          // point estimate itself on a skewed cost distribution, and a
-          // negative arm would render as a bar pointing the wrong way.
-          xOffsets:
-            xCI && x !== null
-              ? ([Math.max(0, x - xCI[0]), Math.max(0, xCI[1] - x)] as [
-                  number,
-                  number,
-                ])
-              : undefined,
-          xCI,
-          size: readMetric(entry.variantId, sizeMetric),
-          dominated: (dominance.dominatedBy[entry.variantId]?.length ?? 0) > 0,
-          ciOffsets: scoreCI
-            ? ([entry.score - scoreCI[0], scoreCI[1] - entry.score] as [
-                number,
-                number,
-              ])
-            : undefined,
-          color:
-            targetColors?.[entry.variantId] ??
-            VARIANT_COLORS[index % VARIANT_COLORS.length]!,
-        };
-      })
-      .filter((d): d is typeof d & { x: number } => d.x !== null);
-  }, [
-    leaderboard.entries,
-    variantMetrics,
-    variantNames,
-    targetColors,
-    xAxisMetric,
-    sizeMetric,
-    dominance,
-  ]);
-
-  const formatX = xAxisMetric === "cost" ? formatCost : formatDuration;
-  const formatSize = sizeMetric === "cost" ? formatCost : formatDuration;
-  const xLabel = xAxisMetric === "cost" ? "Avg cost" : "Avg duration";
-  const sizeLabel = sizeMetric === "cost" ? "avg cost" : "avg duration";
-
-  const sizeIsMeaningful = data.some((d) => d.size !== null);
-  const anyInterval = data.some((d) => d.ciOffsets !== undefined);
-  const anyXInterval = data.some((d) => d.xOffsets !== undefined);
-  const anyDominated = data.some((d) => d.dominated);
+  const data = useMemo(
+    () =>
+      buildParetoPoints({
+        entries: leaderboard.entries,
+        variantMetrics,
+        variantNames,
+        targetColors,
+        axis,
+        dominance,
+      }),
+    [
+      leaderboard.entries,
+      variantMetrics,
+      variantNames,
+      targetColors,
+      axis,
+      dominance,
+    ],
+  );
 
   return (
     <VStack align="stretch" gap={2}>
       <HStack justify="space-between" flexWrap="wrap">
         <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-          Quality vs. {xLabel.toLowerCase()}
+          Quality vs. {axis.xLabel.toLowerCase()}
         </Text>
-        <HStack gap={1}>
-          <Button
-            size="2xs"
-            variant={xAxisMetric === "cost" ? "solid" : "ghost"}
-            onClick={() => setXAxisMetric("cost")}
-          >
-            Cost
-          </Button>
-          <Button
-            size="2xs"
-            variant={xAxisMetric === "duration" ? "solid" : "ghost"}
-            onClick={() => setXAxisMetric("duration")}
-          >
-            Duration
-          </Button>
-        </HStack>
+        <AxisPicker value={xAxisMetric} onChange={setXAxisMetric} />
       </HStack>
 
       {data.length === 0 ? (
@@ -198,158 +276,221 @@ export function ParetoScatterChart({
         </Text>
       ) : (
         <>
-          <ResponsiveContainer width="100%" height={chartHeight}>
-            <ScatterChart margin={{ top: 14, right: 24, left: 10, bottom: 10 }}>
-              <CartesianGrid
-                stroke="var(--chakra-colors-border)"
-                strokeDasharray="3 3"
-              />
-              <XAxis
-                type="number"
-                dataKey="x"
-                name={xLabel}
-                tickFormatter={(v) => formatX(v as number)}
-                style={{ fontSize: "11px" }}
-                tick={{ fill: "var(--chakra-colors-fg-muted)" }}
-              />
-              <YAxis
-                type="number"
-                dataKey="score"
-                name="BT score"
-                style={{ fontSize: "11px" }}
-                tick={{ fill: "var(--chakra-colors-fg-muted)" }}
-                width={40}
-              />
-              {/*
-                The third metric. Range is area in px², so the mapping stays
-                perceptually honest — encoding it as radius would square the
-                apparent difference and make a 2x slower variant look 4x worse.
-              */}
-              <ZAxis
-                type="number"
-                dataKey="size"
-                name={sizeLabel}
-                range={sizeIsMeaningful ? SIZE_RANGE : FLAT_SIZE_RANGE}
-              />
-              <Tooltip
-                cursor={{ strokeDasharray: "3 3" }}
-                content={({ active, payload }) => {
-                  if (!active || !payload?.[0]) return null;
-                  const point = payload[0].payload as (typeof data)[number];
-                  return (
-                    <VStack
-                      align="start"
-                      gap={0}
-                      bg="bg.panel"
-                      border="1px solid"
-                      borderColor="border"
-                      borderRadius="md"
-                      padding={2}
-                      fontSize="xs"
-                    >
-                      <Text fontWeight="semibold">{point.name}</Text>
-                      <Text>
-                        BT score: {point.score.toFixed(2)}
-                        {point.ciOffsets
-                          ? ` (${(point.score - point.ciOffsets[0]).toFixed(
-                              0,
-                            )} to ${(point.score + point.ciOffsets[1]).toFixed(0)})`
-                          : ""}
-                      </Text>
-                      <Text>
-                        {xLabel}: {formatX(point.x)}
-                        {point.xCI
-                          ? ` (${formatX(point.xCI[0])} to ${formatX(point.xCI[1])})`
-                          : ""}
-                      </Text>
-                      {point.size !== null ? (
-                        <Text>
-                          {sizeMetric === "cost" ? "Avg cost" : "Avg duration"}:{" "}
-                          {formatSize(point.size)}
-                        </Text>
-                      ) : null}
-                      {point.dominated ? (
-                        <Text color="fg.muted">
-                          Beaten outright by another variant
-                        </Text>
-                      ) : null}
-                    </VStack>
-                  );
-                }}
-              />
-              <Scatter data={data} name="Variants">
-                {/*
-                  Drawn before the cells so the bar sits under the point.
-                  Muted rather than per-variant coloured: the bar is a
-                  statement about uncertainty, not another category to track.
-                */}
-                {anyInterval ? (
-                  <ErrorBar
-                    dataKey="ciOffsets"
-                    direction="y"
-                    width={4}
-                    strokeWidth={1.5}
-                    stroke="var(--chakra-colors-fg-muted)"
-                  />
-                ) : null}
-                {/*
-                  The horizontal arm. Same visual weight and colour as the
-                  vertical one because they are the same kind of statement —
-                  a 95% bootstrap interval for where the true value lies —
-                  and styling them differently would imply otherwise.
-                */}
-                {anyXInterval ? (
-                  <ErrorBar
-                    dataKey="xOffsets"
-                    direction="x"
-                    width={4}
-                    strokeWidth={1.5}
-                    stroke="var(--chakra-colors-fg-muted)"
-                  />
-                ) : null}
-                {data.map((d) => (
-                  <Cell
-                    key={d.variantId}
-                    fill={d.color}
-                    // Beaten outright on every metric — hollowed out so the
-                    // eye lands on the variants still in contention without
-                    // having to read the sentence first.
-                    fillOpacity={d.dominated ? 0.25 : 0.9}
-                    stroke={d.color}
-                    strokeWidth={d.dominated ? 1.5 : 0}
-                  />
-                ))}
-              </Scatter>
-            </ScatterChart>
-          </ResponsiveContainer>
-
-          <VStack align="start" gap={0}>
-            {sizeIsMeaningful ? (
-              <Text fontSize="xs" color="fg.muted">
-                Point size is {sizeLabel} — bigger is{" "}
-                {sizeMetric === "cost" ? "dearer" : "slower"}.
-              </Text>
-            ) : (
-              <Text fontSize="xs" color="fg.muted">
-                No {sizeMetric} was recorded, so point size means nothing here.
-              </Text>
-            )}
-            {anyInterval ? (
-              <Text fontSize="xs" color="fg.muted">
-                Bars are 95% confidence intervals — vertically for the score,
-                {anyXInterval
-                  ? ` horizontally for the ${xLabel.toLowerCase()}. Both say where the true value lies, not how much individual rows varied.`
-                  : "."}
-              </Text>
-            ) : null}
-            {anyDominated ? (
-              <Text fontSize="xs" color="fg.muted">
-                Hollow points are beaten outright on every metric shown.
-              </Text>
-            ) : null}
-          </VStack>
+          <ParetoPlot data={data} axis={axis} chartHeight={chartHeight} />
+          <ParetoNotes data={data} axis={axis} />
         </>
       )}
+    </VStack>
+  );
+}
+
+function AxisPicker({
+  value,
+  onChange,
+}: {
+  value: ParetoAxis;
+  onChange: (metric: ParetoAxis) => void;
+}) {
+  return (
+    <HStack gap={1}>
+      <Button
+        size="2xs"
+        variant={value === "cost" ? "solid" : "ghost"}
+        onClick={() => onChange("cost")}
+      >
+        Cost
+      </Button>
+      <Button
+        size="2xs"
+        variant={value === "duration" ? "solid" : "ghost"}
+        onClick={() => onChange("duration")}
+      >
+        Duration
+      </Button>
+    </HStack>
+  );
+}
+
+/**
+ * Beaten outright on every metric — hollowed out so the eye lands on the
+ * variants still in contention without having to read the sentence first.
+ */
+const renderPointCell = (point: ParetoPoint) => (
+  <Cell
+    key={point.variantId}
+    fill={point.color}
+    fillOpacity={point.dominated ? 0.25 : 0.9}
+    stroke={point.color}
+    strokeWidth={point.dominated ? 1.5 : 0}
+  />
+);
+
+function ParetoPlot({
+  data,
+  axis,
+  chartHeight,
+}: {
+  data: ParetoPoint[];
+  axis: AxisConfig;
+  chartHeight: number;
+}) {
+  const sizeIsMeaningful = data.some((point) => point.size !== null);
+  const anyInterval = data.some((point) => point.ciOffsets !== undefined);
+  const anyXInterval = data.some((point) => point.xOffsets !== undefined);
+
+  return (
+    <ResponsiveContainer width="100%" height={chartHeight}>
+      <ScatterChart margin={{ top: 14, right: 24, left: 10, bottom: 10 }}>
+        <CartesianGrid
+          stroke="var(--chakra-colors-border)"
+          strokeDasharray="3 3"
+        />
+        <XAxis
+          type="number"
+          dataKey="x"
+          name={axis.xLabel}
+          tickFormatter={(v) => axis.formatX(v as number)}
+          style={{ fontSize: "11px" }}
+          tick={{ fill: "var(--chakra-colors-fg-muted)" }}
+        />
+        <YAxis
+          type="number"
+          dataKey="score"
+          name="BT score"
+          style={{ fontSize: "11px" }}
+          tick={{ fill: "var(--chakra-colors-fg-muted)" }}
+          width={40}
+        />
+        {/*
+          The third metric. Range is area in px², so the mapping stays
+          perceptually honest — encoding it as radius would square the
+          apparent difference and make a 2x slower variant look 4x worse.
+        */}
+        <ZAxis
+          type="number"
+          dataKey="size"
+          name={axis.sizeLabel}
+          range={sizeIsMeaningful ? SIZE_RANGE : FLAT_SIZE_RANGE}
+        />
+        <Tooltip
+          cursor={{ strokeDasharray: "3 3" }}
+          content={({ active, payload }) => (
+            <ParetoTooltip
+              active={active}
+              point={payload?.[0]?.payload as ParetoPoint | undefined}
+              axis={axis}
+            />
+          )}
+        />
+        <Scatter data={data} name="Variants">
+          {/* Drawn before the cells so the bars sit under the point. */}
+          {anyInterval ? (
+            <ErrorBar
+              dataKey="ciOffsets"
+              direction="y"
+              {...INTERVAL_BAR_STYLE}
+            />
+          ) : null}
+          {anyXInterval ? (
+            <ErrorBar
+              dataKey="xOffsets"
+              direction="x"
+              {...INTERVAL_BAR_STYLE}
+            />
+          ) : null}
+          {data.map(renderPointCell)}
+        </Scatter>
+      </ScatterChart>
+    </ResponsiveContainer>
+  );
+}
+
+function ParetoTooltip({
+  active,
+  point,
+  axis,
+}: {
+  active?: boolean;
+  point?: ParetoPoint;
+  axis: AxisConfig;
+}) {
+  if (!active || !point) return null;
+
+  return (
+    <VStack
+      align="start"
+      gap={0}
+      bg="bg.panel"
+      border="1px solid"
+      borderColor="border"
+      borderRadius="md"
+      padding={2}
+      fontSize="xs"
+    >
+      <Text fontWeight="semibold">{point.name}</Text>
+      <Text>
+        BT score: {point.score.toFixed(2)}
+        {point.ciOffsets
+          ? ` (${(point.score - point.ciOffsets[0]).toFixed(
+              0,
+            )} to ${(point.score + point.ciOffsets[1]).toFixed(0)})`
+          : ""}
+      </Text>
+      <Text>
+        {axis.xLabel}: {axis.formatX(point.x)}
+        {point.xCI
+          ? ` (${axis.formatX(point.xCI[0])} to ${axis.formatX(point.xCI[1])})`
+          : ""}
+      </Text>
+      {point.size !== null ? (
+        <Text>
+          {metricTitle(axis.sizeMetric)}: {axis.formatSize(point.size)}
+        </Text>
+      ) : null}
+      {point.dominated ? (
+        <Text color="fg.muted">Beaten outright by another variant</Text>
+      ) : null}
+    </VStack>
+  );
+}
+
+function ParetoNotes({
+  data,
+  axis,
+}: {
+  data: ParetoPoint[];
+  axis: AxisConfig;
+}) {
+  const sizeIsMeaningful = data.some((point) => point.size !== null);
+  const anyInterval = data.some((point) => point.ciOffsets !== undefined);
+  const anyXInterval = data.some((point) => point.xOffsets !== undefined);
+  const anyDominated = data.some((point) => point.dominated);
+
+  return (
+    <VStack align="start" gap={0}>
+      {sizeIsMeaningful ? (
+        <Text fontSize="xs" color="fg.muted">
+          Point size is {axis.sizeLabel} — bigger is{" "}
+          {axis.sizeMetric === "cost" ? "dearer" : "slower"}.
+        </Text>
+      ) : (
+        <Text fontSize="xs" color="fg.muted">
+          No {axis.sizeMetric} was recorded, so point size means nothing here.
+        </Text>
+      )}
+      {anyInterval ? (
+        <Text fontSize="xs" color="fg.muted">
+          Bars are 95% confidence intervals — vertically for the score,
+          {anyXInterval
+            ? ` horizontally for the ${axis.xLabel.toLowerCase()}. Both say where the true value lies, not how much individual rows varied.`
+            : "."}
+        </Text>
+      ) : null}
+      {anyDominated ? (
+        <Text fontSize="xs" color="fg.muted">
+          Hollow points are beaten outright on every metric shown.
+        </Text>
+      ) : null}
     </VStack>
   );
 }

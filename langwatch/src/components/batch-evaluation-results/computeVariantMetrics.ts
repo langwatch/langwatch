@@ -129,6 +129,51 @@ const pairedDifferenceCI = ({
   return bootstrapMeanCI({ values: differences, seed });
 };
 
+/**
+ * Every pair's interval, computed once per UNORDERED pair and mirrored exactly.
+ *
+ * Computing each direction separately seeded them differently, so the two came
+ * from different resample draws and were not exact negations. Near zero that
+ * let one run answer "is a cheaper than b" and "is b cheaper than a"
+ * inconsistently — dominance is a property of a pair, and it stopped being one.
+ * Doing it once is also half the work, which matters because this is
+ * O(variants squared) bootstraps on the render thread.
+ */
+const pairedDifferenceCIs = ({
+  variantIds,
+  valuesByRow,
+}: {
+  variantIds: string[];
+  valuesByRow: Record<string, Array<number | null>>;
+}): Record<string, Record<string, [number, number]>> => {
+  const byVariant: Record<string, Record<string, [number, number]>> = {};
+  for (const variantId of variantIds) {
+    byVariant[variantId] = {};
+  }
+
+  for (let i = 0; i < variantIds.length; i++) {
+    for (let j = i + 1; j < variantIds.length; j++) {
+      const left = variantIds[i]!;
+      const right = variantIds[j]!;
+      // NUL rather than a space: variant ids are free-form, and with a
+      // space "a b" + "c" and "a" + "b c" hash to the same seed.
+      const seed = seedFor(`${left}\u0000${right}`);
+
+      const difference = pairedDifferenceCI({
+        a: valuesByRow[left]!,
+        b: valuesByRow[right]!,
+        seed,
+      });
+      if (!difference) continue;
+
+      byVariant[left]![right] = difference;
+      byVariant[right]![left] = [-difference[1], -difference[0]];
+    }
+  }
+
+  return byVariant;
+};
+
 export function computeVariantMetrics({
   variantIds,
   rows,
@@ -149,53 +194,14 @@ export function computeVariantMetrics({
     });
   }
 
-  const costDifferenceCI: Record<string, Record<string, [number, number]>> = {};
-  const durationDifferenceCI: Record<
-    string,
-    Record<string, [number, number]>
-  > = {};
-  for (const variantId of variantIds) {
-    costDifferenceCI[variantId] = {};
-    durationDifferenceCI[variantId] = {};
-  }
-
-  // Once per UNORDERED pair, mirrored exactly.
-  //
-  // Computing each direction separately seeded them differently, so the two
-  // came from different resample draws and were not exact negations. Near
-  // zero that let one run answer "is a cheaper than b" and "is b cheaper
-  // than a" inconsistently — dominance is a property of a pair, and it
-  // stopped being one. Doing it once is also half the work, which matters
-  // because this is O(variants squared) bootstraps on the render thread.
-  for (let i = 0; i < variantIds.length; i++) {
-    for (let j = i + 1; j < variantIds.length; j++) {
-      const left = variantIds[i]!;
-      const right = variantIds[j]!;
-      // NUL rather than a space: variant ids are free-form, and with a
-      // space "a b" + "c" and "a" + "b c" hash to the same seed.
-      const seed = seedFor(`${left}\u0000${right}`);
-
-      const cost = pairedDifferenceCI({
-        a: costByRow[left]!,
-        b: costByRow[right]!,
-        seed,
-      });
-      if (cost) {
-        costDifferenceCI[left]![right] = cost;
-        costDifferenceCI[right]![left] = [-cost[1], -cost[0]];
-      }
-
-      const duration = pairedDifferenceCI({
-        a: durationByRow[left]!,
-        b: durationByRow[right]!,
-        seed,
-      });
-      if (duration) {
-        durationDifferenceCI[left]![right] = duration;
-        durationDifferenceCI[right]![left] = [-duration[1], -duration[0]];
-      }
-    }
-  }
+  const costDifferenceCI = pairedDifferenceCIs({
+    variantIds,
+    valuesByRow: costByRow,
+  });
+  const durationDifferenceCI = pairedDifferenceCIs({
+    variantIds,
+    valuesByRow: durationByRow,
+  });
 
   for (const variantId of variantIds) {
     const costs = costByRow[variantId]!.filter((v): v is number => v !== null);

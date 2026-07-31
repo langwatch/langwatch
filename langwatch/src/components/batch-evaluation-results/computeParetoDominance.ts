@@ -96,6 +96,140 @@ const usableMean = (
     ? stats.avg
     : null;
 
+/**
+ * Cost and speed: the interval of the mean paired per-row difference.
+ *
+ * This is the real test. A pair with no interval means the paired test RAN AND
+ * DECLINED — the two shared too few rows to compare — so the run cannot tell
+ * them apart on this dimension.
+ *
+ * There used to be a fallback here that compared the two overall averages
+ * against a flat 5% threshold. It judged anyway, by a cruder test, in exactly
+ * the case where the averages are least trustworthy, and it was also dead:
+ * `VariantMetrics` declares the difference maps non-optional and
+ * `computeVariantMetrics` is the only thing that builds one, so no production
+ * caller could ever reach it. Ten tests in this module's suite were passing
+ * against it.
+ */
+const comparePairedMetric = ({
+  metrics,
+  dimension,
+  otherVariantId,
+}: {
+  metrics: VariantMetrics | undefined;
+  dimension: "cost" | "speed";
+  otherVariantId: string;
+}): Comparison => {
+  const differences =
+    dimension === "cost"
+      ? metrics?.costDifferenceCI
+      : metrics?.durationDifferenceCI;
+  const paired = differences?.[otherVariantId];
+  if (!paired?.every((bound) => Number.isFinite(bound))) return 0;
+
+  // Lower is better, so a is better when the whole interval is below zero.
+  if (paired[1] < 0) return 1;
+  if (paired[0] > 0) return -1;
+  return 0;
+};
+
+const compareOn = ({
+  dimension,
+  a,
+  b,
+  leaderboard,
+  variantMetrics,
+}: {
+  dimension: TradeoffDimension;
+  a: BTLeaderboardEntry;
+  b: BTLeaderboardEntry;
+  leaderboard: BTLeaderboard;
+  variantMetrics: Record<string, VariantMetrics>;
+}): Comparison => {
+  if (dimension === "quality") {
+    return compareQuality({
+      a,
+      b,
+      differenceCI: leaderboard.scoreDifferenceCI,
+    });
+  }
+  return comparePairedMetric({
+    metrics: variantMetrics[a.variantId],
+    dimension,
+    otherVariantId: b.variantId,
+  });
+};
+
+/** Whether every ranked variant recorded enough of this metric to compare. */
+const everyVariantRecorded = ({
+  ranked,
+  variantMetrics,
+  dimension,
+}: {
+  ranked: BTLeaderboardEntry[];
+  variantMetrics: Record<string, VariantMetrics>;
+  dimension: "cost" | "speed";
+}): boolean =>
+  ranked.length > 0 &&
+  ranked.every((entry) => {
+    const metrics = variantMetrics[entry.variantId];
+    const stats =
+      dimension === "cost" ? metrics?.costStats : metrics?.durationStats;
+    return usableMean(stats) !== null;
+  });
+
+/**
+ * The dimensions this run may state dominance on.
+ *
+ * Every ranked variant must have the metric, or the dimension is dropped.
+ * Comparing a pair that happens to have cost while another pair does not
+ * would make dominance depend on which rows happened to record a price.
+ */
+const comparableDimensions = ({
+  ranked,
+  variantMetrics,
+}: {
+  ranked: BTLeaderboardEntry[];
+  variantMetrics: Record<string, VariantMetrics>;
+}): TradeoffDimension[] => {
+  const dimensions: TradeoffDimension[] = ["quality"];
+  if (everyVariantRecorded({ ranked, variantMetrics, dimension: "cost" })) {
+    dimensions.push("cost");
+  }
+  if (everyVariantRecorded({ ranked, variantMetrics, dimension: "speed" })) {
+    dimensions.push("speed");
+  }
+  return dimensions;
+};
+
+/** The edge for one ordered pair, or null when the winner does not dominate. */
+const dominanceEdge = ({
+  winner,
+  loser,
+  dimensions,
+  leaderboard,
+  variantMetrics,
+}: {
+  winner: BTLeaderboardEntry;
+  loser: BTLeaderboardEntry;
+  dimensions: TradeoffDimension[];
+  leaderboard: BTLeaderboard;
+  variantMetrics: Record<string, VariantMetrics>;
+}): DominanceEdge | null => {
+  const results = dimensions.map((dimension) =>
+    compareOn({ dimension, a: winner, b: loser, leaderboard, variantMetrics }),
+  );
+  const noneWorse = results.every((r) => r >= 0);
+  const someBetter = results.some((r) => r > 0);
+  if (!noneWorse || !someBetter) return null;
+
+  return {
+    winnerId: winner.variantId,
+    loserId: loser.variantId,
+    strictlyBetterOn: dimensions.filter((_, i) => results[i]! > 0),
+  };
+};
+
 export const computeParetoDominance = ({
   leaderboard,
   variantMetrics,
@@ -104,66 +238,7 @@ export const computeParetoDominance = ({
   variantMetrics: Record<string, VariantMetrics>;
 }): ParetoDominance => {
   const ranked = leaderboard.entries.filter((entry) => !entry.isDegenerate);
-
-  const costOf = (variantId: string) =>
-    usableMean(variantMetrics[variantId]?.costStats);
-  const speedOf = (variantId: string) =>
-    usableMean(variantMetrics[variantId]?.durationStats);
-
-  // Every ranked variant must have the metric, or the dimension is dropped.
-  // Comparing a pair that happens to have cost while another pair does not
-  // would make dominance depend on which rows happened to record a price.
-  const dimensions: TradeoffDimension[] = ["quality"];
-  if (ranked.length > 0 && ranked.every((e) => costOf(e.variantId) !== null)) {
-    dimensions.push("cost");
-  }
-  if (ranked.length > 0 && ranked.every((e) => speedOf(e.variantId) !== null)) {
-    dimensions.push("speed");
-  }
-
-  const compare = (
-    dimension: TradeoffDimension,
-    a: BTLeaderboardEntry,
-    b: BTLeaderboardEntry,
-  ): Comparison => {
-    if (dimension === "quality") {
-      return compareQuality({
-        a,
-        b,
-        differenceCI: leaderboard.scoreDifferenceCI,
-      });
-    }
-
-    // The paired per-row difference, when the run produced one. This is the
-    // real test, and it supersedes the relative floor below — that floor was
-    // a stand-in from when no interval existed, and it could call a 6% gap
-    // "cheaper" on two rows or miss a dead-certain 4% gap on two hundred.
-    const metrics = variantMetrics[a.variantId];
-    const differences =
-      dimension === "cost"
-        ? metrics?.costDifferenceCI
-        : metrics?.durationDifferenceCI;
-    const paired = differences?.[b.variantId];
-    if (paired?.every((bound) => Number.isFinite(bound))) {
-      // Lower is better, so a is better when the whole interval is below zero.
-      if (paired[1] < 0) return 1;
-      if (paired[0] > 0) return -1;
-      return 0;
-    }
-
-    // No interval for this pair means the paired test RAN AND DECLINED — the
-    // two shared too few rows to compare — so the run cannot tell them apart
-    // on this dimension.
-    //
-    // There used to be a fallback here that compared the two overall averages
-    // against a flat 5% threshold. It judged anyway, by a cruder test, in
-    // exactly the case where the averages are least trustworthy, and it was
-    // also dead: `VariantMetrics` declares the difference maps non-optional
-    // and `computeVariantMetrics` is the only thing that builds one, so no
-    // production caller could ever reach it. Ten tests in this module's suite
-    // were passing against it.
-    return 0;
-  };
+  const dimensions = comparableDimensions({ ranked, variantMetrics });
 
   const edges: DominanceEdge[] = [];
   const dominatedBy: Record<string, string[]> = Object.fromEntries(
@@ -174,16 +249,16 @@ export const computeParetoDominance = ({
     for (const loser of ranked) {
       if (winner.variantId === loser.variantId) continue;
 
-      const results = dimensions.map((d) => compare(d, winner, loser));
-      const noneWorse = results.every((r) => r >= 0);
-      const someBetter = results.some((r) => r > 0);
-      if (!noneWorse || !someBetter) continue;
-
-      edges.push({
-        winnerId: winner.variantId,
-        loserId: loser.variantId,
-        strictlyBetterOn: dimensions.filter((_, i) => results[i]! > 0),
+      const edge = dominanceEdge({
+        winner,
+        loser,
+        dimensions,
+        leaderboard,
+        variantMetrics,
       });
+      if (!edge) continue;
+
+      edges.push(edge);
       dominatedBy[loser.variantId]!.push(winner.variantId);
     }
   }

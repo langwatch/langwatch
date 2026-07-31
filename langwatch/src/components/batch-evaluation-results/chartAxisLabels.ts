@@ -49,6 +49,30 @@ export const truncateLabel = (
 /** Characters a shared prefix may be cut at, so a word is never split. */
 const BOUNDARY_CHARS = new Set(["-", "_", ".", " ", "/", ":"]);
 
+/** The longest prefix every name shares, before any word-boundary trim. */
+const longestCommonPrefix = (names: string[]): string => {
+  let prefix = names[0] ?? "";
+  for (const name of names.slice(1)) {
+    let i = 0;
+    while (i < prefix.length && i < name.length && prefix[i] === name[i]) i++;
+    prefix = prefix.slice(0, i);
+    if (!prefix) return "";
+  }
+  return prefix;
+};
+
+/**
+ * Length of `prefix` cut back to just after its last separator, or 0 when it
+ * has none. Cutting there stops `…-warm` / `…-warm-premium` becoming
+ * `` / `-premium`, which is what a raw longest-common-prefix would do.
+ */
+const boundaryCutLength = (prefix: string): number => {
+  for (let i = prefix.length - 1; i >= 0; i--) {
+    if (BOUNDARY_CHARS.has(prefix[i]!)) return i + 1;
+  }
+  return 0;
+};
+
 /**
  * The prefix every one of these names shares, cut back to a word boundary.
  *
@@ -60,23 +84,8 @@ const BOUNDARY_CHARS = new Set(["-", "_", ".", " ", "/", ":"]);
 export const commonLabelPrefix = (names: string[]): string => {
   if (names.length < 2) return "";
 
-  let prefix = names[0] ?? "";
-  for (const name of names.slice(1)) {
-    let i = 0;
-    while (i < prefix.length && i < name.length && prefix[i] === name[i]) i++;
-    prefix = prefix.slice(0, i);
-    if (!prefix) return "";
-  }
-
-  // Cut at a separator so `…-warm` / `…-warm-premium` never becomes
-  // `` / `-premium`, which is what a raw longest-common-prefix would do.
-  let cut = -1;
-  for (let i = prefix.length - 1; i >= 0; i--) {
-    if (BOUNDARY_CHARS.has(prefix[i]!)) {
-      cut = i + 1;
-      break;
-    }
-  }
+  const prefix = longestCommonPrefix(names);
+  const cut = boundaryCutLength(prefix);
   if (cut <= 0) return "";
 
   const candidate = prefix.slice(0, cut);

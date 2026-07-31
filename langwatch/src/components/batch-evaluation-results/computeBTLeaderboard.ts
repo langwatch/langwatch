@@ -153,32 +153,23 @@ export function computeBTLeaderboard({
   const opts = { ...DEFAULT_OPTS, ...options };
   const n = variantIds.length;
 
-  if (n === 0) {
-    return {
-      entries: [],
-      winMatrix: {},
-      comparisonCount: 0,
-      minMatchups: 0,
-      hasDegenerate: false,
-      didConverge: true,
-      comparability: { identifiable: true, groups: [], dominates: [] },
-      scoreDifferenceCI: null,
-      bootstrapNonConvergence: null,
-    };
-  }
+  if (n === 0) return emptyLeaderboard();
 
   const idx = new Map(variantIds.map((id, i) => [id, i]));
   // Rows that survive to contribute evidence. `winner !== null` alone was too
   // permissive: an N-way tie, an unknown winner, or an empty candidate list all
-  // pass it and are then discarded inside the matrix builders, so the run
+  // pass it and are then discarded while building the matrix, so the run
   // reported "based on 60 comparisons" while ranking on fewer. Resolve first
   // and count what is left.
-  const usable = comparisons.filter(
-    (c) =>
-      c.winner !== null && resolveComparison({ comparison: c, idx }) !== null,
-  );
+  //
+  // Resolving here rather than inside each consumer also keeps the bootstrap
+  // off the Map: re-resolving inside every replicate was ~3M string-key
+  // lookups on a mid-sized run and dominated the whole computation.
+  const usable = comparisons
+    .map((comparison) => resolveComparison({ comparison, idx }))
+    .filter((resolved): resolved is ResolvedComparison => resolved !== null);
 
-  const W = buildWinMatrix(usable, idx, n);
+  const W = buildWinMatrix({ resolved: usable, n });
   const { wins, losses, matchups } = perVariantTotals(W);
 
   const degenerateMask = wins.map((w, i) => w === 0 || losses[i] === 0);
@@ -212,25 +203,72 @@ export function computeBTLeaderboard({
   // on the observed differences, not on the mean of the replicates.
   const score = strength.map((s) => 400 * Math.log10(s));
 
-  let scoreCI: Array<[number, number] | null> = new Array(n).fill(null);
-  let scoreDifferenceCI: ScoreDifferenceCI | null = null;
-  let bootstrapNonConvergence: number | null = null;
-  if (opts.bootstrapSamples > 0 && usable.length > 1) {
-    const bootstrapped = bootstrapScoreCI({
-      comparisons: usable,
-      idx,
-      n,
-      variantIds,
-      samples: opts.bootstrapSamples,
-      seed: opts.seed,
-      maxIter: opts.maxIter,
-      tol: opts.tol,
-    });
-    scoreCI = bootstrapped.scoreCI;
-    scoreDifferenceCI = bootstrapped.differenceCI;
-    bootstrapNonConvergence = bootstrapped.nonConverged / opts.bootstrapSamples;
-  }
+  const bootstrap = bootstrapIntervals({
+    resolved: usable,
+    n,
+    variantIds,
+    opts,
+  });
 
+  const entries = buildEntries({
+    variantIds,
+    wins,
+    losses,
+    matchups,
+    strength,
+    score,
+    scoreCI: bootstrap.scoreCI,
+    degenerateMask,
+  });
+
+  const winMatrix = toWinMatrix({ W, variantIds });
+
+  return {
+    entries,
+    winMatrix,
+    comparisonCount: usable.length,
+    minMatchups: matchups.length > 0 ? Math.min(...matchups) : 0,
+    hasDegenerate,
+    didConverge,
+    comparability: computeComparability({ winMatrix, variantIds }),
+    scoreDifferenceCI: bootstrap.differenceCI,
+    bootstrapNonConvergence: bootstrap.nonConvergence,
+  };
+}
+
+function emptyLeaderboard(): BTLeaderboard {
+  return {
+    entries: [],
+    winMatrix: {},
+    comparisonCount: 0,
+    minMatchups: 0,
+    hasDegenerate: false,
+    didConverge: true,
+    comparability: { identifiable: true, groups: [], dominates: [] },
+    scoreDifferenceCI: null,
+    bootstrapNonConvergence: null,
+  };
+}
+
+function buildEntries({
+  variantIds,
+  wins,
+  losses,
+  matchups,
+  strength,
+  score,
+  scoreCI,
+  degenerateMask,
+}: {
+  variantIds: string[];
+  wins: number[];
+  losses: number[];
+  matchups: number[];
+  strength: number[];
+  score: number[];
+  scoreCI: Array<[number, number] | null>;
+  degenerateMask: boolean[];
+}): BTLeaderboardEntry[] {
   const entries: BTLeaderboardEntry[] = variantIds.map((id, i) => ({
     variantId: id,
     wins: wins[i] ?? 0,
@@ -242,16 +280,31 @@ export function computeBTLeaderboard({
     scoreCI: scoreCI[i] ?? null,
     isDegenerate: degenerateMask[i] ?? false,
   }));
+  entries.sort(byScoreDegenerateLast);
+  return entries;
+}
 
-  // Sort by score desc, but push isDegenerate variants to the bottom so a
-  // smoothed +∞-ish "always wins" variant doesn't dominate the table.
-  entries.sort((a, b) => {
-    if (a.isDegenerate !== b.isDegenerate) return a.isDegenerate ? 1 : -1;
-    return b.score - a.score;
-  });
+/**
+ * Sort by score desc, but push isDegenerate variants to the bottom so a
+ * smoothed +∞-ish "always wins" variant doesn't dominate the table.
+ */
+function byScoreDegenerateLast(
+  a: BTLeaderboardEntry,
+  b: BTLeaderboardEntry,
+): number {
+  if (a.isDegenerate !== b.isDegenerate) return a.isDegenerate ? 1 : -1;
+  return b.score - a.score;
+}
 
-  const minMatchups = matchups.length > 0 ? Math.min(...matchups) : 0;
-
+/** Index-keyed win counts re-keyed by variantId for the heatmap. */
+function toWinMatrix({
+  W,
+  variantIds,
+}: {
+  W: number[][];
+  variantIds: string[];
+}): WinMatrix {
+  const n = variantIds.length;
   const winMatrix: WinMatrix = {};
   for (let i = 0; i < n; i++) {
     const row: Record<string, number> = {};
@@ -261,57 +314,7 @@ export function computeBTLeaderboard({
     }
     winMatrix[variantIds[i]!] = row;
   }
-
-  return {
-    entries,
-    winMatrix,
-    comparisonCount: usable.length,
-    minMatchups,
-    hasDegenerate,
-    didConverge,
-    comparability: computeComparability({ winMatrix, variantIds }),
-    scoreDifferenceCI,
-    bootstrapNonConvergence,
-  };
-}
-
-function buildWinMatrix(
-  comparisons: PairwiseComparison[],
-  idx: Map<string, number>,
-  n: number,
-): number[][] {
-  const W: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
-  for (const c of comparisons) {
-    const candIdxs: number[] = [];
-    for (const id of c.candidates) {
-      const k = idx.get(id);
-      if (k !== undefined) candIdxs.push(k);
-    }
-    if (candIdxs.length < 2) continue;
-
-    if (c.winner === "tie") {
-      // Only well-defined for 2-way. N>2 "tie" rows are dropped — semantics
-      // are ambiguous (did all N tie pairwise? did some subset tie?).
-      if (candIdxs.length === 2) {
-        const [i, j] = candIdxs as [number, number];
-        W[i]![j]! += 0.5;
-        W[j]![i]! += 0.5;
-      }
-      continue;
-    }
-    const wIdx = idx.get(c.winner as string);
-    // The winner must have been ON the row. types.ts assembles variantIds from
-    // every label the column ever produced, while `candidates` is the per-row
-    // set the judge actually saw — so a winner naming a variant that was
-    // dropped from this row (no output) resolves fine against the global index
-    // and then beats opponents it never faced. Ten such rows fabricated twenty
-    // matchups and a first-place finish.
-    if (wIdx === undefined || !candIdxs.includes(wIdx)) continue;
-    for (const cIdx of candIdxs) {
-      if (cIdx !== wIdx) W[wIdx]![cIdx]! += 1;
-    }
-  }
-  return W;
+  return winMatrix;
 }
 
 /**
@@ -347,23 +350,25 @@ function resolveComparison({
   }
 
   const wIdx = idx.get(comparison.winner as string);
-  // Same guard as buildWinMatrix: a winner absent from this row's candidates
-  // is not evidence about this row. The two paths must agree, or the bootstrap
-  // would describe a different dataset than the point estimate.
+  // The winner must have been ON the row. types.ts assembles variantIds from
+  // every label the column ever produced, while `candidates` is the per-row
+  // set the judge actually saw — so a winner naming a variant that was
+  // dropped from this row (no output) resolves fine against the global index
+  // and then beats opponents it never faced. Ten such rows fabricated twenty
+  // matchups and a first-place finish.
   if (wIdx === undefined || !candIdxs.includes(wIdx)) return null;
   return { candIdxs, winner: wIdx };
 }
 
-function buildWinMatrixFromResolved({
+function buildWinMatrix({
   resolved,
   n,
 }: {
-  resolved: (ResolvedComparison | null)[];
+  resolved: ResolvedComparison[];
   n: number;
 }): number[][] {
   const W: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
   for (const r of resolved) {
-    if (!r) continue;
     if (r.winner === TIE) {
       const [i, j] = r.candIdxs as [number, number];
       W[i]![j]! += 0.5;
@@ -424,37 +429,13 @@ function fitBT({
   if (n === 0) return { strength: [], didConverge: true };
   if (n === 1) return { strength: [1], didConverge: true };
 
-  let p = new Array(n).fill(1);
+  let p: number[] = new Array(n).fill(1);
   let didConverge = false;
 
   for (let iter = 0; iter < maxIter; iter++) {
-    const next = new Array(n).fill(0);
-    for (let i = 0; i < n; i++) {
-      let wi = smooth * (n - 1);
-      for (let j = 0; j < n; j++) {
-        if (i !== j) wi += W[i]![j]!;
-      }
-      let denom = 0;
-      for (let j = 0; j < n; j++) {
-        if (i === j) continue;
-        const nij = W[i]![j]! + W[j]![i]! + 2 * smooth;
-        denom += nij / (p[i] + p[j]);
-      }
-      next[i] = denom > 0 ? wi / denom : p[i];
-    }
-
-    // Renormalize to geometric mean 1 (stable across iterations and avoids
-    // the trivial p_i → ∞ direction).
-    const logMean =
-      next.reduce((s, v) => s + Math.log(Math.max(v, 1e-300)), 0) / n;
-    const scale = Math.exp(logMean);
-    for (let i = 0; i < n; i++) next[i] = next[i] / scale;
-
-    let delta = 0;
-    for (let i = 0; i < n; i++) {
-      const d = Math.abs(next[i] - p[i]) / Math.max(p[i], 1e-12);
-      if (d > delta) delta = d;
-    }
+    const next = mmSweep({ W, p, smooth });
+    normalizeToGeometricMean(next);
+    const delta = maxRelativeChange({ next, previous: p });
     p = next;
     if (delta < tol) {
       didConverge = true;
@@ -463,6 +444,78 @@ function fitBT({
   }
 
   return { strength: p, didConverge };
+}
+
+/** One MM iteration: the update applied to every variant at once. */
+function mmSweep({
+  W,
+  p,
+  smooth,
+}: {
+  W: number[][];
+  p: number[];
+  smooth: number;
+}): number[] {
+  const n = W.length;
+  const next: number[] = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    next[i] = mmUpdateFor({ W, p, smooth, i });
+  }
+  return next;
+}
+
+/** The MM update for a single variant. Holds p_i when the pair mass is zero. */
+function mmUpdateFor({
+  W,
+  p,
+  smooth,
+  i,
+}: {
+  W: number[][];
+  p: number[];
+  smooth: number;
+  i: number;
+}): number {
+  const n = W.length;
+  let wi = smooth * (n - 1);
+  for (let j = 0; j < n; j++) {
+    if (i !== j) wi += W[i]![j]!;
+  }
+  let denom = 0;
+  for (let j = 0; j < n; j++) {
+    if (i === j) continue;
+    const nij = W[i]![j]! + W[j]![i]! + 2 * smooth;
+    denom += nij / (p[i]! + p[j]!);
+  }
+  return denom > 0 ? wi / denom : p[i]!;
+}
+
+/**
+ * Renormalize in place to geometric mean 1 (stable across iterations and
+ * avoids the trivial p_i → ∞ direction).
+ */
+function normalizeToGeometricMean(values: number[]): void {
+  const n = values.length;
+  const logMean =
+    values.reduce((s, v) => s + Math.log(Math.max(v, 1e-300)), 0) / n;
+  const scale = Math.exp(logMean);
+  for (let i = 0; i < n; i++) values[i] = values[i]! / scale;
+}
+
+/** Largest relative move across the field — the MM convergence test. */
+function maxRelativeChange({
+  next,
+  previous,
+}: {
+  next: number[];
+  previous: number[];
+}): number {
+  let delta = 0;
+  for (let i = 0; i < next.length; i++) {
+    const d = Math.abs(next[i]! - previous[i]!) / Math.max(previous[i]!, 1e-12);
+    if (d > delta) delta = d;
+  }
+  return delta;
 }
 
 /**
@@ -485,9 +538,47 @@ function smoothingFor(W: number[][], n: number): number {
   return 0;
 }
 
+/** The bootstrap outputs, or their disabled stand-ins when it does not run. */
+function bootstrapIntervals({
+  resolved,
+  n,
+  variantIds,
+  opts,
+}: {
+  resolved: ResolvedComparison[];
+  n: number;
+  variantIds: string[];
+  opts: Required<BTLeaderboardOptions>;
+}): {
+  scoreCI: Array<[number, number] | null>;
+  differenceCI: ScoreDifferenceCI | null;
+  nonConvergence: number | null;
+} {
+  if (opts.bootstrapSamples > 0 && resolved.length > 1) {
+    const bootstrapped = bootstrapScoreCI({
+      resolved,
+      n,
+      variantIds,
+      samples: opts.bootstrapSamples,
+      seed: opts.seed,
+      maxIter: opts.maxIter,
+      tol: opts.tol,
+    });
+    return {
+      scoreCI: bootstrapped.scoreCI,
+      differenceCI: bootstrapped.differenceCI,
+      nonConvergence: bootstrapped.nonConverged / opts.bootstrapSamples,
+    };
+  }
+  return {
+    scoreCI: new Array<[number, number] | null>(n).fill(null),
+    differenceCI: null,
+    nonConvergence: null,
+  };
+}
+
 function bootstrapScoreCI({
-  comparisons,
-  idx,
+  resolved,
   n,
   variantIds,
   samples,
@@ -495,8 +586,7 @@ function bootstrapScoreCI({
   maxIter,
   tol,
 }: {
-  comparisons: PairwiseComparison[];
-  idx: Map<string, number>;
+  resolved: ResolvedComparison[];
   n: number;
   variantIds: string[];
   samples: number;
@@ -508,33 +598,58 @@ function bootstrapScoreCI({
   differenceCI: ScoreDifferenceCI;
   nonConverged: number;
 } {
+  const { scoreSamples, nonConverged } = runBootstrapReplicates({
+    resolved,
+    n,
+    samples,
+    seed,
+    maxIter,
+    tol,
+  });
+
+  return {
+    scoreCI: scoreSamples.map((arr) => percentileCI(arr)),
+    differenceCI: pairwiseDifferenceCIs({
+      scoreSamples,
+      n,
+      variantIds,
+      samples,
+    }),
+    nonConverged,
+  };
+}
+
+/** Resample the rows `samples` times, refitting the whole field each time. */
+function runBootstrapReplicates({
+  resolved,
+  n,
+  samples,
+  seed,
+  maxIter,
+  tol,
+}: {
+  resolved: ResolvedComparison[];
+  n: number;
+  samples: number;
+  seed: number;
+  maxIter: number;
+  tol: number;
+}): { scoreSamples: number[][]; nonConverged: number } {
   const rand = mulberry32(seed);
-  const m = comparisons.length;
+  const m = resolved.length;
   const scoreSamples: number[][] = Array.from({ length: n }, () => []);
   // Replicates whose own MM fit hit the iteration cap. Silently averaging
   // these in means the interval is partly built from fits that never
   // settled, and nothing downstream could tell.
   let nonConverged = 0;
 
-  // Resolve candidate ids to indices ONCE rather than inside every replicate.
-  // buildWinMatrix does a Map<string, number> lookup per candidate per row, so
-  // re-running it 200x over the same rows was ~3M string-key lookups on a
-  // mid-sized run and dominated the whole computation.
-  //
-  // The array keeps its original length, nulls included, so the resampling
-  // draws the same indices in the same order as before and the output stays
-  // bit-identical — this is a speedup, not a change in behaviour.
-  const resolved = comparisons.map((comparison) =>
-    resolveComparison({ comparison, idx }),
-  );
-
   for (let b = 0; b < samples; b++) {
-    const resampled: (ResolvedComparison | null)[] = new Array(m);
+    const resampled: ResolvedComparison[] = new Array(m);
     for (let k = 0; k < m; k++) {
       const r = Math.floor(rand() * m);
       resampled[k] = resolved[r]!;
     }
-    const Wb = buildWinMatrixFromResolved({ resolved: resampled, n });
+    const Wb = buildWinMatrix({ resolved: resampled, n });
     // Smoothing must be decided per replicate, not inherited from the full
     // dataset. A resample routinely contains a variant that happened to win
     // nothing, even when no variant is degenerate overall — and with smooth=0
@@ -554,58 +669,72 @@ function bootstrapScoreCI({
     }
   }
 
-  const scoreCI = scoreSamples.map((arr): [number, number] | null => {
-    if (arr.length === 0) return null;
-    const sorted = [...arr].sort((a, b) => a - b);
-    return [quantile(sorted, 0.025), quantile(sorted, 0.975)];
-  });
+  return { scoreSamples, nonConverged };
+}
 
-  // The paired difference, computed from the SAME replicates. Replicate b of
-  // variant i and replicate b of variant j come from one resample and one
-  // fit, so subtracting them cancels whatever that resample did to the field
-  // as a whole. That is the entire reason this is worth keeping: the spread
-  // of the difference is smaller than the spread of either score whenever the
-  // two move together, which on a shared fit they always do.
-  //
-  // ── These are PER-PAIR intervals, and that is a deliberate choice ──
-  //
-  // The UI asks about several pairs at once: four variants make six, and the
-  // trust panel reports how many were separated. Six tests at 95% leave
-  // roughly a 1-in-4 chance that at least one fires on luck alone, so the
-  // count is not a joint guarantee and must not be read as one.
-  //
-  // The textbook answer is to widen the bands until they hold simultaneously.
-  // That was built and measured, and it is worse than useless here. A max-t
-  // construction — take the largest standardised deviation across all pairs
-  // in each replicate, then its 95th percentile as one critical value — is
-  // the efficient version of that idea, since it reads the correlation
-  // between pairs off the replicates instead of assuming the worst the way
-  // Bonferroni does. Measured on 40 synthetic four-variant runs it separated
-  // 12.9% of pairs, against 26.3% for the plain interval-overlap test this
-  // work replaced and 39.2% for the per-pair difference below. The
-  // simultaneous band came out about 1.10x the overlap test's own effective
-  // threshold: the multiplicity multiplier (~2.9 rather than 1.96) more than
-  // cancels the correlation gain that makes the difference worth using.
-  //
-  // Shipping that would make every claim weaker than before any of this
-  // work, to fix an overstatement that costs nothing to fix with a sentence.
-  // So the bands stay per-pair — each individual claim is then correctly
-  // calibrated at 95%, which is what "these two differ" should mean — and
-  // `computeSampleAdequacy` states the multiplicity plainly wherever it
-  // reports a count across pairs.
+/** Percentile interval over one variant's replicate scores. */
+function percentileCI(samples: number[]): [number, number] | null {
+  if (samples.length === 0) return null;
+  const sorted = [...samples].sort((a, b) => a - b);
+  return [quantile(sorted, 0.025), quantile(sorted, 0.975)];
+}
+
+/**
+ * The paired difference, computed from the SAME replicates. Replicate b of
+ * variant i and replicate b of variant j come from one resample and one
+ * fit, so subtracting them cancels whatever that resample did to the field
+ * as a whole. That is the entire reason this is worth keeping: the spread
+ * of the difference is smaller than the spread of either score whenever the
+ * two move together, which on a shared fit they always do.
+ *
+ * ── These are PER-PAIR intervals, and that is a deliberate choice ──
+ *
+ * The UI asks about several pairs at once: four variants make six, and the
+ * trust panel reports how many were separated. Six tests at 95% leave
+ * roughly a 1-in-4 chance that at least one fires on luck alone, so the
+ * count is not a joint guarantee and must not be read as one.
+ *
+ * The textbook answer is to widen the bands until they hold simultaneously.
+ * That was built and measured, and it is worse than useless here. A max-t
+ * construction — take the largest standardised deviation across all pairs
+ * in each replicate, then its 95th percentile as one critical value — is
+ * the efficient version of that idea, since it reads the correlation
+ * between pairs off the replicates instead of assuming the worst the way
+ * Bonferroni does. Measured on 40 synthetic four-variant runs it separated
+ * 12.9% of pairs, against 26.3% for the plain interval-overlap test this
+ * work replaced and 39.2% for the per-pair difference below. The
+ * simultaneous band came out about 1.10x the overlap test's own effective
+ * threshold: the multiplicity multiplier (~2.9 rather than 1.96) more than
+ * cancels the correlation gain that makes the difference worth using.
+ *
+ * Shipping that would make every claim weaker than before any of this
+ * work, to fix an overstatement that costs nothing to fix with a sentence.
+ * So the bands stay per-pair — each individual claim is then correctly
+ * calibrated at 95%, which is what "these two differ" should mean — and
+ * `computeSampleAdequacy` states the multiplicity plainly wherever it
+ * reports a count across pairs.
+ */
+function pairwiseDifferenceCIs({
+  scoreSamples,
+  n,
+  variantIds,
+  samples,
+}: {
+  scoreSamples: number[][];
+  n: number;
+  variantIds: string[];
+  samples: number;
+}): ScoreDifferenceCI {
   const differenceCI: ScoreDifferenceCI = {};
   for (const id of variantIds) differenceCI[id] = {};
 
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      const diffs: number[] = [];
-      for (let b = 0; b < samples; b++) {
-        const d = scoreSamples[i]![b]! - scoreSamples[j]![b]!;
-        // A replicate that produced a non-finite score for either variant
-        // says nothing about the gap between them. Dropping it is the only
-        // honest option; keeping it would poison every quantile.
-        if (Number.isFinite(d)) diffs.push(d);
-      }
+      const diffs = finiteDifferences({
+        a: scoreSamples[i]!,
+        b: scoreSamples[j]!,
+        samples,
+      });
       if (diffs.length === 0) continue;
       diffs.sort((a, b) => a - b);
       const lo = quantile(diffs, 0.025);
@@ -618,7 +747,30 @@ function bootstrapScoreCI({
     }
   }
 
-  return { scoreCI, differenceCI, nonConverged };
+  return differenceCI;
+}
+
+/**
+ * Replicate-by-replicate gap between two variants. A replicate that produced
+ * a non-finite score for either variant says nothing about the gap between
+ * them. Dropping it is the only honest option; keeping it would poison every
+ * quantile.
+ */
+function finiteDifferences({
+  a,
+  b,
+  samples,
+}: {
+  a: number[];
+  b: number[];
+  samples: number;
+}): number[] {
+  const diffs: number[] = [];
+  for (let s = 0; s < samples; s++) {
+    const d = a[s]! - b[s]!;
+    if (Number.isFinite(d)) diffs.push(d);
+  }
+  return diffs;
 }
 
 function quantile(sorted: number[], q: number): number {

@@ -25,7 +25,6 @@ const entry = (
   variantId: string,
   score: number,
   scoreCI: [number, number] | null,
-  isDegenerate = false,
 ) =>
   ({
     variantId,
@@ -36,7 +35,7 @@ const entry = (
     strength: 1,
     score,
     scoreCI,
-    isDegenerate,
+    isDegenerate: false,
   }) as any;
 
 const board = (entries: any[]) =>
@@ -52,6 +51,7 @@ const board = (entries: any[]) =>
 
 describe("computeLeaderboardVerdict — claims it must not make", () => {
   describe("given a strict order where the leader swept and the tail was swept", () => {
+    /** @scenario "The last variant standing is not crowned by default" */
     it("refuses to crown the variant that lost every match it played", () => {
       // a > b > c. Both a and c are degenerate (a never lost, c never won),
       // so the rankable field collapses to b alone. That used to satisfy
@@ -76,6 +76,7 @@ describe("computeLeaderboardVerdict — claims it must not make", () => {
   });
 
   describe("given a tie set the run partly separated", () => {
+    /** @scenario "Variants the run separated are never called interchangeable" */
     it("excludes a variant the run distinguished from another tied member", () => {
       // L overlaps M and overlaps C, but M and C do NOT overlap (48 > 45).
       // Filtering against the leader alone swept all three into one set and
@@ -211,6 +212,7 @@ describe("findCheaperTiedAlternative — the saving it quotes", () => {
     ) as any;
 
   describe("given the leader is not the dearest tied variant", () => {
+    /** @scenario "A cheaper recommendation is measured against what I would ship" */
     it("measures the saving against the leader, not the dearest", () => {
       // Leader $0.002, another tied option $0.010, cheapest $0.0018.
       // Against the dearest that is an 82% saving; but the reader ships the
@@ -245,6 +247,7 @@ describe("findCheaperTiedAlternative — the saving it quotes", () => {
   });
 
   describe("given a mean drawn from too few priced rows", () => {
+    /** @scenario "A cost averaged over too few rows does not drive the headline" */
     it("declines to recommend on cost", () => {
       // Rows are priced independently, so a run can record cost on one row
       // and leave the rest null. That average was previously printed as

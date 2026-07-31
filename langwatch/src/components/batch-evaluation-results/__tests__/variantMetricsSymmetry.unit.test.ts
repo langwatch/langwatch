@@ -79,6 +79,7 @@ describe("computeVariantMetrics — paired difference intervals", () => {
       expect(ba[1]).toBeCloseTo(-ab[0], 9);
     });
 
+    /** @scenario "Asking about a pair in either order gives the same answer" */
     it("never lets both directions claim the other is cheaper", () => {
       const metrics = computeVariantMetrics({ variantIds: ["a", "b"], rows });
       const ab = metrics.a!.costDifferenceCI.b!;
@@ -96,6 +97,7 @@ describe("computeVariantMetrics — paired difference intervals", () => {
   });
 
   describe("given the variants share too few priced rows", () => {
+    /** @scenario "Two variants that share too few rows are not compared on cost" */
     it("declines to produce an interval from a couple of points", () => {
       // Each variant is priced on enough rows to clear the per-variant floor,
       // but they barely overlap, so the PAIRED sample is tiny. A dominance

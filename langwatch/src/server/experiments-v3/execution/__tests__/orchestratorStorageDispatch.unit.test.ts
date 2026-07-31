@@ -104,6 +104,7 @@ describe("buildTargetMetadata", () => {
     // a model family with a candidate. Reading the evaluator's live config
     // at render time would answer that question about today's config rather
     // than the run's, so the judge model is pinned onto the run here.
+    /** @scenario "The judge model is the one that actually ran" */
     it("records the judging model from the evaluator's settings", () => {
       const [target] = buildTargetMetadata({
         targets: evaluatorTarget(),

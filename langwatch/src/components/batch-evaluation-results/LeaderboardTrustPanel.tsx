@@ -103,6 +103,71 @@ const buildComparabilityCheck = (
   };
 };
 
+const buildSampleSizeCheck = ({
+  leaderboard,
+  warnThreshold,
+}: Pick<
+  LeaderboardTrustPanelProps,
+  "leaderboard" | "warnThreshold"
+>): TrustCheck => ({
+  label: "Enough comparisons",
+  tone: leaderboard.minMatchups >= warnThreshold ? "ok" : "warn",
+  detail:
+    leaderboard.minMatchups >= warnThreshold
+      ? `Every variant took part in at least ${leaderboard.minMatchups} matchups.`
+      : `The least-compared variant has only ${leaderboard.minMatchups} of the ${warnThreshold} matchups needed for a stable score. Run more rows.`,
+});
+
+const buildSweepCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
+  label: "Every variant both won and lost",
+  tone: leaderboard.hasDegenerate ? "warn" : "ok",
+  detail: leaderboard.hasDegenerate
+    ? "At least one variant never won, or never lost. There is no score that fits that, so it is excluded from the ranking."
+    : "No variant swept or was swept.",
+});
+
+/**
+ * `didConverge` alone would overstate this. The solver stops when consecutive
+ * iterates stop moving much, which cannot distinguish settling on an answer
+ * from creeping toward one that does not exist — on a field that fails the
+ * Ford condition it reports success while the scores march off with the
+ * iteration cap. So the claim is only made when there was an answer to
+ * converge to.
+ */
+const buildSettledCheck = (leaderboard: BTLeaderboard): TrustCheck => ({
+  label: "Ranking settled",
+  tone:
+    leaderboard.didConverge && leaderboard.comparability.identifiable
+      ? "ok"
+      : "warn",
+  detail: !leaderboard.comparability.identifiable
+    ? "The ranking cannot settle across groups the run never connected, so treat gaps that span them as unmeasured."
+    : leaderboard.didConverge
+      ? "The ranking converged on a stable answer."
+      : "The ranking did not fully settle, so treat the order as approximate.",
+});
+
+/**
+ * The margins of error are built from a thousand OTHER fits, and their
+ * failures used to be discarded — so the settled check could report a clean
+ * convergence while the intervals beside it came from fits that never settled.
+ * A resample is often harder to fit than the full dataset, because it can drop
+ * a variant's only wins.
+ */
+const buildMarginsCheck = (leaderboard: BTLeaderboard): TrustCheck[] => {
+  const rate = leaderboard.bootstrapNonConvergence;
+  if (rate === null || rate <= BOOTSTRAP_NONCONVERGENCE_LIMIT) return [];
+  return [
+    {
+      label: "Margins of error are approximate",
+      tone: "warn",
+      detail: `${Math.round(
+        rate * 100,
+      )}% of the resamples used to size the margins of error did not settle, so treat the intervals as rough rather than exact.`,
+    },
+  ];
+};
+
 /** Exported for tests: the checks that decide whether a run is trustworthy. */
 export const buildTrustChecks = ({
   leaderboard,
@@ -112,22 +177,14 @@ export const buildTrustChecks = ({
   judgeIndependence,
   variantNames,
 }: LeaderboardTrustPanelProps): TrustCheck[] => {
-  const checks: TrustCheck[] = [
-    {
-      label: "Enough comparisons",
-      tone: leaderboard.minMatchups >= warnThreshold ? "ok" : "warn",
-      detail:
-        leaderboard.minMatchups >= warnThreshold
-          ? `Every variant took part in at least ${leaderboard.minMatchups} matchups.`
-          : `The least-compared variant has only ${leaderboard.minMatchups} of the ${warnThreshold} matchups needed for a stable score. Run more rows.`,
-    },
-    {
-      label: "Every variant both won and lost",
-      tone: leaderboard.hasDegenerate ? "warn" : "ok",
-      detail: leaderboard.hasDegenerate
-        ? "At least one variant never won, or never lost. There is no score that fits that, so it is excluded from the ranking."
-        : "No variant swept or was swept.",
-    },
+  // The top variant the fit is entitled to rank — degenerates are excluded
+  // from every claim, so one of them is not a leader.
+  const leaderId =
+    leaderboard.entries.find((entry) => !entry.isDegenerate)?.variantId ?? null;
+
+  return [
+    buildSampleSizeCheck({ leaderboard, warnThreshold }),
+    buildSweepCheck(leaderboard),
     // Split out from the check above, which used to end "...so all of them can
     // be placed on the same scale". No variant sweeping is necessary for that
     // and not sufficient: a field can have every variant winning and losing
@@ -136,59 +193,17 @@ export const buildTrustChecks = ({
     // rather than a measurement. Ford (1957) is the sufficient condition, so
     // it gets its own check rather than riding on the sweep one.
     buildComparabilityCheck(leaderboard),
-    // `didConverge` alone would overstate this. The solver stops when
-    // consecutive iterates stop moving much, which cannot distinguish settling
-    // on an answer from creeping toward one that does not exist — on a field
-    // that fails the Ford condition it reports success while the scores march
-    // off with the iteration cap. So the claim is only made when there was an
-    // answer to converge to.
-    {
-      label: "Ranking settled",
-      tone:
-        leaderboard.didConverge && leaderboard.comparability.identifiable
-          ? "ok"
-          : "warn",
-      detail: !leaderboard.comparability.identifiable
-        ? "The ranking cannot settle across groups the run never connected, so treat gaps that span them as unmeasured."
-        : leaderboard.didConverge
-          ? "The ranking converged on a stable answer."
-          : "The ranking did not fully settle, so treat the order as approximate.",
-    },
-    // The margins of error are built from a thousand OTHER fits, and their
-    // failures used to be discarded — so the check above could report a clean
-    // convergence while the intervals beside it came from fits that never
-    // settled. A resample is often harder to fit than the full dataset,
-    // because it can drop a variant's only wins.
-    ...(leaderboard.bootstrapNonConvergence !== null &&
-    leaderboard.bootstrapNonConvergence > BOOTSTRAP_NONCONVERGENCE_LIMIT
-      ? [
-          {
-            label: "Margins of error are approximate",
-            tone: "warn" as const,
-            detail: `${Math.round(
-              leaderboard.bootstrapNonConvergence * 100,
-            )}% of the resamples used to size the margins of error did not settle, so treat the intervals as rough rather than exact.`,
-          },
-        ]
-      : []),
-  ];
-
-  // How much of the order this run actually established. Deliberately a
-  // count of what happened rather than an estimate of what more rows would
-  // buy: a required-sample figure is a power calculation over an effect
-  // size drawn from this same thin data, so "20 more will settle it" is a
-  // promise the run cannot keep.
-  checks.push(buildResolutionCheck(sampleAdequacy));
-  checks.push(buildVerbosityCheck(verbosity));
-  // The top variant the fit is entitled to rank — degenerates are excluded
-  // from every claim, so one of them is not a leader.
-  const leaderId =
-    leaderboard.entries.find((entry) => !entry.isDegenerate)?.variantId ?? null;
-  checks.push(
+    buildSettledCheck(leaderboard),
+    ...buildMarginsCheck(leaderboard),
+    // How much of the order this run actually established. Deliberately a
+    // count of what happened rather than an estimate of what more rows would
+    // buy: a required-sample figure is a power calculation over an effect
+    // size drawn from this same thin data, so "20 more will settle it" is a
+    // promise the run cannot keep.
+    buildResolutionCheck(sampleAdequacy),
+    buildVerbosityCheck(verbosity),
     buildJudgeIndependenceCheck(judgeIndependence, variantNames, leaderId),
-  );
-
-  return checks;
+  ];
 };
 
 /**

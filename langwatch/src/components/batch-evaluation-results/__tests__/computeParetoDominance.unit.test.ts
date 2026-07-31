@@ -95,6 +95,22 @@ const differenceInterval = (
   return [diff - halfWidth, diff + halfWidth];
 };
 
+/** One variant's interval against each opponent, keyed by opponent id. */
+const pairIntervals = (
+  mine: number | null | undefined,
+  others: Array<[string, number | null | undefined]>,
+): Record<string, [number, number]> => {
+  const out: Record<string, [number, number]> = {};
+  for (const [id, theirs] of others) {
+    const ci = differenceInterval(mine, theirs);
+    if (ci) out[id] = ci;
+  }
+  return out;
+};
+
+const statsOrNull = (value: number | null | undefined, rows: number) =>
+  value === null || value === undefined ? null : stats(value, rows);
+
 const metrics = (
   byId: Record<
     string,
@@ -105,31 +121,24 @@ const metrics = (
   return Object.fromEntries(
     ids.map((variantId) => {
       const m = byId[variantId]!;
-      const costDifferenceCI: Record<string, [number, number]> = {};
-      const durationDifferenceCI: Record<string, [number, number]> = {};
-      for (const other of ids) {
-        if (other === variantId) continue;
-        const cost = differenceInterval(m.cost, byId[other]!.cost);
-        if (cost) costDifferenceCI[other] = cost;
-        const duration = differenceInterval(m.duration, byId[other]!.duration);
-        if (duration) durationDifferenceCI[other] = duration;
-      }
+      const rows = m.rows ?? 20;
+      const others = ids.filter((id) => id !== variantId);
       return [
         variantId,
         {
           variantId,
-          costStats:
-            m.cost === null || m.cost === undefined
-              ? null
-              : stats(m.cost, m.rows ?? 20),
-          durationStats:
-            m.duration === null || m.duration === undefined
-              ? null
-              : stats(m.duration, m.rows ?? 20),
+          costStats: statsOrNull(m.cost, rows),
+          durationStats: statsOrNull(m.duration, rows),
           costMeanCI: null,
           durationMeanCI: null,
-          costDifferenceCI,
-          durationDifferenceCI,
+          costDifferenceCI: pairIntervals(
+            m.cost,
+            others.map((id) => [id, byId[id]!.cost]),
+          ),
+          durationDifferenceCI: pairIntervals(
+            m.duration,
+            others.map((id) => [id, byId[id]!.duration]),
+          ),
         },
       ];
     }),
@@ -147,6 +156,7 @@ describe("computeParetoDominance", () => {
       b: { cost: 0.01, duration: 5000 },
     });
 
+    /** @scenario "A variant beaten on every metric is named outright" */
     it("names the variant that beats it", () => {
       const dominance = computeParetoDominance({ leaderboard, variantMetrics });
 
@@ -188,6 +198,7 @@ describe("computeParetoDominance", () => {
       ).toEqual(["a"]);
     });
 
+    /** @scenario "Dominance is never claimed from a quality difference the run cannot see" */
     it("does not count quality among the dimensions won", () => {
       const edge = computeParetoDominance({
         leaderboard,
@@ -225,6 +236,7 @@ describe("computeParetoDominance", () => {
     // row-to-row spread.
     const TWO_PERCENT_APART = 1.02;
 
+    /** @scenario "A negligible cost or speed difference is not a win" */
     it("does not treat it as cheaper", () => {
       // No duration on purpose: an equal duration on both sides is itself
       // decided by the floor, so leaving it in lets the speed comparison
@@ -245,6 +257,7 @@ describe("computeParetoDominance", () => {
   });
 
   describe("given a genuine trade-off", () => {
+    /** @scenario "A variant nothing beats outright is left for the reader to choose between" */
     it("reports no variant to drop", () => {
       // a is better but dearer. That is the case the chart exists for, and
       // the reader has to make the call.
@@ -265,6 +278,7 @@ describe("computeParetoDominance", () => {
   });
 
   describe("given no duration recorded anywhere", () => {
+    /** @scenario "Dominance is only claimed over metrics the run actually recorded" */
     it("compares on quality and cost only", () => {
       const leaderboard = board([
         entry({ variantId: "a", score: 200, scoreCI: [150, 250] }),
@@ -406,6 +420,7 @@ describe("computeParetoDominance — when the paired test declined", () => {
     }) as any;
 
   describe("given the run computed intervals but not for this pair", () => {
+    /** @scenario "Cheaper and faster are decided per row, not on the averages" */
     it("treats cost as unknown rather than falling back to the averages", () => {
       // The interval is absent precisely because the two shared too few rows.
       // Falling back to a threshold on the averages judges anyway, using a
@@ -490,6 +505,7 @@ describe("computeParetoDominance — the duration side of the paired test", () =
     }) as any;
 
   describe("given a mean speed gap swamped by row-to-row variation", () => {
+    /** @scenario "A speed difference swamped by row-to-row variation is not claimed" */
     it("does not claim the faster average as a speed win", () => {
       // Taken from the live run: 'a' averages 8.2s faster than 'b' over 60
       // paired rows, but the per-row difference has a standard deviation of

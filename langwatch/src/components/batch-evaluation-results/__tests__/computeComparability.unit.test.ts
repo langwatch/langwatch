@@ -60,6 +60,7 @@ describe("computeComparability", () => {
     ];
     const variantIds = ["A", "B", "C", "D"];
 
+    /** @scenario "A field that splits into tiers is not presented as one scale" */
     it("is not identifiable even though no variant swept or was swept", () => {
       const leaderboard = computeBTLeaderboard({
         comparisons,
@@ -129,6 +130,7 @@ describe("computeComparability", () => {
     ];
     const variantIds = ["A", "B", "C", "D"];
 
+    /** @scenario "A ranking that cannot settle does not claim it has" */
     it("is not identifiable", () => {
       const comparability = computeComparability({
         winMatrix: computeBTLeaderboard({
@@ -142,6 +144,7 @@ describe("computeComparability", () => {
       expect(comparability.identifiable).toBe(false);
     });
 
+    /** @scenario "Variants that never met are not ordered against each other" */
     it("refuses to order variants from different islands", () => {
       const comparability = computeComparability({
         winMatrix: computeBTLeaderboard({

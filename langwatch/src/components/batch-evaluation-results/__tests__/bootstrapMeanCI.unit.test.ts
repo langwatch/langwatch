@@ -22,6 +22,7 @@ describe("bootstrapMeanCI", () => {
       expect(ci[1]).toBeGreaterThan(mean);
     });
 
+    /** @scenario "The cost axis carries its uncertainty too" */
     it("is narrower than the spread of the values themselves", () => {
       // The distinction the whole module rests on: this is the uncertainty of
       // the MEAN, not the range of the rows. Confusing the two would draw an
@@ -48,6 +49,7 @@ describe("bootstrapMeanCI", () => {
   });
 
   describe("given a single observation", () => {
+    /** @scenario "A cost averaged over a single row admits it cannot be bounded" */
     it("refuses to produce an interval", () => {
       // Every replicate would be that one value, so the interval comes out
       // zero-width and reads as certainty about a mean drawn from one row.

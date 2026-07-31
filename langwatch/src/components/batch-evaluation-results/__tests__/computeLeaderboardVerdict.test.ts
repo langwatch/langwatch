@@ -190,6 +190,7 @@ describe("findCheaperTiedAlternative", () => {
   describe("when two tied variants differ sharply in cost", () => {
     // The whole payoff of reporting ties honestly: same measured quality,
     // so the price is the decision.
+    /** @scenario "A cheaper variant that isn't meaningfully worse is visible at a glance" */
     it("recommends the cheaper one", () => {
       const verdict = {
         kind: "tie-at-top" as const,

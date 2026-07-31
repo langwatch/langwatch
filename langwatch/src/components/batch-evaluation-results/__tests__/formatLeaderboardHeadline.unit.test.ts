@@ -7,6 +7,7 @@ const NAMES = { a: "warm", b: "warm-premium", c: "blunt" };
 
 describe("formatLeaderboardHeadline", () => {
   describe("given one variant beats every other beyond the margin", () => {
+    /** @scenario "The answer is one sentence, before any chart" */
     it("names it as the one to ship", () => {
       const headline = formatLeaderboardHeadline({
         verdict: {
@@ -83,6 +84,7 @@ describe("formatLeaderboardHeadline", () => {
   });
 
   describe("given the top two are tied with no cost difference", () => {
+    /** @scenario "The headline never claims a winner the run cannot support" */
     it("refuses to name a winner", () => {
       const headline = formatLeaderboardHeadline({
         verdict: {

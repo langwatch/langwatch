@@ -10,7 +10,6 @@ const entry = (
   variantId: string,
   score: number,
   scoreCI: [number, number] | null,
-  isDegenerate = false,
 ): BTLeaderboardEntry => ({
   variantId,
   wins: 1,
@@ -20,7 +19,17 @@ const entry = (
   strength: 1,
   score,
   scoreCI,
-  isDegenerate,
+  isDegenerate: false,
+});
+
+/** A variant that swept or was swept: no score the fit can defend. */
+const degenerateEntry = (
+  variantId: string,
+  score: number,
+  scoreCI: [number, number] | null,
+): BTLeaderboardEntry => ({
+  ...entry(variantId, score, scoreCI),
+  isDegenerate: true,
 });
 
 const leaderboard = (
@@ -59,6 +68,7 @@ describe("computeSampleAdequacy", () => {
   });
 
   describe("given a run where the top two overlap", () => {
+    /** @scenario "Sample size is reported as observed, never as a forecast" */
     it("counts only the pairs that were actually separated", () => {
       const adequacy = computeSampleAdequacy(
         leaderboard([
@@ -117,7 +127,7 @@ describe("computeSampleAdequacy", () => {
         leaderboard([
           entry("a", 200, [150, 250]),
           entry("b", -200, [-250, -150]),
-          entry("swept", -900, null, true),
+          degenerateEntry("swept", -900, null),
         ]),
       );
 
@@ -179,6 +189,7 @@ describe("computeSampleAdequacy — when multiplicity is worth raising", () => {
   });
 
   describe("given several pairs", () => {
+    /** @scenario "The count of separated pairs states its own multiplicity" */
     it("reports the chance that at least one separated by luck", () => {
       const adequacy = computeSampleAdequacy(board(["a", "b", "c"]));
 

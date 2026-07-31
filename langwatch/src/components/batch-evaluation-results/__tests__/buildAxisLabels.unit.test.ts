@@ -50,6 +50,7 @@ describe("buildAxisLabels", () => {
     // one chart rendered four identical labels and its sibling rendered
     // "(1) (2) (3) (4)". Dropping the shared prefix removes the collision at
     // source, so neither workaround is needed.
+    /** @scenario "Labels name the part that tells the variants apart" */
     it("labels them by the part that differs", () => {
       const labels = buildAxisLabels(
         [
@@ -79,6 +80,7 @@ describe("buildAxisLabels", () => {
   });
 
   describe("given names with no shared prefix", () => {
+    /** @scenario "Names that already fit are shown in full" */
     it("leaves them alone", () => {
       expect(buildAxisLabels(["warm", "formal", "blunt"], 16)).toEqual([
         "warm",

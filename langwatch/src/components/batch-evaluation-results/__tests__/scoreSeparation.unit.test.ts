@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type BTLeaderboardEntry,
   computeBTLeaderboard,
   type PairwiseComparison,
 } from "../computeBTLeaderboard";
@@ -36,6 +37,7 @@ const intervalsOverlap = (a: [number, number], b: [number, number]) =>
 
 describe("areDistinguishable", () => {
   describe("given overlapping intervals but a difference that excludes zero", () => {
+    /** @scenario "Two variants are separated on the difference between them" */
     it("reports the pair as separated", () => {
       // The case the whole change exists for. Both variants ride the same
       // resample, so their marginal intervals overlap heavily while every
@@ -146,6 +148,7 @@ describe("areDistinguishable", () => {
   });
 
   describe("given no difference intervals at all", () => {
+    /** @scenario "Without resamples the run falls back to comparing intervals" */
     it("falls back to comparing the marginal intervals", () => {
       expect(
         areDistinguishable({
@@ -176,99 +179,100 @@ describe("areDistinguishable", () => {
   });
 });
 
-describe("computeBTLeaderboard — the difference intervals it produces", () => {
-  const fourWay = ({ rows, seed }: { rows: number; seed: number }) => {
-    // Deterministic pseudo-random four-way verdicts with a known ordering.
-    let a = seed >>> 0;
-    const rand = () => {
-      a = (a + 0x6d2b79f5) | 0;
-      let t = Math.imul(a ^ (a >>> 15), 1 | a);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-    const ids = ["a", "b", "c", "d"];
-    const strength = [2.2, 1.6, 1.0, 0.7];
-    const total = strength.reduce((s, w) => s + w, 0);
-    const comparisons: PairwiseComparison[] = [];
-    for (let r = 0; r < rows; r++) {
-      let pick = rand() * total;
-      let winner = ids[0]!;
-      for (let i = 0; i < ids.length; i++) {
-        pick -= strength[i]!;
-        if (pick <= 0) {
-          winner = ids[i]!;
-          break;
-        }
-      }
-      comparisons.push({ candidates: [...ids], winner });
-    }
-    return computeBTLeaderboard({
-      comparisons,
-      variantIds: ids,
-      bootstrapSamples: 300,
-      seed,
-    });
-  };
+const SEEDS = [1, 2, 3, 4, 5, 6];
 
+/** Deterministic pseudo-random four-way verdicts with a known ordering. */
+const fourWay = ({ rows, seed }: { rows: number; seed: number }) => {
+  let a = seed >>> 0;
+  const rand = () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const ids = ["a", "b", "c", "d"];
+  const strength = [2.2, 1.6, 1.0, 0.7];
+  const total = strength.reduce((s, w) => s + w, 0);
+  const pickWinner = () => {
+    let pick = rand() * total;
+    for (let i = 0; i < ids.length; i++) {
+      pick -= strength[i]!;
+      if (pick <= 0) return ids[i]!;
+    }
+    return ids[0]!;
+  };
+  const comparisons: PairwiseComparison[] = Array.from(
+    { length: rows },
+    () => ({
+      candidates: [...ids],
+      winner: pickWinner(),
+    }),
+  );
+  return computeBTLeaderboard({
+    comparisons,
+    variantIds: ids,
+    bootstrapSamples: 300,
+    seed,
+  });
+};
+
+/** Every unordered pair of the variants the fit is entitled to rank. */
+const rankedPairs = (lb: ReturnType<typeof fourWay>) => {
+  const ranked = lb.entries.filter((e) => !e.isDegenerate);
+  return ranked.flatMap((a, i) =>
+    ranked.slice(i + 1).map((b) => [a, b] as const),
+  );
+};
+
+/** The test this feature replaced: do the two marginal intervals miss? */
+const separatedByOverlap = (a: BTLeaderboardEntry, b: BTLeaderboardEntry) =>
+  !!a.scoreCI && !!b.scoreCI && !intervalsOverlap(a.scoreCI, b.scoreCI);
+
+/** Pairs the overlap test separates but the difference test does not. */
+const overlapPairsTheDifferenceMisses = (lb: ReturnType<typeof fourWay>) =>
+  rankedPairs(lb)
+    .filter(([a, b]) => separatedByOverlap(a, b))
+    .filter(
+      ([a, b]) =>
+        !areDistinguishable({ a, b, differenceCI: lb.scoreDifferenceCI }),
+    )
+    .map(([a, b]) => `${a.variantId}/${b.variantId}`);
+
+/** How many pairs each of the two tests calls apart, over one fit. */
+const countSeparations = (lb: ReturnType<typeof fourWay>) => {
+  let byOverlap = 0;
+  let byDifference = 0;
+  for (const [a, b] of rankedPairs(lb)) {
+    if (separatedByOverlap(a, b)) byOverlap++;
+    if (areDistinguishable({ a, b, differenceCI: lb.scoreDifferenceCI })) {
+      byDifference++;
+    }
+  }
+  return { byOverlap, byDifference };
+};
+
+describe("computeBTLeaderboard — the difference intervals it produces", () => {
   describe("given a fitted run", () => {
     it("never separates fewer pairs than comparing the intervals would", () => {
       // Mathematically the overlap test is the strictly stronger condition,
       // so anything it separates the difference must separate too. If this
       // ever fails the two are not measuring the same thing.
-      for (const seed of [1, 2, 3, 4, 5, 6]) {
+      for (const seed of SEEDS) {
         const lb = fourWay({ rows: 60, seed });
-        const ranked = lb.entries.filter((e) => !e.isDegenerate);
-        for (let i = 0; i < ranked.length; i++) {
-          for (let j = i + 1; j < ranked.length; j++) {
-            const A = ranked[i]!;
-            const B = ranked[j]!;
-            const byOverlap =
-              !!A.scoreCI &&
-              !!B.scoreCI &&
-              !intervalsOverlap(A.scoreCI, B.scoreCI);
-            if (!byOverlap) continue;
-            expect(
-              areDistinguishable({
-                a: A,
-                b: B,
-                differenceCI: lb.scoreDifferenceCI,
-              }),
-            ).toBe(true);
-          }
-        }
+        expect(overlapPairsTheDifferenceMisses(lb)).toEqual([]);
       }
     });
 
+    /** @scenario "A difference the run can see is not reported as a tie" */
     it("separates strictly more pairs than comparing the intervals", () => {
       // The reason for the change. Without it the run reports "too close to
       // call" on pairs it demonstrably resolved.
       let byOverlap = 0;
       let byDifference = 0;
-      for (const seed of [1, 2, 3, 4, 5, 6]) {
-        const lb = fourWay({ rows: 60, seed });
-        const ranked = lb.entries.filter((e) => !e.isDegenerate);
-        for (let i = 0; i < ranked.length; i++) {
-          for (let j = i + 1; j < ranked.length; j++) {
-            const A = ranked[i]!;
-            const B = ranked[j]!;
-            if (
-              !!A.scoreCI &&
-              !!B.scoreCI &&
-              !intervalsOverlap(A.scoreCI, B.scoreCI)
-            ) {
-              byOverlap++;
-            }
-            if (
-              areDistinguishable({
-                a: A,
-                b: B,
-                differenceCI: lb.scoreDifferenceCI,
-              })
-            ) {
-              byDifference++;
-            }
-          }
-        }
+      for (const seed of SEEDS) {
+        const counts = countSeparations(fourWay({ rows: 60, seed }));
+        byOverlap += counts.byOverlap;
+        byDifference += counts.byDifference;
       }
 
       expect(byDifference).toBeGreaterThan(byOverlap);

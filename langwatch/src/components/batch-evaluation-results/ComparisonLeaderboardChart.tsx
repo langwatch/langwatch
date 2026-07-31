@@ -30,6 +30,7 @@ import {
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { useDrawer } from "~/hooks/useDrawer";
 import { axisLabelProps, buildAxisLabels } from "./chartAxisLabels";
+import type { BTLeaderboard } from "./computeBTLeaderboard";
 import {
   computeLeaderboardVerdict,
   findCheaperTiedAlternative,
@@ -97,6 +98,161 @@ export type ComparisonLeaderboardChartProps = {
   judgeModel?: string | null;
 };
 
+/** The bars the compact card has room for, already labelled and coloured. */
+const buildCompactBars = ({
+  leaderboard,
+  column,
+  targetColors,
+}: {
+  leaderboard: BTLeaderboard;
+  column: BatchComparisonColumn;
+  targetColors?: Record<string, string>;
+}) => {
+  const nameById = new Map(column.variants.map((v) => [v.id, v.name]));
+  const names = leaderboard.entries.map(
+    (e) => nameById.get(e.variantId) ?? e.variantId,
+  );
+  const axis = axisLabelProps(
+    Math.min(leaderboard.entries.length, MAX_COMPACT_BARS),
+  );
+  const displayNames = buildAxisLabels(names, axis.maxLabelLength);
+  const fullNames = disambiguateNames(names);
+
+  const shown = leaderboard.entries.slice(0, MAX_COMPACT_BARS);
+  const chartData = shown.map((e, index) => ({
+    key: e.variantId,
+    name: displayNames[index] ?? e.variantId,
+    fullName: fullNames[index] ?? e.variantId,
+    score: e.score,
+    color:
+      targetColors?.[e.variantId] ??
+      VARIANT_COLORS[index % VARIANT_COLORS.length]!,
+  }));
+
+  return {
+    axis,
+    chartData,
+    hiddenCount: leaderboard.entries.length - shown.length,
+    yMax: Math.max(1, ...chartData.map((d) => Math.abs(d.score))),
+  };
+};
+
+const HEADLINE_COLORS = {
+  positive: "green.fg",
+  caution: "orange.fg",
+  neutral: "fg.muted",
+} as const;
+
+/** The card's title row and, under it, the one-sentence answer. */
+function LeaderboardCardHeader({
+  title,
+  headline,
+  onExpand,
+}: {
+  title: string;
+  headline: ReturnType<typeof formatLeaderboardHeadline>;
+  onExpand: () => void;
+}) {
+  return (
+    <>
+      <HStack justify="space-between" marginBottom={2}>
+        <Text fontSize="xs" fontWeight="medium" lineClamp={1} title={title}>
+          {title}
+        </Text>
+        {/* Always visible, just quiet. Revealing this only on hover made the
+            one route into the full leaderboard invisible until you happened to
+            mouse over the card — and unreachable altogether by keyboard or on
+            a touch screen, where there is no hover at all. Subdued by default,
+            full strength on hover or keyboard focus. */}
+        <IconButton
+          aria-label="Expand leaderboard"
+          size="2xs"
+          variant="ghost"
+          opacity={0.55}
+          _groupHover={{ opacity: 1 }}
+          _focusVisible={{ opacity: 1 }}
+          transition="opacity 0.15s"
+          onClick={onExpand}
+        >
+          <LuMaximize2 size={12} />
+        </IconButton>
+      </HStack>
+      <Text
+        fontSize="2xs"
+        fontWeight="semibold"
+        color={HEADLINE_COLORS[headline.tone]}
+        lineClamp={1}
+        marginBottom={1}
+        title={`${headline.heading} — ${headline.detail}`}
+      >
+        {headline.heading}
+      </Text>
+    </>
+  );
+}
+
+function LeaderboardBars({
+  bars,
+  chartHeight,
+}: {
+  bars: ReturnType<typeof buildCompactBars>;
+  chartHeight: number;
+}) {
+  const { chartData, yMax, axis } = bars;
+  return (
+    <ResponsiveContainer width="100%" height={chartHeight}>
+      <BarChart
+        data={chartData}
+        layout="vertical"
+        margin={{ left: 10, right: 20 }}
+      >
+        <CartesianGrid
+          horizontal={false}
+          vertical={true}
+          stroke="var(--chakra-colors-border)"
+          strokeDasharray="0"
+        />
+        <XAxis
+          type="number"
+          domain={[-yMax, yMax]}
+          style={{ fontSize: "11px" }}
+          tick={{ fill: "var(--chakra-colors-fg-muted)" }}
+          hide
+        />
+        <YAxis
+          type="category"
+          dataKey="name"
+          width={axis.maxLabelLength * 6 + 10}
+          style={{ fontSize: "11px" }}
+          tick={{ fill: "var(--chakra-colors-fg-muted)" }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip
+          cursor={{ fill: "var(--chakra-colors-bg-muted)" }}
+          contentStyle={{
+            background: "var(--chakra-colors-bg-panel)",
+            border: "1px solid var(--chakra-colors-border)",
+            borderRadius: 6,
+            fontSize: 12,
+          }}
+          formatter={(value) => [(value as number).toFixed(2), "BT score"]}
+          labelFormatter={(label, payload) =>
+            (payload?.[0]?.payload as { fullName?: string } | undefined)
+              ?.fullName ?? label
+          }
+        />
+        <Bar dataKey="score" name="BT score" radius={[0, 4, 4, 0]}>
+          <LabelList dataKey="score" content={ScoreValueLabel} />
+          {chartData.map((d) => (
+            <Cell key={d.key} fill={d.color} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
 export function ComparisonLeaderboardChart({
   column,
   rows,
@@ -117,32 +273,7 @@ export function ComparisonLeaderboardChart({
   // it twice was a visible pause when the drawer opened.
   const leaderboard = useBTLeaderboard({ column, variantIds });
 
-  const nameById = new Map(column.variants.map((v) => [v.id, v.name]));
-  const axis = axisLabelProps(
-    Math.min(leaderboard.entries.length, MAX_COMPACT_BARS),
-  );
-  const displayNames = buildAxisLabels(
-    leaderboard.entries.map((e) => nameById.get(e.variantId) ?? e.variantId),
-    axis.maxLabelLength,
-  );
-  const fullNames = disambiguateNames(
-    leaderboard.entries.map((e) => nameById.get(e.variantId) ?? e.variantId),
-  );
-
-  const shown = leaderboard.entries.slice(0, MAX_COMPACT_BARS);
-  const hiddenCount = leaderboard.entries.length - shown.length;
-
-  const chartData = shown.map((e, index) => ({
-    key: e.variantId,
-    name: displayNames[index] ?? e.variantId,
-    fullName: fullNames[index] ?? e.variantId,
-    score: e.score,
-    color:
-      targetColors?.[e.variantId] ??
-      VARIANT_COLORS[index % VARIANT_COLORS.length]!,
-  }));
-
-  const yMax = Math.max(1, ...chartData.map((d) => Math.abs(d.score)));
+  const bars = buildCompactBars({ leaderboard, column, targetColors });
 
   // The conclusion, on the card itself. Bars alone leave the reader to
   // eyeball whether the tallest one is meaningfully ahead, which is exactly
@@ -172,12 +303,6 @@ export function ComparisonLeaderboardChart({
     cheaperAlternative,
     variantNames,
   });
-  const headlineColor =
-    headline.tone === "positive"
-      ? "green.fg"
-      : headline.tone === "caution"
-        ? "orange.fg"
-        : "fg.muted";
 
   const onExpand = () => {
     // Passed straight through openDrawer (not a separate setComplexProps
@@ -209,101 +334,20 @@ export function ComparisonLeaderboardChart({
       data-testid={`chart-leaderboard-${column.evaluatorId}`}
       role="group"
     >
-      <HStack justify="space-between" marginBottom={2}>
-        <Text
-          fontSize="xs"
-          fontWeight="medium"
-          lineClamp={1}
-          title={`${column.name} — leaderboard`}
-        >
-          {column.name} — leaderboard
-        </Text>
-        {/* Always visible, just quiet. Revealing this only on hover made the
-            one route into the full leaderboard invisible until you happened to
-            mouse over the card — and unreachable altogether by keyboard or on
-            a touch screen, where there is no hover at all. Subdued by default,
-            full strength on hover or keyboard focus. */}
-        <IconButton
-          aria-label="Expand leaderboard"
-          size="2xs"
-          variant="ghost"
-          opacity={0.55}
-          _groupHover={{ opacity: 1 }}
-          _focusVisible={{ opacity: 1 }}
-          transition="opacity 0.15s"
-          onClick={onExpand}
-        >
-          <LuMaximize2 size={12} />
-        </IconButton>
-      </HStack>
-      <Text
-        fontSize="2xs"
-        fontWeight="semibold"
-        color={headlineColor}
-        lineClamp={1}
-        marginBottom={1}
-        title={`${headline.heading} — ${headline.detail}`}
-      >
-        {headline.heading}
-      </Text>
-      <ResponsiveContainer width="100%" height={chartHeight}>
-        <BarChart
-          data={chartData}
-          layout="vertical"
-          margin={{ left: 10, right: 20 }}
-        >
-          <CartesianGrid
-            horizontal={false}
-            vertical={true}
-            stroke="var(--chakra-colors-border)"
-            strokeDasharray="0"
-          />
-          <XAxis
-            type="number"
-            domain={[-yMax, yMax]}
-            style={{ fontSize: "11px" }}
-            tick={{ fill: "var(--chakra-colors-fg-muted)" }}
-            hide
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={axis.maxLabelLength * 6 + 10}
-            style={{ fontSize: "11px" }}
-            tick={{ fill: "var(--chakra-colors-fg-muted)" }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip
-            cursor={{ fill: "var(--chakra-colors-bg-muted)" }}
-            contentStyle={{
-              background: "var(--chakra-colors-bg-panel)",
-              border: "1px solid var(--chakra-colors-border)",
-              borderRadius: 6,
-              fontSize: 12,
-            }}
-            formatter={(value) => [(value as number).toFixed(2), "BT score"]}
-            labelFormatter={(label, payload) =>
-              (payload?.[0]?.payload as { fullName?: string } | undefined)
-                ?.fullName ?? label
-            }
-          />
-          <Bar dataKey="score" name="BT score" radius={[0, 4, 4, 0]}>
-            <LabelList dataKey="score" content={ScoreValueLabel} />
-            {chartData.map((d) => (
-              <Cell key={d.key} fill={d.color} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-      {hiddenCount > 0 ? (
+      <LeaderboardCardHeader
+        title={`${column.name} — leaderboard`}
+        headline={headline}
+        onExpand={onExpand}
+      />
+      <LeaderboardBars bars={bars} chartHeight={chartHeight} />
+      {bars.hiddenCount > 0 ? (
         <Text
           fontSize="2xs"
           color="fg.muted"
           textAlign="center"
           paddingBottom={1}
         >
-          +{hiddenCount} more — expand for the full leaderboard
+          +{bars.hiddenCount} more — expand for the full leaderboard
         </Text>
       ) : null}
     </Box>

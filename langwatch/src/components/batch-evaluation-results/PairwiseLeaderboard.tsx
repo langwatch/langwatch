@@ -338,6 +338,110 @@ function WarnBanner({
   );
 }
 
+/** The head-to-head record behind one cell, and how it reads aloud. */
+const matchupOf = ({
+  winMatrix,
+  variantNames,
+  rowId,
+  colId,
+}: {
+  winMatrix: BTLeaderboard["winMatrix"];
+  variantNames: Record<string, string>;
+  rowId: string;
+  colId: string;
+}) => {
+  const wins = winMatrix[rowId]?.[colId] ?? 0;
+  const losses = winMatrix[colId]?.[rowId] ?? 0;
+  const total = wins + losses;
+  const rate = total > 0 ? wins / total : null;
+  const pair = `${variantNames[rowId] ?? rowId} vs ${variantNames[colId] ?? colId}`;
+  const summary =
+    rate === null
+      ? "No matchups"
+      : `${wins} wins / ${total} matchups (${Math.round(rate * 100)}%)`;
+  return { wins, total, rate, pair, summary };
+};
+
+const focusableCellProps = ({
+  rowId,
+  colId,
+  onCellClick,
+}: {
+  rowId: string;
+  colId: string;
+  onCellClick: (rowVariantId: string, colVariantId: string) => void;
+}) => ({
+  role: "button",
+  tabIndex: 0,
+  onKeyDown: (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onCellClick(rowId, colId);
+    }
+  },
+  _focusVisible: {
+    outline: "2px solid",
+    outlineColor: "blue.focusRing",
+  },
+});
+
+/** One head-to-head cell: how often the row variant beat the column variant. */
+function WinMatrixCell({
+  winMatrix,
+  variantNames,
+  rowId,
+  colId,
+  onCellClick,
+}: {
+  winMatrix: BTLeaderboard["winMatrix"];
+  variantNames: Record<string, string>;
+  rowId: string;
+  colId: string;
+  onCellClick?: (rowVariantId: string, colVariantId: string) => void;
+}) {
+  if (rowId === colId) {
+    return (
+      <Table.Cell textAlign="center" color="fg.muted">
+        —
+      </Table.Cell>
+    );
+  }
+
+  const { wins, total, rate, pair, summary } = matchupOf({
+    winMatrix,
+    variantNames,
+    rowId,
+    colId,
+  });
+  const onClick = total > 0 ? onCellClick : undefined;
+
+  return (
+    <Table.Cell
+      textAlign="center"
+      bg={heatmapBg(rate)}
+      cursor={onClick ? "pointer" : undefined}
+      onClick={onClick ? () => onClick(rowId, colId) : undefined}
+      // Only the cells that actually do something are focus stops. Making every
+      // cell tabbable would put an N×N grid of dead targets in the tab order —
+      // worse than no keyboard support, because it buries the real ones.
+      {...(onClick
+        ? focusableCellProps({ rowId, colId, onCellClick: onClick })
+        : {})}
+      // The visible cell is a bare number, which tells a screen reader nothing
+      // about whose matchup it is or that activating it opens the judge's
+      // reasoning.
+      aria-label={
+        onClick
+          ? `${pair}: ${summary}. Show the judge's reasoning.`
+          : `${pair}: ${summary}`
+      }
+      title={summary}
+    >
+      {total === 0 ? "—" : wins}
+    </Table.Cell>
+  );
+}
+
 function WinMatrixHeatmap({
   leaderboard,
   variantNames,
@@ -404,72 +508,16 @@ function WinMatrixHeatmap({
                 <Table.Cell fontWeight="medium">
                   {variantNames[rowId] ?? rowId}
                 </Table.Cell>
-                {ids.map((colId) => {
-                  if (rowId === colId) {
-                    return (
-                      <Table.Cell
-                        key={colId}
-                        textAlign="center"
-                        color="fg.muted"
-                      >
-                        —
-                      </Table.Cell>
-                    );
-                  }
-                  const w = leaderboard.winMatrix[rowId]?.[colId] ?? 0;
-                  const l = leaderboard.winMatrix[colId]?.[rowId] ?? 0;
-                  const total = w + l;
-                  const rate = total > 0 ? w / total : null;
-                  const clickable = total > 0 && !!onCellClick;
-                  const rowName = variantNames[rowId] ?? rowId;
-                  const colName = variantNames[colId] ?? colId;
-                  const summary =
-                    rate === null
-                      ? "No matchups"
-                      : `${w} wins / ${total} matchups (${Math.round(rate * 100)}%)`;
-                  return (
-                    <Table.Cell
-                      key={colId}
-                      textAlign="center"
-                      bg={heatmapBg(rate)}
-                      cursor={clickable ? "pointer" : undefined}
-                      onClick={
-                        clickable ? () => onCellClick!(rowId, colId) : undefined
-                      }
-                      // Only the cells that actually do something are focus
-                      // stops. Making every cell tabbable would put an N×N grid
-                      // of dead targets in the tab order — worse than no
-                      // keyboard support, because it buries the real ones.
-                      {...(clickable
-                        ? {
-                            role: "button",
-                            tabIndex: 0,
-                            onKeyDown: (e: React.KeyboardEvent) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                onCellClick!(rowId, colId);
-                              }
-                            },
-                            _focusVisible: {
-                              outline: "2px solid",
-                              outlineColor: "blue.focusRing",
-                            },
-                          }
-                        : {})}
-                      // The visible cell is a bare number, which tells a screen
-                      // reader nothing about whose matchup it is or that
-                      // activating it opens the judge's reasoning.
-                      aria-label={
-                        clickable
-                          ? `${rowName} vs ${colName}: ${summary}. Show the judge's reasoning.`
-                          : `${rowName} vs ${colName}: ${summary}`
-                      }
-                      title={summary}
-                    >
-                      {total === 0 ? "—" : w}
-                    </Table.Cell>
-                  );
-                })}
+                {ids.map((colId) => (
+                  <WinMatrixCell
+                    key={colId}
+                    winMatrix={leaderboard.winMatrix}
+                    variantNames={variantNames}
+                    rowId={rowId}
+                    colId={colId}
+                    onCellClick={onCellClick}
+                  />
+                ))}
               </Table.Row>
             ))}
           </Table.Body>

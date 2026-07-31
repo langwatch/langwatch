@@ -114,6 +114,7 @@ const separatedPairs = () => {
 
 describe("the panels agree on which pairs were separated", () => {
   describe("given a run where the difference test and the overlap test disagree", () => {
+    /** @scenario "Every panel agrees on which pairs were separated" */
     it("separates exactly the pairs the shared test says it does", () => {
       // Sanity: if this fixture ever stops exercising the divergence, the
       // agreement checks below become vacuous.

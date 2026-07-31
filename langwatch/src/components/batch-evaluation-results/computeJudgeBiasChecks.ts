@@ -66,6 +66,25 @@ const meanOf = (values: number[]): number | null =>
     ? null
     : values.reduce((sum, v) => sum + v, 0) / values.length;
 
+/** Mean output length for one variant, over the rows it answered with text. */
+const meanOutputLength = ({
+  rows,
+  variantId,
+}: {
+  rows: BatchResultRow[];
+  variantId: string;
+}): number | null => {
+  const lengths: number[] = [];
+  for (const row of rows) {
+    const target = row.targets[variantId];
+    if (!target || target.error) continue;
+    const text = extractOutputText(target.output);
+    if (typeof text !== "string" || text.length === 0) continue;
+    lengths.push(text.length);
+  }
+  return meanOf(lengths);
+};
+
 /**
  * Mean answer length per variant, and how the leader compares to the rest.
  *
@@ -83,17 +102,8 @@ export const computeVerbosityProfile = ({
   leaderId: string | null;
 }): VerbosityProfile => {
   const meanLengthByVariant: Record<string, number | null> = {};
-
   for (const variantId of variantIds) {
-    const lengths: number[] = [];
-    for (const row of rows) {
-      const target = row.targets[variantId];
-      if (!target || target.error) continue;
-      const text = extractOutputText(target.output);
-      if (typeof text !== "string" || text.length === 0) continue;
-      lengths.push(text.length);
-    }
-    meanLengthByVariant[variantId] = meanOf(lengths);
+    meanLengthByVariant[variantId] = meanOutputLength({ rows, variantId });
   }
 
   const leaderMeanLength = leaderId

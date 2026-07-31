@@ -31,6 +31,7 @@ import type {
   BatchComparisonColumn,
   BatchEvaluationData,
   BatchResultRow,
+  BatchTargetColumn,
   ComparisonRunData,
 } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
@@ -314,6 +315,77 @@ export const computeRunMetrics = (
   };
 };
 
+/**
+ * Which model each target ran on, and which model judged each comparison.
+ *
+ * Evaluators are keyed under BOTH ids on purpose. detectComparisonColumns keys
+ * a column-style comparison by its TARGET id, while an inline evaluator is
+ * keyed by its config id — so `column.evaluatorId` is one or the other
+ * depending on how the comparison was authored. Indexing only the config id
+ * silently missed every column-style comparison, which is the shape the
+ * workbench actually creates.
+ */
+const collectRunModels = (targetColumns: BatchTargetColumn[]) => {
+  const modelByTargetId: Record<string, string | null> = {};
+  const judgeModelByEvaluatorId: Record<string, string | null> = {};
+  for (const target of targetColumns) {
+    const model = target.model ?? null;
+    modelByTargetId[target.id] = model;
+    if (target.type !== "evaluator") continue;
+    judgeModelByEvaluatorId[target.id] = model;
+    if (target.evaluatorId) judgeModelByEvaluatorId[target.evaluatorId] = model;
+  }
+  return { modelByTargetId, judgeModelByEvaluatorId };
+};
+
+/** One metric entry per evaluator — its own score or pass-rate chart. */
+const perEvaluatorMetrics = ({
+  evaluators,
+  type,
+  idPrefix,
+  label,
+}: {
+  evaluators: { id: string; name: string }[];
+  type: MetricDefinition["type"];
+  idPrefix: string;
+  label: string;
+}): MetricDefinition[] =>
+  evaluators.map((ev) => ({
+    id: `${idPrefix}_${ev.id}` as MetricType,
+    name: `${ev.name} (${label})`,
+    type,
+    evaluatorId: ev.id,
+  }));
+
+/**
+ * Win-rate and Bradley-Terry leaderboard entries for the comparison columns,
+ * so both toggle through the same Metrics visibility system as their siblings
+ * (Cost / Latency / Score / Pass Rate).
+ *
+ * The leaderboard (#5103) is only meaningful at 3+ variants; a 2-variant
+ * comparison is already a plain win-rate story, which the win-rate chart
+ * already tells. Additive to that chart, never a replacement, so both are
+ * offered for a 3+ comparison.
+ */
+const comparisonMetrics = (
+  columns: BatchComparisonColumn[],
+): MetricDefinition[] => [
+  ...columns.map((column) => ({
+    id: `comparison_${column.evaluatorId}` as MetricType,
+    name: `${column.name} (Win Rate)`,
+    type: "comparison" as const,
+    evaluatorId: column.evaluatorId,
+  })),
+  ...columns
+    .filter((column) => column.variants.length >= 3)
+    .map((column) => ({
+      id: `leaderboard_${column.evaluatorId}` as MetricType,
+      name: `${column.name} (Leaderboard)`,
+      type: "leaderboard" as const,
+      evaluatorId: column.evaluatorId,
+    })),
+];
+
 export const ComparisonCharts = ({
   comparisonData,
   isVisible: controlledVisible,
@@ -355,26 +427,10 @@ export const ComparisonCharts = ({
    * itself, which is exactly the kind of quiet misattribution this panel
    * exists to prevent.
    */
-  const modelsFromRun = useMemo(() => {
-    const modelByTargetId: Record<string, string | null> = {};
-    const judgeModelByEvaluatorId: Record<string, string | null> = {};
-    for (const target of comparisonData[0]?.data?.targetColumns ?? []) {
-      modelByTargetId[target.id] = target.model ?? null;
-      if (target.type === "evaluator") {
-        // Keyed under BOTH ids on purpose. detectComparisonColumns keys a
-        // column-style comparison by its TARGET id, while an inline
-        // evaluator is keyed by its config id — so `column.evaluatorId` is
-        // one or the other depending on how the comparison was authored.
-        // Indexing only the config id silently missed every column-style
-        // comparison, which is the shape the workbench actually creates.
-        judgeModelByEvaluatorId[target.id] = target.model ?? null;
-        if (target.evaluatorId) {
-          judgeModelByEvaluatorId[target.evaluatorId] = target.model ?? null;
-        }
-      }
-    }
-    return { modelByTargetId, judgeModelByEvaluatorId };
-  }, [comparisonData]);
+  const modelsFromRun = useMemo(
+    () => collectRunModels(comparisonData[0]?.data?.targetColumns ?? []),
+    [comparisonData],
+  );
   // Determine default visibility based on target count
   const shouldShowByDefault = useMemo(() => {
     if (defaultVisible !== undefined) return defaultVisible;
@@ -839,60 +895,26 @@ export const ComparisonCharts = ({
   }, [runMetrics]);
 
   // Build available metrics list
-  const availableMetrics: MetricDefinition[] = useMemo(() => {
-    const metrics: MetricDefinition[] = [
+  const availableMetrics: MetricDefinition[] = useMemo(
+    () => [
       { id: "cost", name: "Total Cost", type: "cost" },
       { id: "latency", name: "Avg Latency", type: "latency" },
-    ];
-
-    // Add per-evaluator score metrics
-    for (const ev of scoreEvaluators) {
-      metrics.push({
-        id: `score_${ev.id}` as MetricType,
-        name: `${ev.name} (Score)`,
+      ...perEvaluatorMetrics({
+        evaluators: scoreEvaluators,
         type: "score",
-        evaluatorId: ev.id,
-      });
-    }
-
-    // Add per-evaluator pass rate metrics
-    for (const ev of passRateEvaluators) {
-      metrics.push({
-        id: `pass_${ev.id}` as MetricType,
-        name: `${ev.name} (Pass Rate)`,
+        idPrefix: "score",
+        label: "Score",
+      }),
+      ...perEvaluatorMetrics({
+        evaluators: passRateEvaluators,
         type: "passRate",
-        evaluatorId: ev.id,
-      });
-    }
-
-    // Add per-comparison-evaluator win-rate metrics so users can toggle
-    // win-rate charts through the same Metrics visibility system as their
-    // siblings (Cost / Latency / Score / Pass Rate).
-    for (const column of comparisonColumns ?? []) {
-      metrics.push({
-        id: `comparison_${column.evaluatorId}` as MetricType,
-        name: `${column.name} (Win Rate)`,
-        type: "comparison",
-        evaluatorId: column.evaluatorId,
-      });
-    }
-
-    // Bradley-Terry leaderboard (#5103) — only meaningful at 3+ variants; a
-    // 2-variant comparison is already a plain win-rate story, which the
-    // win-rate chart above already tells. Additive to that chart, never a
-    // replacement, so both are offered for a 3+ comparison.
-    for (const column of comparisonColumns ?? []) {
-      if (column.variants.length < 3) continue;
-      metrics.push({
-        id: `leaderboard_${column.evaluatorId}` as MetricType,
-        name: `${column.name} (Leaderboard)`,
-        type: "leaderboard",
-        evaluatorId: column.evaluatorId,
-      });
-    }
-
-    return metrics;
-  }, [scoreEvaluators, passRateEvaluators, comparisonColumns]);
+        idPrefix: "pass",
+        label: "Pass Rate",
+      }),
+      ...comparisonMetrics(comparisonColumns ?? []),
+    ],
+    [scoreEvaluators, passRateEvaluators, comparisonColumns],
+  );
 
   // Show every metric the run offers, including ones that appear later.
   //
