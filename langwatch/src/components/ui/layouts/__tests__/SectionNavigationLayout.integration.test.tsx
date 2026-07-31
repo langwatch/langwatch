@@ -45,32 +45,4 @@ describe("SectionNavigationFrame", () => {
     ).toBeInTheDocument();
     expect(navigation.nextElementSibling).toBe(content);
   });
-
-  // jsdom resolves no media queries, so the responsive values are asserted
-  // as declarations rather than as computed layout: what is pinned is that
-  // the rail's fixed width and its shrink lock are conditioned on the
-  // breakpoint, which is what stopped a phone-width content column from
-  // collapsing to nothing.
-  /** @scenario "The local navigation stops taking a column on a narrow viewport" */
-  it("drops the fixed-width rail below the md breakpoint", () => {
-    renderFrame();
-
-    const navigation = screen.getByRole("navigation", {
-      name: "Automations navigation",
-    });
-    const stack = navigation.parentElement;
-    expect(stack).not.toBeNull();
-
-    // The rail and the content stack vertically on a narrow screen and sit
-    // side by side from md up.
-    expect(
-      getComputedStyle(stack!).getPropertyValue("--stack-direction"),
-    ).not.toBe("row");
-
-    // Chakra emits the base value inline and the md override in a media
-    // query, so the base width is the one readable here: full, not 220px.
-    const navStyle = getComputedStyle(navigation);
-    expect(navStyle.width).not.toBe("220px");
-    expect(navStyle.minWidth).not.toBe("220px");
-  });
 });

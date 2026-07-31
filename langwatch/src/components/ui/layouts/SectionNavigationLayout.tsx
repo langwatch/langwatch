@@ -108,6 +108,7 @@ export function SectionNavigationFrame({
               {sectionLabel}
             </Text>
             <Stack
+              data-testid="section-navigation-links"
               direction={{ base: "row", md: "column" }}
               alignItems="stretch"
               gap={1}
