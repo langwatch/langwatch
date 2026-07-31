@@ -440,12 +440,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
    * press needs an answer of its own.
    */
   const reportInvalid = useCallback((errors: FieldErrors<ScenarioFormData>) => {
-    const messages = Object.values(errors)
-      .map((error) => (error as { message?: string } | undefined)?.message)
-      .filter((message): message is string => !!message);
+    // Only the messages this form authored. A server-set field error is put
+    // there by applyHandledErrorToForm, which already renders it at its field,
+    // and its text is copy we did not write — so it never becomes the summary.
+    const fieldMessages = Object.values(errors)
+      .filter((entry) => (entry as { type?: string } | undefined)?.type !== "server")
+      .map((entry) => (entry as { message?: string } | undefined)?.message)
+      .filter((text): text is string => !!text);
     toaster.create({
       title: "Check the highlighted fields",
-      description: messages[0] ?? "Some values need fixing before saving.",
+      description: fieldMessages[0] ?? "Some values need fixing before saving.",
       type: "warning",
       meta: { closable: true },
     });
