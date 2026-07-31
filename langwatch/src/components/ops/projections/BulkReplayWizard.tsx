@@ -440,9 +440,9 @@ export function BulkReplayWizard({
                         marginTop={1}
                         marginLeft={6}
                       >
-                        For targets that were truncated or swapped empty. Off,
-                        the run resumes and skips whatever an earlier run
-                        finished.
+                        Clears replay markers first. Use it when the target
+                        table was truncated or swapped empty; otherwise the run
+                        resumes and skips finished aggregates.
                       </Text>
                     </Box>
                     <HStack gap={2}>

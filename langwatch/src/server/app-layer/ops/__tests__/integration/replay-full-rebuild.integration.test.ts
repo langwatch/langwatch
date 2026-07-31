@@ -248,7 +248,7 @@ async function startAndAwaitReplay(params: {
   return opsReplay.getStatus();
 }
 
-describe("given a completed replay marker that survived an aborted run", () => {
+describe("given identical span history for tenants whose rollup is empty", () => {
   beforeAll(async () => {
     await startTestContainers();
     client = getTestClickHouseClient()!;
