@@ -37,7 +37,11 @@ const secured = createServiceApp({ basePath: "/api/export/batch-run-report" });
 
 secured
   .access(
-    handlerManagedAuth("user session + scenarios:view enforced in-handler"),
+    handlerManagedAuth({
+      reason: "user session + scenarios:view enforced in-handler",
+      permissions: ["scenarios:view"],
+      credential: "session",
+    }),
   )
   .post(
     "/download",
