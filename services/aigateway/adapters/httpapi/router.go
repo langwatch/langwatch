@@ -391,12 +391,14 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		r.Body = http.MaxBytesReader(w, r.Body, maxTranscriptionBodyBytes)
+		if err := prepareRequestBody(w, r, maxTranscriptionBodyBytes); err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
 		// Memory threshold: files up to 10 MB stay in memory, larger ones
 		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
+			if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
 				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
 					"message": "audio upload exceeds the 25 MB transcription limit",
 				}))
@@ -690,15 +692,13 @@ func readFullBody(logger *zap.Logger, w http.ResponseWriter, r *http.Request, ma
 	if maxBytes <= 0 {
 		maxBytes = config.DefaultMaxRequestBodyBytes
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		writeError(logger, w, ctx, err)
+		return nil, false
+	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		code := domain.ErrBadRequest
-		var mbe *http.MaxBytesError
-		if errors.As(err, &mbe) {
-			code = domain.ErrPayloadTooLarge
-		}
-		writeError(logger, w, ctx, herr.New(ctx, code, nil))
+		writeError(logger, w, ctx, herr.New(ctx, bodyReadErrorCode(err), herr.M{"message": err.Error()}))
 		return nil, false
 	}
 	return body, true
@@ -713,13 +713,25 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 	if maxBytes <= 0 {
 		maxBytes = config.DefaultMaxRequestBodyBytes
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		writeError(clog.Get(r.Context()), w, r.Context(), err)
+		return nil, nil, func() {}, false
+	}
 
-	buf := bodyPool.Get().(*bytes.Buffer)
 	peeked := make([]byte, peekSize)
-	n, _ := io.ReadFull(r.Body, peeked)
+	n, err := io.ReadFull(r.Body, peeked)
+	// A body shorter than the peek window is the normal case and reports EOF.
+	// Any other failure comes from the decoder or one of the size ceilings, and
+	// swallowing it would peek at a truncated payload and then surface the real
+	// cause as a downstream application error instead of a 400 / 413.
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		writeError(clog.Get(r.Context()), w, r.Context(),
+			herr.New(r.Context(), bodyReadErrorCode(err), herr.M{"message": err.Error()}))
+		return nil, nil, func() {}, false
+	}
 	peeked = peeked[:n]
 
+	buf := bodyPool.Get().(*bytes.Buffer)
 	body := io.MultiReader(bytes.NewReader(peeked), r.Body)
 
 	// Since we need to materialize for bifrost anyway, we still use the pool
@@ -729,6 +741,7 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 
 	var once sync.Once
 	materializedBody := &lazyPooledBody{
+		ctx:    r.Context(),
 		reader: body,
 		buf:    buf,
 		release: func() {
@@ -743,6 +756,7 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 }
 
 type lazyPooledBody struct {
+	ctx     context.Context
 	reader  io.Reader
 	buf     *bytes.Buffer
 	release func()
@@ -752,6 +766,16 @@ func (l *lazyPooledBody) Read(p []byte) (n int, err error) {
 	n, err = l.reader.Read(p)
 	if n > 0 {
 		l.buf.Write(p[:n])
+	}
+	// This reader is handed to the application pipeline, which materializes it
+	// well past the transport. The rest of the body can still fail there — a
+	// decoded payload only crosses its ceiling once enough of it has been read
+	// — and an unclassified error at that depth answers 500 instead of the
+	// 400 / 413 the transport already knows the request earned. Classifying it
+	// as a herr here keeps that answer intact: MaterializeBody wraps with %w,
+	// so writeError still unwraps to the gateway code.
+	if err != nil && !errors.Is(err, io.EOF) {
+		return n, herr.New(l.ctx, bodyReadErrorCode(err), herr.M{"message": err.Error()})
 	}
 	return n, err
 }

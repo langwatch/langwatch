@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchEvaluationResultsTable } from "../BatchEvaluationResultsTable";
-import type { BatchEvaluationData } from "../types";
+import type { BatchEvaluationData, ComparisonRunData } from "../types";
 
 // Mock the drawer hook
 vi.mock("~/hooks/useDrawer", () => ({
@@ -429,6 +429,172 @@ describe("BatchEvaluationResultsTable", () => {
       // Both columns and their values should be visible
       expect(screen.getByText("row-123")).toBeInTheDocument();
       expect(screen.getByText("Test input")).toBeInTheDocument();
+    });
+  });
+
+  describe("when changing visible result fields", () => {
+    /** @scenario Hide scores to focus on outputs */
+    it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          showEvaluations={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // The output is rendered as JSON, so it is matched via its "response" field.
+      expect(screen.getByText(/response/)).toBeInTheDocument();
+      expect(screen.queryByText("Exact Match")).not.toBeInTheDocument();
+    });
+
+    /** @scenario Hide outputs to focus on scores */
+    it("hides outputs but keeps evaluator chips when showOutputs is false", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          showOutputs={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("Exact Match")).toBeInTheDocument();
+      expect(screen.queryByText(/response/)).not.toBeInTheDocument();
+    });
+
+    /** @scenario Hide cost and latency to reduce clutter */
+    it("hides cost and latency but keeps output when showCostAndLatency is false", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          showCostAndLatency={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText(/response/)).toBeInTheDocument();
+      expect(screen.queryByTestId("cost-target-1")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("latency-target-1")).not.toBeInTheDocument();
+    });
+
+    /** @scenario Hide the target column when no fields are shown */
+    it("removes the target column when all fields are off", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          showOutputs={false}
+          showEvaluations={false}
+          showCostAndLatency={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+      expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
+    });
+  });
+
+  describe("when changing visible result fields in comparison mode", () => {
+    const createComparisonRuns = (): ComparisonRunData[] => [
+      {
+        runId: "run-a",
+        runName: "Run A",
+        color: "#3182ce",
+        data: createTestData({ runId: "run-a" }),
+        isLoading: false,
+      },
+      {
+        runId: "run-b",
+        runName: "Run B",
+        color: "#dd6b20",
+        data: createTestData({ runId: "run-b" }),
+        isLoading: false,
+      },
+    ];
+
+    /** @scenario Hide scores to focus on outputs */
+    it("hides evaluator chips but keeps outputs when showEvaluations is false", () => {
+      render(
+        <BatchEvaluationResultsTable
+          data={null}
+          comparisonData={createComparisonRuns()}
+          showEvaluations={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getAllByText(/response/).length).toBeGreaterThan(0);
+      expect(screen.queryAllByText("Exact Match")).toHaveLength(0);
+    });
+
+    /** @scenario Hide outputs to focus on scores */
+    it("hides outputs but keeps evaluator chips when showOutputs is false", () => {
+      render(
+        <BatchEvaluationResultsTable
+          data={null}
+          comparisonData={createComparisonRuns()}
+          showOutputs={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getAllByText("Exact Match").length).toBeGreaterThan(0);
+      expect(screen.queryAllByText(/response/)).toHaveLength(0);
+    });
+
+    /** @scenario Hide the target column when no fields are shown */
+    it("removes the target column when all fields are off", () => {
+      render(
+        <BatchEvaluationResultsTable
+          data={null}
+          comparisonData={createComparisonRuns()}
+          showOutputs={false}
+          showEvaluations={false}
+          showCostAndLatency={false}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+      expect(screen.getAllByText("What is 2+2?").length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when changing row height", () => {
+    /** @scenario Increase row height to see more of a long output before expanding */
+    it("threads the selected tier down to each cell", () => {
+      const data = createTestData();
+
+      render(
+        <BatchEvaluationResultsTable
+          data={data}
+          rowHeight="l"
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(
+        screen.getByText("What is 2+2?").closest("[data-row-height]"),
+      ).toHaveAttribute("data-row-height", "l");
+      expect(
+        screen.getByText(/response/).closest("[data-row-height]"),
+      ).toHaveAttribute("data-row-height", "l");
     });
   });
 });

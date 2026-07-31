@@ -13,6 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
 import { buildSlimTimeseriesQuery } from "../query-builders/slim-timeseries-query";
 
@@ -147,6 +148,18 @@ describe("buildSlimTimeseriesQuery", () => {
     expect(sql).toMatch(/ta\.TenantId\s*=\s*\{tenantId:String\}/);
   });
 
+  /**
+   * The fold's store writes a row for every state it is handed, including one
+   * whose only signal is a topic or an annotation, because that is what makes
+   * an absent row proof the trace was never committed. Every row on this table
+   * counts as A TRACE to the aggregates below, so this predicate is the only
+   * thing standing between the always-write row and the product's numbers.
+   */
+  /** @scenario absence is authoritative because nothing is ever gated out */
+  it("keeps dimension-only rows out via the has-signal predicate", () => {
+    expect(sql).toContain(TRACE_ANALYTICS_HAS_SIGNAL_SQL);
+  });
+
   it("filters on the partition column OccurredAt for partition pruning", () => {
     expect(sql).toContain("OccurredAt >= {currentStart:DateTime64(3)}");
     expect(sql).toContain("OccurredAt >= {previousStart:DateTime64(3)}");
@@ -157,25 +170,20 @@ describe("buildSlimTimeseriesQuery", () => {
   });
 
   describe("when grouped by metadata.model", () => {
-    const modelGrouped = buildSlimTimeseriesQuery({
-      projectId: "tenant-slim",
-      ...baseDates,
-      series: [{ metric: "performance.total_cost", aggregation: "sum" }],
-      groupBy: "metadata.model",
-      timeScale: 1440,
-    });
-
-    // Byte-for-byte the expression legacy uses in
-    // `aggregation-builder.ts`'s `metadata.model` field definition, so a
-    // routed query buckets multi-model traces identically to trace_summaries.
-    it("arrayJoins the per-trace Models[] exactly as legacy does", () => {
-      expect(modelGrouped.sql).toContain(
-        "arrayJoin(if(empty(ta.Models), ['unknown'], ta.Models))",
-      );
-    });
-
-    it("omits HAVING group_key != '' because the expression already yields 'unknown' (legacy handlesUnknown: true)", () => {
-      expect(modelGrouped.sql).not.toContain("HAVING");
+    // Model group-bys need per-SPAN attribution (the legacy builder's
+    // span-model partition join) so buckets sum exactly to the ungrouped
+    // totals. Slim has no span data: the router must never send model
+    // group-bys here, and the builder throws as the backstop.
+    it("throws: the router should have routed model group-bys to trace_summaries", () => {
+      expect(() =>
+        buildSlimTimeseriesQuery({
+          projectId: "tenant-slim",
+          ...baseDates,
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          groupBy: "metadata.model",
+          timeScale: 1440,
+        }),
+      ).toThrow(/cannot group by "metadata\.model"/);
     });
 
     it("still emits HAVING for group-bys legacy filters, e.g. topics", () => {

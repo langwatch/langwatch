@@ -945,3 +945,92 @@ podAffinity:
     {{- .Values.clickhouse.external.cluster -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+  Security contexts: a per-component override LAYERS onto the hardened global
+  default. The operator's key wins; every key they do not mention keeps its
+  default. Overriding one field is therefore never a way to drop the others.
+
+  Use mustMergeOverwrite, not coalesce: coalesce is all-or-nothing, taking the
+  component map whole as soon as it is non-empty, which makes a partial
+  override behave as a full replacement. deepCopy because mustMergeOverwrite
+  mutates its first argument and .Values.global is shared across every
+  component in the release.
+
+  Usage: {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.app) }}
+*/}}
+{{- define "langwatch.podSecurityContext" -}}
+{{- $global := .ctx.Values.global.podSecurityContext | default dict -}}
+{{- /* Three levels, lowest priority first: global, then the component's uid
+       "base", then the operator's override.
+
+       `base` USED TO REPLACE global entirely (`.base | default $global`),
+       which quietly defeated the whole point of a global default: an operator
+       who raised the bar globally — seccompProfile.type: Localhost,
+       supplementalGroups, fsGroupChangePolicy — got it on app/workers/nlp/
+       langevals while the bundled PostgreSQL and Redis silently stayed on
+       whatever `base` happened to name. The two workloads holding data were
+       the two exempt from the hardening.
+
+       Now `base` pins ONLY the keys it actually names (the uid the image
+       requires, which the datastores cannot change), and every other global
+       key survives underneath it.
+
+       To DROP an inherited key rather than change it — e.g. runAsUser on
+       OpenShift, where the SCC assigns one from a range — set it to null:
+       `postgresql.podSecurityContext.runAsUser: null`. mustMergeOverwrite
+       keeps the explicit null, which renders as no value. */ -}}
+{{- $override := .component.podSecurityContext | default dict -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) (.base | default dict) $override) -}}
+{{- end -}}
+
+{{- define "langwatch.containerSecurityContext" -}}
+{{- $global := .ctx.Values.global.containerSecurityContext | default dict -}}
+{{- $override := .component.containerSecurityContext | default dict -}}
+{{- toYaml (mustMergeOverwrite (deepCopy $global) $override) -}}
+{{- end -}}
+
+{{/*
+Ingress: validated + normalised `ingress.blockedPaths`, as a JSON array.
+Consume with: {{- $blocked := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
+
+Validation is security-relevant: a trailing slash, a missing leading slash, a
+bare "/" or a non-list value each leave the block rendered but inert. Rejected
+here, once, by name, so both consuming templates agree.
+*/}}
+{{- define "langwatch.ingress.blockedPaths" -}}
+  {{- $normalised := list -}}
+  {{- $raw := .Values.ingress.blockedPaths -}}
+  {{- if $raw -}}
+    {{- if not (kindIs "slice" $raw) -}}
+      {{- fail (printf "ingress.blockedPaths must be a list, got %s (%v). With --set, a list literal is assigned as a string — use --set-json 'ingress.blockedPaths=[\"/api/internal\"]', or set it in a values file." (kindOf $raw) $raw) -}}
+    {{- end -}}
+    {{- range $entry := $raw -}}
+      {{- $path := toString $entry -}}
+      {{- if not (hasPrefix "/" $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must be an absolute path beginning with \"/\". As written it renders an Ingress the API server rejects, and blocks nothing in the meantime." $path) -}}
+      {{- end -}}
+      {{- /* Reject rather than normalise. `trimSuffix "/"` strips exactly ONE
+             character, so "/api/internal//" became "/api/internal/" and the
+             nested-path guard then compared against a prefix no real request
+             path can match — rendering a blackhole rule that blocks nothing
+             while an app rule for /api/internal/status out-matched it. Silently
+             repairing operator input is what made that reachable; a security
+             control should refuse input it cannot interpret exactly. */ -}}
+      {{- if ne $path (trim $path) -}}
+        {{- fail (printf "ingress.blockedPaths entry %q has leading or trailing whitespace. Kubernetes matches the path literally, so the block would never fire. Remove the whitespace." $path) -}}
+      {{- end -}}
+      {{- if contains "//" $path -}}
+        {{- fail (printf "ingress.blockedPaths entry %q contains an empty path segment (\"//\"). No request path matches it, so the block would render but never fire. Use a single slash between segments." $path) -}}
+      {{- end -}}
+      {{- if eq $path "/" -}}
+        {{- fail "ingress.blockedPaths may not contain \"/\" — that would route the whole site to the blackhole. Block a specific prefix, or set ingress.enabled: false." -}}
+      {{- end -}}
+      {{- if hasSuffix "/" $path -}}
+        {{- fail (printf "ingress.blockedPaths entry %q must not end in a slash — with pathType: Prefix, %q already covers every path beneath it, and the trailing form silently fails to match the prefix itself." $path (trimSuffix "/" $path)) -}}
+      {{- end -}}
+      {{- $normalised = append $normalised $path -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $normalised | uniq | toJson -}}
+{{- end -}}

@@ -51,7 +51,7 @@ function baseline(
       system: cat(categoryDispositions.system ?? "capture"),
       tools: cat(categoryDispositions.tools ?? "capture"),
     },
-    pii: { level: "essential", entities: [] },
+    pii: { level: "essential", entities: [], exceptPatterns: [] },
     secrets: { enabled: true, customPatterns: [] },
     customAttributes: [],
   };

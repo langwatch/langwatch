@@ -1,10 +1,19 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import type * as NodeFs from "node:fs";
-import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
+import {
+  type VirtualKeyBudgetInput,
+  type VirtualKeyRoutingMode,
+  VirtualKeysApiService,
+} from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import { formatScope, parseScopeArg } from "./_shared";
+import {
+  buildBudgetFlags,
+  formatScope,
+  parseRoutingModeArg,
+  parseScopeArg,
+} from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 export interface UpdateVirtualKeyOptions {
@@ -12,11 +21,19 @@ export interface UpdateVirtualKeyOptions {
   description?: string;
   clearDescription?: boolean;
   scope?: string[];
+  traceProject?: string;
+  clearTraceProject?: boolean;
   routingPolicy?: string;
   clearRoutingPolicy?: boolean;
+  routingMode?: string;
+  budgetLimit?: string;
+  budgetWindow?: string;
+  budgetBreach?: "block" | "warn";
+  clearBudget?: boolean;
   configJson?: string;
   configFile?: string;
 }
+
 
 function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> | undefined {
   if (options.configJson) {
@@ -53,8 +70,14 @@ export const updateVirtualKeyCommand = async (
   await resolveCredentials();
 
   let config: Record<string, unknown> | undefined;
+  let budget: VirtualKeyBudgetInput | null | undefined;
+  let routingMode: VirtualKeyRoutingMode | undefined;
   try {
     config = parseConfig(options);
+    budget = buildBudgetFlags(options);
+    if (options.routingMode !== undefined) {
+      routingMode = parseRoutingModeArg(options.routingMode);
+    }
   } catch (err) {
     console.error(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`));
     process.exit(1);
@@ -65,14 +88,18 @@ export const updateVirtualKeyCommand = async (
     options.description === undefined &&
     !options.clearDescription &&
     (options.scope === undefined || options.scope.length === 0) &&
+    options.traceProject === undefined &&
+    !options.clearTraceProject &&
     options.routingPolicy === undefined &&
     !options.clearRoutingPolicy &&
+    routingMode === undefined &&
+    budget === undefined &&
     config === undefined;
 
   if (noFieldsProvided) {
     console.error(
       chalk.red(
-        "Error: nothing to update. Provide at least one of --name, --description, --clear-description, --scope, --routing-policy, --clear-routing-policy, --config-json, --config-file.",
+        "Error: nothing to update. Provide at least one of --name, --description, --clear-description, --scope, --trace-project, --clear-trace-project, --routing-policy, --clear-routing-policy, --routing-mode, --budget-limit/--budget-window, --clear-budget, --config-json, --config-file.",
       ),
     );
     process.exit(1);
@@ -96,7 +123,14 @@ export const updateVirtualKeyCommand = async (
       name: options.name,
       description: options.clearDescription ? null : options.description,
       scopes,
+      ...(options.clearTraceProject
+        ? { trace_project_id: null }
+        : options.traceProject !== undefined
+          ? { trace_project_id: options.traceProject }
+          : {}),
       routing_policy_id: options.clearRoutingPolicy ? null : options.routingPolicy,
+      routing_mode: routingMode,
+      budget,
       config,
     });
 

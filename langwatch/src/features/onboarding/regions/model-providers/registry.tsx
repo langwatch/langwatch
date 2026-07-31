@@ -75,6 +75,52 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     },
   },
   {
+    key: "google_agent_platform",
+    backendModelProviderKey: "google_agent_platform",
+    label: "Google Agent Platform",
+    // No `defaultModel`: this provider has no catalog entries (like
+    // `vertex_ai`), and `resolveProviderDefaultModel` in
+    // `components/gateway/eligibleModelProviders.ts` reads a registry
+    // default BEFORE falling back to whatever the customer actually
+    // configured. Naming a model here that isn't in the catalog would make
+    // the gateway's eligible-providers surface hand out a model string the
+    // customer never chose, unconditionally, instead of deferring to their
+    // custom models the way `vertex_ai` correctly does by omitting this.
+    //
+    // `defaultBaseUrl` is this host, static; the full request path also
+    // names the project and location, assembled per credential in
+    // `providerValidation.ts`'s `google_agent_platform` probe branch, which
+    // reads `apiRoot` below for the host rather than repeating this string.
+    defaultBaseUrl: "https://aiplatform.googleapis.com",
+    apiRoot: "https://aiplatform.googleapis.com",
+    icon: singleIcon(
+      "/images/external-icons/gcloud.svg",
+      "Google Agent Platform",
+    ),
+    externalDocsUrl:
+      "https://docs.cloud.google.com/gemini-enterprise-agent-platform",
+    fieldMetadata: {
+      GOOGLE_AGENT_PLATFORM_API_KEY: {
+        label: "Agent Platform API Key",
+        // Says where the key comes from, because this is the distinction that
+        // sent a customer round in circles: an Agent Platform key and an AI
+        // Studio key look alike and are not interchangeable.
+        description:
+          "A Google Cloud API key for Gemini Enterprise Agent Platform, created under APIs & Services > Credentials. An AI Studio key belongs on the Google Gemini provider instead.",
+      },
+      GOOGLE_AGENT_PLATFORM_PROJECT: {
+        label: "Google Cloud Project ID",
+        description:
+          "The project the key belongs to. Its number appears in the error Google returns if the key is used against the wrong service.",
+      },
+      GOOGLE_AGENT_PLATFORM_LOCATION: {
+        label: "Location",
+        description:
+          "Where to serve the model from — 'global', or a region such as us-central1.",
+      },
+    },
+  },
+  {
     key: "open_ai_azure",
     backendModelProviderKey: "azure",
     label: "Azure OpenAI",

@@ -113,7 +113,15 @@ terminationGracePeriodSeconds: 30
 
 # emptyDir for /workspace. Bump sizeLimit if many concurrent sessions write
 # large per-worker homes; leave {} for the cluster default.
-workspaceVolume: {}
+workspaceVolume:
+  # Bounded by default: the workspace is node ephemeral storage, and a
+  # runaway session filling it evicts every pod on the node, not just this
+  # one. Override with a larger cap, or replace wholesale with another
+  # emptyDir spec (e.g. medium: Memory).
+  sizeLimit: 2Gi
+
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem.
+scratchSizeLimit: 1Gi
 
 ## SecurityContext.
 ##

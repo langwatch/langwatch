@@ -662,6 +662,7 @@ export function PrivacyRuleDrawer({
   });
   const [piiChoice, setPiiChoice] = useState<PiiChoice>("inherit");
   const [piiEntities, setPiiEntities] = useState<string[]>([]);
+  const [piiExceptPatterns, setPiiExceptPatterns] = useState<string[]>([]);
   const [secretsChoice, setSecretsChoice] = useState<SecretsChoice>("inherit");
   const [secretsPatterns, setSecretsPatterns] = useState<string[]>([]);
   const [customAttributes, setCustomAttributes] = useState<
@@ -681,6 +682,7 @@ export function PrivacyRuleDrawer({
     setAudience(form.audience);
     setPiiChoice(form.piiChoice);
     setPiiEntities(form.piiEntities);
+    setPiiExceptPatterns(form.piiExceptPatterns);
     setSecretsChoice(form.secretsChoice);
     setSecretsPatterns(form.secretsPatterns);
     setCustomAttributes(form.customAttributes);
@@ -734,6 +736,7 @@ export function PrivacyRuleDrawer({
         audience,
         piiChoice,
         piiEntities,
+        piiExceptPatterns,
         secretsChoice,
         secretsPatterns,
         customAttributes,
@@ -743,6 +746,7 @@ export function PrivacyRuleDrawer({
       audience,
       piiChoice,
       piiEntities,
+      piiExceptPatterns,
       secretsChoice,
       secretsPatterns,
       customAttributes,
@@ -751,6 +755,7 @@ export function PrivacyRuleDrawer({
 
   const hasInvalidPatterns =
     secretsPatterns.some((p) => secretPatternError(p) !== null) ||
+    piiExceptPatterns.some((p) => secretPatternError(p) !== null) ||
     customAttributes.some((row) => attributePatternError(row.pattern) !== null);
 
   // Add: enabled once the built config persists at least one control. Edit:
@@ -1107,6 +1112,87 @@ export function PrivacyRuleDrawer({
                     selected={piiEntities}
                     onToggle={togglePiiEntity}
                   />
+                </VStack>
+              )}
+              {piiChoice !== "inherit" && piiChoice !== "disabled" && (
+                <VStack gap={2} align="stretch" paddingLeft={6}>
+                  <HStack gap={1}>
+                    {piiExceptPatterns.length > 0 && (
+                      <Text fontWeight="600" fontSize="sm">
+                        Exceptions
+                      </Text>
+                    )}
+                    {piiExceptPatterns.length > 0 && (
+                      <Tooltip
+                        content="A detected value that fully matches one of these regular expressions is kept as is. Use this for business identifiers that look like personal data, such as an internal reservation number detection reads as a card number. Applies to Fast detection matches; Deep detection (names, locations) can still redact a value even if it matches an exception."
+                        contentProps={{ maxWidth: "340px" }}
+                      >
+                        <Box color="fg.muted" display="inline-flex">
+                          <HelpCircle size={13} />
+                        </Box>
+                      </Tooltip>
+                    )}
+                  </HStack>
+                  {piiExceptPatterns.map((pattern, index) => {
+                    const error = secretPatternError(pattern);
+                    return (
+                      <VStack key={index} gap={1} align="stretch">
+                        <HStack gap={2}>
+                          <Input
+                            size="sm"
+                            fontFamily="mono"
+                            placeholder="00[0-9]{12}"
+                            value={pattern}
+                            aria-label={`PII exception pattern ${index + 1}`}
+                            borderColor={error ? "red.500" : undefined}
+                            onChange={(e) =>
+                              setPiiExceptPatterns((prev) =>
+                                prev.map((p, i) =>
+                                  i === index ? e.target.value : p,
+                                ),
+                              )
+                            }
+                          />
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            aria-label={`Remove PII exception pattern ${
+                              index + 1
+                            }`}
+                            onClick={() =>
+                              setPiiExceptPatterns((prev) =>
+                                prev.filter((_, i) => i !== index),
+                              )
+                            }
+                          >
+                            <X size={14} />
+                          </Button>
+                        </HStack>
+                        {error && (
+                          <Text fontSize="xs" color="red.500">
+                            {error}
+                          </Text>
+                        )}
+                      </VStack>
+                    );
+                  })}
+                  <Box>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() =>
+                        setPiiExceptPatterns((prev) => [...prev, ""])
+                      }
+                    >
+                      <Plus size={14} /> Add exception
+                    </Button>
+                  </Box>
+                  {piiExceptPatterns.length === 0 && (
+                    <Text fontSize="xs" color="fg.muted">
+                      Keep known-safe formats that look like personal data, such
+                      as internal reservation numbers.
+                    </Text>
+                  )}
                 </VStack>
               )}
             </VStack>

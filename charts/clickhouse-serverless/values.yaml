@@ -112,6 +112,28 @@ keeper:
     size: 10Gi
     storageClass: ""  # defaults to parent storage.storageClass
 
+# Writable scratch (emptyDir) for the paths ClickHouse and Keeper touch outside
+# their data PVC, so both can run with a read-only root filesystem.
+#
+# These are bounded on purpose. An unbounded emptyDir is backed by the node's
+# ephemeral storage, so a pod stuck in a merge/replication error loop can fill
+# the node and trigger DiskPressure evictions for unrelated workloads. With a
+# sizeLimit the kubelet evicts only the offending pod.
+#
+# logsSizeLimit is deliberately BELOW the image's own retention ceiling. The
+# chart renders `console: true` into config.d, but it does not disable the base
+# image's file logging, which rotates at 1000M x 10 for each of
+# clickhouse-server.log and clickhouse-server.err.log — roughly 20Gi if both
+# ever fill. Sizing the volume for that would defeat the point: the cap exists
+# so a pathological logger is evicted on its own quota long before it reaches
+# it. Normal operation stays far below 2Gi, and the pod's logs are on stdout
+# regardless, so cluster log collection is unaffected either way.
+#
+# Raise it if you deliberately want the full on-disk retention.
+scratch:
+  logsSizeLimit: 2Gi
+  tmpSizeLimit: 1Gi
+
 # ServiceAccount
 serviceAccount:
   create: true

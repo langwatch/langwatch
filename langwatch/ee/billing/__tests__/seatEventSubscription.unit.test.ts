@@ -1,3 +1,4 @@
+import Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../utils/growthSeatEvent", () => ({
@@ -751,18 +752,21 @@ describe("seatEventSubscription", () => {
       });
     });
 
-    describe("when the Stripe customer currency lookup fails", () => {
+    describe("when the provider rate-limits the currency lookup", () => {
       beforeEach(() => {
         db.subscription.findMany.mockResolvedValue([]);
         stripe.customers.retrieve.mockRejectedValue(
-          new Error("rate limit exceeded"),
+          new Stripe.errors.StripeRateLimitError({
+            message: "slow down",
+            type: "rate_limit_error",
+          }),
         );
         stripe.checkout.sessions.create.mockResolvedValue({
           url: "https://checkout.stripe.com/session",
         });
       });
 
-      it("fails with a retryable billing-currency error", async () => {
+      it("fails with a retryable provider-unavailable error", async () => {
         await expect(
           service.createSeatEventCheckout({
             organizationId: "org_1",
@@ -772,13 +776,68 @@ describe("seatEventSubscription", () => {
             billingInterval: "monthly",
             membersToAdd: 2,
           }),
-        ).rejects.toMatchObject({ code: "billing_currency_unavailable" });
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
       });
 
-      it("keeps the original failure as a reason on the handled error", async () => {
-        const lookupError = new Error("rate limit exceeded");
-        stripe.customers.retrieve.mockRejectedValue(lookupError);
+      it("creates no checkout session and no pending records", async () => {
+        await service
+          .createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          })
+          .catch(() => undefined);
 
+        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+        expect(db.$transaction).not.toHaveBeenCalled();
+        expect(db.subscription.updateMany).not.toHaveBeenCalled();
+        expect(db.organizationInvite.deleteMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the provider is unreachable during the currency lookup", () => {
+      beforeEach(() => {
+        db.subscription.findMany.mockResolvedValue([]);
+        stripe.customers.retrieve.mockRejectedValue(
+          new Stripe.errors.StripeConnectionError({
+            message: "network down",
+            type: "api_error",
+          }),
+        );
+        stripe.checkout.sessions.create.mockResolvedValue({
+          url: "https://checkout.stripe.com/session",
+        });
+      });
+
+      it("fails with the same retryable provider-unavailable error", async () => {
+        await expect(
+          service.createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: "USD" as any,
+            billingInterval: "monthly",
+            membersToAdd: 2,
+          }),
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
+      });
+    });
+
+    describe("when the currency lookup fails for a reason we cannot name", () => {
+      const lookupError = new Error("socket hang up");
+
+      beforeEach(() => {
+        db.subscription.findMany.mockResolvedValue([]);
+        stripe.customers.retrieve.mockRejectedValue(lookupError);
+        stripe.checkout.sessions.create.mockResolvedValue({
+          url: "https://checkout.stripe.com/session",
+        });
+      });
+
+      it("lets the original error through instead of dressing it as handled", async () => {
         const error = await service
           .createSeatEventCheckout({
             organizationId: "org_1",
@@ -790,12 +849,13 @@ describe("seatEventSubscription", () => {
           })
           .catch((caught: unknown) => caught);
 
-        expect((error as { reasons: readonly Error[] }).reasons).toEqual([
-          lookupError,
-        ]);
+        // Identity, not just the message: "returned untouched" is the contract,
+        // and a same-message replacement would satisfy a message check.
+        expect(error).toBe(lookupError);
+        expect(error).not.toHaveProperty("isHandled");
       });
 
-      it("creates no checkout session and no pending records", async () => {
+      it("still creates no checkout session and no pending records", async () => {
         await service
           .createSeatEventCheckout({
             organizationId: "org_1",

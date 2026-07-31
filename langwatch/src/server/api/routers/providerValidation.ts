@@ -35,8 +35,14 @@ export type ValidationResult =
  * - `anthropic`: Uses `x-api-key` header with `anthropic-version`
  * - `gemini`: Uses query parameter `?key=`
  * - `elevenlabs`: Uses `xi-api-key` header
+ * - `google_agent_platform`: `x-goog-api-key` on a generate-content POST
  */
-type AuthStrategy = "bearer" | "anthropic" | "gemini" | "elevenlabs";
+type AuthStrategy =
+  | "bearer"
+  | "anthropic"
+  | "gemini"
+  | "elevenlabs"
+  | "google_agent_platform";
 
 /**
  * Providers that use non-standard auth. All others default to bearer auth.
@@ -45,7 +51,31 @@ const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
   anthropic: "anthropic",
   gemini: "gemini",
   elevenlabs: "elevenlabs",
+  google_agent_platform: "google_agent_platform",
 };
+
+/**
+ * The model a credential check asks Agent Platform to run.
+ *
+ * Any published model would do; this one is picked because it resolves in
+ * both `global` and the regional locations. A model the project cannot reach
+ * answers 404 rather than 401, which `handleHttpError` already keeps distinct
+ * from a refused key.
+ */
+const AGENT_PLATFORM_PROBE_MODEL = "gemini-2.5-flash";
+
+/**
+ * The smallest generate-content request that still proves the credential.
+ *
+ * Agent Platform has to be probed by generating rather than by listing:
+ * `GET .../models` answers `401 "API keys are not supported by this API"`
+ * however good the key is, so validating the way every other provider here
+ * does would report a working credential as unusable.
+ */
+const AGENT_PLATFORM_PROBE_BODY = JSON.stringify({
+  contents: [{ role: "user", parts: [{ text: "ping" }] }],
+  generationConfig: { maxOutputTokens: 1 },
+});
 
 /** Providers with complex auth (AWS, gcloud, etc.) that skip validation */
 const SKIP_VALIDATION = new Set(["bedrock", "vertex_ai", "azure"]);
@@ -493,8 +523,19 @@ type ProbeContext = {
  */
 const PROBE_BUDGET_MS = 10_000;
 
-/** The request that proves a key works: list the provider's models. */
-type ProbeRequest = { url: string; headers: Record<string, string> };
+/**
+ * The request that proves a key works.
+ *
+ * Listing models for every provider that has such an endpoint; `method` and
+ * `body` exist for the one that does not — Agent Platform rejects API keys on
+ * its listing route and accepts them only on a generate-content POST.
+ */
+type ProbeRequest = {
+  url: string;
+  headers: Record<string, string>;
+  method?: "GET" | "POST";
+  body?: string;
+};
 
 /**
  * Every way a provider's credential can legitimately prove itself.
@@ -517,6 +558,7 @@ function buildProbeCandidates({
   baseUrl,
   defaultBaseUrl,
   apiRoot,
+  agentPlatform,
 }: {
   strategy: AuthStrategy;
   apiKey: string;
@@ -524,6 +566,8 @@ function buildProbeCandidates({
   defaultBaseUrl: string;
   /** The provider's version-less root, when it serves more than one path. */
   apiRoot?: string;
+  /** The project and location Agent Platform's path is built from. */
+  agentPlatform?: { project: string; location: string };
 }): ProbeRequest[] {
   const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
   const headers: Record<string, string> = {
@@ -531,6 +575,39 @@ function buildProbeCandidates({
   };
 
   switch (strategy) {
+    case "google_agent_platform": {
+      // No project, no location, or no host to build the path from means
+      // no path to probe. Returning nothing rather than guessing a default
+      // leaves the walk empty, which `runProbeChain` reports as
+      // unreachable — honest, since nothing was asked — instead of
+      // inventing a verdict about the key.
+      if (!agentPlatform?.project || !agentPlatform.location || !apiRoot) {
+        return [];
+      }
+
+      const { project, location } = agentPlatform;
+      const host = apiRoot.replace(/\/$/, "");
+
+      return [
+        {
+          // The key rides in a header, not `?key=`, which Agent Platform also
+          // accepts: a credential in a URL reaches access logs, proxy logs and
+          // browser history, and both shapes were verified to work.
+          //
+          // The global host with a region in the path was verified live
+          // against two regions (us-central1, europe-west4), both 200 — the
+          // same form every other verified shape uses, so this does not
+          // special-case a regional subdomain on top of it.
+          url:
+            `${host}/v1/projects/${encodeURIComponent(project)}` +
+            `/locations/${encodeURIComponent(location)}/publishers/google/models/` +
+            `${AGENT_PLATFORM_PROBE_MODEL}:generateContent`,
+          headers: { ...headers, "x-goog-api-key": apiKey },
+          method: "POST",
+          body: AGENT_PLATFORM_PROBE_BODY,
+        },
+      ];
+    }
     case "anthropic":
       return [
         {
@@ -667,8 +744,9 @@ async function probeOnce({
   let response: Response;
   try {
     response = await fetch(candidate.url, {
-      method: "GET",
+      method: candidate.method ?? "GET",
       headers: candidate.headers,
+      ...(candidate.body === undefined ? {} : { body: candidate.body }),
       signal: deadline,
     });
   } catch {
@@ -795,8 +873,17 @@ export async function validateKeyWithCustomUrl(
     };
   }
 
-  // Build customKeys with the retrieved API key and optional custom URL
+  // Start from what's stored, not from a blank object: a provider whose
+  // credential is more than a key plus an endpoint — Agent Platform's
+  // project and location, or any future one — had those fields silently
+  // dropped when this rebuilt customKeys from scratch. That turned "the
+  // customer edited an unrelated field" into an empty probe walk and a
+  // false "could not reach the provider", which is the exact misdiagnosis
+  // this whole area of the code exists to remove. The freshly resolved key
+  // and an explicit custom URL are layered on top, in that order, so they
+  // still win over whatever was stored.
   const customKeys: Record<string, string> = {
+    ...(storedKeys ?? {}),
     [apiKeyField]: apiKey,
   };
   if (endpointField && customBaseUrl) {
@@ -888,6 +975,10 @@ export async function validateProviderApiKey(
       baseUrl,
       defaultBaseUrl,
       apiRoot: providerApiRoots[provider],
+      agentPlatform: {
+        project: customKeys.GOOGLE_AGENT_PLATFORM_PROJECT?.trim() ?? "",
+        location: customKeys.GOOGLE_AGENT_PLATFORM_LOCATION?.trim() ?? "",
+      },
     }),
     context: {
       provider,

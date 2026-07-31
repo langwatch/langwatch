@@ -42,7 +42,35 @@ export type AccessPolicy =
   | { readonly kind: "anyAuthenticated" }
   | { readonly kind: "public"; readonly reason: string }
   | { readonly kind: "internal"; readonly reason: string }
-  | { readonly kind: "handlerManaged"; readonly reason: string };
+  | {
+      readonly kind: "handlerManaged";
+      readonly reason: string;
+      /**
+       * The RBAC permissions the handler enforces for itself; `[]` when it
+       * gates on something that is not an RBAC permission. Mandatory — see
+       * `handlerManagedAuth` for why the optional version was a defect.
+       */
+      readonly permissions: readonly Permission[];
+      /**
+       * What kind of credential reaches this route:
+       *
+       *   apiKey   — a project/personal API key (what SDKs, the CLI and the
+       *              Langy assistant carry)
+       *   session  — a browser session cookie only
+       *   both     — either is accepted
+       *   internal — a shared secret or signature, not a user credential
+       *
+       * Mandatory for the same reason `permissions` is. It exists so that
+       * "can an API key even reach this route?" is a property of the route
+       * rather than a curated list of paths kept somewhere else — the audits
+       * that need the answer were maintaining their own path lists, which
+       * silently misclassify a route the moment one is added or renamed.
+       */
+      readonly credential: HandlerCredential;
+    };
+
+/** @see the `credential` field on the handler-managed policy. */
+export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
 
 /**
  * Require a specific RBAC permission at the app's scope. The secured app
@@ -119,9 +147,65 @@ export function internalSecret(reason: string): AccessPolicy {
  * unaccounted-for endpoint. Prefer a real `requires(...)` / `internalSecret(...)`
  * strategy when the auth can be expressed as middleware.
  */
-export function handlerManagedAuth(reason: string): AccessPolicy {
+export function handlerManagedAuth({
+  reason,
+  permissions,
+  credential,
+}: {
+  reason: string;
+  /** Which credential reaches this route. @see the policy type. */
+  credential: HandlerCredential;
+  /**
+   * The RBAC permissions this handler enforces for itself — `[]` when it gates
+   * on something that is not an RBAC permission (an internal secret, a raw
+   * session check, a signature).
+   *
+   * REQUIRED, and that is the entire point. When it was optional, omitting it
+   * and having nothing to declare were the same value, so a self-enforcing RBAC
+   * route contributed nothing to the registry and every audit that reads the
+   * registry walked straight past it. Writing `[]` is a claim; leaving it out
+   * was an absence, and absence is what let `POST /api/experiments/:slug/run`
+   * sit on a grain no least-privilege key could hold.
+   */
+  permissions: readonly Permission[];
+}): AccessPolicy {
   assertReason(reason, "handlerManagedAuth");
-  return { kind: "handlerManaged", reason };
+  return { kind: "handlerManaged", reason, permissions, credential };
+}
+
+/**
+ * Can a caller holding an API key reach this route at all?
+ *
+ * The question every "what can a key-bearing client do?" audit actually wants.
+ * Non-handler-managed policies are reachable by key: the secured-app builder
+ * authenticates them by key or session alike.
+ */
+export function isApiKeyReachable(policy: AccessPolicy): boolean {
+  if (policy.kind === "handlerManaged") {
+    return policy.credential === "apiKey" || policy.credential === "both";
+  }
+  return policy.kind !== "public" && policy.kind !== "internal";
+}
+
+/**
+ * Every RBAC permission a route requires, whichever way it declares it —
+ * middleware policy or self-enforcing handler. The single place any audit
+ * should ask "what does this route actually demand?", so a new policy kind
+ * cannot quietly drop out of the answer.
+ */
+export function policyPermissions(policy: AccessPolicy): readonly Permission[] {
+  switch (policy.kind) {
+    case "permission":
+    case "apiKeyPermission":
+    case "projectPermission":
+      return [policy.permission];
+    case "handlerManaged":
+      return policy.permissions;
+    case "anyAuthenticated":
+    case "public":
+    case "internal":
+      return [];
+  }
 }
 
 function assertReason(reason: string, fn: string): void {

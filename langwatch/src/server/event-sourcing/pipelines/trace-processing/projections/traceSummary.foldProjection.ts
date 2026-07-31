@@ -1,4 +1,3 @@
-import { DEFAULT_PARTITION_WINDOW_MS } from "~/server/app-layer/clients/clickhouse/windowed-read";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
@@ -94,6 +93,12 @@ const traceNameResolutionService = new TraceNameResolutionService();
  * Past the cap we only keep counting so the true magnitude stays visible.
  */
 export const MAX_PROCESSED_SPANS = 512;
+
+/**
+ * ±7 days, aligned with TRACE_ANALYTICS_READ_WINDOW_MS — see the `options`
+ * docstring for the production measurement that retired the ±2-day width.
+ */
+export const TRACE_SUMMARY_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Reserved trace-summary attribute keys holding cache / reasoning token
@@ -202,6 +207,11 @@ export function applySpanToSummary({
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
+
+  // Surface the span-derived models as trace-level metadata (primary +
+  // set) so `trace.metadata.model` is populated for API consumers and
+  // metadata filters, not just the Models column.
+  traceAttributeAccumulationService.stampModelMetadata({ attributes, models });
 
   // Precedence rules for traceName / rootSpanType / rootSpanStartTimeMs
   // live in TraceNameResolutionService — see that file for the full set.
@@ -370,6 +380,13 @@ function applyLogContribution({
     totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + outputTokens;
   }
 
+  // Same trace-level model metadata stamp the span path applies, so
+  // log-only (Path B) traces also surface `metadata.model`.
+  traceAttributeAccumulationService.stampModelMetadata({
+    attributes: mergedAttributes,
+    models,
+  });
+
   return {
     ...state,
     traceId: state.traceId || contribution.traceId,
@@ -455,15 +472,33 @@ export class TraceSummaryFoldProjection
    */
   /**
    * `readWindow` bounds the read-back to a partition-pruned window around the
-   * folded event's business time — the platform's shared ±2-day partition
-   * window (ADR-068): OccurredAt is the trace's own occurrence time, so drift
-   * from the folded event's occurredAt is clock skew, not aggregate lifetime.
-   * The executor retries a windowed miss without the window, so correctness
-   * never depends on the width.
+   * folded event's business time. ±7 days, matching the other analytics folds
+   * — NOT the platform's shared ±2-day partition window this fold used to
+   * declare. That width's rationale ("drift from the folded event's occurredAt
+   * is clock skew, not aggregate lifetime") measured FALSE in production:
+   * 138,654 unwindowed fallback recoveries in 30 days, i.e. ~4.6k times a DAY
+   * a live summary row sat 2-7 days from the incoming event — evaluations and
+   * annotations land on traces days after their anchor, and a span event's
+   * occurredAt is INGEST wall-clock besides. Beyond 7 days the drift measures
+   * zero: the 7-day-windowed folds' fallback `recovered` count over the same
+   * 30 days is 0 across 230k+ misses.
+   *
+   * `trustAbsentMiss: true` — an absent windowed read is final; no unwindowed
+   * retry. This fold's stake in that retry is narrower than the read-back
+   * folds': it declares no `refoldOnStoreMiss`, so an absent miss always
+   * folded from `init()` — the retry only decided whether a row EXISTED
+   * outside the window. At ±7 days that is measured-never (above), and the
+   * one state the retry could not have found anyway is one the store's own
+   * persistability gate never wrote — a dimension-only summary, which lives
+   * in the Redis tier alone today, trusted or not. So the retry was proving
+   * non-existence at ~100 unpruned scans/min; the flag stops paying for the
+   * proof. Watch `es_fold_read_window_fallback_total{outcome="recovered"}`
+   * on the OTHER folds for the width contract, as ever.
    */
   readonly options = {
     refoldOnOutOfOrder: false,
-    readWindow: { widthMs: DEFAULT_PARTITION_WINDOW_MS },
+    trustAbsentMiss: true,
+    readWindow: { widthMs: TRACE_SUMMARY_READ_WINDOW_MS },
   } as const;
 
   protected readonly events = traceSummaryEvents;
