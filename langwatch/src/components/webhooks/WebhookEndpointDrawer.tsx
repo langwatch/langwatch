@@ -46,15 +46,27 @@ export function WebhookEndpointDrawer({
   eventTypes: readonly EventType[] | undefined;
   isSaving: boolean;
   onClose: () => void;
-  onSave: (input: { url: string; enabledEvents: string[] }) => void;
+  onSave: (input: {
+    url: string;
+    enabledEvents: string[];
+    maxBatchSize: number;
+    maxBatchDelayMs: number;
+    maxInFlight: number;
+  }) => void;
 }) {
   const [url, setUrl] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [maxBatchSize, setMaxBatchSize] = useState(100);
+  const [maxBatchDelayMs, setMaxBatchDelayMs] = useState(250);
+  const [maxInFlight, setMaxInFlight] = useState(4);
 
   useEffect(() => {
     if (!isOpen) return;
     setUrl(endpoint?.url ?? "");
     setSelected(new Set(endpoint?.enabledEvents ?? []));
+    setMaxBatchSize(endpoint?.maxBatchSize ?? 100);
+    setMaxBatchDelayMs(endpoint?.maxBatchDelayMs ?? 250);
+    setMaxInFlight(endpoint?.maxInFlight ?? 4);
   }, [isOpen, endpoint]);
 
   const families = useMemo(() => {
@@ -192,6 +204,65 @@ export function WebhookEndpointDrawer({
                 );
               })}
             </VStack>
+
+            <VStack gap={3} align="start" width="full">
+              <HStack gap={1}>
+                <Text fontWeight="600" fontSize="sm">
+                  Delivery
+                </Text>
+                <FieldInfoTooltip
+                  description="Batch size caps how many events ship per POST (up to 100). Batch delay is how long a partial batch waits for more events before shipping. In-flight caps concurrent POSTs to your receiver; when it is behind, batches grow toward the cap to drain faster."
+                  testId="webhook-delivery-info"
+                />
+              </HStack>
+              <HStack gap={4} width="full">
+                <VStack gap={1} align="start">
+                  <Text fontSize="xs" color="fg.muted">
+                    Batch size
+                  </Text>
+                  <Input
+                    type="number"
+                    size="sm"
+                    width="90px"
+                    min={1}
+                    max={100}
+                    value={maxBatchSize}
+                    onChange={(e) => setMaxBatchSize(Number(e.target.value))}
+                    data-testid="webhook-max-batch-size"
+                  />
+                </VStack>
+                <VStack gap={1} align="start">
+                  <Text fontSize="xs" color="fg.muted">
+                    Batch delay (ms)
+                  </Text>
+                  <Input
+                    type="number"
+                    size="sm"
+                    width="110px"
+                    min={0}
+                    max={60000}
+                    value={maxBatchDelayMs}
+                    onChange={(e) => setMaxBatchDelayMs(Number(e.target.value))}
+                    data-testid="webhook-max-batch-delay"
+                  />
+                </VStack>
+                <VStack gap={1} align="start">
+                  <Text fontSize="xs" color="fg.muted">
+                    In-flight
+                  </Text>
+                  <Input
+                    type="number"
+                    size="sm"
+                    width="80px"
+                    min={1}
+                    max={8}
+                    value={maxInFlight}
+                    onChange={(e) => setMaxInFlight(Number(e.target.value))}
+                    data-testid="webhook-max-in-flight"
+                  />
+                </VStack>
+              </HStack>
+            </VStack>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -204,7 +275,13 @@ export function WebhookEndpointDrawer({
               disabled={!canSave}
               loading={isSaving}
               onClick={() =>
-                onSave({ url: url.trim(), enabledEvents: [...selected] })
+                onSave({
+                  url: url.trim(),
+                  enabledEvents: [...selected],
+                  maxBatchSize,
+                  maxBatchDelayMs,
+                  maxInFlight,
+                })
               }
               data-testid="webhook-save"
             >

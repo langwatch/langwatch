@@ -1895,11 +1895,23 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     webhooksCmd
       .command("update <id>")
-      .description("Update an endpoint's URL or event subscriptions")
+      .description("Update an endpoint's URL, event subscriptions, or delivery controls")
       .option("--url <url>", "New HTTPS receiver URL")
       .option("--events <types>", "New comma-separated event types (replaces the set)")
+      .option("--max-batch-size <n>", "Envelopes per POST, 1-100")
+      .option("--max-batch-delay <ms>", "Coalescing window in ms before a partial batch ships, 0-60000")
+      .option("--max-in-flight <n>", "Concurrent POSTs to the receiver, 1-8")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (id: string, options: { url?: string; events?: string }) => {
+    async (
+      id: string,
+      options: {
+        url?: string;
+        events?: string;
+        maxBatchSize?: string;
+        maxBatchDelay?: string;
+        maxInFlight?: string;
+      },
+    ) => {
       const { updateWebhookCommand: impl } = await import("./commands/webhooks/update.js");
       return impl(id, options);
     },
@@ -2055,6 +2067,28 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (endUserId: string, options: { window?: "day" | "week" | "month"; virtualKey?: string }) => {
       const { spendByUserCommand: impl } = await import("./commands/spend-events/by-user.js");
       return impl(endUserId, options);
+    },
+  );
+
+  emitsResult(
+    spendEventsCmd
+      .command("summary")
+      .description("Per-key spend rollups, the reconciliation checksum fast path (settled requests counted separately, never in cost sums)")
+      .option("--group-by <key>", "virtual_key (default) or end_user")
+      .option("--from <instant>", "Range start (ISO or unix ms), default 24h ago")
+      .option("--to <instant>", "Range end (ISO or unix ms), default now")
+      .option("--project <id>", "Narrow to one project")
+      .option("--limit <n>", "Max rows, default 500")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (options: {
+      groupBy?: string;
+      from?: string;
+      to?: string;
+      project?: string;
+      limit?: string;
+    }) => {
+      const { spendSummaryCommand: impl } = await import("./commands/spend-events/summary.js");
+      return impl(options);
     },
   );
 

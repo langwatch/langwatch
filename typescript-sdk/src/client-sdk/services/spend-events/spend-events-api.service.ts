@@ -53,6 +53,26 @@ export interface SpendEvent {
   };
 }
 
+export interface SpendSummaryRow {
+  key: string;
+  /** Priced outcomes (confirmed and failed). */
+  event_count: number;
+  /** Unpriced settled requests, counted separately: never in cost sums. */
+  settled_count: number;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_input_tokens: number;
+    cache_creation_input_tokens: number;
+    reasoning_tokens: number;
+  };
+  cost: { total_usd: string; nano_usd: number };
+}
+
+export interface SpendSummariesResponse {
+  data: SpendSummaryRow[];
+}
+
 export interface SpendEventsPage {
   data: SpendEvent[];
   next_cursor: string | null;
@@ -168,6 +188,25 @@ export class SpendEventsApiService {
     return await this.request<SpendEventsPage>(
       "list spend events",
       `/api/gateway/v1/spend-events${qs}`,
+    );
+  }
+
+  async summaries(options: {
+    groupBy: "virtual_key" | "end_user";
+    from: number;
+    to: number;
+    projectId?: string;
+    limit?: number;
+  }): Promise<SpendSummariesResponse> {
+    const params = new URLSearchParams();
+    params.set("group_by", options.groupBy);
+    params.set("from", String(options.from));
+    params.set("to", String(options.to));
+    if (options.projectId) params.set("project_id", options.projectId);
+    if (options.limit !== undefined) params.set("limit", String(options.limit));
+    return await this.request<SpendSummariesResponse>(
+      "read spend summaries",
+      `/api/gateway/v1/spend-summaries?${params.toString()}`,
     );
   }
 

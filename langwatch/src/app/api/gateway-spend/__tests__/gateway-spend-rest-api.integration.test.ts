@@ -387,6 +387,57 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     expect(res.status).toBe(400);
   });
 
+  /** @scenario Per key summaries roll up priced outcomes with settled counted separately */
+  it("summarizes by end user with settled counted apart from cost", async () => {
+    const u = `${ns}-sum-user`;
+    await seed([
+      spendRow(`${ns}-sum-1`, {
+        endUserId: u,
+        costUsd: "0.020000",
+        occurredAt: new Date(baseTime + 40_000),
+      }),
+      spendRow(`${ns}-sum-2`, {
+        endUserId: u,
+        costUsd: "0.030000",
+        occurredAt: new Date(baseTime + 41_000),
+      }),
+      spendRow(`${ns}-sum-settled`, {
+        endUserId: u,
+        status: "settled" as const,
+        needsReconciliation: true,
+        settleReason: "confirmation_deadline_expired",
+        costUsd: "0.000000",
+        tokensInput: 0,
+        tokensOutput: 0,
+        tokensCacheRead: 0,
+        tokensCacheWrite: 0,
+        occurredAt: new Date(baseTime + 42_000),
+      }),
+    ]);
+
+    const res = await app.request(
+      `/api/gateway/v1/spend-summaries?group_by=end_user&from=${baseTime + 39_000}&to=${baseTime + 50_000}`,
+      { headers: headers() },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{
+        key: string;
+        event_count: number;
+        settled_count: number;
+        usage: { input_tokens: number };
+        cost: { total_usd: string; nano_usd: number };
+      }>;
+    };
+    const row = body.data.find((r) => r.key === u)!;
+    expect(row).toBeDefined();
+    expect(row.event_count).toBe(2);
+    expect(row.settled_count).toBe(1);
+    expect(row.cost.nano_usd).toBe(50_000_000);
+    expect(Number(row.cost.total_usd)).toBeCloseTo(0.05, 6);
+    expect(row.usage.input_tokens).toBe(200);
+  });
+
   /** @scenario The end-user rollup sums exactly that user's requests in the window */
   it("rolls up one end user's spend with token classes", async () => {
     await seed([

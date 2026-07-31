@@ -28,6 +28,12 @@ function formatWhen(date: Date | string) {
   return new Date(date).toLocaleString();
 }
 
+function formatAge(ms: number) {
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`;
+  return `${(ms / 3_600_000).toFixed(1)}h`;
+}
+
 /**
  * Read-only delivery history for one endpoint: the health strip on top,
  * then one row per attempt with the receiver's own status code, latency,
@@ -51,6 +57,13 @@ export function WebhookDeliveriesDrawer({
       limit: 100,
     },
     { enabled: endpoint !== null },
+  );
+  const health = api.webhookEndpoints.health.useQuery(
+    {
+      organizationId,
+      endpointId: endpoint?.id ?? "",
+    },
+    { enabled: endpoint !== null, refetchInterval: 15_000 },
   );
 
   return (
@@ -80,6 +93,54 @@ export function WebhookDeliveriesDrawer({
                   {endpoint.url}
                 </Text>
                 <HStack gap={4} fontSize="sm" flexWrap="wrap">
+                  <HStack gap={1} data-testid="webhook-health-lag">
+                    <Text color="fg.muted">Lag:</Text>
+                    <Text
+                      fontWeight="600"
+                      color={
+                        (health.data?.oldestUndeliveredAgeMs ?? 0) > 300_000
+                          ? "fg.error"
+                          : undefined
+                      }
+                    >
+                      {health.data
+                        ? health.data.oldestUndeliveredAgeMs === null
+                          ? "caught up"
+                          : formatAge(health.data.oldestUndeliveredAgeMs)
+                        : "..."}
+                    </Text>
+                  </HStack>
+                  {(health.data?.dlqDepth ?? 0) > 0 && (
+                    <Badge colorPalette="red" data-testid="webhook-dlq-badge">
+                      {health.data!.dlqDepth} dead-lettered
+                    </Badge>
+                  )}
+                  <HStack gap={1}>
+                    <Text color="fg.muted">Sends/min:</Text>
+                    <Text>
+                      {health.data ? health.data.sendsPerMinute.toFixed(2) : "..."}
+                    </Text>
+                  </HStack>
+                  <HStack gap={1}>
+                    <Text color="fg.muted">Success:</Text>
+                    <Text>
+                      {health.data
+                        ? health.data.successRate === null
+                          ? "-"
+                          : `${Math.round(health.data.successRate * 100)}%`
+                        : "..."}
+                    </Text>
+                  </HStack>
+                  <HStack gap={1}>
+                    <Text color="fg.muted">p95:</Text>
+                    <Text>
+                      {health.data
+                        ? health.data.p95LatencyMs === null
+                          ? "-"
+                          : `${health.data.p95LatencyMs}ms`
+                        : "..."}
+                    </Text>
+                  </HStack>
                   <HStack gap={1}>
                     <Text color="fg.muted">Last success:</Text>
                     <Text>

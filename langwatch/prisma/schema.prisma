@@ -900,6 +900,12 @@ model WebhookEndpoint {
   /// Start of the current consecutive-failure streak; cleared on any 2xx.
   /// 72 hours of unbroken failures from this instant auto-disables.
   failingSince    DateTime?
+  /// Delivery controls, each server-bounded (see webhookDeliveryControls
+  /// constants): envelopes per POST, coalescing window before a partial
+  /// batch ships, and concurrent POSTs to this receiver.
+  maxBatchSize    Int                   @default(100)
+  maxBatchDelayMs Int                   @default(250)
+  maxInFlight     Int                   @default(4)
   lastSuccessAt   DateTime?
   lastFailureAt   DateTime?
   archivedAt      DateTime?

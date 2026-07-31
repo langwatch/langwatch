@@ -507,6 +507,85 @@ export class GatewaySpendEventsRepository {
    * Admitted/settled rows carry zero quantities and zero cost, so
    * including them keeps requestCount honest without touching money.
    */
+  /**
+   * Reconciliation checksum fast path: per-key rollups over the spend
+   * records, grouped by virtual key or end user. Money sums only priced
+   * outcomes (confirmed and failed); settled requests are counted
+   * SEPARATELY so unpriced spend is visible in the checksum instead of
+   * silently reading as zero cost. Admitted rows are in-flight and
+   * excluded. FINAL keeps the read replacement-aware.
+   */
+  async readSpendSummaries({
+    tenantIds,
+    groupBy,
+    fromMs,
+    toMs,
+    limit = 500,
+  }: {
+    tenantIds: string[];
+    groupBy: "virtual_key" | "end_user";
+    fromMs: number;
+    toMs: number;
+    limit?: number;
+  }): Promise<
+    Array<{
+      key: string;
+      eventCount: number;
+      settledCount: number;
+      tokensInput: number;
+      tokensOutput: number;
+      tokensCacheRead: number;
+      tokensCacheWrite: number;
+      tokensReasoning: number;
+      costNanoUsd: number;
+      costUsd: string;
+    }>
+  > {
+    if (tenantIds.length === 0) return [];
+    const client = await this.resolveClient(tenantIds[0]!);
+    const keyColumn = groupBy === "virtual_key" ? "VirtualKeyId" : "EndUserId";
+    const result = await client.query({
+      query: `
+        SELECT
+          ${keyColumn} AS GroupKey,
+          countIf(Status IN ('confirmed', 'failed')) AS EventCount,
+          countIf(Status = 'settled') AS SettledCount,
+          sumIf(TokensInput, Status IN ('confirmed', 'failed')) AS TokensInput,
+          sumIf(TokensOutput, Status IN ('confirmed', 'failed')) AS TokensOutput,
+          sumIf(TokensCacheRead, Status IN ('confirmed', 'failed')) AS TokensCacheRead,
+          sumIf(TokensCacheWrite, Status IN ('confirmed', 'failed')) AS TokensCacheWrite,
+          sumIf(TokensReasoning, Status IN ('confirmed', 'failed')) AS TokensReasoning,
+          sumIf(CostNanoUSD, Status IN ('confirmed', 'failed')) AS CostNanoUSD
+        FROM ${TABLE} FINAL
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND Status != 'admitted'
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND OccurredAt < fromUnixTimestamp64Milli({toMs:Int64})
+        GROUP BY GroupKey
+        ORDER BY CostNanoUSD DESC, GroupKey ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { tenantIds, fromMs, toMs, limit },
+      format: "JSONEachRow",
+    });
+    const raw = (await result.json()) as Array<Record<string, unknown>>;
+    return raw.map((r) => {
+      const nano = Number(r.CostNanoUSD ?? 0);
+      return {
+        key: String(r.GroupKey ?? ""),
+        eventCount: Number(r.EventCount ?? 0),
+        settledCount: Number(r.SettledCount ?? 0),
+        tokensInput: Number(r.TokensInput ?? 0),
+        tokensOutput: Number(r.TokensOutput ?? 0),
+        tokensCacheRead: Number(r.TokensCacheRead ?? 0),
+        tokensCacheWrite: Number(r.TokensCacheWrite ?? 0),
+        tokensReasoning: Number(r.TokensReasoning ?? 0),
+        costNanoUsd: nano,
+        costUsd: nanoToUsdString(nano),
+      };
+    });
+  }
+
   async readEndUserSpend({
     tenantIds,
     endUserId,

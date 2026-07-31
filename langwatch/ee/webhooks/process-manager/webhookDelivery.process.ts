@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
@@ -36,7 +37,10 @@ import {
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";
-import type { WebhookEndpointService } from "../webhookEndpoint.service";
+import type {
+  WebhookEndpointService,
+  WebhookEndpointView,
+} from "../webhookEndpoint.service";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 
@@ -64,6 +68,19 @@ export function webhookRetryDelayMs({ attempt }: { attempt: number }): number {
     WEBHOOK_RETRY_LADDER_MS[WEBHOOK_RETRY_LADDER_MS.length - 1]!
   );
 }
+
+/** How soon a stream capped on in-flight rechecks, and the floor for a
+ *  delay-armed wake. Batching never waits longer than the endpoint's own
+ *  max_batch_delay_ms; this only bounds the retry cadence while capped. */
+export const WEBHOOK_FLUSH_RECHECK_MS = 500;
+/** Dispatched outbox rows older than this are pruned by maintenance. */
+const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
+/** Maintenance cadence: the winner of the hourly CAS runs the sweeps. */
+const MAINTENANCE_INTERVAL_MS = 60 * 60 * 1000;
+const MAINTENANCE_PROCESS_KEY = "maintenance";
+/** In-process throttle so the hot deliver path checks the CAS row at most
+ *  once a minute per pod. */
+let maintenanceLastCheckedMs = 0;
 
 /**
  * The delivery process manager consumes the spend pipeline's committed
@@ -103,6 +120,26 @@ export interface WebhookDeliveryState {
 export const INITIAL_WEBHOOK_DELIVERY_STATE: WebhookDeliveryState = {
   attribution: null,
 };
+
+/** A buffered envelope with its arrival instant, for the coalescing
+ *  deadline and the lag (oldest-undelivered) metric. */
+export interface PendingEnvelope {
+  envelope: SendBatchPayload["envelopes"][number];
+  appendedAtMs: number;
+}
+
+/**
+ * The per-endpoint stream instance (processKey `endpoint:<id>`), committed
+ * directly through the ProcessStore by the deliver and flush executors.
+ * Holds the coalescing buffer; everything shipped lives in outbox messages.
+ */
+export interface EndpointStreamState {
+  pending: PendingEnvelope[];
+}
+
+export function isEndpointStreamKey(processKey: string): boolean {
+  return processKey.startsWith("endpoint:");
+}
 
 const spendUsagePayloadSchema = z.object({
   input_tokens: z.number().int().min(0),
@@ -165,6 +202,14 @@ export const sendBatchSchema = z.object({
   ),
 });
 export type SendBatchPayload = z.infer<typeof sendBatchSchema>;
+
+export const flushEndpointSchema = z.object({
+  organizationId: z.string(),
+  projectId: z.string(),
+  endpointId: z.string(),
+  scheduledFor: z.number().int(),
+});
+export type FlushEndpointPayload = z.infer<typeof flushEndpointSchema>;
 
 export interface WebhookDeliveryProcessDeps {
   prisma: PrismaClient;
@@ -230,11 +275,137 @@ export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
   };
 }
 
+function batchIdFor(
+  endpointId: string,
+  envelopes: ReadonlyArray<{ id: string }>,
+): string {
+  const hash = createHash("sha256")
+    .update(envelopes.map((e) => e.id).join(","))
+    .digest("hex")
+    .slice(0, 16);
+  return `${endpointId}:${hash}`;
+}
+
 /**
- * Level 1: resolve the org's ACTIVE endpoints subscribed to the family and
- * commit one per-endpoint send message with a deterministic key. Redelivery
- * of this intent re-derives the same keys and the outbox suppresses them,
- * so the fan-out is idempotent end to end.
+ * The coalescing core shared by the deliver and flush executors: append an
+ * envelope (when given) to the endpoint's buffered stream, then ship as
+ * many full-or-due batches as the in-flight cap allows, in one atomic
+ * commit of buffer state + outbox messages.
+ *
+ * Shipping policy, per the adopted delivery-controls design:
+ * - a batch at max_batch_size ships immediately, delay never holds a full
+ *   batch back;
+ * - a partial batch ships once its oldest envelope has waited
+ *   max_batch_delay_ms (zero means ship on arrival);
+ * - nothing ships past max_in_flight pending sends, so a slow receiver
+ *   accumulates buffer instead of parallel POSTs, and because full batches
+ *   ship first the batch size CLIMBS toward its cap under backpressure,
+ *   draining faster exactly when the receiver is behind.
+ *
+ * Redelivery safety: deliver appends carry an inbox sourceEventId (the
+ * store absorbs duplicates), flushes are revision-guarded, and the batch
+ * message key is a content hash, so any retry re-derives the same key and
+ * the outbox suppresses it.
+ */
+async function flushEndpointStream({
+  deps,
+  organizationId,
+  projectId,
+  endpoint,
+  append,
+  sourceEventId,
+}: {
+  deps: WebhookDeliveryProcessDeps;
+  organizationId: string;
+  projectId: string;
+  endpoint: WebhookEndpointView;
+  append?: SendBatchPayload["envelopes"][number];
+  sourceEventId?: string;
+}): Promise<void> {
+  const now = (deps.now ?? Date.now)();
+  const ref = {
+    processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+    projectId,
+    processKey: `endpoint:${endpoint.id}`,
+  };
+  const existing = await deps.processStore.findByRef<EndpointStreamState>({
+    ref,
+  });
+  const pending: PendingEnvelope[] = [
+    ...(existing?.state.pending ?? []),
+    ...(append ? [{ envelope: append, appendedAtMs: now }] : []),
+  ];
+
+  const outstanding = (
+    await deps.processStore.findMessagesByRef({ ref })
+  ).filter((m) => m.intentType === "sendBatch" && m.status === "pending")
+    .length;
+
+  const messages: NewOutboxMessage[] = [];
+  let inFlight = outstanding;
+  const remaining = [...pending];
+  const dueAt = (entry: PendingEnvelope) =>
+    entry.appendedAtMs + endpoint.maxBatchDelayMs;
+  while (
+    remaining.length > 0 &&
+    inFlight < endpoint.maxInFlight &&
+    (remaining.length >= endpoint.maxBatchSize ||
+      endpoint.maxBatchDelayMs === 0 ||
+      dueAt(remaining[0]!) <= now)
+  ) {
+    const batch = remaining
+      .splice(0, endpoint.maxBatchSize)
+      .map((e) => e.envelope);
+    const batchId = batchIdFor(endpoint.id, batch);
+    messages.push({
+      messageKey: `send:${batchId}`,
+      intentType: "sendBatch",
+      // Envelope data is JSON by construction (spendRowToEnvelope emits
+      // only JSON primitives); the cast crosses the JsonValue boundary.
+      payload: {
+        organizationId,
+        projectId,
+        endpointId: endpoint.id,
+        batchId,
+        envelopes: batch,
+      } as unknown as JsonValue,
+      traceCarrier: {},
+    });
+    inFlight++;
+  }
+
+  // Anything still buffered arms a wake: the coalescing deadline when the
+  // delay is holding it, a short recheck when the in-flight cap is.
+  const nextWakeAt =
+    remaining.length === 0
+      ? null
+      : inFlight >= endpoint.maxInFlight
+        ? now + WEBHOOK_FLUSH_RECHECK_MS
+        : Math.max(dueAt(remaining[0]!), now + WEBHOOK_FLUSH_RECHECK_MS);
+
+  const result = await deps.processStore.commit<EndpointStreamState>({
+    ref,
+    tenantId: projectId,
+    sourceEventId: sourceEventId ?? null,
+    expectedRevision: existing?.revision ?? 0,
+    state: { pending: remaining },
+    nextWakeAt,
+    messages,
+    now,
+  });
+  if (result.outcome === "revisionConflict") {
+    // A concurrent append or flush won the stream's revision; retry this
+    // intent so nothing is lost (idempotent by inbox id and content key).
+    throw new Error(
+      `webhook stream flush hit a revision conflict on endpoint ${endpoint.id}; retrying`,
+    );
+  }
+}
+
+/**
+ * Level 1: resolve the org's ACTIVE endpoints subscribed to the event's
+ * type and append the envelope to each endpoint's coalescing stream. The
+ * append and any due batches commit atomically per endpoint.
  */
 export function runDeliver(deps: WebhookDeliveryProcessDeps) {
   return async (
@@ -269,51 +440,111 @@ export function runDeliver(deps: WebhookDeliveryProcessDeps) {
     if (endpoints.length === 0) return;
 
     const row = deliverPayloadToRow(payload);
-    const envelope = spendRowToEnvelope(row);
-    const now = (deps.now ?? Date.now)();
+    const envelope = spendRowToEnvelope(
+      row,
+    ) as SendBatchPayload["envelopes"][number];
 
     for (const endpoint of endpoints) {
-      const ref = {
-        processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+      await flushEndpointStream({
+        deps,
+        organizationId,
         projectId: payload.project_id,
-        processKey: `endpoint:${endpoint.id}`,
-      };
-      const existing = await deps.processStore.findByRef({ ref });
-      const batchId = `${endpoint.id}:${payload.gateway_request_id}:${payload.status}`;
-      const message: NewOutboxMessage = {
-        messageKey: `send:${batchId}`,
-        intentType: "sendBatch",
-        // Envelope data is JSON by construction (spendRowToEnvelope emits
-        // only JSON primitives); the cast crosses the JsonValue boundary.
-        payload: {
-          organizationId,
-          projectId: payload.project_id,
-          endpointId: endpoint.id,
-          batchId,
-          envelopes: [envelope],
-        } as unknown as JsonValue,
-        traceCarrier: {},
-      };
-      const result = await deps.processStore.commit({
-        ref,
-        tenantId: payload.project_id,
-        sourceEventId: `deliver:${batchId}`,
-        expectedRevision: existing?.revision ?? 0,
-        state: existing?.state ?? {},
-        nextWakeAt: existing?.nextWakeAt ?? null,
-        messages: [message],
-        now,
+        endpoint,
+        append: envelope,
+        sourceEventId: `deliver:${endpoint.id}:${payload.gateway_request_id}:${payload.status}`,
       });
-      if (result.outcome === "revisionConflict") {
-        // Another deliver run is committing onto this endpoint's stream
-        // concurrently; retry this intent so the message is not lost (the
-        // deterministic key makes the retry idempotent).
-        throw new Error(
-          `webhook deliver hit a revision conflict on endpoint ${endpoint.id}; retrying`,
-        );
-      }
     }
+
+    await runMaintenanceIfDue(deps, payload.project_id);
   };
+}
+
+/**
+ * The wake-armed half of coalescing: ship whatever became due (delay
+ * elapsed or in-flight freed) for one endpoint's stream.
+ */
+export function runFlushEndpoint(deps: WebhookDeliveryProcessDeps) {
+  return async (
+    payload: FlushEndpointPayload,
+    _context: IntentContext,
+  ): Promise<void> => {
+    const endpoint = await deps.prisma.webhookEndpoint.findFirst({
+      where: {
+        id: payload.endpointId,
+        organizationId: payload.organizationId,
+      },
+    });
+    if (!endpoint) return;
+    await flushEndpointStream({
+      deps,
+      organizationId: payload.organizationId,
+      projectId: payload.projectId,
+      endpoint: {
+        id: endpoint.id,
+        organizationId: endpoint.organizationId,
+        url: endpoint.url,
+        enabledEvents: endpoint.enabledEvents,
+        status: endpoint.status,
+        disabledReason: endpoint.disabledReason,
+        disabledAt: endpoint.disabledAt,
+        failingSince: endpoint.failingSince,
+        lastSuccessAt: endpoint.lastSuccessAt,
+        lastFailureAt: endpoint.lastFailureAt,
+        maxBatchSize: endpoint.maxBatchSize,
+        maxBatchDelayMs: endpoint.maxBatchDelayMs,
+        maxInFlight: endpoint.maxInFlight,
+        createdAt: endpoint.createdAt,
+        updatedAt: endpoint.updatedAt,
+      },
+    });
+  };
+}
+
+/**
+ * Outbox and delivery-log retention, CAS-guarded on a singleton stream row
+ * so exactly one pod runs each hourly sweep. The in-process throttle keeps
+ * the hot deliver path from probing the row more than once a minute.
+ */
+async function runMaintenanceIfDue(
+  deps: WebhookDeliveryProcessDeps,
+  projectId: string,
+): Promise<void> {
+  const now = (deps.now ?? Date.now)();
+  if (now - maintenanceLastCheckedMs < 60_000) return;
+  maintenanceLastCheckedMs = now;
+
+  const ref = {
+    processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+    projectId,
+    processKey: MAINTENANCE_PROCESS_KEY,
+  };
+  try {
+    const existing = await deps.processStore.findByRef<{ lastRunMs: number }>(
+      { ref },
+    );
+    if (existing && now - existing.state.lastRunMs < MAINTENANCE_INTERVAL_MS) {
+      return;
+    }
+    const claimed = await deps.processStore.commit({
+      ref,
+      tenantId: projectId,
+      sourceEventId: null,
+      expectedRevision: existing?.revision ?? 0,
+      state: { lastRunMs: now },
+      nextWakeAt: null,
+      messages: [],
+      now,
+    });
+    if (claimed.outcome !== "committed") return;
+
+    await deps.processStore.deleteDispatchedBefore({
+      processName: WEBHOOK_DELIVERY_PROCESS_NAME,
+      before: now - OUTBOX_ROW_RETENTION_MS,
+    });
+    await deps.endpoints.pruneDeliveries(new Date(now));
+  } catch (error) {
+    logger.warn({ error }, "webhook delivery maintenance sweep failed");
+  }
 }
 
 /**
@@ -459,6 +690,7 @@ export function webhookDeliveryPM(
     pm
       .state<WebhookDeliveryState>(INITIAL_WEBHOOK_DELIVERY_STATE)
       .intent("deliver", deliverSchema, runDeliver(deps))
+      .intent("flushEndpoint", flushEndpointSchema, runFlushEndpoint(deps))
       .intent("sendBatch", sendBatchSchema, runWebhookSendBatch(deps))
       .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data) => ({
         state: {
@@ -528,6 +760,30 @@ export function webhookDeliveryPM(
               duration_ms: 0,
               error: null,
               settle_reason: settled.reason,
+            }),
+          ],
+        };
+      })
+      // Endpoint streams arm wakes for their coalescing deadlines; the
+      // wake hands the flush to the I/O executor. Per-request instances
+      // never arm wakes, and unknown keys stand down harmlessly.
+      .onWake((state, ctx) => {
+        if (!isEndpointStreamKey(ctx.key)) return { state };
+        const stream = state as unknown as EndpointStreamState;
+        const endpointId = ctx.key.slice("endpoint:".length);
+        const organizationId =
+          stream.pending[0]?.envelope.data?.organization_id;
+        if (typeof organizationId !== "string" || organizationId === "") {
+          return { state };
+        }
+        return {
+          state,
+          intents: [
+            ctx.intents.flushEndpoint(`flush:${ctx.at}`, {
+              organizationId,
+              projectId: ctx.projectId,
+              endpointId,
+              scheduledFor: ctx.at,
             }),
           ],
         };

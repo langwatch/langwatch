@@ -39,6 +39,13 @@ export interface WebhookEndpointHealth {
   failing_since: string | null;
   last_success_at: string | null;
   last_failure_at: string | null;
+  /** The headline: age of the oldest envelope still buffered or retrying;
+   *  null when the feed is fully delivered. */
+  oldest_undelivered_age_ms: number | null;
+  dlq_depth: number;
+  sends_per_minute: number;
+  success_rate: number | null;
+  p95_latency_ms: number | null;
 }
 
 export interface WebhookEventType {
@@ -166,6 +173,9 @@ export class WebhooksApiService {
       url?: string;
       enabledEvents?: string[];
       status?: "ACTIVE" | "DISABLED";
+      maxBatchSize?: number;
+      maxBatchDelayMs?: number;
+      maxInFlight?: number;
     },
   ): Promise<WebhookEndpointSummary> {
     const res = await this.request<{ data: WebhookEndpointSummary }>(
@@ -179,6 +189,15 @@ export class WebhooksApiService {
             ? { enabled_events: input.enabledEvents }
             : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(input.maxBatchSize !== undefined
+            ? { max_batch_size: input.maxBatchSize }
+            : {}),
+          ...(input.maxBatchDelayMs !== undefined
+            ? { max_batch_delay_ms: input.maxBatchDelayMs }
+            : {}),
+          ...(input.maxInFlight !== undefined
+            ? { max_in_flight: input.maxInFlight }
+            : {}),
         }),
       },
     );

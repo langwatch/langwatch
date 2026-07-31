@@ -22,6 +22,64 @@ export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export const WEBHOOK_DISABLED_REASON_AUTO = "auto_failures_72h";
 export const WEBHOOK_DISABLED_REASON_MANUAL = "manual";
 
+/**
+ * Server bounds for the per-endpoint delivery controls. Out-of-bounds
+ * values are rejected at every write surface with the bound in the error.
+ *
+ * - Batch size caps at 100, the wire contract's batch ceiling.
+ * - The coalescing delay caps at a minute: it is added invoice lag, and
+ *   past that the customer should scale receivers, not buffering.
+ * - In-flight caps at 8: the dispatcher pool is small, and more parallel
+ *   POSTs than that just moves queueing into the receiver.
+ */
+export const WEBHOOK_MAX_BATCH_SIZE_BOUNDS = { min: 1, max: 100 } as const;
+export const WEBHOOK_BATCH_DELAY_BOUNDS_MS = { min: 0, max: 60_000 } as const;
+export const WEBHOOK_IN_FLIGHT_BOUNDS = { min: 1, max: 8 } as const;
+
+export interface WebhookDeliveryControls {
+  maxBatchSize: number;
+  maxBatchDelayMs: number;
+  maxInFlight: number;
+}
+
+function assertControlInBounds(
+  name: string,
+  value: number,
+  bounds: { min: number; max: number },
+): void {
+  if (!Number.isInteger(value) || value < bounds.min || value > bounds.max) {
+    throw new WebhookEndpointValidationError(
+      `${name} must be an integer between ${bounds.min} and ${bounds.max}`,
+    );
+  }
+}
+
+export function assertValidDeliveryControls(
+  controls: Partial<WebhookDeliveryControls>,
+): void {
+  if (controls.maxBatchSize !== undefined) {
+    assertControlInBounds(
+      "max_batch_size",
+      controls.maxBatchSize,
+      WEBHOOK_MAX_BATCH_SIZE_BOUNDS,
+    );
+  }
+  if (controls.maxBatchDelayMs !== undefined) {
+    assertControlInBounds(
+      "max_batch_delay_ms",
+      controls.maxBatchDelayMs,
+      WEBHOOK_BATCH_DELAY_BOUNDS_MS,
+    );
+  }
+  if (controls.maxInFlight !== undefined) {
+    assertControlInBounds(
+      "max_in_flight",
+      controls.maxInFlight,
+      WEBHOOK_IN_FLIGHT_BOUNDS,
+    );
+  }
+}
+
 export class WebhookEndpointValidationError extends Error {}
 export class WebhookEndpointNotFoundError extends Error {
   constructor() {
@@ -40,6 +98,9 @@ export interface WebhookEndpointView {
   failingSince: Date | null;
   lastSuccessAt: Date | null;
   lastFailureAt: Date | null;
+  maxBatchSize: number;
+  maxBatchDelayMs: number;
+  maxInFlight: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,6 +117,9 @@ function toView(endpoint: WebhookEndpoint): WebhookEndpointView {
     failingSince: endpoint.failingSince,
     lastSuccessAt: endpoint.lastSuccessAt,
     lastFailureAt: endpoint.lastFailureAt,
+    maxBatchSize: endpoint.maxBatchSize,
+    maxBatchDelayMs: endpoint.maxBatchDelayMs,
+    maxInFlight: endpoint.maxInFlight,
     createdAt: endpoint.createdAt,
     updatedAt: endpoint.updatedAt,
   };
@@ -120,9 +184,13 @@ export class WebhookEndpointService {
     organizationId: string;
     url: string;
     enabledEvents: string[];
+    maxBatchSize?: number;
+    maxBatchDelayMs?: number;
+    maxInFlight?: number;
   }): Promise<{ endpoint: WebhookEndpointView; secret: string }> {
     assertValidUrl(params.url);
     assertValidEvents(params.enabledEvents);
+    assertValidDeliveryControls(params);
     const secret = newSecret();
     const endpoint = await this.deps.prisma.webhookEndpoint.create({
       data: {
@@ -131,6 +199,15 @@ export class WebhookEndpointService {
         url: params.url,
         enabledEvents: params.enabledEvents,
         secretEncrypted: encrypt(secret),
+        ...(params.maxBatchSize !== undefined
+          ? { maxBatchSize: params.maxBatchSize }
+          : {}),
+        ...(params.maxBatchDelayMs !== undefined
+          ? { maxBatchDelayMs: params.maxBatchDelayMs }
+          : {}),
+        ...(params.maxInFlight !== undefined
+          ? { maxInFlight: params.maxInFlight }
+          : {}),
       },
     });
     return { endpoint: toView(endpoint), secret };
@@ -158,17 +235,30 @@ export class WebhookEndpointService {
     endpointId: string;
     url?: string;
     enabledEvents?: string[];
+    maxBatchSize?: number;
+    maxBatchDelayMs?: number;
+    maxInFlight?: number;
   }): Promise<WebhookEndpointView> {
     const endpoint = await this.requireEndpoint(params);
     if (params.url !== undefined) assertValidUrl(params.url);
     if (params.enabledEvents !== undefined)
       assertValidEvents(params.enabledEvents);
+    assertValidDeliveryControls(params);
     const updated = await this.deps.prisma.webhookEndpoint.update({
       where: { id: endpoint.id },
       data: {
         ...(params.url !== undefined ? { url: params.url } : {}),
         ...(params.enabledEvents !== undefined
           ? { enabledEvents: params.enabledEvents }
+          : {}),
+        ...(params.maxBatchSize !== undefined
+          ? { maxBatchSize: params.maxBatchSize }
+          : {}),
+        ...(params.maxBatchDelayMs !== undefined
+          ? { maxBatchDelayMs: params.maxBatchDelayMs }
+          : {}),
+        ...(params.maxInFlight !== undefined
+          ? { maxInFlight: params.maxInFlight }
           : {}),
       },
     });

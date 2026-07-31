@@ -199,6 +199,15 @@ Feature: Billing spend events, one durable record per gateway request
       Then gateway spend events are not governed by it
       And the table's own retention is a fixed thirteen month delete
 
+  Rule: Summaries are the reconciliation checksum
+
+    @integration
+    Scenario: Per key summaries roll up priced outcomes with settled counted separately
+      Given priced and settled spend records across keys and end users
+      When the spend summaries are read grouped by a key
+      Then each row sums tokens and integer nano cost over priced outcomes only
+      And settled requests appear as their own count, never in the cost
+
   Rule: The caller declares who spent it
 
     @unit

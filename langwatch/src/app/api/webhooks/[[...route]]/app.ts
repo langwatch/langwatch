@@ -4,6 +4,8 @@ import { describeRoute } from "hono-openapi";
 import type { Context, Next } from "hono";
 import { z } from "zod";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
+import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
 import {
   WebhookEventsClickHouseRepository,
@@ -22,6 +24,10 @@ import { handleWebhookApiError } from "./error-handler";
 patchZodOpenapi();
 
 const endpoints = new WebhookEndpointService({ prisma });
+const health = new WebhookHealthService({
+  prisma,
+  processStore: new PrismaProcessStore(prisma),
+});
 const eventsRepository = new WebhookEventsClickHouseRepository(
   async (tenantId) => {
     const client = await getClickHouseClientForProject(tenantId);
@@ -48,15 +54,23 @@ async function requireWebhookPlan(c: Context, next: Next): Promise<void> {
   await next();
 }
 
+const deliveryControlsSchema = {
+  max_batch_size: z.number().int().optional(),
+  max_batch_delay_ms: z.number().int().optional(),
+  max_in_flight: z.number().int().optional(),
+};
+
 const createEndpointSchema = z.object({
   url: z.string().min(1).max(2000),
   enabled_events: z.array(z.string().min(1).max(200)).min(1).max(100),
+  ...deliveryControlsSchema,
 });
 
 const updateEndpointSchema = z.object({
   url: z.string().min(1).max(2000).optional(),
   enabled_events: z.array(z.string().min(1).max(200)).min(1).max(100).optional(),
   status: z.enum(["ACTIVE", "DISABLED"]).optional(),
+  ...deliveryControlsSchema,
 });
 
 const deliveriesQuerySchema = z.object({
@@ -81,6 +95,9 @@ function endpointResponse(endpoint: {
   failingSince: Date | null;
   lastSuccessAt: Date | null;
   lastFailureAt: Date | null;
+  maxBatchSize: number;
+  maxBatchDelayMs: number;
+  maxInFlight: number;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -94,6 +111,9 @@ function endpointResponse(endpoint: {
     failing_since: endpoint.failingSince?.toISOString() ?? null,
     last_success_at: endpoint.lastSuccessAt?.toISOString() ?? null,
     last_failure_at: endpoint.lastFailureAt?.toISOString() ?? null,
+    max_batch_size: endpoint.maxBatchSize,
+    max_batch_delay_ms: endpoint.maxBatchDelayMs,
+    max_in_flight: endpoint.maxInFlight,
     created_at: endpoint.createdAt.toISOString(),
     updated_at: endpoint.updatedAt.toISOString(),
   };
@@ -120,6 +140,9 @@ secured
         organizationId: organization.id,
         url: body.url,
         enabledEvents: body.enabled_events,
+        maxBatchSize: body.max_batch_size,
+        maxBatchDelayMs: body.max_batch_delay_ms,
+        maxInFlight: body.max_in_flight,
       });
       return c.json(
         { data: { ...endpointResponse(endpoint), secret } },
@@ -177,6 +200,9 @@ secured
         endpointId,
         url: body.url,
         enabledEvents: body.enabled_events,
+        maxBatchSize: body.max_batch_size,
+        maxBatchDelayMs: body.max_batch_delay_ms,
+        maxInFlight: body.max_in_flight,
       });
       if (body.status === "DISABLED" && endpoint.status === "ACTIVE") {
         endpoint = await endpoints.disable({
@@ -357,21 +383,26 @@ secured
     requireWebhookPlan,
     describeRoute({
       description:
-        "Delivery health: status, failure streak, last success and failure",
+        "Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.",
     }),
     async (c) => {
       const organization = c.get("organization") as Organization;
-      const health = await endpoints.health({
+      const report = await health.health({
         organizationId: organization.id,
         endpointId: c.req.param("id"),
       });
       return c.json({
         data: {
-          status: health.status,
-          disabled_reason: health.disabledReason,
-          failing_since: health.failingSince?.toISOString() ?? null,
-          last_success_at: health.lastSuccessAt?.toISOString() ?? null,
-          last_failure_at: health.lastFailureAt?.toISOString() ?? null,
+          status: report.status,
+          disabled_reason: report.disabledReason,
+          failing_since: report.failingSince?.toISOString() ?? null,
+          last_success_at: report.lastSuccessAt?.toISOString() ?? null,
+          last_failure_at: report.lastFailureAt?.toISOString() ?? null,
+          oldest_undelivered_age_ms: report.oldestUndeliveredAgeMs,
+          dlq_depth: report.dlqDepth,
+          sends_per_minute: report.sendsPerMinute,
+          success_rate: report.successRate,
+          p95_latency_ms: report.p95LatencyMs,
         },
       });
     },

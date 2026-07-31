@@ -323,16 +323,32 @@ export default function WebhooksSettingsPage() {
           setDrawerOpen(false);
           setEditing(null);
         }}
-        onSave={({ url, enabledEvents }) => {
+        onSave={({
+          url,
+          enabledEvents,
+          maxBatchSize,
+          maxBatchDelayMs,
+          maxInFlight,
+        }) => {
           if (editing) {
             updateMutation.mutate({
               organizationId,
               endpointId: editing.id,
               url,
               enabledEvents,
+              maxBatchSize,
+              maxBatchDelayMs,
+              maxInFlight,
             });
           } else {
-            createMutation.mutate({ organizationId, url, enabledEvents });
+            createMutation.mutate({
+              organizationId,
+              url,
+              enabledEvents,
+              maxBatchSize,
+              maxBatchDelayMs,
+              maxInFlight,
+            });
           }
         }}
       />

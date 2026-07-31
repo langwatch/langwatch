@@ -6,7 +6,13 @@ import type { CommandResult } from "../../utils/output";
 
 export const updateWebhookCommand = async (
   id: string,
-  options: { url?: string; events?: string },
+  options: {
+    url?: string;
+    events?: string;
+    maxBatchSize?: string;
+    maxBatchDelay?: string;
+    maxInFlight?: string;
+  },
 ): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const service = new WebhooksApiService({ apiKey });
@@ -14,6 +20,18 @@ export const updateWebhookCommand = async (
   try {
     const endpoint = await service.update(id, {
       url: options.url,
+      maxBatchSize:
+        options.maxBatchSize !== undefined
+          ? Number(options.maxBatchSize)
+          : undefined,
+      maxBatchDelayMs:
+        options.maxBatchDelay !== undefined
+          ? Number(options.maxBatchDelay)
+          : undefined,
+      maxInFlight:
+        options.maxInFlight !== undefined
+          ? Number(options.maxInFlight)
+          : undefined,
       enabledEvents: options.events !== undefined
         ? options.events.split(",").map((e) => e.trim()).filter(Boolean)
         : undefined,

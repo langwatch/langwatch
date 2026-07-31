@@ -154,6 +154,22 @@ describe("Feature: Webhook endpoints REST API", () => {
     expect(rolled.data.secret).not.toBe(created.data.secret);
   });
 
+  it("rejects out-of-bounds delivery controls with the bound in the error", async () => {
+    planHasWebhookEndpoints = true;
+    const res = await app.request("/api/webhooks/v1/endpoints", {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        url: "https://example.com/hooks/bounds",
+        enabled_events: ["gateway.request.completed"],
+        max_batch_size: 1000,
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { message?: string; error?: string };
+    expect(JSON.stringify(body)).toContain("between 1 and 100");
+  });
+
   it("rejects unknown event selectors with a 400", async () => {
     planHasWebhookEndpoints = true;
     const res = await app.request("/api/webhooks/v1/endpoints", {

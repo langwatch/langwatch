@@ -93,6 +93,53 @@ const secured = createOrgApp({ basePath: "/api/gateway/v1" });
 
 secured.hono.onError(handleGatewaySpendApiError);
 
+const spendSummariesQuerySchema = z.object({
+  group_by: z.enum(["virtual_key", "end_user"]),
+  from: z.coerce.number().int().positive(),
+  to: z.coerce.number().int().positive(),
+  project_id: z.string().min(1).max(100).optional(),
+  limit: z.coerce.number().int().positive().max(1000).optional().default(500),
+});
+
+secured
+  .access(requires("gatewaySpend:view"))
+  .get(
+    "/spend-summaries",
+    requireBillingPlan,
+    describeRoute({
+      description:
+        "Reconciliation checksum fast path: per-key spend rollups grouped by virtual key or end user, with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges.",
+    }),
+    zValidator("query", spendSummariesQuerySchema),
+    async (c) => {
+      const organization = c.get("organization") as Organization;
+      const query = c.req.valid("query");
+      const tenantIds = await orgTenantIds(organization.id, query.project_id);
+      const rows = await spendEvents.readSpendSummaries({
+        tenantIds,
+        groupBy: query.group_by,
+        fromMs: query.from,
+        toMs: query.to,
+        limit: query.limit,
+      });
+      return c.json({
+        data: rows.map((r) => ({
+          key: r.key,
+          event_count: r.eventCount,
+          settled_count: r.settledCount,
+          usage: {
+            input_tokens: r.tokensInput,
+            output_tokens: r.tokensOutput,
+            cache_read_input_tokens: r.tokensCacheRead,
+            cache_creation_input_tokens: r.tokensCacheWrite,
+            reasoning_tokens: r.tokensReasoning,
+          },
+          cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
+        })),
+      });
+    },
+  );
+
 secured
   .access(requires("gatewaySpend:view"))
   .get(

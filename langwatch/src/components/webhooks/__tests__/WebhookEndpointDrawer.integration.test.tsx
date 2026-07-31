@@ -86,6 +86,9 @@ describe("WebhookEndpointDrawer", () => {
     expect(onSave).toHaveBeenCalledWith({
       url: "https://example.com/hook",
       enabledEvents: ["gateway.*"],
+      maxBatchSize: 100,
+      maxBatchDelayMs: 250,
+      maxInFlight: 4,
     });
   });
 
@@ -104,6 +107,9 @@ describe("WebhookEndpointDrawer", () => {
     expect(onSave).toHaveBeenCalledWith({
       url: "https://example.com/hook",
       enabledEvents: ["gateway.request.completed"],
+      maxBatchSize: 100,
+      maxBatchDelayMs: 250,
+      maxInFlight: 4,
     });
   });
 
@@ -115,6 +121,42 @@ describe("WebhookEndpointDrawer", () => {
 });
 
 describe("WebhookSecretDialog", () => {
+  /** @scenario Delivery controls are editable in the drawer within their bounds */
+  it("renders the delivery controls with defaults and saves edited values", async () => {
+    const { onSave } = renderDrawer();
+    const user = userEvent.setup();
+
+    const batchSize = screen.getByTestId("webhook-max-batch-size");
+    const batchDelay = screen.getByTestId("webhook-max-batch-delay");
+    const inFlight = screen.getByTestId("webhook-max-in-flight");
+    expect(batchSize).toHaveValue(100);
+    expect(batchDelay).toHaveValue(250);
+    expect(inFlight).toHaveValue(4);
+
+    await user.type(
+      screen.getByTestId("webhook-url-input"),
+      "https://example.com/hooks",
+    );
+    await user.click(
+      screen.getByTestId("webhook-event-gateway.request.completed"),
+    );
+    await user.clear(batchSize);
+    await user.type(batchSize, "25");
+    await user.clear(batchDelay);
+    await user.type(batchDelay, "1000");
+    await user.clear(inFlight);
+    await user.type(inFlight, "2");
+    await user.click(screen.getByTestId("webhook-save"));
+
+    expect(onSave).toHaveBeenCalledWith({
+      url: "https://example.com/hooks",
+      enabledEvents: ["gateway.request.completed"],
+      maxBatchSize: 25,
+      maxBatchDelayMs: 1000,
+      maxInFlight: 2,
+    });
+  });
+
   /** @scenario The signing secret dialog warns it is shown only once */
   it("shows the secret with the shown-once warning while open", () => {
     render(

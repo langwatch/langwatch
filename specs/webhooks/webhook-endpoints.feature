@@ -158,6 +158,47 @@ Feature: Webhook endpoints, signed outbound event delivery
       When the operator requeues that endpoint's dead messages
       Then the message is pending again with a fresh attempt budget
 
+  Rule: Delivery is tunable per endpoint, within server bounds
+
+    @unit
+    Scenario: Out of bounds delivery controls are rejected with the bound in the error
+      When an endpoint is saved with a batch size past the server bound
+      Then the save is rejected
+      And the error names the allowed range
+
+    @unit
+    Scenario: Delivery controls are editable in the drawer within their bounds
+      Given the endpoint drawer is open
+      Then the batch size, batch delay, and in-flight controls show their defaults
+      And saving sends the edited values
+
+    @integration
+    Scenario: Envelopes coalesce into one signed batch up to the endpoint's size
+      Given an endpoint with a coalescing delay holding partial batches
+      When enough events arrive to fill a batch
+      Then one POST carries the full batch under a single signature
+      And every envelope keeps its own event id
+
+    @integration
+    Scenario: A partial batch ships once its delay elapses
+      Given buffered envelopes fewer than the batch size
+      When the coalescing deadline passes
+      Then the wake flushes them as one batch
+
+    @integration
+    Scenario: Under backpressure batches grow toward the size cap
+      Given an endpoint capped at one in-flight send with a slow receiver
+      When events keep arriving while the send retries
+      Then they accumulate in the buffer instead of new POSTs
+      And the next flush ships them as one larger batch
+
+    @integration
+    Scenario: The health report leads with the oldest undelivered age
+      Given envelopes buffered and a send riding retries
+      When the endpoint's health is read
+      Then the oldest undelivered age reflects the stalest envelope
+      And dead lettered batches are counted as DLQ depth
+
   Rule: Secrets are shown once and the platform is enterprise gated
 
     @integration

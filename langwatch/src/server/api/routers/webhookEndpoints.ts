@@ -12,6 +12,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
+import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
+import { PrismaProcessStore } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import {
   WebhookEndpointNotFoundError,
   WebhookEndpointService,
@@ -103,6 +105,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
       orgInput.extend({
         url: z.string(),
         enabledEvents: z.array(z.string()).min(1),
+        maxBatchSize: z.number().int().optional(),
+        maxBatchDelayMs: z.number().int().optional(),
+        maxInFlight: z.number().int().optional(),
       }),
     )
     .use(checkOrganizationPermission("webhookEndpoints:manage"))
@@ -113,6 +118,25 @@ export const webhookEndpointsRouter = createTRPCRouter({
           organizationId: input.organizationId,
           url: input.url,
           enabledEvents: input.enabledEvents,
+          maxBatchSize: input.maxBatchSize,
+          maxBatchDelayMs: input.maxBatchDelayMs,
+          maxInFlight: input.maxInFlight,
+        }),
+      ),
+    ),
+
+  health: protectedProcedure
+    .input(endpointInput)
+    .use(checkOrganizationPermission("webhookEndpoints:view"))
+    .use(requireWebhooksPlan)
+    .query(({ ctx, input }) =>
+      translating(() =>
+        new WebhookHealthService({
+          prisma: ctx.prisma,
+          processStore: new PrismaProcessStore(ctx.prisma),
+        }).health({
+          organizationId: input.organizationId,
+          endpointId: input.endpointId,
         }),
       ),
     ),
@@ -122,6 +146,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
       endpointInput.extend({
         url: z.string().optional(),
         enabledEvents: z.array(z.string()).min(1).optional(),
+        maxBatchSize: z.number().int().optional(),
+        maxBatchDelayMs: z.number().int().optional(),
+        maxInFlight: z.number().int().optional(),
       }),
     )
     .use(checkOrganizationPermission("webhookEndpoints:manage"))
@@ -133,6 +160,9 @@ export const webhookEndpointsRouter = createTRPCRouter({
           endpointId: input.endpointId,
           url: input.url,
           enabledEvents: input.enabledEvents,
+          maxBatchSize: input.maxBatchSize,
+          maxBatchDelayMs: input.maxBatchDelayMs,
+          maxInFlight: input.maxInFlight,
         }),
       ),
     ),
