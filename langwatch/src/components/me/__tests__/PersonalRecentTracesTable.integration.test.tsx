@@ -51,13 +51,14 @@ describe("PersonalRecentTracesTable", () => {
       expect(screen.queryByText(/Skills\s+and\s+MCP/i)).toBeNull();
     });
 
-    it("links the API-key offer to the personal project's api-keys settings", () => {
+    it("links the API-key offer to the api-keys settings page", () => {
       renderEmpty("jane-personal");
 
       const link = screen.getByText("Create an API key").closest("a");
-      expect(link?.getAttribute("href")).toBe(
-        "/jane-personal/settings/api-keys",
-      );
+      // Settings is a top-level route. A project-slug prefix has no route
+      // behind it and lands the reader on a 404 or, for a member whose
+      // ambient team resolves elsewhere, on a refusal.
+      expect(link?.getAttribute("href")).toBe("/settings/api-keys");
     });
 
     it("renders the two in-page offers as buttons (scroll to the matching section)", () => {
