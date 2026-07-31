@@ -296,47 +296,39 @@ function reportMissingCredentials(endpoint: string): never {
 }
 
 /**
- * Org-anchored surfaces (webhooks, spend-events) authenticate with an
- * ORGANIZATION API key (sk-lw-*), not a project key. Resolution:
- * LANGWATCH_ORG_API_KEY wins; LANGWATCH_API_KEY is accepted as a fallback
- * for callers who keep their org key there (the server rejects
- * project-scoped keys on these routes with a 401 either way). Returns the
- * resolved key so services can be constructed with it explicitly.
+ * Org-anchored surfaces (webhooks, spend-events) authenticate with the ONE
+ * supported credential, LANGWATCH_API_KEY, exactly like every other
+ * command: org and project permission checks are enforced server-side, and
+ * a project-scoped key gets a 401 from these routes. No separate org-key
+ * variable and no client-side fallback chain, per the recorded auth
+ * decision.
  */
 export const checkOrgApiKey = (): string => {
   loadEnvFileScoped();
-
-  // Empty strings count as absent (?? alone would accept an empty var and
-  // then fail the presence check below without ever trying the fallback).
-  const firstNonEmpty = (...values: Array<string | undefined>): string | undefined =>
-    values.find((v) => v !== undefined && v.trim() !== "");
-  const orgKey = firstNonEmpty(
-    process.env.LANGWATCH_ORG_API_KEY,
-    process.env.LANGWATCH_API_KEY,
-  );
-  if (orgKey) return orgKey;
+  const key = process.env.LANGWATCH_API_KEY;
+  if (key && key.trim() !== "") return key;
 
   const settingsUrl = `${getEndpoint()}/settings/api-keys`;
   if (getOutputFormat() !== "text") {
     console.log(
       renderErrorAsJson({
-        code: "missing_org_api_key",
+        code: "missing_api_key",
         kind: "missing_api_key",
         message:
-          "LANGWATCH_ORG_API_KEY is not set. Create an organization API key in Settings > API Keys and add it to your .env file.",
+          "LANGWATCH_API_KEY is not set. This command needs an organization-capable API key; create one in Settings > API Keys and add it to your .env file.",
         httpStatus: 0,
         meta: { settingsUrl },
         isHandled: true,
       }),
     );
-    console.error(chalk.red("Error: LANGWATCH_ORG_API_KEY not found."));
+    console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));
     process.exit(1);
   }
 
-  console.error(chalk.red("Error: LANGWATCH_ORG_API_KEY not found."));
-  console.error(chalk.gray("This command needs an ORGANIZATION API key (sk-lw-...). Create one at:"));
+  console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));
+  console.error(chalk.gray("This command needs an organization-capable API key. Create one at:"));
   console.error(chalk.cyan(`  ${settingsUrl}`));
   console.error(chalk.gray("Then add it to your .env file:"));
-  console.error(chalk.cyan("  echo 'LANGWATCH_ORG_API_KEY=<your-key>' >> .env"));
+  console.error(chalk.cyan("  echo 'LANGWATCH_API_KEY=<your-key>' >> .env"));
   process.exit(1);
 };

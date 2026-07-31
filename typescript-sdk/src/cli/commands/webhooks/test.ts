@@ -15,6 +15,9 @@ export const testWebhookCommand = async (id: string): Promise<CommandResult | vo
       spinner.succeed(`Receiver answered ${result.response_status}`);
     } else {
       spinner.warn(`Delivery failed${result.response_status !== null ? ` (HTTP ${result.response_status})` : ""}${result.error ? `: ${result.error}` : ""}`);
+      // Scripts read the exit code; a rejected test delivery is a failure.
+      // exitCode (not exit) so the structured payload still prints.
+      process.exitCode = 1;
     }
     return {
       data: result,

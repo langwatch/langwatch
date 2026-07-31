@@ -15,6 +15,18 @@ export const updateWebhookCommand = async (
   },
 ): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
+  if (
+    options.url === undefined &&
+    options.events === undefined &&
+    options.maxBatchSize === undefined &&
+    options.maxBatchDelay === undefined &&
+    options.maxInFlight === undefined
+  ) {
+    console.error(
+      "Nothing to update: pass at least one of --url, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
+    );
+    process.exit(1);
+  }
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Updating webhook endpoint...").start();
   try {
@@ -37,7 +49,17 @@ export const updateWebhookCommand = async (
         : undefined,
     });
     spinner.succeed(`Updated endpoint ${endpoint.id}`);
-    return { data: endpoint, table: () => {} };
+    return {
+      data: endpoint,
+      table: () => {
+        console.log();
+        console.log(`Endpoint:    ${endpoint.id}`);
+        console.log(`URL:         ${endpoint.url}`);
+        console.log(`Events:      ${endpoint.enabled_events.join(", ")}`);
+        console.log(`Delivery:    batch<=${endpoint.max_batch_size}, delay ${endpoint.max_batch_delay_ms}ms, in-flight<=${endpoint.max_in_flight}`);
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "update webhook endpoint" });
     process.exit(1);
@@ -51,7 +73,14 @@ export const enableWebhookCommand = async (id: string): Promise<CommandResult | 
   try {
     const endpoint = await service.update(id, { status: "ACTIVE" });
     spinner.succeed(`Endpoint ${endpoint.id} is active`);
-    return { data: endpoint, table: () => {} };
+    return {
+      data: endpoint,
+      table: () => {
+        console.log();
+        console.log(`Endpoint ${endpoint.id} is active again. Replay the gap window if the pause left undelivered events.`);
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "enable webhook endpoint" });
     process.exit(1);
@@ -65,7 +94,14 @@ export const disableWebhookCommand = async (id: string): Promise<CommandResult |
   try {
     const endpoint = await service.update(id, { status: "DISABLED" });
     spinner.succeed(`Endpoint ${endpoint.id} disabled (deliveries drain without sending)`);
-    return { data: endpoint, table: () => {} };
+    return {
+      data: endpoint,
+      table: () => {
+        console.log();
+        console.log(`Endpoint ${endpoint.id} is disabled. Events keep accruing; re-enable and replay to catch up.`);
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "disable webhook endpoint" });
     process.exit(1);

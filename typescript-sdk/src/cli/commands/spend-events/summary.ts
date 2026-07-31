@@ -24,16 +24,16 @@ export const spendSummaryCommand = async (options: {
 }): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
   const groupBy = options.groupBy === "end_user" ? "end_user" : "virtual_key";
+  const now = Date.now();
+  const fromMs =
+    options.from !== undefined
+      ? parseInstant(options.from, "--from")
+      : now - 24 * 60 * 60 * 1000;
+  const toMs =
+    options.to !== undefined ? parseInstant(options.to, "--to") : now;
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Reading spend summaries...").start();
   try {
-    const now = Date.now();
-    const fromMs =
-      options.from !== undefined
-        ? parseInstant(options.from, "--from")
-        : now - 24 * 60 * 60 * 1000;
-    const toMs =
-      options.to !== undefined ? parseInstant(options.to, "--to") : now;
     const { data } = await service.summaries({
       groupBy,
       from: fromMs,

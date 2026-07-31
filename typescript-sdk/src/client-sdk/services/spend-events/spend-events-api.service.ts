@@ -120,11 +120,7 @@ export class SpendEventsApiService {
       process.env.LANGWATCH_ENDPOINT ??
       DEFAULT_ENDPOINT
     ).replace(/\/+$/, "");
-    this.apiKey =
-      config?.apiKey ??
-      process.env.LANGWATCH_ORG_API_KEY ??
-      process.env.LANGWATCH_API_KEY ??
-      "";
+    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private async request<T>(
@@ -134,6 +130,8 @@ export class SpendEventsApiService {
   ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
+      // A hung control plane must fail the command, not freeze it.
+      signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
@@ -184,7 +182,7 @@ export class SpendEventsApiService {
     if (options?.projectId) params.set("project_id", options.projectId);
     if (options?.model) params.set("model", options.model);
     if (options?.status) params.set("status", options.status);
-    const qs = params.size > 0 ? `?${params.toString()}` : "";
+    const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     return await this.request<SpendEventsPage>(
       "list spend events",
       `/api/gateway/v1/spend-events${qs}`,
@@ -224,7 +222,7 @@ export class SpendEventsApiService {
     if (options?.from !== undefined) params.set("from", String(options.from));
     if (options?.to !== undefined) params.set("to", String(options.to));
     if (options?.virtualKeyId) params.set("virtual_key_id", options.virtualKeyId);
-    const qs = params.size > 0 ? `?${params.toString()}` : "";
+    const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     const res = await this.request<{ data: EndUserSpend }>(
       "read end-user spend",
       `/api/gateway/v1/end-users/${encodeURIComponent(endUserId)}/spend${qs}`,

@@ -8,6 +8,13 @@ import type { CommandResult } from "../../utils/output";
 
 import { parseInstantOrNull } from "../../utils/instant";
 
+const parsePositiveInt = (value: string, flag: string): number => {
+  const parsed = Number(value);
+  if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
+  console.error(`Invalid ${flag}: pass a positive integer.`);
+  process.exit(1);
+};
+
 const parseInstant = (value: string, flag: string): number => {
   const parsed = parseInstantOrNull(value);
   if (parsed !== null) return parsed;
@@ -27,14 +34,24 @@ export const listSpendEventsCommand = async (options: {
   status?: "success" | "error";
 }): Promise<CommandResult | void> => {
   const apiKey = checkOrgApiKey();
+  // Parse flags before the spinner starts: bad input must produce a clean
+  // structured error, not frames interleaved with a dying spinner.
+  const from =
+    options.from !== undefined ? parseInstant(options.from, "--from") : undefined;
+  const to =
+    options.to !== undefined ? parseInstant(options.to, "--to") : undefined;
+  const limit =
+    options.limit !== undefined
+      ? parsePositiveInt(options.limit, "--limit")
+      : undefined;
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Fetching spend events...").start();
   try {
     const page = await service.list({
-      from: options.from !== undefined ? parseInstant(options.from, "--from") : undefined,
-      to: options.to !== undefined ? parseInstant(options.to, "--to") : undefined,
+      from,
+      to,
       cursor: options.cursor,
-      limit: options.limit !== undefined ? Number(options.limit) : undefined,
+      limit,
       virtualKeyId: options.virtualKey,
       endUserId: options.endUser,
       projectId: options.project,

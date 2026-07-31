@@ -17,10 +17,14 @@ export const webhookEventsCommand = async (options: {
   const service = new WebhooksApiService({ apiKey });
   const spinner = createSpinner("Fetching emitted events...").start();
   try {
+    const parseInstantValue = (value: string): number => {
+      const parsed = Date.parse(value);
+      return Number.isNaN(parsed) ? Number(value) : parsed;
+    };
     const page = await service.events({
       type: options.type,
-      from: options.from !== undefined ? Date.parse(options.from) || Number(options.from) : undefined,
-      to: options.to !== undefined ? Date.parse(options.to) || Number(options.to) : undefined,
+      from: options.from !== undefined ? parseInstantValue(options.from) : undefined,
+      to: options.to !== undefined ? parseInstantValue(options.to) : undefined,
       cursor: options.cursor,
       limit: options.limit !== undefined ? Number(options.limit) : undefined,
     });
@@ -71,7 +75,7 @@ export const webhookEventTypesCommand = async (): Promise<CommandResult | void> 
           data: types.map((t) => ({
             Type: t.type,
             Family: t.family,
-            Emitting: t.emitting ? chalk.green("yes") : chalk.gray("declared"),
+            Emitting: t.is_emitting ? chalk.green("yes") : chalk.gray("declared"),
             Description: t.description.length > 50 ? `${t.description.slice(0, 47)}...` : t.description,
           })),
           headers: ["Type", "Family", "Emitting", "Description"],

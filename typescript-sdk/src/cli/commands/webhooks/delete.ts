@@ -11,7 +11,14 @@ export const deleteWebhookCommand = async (id: string): Promise<CommandResult | 
   try {
     await service.delete(id);
     spinner.succeed(`Endpoint ${id} archived`);
-    return { data: { id, archived: true }, table: () => {} };
+    return {
+      data: { id, archived: true },
+      table: () => {
+        console.log();
+        console.log(`Endpoint ${id} archived.`);
+        console.log();
+      },
+    };
   } catch (error) {
     failSpinner({ spinner, error, action: "archive webhook endpoint" });
     process.exit(1);

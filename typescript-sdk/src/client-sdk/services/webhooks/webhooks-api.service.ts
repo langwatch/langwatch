@@ -5,6 +5,9 @@ import { DEFAULT_ENDPOINT } from "@/internal/constants";
 export interface WebhookEndpointSummary {
   id: string;
   url: string;
+  max_batch_size: number;
+  max_batch_delay_ms: number;
+  max_in_flight: number;
   enabled_events: string[];
   status: "ACTIVE" | "DISABLED";
   disabled_reason: string | null;
@@ -33,6 +36,13 @@ export interface WebhookDeliveryRecord {
   fired_at: string;
 }
 
+export interface WebhookTestResult {
+  delivered: boolean;
+  response_status: number | null;
+  response_body?: string;
+  error?: string;
+}
+
 export interface WebhookEndpointHealth {
   status: "ACTIVE" | "DISABLED";
   disabled_reason: string | null;
@@ -52,7 +62,7 @@ export interface WebhookEventType {
   type: string;
   family: string;
   schema_version: string;
-  emitting: boolean;
+  is_emitting: boolean;
   description: string;
 }
 
@@ -90,11 +100,7 @@ export class WebhooksApiService {
       process.env.LANGWATCH_ENDPOINT ??
       DEFAULT_ENDPOINT
     ).replace(/\/+$/, "");
-    this.apiKey =
-      config?.apiKey ??
-      process.env.LANGWATCH_ORG_API_KEY ??
-      process.env.LANGWATCH_API_KEY ??
-      "";
+    this.apiKey = config?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
   private async request<T>(
@@ -104,6 +110,8 @@ export class WebhooksApiService {
   ): Promise<T> {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...init,
+      // A hung control plane must fail the command, not freeze it.
+      signal: init?.signal ?? AbortSignal.timeout(30_000),
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
@@ -221,20 +229,8 @@ export class WebhooksApiService {
     return res.data;
   }
 
-  async test(id: string): Promise<{
-    delivered: boolean;
-    response_status: number | null;
-    response_body?: string;
-    error?: string;
-  }> {
-    const res = await this.request<{
-      data: {
-        delivered: boolean;
-        response_status: number | null;
-        response_body?: string;
-        error?: string;
-      };
-    }>(
+  async test(id: string): Promise<WebhookTestResult> {
+    const res = await this.request<{ data: WebhookTestResult }>(
       "test webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/test`,
       { method: "POST" },
@@ -248,7 +244,7 @@ export class WebhooksApiService {
   ): Promise<WebhookDeliveryRecord[]> {
     const params = new URLSearchParams();
     if (options?.limit !== undefined) params.set("limit", String(options.limit));
-    const qs = params.size > 0 ? `?${params.toString()}` : "";
+    const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     const res = await this.request<{ data: WebhookDeliveryRecord[] }>(
       "list webhook deliveries",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/deliveries${qs}`,
@@ -285,7 +281,7 @@ export class WebhooksApiService {
     if (options?.to !== undefined) params.set("to", String(options.to));
     if (options?.cursor) params.set("cursor", options.cursor);
     if (options?.limit !== undefined) params.set("limit", String(options.limit));
-    const qs = params.size > 0 ? `?${params.toString()}` : "";
+    const qs = params.toString() !== "" ? `?${params.toString()}` : "";
     return await this.request<{
       data: EmittedEvent[];
       next_cursor: string | null;

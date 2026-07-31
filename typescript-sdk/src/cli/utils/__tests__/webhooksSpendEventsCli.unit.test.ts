@@ -46,15 +46,11 @@ describe("Feature: CLI families for webhooks and spend events", () => {
   });
 
   /** @scenario Org-anchored commands resolve the organization API key */
-  it("prefers LANGWATCH_ORG_API_KEY and exits without either key", async () => {
+  it("uses LANGWATCH_API_KEY, the one supported credential, and exits without it", async () => {
     const { checkOrgApiKey } = await import("../apiKey.js");
 
-    vi.stubEnv("LANGWATCH_ORG_API_KEY", "sk-lw-org-key");
-    vi.stubEnv("LANGWATCH_API_KEY", "sk-lw-project-key");
-    expect(checkOrgApiKey()).toBe("sk-lw-org-key");
-
-    vi.stubEnv("LANGWATCH_ORG_API_KEY", "");
-    expect(checkOrgApiKey()).toBe("sk-lw-project-key");
+    vi.stubEnv("LANGWATCH_API_KEY", "sk-lw-key");
+    expect(checkOrgApiKey()).toBe("sk-lw-key");
 
     vi.stubEnv("LANGWATCH_API_KEY", "");
     const exit = vi
@@ -62,14 +58,17 @@ describe("Feature: CLI families for webhooks and spend events", () => {
       .mockImplementation((() => {
         throw new Error("exit");
       }) as never);
-    const stderr = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stderr = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
     expect(() => checkOrgApiKey()).toThrow("exit");
     expect(
       stderr.mock.calls.flat().some((line) =>
-        String(line).includes("LANGWATCH_ORG_API_KEY"),
+        String(line).includes("LANGWATCH_API_KEY"),
       ),
     ).toBe(true);
     exit.mockRestore();
+    stderr.mockRestore();
   });
 
   /** @scenario From and to flags parse ISO-8601 and epoch milliseconds */
