@@ -260,6 +260,18 @@ export const CAPABILITY_CATALOG = {
     noun: { singular: "gateway budget", plural: "gateway budgets" },
     icon: "coins",
   },
+  webhooks: {
+    surface: "gateway",
+    digestStrategy: "id-ref",
+    noun: { singular: "webhook endpoint", plural: "webhook endpoints" },
+    icon: "radioTower",
+  },
+  "spend-events": {
+    surface: "gateway",
+    digestStrategy: "reduced",
+    noun: { singular: "spend event", plural: "spend events" },
+    icon: "coins",
+  },
   governance: {
     surface: "gateway",
     digestStrategy: "reduced",

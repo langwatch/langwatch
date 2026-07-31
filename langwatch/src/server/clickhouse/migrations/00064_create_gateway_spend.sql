@@ -17,7 +17,7 @@
 --
 -- Retention: deliberately EXEMPT from tenant retention. Tenant policies
 -- are customer-shrinkable to weeks and retroactively rewrite
--- _retention_days across every mapped table; billing records must not be
+-- per-project retention day macros across every mapped table; billing records must not be
 -- governed by that. Precedent: the usage-estimate ledgers (fixed 13-month
 -- TTL declared here, table absent from RETENTION_TABLE_CATEGORY_MAP and
 -- TABLE_TTL_CONFIG so the reconciler's whole-clause MODIFY TTL never

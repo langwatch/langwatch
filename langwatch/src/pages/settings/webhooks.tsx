@@ -28,6 +28,7 @@ import SettingsLayout from "~/components/SettingsLayout";
 import { ContactSalesBlock } from "~/components/subscription/ContactSalesBlock";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { WebhookDeliveriesDrawer } from "~/components/webhooks/WebhookDeliveriesDrawer";
 import { WebhookEndpointDrawer } from "~/components/webhooks/WebhookEndpointDrawer";
 import { WebhookSecretDialog } from "~/components/webhooks/WebhookSecretDialog";
@@ -84,12 +85,8 @@ export default function WebhooksSettingsPage() {
   );
 
   const refresh = () => void utils.webhookEndpoints.list.invalidate();
-  const onError = (error: { message: string }) =>
-    toaster.create({
-      title: error.message,
-      type: "error",
-      meta: { closable: true },
-    });
+  const onError = (error: unknown) =>
+    showErrorToast({ error, fallbackTitle: "That webhook change failed" });
 
   const createMutation = api.webhookEndpoints.create.useMutation({
     onSuccess: ({ secret }) => {

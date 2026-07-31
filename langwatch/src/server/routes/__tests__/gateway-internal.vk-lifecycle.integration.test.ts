@@ -26,6 +26,7 @@ const ORG_ID = `org-vklc-${suffix}`;
 const TEAM_ID = `team-vklc-${suffix}`;
 const PROJECT_ID = `proj-vklc-${suffix}`;
 const USER_ID = `usr-vklc-${suffix}`;
+// gitleaks:allow — sequential-hex HMAC fixture for the signed-route test, not a credential
 const SECRET = "0123456789abcdef0123456789abcdef";
 
 function signedResolveKey(keyPresented: string) {

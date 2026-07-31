@@ -1110,6 +1110,16 @@ const presentations = {
     title: "You've reached your spending limit",
     describe: () => "Raise the limit in settings to keep going.",
   },
+  end_user_required: {
+    title: "This key needs a user on every request",
+    describe: () =>
+      "Send the OpenAI user field or the X-LangWatch-End-User-Id header.",
+  },
+  virtual_key_disabled: {
+    title: "This key is disabled",
+    describe: () =>
+      "An administrator can re-enable it; the key itself is unchanged.",
+  },
   rate_limited: {
     title: "Too many requests",
     describe: () => "Slow down for a moment, then try again.",
