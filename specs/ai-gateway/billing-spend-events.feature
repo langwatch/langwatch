@@ -1,84 +1,190 @@
-Feature: Billing spend events, one unconditional record per gateway request
-  The budget ledger exists for enforcement and only gets rows when a budget
-  applies. Billing is different: every gateway request must be metered,
-  budget or no budget, at per-request grain, with token classes split out,
-  the rated cost, attribution, and a stable idempotency key. The trace fold
-  keeps one bookkeeping entry per gateway span so requests survive being
-  folded under a shared client traceparent, and a dedicated reactor writes
-  them to their own table, exempt from tenant retention.
+Feature: Billing spend events, one durable record per gateway request
+  The spend record is projected from the gateway's own commands, not from
+  telemetry: every request is admitted before any gating runs, its outcome
+  is confirmed or failed with integer quantities and the full error
+  taxonomy, and a confirmation that never arrives is settled visibly
+  instead of dropped. Rating happens in the pipeline as integer nano-USD,
+  so a price correction is a projection rebuild, never a correction stream.
+  Commands leave the pod through a bounded fsync'd spool, so the request
+  path never waits on the ingest endpoint and a crash loses at most the
+  unflushed tail.
 
   Background:
     Given a virtual key serving traffic through the gateway
 
-  Rule: Every request is metered, independently of budgets
+  Rule: Every request is a record, before and regardless of its outcome
 
     @unit
-    Scenario: A gateway request is metered even when its key has no budget
-      Given the key has no applicable budgets
-      When a request folds into the trace summary
-      Then a spend record exists for that request
-      And no budget debit row is written
+    Scenario: Every request admits a spend record before any gating runs
+      When a request enters the gateway pipeline
+      Then an admit command is emitted before budget or guardrail gating
+      And its attribution is already resolved
 
     @unit
-    Scenario: Budget debits stay budget-gated while spend records never are
-      Given the key has one applicable budget
-      When a request folds into the trace summary
-      Then a budget debit row is written for that budget
-      And the spend record for the request exists regardless
-
-  Rule: Grain is per request, never per trace
+    Scenario: A gateway rejection admits and fails with its own taxonomy token
+      Given a request a budget or guardrail rejects
+      When the gateway refuses it
+      Then the admitted record is failed with the gateway's taxonomy token
+      And the rejection is a visible record, not a missing one
 
     @unit
-    Scenario: N requests under one client traceparent produce N spend records
-      Given a client that reuses one traceparent across three gateway calls
-      When the three spans fold into one trace
-      Then three spend records exist, each under its own gateway request id
-
-    @integration
-    Scenario: Re-folding a trace does not duplicate spend records
-      When the same trace folds twice
-      Then each gateway request still has exactly one spend record
+    Scenario: A provider failure classifies through the upstream taxonomy
+      Given a provider that answers with an error
+      When the gateway fails the request
+      Then the fail command carries the full error class and http status
 
     @unit
-    Scenario: Entry-less legacy folds still meter as one whole-trace record
-      Given a trace folded before per-request bookkeeping existed
-      When the reactors process it
-      Then one spend record exists under the first request id
-      And it carries the whole-trace totals
-
-  Rule: The record carries what billing actually prices
+    Scenario: A streaming request confirms once with the accumulated usage
+      Given a streaming response consumed to its end
+      Then exactly one confirm command carries the accumulated token classes
 
     @unit
-    Scenario: Cache read and cache write tokens are metered with real values
-      Given a request whose response reports cache read and cache write tokens
-      When it folds
-      Then the spend record and the budget debit both carry those token counts
+    Scenario: A client disconnect mid-stream confirms the tokens consumed so far
+      Given a client that drops the stream midway
+      Then the confirm command carries the usage accumulated to the drop
 
     @unit
-    Scenario: The provider id rides the spend record when the span carries it
-      Given a gateway span stamped with a model provider id
-      When it folds
-      Then the spend record carries that provider id
+    Scenario: A stream that dies mid-flight fails with the accumulated usage
+      Given a provider stream that errors midway
+      Then the fail command carries the partial usage consumed before the error
 
     @unit
-    Scenario: A failed request keeps its rich error class and http status
-      Given a request that failed upstream with a classified error
-      When it folds
-      Then the spend record status is error
-      And it carries the error class and the upstream http status
+    Scenario: The header-resolved end user beats the body param
+      Given a request carrying both the end user header and a body user param
+      When the gateway resolves attribution at admission
+      Then the admit command carries the header value
 
     @unit
-    Scenario: Spend records anchor to request time, not ingest time
-      When a request folds long after it happened
-      Then the spend record's occurred-at is the request's own start time
+    Scenario: Outcome duration measures the request, not the emission
+      When an outcome command is emitted asynchronously
+      Then its duration is the provider round trip, never the spool latency
+
+  Rule: The spool survives what the pod does
+
+    @unit
+    Scenario: Appended records seal within a flush interval and read back in order
+      When commands are appended to the spool
+      Then they are fsync sealed within the flush interval
+      And read back in append order
+
+    @unit
+    Scenario: Sequence numbers continue across a clean restart
+      Given a pod that restarts cleanly
+      Then per-pod sequence numbers continue instead of resetting
+      And the gap detector sees no false hole
+
+    @unit
+    Scenario: A hard crash preserves flushed records and skips a torn last line
+      Given a pod killed mid-append
+      When the spool reopens
+      Then every sealed record survives
+      And the torn tail line is skipped, not misparsed
+
+    @unit
+    Scenario: Overflow drops the oldest segments and counts every lost record
+      Given a spool at its size bound with the drainer down
+      When new commands keep arriving
+      Then the oldest segments are dropped first
+      And every dropped record increments the loss counter
+
+    @unit
+    Scenario: Appends never block even when the writer is gone
+      Given the spool writer has died
+      Then request-path appends still return immediately
+
+    @unit
+    Scenario: The drainer ships oldest first and deletes only after ack
+      Given sealed segments waiting in the spool
+      Then batches ship oldest first
+      And a segment is deleted only after the ingest acked it
+
+    @unit
+    Scenario: Ship failures back off and never touch the spooled data
+      Given an ingest endpoint that errors
+      Then the drainer backs off and retries
+      And the spooled segments are left intact
+
+    @unit
+    Scenario: A hung ingest endpoint never slows the request path
+      Given an ingest endpoint that hangs
+      Then request latency is unaffected
+      And the spool absorbs the backlog
+
+  Rule: The wire contract is the spine's
+
+    @unit
+    Scenario: The admitted payload carries the spine contract field names
+      When an admit command is serialized for the ingest route
+      Then its field names match the spend pipeline's command schema exactly
+
+    @unit
+    Scenario: The confirmed payload carries usage by token class and never a cost
+      When a confirm command is serialized
+      Then it carries integer token quantities and the rate identity
+      And no cost field exists anywhere in it
+
+    @unit
+    Scenario: The failed payload keeps the full error taxonomy
+      When a fail command is serialized
+      Then the error class and http status ride verbatim
+
+    @unit
+    Scenario: A shipped batch is signed with the shared gateway HMAC scheme
+      When the drainer ships a command batch
+      Then the request is signed with the gateway's shared HMAC scheme
+
+  Rule: The fold is the spend record
+
+    @unit
+    Scenario: The admit command carries attribution into the spend record
+      When an admitted event folds
+      Then the record carries the attribution, the end user id, and the echo verbatim
+
+    @unit
+    Scenario: Rating happens in the fold as integer nano dollars
+      When a confirmed event folds
+      Then the quantities are priced through the registry cascade
+      And the cost is an integer nano-USD value with its rate identity
+
+    @unit
+    Scenario: A redelivered event re-sets the same values
+      Given a confirmed event the fold already applied
+      When the same event is delivered again
+      Then every field re-sets to the identical value
+      And nothing increments
+
+    @unit
+    Scenario: Settlement marks the unknown instead of guessing
+      Given an admission whose confirmation never arrived
+      When the settlement event folds
+      Then the record is settled with null quantities
+      And it is flagged for reconciliation with its reason
+
+    @unit
+    Scenario: A late confirmation resolves a settled request
+      Given a request already settled as unknown
+      When its confirmation finally folds
+      Then the record is confirmed and the reconciliation flag clears
+
+    @unit
+    Scenario: A confirmed request never downgrades
+      Given a confirmed record
+      When a failed or settled event is redelivered after it
+      Then the record is unchanged
+
+    @unit
+    Scenario: An outcome racing ahead of its admission keeps its status
+      Given a confirmation that arrived before its admission
+      When the admission folds afterwards
+      Then the status stays confirmed and the attribution fills in
+
+    @unit
+    Scenario: Partial usage on a failure still prices
+      Given a failure that consumed tokens before it broke
+      When the failed event folds
+      Then the partial usage is rated to integer nano-USD
 
   Rule: The table is a billing ledger, not observability data
-
-    @integration
-    Scenario: Spend reads are replacement-aware
-      Given the same spend record was written twice by at-least-once delivery
-      When the reconciliation read runs
-      Then it returns the record exactly once
 
     @unit
     Scenario: Billing records are exempt from tenant retention and keep a fixed thirteen month window
@@ -124,18 +230,6 @@ Feature: Billing spend events, one unconditional record per gateway request
       Then none of those headers survive on the forwarded request
       And the body user param passes through unchanged
 
-    @unit
-    Scenario: The end user id and metadata echo ride the entry into billing
-      Given a request attributed to an end user with a metadata echo
-      When it folds into a spend record
-      Then the record carries the end user id and the echo verbatim
-
-    @unit
-    Scenario: Entries stored before the metadata field existed still parse
-      Given a fold entry persisted before the metadata echo shipped
-      When the entry list is parsed
-      Then the entry parses with an empty echo
-
   Rule: The metadata echo is a join key, not a payload channel
 
     @unit
@@ -153,4 +247,4 @@ Feature: Billing spend events, one unconditional record per gateway request
     Scenario: An invalid metadata echo is dropped without failing the request
       Given a metadata header that is oversized or not a JSON object
       When the gateway processes the request
-      Then the echo is dropped and the request succeeds
+      Then the echo is dropped and the request proceeds

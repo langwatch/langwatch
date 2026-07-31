@@ -1,58 +1,46 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import type { PlanInfo } from "../../licensing/planInfo";
-import {
-  defineProcessManager,
-  type IntentSpec,
-  type ProcessManagerDefinition,
-  type WakeHandler,
-} from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import type { ProcessManagerApplier } from "~/server/event-sourcing/pipeline/processBuilder";
+import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import type { JsonValue } from "~/server/event-sourcing/process-manager/json";
 import type {
   NewOutboxMessage,
   ProcessStore,
 } from "~/server/event-sourcing/process-manager/stores/processStore.types";
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
   assertWebhookDelivered,
   sendWebhook,
 } from "~/server/app-layer/automations/delivery/sendWebhook";
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
-import { spendRowToEnvelope, type WebhookEnvelope } from "../envelope";
-import { eventMatches } from "../eventRegistry";
-import type { WebhookEventsClickHouseRepository } from "../webhookEvents.clickhouse.repository";
 import type {
-  WebhookEndpointService,
-  WebhookEndpointView,
-} from "../webhookEndpoint.service";
+  AdmitSpendCommandData,
+  ConfirmSpendCommandData,
+  FailSpendCommandData,
+  SettleSpendCommandData,
+  SpendUsage,
+} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
+import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
+import type { GatewaySpendProcessingEvent } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/events";
+import {
+  NANO_USD_PER_USD,
+  rateSpendNanoUsd,
+} from "~/server/event-sourcing/pipelines/gateway-spend-processing/services/spend-rating.service";
+import { spendRowToEnvelope } from "../envelope";
+import { eventMatches } from "../eventRegistry";
+import type { WebhookEndpointService } from "../webhookEndpoint.service";
 
 const logger = createLogger("langwatch:webhooks:delivery-process");
 
 export const WEBHOOK_DELIVERY_PROCESS_NAME = "webhookDelivery" as const;
-
-/** Scan cadence: how fresh the push is. Billing tolerates seconds. */
-export const WEBHOOK_SCAN_INTERVAL_MS = 15_000;
-/** Envelopes per POST, the contract's batch cap. */
-export const WEBHOOK_BATCH_MAX_EVENTS = 100;
-/** Spend rows examined per project per scan; the next scan continues. */
-export const WEBHOOK_SCAN_ROW_LIMIT = 500;
-/**
- * Cursor floor: a project whose scan fell further behind than this resumes
- * here and the skipped window is served by replay, never silently.
- */
-export const WEBHOOK_SCAN_LOOKBACK_MS = 72 * 60 * 60 * 1000;
-/**
- * First cursor for a project never scanned before: a small overlap rather
- * than deep history, Stripe's endpoints-receive-from-creation semantics.
- * Backfill is the replay surface's job.
- */
-export const WEBHOOK_NEW_CURSOR_OVERLAP_MS = 5 * 60 * 1000;
-/** Dispatched scan/send outbox rows older than this are pruned. */
-const OUTBOX_ROW_RETENTION_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The Stripe-shaped retry ladder. `attempt` is the 1-based attempt that
@@ -77,7 +65,88 @@ export function webhookRetryDelayMs({ attempt }: { attempt: number }): number {
   );
 }
 
-export const scanSchema = z.object({ scheduledFor: z.number().int() });
+/**
+ * The delivery process manager consumes the spend pipeline's committed
+ * events straight off the log through its transactional inbox: the inbox's
+ * event-id uniqueness IS the delivery dedup, so a redelivered event never
+ * re-queues an envelope and no first-sight bookkeeping exists anywhere
+ * else. One process instance per gateway request: `admitted` stores the
+ * attribution the outcome events do not carry, `confirmed`/`failed`/
+ * `settled` freeze the full envelope source into a `deliver` intent.
+ * Delivery is two outbox levels under this one process name: `deliver`
+ * (per request) resolves the org's matching ACTIVE endpoints and commits
+ * one `sendBatch` message per endpoint with a deterministic key, so each
+ * endpoint retries its own Stripe ladder independently and one dead
+ * endpoint never blocks another.
+ */
+
+/** Attribution captured at admission; outcome events carry only the
+ *  outcome. Field names mirror the admit command's wire shape. */
+export interface SpendAttribution {
+  organization_id: string;
+  virtual_key_id: string;
+  principal_user_id: string;
+  end_user_id: string;
+  model: string;
+  model_provider_id: string;
+  trace_id: string;
+  request_type: string;
+  labels: string[];
+  metadata: string;
+  admitted_at: number;
+}
+
+export interface WebhookDeliveryState {
+  attribution: SpendAttribution | null;
+}
+
+export const INITIAL_WEBHOOK_DELIVERY_STATE: WebhookDeliveryState = {
+  attribution: null,
+};
+
+const spendUsagePayloadSchema = z.object({
+  input_tokens: z.number().int().min(0),
+  output_tokens: z.number().int().min(0),
+  cache_read_input_tokens: z.number().int().min(0),
+  cache_creation_input_tokens: z.number().int().min(0),
+  reasoning_tokens: z.number().int().min(0),
+});
+
+/** Everything the deliver executor needs to rate, build the envelope, and
+ *  fan out, frozen at evolve time from state + the outcome event. */
+export const deliverSchema = z.object({
+  gateway_request_id: z.string(),
+  project_id: z.string(),
+  status: z.enum(["confirmed", "failed", "settled"]),
+  occurred_at: z.number().int().positive(),
+  attribution: z
+    .object({
+      organization_id: z.string(),
+      virtual_key_id: z.string(),
+      principal_user_id: z.string(),
+      end_user_id: z.string(),
+      model: z.string(),
+      model_provider_id: z.string(),
+      trace_id: z.string(),
+      request_type: z.string(),
+      labels: z.array(z.string()),
+      metadata: z.string(),
+      admitted_at: z.number(),
+    })
+    .nullable(),
+  /** The RESOLVED model identity from the outcome event, when it carried
+   *  one; wins over the admitted (requested) identity. */
+  model: z.string(),
+  model_provider_id: z.string(),
+  usage: spendUsagePayloadSchema.nullable(),
+  rate_version: z.string(),
+  duration_ms: z.number().int().min(0),
+  error: z
+    .object({ type: z.string(), http_status: z.number().int() })
+    .nullable(),
+  settle_reason: z.string().nullable(),
+});
+export type DeliverPayload = z.infer<typeof deliverSchema>;
 
 export const sendBatchSchema = z.object({
   organizationId: z.string(),
@@ -97,345 +166,155 @@ export const sendBatchSchema = z.object({
 });
 export type SendBatchPayload = z.infer<typeof sendBatchSchema>;
 
-export interface WebhookDeliverySingletonState {
-  lastScanAt: number | null;
-  lastDeliveryPruneAt: number | null;
-}
-
-/** Per-project scan cursor, committed by the scan through the ProcessStore. */
-export interface WebhookProjectCursorState {
-  cursorEventTsMs: number;
-}
-
-type DeliveryIntents = {
-  scan: IntentSpec<typeof scanSchema>;
-  sendBatch: IntentSpec<typeof sendBatchSchema>;
-};
-
-/**
- * Singleton wake: emit one scan slot. The scan itself is I/O and lives in
- * the intent executor; a failed scan's retries are superseded by the next
- * slot, so losing one is losing freshness, never data.
- */
-export const webhookDeliveryWake: WakeHandler<
-  WebhookDeliverySingletonState,
-  DeliveryIntents
-> = (state, ctx) => ({
-  state: { ...state, lastScanAt: ctx.at },
-  intents: [ctx.intents.scan(`scan:${ctx.at}`, { scheduledFor: ctx.at })],
-});
-
 export interface WebhookDeliveryProcessDeps {
   prisma: PrismaClient;
   processStore: ProcessStore;
-  eventsRepository: WebhookEventsClickHouseRepository;
   endpoints: WebhookEndpointService;
   /** Resolves the org's active plan for the enterprise gate. */
   getPlan: (organizationId: string) => Promise<PlanInfo>;
   now?: () => number;
 }
 
-function batchHash(ids: readonly string[]): string {
-  return createHash("sha256").update(ids.join(",")).digest("hex").slice(0, 16);
-}
+const EMPTY_USAGE: SpendUsage = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cache_read_input_tokens: 0,
+  cache_creation_input_tokens: 0,
+  reasoning_tokens: 0,
+};
 
-function chunk<T>(items: readonly T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(items.slice(i, i + size) as T[]);
-  }
-  return out;
+/** The delivery view as a spend row, so the envelope mapper stays the one
+ *  place the external contract is shaped. Rating happens here with the
+ *  same deterministic service the fold uses, never by reading the fold's
+ *  table: the two consumers of the log stay independent by contract. */
+export function deliverPayloadToRow(payload: DeliverPayload): SpendEventRow {
+  const usage = payload.usage ?? EMPTY_USAGE;
+  const rated =
+    payload.status === "settled"
+      ? { costNanoUsd: 0, rateVersion: "" }
+      : rateSpendNanoUsd({
+          model: payload.model || payload.attribution?.model || "unknown",
+          usage,
+          rateVersion: payload.rate_version,
+        });
+  return {
+    tenantId: payload.project_id,
+    gatewayRequestId: payload.gateway_request_id,
+    organizationId: payload.attribution?.organization_id ?? "",
+    teamId: "",
+    virtualKeyId: payload.attribution?.virtual_key_id ?? "",
+    principalUserId: payload.attribution?.principal_user_id ?? "",
+    endUserId: payload.attribution?.end_user_id ?? "",
+    traceId: payload.attribution?.trace_id ?? "",
+    model: payload.model || payload.attribution?.model || "",
+    providerKey:
+      payload.model_provider_id || payload.attribution?.model_provider_id || "",
+    requestType: payload.attribution?.request_type ?? "",
+    tokensInput: usage.input_tokens,
+    tokensOutput: usage.output_tokens,
+    tokensCacheRead: usage.cache_read_input_tokens,
+    tokensCacheWrite: usage.cache_creation_input_tokens,
+    tokensReasoning: usage.reasoning_tokens,
+    costNanoUsd: rated.costNanoUsd,
+    costUsd: (rated.costNanoUsd / NANO_USD_PER_USD).toFixed(6),
+    rateVersion: rated.rateVersion,
+    status: payload.status,
+    errorClass: payload.error?.type ?? "",
+    httpStatus: payload.error?.http_status ?? 0,
+    needsReconciliation: payload.status === "settled",
+    labels: payload.attribution?.labels ?? [],
+    metadata: payload.attribution?.metadata ?? "",
+    durationMs: payload.duration_ms,
+    occurredAt: new Date(payload.occurred_at),
+  };
 }
 
 /**
- * One scan slot: for every org with ACTIVE matching endpoints (and the
- * plan flag), walk each project's spend log from its cursor, first-sight
- * filter against the delivered-marker table, freeze the fresh rows into
- * per-endpoint batches, and commit them onto the delivery outbox together
- * with the advanced cursor. The commit is the atomic boundary: markers are
- * written after it, so a crash in between re-derives the same batch next
- * scan and the deterministic message key suppresses the duplicate.
+ * Level 1: resolve the org's ACTIVE endpoints subscribed to the family and
+ * commit one per-endpoint send message with a deterministic key. Redelivery
+ * of this intent re-derives the same keys and the outbox suppresses them,
+ * so the fan-out is idempotent end to end.
  */
-export function runWebhookScan(deps: WebhookDeliveryProcessDeps) {
+export function runDeliver(deps: WebhookDeliveryProcessDeps) {
   return async (
-    payload: z.output<typeof scanSchema>,
+    payload: DeliverPayload,
     _context: IntentContext,
   ): Promise<void> => {
+    const organizationId = payload.attribution?.organization_id ?? "";
+    if (!organizationId) {
+      logger.warn(
+        {
+          projectId: payload.project_id,
+          gatewayRequestId: payload.gateway_request_id,
+        },
+        "spend outcome arrived without admission attribution; skipping webhook delivery (reconciliation surfaces the row)",
+      );
+      return;
+    }
+
+    const plan = await deps.getPlan(organizationId);
+    if (plan.webhookEndpoints !== true) return;
+
+    const endpoints = (
+      await deps.endpoints.listActiveByOrganization({ organizationId })
+    ).filter((e) => eventMatches(e.enabledEvents, "gateway.request.completed"));
+    if (endpoints.length === 0) return;
+
+    const row = deliverPayloadToRow(payload);
+    const envelope = spendRowToEnvelope(row);
     const now = (deps.now ?? Date.now)();
-    const organizationIds =
-      await deps.endpoints.organizationIdsWithActiveEndpoints();
 
-    for (const organizationId of organizationIds) {
-      try {
-        await scanOrganization({ deps, organizationId, now });
-      } catch (error) {
-        logger.error(
-          { organizationId, error },
-          "webhook delivery scan failed for organization; next slot retries",
-        );
-      }
-    }
-
-    // Self-retention (ADR-052): recurring scan intents and yesterday's
-    // dispatched batches; dead rows are never touched.
-    try {
-      await deps.processStore.deleteDispatchedBefore({
+    for (const endpoint of endpoints) {
+      const ref = {
         processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-        before: now - OUTBOX_ROW_RETENTION_MS,
-      });
-    } catch (error) {
-      logger.warn({ error }, "webhook delivery outbox retention failed");
-    }
-    // Delivery-log prune rides the scan hourly rather than a second
-    // scheduled process; the hour guard keeps it one deletion an hour.
-    const hourOf = (ms: number) => Math.floor(ms / (60 * 60 * 1000));
-    if (hourOf(payload.scheduledFor) !== hourOf(payload.scheduledFor - WEBHOOK_SCAN_INTERVAL_MS)) {
-      try {
-        await deps.endpoints.pruneDeliveries(new Date(now));
-      } catch (error) {
-        logger.warn({ error }, "webhook delivery-log prune failed");
-      }
-    }
-  };
-}
-
-async function scanOrganization({
-  deps,
-  organizationId,
-  now,
-}: {
-  deps: WebhookDeliveryProcessDeps;
-  organizationId: string;
-  now: number;
-}): Promise<void> {
-  const plan = await deps.getPlan(organizationId);
-  if (plan.webhookEndpoints !== true) return;
-
-  const endpoints = (
-    await deps.endpoints.listActiveByOrganization({ organizationId })
-  ).filter((e) => eventMatches(e.enabledEvents, "gateway.request.completed"));
-  if (endpoints.length === 0) return;
-
-  const projects = await deps.prisma.project.findMany({
-    where: { team: { organizationId } },
-    select: { id: true },
-  });
-
-  for (const project of projects) {
-    await scanProject({
-      deps,
-      organizationId,
-      projectId: project.id,
-      endpoints,
-      now,
-    });
-  }
-}
-
-async function scanProject({
-  deps,
-  organizationId,
-  projectId,
-  endpoints,
-  now,
-}: {
-  deps: WebhookDeliveryProcessDeps;
-  organizationId: string;
-  projectId: string;
-  endpoints: WebhookEndpointView[];
-  now: number;
-}): Promise<void> {
-  const ref = {
-    processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-    projectId,
-    processKey: projectId,
-  };
-  const existing =
-    await deps.processStore.findByRef<WebhookProjectCursorState>({ ref });
-  const rawCursor =
-    existing?.state.cursorEventTsMs ?? now - WEBHOOK_NEW_CURSOR_OVERLAP_MS;
-  const cursor = Math.max(rawCursor, now - WEBHOOK_SCAN_LOOKBACK_MS);
-  if (cursor > rawCursor && existing) {
-    logger.warn(
-      { projectId, skippedMs: cursor - rawCursor },
-      "webhook delivery cursor clamped to the lookback window; the gap needs a replay",
-    );
-  }
-
-  const rows = await deps.eventsRepository.readSpendEventsSince({
-    tenantId: projectId,
-    sinceEventTsMs: cursor,
-    limit: WEBHOOK_SCAN_ROW_LIMIT,
-  });
-  if (rows.length === 0) return;
-
-  const maxTs = rows[rows.length - 1]!.eventTimestampMs;
-  const seen = await deps.eventsRepository.probeDelivered({
-    tenantId: projectId,
-    requestIds: rows.map((r) => r.row.gatewayRequestId),
-  });
-  const fresh = rows.filter((r) => !seen.has(r.row.gatewayRequestId));
-
-  // Nothing new to emit: advance the cursor alone, dampened so an idle
-  // project is not a commit per scan.
-  if (fresh.length === 0) {
-    if (maxTs > cursor + 60_000 || rows.length === WEBHOOK_SCAN_ROW_LIMIT) {
-      await commitScan({ deps, ref, existing, maxTs, messages: [], now });
-    }
-    return;
-  }
-
-  const freshRows: SpendEventRow[] = fresh.map((r) => r.row);
-  const envelopes = freshRows.map(spendRowToEnvelope);
-  const chunks = chunk(envelopes, WEBHOOK_BATCH_MAX_EVENTS);
-
-  const messages = endpoints.flatMap((endpoint) =>
-    chunks.map((batch) => {
-      const batchId = `${endpoint.id}:${batchHash(batch.map((e) => e.id))}`;
-      const payload: SendBatchPayload = {
-        organizationId,
-        projectId,
-        endpointId: endpoint.id,
-        batchId,
-        envelopes: batch as SendBatchPayload["envelopes"],
+        projectId: payload.project_id,
+        processKey: `endpoint:${endpoint.id}`,
       };
-      return {
+      const existing = await deps.processStore.findByRef({ ref });
+      const batchId = `${endpoint.id}:${payload.gateway_request_id}:${payload.status}`;
+      const message: NewOutboxMessage = {
         messageKey: `send:${batchId}`,
         intentType: "sendBatch",
         // Envelope data is JSON by construction (spendRowToEnvelope emits
         // only JSON primitives); the cast crosses the JsonValue boundary.
-        payload: payload as unknown as JsonValue,
+        payload: {
+          organizationId,
+          projectId: payload.project_id,
+          endpointId: endpoint.id,
+          batchId,
+          envelopes: [envelope],
+        } as unknown as JsonValue,
         traceCarrier: {},
       };
-    }),
-  );
-
-  const outcome = await commitScan({
-    deps,
-    ref,
-    existing,
-    maxTs,
-    messages,
-    now,
-  });
-  if (outcome !== "committed") return;
-
-  // The commit above is the atomic boundary: batches and cursor land
-  // together, so the events are enqueued no matter what happens next. The
-  // markers only guard future re-emission, so their write is retried here
-  // rather than failing the (already-committed) scan.
-  const markers = freshRows.map((row) => ({
-    tenantId: projectId,
-    gatewayRequestId: row.gatewayRequestId,
-    eventType: "gateway.request.completed",
-    batchId: `scan:${now}`,
-  }));
-  let lastMarkerError: unknown;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await deps.eventsRepository.markEnqueued(markers);
-      lastMarkerError = undefined;
-      break;
-    } catch (error) {
-      lastMarkerError = error;
+      const result = await deps.processStore.commit({
+        ref,
+        tenantId: payload.project_id,
+        sourceEventId: `deliver:${batchId}`,
+        expectedRevision: existing?.revision ?? 0,
+        state: existing?.state ?? {},
+        nextWakeAt: existing?.nextWakeAt ?? null,
+        messages: [message],
+        now,
+      });
+      if (result.outcome === "revisionConflict") {
+        // Another deliver run is committing onto this endpoint's stream
+        // concurrently; retry this intent so the message is not lost (the
+        // deterministic key makes the retry idempotent).
+        throw new Error(
+          `webhook deliver hit a revision conflict on endpoint ${endpoint.id}; retrying`,
+        );
+      }
     }
-  }
-  if (lastMarkerError !== undefined) {
-    logger.error(
-      { projectId, count: markers.length, error: lastMarkerError },
-      "webhook first-sight markers failed after the batch commit; a future restatement of these ids could re-emit",
-    );
-  }
-}
-
-async function commitScan({
-  deps,
-  ref,
-  existing,
-  maxTs,
-  messages,
-  now,
-}: {
-  deps: WebhookDeliveryProcessDeps;
-  ref: { processName: string; projectId: string; processKey: string };
-  existing: { revision: number } | null;
-  maxTs: number;
-  messages: NewOutboxMessage[];
-  now: number;
-}): Promise<"committed" | "skipped"> {
-  const result = await deps.processStore.commit<WebhookProjectCursorState>({
-    ref,
-    tenantId: ref.projectId,
-    sourceEventId: null,
-    expectedRevision: existing?.revision ?? 0,
-    state: { cursorEventTsMs: maxTs },
-    nextWakeAt: null,
-    messages,
-    now,
-  });
-  if (result.outcome === "committed") {
-    if (result.duplicateMessageKeys.length > 0) {
-      logger.info(
-        { projectId: ref.projectId, duplicates: result.duplicateMessageKeys.length },
-        "webhook scan re-derived already-enqueued batches; duplicates suppressed",
-      );
-    }
-    return "committed";
-  }
-  // A concurrent scan slot won the revision race; its view supersedes ours.
-  logger.info(
-    { projectId: ref.projectId, outcome: result.outcome },
-    "webhook scan commit superseded by a concurrent slot",
-  );
-  return "skipped";
+  };
 }
 
 /**
- * The registered process manager: a scheduled singleton whose wake emits
- * scan slots, plus the sendBatch intents the scan commits directly through
- * the ProcessStore under this same process name (per-project cursor
- * instances). The outbox config IS the delivery contract's retry ladder.
- */
-export function createWebhookDeliveryProcessManager(
-  deps: WebhookDeliveryProcessDeps,
-): ProcessManagerDefinition<
-  WebhookDeliverySingletonState,
-  DeliveryIntents
-> {
-  return defineProcessManager({
-    name: WEBHOOK_DELIVERY_PROCESS_NAME,
-    state: {
-      lastScanAt: null,
-      lastDeliveryPruneAt: null,
-    } as WebhookDeliverySingletonState,
-    eventTypes: [],
-    handlers: {},
-    schedule: { everyMs: WEBHOOK_SCAN_INTERVAL_MS },
-    onWake: webhookDeliveryWake,
-    intents: {
-      scan: { schema: scanSchema, run: runWebhookScan(deps) },
-      sendBatch: { schema: sendBatchSchema, run: runWebhookSendBatch(deps) },
-    },
-    outbox: {
-      maxAttempts: WEBHOOK_SEND_MAX_ATTEMPTS,
-      retryDelayMs: webhookRetryDelayMs,
-      // Sends are slow (a receiver can burn the full 10s timeout) and
-      // parallel-safe: batches are independent, and Stripe-style receivers
-      // must tolerate concurrent deliveries. Bound the leased batch to the
-      // in-flight count so waiting messages are not invisible for a lease.
-      concurrency: 4,
-      batchSize: 8,
-      leaseDurationMs: 120_000,
-    },
-  });
-}
-
-/**
- * Deliver one frozen batch to one endpoint through the SSRF-fenced signed
- * sender, record the receiver's answer, and classify: 2xx acks, 5xx/429/408
- * retry along the ladder (Retry-After honored as a floor), other statuses
- * retire the batch to the dead letter immediately. The endpoint's failure
- * streak and the 72h auto-disable ride every recorded outcome.
+ * Level 2: deliver one frozen batch to one endpoint through the
+ * SSRF-fenced signed sender, record the receiver's answer, and classify:
+ * 2xx acks, 5xx/429/408 retry along the ladder (Retry-After honored as a
+ * floor), other statuses retire the batch to the dead letter immediately.
+ * The endpoint's failure streak and the 72h auto-disable ride every
+ * recorded outcome.
  */
 export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
   return async (
@@ -448,8 +327,8 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
         organizationId: payload.organizationId,
       },
     });
-    // A deleted or disabled endpoint drains its queue without POSTing:
-    // source tables keep the events, re-enable plus replay covers the gap.
+    // A deleted or disabled endpoint drains its queue without POSTing: the
+    // spend record keeps the events, re-enable plus replay covers the gap.
     if (!endpoint || endpoint.status !== "ACTIVE" || endpoint.archivedAt) {
       logger.info(
         { endpointId: payload.endpointId, batchId: payload.batchId },
@@ -462,9 +341,7 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
       organizationId: payload.organizationId,
       endpointId: payload.endpointId,
     });
-    const body = JSON.stringify({
-      batch: payload.envelopes satisfies WebhookEnvelope[],
-    });
+    const body = JSON.stringify({ batch: payload.envelopes });
     const startedAt = (deps.now ?? Date.now)();
 
     let status: number | undefined;
@@ -500,7 +377,8 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
         eventCount: payload.envelopes.length,
         outcome: retryable ? "retryable" : "terminal",
         latencyMs: (deps.now ?? Date.now)() - startedAt,
-        error: error instanceof Error ? error.message.slice(0, 500) : String(error),
+        error:
+          error instanceof Error ? error.message.slice(0, 500) : String(error),
       });
       throw error;
     }
@@ -543,4 +421,121 @@ export function runWebhookSendBatch(deps: WebhookDeliveryProcessDeps) {
       triggerName: payload.endpointId,
     });
   };
+}
+
+function attributionFrom(data: AdmitSpendCommandData): SpendAttribution {
+  return {
+    organization_id: data.organization_id,
+    virtual_key_id: data.virtual_key_id,
+    principal_user_id: data.principal_user_id,
+    end_user_id: data.end_user_id,
+    model: data.model,
+    model_provider_id: data.model_provider_id,
+    trace_id: data.trace_id,
+    request_type: data.request_type,
+    labels: data.labels,
+    metadata: data.metadata,
+    admitted_at: data.occurred_at,
+  };
+}
+
+/**
+ * The staged applier mounted on the gateway-spend pipeline. The generated
+ * subscriber keys instances by the aggregate id (the gateway request) and
+ * the transactional inbox consumes each event exactly once.
+ */
+export function webhookDeliveryPM(
+  deps: WebhookDeliveryProcessDeps,
+): ProcessManagerApplier<GatewaySpendProcessingEvent> {
+  return (pm) =>
+    pm
+      .state<WebhookDeliveryState>(INITIAL_WEBHOOK_DELIVERY_STATE)
+      .intent("deliver", deliverSchema, runDeliver(deps))
+      .intent("sendBatch", sendBatchSchema, runWebhookSendBatch(deps))
+      .on(GATEWAY_SPEND_ADMITTED_EVENT_TYPE, (state, data) => ({
+        state: {
+          ...state,
+          attribution: attributionFrom(data as AdmitSpendCommandData),
+        },
+      }))
+      .on(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, (state, data, ctx) => {
+        const confirmed = data as ConfirmSpendCommandData;
+        return {
+          state,
+          intents: [
+            ctx.intents.deliver("deliver:confirmed", {
+              gateway_request_id: confirmed.gateway_request_id,
+              project_id: ctx.projectId,
+              status: "confirmed",
+              occurred_at: confirmed.occurred_at,
+              attribution: state.attribution,
+              model: confirmed.model,
+              model_provider_id: confirmed.model_provider_id,
+              usage: confirmed.usage,
+              rate_version: confirmed.rate_version,
+              duration_ms: confirmed.duration_ms,
+              error: null,
+              settle_reason: null,
+            }),
+          ],
+        };
+      })
+      .on(GATEWAY_SPEND_FAILED_EVENT_TYPE, (state, data, ctx) => {
+        const failed = data as FailSpendCommandData;
+        return {
+          state,
+          intents: [
+            ctx.intents.deliver("deliver:failed", {
+              gateway_request_id: failed.gateway_request_id,
+              project_id: ctx.projectId,
+              status: "failed",
+              occurred_at: failed.occurred_at,
+              attribution: state.attribution,
+              model: failed.model,
+              model_provider_id: failed.model_provider_id,
+              usage: failed.usage,
+              rate_version: "",
+              duration_ms: failed.duration_ms,
+              error: failed.error,
+              settle_reason: null,
+            }),
+          ],
+        };
+      })
+      .on(GATEWAY_SPEND_SETTLED_EVENT_TYPE, (state, data, ctx) => {
+        const settled = data as SettleSpendCommandData;
+        return {
+          state,
+          intents: [
+            ctx.intents.deliver("deliver:settled", {
+              gateway_request_id: settled.gateway_request_id,
+              project_id: ctx.projectId,
+              status: "settled",
+              occurred_at: settled.occurred_at,
+              attribution: state.attribution,
+              model: "",
+              model_provider_id: "",
+              usage: null,
+              rate_version: "",
+              duration_ms: 0,
+              error: null,
+              settle_reason: settled.reason,
+            }),
+          ],
+        };
+      })
+      // Spend events carry ids, integer quantities, and the caller's own
+      // metadata echo; no prompts or responses exist anywhere in this
+      // pipeline, so the event data is safe to persist as the payload.
+      .toPayload((event) => event.data as unknown as JsonValue)
+      .outbox({
+        maxAttempts: WEBHOOK_SEND_MAX_ATTEMPTS,
+        retryDelayMs: webhookRetryDelayMs,
+        // Sends are slow (a receiver can burn the full 10s timeout) and
+        // parallel-safe: batches are independent, and Stripe-style
+        // receivers must tolerate concurrent deliveries.
+        concurrency: 4,
+        batchSize: 8,
+        leaseDurationMs: 120_000,
+      });
 }

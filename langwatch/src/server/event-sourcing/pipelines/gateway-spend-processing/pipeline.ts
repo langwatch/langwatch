@@ -1,3 +1,8 @@
+import {
+  WEBHOOK_DELIVERY_PROCESS_NAME,
+  webhookDeliveryPM,
+  type WebhookDeliveryProcessDeps,
+} from "@ee/webhooks/process-manager/webhookDelivery.process";
 import { definePipeline } from "../..";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import {
@@ -18,6 +23,9 @@ import type { GatewaySpendProcessingEvent } from "./schemas/events";
 
 export interface GatewaySpendProcessingPipelineDeps {
   gatewaySpendStore: FoldProjectionStore<GatewaySpendState>;
+  /** The ADR-073 delivery process manager; absent when webhooks are off
+   *  (the pipeline still projects, delivery just has no consumer). */
+  webhookDelivery?: WebhookDeliveryProcessDeps;
 }
 
 /**
@@ -44,7 +52,7 @@ export interface GatewaySpendProcessingPipelineDeps {
 export function createGatewaySpendProcessingPipeline(
   deps: GatewaySpendProcessingPipelineDeps,
 ) {
-  return definePipeline<GatewaySpendProcessingEvent>()
+  let pipeline = definePipeline<GatewaySpendProcessingEvent>()
     .withName(GATEWAY_SPEND_PIPELINE_NAME)
     .withAggregateType(GATEWAY_SPEND_AGGREGATE_TYPE)
     .withFoldProjection(
@@ -54,6 +62,12 @@ export function createGatewaySpendProcessingPipeline(
     .withCommand("admitSpend", AdmitSpendCommand)
     .withCommand("confirmSpend", ConfirmSpendCommand)
     .withCommand("failSpend", FailSpendCommand)
-    .withCommand("settleSpend", SettleSpendCommand)
-    .build();
+    .withCommand("settleSpend", SettleSpendCommand);
+  if (deps.webhookDelivery) {
+    pipeline = pipeline.withProcessManager(
+      WEBHOOK_DELIVERY_PROCESS_NAME,
+      webhookDeliveryPM(deps.webhookDelivery),
+    );
+  }
+  return pipeline.build();
 }

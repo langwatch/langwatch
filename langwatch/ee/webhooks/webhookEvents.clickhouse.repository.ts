@@ -5,17 +5,8 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import type { SpendEventRow } from "~/server/gateway/spendEvents.clickhouse.repository";
 
 const SPEND_TABLE = "gateway_spend" as const;
-const DELIVERED_TABLE = "webhook_delivered_events" as const;
 
 const logger = createLogger("langwatch:webhooks:events-repository");
-
-/** A spend row plus its ReplacingMergeTree version, which the delivery scan
- *  uses as its per-project cursor. */
-export interface SpendEventWithVersion {
-  row: SpendEventRow;
-  /** EventTimestamp: the write-time RMT version, unix ms. */
-  eventTimestampMs: number;
-}
 
 export interface EmittedEventsPage {
   rows: SpendEventRow[];
@@ -77,111 +68,6 @@ function mapSpendRow(r: Record<string, unknown>): SpendEventRow {
  */
 export class WebhookEventsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
-
-  /**
-   * Spend rows written after the scan cursor, oldest write first. FINAL so
-   * one request yields one row even before background merges settle.
-   */
-  async readSpendEventsSince({
-    tenantId,
-    sinceEventTsMs,
-    limit,
-  }: {
-    tenantId: string;
-    sinceEventTsMs: number;
-    limit: number;
-  }): Promise<SpendEventWithVersion[]> {
-    const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT ${SPEND_COLUMNS}, EventTimestamp
-        FROM ${SPEND_TABLE} FINAL
-        WHERE TenantId = {tenantId:String}
-          AND EventTimestamp > {sinceEventTsMs:UInt64}
-          AND Status IN ('confirmed', 'failed')
-        ORDER BY EventTimestamp ASC, GatewayRequestId ASC
-        LIMIT {limit:UInt32}
-      `,
-      query_params: { tenantId, sinceEventTsMs, limit },
-      format: "JSONEachRow",
-    });
-    const raw = (await result.json()) as Array<Record<string, unknown>>;
-    return raw.map((r) => ({
-      row: mapSpendRow(r),
-      eventTimestampMs: Number(r.EventTimestamp),
-    }));
-  }
-
-  /** Which of these request ids already have a first-sight marker. */
-  async probeDelivered({
-    tenantId,
-    requestIds,
-  }: {
-    tenantId: string;
-    requestIds: string[];
-  }): Promise<Set<string>> {
-    if (requestIds.length === 0) return new Set();
-    const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT DISTINCT GatewayRequestId
-        FROM ${DELIVERED_TABLE}
-        WHERE TenantId = {tenantId:String}
-          AND GatewayRequestId IN {requestIds:Array(String)}
-      `,
-      query_params: { tenantId, requestIds },
-      format: "JSONEachRow",
-    });
-    return new Set(
-      ((await result.json()) as Array<{ GatewayRequestId: string }>).map(
-        (r) => r.GatewayRequestId,
-      ),
-    );
-  }
-
-  /**
-   * Record first sight for enqueued requests. Written AFTER the outbox
-   * commit, so a crash between commit and marker re-marks on the next scan
-   * and the deterministic batch message key suppresses the duplicate:
-   * at-least-once enqueue, exactly-once emit.
-   */
-  async markEnqueued(
-    entries: Array<{
-      tenantId: string;
-      gatewayRequestId: string;
-      eventType: string;
-      batchId: string;
-    }>,
-  ): Promise<void> {
-    if (entries.length === 0) return;
-    const tenantId = entries[0]!.tenantId;
-    if (entries.some((e) => e.tenantId !== tenantId)) {
-      throw new Error(
-        "WebhookEventsClickHouseRepository.markEnqueued: entries span multiple tenants",
-      );
-    }
-    const client = await this.resolveClient(tenantId);
-    try {
-      await client.insert({
-        table: DELIVERED_TABLE,
-        values: entries.map((e) => ({
-          TenantId: e.tenantId,
-          GatewayRequestId: e.gatewayRequestId,
-          EventType: e.eventType,
-          BatchId: e.batchId,
-          EnqueuedAt: Date.now(),
-        })),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      logger.error(
-        { tenantId, count: entries.length, error },
-        "failed to insert webhook delivered-event markers",
-      );
-      throw error;
-    }
-  }
 
   /**
    * The org's emitted-events log (Stripe /v1/events parity), newest first,

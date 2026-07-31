@@ -20,9 +20,13 @@ function row(overrides: Partial<SpendEventRow> = {}): SpendEventRow {
     tokensCacheWrite: 3,
     tokensReasoning: 2,
     costUsd: "0.001234",
-    status: "success",
+    costNanoUsd: 1_234_000,
+    rateVersion: "catalog@2026-07-26",
+    status: "confirmed",
     errorClass: "",
     httpStatus: 200,
+    needsReconciliation: false,
+    requestType: "chat",
     labels: ["customer:acme-172"],
     metadata: '{"call_site":"summary"}',
     durationMs: 1234,
@@ -53,7 +57,11 @@ describe("spend event envelope", () => {
       cache_creation_input_tokens: 3,
       reasoning_tokens: 2,
     });
-    expect(envelope.data.cost).toEqual({ total_usd: "0.001234" });
+    expect(envelope.data.cost).toEqual({
+      total_usd: "0.001234",
+      nano_usd: 1_234_000,
+      rate_version: "catalog@2026-07-26",
+    });
     expect(envelope.data.end_user_id).toBe("end-user-7");
     expect(envelope.data.metadata).toEqual({ call_site: "summary" });
     expect(envelope.data.occurred_at).toBe("2026-07-27T14:03:11.482Z");
@@ -71,7 +79,7 @@ describe("spend event envelope", () => {
 
   it("shapes the error block from the rich class on failures", () => {
     const envelope = spendRowToEnvelope(
-      row({ status: "error", errorClass: "upstream_rate_limited", httpStatus: 429 }),
+      row({ status: "failed", errorClass: "upstream_rate_limited", httpStatus: 429 }),
     );
     expect(envelope.data.status).toBe("error");
     expect(envelope.data.error).toEqual({

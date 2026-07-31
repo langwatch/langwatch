@@ -33,7 +33,6 @@ import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postg
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
@@ -769,9 +768,6 @@ export function initializeDefaultApp(options?: {
     ? {
         prisma,
         processStore: repositories.processStore,
-        eventsRepository: new WebhookEventsClickHouseRepository(
-          resolveClickHouseClient,
-        ),
         endpoints: webhookEndpointService,
         getPlan: (organizationId: string) =>
           planProvider.getActivePlan({ organizationId }),

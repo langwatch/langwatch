@@ -157,31 +157,3 @@ describe("gateway_spend retention exemption", () => {
     expect(migration).not.toContain("_retention_days UInt16");
   });
 });
-
-describe("webhook_delivered_events retention exemption", () => {
-  // The first-sight marker ledger backs the completed-events-fire-once
-  // delivery contract. It follows the spend table's exemption for the same
-  // reason, and its own TTL runs one month LONGER than the spend table's so
-  // the anti-join can never resurrect a request whose marker expired first.
-  /** @scenario Delivered marker retention is exempt from tenant retention */
-  it("is absent from tenant retention and outlives the spend window", async () => {
-    expect(RETENTION_MANAGED_TABLES).not.toContain("webhook_delivered_events");
-    expect(
-      TABLE_TTL_CONFIG.find((c) => c.table === "webhook_delivered_events"),
-    ).toBeUndefined();
-
-    const { readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
-    const migration = readFileSync(
-      join(
-        process.cwd(),
-        "src/server/clickhouse/migrations/00061_webhook_delivered_events.sql",
-      ),
-      "utf8",
-    );
-    expect(migration).toContain(
-      "TTL toDateTime(EnqueuedAt) + INTERVAL 14 MONTH DELETE",
-    );
-    expect(migration).not.toContain("_retention_days UInt16");
-  });
-});

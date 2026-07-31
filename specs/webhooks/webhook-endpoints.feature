@@ -33,27 +33,27 @@ Feature: Webhook endpoints, signed outbound event delivery
       When an endpoint is saved with a selector the registry does not know
       Then the save is rejected with a validation error
 
-  Rule: Completed events fire on first sight only
+  Rule: The delivery process manager consumes the event log exactly once
 
     @integration
-    Scenario: One spend record becomes exactly one delivery batch entry
-      Given a spend record the scan has never seen
-      When the delivery scan runs
-      Then the record is frozen into one batch for the endpoint
-      And a first-sight marker is written for its request id
+    Scenario: A confirmed spend event becomes exactly one delivery per endpoint
+      Given an admitted request whose confirmation arrives
+      When the process manager consumes both events
+      Then one send message exists for the endpoint carrying the full envelope
+      And the envelope joins the admission attribution with the outcome
 
     @integration
-    Scenario: A restated spend record is never re-emitted as completed
-      Given a spend record already marked as enqueued
-      When a re-fold writes a newer version of the same request id
-      And the delivery scan runs again
-      Then no new batch contains that request id
+    Scenario: A redelivered event never queues a second envelope
+      Given a confirmed event the process manager already consumed
+      When the same event is delivered again
+      Then the transactional inbox absorbs it
+      And no second send message exists
 
     @integration
-    Scenario: Batches and the cursor commit atomically, marker failures lose nothing
-      Given the marker write fails transiently after a scan
-      Then the batch intents were already committed with the advanced cursor
-      And the scan retries the markers until they land
+    Scenario: Failed and settled requests are delivered with their own statuses
+      Given a request that failed at the provider
+      When the process manager consumes the failure
+      Then the envelope carries the error class and failed status
 
   Rule: Deliveries are signed and attributable
 
@@ -152,8 +152,9 @@ Feature: Webhook endpoints, signed outbound event delivery
       When the events log is read with a page limit
       Then envelopes come back newest first with a continuation cursor
 
-    @unit
-    Scenario: Delivered marker retention is exempt from tenant retention
-      Given a tenant retention policy of thirty five days
-      Then webhook delivered markers are not governed by it
-      And their own retention outlives the spend table's window
+    @integration
+    Scenario: Each endpoint retries independently on its own ladder
+      Given two endpoints where one receiver is down
+      When a spend event is delivered
+      Then the healthy endpoint's send succeeds
+      And only the dead endpoint's message retries

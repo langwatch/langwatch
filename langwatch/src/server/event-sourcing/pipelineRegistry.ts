@@ -6,10 +6,7 @@ import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
 } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
-import {
-  createWebhookDeliveryProcessManager,
-  type WebhookDeliveryProcessDeps,
-} from "@ee/webhooks/process-manager/webhookDelivery.process";
+import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
@@ -765,6 +762,9 @@ export class PipelineRegistry {
           new GatewaySpendStore(deps.repository),
           "gateway_spend",
         ),
+        // The ADR-073 delivery process manager consumes this pipeline's
+        // committed events through its transactional inbox.
+        webhookDelivery: this.deps.webhookDelivery,
       }),
     );
   }
@@ -987,9 +987,6 @@ export class PipelineRegistry {
       ? createGatewayBudgetSyncReactor(this.deps.gatewayBudgetSync)
       : undefined;
 
-    const webhookDeliveryProcessManager = this.deps.webhookDelivery
-      ? createWebhookDeliveryProcessManager(this.deps.webhookDelivery)
-      : undefined;
 
     const governanceKpisSyncReactor = this.deps.governanceKpisSync
       ? createGovernanceKpisSyncReactor(this.deps.governanceKpisSync)
@@ -1026,7 +1023,6 @@ export class PipelineRegistry {
         experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
         gatewayBudgetSyncReactor,
-        webhookDeliveryProcessManager,
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,

@@ -92,15 +92,67 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
     tokensCacheWrite: 5,
     tokensReasoning: 0,
     costUsd: "0.010000",
-    status: "success",
+    costNanoUsd: 10_000_000,
+    rateVersion: "catalog@2026-07-26",
+    status: "confirmed" as const,
     errorClass: "",
     httpStatus: 200,
+    needsReconciliation: false,
+    requestType: "chat",
     labels: [],
     metadata: "",
     durationMs: 800,
     occurredAt: new Date(baseTime),
     ...overrides,
   });
+
+  // The write path is the fold's upsert now; tests seed by mapping a row to
+  // the fold state it would have produced.
+  async function seed(rows: SpendEventRow[]): Promise<void> {
+    await repo.upsertFromFold(
+      rows.map((row) => ({
+        tenantId: row.tenantId,
+        gatewayRequestId: row.gatewayRequestId,
+        state: {
+          status: row.status,
+          organizationId: row.organizationId,
+          virtualKeyId: row.virtualKeyId,
+          principalUserId: row.principalUserId,
+          endUserId: row.endUserId,
+          model: row.model,
+          providerKey: row.providerKey,
+          traceId: row.traceId,
+          requestType: row.requestType,
+          labels: row.labels,
+          metadataJson: row.metadata,
+          podId: "",
+          podSeq: 0,
+          usage: {
+            input_tokens: row.tokensInput,
+            output_tokens: row.tokensOutput,
+            cache_read_input_tokens: row.tokensCacheRead,
+            cache_creation_input_tokens: row.tokensCacheWrite,
+            reasoning_tokens: row.tokensReasoning,
+          },
+          rateVersion: row.rateVersion,
+          // Overrides set the display string; derive the integer so both
+          // stay consistent however the row was authored.
+          costNanoUsd: Math.round(Number(row.costUsd) * 1_000_000_000),
+          errorType: row.errorClass,
+          httpStatus: row.httpStatus,
+          needsReconciliation: row.needsReconciliation,
+          settleReason: "",
+          occurredAtMs: row.occurredAt.getTime(),
+          durationMs: row.durationMs,
+          // Write-time stamps: the walk pages by insert order, so the
+          // version must be the seed instant, never the occurred-at.
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          LastEventOccurredAt: row.occurredAt.getTime(),
+        },
+      })),
+    );
+  }
 
   beforeAll(async () => {
     const containers = await startTestContainers();
@@ -257,11 +309,11 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario Pagination under concurrent inserts never skips a row */
   it("serves late-folded rows on later pages of an in-flight walk", async () => {
-    await repo.insertSpendEvents([
+    await seed([
       spendRow(`${ns}-r1`, { occurredAt: new Date(baseTime + 1_000) }),
       spendRow(`${ns}-r2`, { occurredAt: new Date(baseTime + 2_000) }),
     ]);
-    await repo.insertSpendEvents([
+    await seed([
       spendRow(`${ns}-r3`, { occurredAt: new Date(baseTime + 3_000) }),
     ]);
 
@@ -279,7 +331,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
     // A late fold: OLDER occurred-at than everything served, inserted while
     // the walk is mid-flight. Insert-order pagination must still serve it.
-    await repo.insertSpendEvents([
+    await seed([
       spendRow(`${ns}-late`, { occurredAt: new Date(baseTime - 60_000) }),
     ]);
 
@@ -305,7 +357,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario The pull is org-fenced */
   it("never serves another organization's rows", async () => {
-    await repo.insertSpendEvents([
+    await seed([
       {
         ...spendRow(`${ns}-foreign`),
         tenantId: foreignProject.id,
@@ -330,7 +382,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario The end-user rollup sums exactly that user's requests in the window */
   it("rolls up one end user's spend with token classes", async () => {
-    await repo.insertSpendEvents([
+    await seed([
       spendRow(`${ns}-u1a`, {
         endUserId: `${ns}-user-1`,
         costUsd: "0.020000",
@@ -368,7 +420,7 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario A virtual key filter narrows the rollup */
   it("narrows the rollup to one virtual key", async () => {
-    await repo.insertSpendEvents([
+    await seed([
       spendRow(`${ns}-vk-a`, {
         endUserId: `${ns}-user-3`,
         virtualKeyId: "vk-a",

@@ -1,126 +1,203 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * The delivery pipeline against real ClickHouse and Postgres: scan slots
- * turning spend rows into committed outbox batches with first-sight
- * markers, and batch sends recording the receiver's answers. The HTTP
- * sender is mocked; everything else is the real machinery.
+ * The delivery process manager end to end against real Postgres: spend
+ * pipeline events consumed through the transactional inbox, the deliver
+ * fan-out committing per-endpoint send messages, and the send executor
+ * recording the receiver's answers. The HTTP sender is mocked; the
+ * definition under test is the EXACT one the runtime mounts, built through
+ * the pipeline's own applier.
  */
 
-import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { Organization, Project, Team } from "@prisma/client";
 import { prisma } from "~/server/db";
-import { InMemoryProcessStore } from "~/server/event-sourcing/process-manager/stores/inMemoryProcessStore";
 import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
+  InMemoryProcessStore,
+  ProcessManagerService,
+  type ProcessDefinition,
+} from "~/server/event-sourcing/process-manager";
+import { buildProcessManager } from "~/server/event-sourcing/pipeline/processBuilder";
 import {
-  GatewaySpendEventsRepository,
-  type SpendEventRow,
-} from "~/server/gateway/spendEvents.clickhouse.repository";
-import { WebhookEventsClickHouseRepository } from "../webhookEvents.clickhouse.repository";
+  buildIntentHandlers,
+  buildProcessDefinition,
+} from "~/server/event-sourcing/process-manager/processRuntime";
+import { OutboxDispatcherService } from "~/server/event-sourcing/process-manager/outbox/outboxDispatcherService";
+import type { ProcessEventEnvelope } from "~/server/event-sourcing/process-manager/processManager.types";
+import {
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+} from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import { WebhookEndpointService } from "../webhookEndpoint.service";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
-  runWebhookScan,
-  runWebhookSendBatch,
-  type SendBatchPayload,
+  webhookDeliveryPM,
   type WebhookDeliveryProcessDeps,
+  type WebhookDeliveryState,
 } from "../process-manager/webhookDelivery.process";
 
-vi.mock("~/server/app-layer/automations/delivery/sendWebhook", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("~/server/app-layer/automations/delivery/sendWebhook")>();
-  return { ...original, sendWebhook: vi.fn() };
-});
+vi.mock(
+  "~/server/app-layer/automations/delivery/sendWebhook",
+  async (importOriginal) => {
+    const original =
+      await importOriginal<
+        typeof import("~/server/app-layer/automations/delivery/sendWebhook")
+      >();
+    return { ...original, sendWebhook: vi.fn() };
+  },
+);
 import { sendWebhook } from "~/server/app-layer/automations/delivery/sendWebhook";
 const sendWebhookMock = vi.mocked(sendWebhook);
 
 const ns = `webhook-pm-${nanoid(8)}`;
-
-let client: ClickHouseClient;
-let spendRepo: GatewaySpendEventsRepository;
-let eventsRepository: WebhookEventsClickHouseRepository;
-let endpoints: WebhookEndpointService;
-let store: InMemoryProcessStore;
-let deps: WebhookDeliveryProcessDeps;
+const T0 = Date.UTC(2026, 6, 20, 12, 0, 0);
 
 let organization: Organization;
 let team: Team;
 let project: Project;
 let endpointId: string;
 
-const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);
+const endpoints = new WebhookEndpointService({ prisma });
+
+let store: InMemoryProcessStore;
+let service: ProcessManagerService<WebhookDeliveryState>;
+let dispatcher: OutboxDispatcherService;
+let deps: WebhookDeliveryProcessDeps;
 let clock: number;
 
-function spendRow(
+function buildDefinition(d: WebhookDeliveryProcessDeps) {
+  return buildProcessDefinition(
+    buildProcessManager({
+      name: WEBHOOK_DELIVERY_PROCESS_NAME,
+      applier: webhookDeliveryPM(d),
+    }).config,
+  ) as ProcessDefinition<WebhookDeliveryState>;
+}
+
+function envelopeFor(
   requestId: string,
-  overrides: Partial<SpendEventRow> = {},
-): SpendEventRow {
+  eventType: string,
+  data: Record<string, unknown>,
+  occurredAt: number,
+): ProcessEventEnvelope {
   return {
+    eventId: `${eventType}:${requestId}`,
+    eventType,
+    occurredAt,
     tenantId: project.id,
-    gatewayRequestId: requestId,
-    organizationId: organization.id,
-    teamId: team.id,
-    virtualKeyId: "vk-test",
-    principalUserId: "",
-    endUserId: "end-user-1",
-    traceId: `trace-${requestId}`,
-    model: "openai/gpt-5",
-    providerKey: "provider-1",
-    tokensInput: 100,
-    tokensOutput: 10,
-    tokensCacheRead: 0,
-    tokensCacheWrite: 0,
-    tokensReasoning: 0,
-    costUsd: "0.001000",
-    status: "success",
-    errorClass: "",
-    httpStatus: 200,
-    labels: [],
-    metadata: "",
-    durationMs: 500,
-    occurredAt: new Date(baseTime),
-    ...overrides,
+    projectId: project.id,
+    processKey: requestId,
+    payload: data as ProcessEventEnvelope["payload"],
   };
 }
 
-async function runScan(): Promise<void> {
-  clock += 20_000;
-  await runWebhookScan(deps)({ scheduledFor: clock }, {
-    processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-    projectId: "__global__",
-    processKey: WEBHOOK_DELIVERY_PROCESS_NAME,
-    tenantId: "__global__",
-    messageKey: `process:${WEBHOOK_DELIVERY_PROCESS_NAME}:scan:${clock}`,
-    attempt: 1,
-  });
+function admittedEnvelope(requestId: string): ProcessEventEnvelope {
+  return envelopeFor(
+    requestId,
+    GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+    {
+      gateway_request_id: requestId,
+      occurred_at: T0,
+      organization_id: organization.id,
+      tenantId: project.id,
+      virtual_key_id: "vk-test",
+      principal_user_id: "",
+      end_user_id: "end-user-1",
+      model: "openai/gpt-5",
+      model_provider_id: "provider-1",
+      trace_id: `trace-${requestId}`,
+      request_type: "chat",
+      labels: ["team:acme"],
+      metadata: '{"call_site":"summary"}',
+      pod_id: "pod-1",
+      pod_seq: 1,
+    },
+    T0,
+  );
 }
 
-async function pendingSendMessages() {
+function confirmedEnvelope(requestId: string): ProcessEventEnvelope {
+  return envelopeFor(
+    requestId,
+    GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+    {
+      gateway_request_id: requestId,
+      occurred_at: T0 + 3000,
+      tenantId: project.id,
+      model: "openai/gpt-5",
+      model_provider_id: "provider-1",
+      usage: {
+        input_tokens: 869,
+        output_tokens: 207,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        reasoning_tokens: 0,
+      },
+      rate_version: "catalog@2026-07-26",
+      duration_ms: 3878,
+    },
+    T0 + 3000,
+  );
+}
+
+function failedEnvelope(requestId: string): ProcessEventEnvelope {
+  return envelopeFor(
+    requestId,
+    GATEWAY_SPEND_FAILED_EVENT_TYPE,
+    {
+      gateway_request_id: requestId,
+      occurred_at: T0 + 1500,
+      tenantId: project.id,
+      model: "openai/gpt-5",
+      model_provider_id: "provider-1",
+      error: { type: "provider_timeout", http_status: 504 },
+      usage: {
+        input_tokens: 869,
+        output_tokens: 0,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        reasoning_tokens: 0,
+      },
+      duration_ms: 1509,
+    },
+    T0 + 1500,
+  );
+}
+
+async function consume(envelope: ProcessEventEnvelope): Promise<void> {
+  const result = await service.handleEvent({ envelope, now: clock });
+  expect(result.outcome).not.toBe("revisionConflict");
+}
+
+async function drainOutbox(passes = 6): Promise<void> {
+  for (let i = 0; i < passes; i++) {
+    clock += 1000;
+    await dispatcher.runOnce({ now: clock, limit: 50 });
+  }
+}
+
+async function sendMessagesFor(endpoint: string) {
   const messages = await store.findMessagesByRef({
     ref: {
       processName: WEBHOOK_DELIVERY_PROCESS_NAME,
       projectId: project.id,
-      processKey: project.id,
+      processKey: `endpoint:${endpoint}`,
     },
   });
-  return messages.filter(
-    (m) => m.intentType === "sendBatch" && m.status === "pending",
-  );
+  return messages.filter((m) => m.intentType === "sendBatch");
 }
 
 beforeAll(async () => {
-  const containers = await startTestContainers();
-  client = containers.clickHouseClient;
-  const resolve = async () => client;
-  spendRepo = new GatewaySpendEventsRepository(resolve);
-  eventsRepository = new WebhookEventsClickHouseRepository(resolve);
-  endpoints = new WebhookEndpointService({ prisma });
-
   organization = await prisma.organization.create({
     data: { name: "Webhook PM Org", slug: `--test-org-${ns}` },
   });
@@ -147,23 +224,9 @@ beforeAll(async () => {
     enabledEvents: ["gateway.request.completed"],
   });
   endpointId = created.endpoint.id;
-
-  // Keep the sweep hermetic: this suite's org only, whatever else the
-  // shared test database currently holds.
-  vi.spyOn(endpoints, "organizationIdsWithActiveEndpoints").mockResolvedValue([
-    organization.id,
-  ]);
-}, 120_000);
+});
 
 afterAll(async () => {
-  if (client && project) {
-    await client.command({
-      query: `ALTER TABLE gateway_spend_events DELETE WHERE TenantId = '${project.id}'`,
-    });
-    await client.command({
-      query: `ALTER TABLE webhook_delivered_events DELETE WHERE TenantId = '${project.id}'`,
-    });
-  }
   await prisma.webhookEndpointDelivery.deleteMany({
     where: { organizationId: organization.id },
   });
@@ -173,7 +236,6 @@ afterAll(async () => {
   await prisma.project.delete({ where: { id: project.id } });
   await prisma.team.delete({ where: { id: team.id } });
   await prisma.organization.delete({ where: { id: organization.id } });
-  await stopTestContainers();
 });
 
 beforeEach(() => {
@@ -182,7 +244,6 @@ beforeEach(() => {
   deps = {
     prisma,
     processStore: store,
-    eventsRepository,
     endpoints,
     getPlan: async () =>
       ({ webhookEndpoints: true }) as Awaited<
@@ -190,254 +251,168 @@ beforeEach(() => {
       >,
     now: () => clock,
   };
+  service = new ProcessManagerService({
+    definition: buildDefinition(deps),
+    store,
+  });
+  dispatcher = new OutboxDispatcherService({
+    store,
+    handlers: buildIntentHandlers(
+      buildProcessManager({
+        name: WEBHOOK_DELIVERY_PROCESS_NAME,
+        applier: webhookDeliveryPM(deps),
+      }).config,
+    ),
+    processNames: [WEBHOOK_DELIVERY_PROCESS_NAME],
+  });
   sendWebhookMock.mockReset();
+  sendWebhookMock.mockResolvedValue({
+    status: 200,
+    body: "ok",
+    eventId: "x",
+  });
 });
 
-describe("webhook delivery scan", () => {
-  /** @scenario One spend record becomes exactly one delivery batch entry */
-  it("freezes a never-seen spend record into one batch and marks first sight", async () => {
+describe("webhook delivery via the transactional inbox", () => {
+  /** @scenario A confirmed spend event becomes exactly one delivery per endpoint */
+  it("joins admission attribution with the outcome into one send per endpoint", async () => {
     const requestId = `req-${nanoid(8)}`;
-    await spendRepo.insertSpendEvents([spendRow(requestId)]);
+    await consume(admittedEnvelope(requestId));
+    await consume(confirmedEnvelope(requestId));
+    await drainOutbox();
 
-    await runScan();
-
-    const sends = await pendingSendMessages();
+    const sends = await sendMessagesFor(endpointId);
     expect(sends).toHaveLength(1);
-    const payload = sends[0]!.payload as unknown as SendBatchPayload;
-    expect(payload.endpointId).toBe(endpointId);
-    expect(payload.envelopes.map((e) => e.id)).toEqual([requestId]);
+    expect(sends[0]!.status).toBe("dispatched");
 
-    const marked = await eventsRepository.probeDelivered({
-      tenantId: project.id,
-      requestIds: [requestId],
-    });
-    expect(marked.has(requestId)).toBe(true);
-
-    // The same store re-scanned: nothing new, no duplicate batch.
-    await runScan();
-    expect(await pendingSendMessages()).toHaveLength(1);
-  });
-
-  /** @scenario A restated spend record is never re-emitted as completed */
-  it("ignores a newer version of an already-enqueued request id", async () => {
-    const requestId = `req-${nanoid(8)}`;
-    await spendRepo.insertSpendEvents([spendRow(requestId)]);
-    await runScan();
-    expect(await pendingSendMessages()).toHaveLength(1);
-
-    // A restatement writes a newer RMT version directly (the app-side
-    // insert probe skips same-id writes; a future corrections path would
-    // not). The scan must not re-emit completed for it.
-    await client.insert({
-      table: "gateway_spend_events",
-      values: [
-        {
-          TenantId: project.id,
-          GatewayRequestId: requestId,
-          OrganizationId: organization.id,
-          TeamId: team.id,
-          VirtualKeyId: "vk-test",
-          PrincipalUserId: "",
-          EndUserId: "end-user-1",
-          TraceId: `trace-${requestId}`,
-          Model: "openai/gpt-5",
-          ProviderKey: "provider-1",
-          TokensInput: 120,
-          TokensOutput: 12,
-          TokensCacheRead: 0,
-          TokensCacheWrite: 0,
-          TokensReasoning: 0,
-          CostUSD: "0.002000",
-          Status: "success",
-          ErrorClass: "",
-          HttpStatus: 200,
-          Labels: [],
-          Metadata: "",
-          DurationMS: 600,
-          OccurredAt: baseTime,
-          EventTimestamp: Date.now() + 60_000,
-        },
-      ],
-      format: "JSONEachRow",
-      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-    });
-
-    await runScan();
-    expect(await pendingSendMessages()).toHaveLength(1);
-  });
-
-  /** @scenario Batches and the cursor commit atomically, marker failures lose nothing */
-  it("keeps committed batches when the marker write fails, and retries markers", async () => {
-    const requestId = `req-${nanoid(8)}`;
-    await spendRepo.insertSpendEvents([spendRow(requestId)]);
-
-    const markSpy = vi
-      .spyOn(eventsRepository, "markEnqueued")
-      .mockRejectedValueOnce(new Error("clickhouse hiccup"));
-
-    await runScan();
-
-    // The batch commit preceded the marker failure and survives it; the
-    // in-scan retry landed the markers on the second attempt.
-    expect(await pendingSendMessages()).toHaveLength(1);
-    expect(markSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
-    const marked = await eventsRepository.probeDelivered({
-      tenantId: project.id,
-      requestIds: [requestId],
-    });
-    expect(marked.has(requestId)).toBe(true);
-    markSpy.mockRestore();
-  });
-
-  /** @scenario The events listing pages the organization's emitted events */
-  it("pages emitted envelopes newest first with a continuation cursor", async () => {
-    const ids = [1, 2, 3].map((i) => `req-page-${i}-${nanoid(6)}`);
-    await spendRepo.insertSpendEvents(
-      ids.map((id, i) =>
-        spendRow(id, { occurredAt: new Date(baseTime + i * 1000) }),
-      ),
-    );
-
-    const first = await eventsRepository.readEmittedEventsPage({
-      tenantIds: [project.id],
-      fromMs: baseTime - 1,
-      toMs: baseTime + 60_000,
-      limit: 2,
-    });
-    expect(first.rows.length).toBe(2);
-    expect(first.nextCursor).not.toBeNull();
-    expect(first.rows[0]!.occurredAt.getTime()).toBeGreaterThanOrEqual(
-      first.rows[1]!.occurredAt.getTime(),
-    );
-
-    const second = await eventsRepository.readEmittedEventsPage({
-      tenantIds: [project.id],
-      fromMs: baseTime - 1,
-      toMs: baseTime + 60_000,
-      cursor: first.nextCursor,
-      limit: 2,
-    });
-    const seen = new Set([
-      ...first.rows.map((r) => r.gatewayRequestId),
-      ...second.rows.map((r) => r.gatewayRequestId),
-    ]);
-    for (const id of ids) expect(seen.has(id)).toBe(true);
-  });
-});
-
-describe("webhook batch send", () => {
-  function sendPayload(requestId: string): SendBatchPayload {
-    return {
-      organizationId: organization.id,
-      projectId: project.id,
-      endpointId,
-      batchId: `${endpointId}:test-${nanoid(6)}`,
-      envelopes: [
-        {
-          id: requestId,
-          type: "gateway.request.completed",
-          created: new Date(baseTime).toISOString(),
-          schema_version: "1",
-          data: { event_id: requestId },
-        },
-      ],
+    expect(sendWebhookMock).toHaveBeenCalledTimes(1);
+    const call = sendWebhookMock.mock.calls[0]![0];
+    expect(call.signingSecret).toMatch(/^whsec_/);
+    const body = JSON.parse(call.body) as {
+      batch: Array<{ id: string; data: Record<string, unknown> }>;
     };
-  }
+    expect(body.batch).toHaveLength(1);
+    expect(body.batch[0]!.id).toBe(requestId);
+    expect(body.batch[0]!.data.organization_id).toBe(organization.id);
+    expect(body.batch[0]!.data.end_user_id).toBe("end-user-1");
+    expect(body.batch[0]!.data.status).toBe("success");
+    const cost = body.batch[0]!.data.cost as { nano_usd: number };
+    expect(cost.nano_usd).toBeGreaterThan(0);
+    expect(Number.isInteger(cost.nano_usd)).toBe(true);
+  });
 
-  const intentContext = (attempt = 1) => ({
-    processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-    projectId: project.id,
-    processKey: project.id,
-    tenantId: project.id,
-    messageKey: "send:test",
-    attempt,
+  /** @scenario A redelivered event never queues a second envelope */
+  it("absorbs a redelivered confirmed event in the inbox", async () => {
+    const requestId = `req-${nanoid(8)}`;
+    await consume(admittedEnvelope(requestId));
+    await consume(confirmedEnvelope(requestId));
+
+    const redelivery = await service.handleEvent({
+      envelope: confirmedEnvelope(requestId),
+      now: clock + 10,
+    });
+    expect(redelivery.outcome).toBe("duplicateEvent");
+
+    await drainOutbox();
+    expect(await sendMessagesFor(endpointId)).toHaveLength(1);
+    expect(sendWebhookMock).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario Failed and settled requests are delivered with their own statuses */
+  it("delivers a failed request with its error class", async () => {
+    const requestId = `req-${nanoid(8)}`;
+    await consume(admittedEnvelope(requestId));
+    await consume(failedEnvelope(requestId));
+    await drainOutbox();
+
+    expect(sendWebhookMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(sendWebhookMock.mock.calls[0]![0].body) as {
+      batch: Array<{ data: Record<string, unknown> }>;
+    };
+    expect(body.batch[0]!.data.status).toBe("error");
+    expect(body.batch[0]!.data.error).toEqual({
+      class: "provider_timeout",
+      http_status: 504,
+    });
   });
 
   /** @scenario The receiver's status code is stored on every attempt */
-  it("records the receiver's 5xx with latency and rethrows retryable", async () => {
+  it("records the receiver's 5xx per attempt and leaves the message pending", async () => {
     sendWebhookMock.mockResolvedValue({
       status: 503,
       body: "upstream down",
-      eventId: "batch-1",
+      eventId: "x",
       retryAfterMs: 30_000,
     });
-    const payload = sendPayload(`req-${nanoid(6)}`);
+    const requestId = `req-${nanoid(8)}`;
+    await consume(admittedEnvelope(requestId));
+    await consume(confirmedEnvelope(requestId));
+    await drainOutbox(2);
 
-    await expect(
-      runWebhookSendBatch(deps)(payload, intentContext(1)),
-    ).rejects.toMatchObject({ retryable: true, retryAfterMs: 30_000 });
-
-    const deliveries = await endpoints.listDeliveries({
-      organizationId: organization.id,
-      endpointId,
-    });
-    const row = deliveries.find((d) => d.dispatchId === payload.batchId);
-    expect(row).toMatchObject({
-      outcome: "retryable",
-      responseStatus: 503,
-      attempt: 1,
-      eventCount: 1,
-    });
-
-    // The signed request carried the delivery headers.
-    const call = sendWebhookMock.mock.calls[0]![0];
-    expect(call.signingSecret).toMatch(/^whsec_/);
-    expect(call.attempt).toBe(1);
-    expect(call.eventId).toBe(payload.batchId);
-  });
-
-  it("a 2xx acks: success row, no throw", async () => {
-    sendWebhookMock.mockResolvedValue({
-      status: 200,
-      body: "ok",
-      eventId: "batch-2",
-    });
-    const payload = sendPayload(`req-${nanoid(6)}`);
-    await runWebhookSendBatch(deps)(payload, intentContext(2));
+    const sends = await sendMessagesFor(endpointId);
+    expect(sends[0]!.status).toBe("pending");
+    expect(sends[0]!.attempts).toBeGreaterThanOrEqual(1);
 
     const deliveries = await endpoints.listDeliveries({
       organizationId: organization.id,
       endpointId,
     });
-    expect(
-      deliveries.find((d) => d.dispatchId === payload.batchId),
-    ).toMatchObject({ outcome: "success", responseStatus: 200, attempt: 2 });
-  });
-
-  it("a non-retryable 4xx records terminal and throws retryable false", async () => {
-    sendWebhookMock.mockResolvedValue({
-      status: 404,
-      body: "gone",
-      eventId: "batch-3",
-    });
-    const payload = sendPayload(`req-${nanoid(6)}`);
-    await expect(
-      runWebhookSendBatch(deps)(payload, intentContext(1)),
-    ).rejects.toMatchObject({ retryable: false });
-
-    const deliveries = await endpoints.listDeliveries({
-      organizationId: organization.id,
-      endpointId,
-    });
-    expect(
-      deliveries.find((d) => d.dispatchId === payload.batchId),
-    ).toMatchObject({ outcome: "terminal", responseStatus: 404 });
+    const row = deliveries.find((d) => d.dispatchId.includes(requestId));
+    expect(row).toMatchObject({ outcome: "retryable", responseStatus: 503 });
   });
 
   /** @scenario A disabled endpoint drains its queue without posting */
   it("drops the batch without posting when the endpoint is disabled", async () => {
+    const requestId = `req-${nanoid(8)}`;
+    await consume(admittedEnvelope(requestId));
+    await consume(confirmedEnvelope(requestId));
+    // Level 1 fans out while the endpoint is ACTIVE; the disable lands
+    // between fan-out and the send, which is the case the drain covers.
+    await drainOutbox(1);
+
     await endpoints.disable({
       organizationId: organization.id,
       endpointId,
     });
     try {
-      const payload = sendPayload(`req-${nanoid(6)}`);
-      await runWebhookSendBatch(deps)(payload, intentContext(1));
+      await drainOutbox();
       expect(sendWebhookMock).not.toHaveBeenCalled();
+      const sends = await sendMessagesFor(endpointId);
+      expect(sends[0]!.status).toBe("dispatched");
     } finally {
       await endpoints.enable({
         organizationId: organization.id,
         endpointId,
+      });
+    }
+  });
+
+  /** @scenario Each endpoint retries independently on its own ladder */
+  it("a dead endpoint's retries never block the healthy endpoint", async () => {
+    const second = await endpoints.create({
+      organizationId: organization.id,
+      url: "https://receiver-two.example.com/hooks",
+      enabledEvents: ["gateway.request.completed"],
+    });
+    try {
+      sendWebhookMock.mockImplementation(async ({ url }) =>
+        url.includes("receiver-two")
+          ? { status: 200, body: "ok", eventId: "x" }
+          : { status: 503, body: "down", eventId: "x" },
+      );
+      const requestId = `req-${nanoid(8)}`;
+      await consume(admittedEnvelope(requestId));
+      await consume(confirmedEnvelope(requestId));
+      await drainOutbox(2);
+
+      const healthy = await sendMessagesFor(second.endpoint.id);
+      const dead = await sendMessagesFor(endpointId);
+      expect(healthy[0]!.status).toBe("dispatched");
+      expect(dead[0]!.status).toBe("pending");
+    } finally {
+      await endpoints.archive({
+        organizationId: organization.id,
+        endpointId: second.endpoint.id,
       });
     }
   });
