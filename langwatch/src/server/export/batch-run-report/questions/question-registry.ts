@@ -91,6 +91,10 @@ function trendClassificationById(
   );
 }
 
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 function scenarioNameFor({
   evidence,
   scenarioId,
@@ -141,31 +145,68 @@ function trendPoints(
  * starts looking for the discrepancy. What this section owns is the row-level
  * detail and the run's place in the sequence.
  */
-function outcomeBlocks(evidence: ReportEvidence): Block[] {
-  const blocks: Block[] = [
+function runRow(run: ReportEvidence["runs"][number]) {
+  return [
+    { text: run.scenarioName },
     {
-      kind: "table",
-      columns: ["Scenario", "Outcome", "Criteria met", "Turns", "Took"],
-      rows: evidence.runs.map((run) => [
-        { text: run.scenarioName },
-        {
-          text: run.status,
-          tone:
-            run.category === "success"
-              ? ("pass" as const)
-              : run.category === "failure"
-                ? ("fail" as const)
-                : ("warn" as const),
-        },
-        {
-          text: `${run.metCriteria.length}/${run.metCriteria.length + run.unmetCriteria.length}`,
-          sortValue: run.metCriteria.length,
-        },
-        { text: String(run.turnCount), sortValue: run.turnCount },
-        { text: formatDuration(run.durationMs), sortValue: run.durationMs },
-      ]),
+      text: run.status,
+      tone:
+        run.category === "success"
+          ? ("pass" as const)
+          : run.category === "failure"
+            ? ("fail" as const)
+            : ("warn" as const),
     },
+    {
+      text: `${run.metCriteria.length}/${run.metCriteria.length + run.unmetCriteria.length}`,
+      sortValue: run.metCriteria.length,
+    },
+    { text: String(run.turnCount), sortValue: run.turnCount },
+    { text: formatDuration(run.durationMs), sortValue: run.durationMs },
   ];
+}
+
+const RUN_COLUMNS = ["Scenario", "Outcome", "Criteria met", "Turns", "Took"];
+
+function outcomeBlocks(evidence: ReportEvidence): Block[] {
+  // Only what a reader would act on. A run of twenty-one scenarios put every
+  // passing row on the page, and a reader scanning for what went wrong had to
+  // do the filtering themselves — on the section that exists to tell them.
+  // The ones that passed are reference, so they are reachable rather than
+  // absent, and a run where nothing failed still shows its rows.
+  const didNotPass = evidence.runs.filter((run) => run.category !== "success");
+  const passed = evidence.runs.filter((run) => run.category === "success");
+  const blocks: Block[] = [];
+
+  if (didNotPass.length > 0) {
+    blocks.push({
+      kind: "table",
+      columns: RUN_COLUMNS,
+      rows: didNotPass.map(runRow),
+    });
+    if (passed.length > 0) {
+      blocks.push({
+        kind: "groups",
+        groups: [
+          {
+            title: `${plural(passed.length, "scenario", "scenarios")} passed`,
+            subtitle: "nothing to do here",
+            tone: "pass" as const,
+            detail: passed.map((run) => ({
+              label: run.scenarioName,
+              body: `${run.metCriteria.length} of ${run.metCriteria.length + run.unmetCriteria.length} criteria, ${formatDuration(run.durationMs)}`,
+            })),
+          },
+        ],
+      });
+    }
+  } else {
+    blocks.push({
+      kind: "table",
+      columns: RUN_COLUMNS,
+      rows: evidence.runs.map(runRow),
+    });
+  }
 
   // This run's rate in the company of the ones before it. A single figure
   // cannot say whether 25% is a collapse or the usual, which is the first
@@ -243,17 +284,38 @@ function streakBlocks(evidence: ReportEvidence): Block[] {
     });
   }
 
+  const longest = Math.max(...[...byText.values()].map((it) => it.batches));
+
+  // This is the section that says a reader does not need to look here, and it
+  // was the second largest in the document — every holding criterion spelled
+  // out, each with the same suffix repeated after it. So it answers in one
+  // line and keeps the roll call behind a disclosure for anyone who wants to
+  // audit it. What is working earns an acknowledgement, not a page.
   return [
     {
-      kind: "list",
-      items: [...byText].map(([text, { scenarios, batches }]) => ({
-        text: [
-          text,
-          scenarios > 1 ? ` — across ${scenarios} scenarios,` : " —",
-          batches > 1 ? ` held for ${batches} runs` : " held in this run",
-        ].join(""),
-        tone: "pass" as const,
-      })),
+      kind: "note",
+      tone: "pass",
+      text:
+        longest > 1
+          ? `${plural(byText.size, "criterion", "criteria")} came through this run without failing, the steadiest of them across ${longest} runs.`
+          : `${plural(byText.size, "criterion", "criteria")} came through this run without failing.`,
+    },
+    {
+      kind: "groups",
+      groups: [
+        {
+          title: "Everything that held",
+          subtitle: plural(byText.size, "criterion", "criteria"),
+          tone: "pass" as const,
+          detail: [...byText].map(([text, { scenarios, batches }]) => ({
+            label: text,
+            body: [
+              scenarios > 1 ? `${scenarios} scenarios` : "1 scenario",
+              batches > 1 ? `${batches} runs` : "this run",
+            ].join(", "),
+          })),
+        },
+      ],
     },
   ];
 }
@@ -492,10 +554,12 @@ function coverageBlocks(evidence: ReportEvidence): Block[] {
       },
       {
         kind: "list",
-        items: notRun.map((scenario) => ({
-          text: scenario.name,
-          tone: "warn" as const,
-        })),
+        // By scenario, not by run: a scenario that stopped running appears once
+        // per prior run that had it, so the same name was arriving three times
+        // over and reading as a rendering fault rather than as three runs.
+        items: [...new Set(notRun.map((scenario) => scenario.name))].map(
+          (name) => ({ text: name, tone: "warn" as const }),
+        ),
       },
     ];
   }
