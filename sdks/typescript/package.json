@@ -52,7 +52,9 @@
   "scripts": {
     "generate": "pnpm run generate:server-types && pnpm run generate:openapi-types",
     "cli": "node dist/cli/index.js",
+    "prelint": "pnpm run generate",
     "lint": "eslint .",
+    "pretest": "pnpm run generate",
     "test": "vitest",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
     "test:e2e": "dotenv -- vitest run -c ./vitest.e2e.config.mts",
