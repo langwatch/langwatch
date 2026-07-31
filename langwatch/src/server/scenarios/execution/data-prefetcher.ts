@@ -48,12 +48,12 @@ import {
   type LiteLLMParams,
   type PromptConfigData,
   RED_TEAM_MAX_TURNS,
+  RedTeamConfigSchema,
+  RedTeamStrategySchema,
   type ScenarioConfig,
   type TargetAdapterData,
   type TargetConfig,
   type WorkflowAgentData,
-  RedTeamConfigSchema,
-  RedTeamStrategySchema,
 } from "./types";
 
 // ============================================================================
@@ -449,7 +449,9 @@ async function fetchScenario(
  * That is unfalsifiable from the outside, so it gets logged with the reason.
  */
 function parseRedTeamConfig(scenario: { id: string; redTeamConfig?: unknown }) {
-  const parsed = RedTeamConfigSchema.nullish().safeParse(scenario.redTeamConfig);
+  const parsed = RedTeamConfigSchema.nullish().safeParse(
+    scenario.redTeamConfig,
+  );
   if (parsed.success) return parsed.data;
 
   logger.warn(

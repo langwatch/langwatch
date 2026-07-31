@@ -19,6 +19,7 @@
 import { redTeamCrescendo } from "@langwatch/scenario";
 import type { LanguageModel } from "ai";
 import { describe, expect, it } from "vitest";
+import { parseChildProcessJobData } from "../child-process-payload";
 import {
   RED_TEAM_DEFAULT_TURNS,
   RED_TEAM_MAX_TARGET_LENGTH,
@@ -26,7 +27,6 @@ import {
   RedTeamStrategySchema,
   ScenarioConfigSchema,
 } from "../types";
-import { parseChildProcessJobData } from "../child-process-payload";
 
 /** The script is built without calling the model, so a stand-in suffices. */
 const stubModel = {} as LanguageModel;

@@ -18,9 +18,8 @@
 import fs from "fs";
 import { generateSpecs } from "hono-openapi";
 import path from "path";
-
-import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
+import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 
 export default async function execute() {
   console.log("Building scenarios spec...");

@@ -21,9 +21,9 @@ import { z } from "zod";
 import {
   RED_TEAM_MAX_TARGET_LENGTH,
   RED_TEAM_MAX_TURNS,
+  type RedTeamConfig,
   RedTeamConfigSchema,
   RedTeamStrategySchema,
-  type RedTeamConfig,
 } from "./execution/types";
 
 /**
@@ -48,12 +48,7 @@ export const redTeamFields = {
     .min(1)
     .max(RED_TEAM_MAX_TARGET_LENGTH)
     .nullish(),
-  redTeamTotalTurns: z
-    .number()
-    .int()
-    .min(1)
-    .max(RED_TEAM_MAX_TURNS)
-    .nullish(),
+  redTeamTotalTurns: z.number().int().min(1).max(RED_TEAM_MAX_TURNS).nullish(),
   redTeamConfig: RedTeamConfigSchema.nullish(),
 };
 
@@ -109,7 +104,6 @@ export interface RedTeamInput {
   redTeamTotalTurns?: number | null;
   redTeamConfig?: RedTeamConfig | null;
 }
-
 
 /**
  * Drop the planner settings a strategy does not use.

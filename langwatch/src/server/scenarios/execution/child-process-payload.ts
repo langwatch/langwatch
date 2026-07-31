@@ -7,7 +7,7 @@
  *
  * @see specs/scenarios/red-team-scenarios.feature
  */
-import { ScenarioConfigSchema, type ChildProcessJobData } from "./types";
+import { type ChildProcessJobData, ScenarioConfigSchema } from "./types";
 
 /**
  * Parses the scenario configuration, and only the scenario configuration.

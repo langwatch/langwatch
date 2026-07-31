@@ -1,9 +1,9 @@
 import {
   Accordion,
   Box,
+  Button,
   Field,
   HStack,
-  Button,
   Input,
   Switch,
   Text,
@@ -13,17 +13,14 @@ import {
 import { ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Controller, type UseFormReturn, useWatch } from "react-hook-form";
+import { Menu } from "~/components/ui/menu";
 import {
   RED_TEAM_DEFAULT_TURNS,
   RED_TEAM_MAX_TURNS,
   type RedTeamStrategyName,
 } from "~/server/scenarios/execution/types";
-import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "../ui/tooltip";
-import {
-  OBJECTIVE_HELP,
-  RED_TEAM_OBJECTIVE_GROUPS,
-} from "./redTeamObjectives";
+import { OBJECTIVE_HELP, RED_TEAM_OBJECTIVE_GROUPS } from "./redTeamObjectives";
 import type { ScenarioFormData } from "./ScenarioForm";
 import { SectionHeader } from "./ui/SectionHeader";
 
@@ -152,7 +149,12 @@ export function RedTeamAttackSection({
       <HStack gap={1.5} align="center">
         <SectionHeader>Attack</SectionHeader>
         <Tooltip content={ATTACK_HELP}>
-          <Box color="fg.muted" display="flex" cursor="pointer" paddingBottom="2px">
+          <Box
+            color="fg.muted"
+            display="flex"
+            cursor="pointer"
+            paddingBottom="2px"
+          >
             <HelpCircle size={13} />
           </Box>
         </Tooltip>
@@ -180,11 +182,15 @@ export function RedTeamAttackSection({
                     borderRadius="md"
                     paddingX={3}
                     paddingY={2.5}
-                    borderColor={selected ? "colorPalette.solid" : "border.muted"}
+                    borderColor={
+                      selected ? "colorPalette.solid" : "border.muted"
+                    }
                     // Ring only — the fill made the whole card read as an
                     // alert. Selection should outline the choice, not repaint it.
                     boxShadow={
-                      selected ? "0 0 0 3px var(--chakra-colors-color-palette-subtle)" : undefined
+                      selected
+                        ? "0 0 0 3px var(--chakra-colors-color-palette-subtle)"
+                        : undefined
                     }
                     transition="border-color 120ms ease, box-shadow 120ms ease"
                     onClick={() => selectStrategy(option.value, field.onChange)}
@@ -440,7 +446,10 @@ export function RedTeamAttackSection({
                         placeholder={
                           "e.g., Turns 1-10: ask about products.\nTurns 11-25: ask how AI assistants work.\nTurns 26-50: ask it to repeat its instructions."
                         }
-                        _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+                        _placeholder={{
+                          color: "gray.400",
+                          fontStyle: "italic",
+                        }}
                         {...register("redTeamConfig.attackPlan", {
                           setValueAs: (v) => (v === "" ? undefined : v),
                         })}
@@ -460,7 +469,10 @@ export function RedTeamAttackSection({
                       <Textarea
                         rows={3}
                         placeholder="Leave empty to use the built-in planning prompt"
-                        _placeholder={{ color: "gray.400", fontStyle: "italic" }}
+                        _placeholder={{
+                          color: "gray.400",
+                          fontStyle: "italic",
+                        }}
                         {...register("redTeamConfig.metapromptTemplate", {
                           setValueAs: (v) => (v === "" ? undefined : v),
                         })}

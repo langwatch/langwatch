@@ -15,8 +15,8 @@
  * need to. Run `pnpm run task generateScenariosOpenAPISpec` when it fires.
  */
 import { describe, expect, it } from "vitest";
-import spec from "../../openapiLangWatch.json";
 import { redTeamFields } from "~/server/scenarios/red-team-input";
+import spec from "../../openapiLangWatch.json";
 
 type SchemaLike = { properties?: Record<string, unknown> };
 

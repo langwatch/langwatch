@@ -18,10 +18,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { UseFormReturn } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { withApplicableRedTeamConfig } from "~/server/scenarios/red-team-input";
 import { ScenarioForm, type ScenarioFormData } from "../ScenarioForm";
-import type { UseFormReturn } from "react-hook-form";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -122,9 +122,9 @@ describe("the attack section", () => {
         await save();
 
         const [data] = onValid.mock.calls[0]!;
-        expect(withApplicableRedTeamConfig(data).redTeamConfig).not.toHaveProperty(
-          "attackPlan",
-        );
+        expect(
+          withApplicableRedTeamConfig(data).redTeamConfig,
+        ).not.toHaveProperty("attackPlan");
       });
 
       it("leaves the objective and the turn budget alone", async () => {
