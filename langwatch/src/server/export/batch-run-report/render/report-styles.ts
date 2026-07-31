@@ -68,6 +68,22 @@ p { margin: 0 0 0.6rem; }
   margin: 0 0 1rem;
 }
 .meta { color: var(--ink-faint); font-size: 0.85rem; margin: 0 0 0.75rem; }
+.summary { border-left: 4px solid var(--neutral); }
+.verdict { font-size: 1.35rem; font-weight: 600; line-height: 1.3; margin: 0 0 0.25rem; }
+.verdict.tone-pass { color: var(--pass); }
+.verdict.tone-fail { color: var(--fail); }
+.verdict.tone-warn { color: var(--warn); }
+.movement { color: var(--ink-soft); margin: 0 0 0.5rem; }
+.summary-line { margin: 0.5rem 0 0; }
+.summary-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}
+.summary-line.caveat { color: var(--ink-soft); }
 .meta span { margin-right: 1rem; }
 .badge {
   display: inline-block;

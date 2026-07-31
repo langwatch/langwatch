@@ -240,6 +240,56 @@ Feature: Run report
     Then the trend section says there is nothing to compare against
     And the rest of the report is unaffected
 
+  # ============================================================================
+  # The reading for people who did not run it
+  # ============================================================================
+
+  # The eleven questions are written for whoever owns the agent. The people who
+  # are told about a run — a product manager, whoever signs off a release — are
+  # asking something shorter, and should not have to infer it from a pass rate
+  # or scroll through failure groups to find it.
+
+  @unit
+  Scenario: The summary is readable without knowing the system
+    Given a run has finished
+    When I export a report
+    Then the report opens with a plain-language verdict
+    And it gives the scale and price of the run
+    And it names no run identifiers
+
+  @unit
+  Scenario: The summary leads with the thing most worth fixing
+    Given a run has failures of differing reach
+    When I export a report
+    Then the summary names the single thing most worth fixing
+
+  # A run that mostly errored still produces a pass rate, and that rate looks
+  # exactly like a judgement on the agent. Saying so is the difference between
+  # a reader concluding "the agent is broken" and "the run is broken".
+  @unit
+  Scenario: The summary says when a run cannot judge the agent
+    Given most scenarios in a run never reached a verdict
+    When I export a report
+    Then the summary says the run could not judge the agent
+    And it warns that the figures describe the run rather than the agent
+
+  @unit
+  Scenario: The summary says which way the run moved
+    Given a suite has run before
+    When I export a report
+    Then the summary says how this run compares with the one before it
+    And a change too small to mean anything is not called movement
+
+  # One pass rate cannot say whether it is a collapse or the usual week. Seeing
+  # it beside the runs before it answers that without the reader opening
+  # anything else.
+  @unit
+  Scenario: The report shows how this run compares with the ones before it
+    Given a suite has run several times
+    When I export a report
+    Then this run's pass rate is shown against the earlier runs
+    And a run that never settled is left out rather than drawn as zero
+
   # A report can be exported long after the run it describes, by which time the
   # suite has run again. Comparing against those would reverse every verdict a
   # reader acts on: a criterion that only starts passing later would be

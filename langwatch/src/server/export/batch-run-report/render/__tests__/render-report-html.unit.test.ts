@@ -381,7 +381,33 @@ describe("Feature: Run report — the conversation behind a failure", () => {
       );
     });
   });
+});
 
+describe("Feature: Run report — the three acts", () => {
+  describe("when the questions span all three", () => {
+    /** @scenario Questions are grouped into what happened, what is true now, and what to do next */
+    it("groups the sections under their act in a fixed order", () => {
+      const html = renderReportHtml({
+        model: makeModel({
+          sections: [
+            makeSection({ questionId: "q3", tier: "future" }),
+            makeSection({ questionId: "q1", tier: "past" }),
+            makeSection({ questionId: "q2", tier: "present" }),
+          ],
+        }),
+      });
+
+      expect(html.indexOf("What happened")).toBeLessThan(
+        html.indexOf("What is true now"),
+      );
+      expect(html.indexOf("What is true now")).toBeLessThan(
+        html.indexOf("What to do next"),
+      );
+    });
+  });
+});
+
+describe("Feature: Run report — conversation edge cases", () => {
   describe("when exactly one turn was dropped", () => {
     /** @scenario A conversation with a dropped middle says where the gap is */
     it("says turn rather than turns", () => {
@@ -422,7 +448,9 @@ describe("Feature: Run report — the conversation behind a failure", () => {
       expect(html).not.toContain("1 turns not shown");
     });
   });
+});
 
+describe("Feature: Run report — a conversation that is not there", () => {
   describe("when a run ended before it exchanged a turn", () => {
     /** @scenario I can read the conversation behind a failure */
     it("says why the conversation is empty rather than showing nothing", () => {
@@ -488,30 +516,6 @@ describe("Feature: Run report — the conversation behind a failure", () => {
       expect(html).toContain("Stopped reporting");
       expect(html).not.toContain('class="replay"');
       expect(html).not.toContain('class="transcript"');
-    });
-  });
-});
-
-describe("Feature: Run report — the three acts", () => {
-  describe("when the questions span all three", () => {
-    /** @scenario Questions are grouped into what happened, what is true now, and what to do next */
-    it("groups the sections under their act in a fixed order", () => {
-      const html = renderReportHtml({
-        model: makeModel({
-          sections: [
-            makeSection({ questionId: "q3", tier: "future" }),
-            makeSection({ questionId: "q1", tier: "past" }),
-            makeSection({ questionId: "q2", tier: "present" }),
-          ],
-        }),
-      });
-
-      expect(html.indexOf("What happened")).toBeLessThan(
-        html.indexOf("What is true now"),
-      );
-      expect(html.indexOf("What is true now")).toBeLessThan(
-        html.indexOf("What to do next"),
-      );
     });
   });
 });

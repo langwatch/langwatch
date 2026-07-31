@@ -303,6 +303,8 @@ export type Block =
         transcripts?: SelectedTranscript[];
       }[];
     }
+  /** Pass rate across the runs leading up to this one, current run last. */
+  | { kind: "trend"; points: { label: string; value: number }[] }
   | { kind: "note"; text: string; tone?: Tone }
   | { kind: "claims"; claims: Claim[] }
   | { kind: "findings"; findings: Finding[] }
@@ -333,6 +335,26 @@ export interface ReportIntegrity {
   notes: string[];
 }
 
+/**
+ * The run in the terms someone who did not run it would ask about.
+ *
+ * Computed, so it survives at every tier. Deliberately free of run ids: this is
+ * read by people for whom an identifier answers nothing.
+ */
+export interface RunSummary {
+  /** One sentence, no jargon, safe to quote on its own. */
+  verdict: string;
+  tone: Tone;
+  /** How this compares with the run before it, when there was one. */
+  movement: string | null;
+  /** Scale and price of the run: scenarios, wall clock, spend. */
+  facts: { label: string; value: string }[];
+  /** The single thing most worth fixing. */
+  topProblem: string | null;
+  /** Why the headline figure may not mean what it appears to. */
+  caveat: string | null;
+}
+
 export interface ReportModel {
   meta: {
     projectId: string;
@@ -342,6 +364,7 @@ export interface ReportModel {
     generatedAt: string;
   };
   tier: ReportTier;
+  summary: RunSummary;
   headline: {
     passRate: PassRateFact;
     counts: RunOutcomeCounts;

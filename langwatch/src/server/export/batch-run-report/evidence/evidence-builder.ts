@@ -239,14 +239,40 @@ function buildSignatures({
     if (!didNotPass(run)) continue;
 
     const kind = signatureKindFor(run);
-    const errorShape = run.error ? normalizeErrorShape(run.error) : null;
-    const signatureId = signatureIdFor({
-      kind,
-      unmetCriteria: kind === "judged" ? run.unmetCriteria : [],
-      errorShape,
+    const signature = signatureFor({ run, kind, signatures });
+    addRunToSignature({
+      signature,
+      run,
+      criterionIds:
+        kind === "judged"
+          ? resolveCriterionIds({ run, criterionIdByRunAndText })
+          : [],
     });
+    signatures.set(signature.signatureId, signature);
+  }
 
-    const existing = signatures.get(signatureId) ?? {
+  return [...signatures.values()];
+}
+
+/** The group this run belongs to, created on first sight of its shape. */
+function signatureFor({
+  run,
+  kind,
+  signatures,
+}: {
+  run: RunFact;
+  kind: FailureSignature["kind"];
+  signatures: Map<string, FailureSignature>;
+}): FailureSignature {
+  const errorShape = run.error ? normalizeErrorShape(run.error) : null;
+  const signatureId = signatureIdFor({
+    kind,
+    unmetCriteria: kind === "judged" ? run.unmetCriteria : [],
+    errorShape,
+  });
+
+  return (
+    signatures.get(signatureId) ?? {
       signatureId,
       kind,
       unmetCriterionIds: [],
@@ -254,19 +280,8 @@ function buildSignatures({
       errorExample: run.error ? toReadableError(run.error) : null,
       runIds: [],
       scenarioIds: [],
-    };
-    addRunToSignature({
-      signature: existing,
-      run,
-      criterionIds:
-        kind === "judged"
-          ? resolveCriterionIds({ run, criterionIdByRunAndText })
-          : [],
-    });
-    signatures.set(signatureId, existing);
-  }
-
-  return [...signatures.values()];
+    }
+  );
 }
 
 /**

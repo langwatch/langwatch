@@ -3,6 +3,7 @@ import { getVercelAIModel } from "~/server/modelProviders/utils";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { buildEvidenceBlock } from "./evidence/evidence-block";
 import { buildEvidence, TREND_WINDOW } from "./evidence/evidence-builder";
+import { buildRunSummary } from "./evidence/run-summary";
 import { selectTranscripts } from "./evidence/transcript-budget";
 import { assembleSections, collectClaims } from "./narrative/assemble";
 import { runNarrativePass } from "./narrative/narrative-pass";
@@ -107,6 +108,7 @@ export class BatchRunReportService {
         generatedAt,
       },
       tier,
+      summary: buildRunSummary({ evidence }),
       headline: { passRate: evidence.passRate, counts: evidence.counts },
       sections,
       integrity,

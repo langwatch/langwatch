@@ -50,6 +50,18 @@ export function makeModel(overrides: Partial<ReportModel> = {}): ReportModel {
       generatedAt: "2026-07-29 10:00 UTC",
     },
     tier: "verified",
+    summary: {
+      verdict: "2 scenarios failed out of 10.",
+      tone: "warn",
+      movement: "That is down 12 points on the run before it.",
+      facts: [
+        { label: "Scenarios", value: "10" },
+        { label: "Took", value: "4s" },
+        { label: "Cost", value: "$0.02" },
+      ],
+      topProblem: 'The most widespread failure is "confirms before charging".',
+      caveat: null,
+    },
     headline: {
       passRate: {
         value: 80,

@@ -77,6 +77,62 @@ describe("the coverage question", () => {
   });
 });
 
+describe("the outcome question's trend line", () => {
+  const outcome = QUESTION_REGISTRY.find(
+    (question) => question.id === "past.outcome",
+  )!;
+
+  function trendBlockOf(evidence: Parameters<typeof outcome.computed>[0]) {
+    const block = outcome.computed(evidence).find((it) => it.kind === "trend");
+    return block?.kind === "trend" ? block : undefined;
+  }
+
+  describe("given earlier runs of the same suite", () => {
+    /** @scenario The report shows how this run compares with the ones before it */
+    it("plots each earlier run oldest first with this run last", () => {
+      const block = trendBlockOf(
+        evidenceFixture({
+          priorBatches: [
+            { batchRunId: "b2", startedAt: 200, passRate: 40, settled: 5 },
+            { batchRunId: "b1", startedAt: 100, passRate: 60, settled: 5 },
+          ],
+        }),
+      );
+
+      expect(block?.points.map((it) => it.value)).toEqual([60, 40, 50]);
+      expect(block?.points.at(-1)?.label).toBe("This run");
+    });
+
+    /**
+     * A run that never settled has no rate. Drawing it as zero would put a
+     * collapse in the chart that never happened.
+     *
+     * @scenario The report shows how this run compares with the ones before it
+     */
+    it("leaves out a run whose rate is unknown", () => {
+      const block = trendBlockOf(
+        evidenceFixture({
+          priorBatches: [
+            { batchRunId: "b1", startedAt: 100, passRate: 60, settled: 5 },
+            { batchRunId: "b2", startedAt: 200, passRate: null, settled: 0 },
+          ],
+        }),
+      );
+
+      expect(block?.points.map((it) => it.value)).toEqual([60, 50]);
+    });
+  });
+
+  describe("given no earlier runs", () => {
+    /** @scenario The first run of a suite reports no trend */
+    it("draws no trend line for a single point", () => {
+      expect(
+        trendBlockOf(evidenceFixture({ priorBatches: [] })),
+      ).toBeUndefined();
+    });
+  });
+});
+
 describe("the failure-grouping question", () => {
   describe("given a group spanning two scenarios that failed the same way", () => {
     // The group keeps each scenario's own criterion id so a claim can cite the
@@ -129,7 +185,9 @@ describe("the failure-grouping question", () => {
       );
     });
   });
+});
 
+describe("the failure-grouping question, errored groups", () => {
   describe("given several groups that all errored", () => {
     const clusters = QUESTION_REGISTRY.find(
       (question) => question.id === "present.clusters",

@@ -163,7 +163,13 @@ describe("buildEvidence() failure grouping", () => {
     expect(errored?.errorShape).toBe("Connection refused by upstream");
     expect(errored?.runIds).toEqual(["run_3"]);
   });
+  /** @scenario A group cannot claim a scenario that did not fail */
+  it("never lists a passing run under a failure group", () => {
+    expect(signatures.flatMap((it) => it.runIds)).not.toContain("run_4");
+  });
+});
 
+describe("buildEvidence() error reporting", () => {
   /**
    * The fingerprint replaces every quoted value, which is right for grouping
    * and leaves a serialised error as nothing but its own punctuation. Runs
@@ -224,11 +230,6 @@ describe("buildEvidence() failure grouping", () => {
     }).signatures;
 
     expect(signature?.errorExample).toBe("Connection refused by upstream");
-  });
-
-  /** @scenario A group cannot claim a scenario that did not fail */
-  it("never lists a passing run under a failure group", () => {
-    expect(signatures.flatMap((it) => it.runIds)).not.toContain("run_4");
   });
 });
 

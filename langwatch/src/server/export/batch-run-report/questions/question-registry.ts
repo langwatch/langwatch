@@ -113,6 +113,30 @@ function formatDuration(ms: number): string {
 // Past
 // ============================================================================
 
+/**
+ * Pass rate per run, oldest first, this run last.
+ *
+ * Runs whose rate is unknown are left out rather than drawn as zero — a run
+ * that never settled is not a run that failed, and plotting it as one invents
+ * a collapse. Ordered by when each run happened, so the line reads left to
+ * right in the order they were seen.
+ */
+function trendPoints(
+  evidence: ReportEvidence,
+): { label: string; value: number }[] {
+  const earlier = [...evidence.priorBatches]
+    .sort((a, b) => a.startedAt - b.startedAt)
+    .filter((batch) => batch.passRate !== null)
+    .map((batch) => ({
+      label: batch.batchRunId,
+      value: batch.passRate as number,
+    }));
+
+  return evidence.passRate.value === null
+    ? earlier
+    : [...earlier, { label: "This run", value: evidence.passRate.value }];
+}
+
 function outcomeBlocks(evidence: ReportEvidence): Block[] {
   const { counts } = evidence;
   const blocks: Block[] = [
@@ -167,6 +191,14 @@ function outcomeBlocks(evidence: ReportEvidence): Block[] {
       ]),
     },
   ];
+
+  // This run's rate in the company of the ones before it. A single figure
+  // cannot say whether 25% is a collapse or the usual, which is the first
+  // thing a reader wants to know about it.
+  const history = trendPoints(evidence);
+  if (history.length > 1) {
+    blocks.push({ kind: "trend", points: history });
+  }
 
   if (evidence.stillRunning) {
     blocks.unshift({

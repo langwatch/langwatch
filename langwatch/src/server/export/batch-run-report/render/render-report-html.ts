@@ -11,12 +11,13 @@ import type {
   ReportModel,
   ReportSection,
   ReportTier,
+  RunSummary,
   SelectedTranscript,
   Severity,
   TableCell,
   Tone,
 } from "../report.types";
-import { type BarSegment, formatRate, passRateBar } from "./charts";
+import { type BarSegment, formatRate, passRateBar, sparkline } from "./charts";
 import { escapeAttr, escapeHtml } from "./html-escape";
 import { REPORT_SCRIPT } from "./report-script";
 import { REPORT_STYLES, toneToken } from "./report-styles";
@@ -340,6 +341,8 @@ function renderBlock(block: Block): string {
       return renderStats(block.stats);
     case "bar":
       return passRateBar({ segments: block.segments });
+    case "trend":
+      return sparkline({ points: block.points });
     case "table":
       return renderTable({ columns: block.columns, rows: block.rows });
     case "list":
@@ -444,6 +447,32 @@ function headlineSentence({
   return `${headline}, likely between ${formatRate(passRate.ci95.low)} and ${formatRate(passRate.ci95.high)}.`;
 }
 
+/**
+ * The card someone reads instead of the report.
+ *
+ * First on the page and free of ids, because the people it is written for are
+ * deciding whether the run needs their attention at all. Everything in it is
+ * computed, so it is the same document at every tier.
+ */
+function renderSummary(summary: RunSummary): string {
+  const parts = [
+    '<section class="card summary" id="summary">',
+    `<p class="verdict ${toneClass(summary.tone)}">${escapeHtml(summary.verdict)}</p>`,
+    summary.movement === null
+      ? ""
+      : `<p class="movement">${escapeHtml(summary.movement)}</p>`,
+    renderStats(summary.facts),
+    summary.topProblem === null
+      ? ""
+      : `<p class="summary-line"><span class="summary-label">Worth fixing first</span>${escapeHtml(summary.topProblem)}</p>`,
+    summary.caveat === null
+      ? ""
+      : `<p class="summary-line caveat"><span class="summary-label">Read with care</span>${escapeHtml(summary.caveat)}</p>`,
+    "</section>",
+  ];
+  return parts.filter(Boolean).join("");
+}
+
 function renderHeadline(model: ReportModel): string {
   const { passRate, counts } = model.headline;
   return [
@@ -534,6 +563,7 @@ function renderBody(model: ReportModel): string {
     "<body>",
     "<main>",
     renderHeader(model),
+    renderSummary(model.summary),
     renderHeadline(model),
     CONTROLS,
     renderTierGroups(model.sections),
