@@ -216,10 +216,16 @@ export function computeVariantMetrics({
       // Seeded per variant so a variant's interval is stable across renders
       // and across which other variants happen to be in the run, but two
       // variants do not share a resampling pattern.
+      //
+      // The two metrics are salted apart for the same reason. Sharing a seed
+      // meant a variant's cost and duration intervals were drawn from the
+      // identical sequence of resampled row indices, so on the trade-off
+      // glyph its x and y error bars moved together by construction — a
+      // correlation the data never showed.
       costMeanCI: bootstrapMeanCI({ values: costs, seed: seedFor(variantId) }),
       durationMeanCI: bootstrapMeanCI({
         values: durations,
-        seed: seedFor(variantId),
+        seed: seedFor(`${variantId}\u0000duration`),
       }),
       costDifferenceCI: costDifferenceCI[variantId]!,
       durationDifferenceCI: durationDifferenceCI[variantId]!,

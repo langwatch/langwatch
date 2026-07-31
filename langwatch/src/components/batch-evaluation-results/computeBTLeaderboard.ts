@@ -256,8 +256,15 @@ function emptyLeaderboard(): BTLeaderboard {
     comparisonCount: 0,
     minMatchups: 0,
     hasDegenerate: false,
-    didConverge: true,
-    comparability: { identifiable: true, groups: [], dominates: [] },
+    // `false`, not `true`. Nothing was fitted, so nothing converged and
+    // nothing was placed on one scale — and the trust panel renders these as
+    // ticks, which would have told the reader "Ranking settled ✓" and
+    // "Everything is on one scale ✓" about a run holding no comparisons.
+    // Green because nothing was checked is the one thing that panel exists to
+    // avoid. Both flow into a step that is only reached with entries, so this
+    // corrects the claim rather than any rendered output today.
+    didConverge: false,
+    comparability: { identifiable: false, groups: [], dominates: [] },
     scoreDifferenceCI: null,
     bootstrapNonConvergence: null,
   };
@@ -349,10 +356,19 @@ function resolveComparison({
   comparison: PairwiseComparison;
   idx: Map<string, number>;
 }): ResolvedComparison | null {
+  // Deduplicated: `targetIdByAnyKey` maps several keys onto one target, so a
+  // row can name the same variant twice. Undeduplicated, ["a","b","b"] with
+  // winner "a" credited a two-nil record from a single verdict — the matchup
+  // counted twice and the interval tightened around evidence that was only
+  // ever produced once.
+  const seen = new Set<number>();
   const candIdxs: number[] = [];
   for (const id of comparison.candidates) {
     const k = idx.get(id);
-    if (k !== undefined) candIdxs.push(k);
+    if (k !== undefined && !seen.has(k)) {
+      seen.add(k);
+      candIdxs.push(k);
+    }
   }
   if (candIdxs.length < 2) return null;
 

@@ -239,12 +239,16 @@ export const findCheaperTiedAlternative = ({
   // the mean gap remains the best answer available.
   const pairedSaving =
     variantMetrics[cheapest.variantId]?.costDifferenceCI?.[baseline.variantId];
-  if (
-    pairedSaving?.every((bound) => Number.isFinite(bound)) &&
+  if (pairedSaving) {
+    // A non-finite bound is a measurement that ran and returned nonsense, not
+    // one that was never taken, so it does not get the absent-interval
+    // treatment of falling back to the mean gap. `every(isFinite)` as part of
+    // the same `&&` made NaN short-circuit the whole condition to false and
+    // wave the recommendation through — the opposite of how `scoreSeparation`
+    // guards this exact shape one file over.
+    if (!pairedSaving.every((bound) => Number.isFinite(bound))) return null;
     // cheapest minus baseline: a real saving sits entirely below zero.
-    pairedSaving[1] >= 0
-  ) {
-    return null;
+    if (pairedSaving[1] >= 0) return null;
   }
 
   return {

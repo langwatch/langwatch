@@ -170,6 +170,28 @@ describe("buildTrustChecks", () => {
     });
   });
 
+  describe("when the judge's model id does not name a provider", () => {
+    /**
+     * `modelFamily` returns null for an id with no `provider/` prefix, which
+     * leaves `sharedFamilyVariantIds` empty for the same reason a genuinely
+     * independent judge does. Reporting "shares a family with none of the
+     * candidates" off that is green because nothing was checked.
+     */
+    it("says the check could not be made rather than passing it", () => {
+      const checks = build({
+        judgeIndependence: independence({
+          judgeModel: "gpt-5-mini",
+          judgeFamily: null,
+          sharedFamilyVariantIds: [],
+        }),
+      });
+
+      const check = find(checks, "Judge independence");
+      expect(check.tone).toBe("note");
+      expect(check.detail).toContain("cannot be checked");
+    });
+  });
+
   describe("when the judge shares a model family with a candidate", () => {
     it("warns and names the affected variant", () => {
       const checks = build({

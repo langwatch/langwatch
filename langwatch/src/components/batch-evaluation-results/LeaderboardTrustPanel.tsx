@@ -314,7 +314,7 @@ const buildJudgeIndependenceCheck = (
   variantNames: Record<string, string>,
   leaderId: string | null,
 ): TrustCheck => {
-  const { judgeModel, sharedFamilyVariantIds } = independence;
+  const { judgeModel, judgeFamily, sharedFamilyVariantIds } = independence;
 
   if (!judgeModel) {
     return {
@@ -322,6 +322,19 @@ const buildJudgeIndependenceCheck = (
       tone: "note",
       detail:
         "This run did not record which model judged it, so whether the judge shares a model family with a candidate cannot be checked.",
+    };
+  }
+
+  // A model id `modelFamily` cannot parse yields no family, which makes
+  // `sharedFamilyVariantIds` empty for the same reason a genuinely
+  // independent judge does — and the branch below would then report
+  // independence it never established. Same failure as an empty leaderboard
+  // reporting a converged fit: green because nothing was checked.
+  if (judgeFamily === null) {
+    return {
+      label: "Judge independence",
+      tone: "note",
+      detail: `The judge is recorded as ${judgeModel}, which does not name a provider, so whether it shares a model family with a candidate cannot be checked.`,
     };
   }
 

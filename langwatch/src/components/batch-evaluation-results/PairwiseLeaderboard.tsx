@@ -81,7 +81,7 @@ export function PairwiseLeaderboard({
     >
       <HStack gap={2} flexWrap="wrap">
         <Text fontWeight="semibold" fontSize="sm">
-          Leaderboard (Bradley-Terry, 95% CI)
+          Leaderboard (95% confidence)
         </Text>
         <Text fontSize="xs" color="fg.muted">
           {/*
@@ -143,7 +143,7 @@ function LeaderboardWarnings({
         <WarnBanner
           tone="warning"
           icon={LuTriangleAlert}
-          text={`Sample size low — at least one variant has fewer than ${warnThreshold} matchups. BT scores may be unstable.`}
+          text={`Sample size low — at least one variant has fewer than ${warnThreshold} matchups. Scores may be unstable.`}
         />
       ) : null}
 
@@ -192,7 +192,7 @@ function LeaderboardTable({
             />
             <Table.ColumnHeader>Variant</Table.ColumnHeader>
             <SortableHeader
-              label="BT score (± 95% CI)"
+              label="Score (± 95% confidence)"
               col="score"
               sortKey={sortKey}
               sortDir={sortDir}
@@ -223,7 +223,7 @@ function LeaderboardTable({
                   <Text>{e.name}</Text>
                   {e.isDegenerate ? (
                     <Text fontSize="xs" color="fg.muted">
-                      (degenerate)
+                      (never won / never lost)
                     </Text>
                   ) : null}
                 </HStack>

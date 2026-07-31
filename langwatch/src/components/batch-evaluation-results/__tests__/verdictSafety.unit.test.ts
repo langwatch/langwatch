@@ -247,6 +247,23 @@ describe("computeBTLeaderboard — evidence it must not invent", () => {
       expect(c.matchups).toBe(0);
     });
 
+    it("counts a repeated candidate id once, not twice", () => {
+      // `targetIdByAnyKey` maps several keys onto one target, so a row can
+      // name the same variant twice. Undeduplicated, one verdict credited a
+      // two-nil record and the interval tightened around evidence produced
+      // only once.
+      const leaderboard = computeBTLeaderboard({
+        comparisons: [{ candidates: ["a", "b", "b"], winner: "a" }],
+        variantIds: ["a", "b"],
+        bootstrapSamples: 0,
+      });
+
+      expect(leaderboard.winMatrix.a?.b).toBe(1);
+      expect(
+        leaderboard.entries.find((e) => e.variantId === "a")?.matchups,
+      ).toBe(1);
+    });
+
     it("applies the same guard on the bootstrap path", () => {
       // The two matrix builders must agree, or the interval would describe a
       // different dataset than the point estimate it is drawn around.

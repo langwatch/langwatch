@@ -236,13 +236,13 @@ function LeaderboardBars({
             borderRadius: 6,
             fontSize: 12,
           }}
-          formatter={(value) => [(value as number).toFixed(2), "BT score"]}
+          formatter={(value) => [(value as number).toFixed(2), "Score"]}
           labelFormatter={(label, payload) =>
             (payload?.[0]?.payload as { fullName?: string } | undefined)
               ?.fullName ?? label
           }
         />
-        <Bar dataKey="score" name="BT score" radius={[0, 4, 4, 0]}>
+        <Bar dataKey="score" name="Score" radius={[0, 4, 4, 0]}>
           <LabelList dataKey="score" content={ScoreValueLabel} />
           {chartData.map((d) => (
             <Cell key={d.key} fill={d.color} />

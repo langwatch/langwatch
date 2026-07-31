@@ -178,7 +178,8 @@ const offsetsAround = ({
   return clampAtZero ? [Math.max(0, low), Math.max(0, high)] : [low, high];
 };
 
-const buildParetoPoints = ({
+/** Exported for tests: the points the scatter actually draws. */
+export const buildParetoPoints = ({
   entries,
   variantMetrics,
   variantNames,
@@ -194,6 +195,16 @@ const buildParetoPoints = ({
   dominance: ParetoDominance;
 }): ParetoPoint[] =>
   entries
+    // Degenerate variants are excluded here for the same reason
+    // `computeParetoDominance` excludes them and the trust panel says they are
+    // excluded: a variant that never won or never lost has no maximum-
+    // likelihood score, so the number it carries is a smoothing artifact.
+    // Plotting it anyway put a variant that swept every matchup at the TOP of
+    // the quality axis, and because `dominatedBy` is built over ranked
+    // variants only it got no entry there, so it drew solid — the styling
+    // that means "still in contention" — while the table beside it said the
+    // score was not a measurement.
+    .filter((entry) => !entry.isDegenerate)
     .map((entry, index): ParetoPoint | null => {
       const metrics = variantMetrics[entry.variantId];
       const x = readAvg({ metrics, metric: axis.xAxisMetric });
@@ -292,10 +303,14 @@ function AxisPicker({
   onChange: (metric: ParetoAxis) => void;
 }) {
   return (
+    // `aria-pressed` because which axis is showing is signalled only by the
+    // solid-vs-ghost variant, which a screen reader does not see — without it
+    // the two buttons are announced identically whichever one is active.
     <HStack gap={1}>
       <Button
         size="2xs"
         variant={value === "cost" ? "solid" : "ghost"}
+        aria-pressed={value === "cost"}
         onClick={() => onChange("cost")}
       >
         Cost
@@ -303,6 +318,7 @@ function AxisPicker({
       <Button
         size="2xs"
         variant={value === "duration" ? "solid" : "ghost"}
+        aria-pressed={value === "duration"}
         onClick={() => onChange("duration")}
       >
         Duration
@@ -356,7 +372,7 @@ function ParetoPlot({
         <YAxis
           type="number"
           dataKey="score"
-          name="BT score"
+          name="Score"
           style={{ fontSize: "11px" }}
           tick={{ fill: "var(--chakra-colors-fg-muted)" }}
           width={40}
@@ -429,7 +445,7 @@ function ParetoTooltip({
     >
       <Text fontWeight="semibold">{point.name}</Text>
       <Text>
-        BT score: {point.score.toFixed(2)}
+        Score: {point.score.toFixed(2)}
         {point.ciOffsets
           ? ` (${(point.score - point.ciOffsets[0]).toFixed(
               0,

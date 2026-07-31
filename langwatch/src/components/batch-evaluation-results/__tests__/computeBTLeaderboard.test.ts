@@ -38,7 +38,13 @@ describe("computeBTLeaderboard", () => {
     expect(result.entries).toEqual([]);
     expect(result.comparisonCount).toBe(0);
     expect(result.hasDegenerate).toBe(false);
-    expect(result.didConverge).toBe(true);
+    // Nothing was fitted, so nothing converged and nothing was placed on one
+    // scale. The trust panel draws both of these as ticks, and a run holding
+    // no comparisons must not be told "Ranking settled" and "Everything is on
+    // one scale" — green because nothing was checked is the failure that
+    // panel exists to prevent.
+    expect(result.didConverge).toBe(false);
+    expect(result.comparability.identifiable).toBe(false);
   });
 
   /** @scenario "The compact card ranks variants by Bradley-Terry score" */
