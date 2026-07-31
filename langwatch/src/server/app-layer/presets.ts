@@ -30,6 +30,7 @@ import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
+import { detectBudgetCrossings } from "@ee/governance/services/governanceSignals.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
@@ -740,13 +741,24 @@ export function initializeDefaultApp(options?: {
   };
 
   const gatewayBudgetSync = clickhouseEnabled
-    ? {
-        prisma,
-        budgetRepository: new GatewayBudgetRepository(prisma),
-        budgetCHRepository: new GatewayBudgetClickHouseRepository(
+    ? (() => {
+        const budgetCHRepository = new GatewayBudgetClickHouseRepository(
           resolveClickHouseClient,
-        ),
-      }
+        );
+        return {
+          prisma,
+          budgetRepository: new GatewayBudgetRepository(prisma),
+          budgetCHRepository,
+          detectCrossings: (
+            rows: Array<{
+              tenantId: string;
+              budgetId: string;
+              bucketScopeId: string;
+              endUserId: string | null;
+            }>,
+          ) => detectBudgetCrossings({ prisma, budgetCHRepository }, rows),
+        };
+      })()
     : undefined;
 
   // The spend-command pipeline projects gateway_spend; it shares the
@@ -768,6 +780,17 @@ export function initializeDefaultApp(options?: {
         endpoints: webhookEndpointService,
         getPlan: (organizationId: string) =>
           planProvider.getActivePlan({ organizationId }),
+      }
+    : undefined;
+
+  // Attributed-user budget debits ride the same pipeline and the same
+  // ClickHouse gate: per-user buckets only exist on the spend ledger.
+  const attributedDebits = clickhouseEnabled
+    ? {
+        prisma,
+        budgetCHRepository: new GatewayBudgetClickHouseRepository(
+          resolveClickHouseClient,
+        ),
       }
     : undefined;
 
@@ -998,6 +1021,7 @@ export function initializeDefaultApp(options?: {
     gatewayBudgetSync,
     gatewaySpend,
     webhookDelivery,
+    attributedDebits,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.

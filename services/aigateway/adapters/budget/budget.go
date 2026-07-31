@@ -12,6 +12,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -26,6 +27,16 @@ type BlockMetrics interface {
 type Checker struct {
 	logger  *zap.Logger
 	metrics BlockMetrics
+	buckets BucketSpendReader
+}
+
+// BucketSpendReader serves the per-(budget, end-user) spend figure an
+// attributed-user template enforces against. Implementations cache: this
+// sits on the request path. ok=false means the figure could not be read
+// in time; the checker then allows (permissive-on-error, matching every
+// other stale-data path here) and the debit reconciles later.
+type BucketSpendReader interface {
+	BucketSpendMicroUSD(ctx context.Context, budgetID, endUserID string) (spent int64, ok bool)
 }
 
 // CheckerOptions configures the budget checker.
@@ -34,11 +45,15 @@ type CheckerOptions struct {
 	// Metrics counts blocked requests by scope. Optional; nil skips
 	// counting.
 	Metrics BlockMetrics
+	// Buckets serves attributed-user bucket spend. Optional; nil disables
+	// template SPEND enforcement (the interceptor's fail-closed id check
+	// still applies) since the figure is unknowable without a reader.
+	Buckets BucketSpendReader
 }
 
 // NewChecker creates a budget checker.
 func NewChecker(opts CheckerOptions) *Checker {
-	return &Checker{logger: opts.Logger, metrics: opts.Metrics}
+	return &Checker{logger: opts.Logger, metrics: opts.Metrics, buckets: opts.Buckets}
 }
 
 // SoftWarnPercent is how much of a budget must be consumed before the gateway
@@ -66,15 +81,35 @@ const SoftWarnPercent = 80
 // ran out. GROUP buckets need no special handling: the bundle materializes
 // one bucket per (budget, member) with the key's principal already resolved,
 // so each "group" scope row here IS the per-member allowance.
-func (c *Checker) Precheck(_ context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error) {
+func (c *Checker) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetDecision, error) {
 	decision := domain.BudgetDecision{Verdict: domain.BudgetAllow}
+
+	// The interceptor resolves the request's end-user id (fail-closed when
+	// a template is present and the id is missing) and stashes it on ctx.
+	endUserID := customertracebridge.EndUserID(ctx)
 
 	for i := range bundle.Config.Budget.Scopes {
 		scope := &bundle.Config.Budget.Scopes[i]
 		if scope.LimitMicroUSD <= 0 {
 			continue
 		}
-		exhausted := scope.SpentMicroUSD >= scope.LimitMicroUSD
+		spent := scope.SpentMicroUSD
+		if scope.PerUser {
+			// Template entry: the bundle figure is meaningless, the
+			// request's own bucket is the allowance. Unreadable bucket
+			// (no reader wired, fetch failed, cache cold and slow) allows:
+			// permissive-on-error, never permissive-on-missing-id (that
+			// case was rejected before this ran).
+			if c.buckets == nil || endUserID == "" {
+				continue
+			}
+			bucketSpent, ok := c.buckets.BucketSpendMicroUSD(ctx, scope.ID, endUserID)
+			if !ok {
+				continue
+			}
+			spent = bucketSpent
+		}
+		exhausted := spent >= scope.LimitMicroUSD
 		if exhausted && scope.OnBreach == "block" {
 			if scope.ProviderKey == "" {
 				if c.metrics != nil {
@@ -91,7 +126,7 @@ func (c *Checker) Precheck(_ context.Context, bundle *domain.Bundle) (domain.Bud
 				Budget:      *scope,
 			})
 		}
-		pctUsed := int((scope.SpentMicroUSD * 100) / scope.LimitMicroUSD)
+		pctUsed := int((spent * 100) / scope.LimitMicroUSD)
 		if pctUsed < SoftWarnPercent {
 			continue
 		}

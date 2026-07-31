@@ -232,6 +232,12 @@ type BudgetScope struct {
 	// PrincipalID names the member a "group" bucket belongs to. Empty for
 	// every other scope.
 	PrincipalID string `json:"principal_id"`
+	// PerUser marks an attributed-user TEMPLATE: ScopeID is the ANCHOR (a
+	// virtual key or project id) and the limit applies per distinct
+	// external end-user id. Enforcement resolves the request's bucket
+	// through the cached bucket-spend read; SpentMicroUSD is meaningless
+	// on template entries.
+	PerUser bool `json:"per_user,omitempty"`
 	// ProviderKey is the ModelProvider row id this budget is filtered to.
 	// Empty means the budget counts and constrains every dispatch; set means
 	// it counts only dispatches to that provider, so a breach removes the

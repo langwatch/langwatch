@@ -89,6 +89,16 @@ export type BudgetSpendTarget = {
    * absorb a filtered sibling's buckets on the same group.
    */
   bucketSuffix?: string | null;
+  /**
+   * Lower bound (unix ms) for the spend read when the budget's period
+   * boundary is NOT the calendar one: always set for MANUAL windows
+   * (currentPeriodStartedAt) and set on calendar windows after a
+   * mid-period reset (until the next calendar boundary passes). Targets
+   * with a floor read the raw ledger events bounded by OccurredAt instead
+   * of the rollup's PeriodStart-equality fast path, which cannot see a
+   * moved boundary.
+   */
+  periodFloorMs?: number;
 };
 
 /**
@@ -167,6 +177,28 @@ export class GatewayBudgetClickHouseRepository {
    * trace = one batch covering every applicable budget) so a single
    * existence probe covers the whole batch.
    */
+  /**
+   * Probe-then-insert is not atomic, and that is survivable here for
+   * structural reasons, not luck. The rollup MV aggregates at INSERT time
+   * (a duplicate row double-counts it forever; the ReplacingMergeTree only
+   * collapses the raw rows), so what actually prevents doubles:
+   *
+   *   1. One writer per (budget, request) pair: the trace reactor owns
+   *      non-template budgets, the attributed-debits process owns
+   *      templates. The two never write the same pair, so cross-writer
+   *      interleaving cannot double any bucket.
+   *   2. Within a writer, execution is serialized per aggregate (reactor
+   *      GroupQueue / process-manager streams are per-aggregate FIFO), so
+   *      two fires for the same request never run concurrently; retries
+   *      run after the failed attempt.
+   *   3. Inserts wait for durability (wait_for_async_insert: 1), so a
+   *      retry's probe sees the rows a crashed-after-insert attempt wrote.
+   *
+   * Residual window, accepted and named: replaying the same aggregate
+   * concurrently from TWO operator sessions can land between another
+   * session's probe and insert. Replay is an ops action; run one at a
+   * time per aggregate.
+   */
   async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
     const tenantId = rows[0]!.tenantId;
@@ -197,6 +229,13 @@ export class GatewayBudgetClickHouseRepository {
       return;
     }
 
+    await this.insertRows(rows);
+  }
+
+  /** Map + insert debit rows; shared by every probing insert path. */
+  private async insertRows(rows: BudgetDebitRow[]): Promise<void> {
+    const tenantId = rows[0]!.tenantId;
+    const client = await this.resolveClient(tenantId);
     const records = rows.map((r) => ({
       TenantId: r.tenantId,
       BudgetId: r.budgetId,
@@ -237,92 +276,45 @@ export class GatewayBudgetClickHouseRepository {
   }
 
   /**
-   * Multi-request sibling of insertDebit for the per-request debit grain:
-   * one reactor fire can now carry rows for SEVERAL gateway_request_ids
-   * (one per gateway span on the trace). One probe covers every id in the
-   * batch, and only rows for ids the ledger has never seen are inserted,
-   * for the same MV-double-count reason insertDebit documents.
+   * Debit insert for a writer that owns specific BUDGETS on a request,
+   * next to another writer owning the request's other budgets. The
+   * whole-request probe insertDebit uses would make two independent
+   * writers mutually exclusive (whoever lands second sees the request id
+   * present and skips); this probes per (BudgetId, GatewayRequestId), so
+   * replays of THIS writer dedup while the other writer's rows never
+   * suppress it. The probe-then-insert race analysis on insertDebit
+   * applies verbatim; the ownership split there is what makes the two
+   * probes composable.
    */
-  async insertDebits(rows: BudgetDebitRow[]): Promise<void> {
+  async insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
     const tenantId = rows[0]!.tenantId;
+    const gatewayRequestId = rows[0]!.gatewayRequestId;
     if (rows.some((r) => r.tenantId !== tenantId)) {
       throw new Error(
-        "GatewayBudgetClickHouseRepository.insertDebits: rows span multiple tenants",
+        "GatewayBudgetClickHouseRepository.insertDebitsForBudgets: rows span multiple tenants",
       );
     }
-
-    const requestIds = [...new Set(rows.map((r) => r.gatewayRequestId))];
+    if (rows.some((r) => r.gatewayRequestId !== gatewayRequestId)) {
+      throw new Error(
+        "GatewayBudgetClickHouseRepository.insertDebitsForBudgets: rows span multiple gateway_request_ids",
+      );
+    }
+    const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
     const client = await this.resolveClient(tenantId);
     const probe = await client.query({
-      query: `SELECT DISTINCT GatewayRequestId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId IN {requestIds:Array(String)}`,
-      query_params: { tenantId, requestIds },
+      query: `SELECT DISTINCT BudgetId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)}`,
+      query_params: { tenantId, requestId: gatewayRequestId, budgetIds },
       format: "JSONEachRow",
     });
     const seen = new Set(
-      ((await probe.json()) as Array<{ GatewayRequestId: string }>).map(
-        (r) => r.GatewayRequestId,
+      ((await probe.json()) as Array<{ BudgetId: string }>).map(
+        (r) => r.BudgetId,
       ),
     );
-    const fresh = rows.filter((r) => !seen.has(r.gatewayRequestId));
-    if (fresh.length === 0) {
-      logger.debug(
-        { tenantId, requestIds: requestIds.length },
-        "skipping replay — every gateway_request_id already in ledger",
-      );
-      return;
-    }
-
-    for (const requestId of [
-      ...new Set(fresh.map((r) => r.gatewayRequestId)),
-    ]) {
-      await this.insertDebitUnchecked(
-        fresh.filter((r) => r.gatewayRequestId === requestId),
-      );
-    }
-  }
-
-  /** Insert rows for one gateway_request_id without the existence probe. */
-  private async insertDebitUnchecked(rows: BudgetDebitRow[]): Promise<void> {
-    if (rows.length === 0) return;
-    const tenantId = rows[0]!.tenantId;
-    const client = await this.resolveClient(tenantId);
-    const records = rows.map((r) => ({
-      TenantId: r.tenantId,
-      BudgetId: r.budgetId,
-      Scope: scopeToClickHouse(r.scope),
-      ScopeId: r.scopeId,
-      Window: windowToClickHouse(r.window),
-      VirtualKeyId: r.virtualKeyId,
-      ProviderCredentialId: r.providerCredentialId ?? "",
-      ProviderKey: r.providerKey ?? "",
-      GatewayRequestId: r.gatewayRequestId,
-      AmountUSD: r.amountUsd,
-      TokensInput: r.tokensInput,
-      TokensOutput: r.tokensOutput,
-      TokensCacheRead: r.tokensCacheRead,
-      TokensCacheWrite: r.tokensCacheWrite,
-      Model: r.model,
-      ProviderSlot: r.providerSlot ?? "",
-      DurationMS: r.durationMs ?? 0,
-      Status: r.status.toLowerCase(),
-      OccurredAt: r.occurredAt.getTime(),
-      EventTimestamp: Date.now(),
-    }));
-    try {
-      await client.insert({
-        table: EVENTS_TABLE,
-        values: records,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      logger.error(
-        { tenantId, count: rows.length, error },
-        "failed to insert gateway budget ledger events",
-      );
-      throw error;
-    }
+    const fresh = rows.filter((r) => !seen.has(r.budgetId));
+    if (fresh.length === 0) return;
+    await this.insertRows(fresh);
   }
 
   /**
@@ -388,14 +380,83 @@ export class GatewayBudgetClickHouseRepository {
   ): Promise<ScopeSpend[]> {
     if (targets.length === 0 || tenantIds.length === 0) return [];
 
+    // Targets with a moved boundary (MANUAL windows, mid-period resets)
+    // cannot use the rollup: its buckets are keyed by calendar PeriodStart
+    // and pre-aggregate the whole bucket, so a floor inside the bucket is
+    // unanswerable there. They read the raw ledger bounded by OccurredAt.
+    const floored = targets.filter((t) => t.periodFloorMs !== undefined);
+    const fast = targets.filter((t) => t.periodFloorMs === undefined);
+
     const byWindow = new Map<GatewayBudgetWindow, BudgetSpendTarget[]>();
-    for (const t of targets) {
+    for (const t of fast) {
       const list = byWindow.get(t.window) ?? [];
       list.push(t);
       byWindow.set(t.window, list);
     }
 
     const out: Map<string, ScopeSpend> = new Map();
+
+    if (floored.length > 0) {
+      const tenantPlaceholders = tenantIds
+        .map((_, i) => `{tenant${i}:String}`)
+        .join(",");
+      const params: Record<string, string | number> = {
+        sep: PROVIDER_BUCKET_SEPARATOR,
+      };
+      for (let i = 0; i < tenantIds.length; i++) {
+        params[`tenant${i}`] = tenantIds[i]!;
+      }
+      // One conditional sum per target: exact even when two budgets share
+      // a bucket with different boundaries.
+      const sumExprs = floored
+        .map((t, i) => {
+          params[`fscope${i}`] = scopeToClickHouse(t.scope);
+          params[`fscopeId${i}`] = t.scopeId;
+          params[`fwindow${i}`] = windowToClickHouse(t.window);
+          params[`ffloor${i}`] = t.periodFloorMs!;
+          const bucket =
+            t.match === "prefix"
+              ? t.bucketSuffix
+                ? ((params[`fsuffix${i}`] = t.bucketSuffix),
+                  `startsWith(ScopeId, {fscopeId${i}:String}) AND endsWith(ScopeId, {fsuffix${i}:String})`)
+                : `startsWith(ScopeId, {fscopeId${i}:String}) AND position(ScopeId, {sep:String}) = 0`
+              : `ScopeId = {fscopeId${i}:String}`;
+          return `toString(sumIf(AmountUSD, Scope = {fscope${i}:String} AND ${bucket} AND Window = {fwindow${i}:String} AND OccurredAt >= fromUnixTimestamp64Milli({ffloor${i}:Int64}))) AS T${i}`;
+        })
+        .join(",\n              ");
+      try {
+        const client = await this.resolveClient(tenantIds[0]!);
+        const result = await client.query({
+          query: `
+            SELECT
+              ${sumExprs}
+            FROM ${EVENTS_TABLE} FINAL
+            WHERE TenantId IN (${tenantPlaceholders})
+              AND Status = 'success'
+          `,
+          query_params: params,
+          format: "JSONEachRow",
+        });
+        const rows = (await result.json()) as Array<Record<string, string>>;
+        const row = rows[0] ?? {};
+        for (let i = 0; i < floored.length; i++) {
+          const t = floored[i]!;
+          const total = Number.parseFloat(row[`T${i}`] ?? "0") || 0;
+          out.set(t.budgetId, {
+            budgetId: t.budgetId,
+            scope: t.scope,
+            scopeId: t.scopeId,
+            spentUsd: total.toFixed(6),
+          });
+        }
+      } catch (error) {
+        logger.error(
+          { tenantIds, targets: floored.length, error },
+          "failed to read boundary-floored gateway budget spend",
+        );
+        throw error;
+      }
+    }
 
     for (const [window, targetsForWindow] of byWindow) {
       const periodStart = currentPeriodStart(window, now);
@@ -677,6 +738,8 @@ function scopeToClickHouse(scope: GatewayBudgetScopeType): string {
       return "principal";
     case "GROUP":
       return "group";
+    case "ATTRIBUTED_USER":
+      return "attributed_user";
   }
 }
 
@@ -696,6 +759,33 @@ function windowToClickHouse(window: GatewayBudgetWindow): string {
  * entirely: spend is written, every read returns 0, and budgets on that
  * window silently stop enforcing.
  */
+/**
+ * The OccurredAt lower bound a spend read must honor for a budget whose
+ * period boundary is not the calendar one, or undefined for the rollup
+ * fast path. MANUAL windows always read from their stored boundary. A
+ * calendar (or TOTAL) window reads from the boundary only after an actual
+ * mid-period reset (lastResetAt set) and only until the next calendar
+ * boundary passes it; an unreset TOTAL budget keeps its lifetime-bucket
+ * semantics.
+ */
+export function budgetPeriodFloorMs(
+  budget: {
+    window: GatewayBudgetWindow;
+    currentPeriodStartedAt: Date;
+    lastResetAt: Date | null;
+  },
+  now: Date = new Date(),
+): number | undefined {
+  if (budget.window === "MANUAL") {
+    return budget.currentPeriodStartedAt.getTime();
+  }
+  if (!budget.lastResetAt) return undefined;
+  const boundary = budget.currentPeriodStartedAt.getTime();
+  return boundary > currentPeriodStart(budget.window, now).getTime()
+    ? boundary
+    : undefined;
+}
+
 export function currentPeriodStart(
   window: GatewayBudgetWindow,
   now: Date,
@@ -724,6 +814,10 @@ export function currentPeriodStart(
   if (window === "MONTH") {
     return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
   }
-  // TOTAL: one lifetime bucket, keyed by the epoch sentinel.
+  // TOTAL and MANUAL: one lifetime bucket, keyed by the epoch sentinel
+  // (the MV's multiIf falls through to epoch for both). MANUAL is never
+  // read through the PeriodStart fast path (budgetPeriodFloorMs always
+  // floors it onto the raw-events read); the sentinel only keys where its
+  // debits land in the rollup.
   return new Date(0);
 }

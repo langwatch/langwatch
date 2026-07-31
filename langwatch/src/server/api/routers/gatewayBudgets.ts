@@ -257,6 +257,31 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       });
       return toDto(row);
     }),
+
+  reset: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        id: z.string(),
+        endUserId: z.string().optional(),
+        reason: z.string().max(500).optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("gatewayBudgets:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = GatewayBudgetService.create(
+        ctx.prisma,
+        chRepoOrUndefined(),
+      );
+      const row = await service.reset({
+        id: input.id,
+        organizationId: input.organizationId,
+        actorUserId: ctx.session.user.id,
+        endUserId: input.endUserId ?? null,
+        reason: input.reason ?? null,
+      });
+      return toDto(row);
+    }),
 });
 
 export type BudgetListScopeTarget = {

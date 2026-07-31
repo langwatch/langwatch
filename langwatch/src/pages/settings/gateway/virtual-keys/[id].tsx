@@ -12,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, FileClock, Pencil, RotateCw, Trash2 } from "lucide-react";
+import { ArrowLeft, FileClock, PauseCircle, Pencil, PlayCircle, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -113,10 +113,19 @@ function VirtualKeyDetailPage() {
     onSuccess: () =>
       utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
   });
+  const disableMutation = api.virtualKeys.disable.useMutation({
+    onSuccess: () =>
+      utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
+  });
+  const enableMutation = api.virtualKeys.enable.useMutation({
+    onSuccess: () =>
+      utils.virtualKeys.get.invalidate({ organizationId: orgId, id: vkId }),
+  });
 
   const [editing, setEditing] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  const [disabling, setDisabling] = useState(false);
   const [revealSecret, setRevealSecret] = useState<{
     name: string;
     secret: string;
@@ -193,6 +202,25 @@ function VirtualKeyDetailPage() {
     }
   };
 
+  const confirmDisable = async () => {
+    if (!vk || !orgId) return;
+    try {
+      await disableMutation.mutateAsync({ organizationId: orgId, id: vk.id });
+      setDisabling(false);
+    } catch (err) {
+      showErrorToast({ error: err, fallbackTitle: "Couldn't disable the key" });
+    }
+  };
+
+  const confirmEnable = async () => {
+    if (!vk || !orgId) return;
+    try {
+      await enableMutation.mutateAsync({ organizationId: orgId, id: vk.id });
+    } catch (err) {
+      showErrorToast({ error: err, fallbackTitle: "Couldn't enable the key" });
+    }
+  };
+
   const confirmRevoke = async () => {
     if (!vk || !orgId) return;
     try {
@@ -252,6 +280,25 @@ function VirtualKeyDetailPage() {
               )}
               {vk.status === "active" && canUpdate && (
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDisabling(true)}
+                >
+                  <PauseCircle size={14} /> Disable
+                </Button>
+              )}
+              {vk.status === "disabled" && canUpdate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={enableMutation.isPending}
+                  onClick={() => void confirmEnable()}
+                >
+                  <PlayCircle size={14} /> Enable
+                </Button>
+              )}
+              {vk.status !== "revoked" && canUpdate && (
+                <Button
                   colorPalette="red"
                   variant="outline"
                   size="sm"
@@ -280,7 +327,13 @@ function VirtualKeyDetailPage() {
                 </DetailRow>
                 <DetailRow label="Status">
                   <Badge
-                    colorPalette={vk.status === "active" ? "green" : "red"}
+                    colorPalette={
+                      vk.status === "active"
+                        ? "green"
+                        : vk.status === "disabled"
+                          ? "yellow"
+                          : "red"
+                    }
                   >
                     {vk.status}
                   </Badge>
@@ -444,6 +497,16 @@ function VirtualKeyDetailPage() {
         tone="warning"
         loading={rotateMutation.isPending}
         onConfirm={confirmRotate}
+      />
+      <ConfirmDialog
+        open={disabling}
+        onOpenChange={setDisabling}
+        title={`Disable ${vk?.name ?? "virtual key"}?`}
+        message="Requests are rejected with a distinct disabled error within seconds. Everything about the key is preserved; enable restores it exactly as it was."
+        confirmLabel="Disable key"
+        tone="warning"
+        loading={disableMutation.isPending}
+        onConfirm={confirmDisable}
       />
       <ConfirmDialog
         open={revoking}

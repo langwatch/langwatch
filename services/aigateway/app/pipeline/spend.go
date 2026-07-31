@@ -104,7 +104,7 @@ func admissionFor(ctx context.Context, call *Call, at time.Time) SpendAdmission 
 		OrganizationID:   call.Bundle.OrganizationID,
 		ProjectID:        call.Bundle.ProjectID,
 		VirtualKeyID:     call.Bundle.VirtualKeyID,
-		EndUserID:        resolveSpendEndUser(ctx, call),
+		EndUserID:        ResolveEndUser(ctx, call),
 		Model:            call.Request.Model,
 		RequestType:      string(call.Request.Type),
 		Labels:           call.Bundle.Config.VKTags,
@@ -112,10 +112,13 @@ func admissionFor(ctx context.Context, call *Call, at time.Time) SpendAdmission 
 	}
 }
 
-// resolveSpendEndUser mirrors the span attribution exactly: the
-// middleware-lifted header value wins, else the OpenAI `user` body param on
-// the request shapes that carry one, both through the shared sanitizer.
-func resolveSpendEndUser(ctx context.Context, call *Call) string {
+// ResolveEndUser is the ONE end-user resolution: the middleware-lifted
+// header value wins (X-LangWatch-End-User-Id, then the LiteLLM alias),
+// else the OpenAI `user` body param on the request shapes that carry one,
+// both through the shared sanitizer. Spend admission and budget
+// enforcement both call this, so metering and capping can never disagree
+// about who a request belonged to.
+func ResolveEndUser(ctx context.Context, call *Call) string {
 	if id := customertracebridge.EndUserID(ctx); id != "" {
 		return id
 	}

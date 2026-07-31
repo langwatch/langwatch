@@ -285,6 +285,40 @@ func (c *Client) FetchConfig(ctx context.Context, vkID string) (domain.BundleCon
 	return wire.toDomain(), nil
 }
 
+// BudgetBucketSpend reads the current-period spend for one attributed-user
+// bucket: the enforcement figure behind per-end-user templates. Cached by
+// the caller (adapters/budget.CachedBucketSpend); this is the cold path.
+func (c *Client) BudgetBucketSpend(ctx context.Context, budgetID, endUserID string) (int64, error) {
+	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/budget-bucket-spend")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return 0, err
+	}
+	q := req.URL.Query()
+	q.Set("budget_id", budgetID)
+	q.Set("end_user_id", endUserID)
+	req.URL.RawQuery = q.Encode()
+	c.setCommonHeaders(req)
+	c.sign(req, nil)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("budget bucket spend returned %d", resp.StatusCode)
+	}
+	var wire struct {
+		SpentMicroUSD int64 `json:"spent_micro_usd"`
+	}
+	if err := json.Unmarshal(body, &wire); err != nil {
+		return 0, err
+	}
+	return wire.SpentMicroUSD, nil
+}
+
 // Health performs the signed control-plane connectivity probe backing the
 // gateway's public /health status endpoint (adapters/statusprobe). It hits
 // the HMAC-protected /api/internal/gateway/health route rather than a

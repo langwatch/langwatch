@@ -24,7 +24,7 @@ export type VirtualKeyCamelDto = {
   organizationId: string;
   name: string;
   description: string | null;
-  status: "active" | "revoked";
+  status: "active" | "disabled" | "revoked";
   purpose: "user" | "langy";
   displayPrefix: string;
   principalUserId: string | null;
@@ -47,7 +47,7 @@ export type VirtualKeySnakeDto = {
   organization_id: string;
   name: string;
   description: string | null;
-  status: "active" | "revoked";
+  status: "active" | "disabled" | "revoked";
   purpose: "user" | "langy";
   display_prefix: string;
   principal_user_id: string | null;
@@ -71,7 +71,12 @@ function baseVk(vk: VirtualKeyWithScopes): BaseVk {
     organizationId: vk.organizationId,
     name: vk.name,
     description: vk.description,
-    status: vk.status === "ACTIVE" ? "active" : "revoked",
+    status:
+      vk.status === "ACTIVE"
+        ? "active"
+        : vk.status === "DISABLED"
+          ? "disabled"
+          : "revoked",
     purpose: vk.purpose === "LANGY" ? "langy" : "user",
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,

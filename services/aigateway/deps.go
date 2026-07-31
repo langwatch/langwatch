@@ -181,6 +181,9 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	budgetChecker := budget.NewChecker(budget.CheckerOptions{
 		Logger:  logger,
 		Metrics: metrics,
+		// Attributed-user templates enforce per end user through a cached
+		// control-plane bucket read; everything else stays bundle-local.
+		Buckets: budget.NewCachedBucketSpend(cpClient),
 	})
 
 	// Per-credential circuit breaker. A provider that keeps failing is

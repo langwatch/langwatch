@@ -15,7 +15,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Archive, ArrowLeft, FileClock, Pencil, Receipt } from "lucide-react";
+import { Archive, ArrowLeft, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
 import { useState } from "react";
 
 import AiGatewayLayout from "~/components/gateway/AiGatewayLayout";
@@ -58,6 +58,7 @@ function BudgetDetailPage() {
 
   const [editing, setEditing] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const canUpdate = hasPermission("gatewayBudgets:update");
   const canDelete = hasPermission("gatewayBudgets:delete");
@@ -76,6 +77,36 @@ function BudgetDetailPage() {
       showErrorToast({
         error: err,
         fallbackTitle: "Couldn't archive the budget",
+      });
+    }
+  };
+
+  const resetMutation = api.gatewayBudgets.reset.useMutation({
+    onSuccess: async () => {
+      if (organization?.id) {
+        await utils.gatewayBudgets.get.invalidate({
+          organizationId: organization.id,
+          id: budgetId,
+        });
+        await utils.gatewayBudgets.list.invalidate({
+          organizationId: organization.id,
+        });
+      }
+    },
+  });
+
+  const confirmReset = async () => {
+    if (!budget || !organization) return;
+    try {
+      await resetMutation.mutateAsync({
+        organizationId: organization.id,
+        id: budget.id,
+      });
+      setResetting(false);
+    } catch (err) {
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't reset the budget period",
       });
     }
   };
@@ -121,6 +152,15 @@ function BudgetDetailPage() {
                   <FileClock size={14} /> Audit history
                 </Button>
               </Link>
+              {!isArchived && canUpdate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setResetting(true)}
+                >
+                  <TimerReset size={14} /> Reset period
+                </Button>
+              )}
               {!isArchived && canUpdate && (
                 <Button
                   variant="outline"
@@ -378,6 +418,16 @@ function BudgetDetailPage() {
         }}
       />
       <ConfirmDialog
+        open={resetting}
+        onOpenChange={setResetting}
+        title={`Reset ${budget?.name ?? "budget"} period?`}
+        message="Starts a new period from now. Recorded spend and the ledger are untouched; only the boundary moves."
+        confirmLabel="Reset"
+        tone="warning"
+        loading={resetMutation.isPending}
+        onConfirm={confirmReset}
+      />
+      <ConfirmDialog
         open={archiving}
         onOpenChange={setArchiving}
         title={`Archive ${budget?.name ?? "budget"}?`}
@@ -441,6 +491,13 @@ type ScopeTarget =
     }
   | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null }
   | {
+      kind: "ATTRIBUTED_USER";
+      id: string;
+      name: string;
+      secondary: string | null;
+      anchorKind: "virtual_key" | "project";
+    }
+  | {
       kind: "GROUP";
       id: string;
       name: string;
@@ -455,7 +512,7 @@ function ScopeBadge({
   target: ScopeTarget;
   projectSlug: string | null;
 }) {
-  const kindLabel = target.kind.toLowerCase().replace("_", " ");
+  const kindLabel = target.kind.toLowerCase().replaceAll("_", " ");
   const vkHref =
     target.kind === "VIRTUAL_KEY"
       ? `/settings/gateway/virtual-keys/${target.id}`

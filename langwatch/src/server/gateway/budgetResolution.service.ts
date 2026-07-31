@@ -35,19 +35,32 @@ export type BudgetResolutionTarget = {
   projectId?: string | null;
   virtualKeyId?: string | null;
   principalUserId?: string | null;
+  /**
+   * External end-user id on the request, when the caller supplied one.
+   * ATTRIBUTED_USER templates resolve to a per-user bucket only when this
+   * is set; without it the template resolves as itself (the bundle entry,
+   * enforcement fetches buckets on demand).
+   */
+  endUserId?: string | null;
 };
 
 export type ResolvedBudget = {
   budget: GatewayBudget;
   /**
    * The id spend accumulates under. Equal to `budget.scopeId` for every
-   * scope except GROUP, where each member gets their own bucket.
+   * scope except GROUP (per-member bucket) and ATTRIBUTED_USER with an end
+   * user in context (per-user bucket).
    */
   bucketScopeId: string;
   /** The member this bucket belongs to. Only set for GROUP budgets. */
   principalUserId: string | null;
   /** The group the budget targets. Only set for GROUP budgets. */
   groupId: string | null;
+  /**
+   * The external end user this bucket belongs to. Only set for
+   * ATTRIBUTED_USER budgets resolved with an end user in context.
+   */
+  endUserId: string | null;
 };
 
 type PrismaLike = PrismaClient | Prisma.TransactionClient;
@@ -74,6 +87,16 @@ export async function resolveApplicableBudgets(
     ors.push({ scopeType: "PROJECT", scopeId: target.projectId });
   }
 
+  // ATTRIBUTED_USER templates anchor on a virtual key or a project: the
+  // template applies to every request on its anchor, whoever the end user
+  // turns out to be.
+  const templateAnchors = [target.virtualKeyId, target.projectId].filter(
+    (id): id is string => typeof id === "string" && id.length > 0,
+  );
+  if (templateAnchors.length > 0) {
+    ors.push({ scopeType: "ATTRIBUTED_USER", scopeId: { in: templateAnchors } });
+  }
+
   // GROUP budgets only enforce through a member. A key with no principal
   // (a shared org/team/project key) has nobody to charge the per-member
   // bucket to, so group budgets do not apply to it at all.
@@ -98,24 +121,39 @@ export async function resolveApplicableBudgets(
     },
   });
 
-  const resolved = rows.map((budget) =>
-    budget.scopeType === "GROUP"
-      ? {
+  const resolved = rows.map((budget) => {
+    if (budget.scopeType === "GROUP") {
+      return {
+        budget,
+        bucketScopeId: bucketScopeIdFor(
           budget,
-          bucketScopeId: bucketScopeIdFor(
-            budget,
-            groupBucketScopeId(budget.scopeId, target.principalUserId!),
-          ),
-          principalUserId: target.principalUserId!,
-          groupId: budget.scopeId,
-        }
-      : {
+          groupBucketScopeId(budget.scopeId, target.principalUserId!),
+        ),
+        principalUserId: target.principalUserId!,
+        groupId: budget.scopeId,
+        endUserId: null,
+      };
+    }
+    if (budget.scopeType === "ATTRIBUTED_USER" && target.endUserId) {
+      return {
+        budget,
+        bucketScopeId: bucketScopeIdFor(
           budget,
-          bucketScopeId: bucketScopeIdFor(budget, budget.scopeId),
-          principalUserId: null,
-          groupId: null,
-        },
-  );
+          attributedUserBucketScopeId(budget.scopeId, target.endUserId),
+        ),
+        principalUserId: null,
+        groupId: null,
+        endUserId: target.endUserId,
+      };
+    }
+    return {
+      budget,
+      bucketScopeId: bucketScopeIdFor(budget, budget.scopeId),
+      principalUserId: null,
+      groupId: null,
+      endUserId: null,
+    };
+  });
 
   return resolved.sort(byScopeThenId);
 }
@@ -165,6 +203,20 @@ export function groupBucketScopeId(
   principalUserId: string,
 ): string {
   return `${groupId}:${principalUserId}`;
+}
+
+/**
+ * Per-end-user bucket key for an ATTRIBUTED_USER template: the anchor (a
+ * virtual key or project id) plus the caller-supplied external id. Anchor
+ * ids are nanoids and never contain ":", so the key parses unambiguously
+ * from the left; the end-user id is external input and may contain
+ * anything, which is why nothing ever parses this key from the right.
+ */
+export function attributedUserBucketScopeId(
+  anchorId: string,
+  endUserId: string,
+): string {
+  return `${anchorId}:${endUserId}`;
 }
 
 /**

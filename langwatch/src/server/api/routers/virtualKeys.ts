@@ -500,4 +500,51 @@ export const virtualKeysRouter = createTRPCRouter({
       });
       return toVirtualKeyCamelDto(updated);
     }),
+
+  disable: protectedProcedure
+    .input(idInput.extend({ reason: z.string().max(500).optional() }))
+    .use(authorizeInResolver)
+    .mutation(async ({ ctx, input }) => {
+      const service = VirtualKeyService.create(ctx.prisma);
+      const existing = await requireExistingVk(
+        service,
+        input.id,
+        input.organizationId,
+      );
+      await assertActorCanOperateOnAnyScope(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
+        existing.scopes,
+        "virtualKeys:update",
+      );
+      const updated = await service.disable({
+        id: input.id,
+        organizationId: input.organizationId,
+        actorUserId: ctx.session.user.id,
+        reason: input.reason ?? null,
+      });
+      return toVirtualKeyCamelDto(updated);
+    }),
+
+  enable: protectedProcedure
+    .input(idInput)
+    .use(authorizeInResolver)
+    .mutation(async ({ ctx, input }) => {
+      const service = VirtualKeyService.create(ctx.prisma);
+      const existing = await requireExistingVk(
+        service,
+        input.id,
+        input.organizationId,
+      );
+      await assertActorCanOperateOnAnyScope(
+        { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
+        existing.scopes,
+        "virtualKeys:update",
+      );
+      const updated = await service.enable({
+        id: input.id,
+        organizationId: input.organizationId,
+        actorUserId: ctx.session.user.id,
+      });
+      return toVirtualKeyCamelDto(updated);
+    }),
 });

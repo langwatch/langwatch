@@ -6,6 +6,7 @@ import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
 } from "@ee/governance/reactors/gatewayBudgetSync.reactor";
+import type { AttributedDebitsProcessDeps } from "@ee/governance/process-manager/attributedUserDebits.process";
 import {
   createGovernanceKpisSyncReactor,
   type GovernanceKpisSyncReactorDeps,
@@ -101,6 +102,7 @@ import {
 } from "./pipelines/billing-reporting/pipeline";
 import { createBlobMaintenancePipeline } from "./pipelines/blob-maintenance/pipeline";
 import { createCodingAgentProcessingPipeline } from "./pipelines/coding-agent-processing/pipeline";
+import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
 import type { CodingAgentSessionState } from "./pipelines/coding-agent-processing/projections/codingAgentSession.foldProjection";
 import { CodingAgentSessionStore } from "./pipelines/coding-agent-processing/projections/codingAgentSession.store";
 import {
@@ -335,6 +337,7 @@ export interface PipelineRegistryDeps {
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   gatewaySpend?: { repository: GatewaySpendEventsRepository };
   webhookDelivery?: WebhookDeliveryProcessDeps;
+  attributedDebits?: AttributedDebitsProcessDeps;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -456,6 +459,7 @@ export class PipelineRegistry {
     const codingAgentPipeline = this.registerCodingAgentPipeline();
     if (this.deps.gatewaySpend) {
       this.registerGatewaySpendPipeline(this.deps.gatewaySpend);
+      this.registerGovernanceEventsPipeline();
     }
     const codingAgentCommands = mapCommands(codingAgentPipeline.commands);
     const metricPipeline = this.registerMetricPipeline({
@@ -762,6 +766,14 @@ export class PipelineRegistry {
    * as a fold projection over gateway_spend, rating in the pipeline. Only
    * registered when ClickHouse is on (the spend table has no PG fallback).
    */
+  private registerGovernanceEventsPipeline() {
+    return this.deps.eventSourcing.register(
+      createGovernanceEventsPipeline({
+        webhookDelivery: this.deps.webhookDelivery,
+      }),
+    );
+  }
+
   private registerGatewaySpendPipeline(deps: {
     repository: GatewaySpendEventsRepository;
   }) {
@@ -774,6 +786,7 @@ export class PipelineRegistry {
         // The ADR-073 delivery process manager consumes this pipeline's
         // committed events through its transactional inbox.
         webhookDelivery: this.deps.webhookDelivery,
+        attributedDebits: this.deps.attributedDebits,
       }),
     );
   }

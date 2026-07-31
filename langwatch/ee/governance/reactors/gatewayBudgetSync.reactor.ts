@@ -36,6 +36,20 @@ export interface GatewayBudgetSyncReactorDeps {
   prisma: PrismaClient;
   budgetRepository: GatewayBudgetRepository;
   budgetCHRepository: GatewayBudgetClickHouseRepository;
+  /**
+   * Post-debit crossing detection for the budget webhook families
+   * (threshold_crossed / breached). Best effort by contract: the detector
+   * never throws, and debits never depend on it. Absent in deployments
+   * without the governance-events pipeline.
+   */
+  detectCrossings?: (
+    rows: Array<{
+      tenantId: string;
+      budgetId: string;
+      bucketScopeId: string;
+      endUserId: string | null;
+    }>,
+  ) => Promise<void>;
 }
 
 /**
@@ -227,6 +241,16 @@ export function createGatewayBudgetSyncReactor(
         );
 
         await deps.budgetCHRepository.insertDebit(rows);
+        if (deps.detectCrossings) {
+          await deps.detectCrossings(
+            rows.map((r) => ({
+              tenantId: r.tenantId,
+              budgetId: r.budgetId,
+              bucketScopeId: r.scopeId,
+              endUserId: null,
+            })),
+          );
+        }
 
         // EC4 — emit a BUDGET_UPDATED change event so the gateway's
         // /changes subscriber (services/aigateway/adapters/authresolver)

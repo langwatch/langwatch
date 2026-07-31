@@ -1,4 +1,9 @@
 import {
+  ATTRIBUTED_DEBITS_PROCESS_NAME,
+  attributedUserDebitsPM,
+  type AttributedDebitsProcessDeps,
+} from "@ee/governance/process-manager/attributedUserDebits.process";
+import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryProcessDeps,
   webhookDeliveryPM,
@@ -26,6 +31,9 @@ export interface GatewaySpendProcessingPipelineDeps {
   /** The ADR-073 delivery process manager; absent when webhooks are off
    *  (the pipeline still projects, delivery just has no consumer). */
   webhookDelivery?: WebhookDeliveryProcessDeps;
+  /** Attributed-user budget debits; absent without the ClickHouse spend
+   *  path (per-user buckets cannot exist without the ledger). */
+  attributedDebits?: AttributedDebitsProcessDeps;
 }
 
 /**
@@ -67,6 +75,12 @@ export function createGatewaySpendProcessingPipeline(
     pipeline = pipeline.withProcessManager(
       WEBHOOK_DELIVERY_PROCESS_NAME,
       webhookDeliveryPM(deps.webhookDelivery),
+    );
+  }
+  if (deps.attributedDebits) {
+    pipeline = pipeline.withProcessManager(
+      ATTRIBUTED_DEBITS_PROCESS_NAME,
+      attributedUserDebitsPM(deps.attributedDebits),
     );
   }
   return pipeline.build();

@@ -1749,6 +1749,29 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     virtualKeysCmd
+      .command("disable <id>")
+      .description("Disable a virtual key (reversible; requests get a distinct virtual_key_disabled error)")
+      .option("--reason <text>", "Audit-logged note shown on the key's detail view")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { reason?: string }) => {
+      const { disableVirtualKeyCommand: impl } = await import("./commands/virtual-keys/disable.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    virtualKeysCmd
+      .command("enable <id>")
+      .description("Re-enable a disabled virtual key, restoring it exactly as it was")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string) => {
+      const { enableVirtualKeyCommand: impl } = await import("./commands/virtual-keys/disable.js");
+      return impl(id);
+    },
+  );
+
+  emitsResult(
+    virtualKeysCmd
       .command("revoke <id>")
       .description("Revoke a virtual key (cannot be reactivated)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
@@ -1812,6 +1835,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     }) => {
       const { createGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/create.js");
       return impl(options);
+    },
+  );
+
+  emitsResult(
+    gatewayBudgetsCmd
+      .command("reset <id>")
+      .description("Move a budget's period boundary to now (never mutates recorded spend)")
+      .option("--end-user <id>", "Reset only this end user's bucket (attributed-user templates)")
+      .option("--reason <text>", "Audit-logged note for the reset")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (id: string, options: { endUser?: string; reason?: string }) => {
+      const { resetGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/reset.js");
+      return impl(id, options);
     },
   );
 

@@ -343,6 +343,42 @@ export class VirtualKeyRepository {
     });
   }
 
+  async setDisabled(
+    id: string,
+    organizationId: string,
+    disabled: boolean,
+    reason: string | null,
+    tx?: Prisma.TransactionClient,
+  ): Promise<VirtualKeyWithScopes> {
+    const client = tx ?? this.prisma;
+    return client.virtualKey.update({
+      where: { id, organizationId },
+      data: disabled
+        ? {
+            status: "DISABLED",
+            disabledAt: new Date(),
+            disabledReason: reason,
+            revision: { increment: 1n },
+          }
+        : {
+            // Rotation-grace fields are deliberately untouched in BOTH
+            // directions: disable is reversible, and a key re-enabled
+            // mid-grace must keep honoring its previous secret.
+            status: "ACTIVE",
+            disabledAt: null,
+            disabledReason: null,
+            revision: { increment: 1n },
+          },
+      include: {
+        scopes: true,
+        principalUser: { select: { id: true, name: true, email: true } },
+        routingPolicy: {
+          select: { id: true, modelAliases: true, policyRules: true },
+        },
+      },
+    });
+  }
+
   async recordUsage(
     id: string,
     at: Date,
