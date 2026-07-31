@@ -64,8 +64,6 @@ type BatchEvaluationResultsTableProps = {
   disableVirtualization?: boolean;
   /** Group rows by this dataset-entry metadata key (comparison mode). */
   groupBy?: string | null;
-  /** Called when the user changes the grouping key. */
-  onGroupByChange?: (key: string | null) => void;
 };
 
 /**
@@ -178,12 +176,6 @@ export const FieldsButton = ({ fields, onToggle }: FieldsButtonProps) => (
   </PopoverRoot>
 );
 
-/**
- * Row height control — how much of each cell's content shows before it
- * needs expanding. Unlike field visibility, nothing is hidden here, only
- * resized, so it's safe (and useful) to persist across sessions — see
- * {@link useResultDisplayPreferences}.
- */
 export type GroupRowsButtonProps = {
   /** Metadata keys this comparison can group on. Empty hides the control. */
   availableKeys: string[];
@@ -280,6 +272,12 @@ export const GroupRowsButton = ({
   );
 };
 
+/**
+ * Row height control — how much of each cell's content shows before it
+ * needs expanding. Unlike field visibility, nothing is hidden here, only
+ * resized, so it's safe (and useful) to persist across sessions — see
+ * {@link useResultDisplayPreferences}.
+ */
 export type RowHeightButtonProps = {
   value: RowHeight;
   onChange: (value: RowHeight) => void;
@@ -331,7 +329,6 @@ export function BatchEvaluationResultsTable({
   rowHeight = DEFAULT_ROW_HEIGHT,
   disableVirtualization = false,
   groupBy,
-  onGroupByChange,
 }: BatchEvaluationResultsTableProps) {
   // Determine if we're in comparison mode
   const isComparisonMode = !!comparisonData && comparisonData.length > 1;
@@ -348,7 +345,6 @@ export function BatchEvaluationResultsTable({
         rowHeight={rowHeight}
         disableVirtualization={disableVirtualization}
         groupBy={groupBy}
-        onGroupByChange={onGroupByChange}
       />
     );
   }

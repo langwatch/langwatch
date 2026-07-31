@@ -667,7 +667,6 @@ export function BatchEvaluationResults({
                   showCostAndLatency={fields.costAndLatency}
                   rowHeight={rowHeight}
                   groupBy={localGroupBy ?? queryGroupBy}
-                  onGroupByChange={handleGroupByChange}
                 />
               </Card.Body>
             </Card.Root>

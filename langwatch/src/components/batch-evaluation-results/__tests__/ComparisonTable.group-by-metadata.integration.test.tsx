@@ -4,19 +4,26 @@
  * field. User-perspective integration tests; see
  * specs/experiments/group-results-by-metadata.feature for scenarios.
  *
+ * The picker and the table are two components: `GroupRowsButton` sits in
+ * the results toolbar and owns the selection, `ComparisonTable` renders
+ * whatever `groupBy` it is handed. Tests about the dropdown therefore
+ * render both through the `GroupableComparison` harness below; tests
+ * about rendering drive the table directly with a `groupBy` prop.
+ *
  * URL persistence is verified at the BatchEvaluationResults level + in
- * the browser. This file scopes to ComparisonTable as a controlled
- * component (groupBy / onGroupByChange props; the keys themselves are
- * derived internally by useResultsGrouping).
+ * the browser.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { GroupRowsButton } from "../BatchEvaluationResultsTable";
 import { ComparisonTable } from "../ComparisonTable";
 import type { ComparisonRunData } from "../types";
+import { useResultsGrouping } from "../useResultsGrouping";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -119,6 +126,42 @@ const renderTable = (props: Partial<TableProps> = {}) =>
     { wrapper: Wrapper },
   );
 
+/**
+ * The same wiring BatchEvaluationResults does — discover the keys, hand
+ * them to the toolbar button, hand the button's selection to the table —
+ * minus the router and tRPC that only the URL half needs.
+ */
+const GroupableComparison = ({
+  comparisonData,
+}: {
+  comparisonData: ComparisonRunData[];
+}) => {
+  const [groupBy, setGroupBy] = useState<string | null>(null);
+  const { availableKeys } = useResultsGrouping({
+    source: "dataset-entry",
+    comparisonData,
+  });
+  return (
+    <>
+      <GroupRowsButton
+        availableKeys={availableKeys}
+        value={groupBy}
+        onChange={setGroupBy}
+      />
+      <ComparisonTable
+        comparisonData={comparisonData}
+        disableVirtualization
+        groupBy={groupBy}
+      />
+    </>
+  );
+};
+
+const renderGroupable = (comparisonData = TWO_RUN_FIXTURE) =>
+  render(<GroupableComparison comparisonData={comparisonData} />, {
+    wrapper: Wrapper,
+  });
+
 describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => {
   afterEach(() => {
     cleanup();
@@ -129,7 +172,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
       /** @scenario "The Group rows by dropdown lists every metadata key from the dataset" */
       it("lists every metadata key discovered from the dataset entries", async () => {
         const user = userEvent.setup();
-        renderTable();
+        renderGroupable();
 
         await user.click(screen.getByTestId("group-by-row-button"));
 
@@ -148,7 +191,7 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
       /** @scenario "Dropdown only offers keys present on the current runs' dataset entries" */
       it("does not list the input column as a grouping option", async () => {
         const user = userEvent.setup();
-        renderTable();
+        renderGroupable();
         await user.click(screen.getByTestId("group-by-row-button"));
         const dropdown = screen.getByTestId("group-by-row-dropdown");
         // 'input' is a column but a row-unique payload, not a slicing dimension.
@@ -236,10 +279,10 @@ describe("ComparisonTable group-by dataset-entry metadata (issue #4632)", () => 
       /** @scenario "Choosing No grouping restores the flat row order" */
       it("drops every group header and returns the rows to one flat list", async () => {
         const user = userEvent.setup();
-        // Uncontrolled: the component owns the selection, so picking an option
-        // is the whole interaction. The URL half of this scenario belongs to
-        // BatchEvaluationResults, which owns that contract.
-        renderTable();
+        // Picker plus table: the toolbar holds the selection, so picking an
+        // option is the whole interaction. The URL half of this scenario
+        // belongs to BatchEvaluationResults, which owns that contract.
+        renderGroupable();
 
         await user.click(screen.getByTestId("group-by-row-button"));
         await user.click(screen.getByTestId("group-by-row-option-city"));

@@ -11,6 +11,7 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  type Row,
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -55,12 +56,10 @@ type ComparisonTableProps = {
   disableVirtualization?: boolean;
   /**
    * Group rows by this dataset-entry metadata key. `null`/undefined =
-   * flat (no grouping). Controlled when provided; otherwise the
-   * component manages its own local selection (no URL sync).
+   * flat (no grouping). Always controlled: the picker lives in the results
+   * toolbar (`GroupRowsButton`), which owns the selection and its URL sync.
    */
   groupBy?: string | null;
-  /** Callback when the user picks a different grouping key. */
-  onGroupByChange?: (key: string | null) => void;
 };
 
 /**
@@ -406,6 +405,166 @@ const computeGroupAggregates = (
   return result;
 };
 
+/** Per-run mean evaluator scores, shown on the right of a group header. */
+const GroupMeanBadges = ({
+  value,
+  aggregates,
+  comparisonData,
+}: {
+  value: string;
+  aggregates: GroupAggregates;
+  comparisonData: ComparisonRunData[];
+}) => (
+  <HStack gap={4} align="start">
+    {comparisonData.map((run) => {
+      const entries = Object.entries(aggregates[run.runId] ?? {});
+      if (entries.length === 0) return null;
+      return (
+        <VStack key={run.runId} gap={0} align="end">
+          {entries.map(([evId, stats]) => (
+            <HStack key={evId} gap={1} fontSize="11px" color="fg.muted">
+              <Box
+                width="6px"
+                height="6px"
+                borderRadius="full"
+                bg={run.color}
+              />
+              <Text>{stats.evaluatorName}</Text>
+              <Text
+                fontWeight="medium"
+                color="fg"
+                data-testid={`group-mean-${value}-${run.runId}-${evId}`}
+              >
+                {stats.mean.toFixed(2)}
+              </Text>
+            </HStack>
+          ))}
+        </VStack>
+      );
+    })}
+  </HStack>
+);
+
+/** The full-width header row that opens each group's <tbody>. */
+const GroupHeaderRow = ({
+  value,
+  rowCount,
+  aggregates,
+  comparisonData,
+  columnCount,
+  collapsed,
+  onToggleCollapse,
+}: {
+  value: string;
+  rowCount: number;
+  aggregates: GroupAggregates;
+  comparisonData: ComparisonRunData[];
+  columnCount: number;
+  collapsed: boolean;
+  onToggleCollapse: (value: string) => void;
+}) => (
+  <tr data-testid={`group-header-${value}`}>
+    <td
+      colSpan={columnCount}
+      style={{
+        background: "var(--chakra-colors-bg-subtle)",
+        borderTop: "1px solid var(--chakra-colors-border)",
+        borderBottom: "1px solid var(--chakra-colors-border)",
+        padding: "6px 8px",
+      }}
+    >
+      <HStack gap={3} align="center">
+        <Box
+          as="button"
+          aria-label={collapsed ? "Expand" : "Collapse"}
+          onClick={() => onToggleCollapse(value)}
+          data-testid={`group-header-toggle-${value}`}
+          fontSize="12px"
+          color="fg.muted"
+          paddingX={1}
+          cursor="pointer"
+          display="flex"
+          alignItems="center"
+        >
+          {/* One rotating chevron rather than swapping two glyphs — the
+              arrow turns instead of the row flickering between characters. */}
+          <ChevronRight
+            size={13}
+            style={{
+              transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
+              transition: "transform 140ms ease",
+            }}
+          />
+        </Box>
+        <Text fontSize="13px" fontWeight="semibold">
+          {value}
+        </Text>
+        <Text
+          fontSize="12px"
+          color="fg.muted"
+          data-testid={`group-count-${value}`}
+        >
+          {rowCount}
+          {rowCount === 1 ? " row" : " rows"}
+        </Text>
+        <Spacer />
+        <GroupMeanBadges
+          value={value}
+          aggregates={aggregates}
+          comparisonData={comparisonData}
+        />
+      </HStack>
+    </td>
+  </tr>
+);
+
+/** One <tbody> per group: header row plus the group's data rows. */
+const GroupSection = ({
+  value,
+  rows,
+  aggregates,
+  comparisonData,
+  columnCount,
+  collapsed,
+  onToggleCollapse,
+  tableRowByIndex,
+}: {
+  value: string;
+  rows: ComparisonRow[];
+  aggregates: GroupAggregates;
+  comparisonData: ComparisonRunData[];
+  columnCount: number;
+  collapsed: boolean;
+  onToggleCollapse: (value: string) => void;
+  tableRowByIndex: Map<number, Row<ComparisonRow>>;
+}) => (
+  <tbody data-testid={`group-section-${value}`}>
+    <GroupHeaderRow
+      value={value}
+      rowCount={rows.length}
+      aggregates={aggregates}
+      comparisonData={comparisonData}
+      columnCount={columnCount}
+      collapsed={collapsed}
+      onToggleCollapse={onToggleCollapse}
+    />
+    {!collapsed &&
+      rows.map((comparisonRow) => {
+        const tableRow = tableRowByIndex.get(comparisonRow.index);
+        if (!tableRow) return null;
+        return (
+          <tr key={tableRow.id} data-index={tableRow.index}>
+            {tableRow.getVisibleCells().map((cell) => (
+              <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </td>
+            ))}
+          </tr>
+        );
+      })}
+  </tbody>
+);
+
 export function ComparisonTable({
   comparisonData,
   isLoading,
@@ -415,8 +574,7 @@ export function ComparisonTable({
   showCostAndLatency = true,
   rowHeight = DEFAULT_ROW_HEIGHT,
   disableVirtualization = false,
-  groupBy: controlledGroupBy,
-  onGroupByChange,
+  groupBy: requestedGroupBy = null,
 }: ComparisonTableProps) {
   // Build columns for comparison mode
   const columns = useMemo(() => {
@@ -457,26 +615,15 @@ export function ComparisonTable({
     comparisonData,
   });
 
-  // Group-by: controlled (parent owns URL sync) or internal (component-local).
-  const [internalGroupBy, setInternalGroupBy] = useState<string | null>(null);
-  const requestedGroupBy =
-    controlledGroupBy !== undefined ? controlledGroupBy : internalGroupBy;
   // A group-by key only means something if this comparison actually has it.
-  // The controlled value comes from the URL, so `?groupBy=input` survives a
-  // link being shared into a run that has no such field — grouping on it would
-  // put every row in its own singleton group and read as a broken table rather
-  // than as a stale parameter.
+  // The value comes from the URL, so `?groupBy=input` survives a link being
+  // shared into a run that has no such field — grouping on it would put every
+  // row in its own singleton group and read as a broken table rather than as a
+  // stale parameter.
   const effectiveGroupBy =
     requestedGroupBy && availableKeys.includes(requestedGroupBy)
       ? requestedGroupBy
       : null;
-  const handleGroupByChange = useCallback(
-    (next: string | null) => {
-      if (onGroupByChange) onGroupByChange(next);
-      else setInternalGroupBy(next);
-    },
-    [onGroupByChange],
-  );
 
   // Collapse state for grouped sections.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
@@ -621,118 +768,19 @@ export function ComparisonTable({
           {groupedRows ? (
             // Grouped mode: one <tbody> per group. Header row spans all
             // columns and carries the per-run mean badges.
-            groupedRows.map(({ value, rows, aggregates }) => {
-              const collapsed = collapsedGroups.has(value);
-              return (
-                <tbody key={value} data-testid={`group-section-${value}`}>
-                  <tr data-testid={`group-header-${value}`}>
-                    <td
-                      colSpan={columnCount}
-                      style={{
-                        background: "var(--chakra-colors-bg-subtle)",
-                        borderTop: "1px solid var(--chakra-colors-border)",
-                        borderBottom: "1px solid var(--chakra-colors-border)",
-                        padding: "6px 8px",
-                      }}
-                    >
-                      <HStack gap={3} align="center">
-                        <Box
-                          as="button"
-                          aria-label={collapsed ? "Expand" : "Collapse"}
-                          onClick={() => toggleCollapse(value)}
-                          data-testid={`group-header-toggle-${value}`}
-                          fontSize="12px"
-                          color="fg.muted"
-                          paddingX={1}
-                          cursor="pointer"
-                          display="flex"
-                          alignItems="center"
-                        >
-                          {/* One rotating chevron rather than swapping two
-                              glyphs — the arrow turns instead of the row
-                              flickering between characters. */}
-                          <ChevronRight
-                            size={13}
-                            style={{
-                              transform: collapsed
-                                ? "rotate(0deg)"
-                                : "rotate(90deg)",
-                              transition: "transform 140ms ease",
-                            }}
-                          />
-                        </Box>
-                        <Text fontSize="13px" fontWeight="semibold">
-                          {value}
-                        </Text>
-                        <Text
-                          fontSize="12px"
-                          color="fg.muted"
-                          data-testid={`group-count-${value}`}
-                        >
-                          {rows.length}
-                          {rows.length === 1 ? " row" : " rows"}
-                        </Text>
-                        <Spacer />
-                        <HStack gap={4} align="start">
-                          {comparisonData.map((run) => {
-                            const perEval = aggregates[run.runId] ?? {};
-                            const entries = Object.entries(perEval);
-                            if (entries.length === 0) return null;
-                            return (
-                              <VStack key={run.runId} gap={0} align="end">
-                                {entries.map(([evId, stats]) => (
-                                  <HStack
-                                    key={evId}
-                                    gap={1}
-                                    fontSize="11px"
-                                    color="fg.muted"
-                                  >
-                                    <Box
-                                      width="6px"
-                                      height="6px"
-                                      borderRadius="full"
-                                      bg={run.color}
-                                    />
-                                    <Text>{stats.evaluatorName}</Text>
-                                    <Text
-                                      fontWeight="medium"
-                                      color="fg"
-                                      data-testid={`group-mean-${value}-${run.runId}-${evId}`}
-                                    >
-                                      {stats.mean.toFixed(2)}
-                                    </Text>
-                                  </HStack>
-                                ))}
-                              </VStack>
-                            );
-                          })}
-                        </HStack>
-                      </HStack>
-                    </td>
-                  </tr>
-                  {!collapsed &&
-                    rows.map((comparisonRow) => {
-                      const tableRow = tableRowByIndex.get(comparisonRow.index);
-                      if (!tableRow) return null;
-                      return (
-                        <tr key={tableRow.id} data-index={tableRow.index}>
-                          {tableRow.getVisibleCells().map((cell) => (
-                            <td
-                              key={cell.id}
-                              style={{ width: cell.column.getSize() }}
-                            >
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext(),
-                              )}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              );
-            })
+            groupedRows.map(({ value, rows, aggregates }) => (
+              <GroupSection
+                key={value}
+                value={value}
+                rows={rows}
+                aggregates={aggregates}
+                comparisonData={comparisonData}
+                columnCount={columnCount}
+                collapsed={collapsedGroups.has(value)}
+                onToggleCollapse={toggleCollapse}
+                tableRowByIndex={tableRowByIndex}
+              />
+            ))
           ) : (
             <tbody>
               {disableVirtualization ? (
