@@ -4,15 +4,15 @@ import type {
 } from "../schemas/metricDataPoint";
 import {
   absorbZeroBuckets,
+  type BucketMap,
   commonZeroThreshold,
   denseBuckets,
   downscaleBuckets,
-  mergeMap,
   MAX_DENSE_BUCKET_SPAN,
+  mergeMap,
   subtractMaps,
-  type BucketMap,
 } from "./exponentialBuckets";
-import { extendExtrema, resetOrGap, type BucketEntry } from "./row";
+import { type BucketEntry, extendExtrema, resetOrGap } from "./row";
 import { bigint, previousPoint, startsNewSequence } from "./sequence";
 
 /** A point re-expressed at the bucket's common scale and zero threshold. */
@@ -179,7 +179,7 @@ function usablePredecessor({
 }): CanonicalMetricDataPoint | undefined {
   if (point.aggregationTemporality !== "cumulative") return undefined;
   const previous = previousPoint(all, index);
-  if (!previous || previous.metricKind !== "exponential_histogram") {
+  if (previous?.metricKind !== "exponential_histogram") {
     return undefined;
   }
   return startsNewSequence(previous, point) ? undefined : previous;
@@ -200,7 +200,8 @@ function collectContributors({
   }
   return new Map<string, CanonicalMetricDataPoint>([
     ...entries.map(
-      ({ point }) => [point.pointId, point] as [string, CanonicalMetricDataPoint],
+      ({ point }) =>
+        [point.pointId, point] as [string, CanonicalMetricDataPoint],
     ),
     ...predecessors,
   ]);
@@ -245,7 +246,11 @@ export function buildExponentialHistogramRow({
           })
         : null;
       if (!delta) {
-        resetOrGap({ row, previous: previousPoint(all, index), current: point });
+        resetOrGap({
+          row,
+          previous: previousPoint(all, index),
+          current: point,
+        });
         usesWholePoint = true;
       } else {
         current = delta;

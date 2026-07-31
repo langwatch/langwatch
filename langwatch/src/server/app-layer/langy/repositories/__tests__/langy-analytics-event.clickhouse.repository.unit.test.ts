@@ -70,7 +70,10 @@ describe("ClickHouseLangyAnalyticsEventRepository", () => {
     );
 
     await repository.insertBatch(
-      [record, { ...record, eventId: "event_2", aggregateId: "conversation_2" }],
+      [
+        record,
+        { ...record, eventId: "event_2", aggregateId: "conversation_2" },
+      ],
       90,
     );
 

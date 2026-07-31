@@ -1,15 +1,16 @@
 /**
  * @vitest-environment jsdom
  */
-import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  fireEvent,
   render,
   screen,
-  within,
-  fireEvent,
   waitFor,
+  within,
 } from "@testing-library/react";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioCreateModal } from "../ScenarioCreateModal";
 
 // Mock useOrganizationTeamProject — use vi.fn so per-test overrides are possible

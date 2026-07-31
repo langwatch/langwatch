@@ -16,8 +16,8 @@ import {
   type EvaluatorTypes,
   evaluatorsSchema,
 } from "../../evaluations/evaluators";
-import { runEvaluationForTrace } from "../../evaluations/runEvaluation";
 import { evaluatorUnavailability } from "../../evaluations/installedEvaluators";
+import { runEvaluationForTrace } from "../../evaluations/runEvaluation";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -47,7 +47,8 @@ export const evaluationsRouter = createTRPCRouter({
           // them still resolve against the static registry and fail their
           // runs with the clear not-installed message.
           .filter(
-            ([key]) => !evaluatorUnavailability({ evaluatorType: key })?.isHiddenFromUi,
+            ([key]) =>
+              !evaluatorUnavailability({ evaluatorType: key })?.isHiddenFromUi,
           )
           .map(([key, evaluator]) => [
             key,

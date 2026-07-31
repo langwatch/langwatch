@@ -89,20 +89,14 @@ export function createEvaluationProcessingPipeline(
     )
     .withSubscriber("triggerMatch", {
       fold: "evaluationRun",
-      events: [
-        EVALUATION_COMPLETED_EVENT_TYPE,
-        EVALUATION_REPORTED_EVENT_TYPE,
-      ],
+      events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
       delay: 10_000,
       ttl: 30_000,
       handler: (event, context) =>
         deps.automations.triggerMatchHandler(event, context),
     })
     .withSubscriber("graphTriggerActivity", {
-      events: [
-        EVALUATION_COMPLETED_EVENT_TYPE,
-        EVALUATION_REPORTED_EVENT_TYPE,
-      ],
+      events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
       delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
       dedup: {
         makeId: (event) => `graph-trigger-activity:${event.tenantId}`,

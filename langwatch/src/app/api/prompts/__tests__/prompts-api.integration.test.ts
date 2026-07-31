@@ -11,13 +11,13 @@ import {
   llmPromptConfigFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
-import { prisma } from "~/server/db";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
+import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 import { createHandle } from "./helpers";
@@ -169,7 +169,7 @@ describe("Prompts API", () => {
 
   // Authentication tests
   describe("Authentication", () => {
-    it("should return 401 with invalid API key", async () => {
+    it("returns 401 with invalid API key", async () => {
       const res = await app.request(`/api/prompts`, {
         headers: { "X-Auth-Token": "invalid-key" },
       });
@@ -183,7 +183,7 @@ describe("Prompts API", () => {
   // GET endpoints tests
   describe("GET endpoints", () => {
     describe("when there are no prompts", () => {
-      it("should get empty array for a project with no prompts", async () => {
+      it("gets empty array for a project with no prompts", async () => {
         const res = await app.request(`/api/prompts`, {
           headers: { "X-Auth-Token": testApiKey },
         });
@@ -217,7 +217,7 @@ describe("Prompts API", () => {
         });
       });
 
-      it("should get all prompts for a project", async () => {
+      it("gets all prompts for a project", async () => {
         const res = await app.request(`/api/prompts`, {
           headers: { "X-Auth-Token": testApiKey },
         });
@@ -230,7 +230,7 @@ describe("Prompts API", () => {
         expect(body[0].projectId).toBe(testProjectId);
       });
 
-      it("should get a single prompt by ID", async () => {
+      it("gets a single prompt by ID", async () => {
         const res = await app.request(`/api/prompts/${config.id}`, {
           headers: { "X-Auth-Token": testApiKey },
         });
@@ -300,7 +300,7 @@ describe("Prompts API", () => {
         });
       });
 
-      it("should return 404 for non-existent prompt ID (should work with handle as well)", async () => {
+      it("returns 404 for non-existent prompt ID (should work with handle as well)", async () => {
         const nonExistentId = `prompt_${nanoid()}`;
         const res = await app.request(`/api/prompts/${nonExistentId}`, {
           headers: { "X-Auth-Token": testApiKey },
@@ -320,7 +320,7 @@ describe("Prompts API", () => {
             });
           });
 
-          it("should get all versions for a prompt", async () => {
+          it("gets all versions for a prompt", async () => {
             const res = await app.request(
               `/api/prompts/${config.id}/versions`,
               {
@@ -346,7 +346,7 @@ describe("Prompts API", () => {
             });
           });
 
-          it("should get empty array for a prompt with no versions", async () => {
+          it("gets empty array for a prompt with no versions", async () => {
             const res = await app.request(
               `/api/prompts/${config.id}/versions`,
               {
@@ -917,7 +917,9 @@ describe("Prompts API", () => {
     describe("when a prompt was previously created and then archived", () => {
       /** @scenario "A user can reuse the handle of an archived prompt for a new prompt" */
       it("allows creating a new prompt with the same handle", async () => {
-        const handle = `reuse-handle-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+        const handle = `reuse-handle-${nanoid(6)
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "x")}`;
 
         // 1) Create the original prompt with this handle.
         const createRes = await helpers.api.post("/api/prompts", {
@@ -949,7 +951,9 @@ describe("Prompts API", () => {
 
       /** @scenario "A user can sync a fresh prompt from the CLI after the previous one was archived" */
       it("allows the CLI sync flow to recreate a prompt with the same handle", async () => {
-        const handle = `sync-reuse-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+        const handle = `sync-reuse-${nanoid(6)
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "x")}`;
 
         // 1) Sync creates the prompt.
         const initialSync = await helpers.api.post(
@@ -975,18 +979,15 @@ describe("Prompts API", () => {
         expect(deleteRes.status).toBe(200);
 
         // 3) Sync again with the same handle — should create a new prompt.
-        const reSync = await helpers.api.post(
-          `/api/prompts/${handle}/sync`,
-          {
-            configData: {
-              prompt: "v2",
-              messages: [],
-              inputs: [{ identifier: "input", type: "str" }],
-              outputs: [{ identifier: "output", type: "str" }],
-              model: "openai/gpt-5-mini",
-            },
+        const reSync = await helpers.api.post(`/api/prompts/${handle}/sync`, {
+          configData: {
+            prompt: "v2",
+            messages: [],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            model: "openai/gpt-5-mini",
           },
-        );
+        });
         expect(reSync.status).toBe(200);
         const reBody = await reSync.json();
         expect(reBody.action).toBe("created");
@@ -996,7 +997,9 @@ describe("Prompts API", () => {
 
     describe("when a prompt with the handle is still active", () => {
       it("returns a 409 with a descriptive message on POST /api/prompts", async () => {
-        const handle = `active-conflict-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+        const handle = `active-conflict-${nanoid(6)
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]/g, "x")}`;
 
         const firstRes = await helpers.api.post("/api/prompts", {
           handle,

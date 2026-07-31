@@ -20,12 +20,18 @@ import { describe, expect, it } from "vitest";
 
 describe("simulationRunState.clickhouse.repository getProjection OOM safety", () => {
   const source = fs.readFileSync(
-    path.resolve(__dirname, "..", "simulationRunState.clickhouse.repository.ts"),
+    path.resolve(
+      __dirname,
+      "..",
+      "simulationRunState.clickhouse.repository.ts",
+    ),
     "utf-8",
   );
 
   it("resolves the latest version with a scalar max(UpdatedAt) subquery", () => {
-    expect(source).toMatch(/t\.UpdatedAt\s*=\s*\(\s*SELECT max\(s\.UpdatedAt\)/);
+    expect(source).toMatch(
+      /t\.UpdatedAt\s*=\s*\(\s*SELECT max\(s\.UpdatedAt\)/,
+    );
   });
 
   it("does not read the latest version via an UpdatedAt IN-tuple subquery", () => {

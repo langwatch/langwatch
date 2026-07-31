@@ -4,8 +4,8 @@ import {
 } from "~/server/event-sourcing/queues/dispatchError";
 import {
   fetchWithResolvedIp,
-  ssrfSafeFetch,
   type SSRFValidationResult,
+  ssrfSafeFetch,
 } from "~/utils/ssrfProtection";
 
 /** Total-request timeout — a slowloris endpoint can't pin a worker slot. */
@@ -61,9 +61,7 @@ export interface HttpDestinationResponse {
 const RESPONSE_HEADER_VALUE_CHARS = 200;
 const RESPONSE_HEADER_MAX_COUNT = 32;
 
-type SsrfResponseHeaders = Awaited<
-  ReturnType<typeof ssrfSafeFetch>
->["headers"];
+type SsrfResponseHeaders = Awaited<ReturnType<typeof ssrfSafeFetch>>["headers"];
 
 function captureResponseHeaders(
   headers: SsrfResponseHeaders | undefined,

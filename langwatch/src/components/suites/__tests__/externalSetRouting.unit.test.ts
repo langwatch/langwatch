@@ -25,9 +25,9 @@ describe("external set routing utilities", () => {
   describe("isExternalSetSelection()", () => {
     describe("when given an external set selection", () => {
       it("returns true", () => {
-        expect(
-          isExternalSetSelection(toExternalSetSelection("some-set")),
-        ).toBe(true);
+        expect(isExternalSetSelection(toExternalSetSelection("some-set"))).toBe(
+          true,
+        );
       });
     });
 

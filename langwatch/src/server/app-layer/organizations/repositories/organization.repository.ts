@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 import type {
   CustomRole,
   Organization,
@@ -260,9 +262,7 @@ export interface OrganizationRepository {
 
   // --- New methods for router delegation ---
 
-  createAndAssign(
-    input: CreateAndAssignInput,
-  ): Promise<CreateAndAssignResult>;
+  createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
   getAllForUser(params: {
     userId: string;

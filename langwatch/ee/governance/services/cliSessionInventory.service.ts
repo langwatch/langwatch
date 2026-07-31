@@ -8,7 +8,7 @@ import { createLogger } from "@langwatch/observability";
  * and a per-row revoke button.
  *
  * Storage model: each CLI session has 1 access token (1h TTL) + 1
- * refresh token (30d TTL) tracked in Redis. The per-user index
+ * refresh token (90d default TTL, rotated on use) tracked in Redis. The per-user index
  * `lwcli:user:<userId>:tokens` (maintained by `auth-cli.ts /exchange`
  * + `/refresh`) lists every Redis key the user owns. Reads SMEMBERS
  * the index, MGETs the records, and groups them by
@@ -82,11 +82,7 @@ export class CliSessionInventoryService {
     return new CliSessionInventoryService(redis);
   }
 
-  async listForUser({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<CliSession[]> {
+  async listForUser({ userId }: { userId: string }): Promise<CliSession[]> {
     if (!this.redis) {
       logger.warn(
         { userId },
@@ -101,10 +97,13 @@ export class CliSessionInventoryService {
     // Bucket tokens by session_started_at (or by issued_at fallback for
     // pre-Phase-8 records). Each bucket = one logical session even when
     // the access token has been rotated multiple times.
-    const buckets = new Map<number, {
-      tokenKeys: string[];
-      records: AccessOrRefreshRecord[];
-    }>();
+    const buckets = new Map<
+      number,
+      {
+        tokenKeys: string[];
+        records: AccessOrRefreshRecord[];
+      }
+    >();
 
     for (const memberKey of memberKeys) {
       const raw = await this.redis.get(memberKey);
@@ -204,9 +203,7 @@ export class CliSessionInventoryService {
   }
 }
 
-function deriveDeviceLabel(
-  info: AccessOrRefreshRecord["client_info"],
-): string {
+function deriveDeviceLabel(info: AccessOrRefreshRecord["client_info"]): string {
   if (!info) return "Unknown device";
   if (info.device_label && info.device_label.trim().length > 0) {
     return info.device_label.trim();

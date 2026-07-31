@@ -4,8 +4,8 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanHoverStore } from "../../../stores/spanHoverStore";
 import {
   BAR_HEIGHT,
-  getSpanBarColor,
   GROUP_ROW_HEIGHT,
+  getSpanBarColor,
   MIN_BAR_PX,
   type SiblingGroup,
 } from "./types";

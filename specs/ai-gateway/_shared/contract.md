@@ -72,7 +72,7 @@ Routing pattern:
   - `<alias>` (e.g. `gpt-4o`, `claude`) — resolved via VK config `model_aliases`. **Aliases always win** if defined; they are the VK owner's explicit redirect.
   - `<provider>/<model>` explicit form (e.g. `openai/gpt-5-mini`, `bedrock/anthropic.claude-haiku-4-5-20251001`, `azure/my-deployment`) — bypasses aliases and addresses the provider directly. Still subject to `models_allowed` allowlist.
 - If the alias/explicit form doesn't resolve to a provider in the VK's `providers` list, returns `model_not_allowed` error.
-- `GET /v1/models` returns the **effective** model list: the union of aliases + explicitly-allowed models for this VK, filtered by `models_allowed` if set.
+- `GET /v1/models` returns the **effective** model list: the union of aliases + explicitly-allowed models for this VK, filtered by `models_allowed` if set. Without an allowlist, the list is discovered from the chain's catalogs: base-URL endpoints and hosted providers are asked for their models, deployment-mapped providers (Azure / Bedrock / Vertex) list their mapped ids. Providers that dispatch can route to but that contributed nothing are named in the `X-Langwatch-Models-Discovery-Incomplete` response header as `provider:reason` tokens (`not-enumerable`, `probe-failed`), so an empty or partial list is diagnosable rather than silent.
 
 ---
 
@@ -228,6 +228,22 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
   },
   "model_aliases": { "gpt-4o": "azure/my-deployment", "claude": "anthropic/claude-haiku-4-5-20251001" },
   "models_allowed": ["gpt-5-mini", "claude-haiku-*", "gemini-2.5-flash"],
+  /* Provider allowlist. `null` means every provider the key reaches through
+     its scope graph, INCLUDING providers added after the key was created;
+     that is what the drawer's "All providers" persists, and `providers[]`
+     above is already filtered to match. A list narrows to those
+     ModelProvider ids; it is never empty. */
+  "providers_allowed": null,
+  /* How the key behaves when its provider fails.
+       none          - no failover. `fallback.max_attempts` is pinned to 1,
+                       so a gateway that does not yet read this field still
+                       behaves correctly. Default for keys created after the
+                       routing-mode split.
+       fallback_all  - walk every eligible provider in `fallback.chain`.
+                       Keys created before the split are migrated to this,
+                       so their behaviour is unchanged.
+       policy        - ordering and rules come from the linked RoutingPolicy. */
+  "routing_mode": "none",
   "cache": { "mode": "respect|force|disable", "ttl_s": 3600 },
   "guardrails": {
     /* Both fail-open flags default false (fail-closed). Flip to true per
@@ -261,19 +277,33 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
      error code = vk_rate_limit_exceeded. TPM deferred to v1.1 (requires
      Redis-coordinated cluster-wide counters; pre-request token count is
      an estimate too imprecise for a hard cap). */
+  /* `scope_id` is the bucket spend accumulates under, which is the budget's
+     target for every scope except "group". `provider_key` is orthogonal to
+     the scope: null counts every dispatch, set counts and constrains only
+     dispatches to that ModelProvider id. See §4.6 for how a filtered budget
+     is enforced. */
   "budgets": [
     {
-      "scope": "virtual_key", "scope_id": "vk_01HZ...",
+      "scope": "virtual_key", "scope_id": "vk_01HZ...", "provider_key": null,
       "window": "day", "limit_usd": 25.00,
       "spent_usd": 4.12, "remaining_usd": 20.88, "resets_at": "2026-04-19T00:00:00Z",
       "on_breach": "block"
     },
-    { "scope": "project", "scope_id": "proj_01HZ...", "window": "month", "limit_usd": 1000.00,
+    { "scope": "project", "scope_id": "proj_01HZ...", "provider_key": "mp_01HZ...",
+      "window": "month", "limit_usd": 1000.00,
       "spent_usd": 437.55, "remaining_usd": 562.45, "resets_at": "2026-05-01T00:00:00Z",
       "on_breach": "block" },
-    { "scope": "team", "scope_id": "team_01HZ...", "window": "month", "limit_usd": 5000.00,
+    { "scope": "team", "scope_id": "team_01HZ...", "provider_key": null,
+      "window": "month", "limit_usd": 5000.00,
       "spent_usd": 3210.00, "remaining_usd": 1790.00, "resets_at": "2026-05-01T00:00:00Z",
-      "on_breach": "warn" }
+      "on_breach": "warn" },
+    /* A group budget is per member: one budget row materialises one
+       bucket per member, so `scope_id` is `<groupId>:<userId>` and
+       `principal_id` names the member. Two members never share a pot. */
+    { "scope": "group", "scope_id": "grp_01HZ...:user_01HZ...", "principal_id": "user_01HZ...",
+      "provider_key": null, "window": "month", "limit_usd": 50.00,
+      "spent_usd": 12.40, "remaining_usd": 37.60, "resets_at": "2026-05-01T00:00:00Z",
+      "on_breach": "block" }
   ],
   "metadata": { "label": "dev/codex", "tags": ["coding-cli"], "created_by": "user_01HZ..." }
 }
@@ -351,9 +381,14 @@ the OTel trace the gateway already emits for every request. The flow:
    cost from the pricing catalog (matching on `gen_ai.request.model` +
    per-project custom costs) and stamps it onto the span.
 3. The `gatewayBudgetSync` reactor reads the enriched span, resolves the
-   applicable budgets (VK, project, team, org, principal scopes), and
-   writes one row per applicable budget to the ClickHouse table
+   applicable budgets (VK, project, team, org, principal and group
+   scopes), and writes one row per applicable budget to the ClickHouse table
    `gateway_budget_ledger_events`, keyed by `(TenantId, BudgetId, GatewayRequestId)`.
+   Each row stamps `ProviderKey`, the provider the request was dispatched
+   to, read from `langwatch.model_provider_id` on the span. A budget with a
+   provider filter is only debited when that provider matches; a dispatch
+   with no reported provider debits unfiltered budgets only, because
+   attributing it to a named provider would be a guess.
 4. A `gateway_budget_scope_totals_mv` AggregatingMergeTree materialised view
    aggregates `sumState(AmountUSD)` per `(scope, scope_id, window, period_start)`.
 5. `/budget/check` reads `finalizeAggregation(sumMerge(SpendUSD))` against the
@@ -367,6 +402,81 @@ or 24h window is required.
 The Postgres `GatewayBudgetLedger` table is deprecated — the schema remains
 for rollback safety but no code writes to it. `GatewayBudget` (the budget
 *definition*) stays authoritative for limits/windows/on_breach.
+
+**Buckets.** The ledger accumulates by `(Scope, ScopeId)`, so anything that
+must accrue separately is separate in `ScopeId`:
+
+| Budget | `ScopeId` written |
+|---|---|
+| Plain | the target id |
+| Provider-filtered | `<targetId>\|provider:<modelProviderId>` |
+| Group (per member) | `<groupId>:<userId>` |
+| Group, provider-filtered | `<groupId>:<userId>\|provider:<modelProviderId>` |
+
+Two budgets on the same target, one counting everything and one counting one
+provider, would otherwise share a bucket and each report the other's spend.
+The control plane computes these keys in `budgetResolution.service.ts`; the
+gateway does not need to construct them, it receives them as `scope_id`.
+
+**Group (GROUP-scoped) budgets require the ClickHouse spend path.** On deploys
+without ClickHouse, `budget.check` falls back to the single Postgres
+`GatewayBudget.spentUsd` column, one running figure per budget row. Per-member
+buckets cannot be represented there: the fallback would enforce each member
+against the whole group's combined spend. `GatewayBudgetService.create`
+therefore refuses GROUP budgets with `group_budget_requires_clickhouse` when
+no ClickHouse spend repository is wired (the same detection `check()` uses to
+pick ClickHouse over the Postgres fallback). The other scope types keep
+working on the fallback because their bucket is the budget row itself.
+
+**Every key must resolve a trace project.** Spend accrual is fed by the trace
+fold above, so a key whose traces land nowhere accrues nothing against ANY
+budget, org-wide caps included. VK create/update refuse org/team-owned keys
+with no resolvable trace project (`trace_project_required`); project-owned and
+personal keys resolve one structurally, and org/team keys resolve the org's
+governance project when it exists. A null `project_id` can still appear in
+bundles for keys that predate the rule; the gateway skips span export for
+those, which is exactly the hole the refusal stops new keys from entering.
+
+**What key spend is read from.** Per-key spend shown to users (the keys
+table's "Spent this month" column and the Usage tab) is NOT read from this
+ledger. The ledger is per budget: it holds nothing for a key nobody capped,
+and one row per budget for a key covered several times. Those surfaces read
+`trace_summaries`, the enriched per-trace cost, keyed on
+`langwatch.virtual_key_id`, deduped per trace. The ledger remains the source
+for budget enforcement and for a budget's own debit list.
+
+### 4.6 Provider-filtered budget enforcement
+
+A budget with `provider_key` set constrains one vendor, not the request. At
+check time (the Budget interceptor runs after Resolve, so the candidate
+providers are known):
+
+- A breached provider-filtered budget removes that provider from the
+  candidate chain, exactly like provider unavailability.
+- If candidates remain, the request is served by one of them and no
+  budget error is returned. The exhausted filtered budget still rides
+  `X-LangWatch-Budget-Warning` (provider-qualified, §5) so the caller
+  hears why the routing changed.
+- If the chain empties, the request is blocked with `budget_exceeded`,
+  naming the budget that emptied it.
+- With `routing_mode: "none"` the chain is length one, so this degenerates
+  to a plain block.
+
+Unfiltered budgets are unchanged: a breach blocks the request outright.
+
+Every `budget_exceeded` envelope names its budget in `error.meta`:
+`budget_id`, `budget_scope`, `budget_window`, plus `budget_provider` (the
+ModelProvider id) when the block came from a provider-filtered budget
+emptying the chain. The message states the scope and window in words, so an
+agent client rendering only `message` still tells the user which allowance
+to raise.
+
+Two enforcement guarantees are the gateway's own, independent of what the
+control plane materialises (defense in depth against a stale or hand-crafted
+bundle): a request can never dispatch to a provider outside
+`providers_allowed`, even when the credential chain still carries one, and
+`routing_mode: "none"` pins the attempt budget to 1 at bundle decode even if
+`fallback.max_attempts` disagrees.
 
 ### 4.6 `POST /api/internal/gateway/guardrail/check`
 
@@ -461,7 +571,7 @@ All errors OpenAI-compatible:
 - `X-LangWatch-Model: gpt-5-mini` — resolved provider model.
 - `X-LangWatch-Cache: hit|miss|bypass|force` — cache outcome as observed by the gateway. (`force` is v1.1 — deferred with 400 cache_override_not_implemented in v1; header value matches the internal `Kind` enum in `services/gateway/internal/cacheoverride`.)
 - `X-LangWatch-Cache-Mode: respect|disable` — echoes the cache-override mode that was applied to the request (independent of upstream outcome). Emitted on every `/v1/messages` response.
-- `X-LangWatch-Budget-Warning: <scope>:<pct>` — optional, emitted on soft-cap breaches (can repeat).
+- `X-LangWatch-Budget-Warning: <scope>:<pct>`: optional, emitted on soft-cap breaches (can repeat). A provider-filtered budget qualifies the scope segment as `<scope>/<model_provider_id>` (e.g. `project/mp_01HZ:95`) so the warning names WHICH budget is running out; the percentage always sits after the only colon, so `split(":")` keeps parsing.
 - `X-LangWatch-Fallback-Count: <n>` — number of fallbacks attempted before success (0 when primary succeeded).
 
 ---
@@ -717,3 +827,4 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
   2. **Cache-rules full stack (§6 extended)** — Lane B iter 38 (2ef1dbd42): `GatewayCacheRule` PG model + service + tRPC + RBAC + audit + multitenancy exemption. Lane B iter 39 (bb9c8ebe8): `config.materialiser.bundleFor(orgId)` emits cache-rules into the VK bundle pre-sorted priority DESC, enabled=true, archived=null. Lane B iter 40 (73552f964): `/gateway/cache-rules` list + create/edit drawers + matcher summary + colour-coded action badges + precedence copy + inline enable toggle + archive from row menu. Matcher shape `{vk_id?, vk_tags?, vk_prefix?, principal_id?, model?, request_metadata?}` + action shape `{mode: respect|force|disable, ttl?, salt?}` wire-locked. `GatewayChangeEvent` emits on every write so /changes long-poll triggers bundle refresh ≤30s. BDD spec `cache-control-rules.feature` §§1–7 cover precedence / matchers / actions / hot-path / observability / RBAC / UI — 29 scenarios total. Go evaluator (`internal/cacherules/eval.go`) still in Lane A's queue; when it lands it reads `bundle.cache_rules` linearly → first-match-wins → emits `langwatch.cache.rule_id` + `gateway_cache_rule_hits_total` per spec §5.
   3. **Helm chart lw-dev smoke (§11 self-hosting)** — Lane A iter 44: ECR push + `helm upgrade --install gateway-smoke ./charts/gateway` on lw-dev EKS; pod Running, /healthz 200 with `X-LangWatch-Gateway-Version` + `X-LangWatch-Request-Id` headers present. /readyz 503 is expected until the langwatch-app Deployment gets `LW_GATEWAY_INTERNAL_SECRET` via local `terraform apply` on lw-dev (mirroring the `infra-env-development.yaml` CI pipeline). rchaves clarification logged: validate-on-lw-dev-before-merge, prod apply stays CI-only via saas PR merge.
   - No wire contract changes on §§3–5 (VK format, auth, endpoints, /api/internal/gateway/*). Permission names updated: §9 RBAC adds `gatewayCacheRules` resource with `:view / :create / :update / :delete / :manage` (default MEMBER = view-only; ADMIN = full CRUD + :manage).
+- **v0.1.5 (2026-07-27)** Gateway enforcement for budgets on every dimension (Wave 2 of the n x n budgets work; bundle fields landed in Wave 1). §4.6 is now live in the Go gateway: a breached provider-filtered blocking budget removes its provider from the candidate chain at dispatch, an emptied chain blocks with `budget_exceeded` naming the budget (`error.meta.budget_id` / `budget_scope` / `budget_window` / `budget_provider`), and the exhausted vendor rides the §5 warning header with a provider-qualified scope segment (`<scope>/<model_provider_id>:<pct>`). The gateway stamps `langwatch.model_provider_id` (ModelProvider row id of the dispatched credential) on every customer span, which is what lets §4.5 step 3 attribute debits to provider-filtered buckets. Defense in depth added gateway-side: dispatch refuses providers outside `providers_allowed` even when a stale bundle chain still carries them, and `routing_mode: "none"` re-pins `max_attempts` to 1 at bundle decode. GROUP buckets enforce as materialised (one per member, principal resolved by the control plane); no gateway-side bucket construction. Contract tests in `services/aigateway/adapters/controlplane/budgets_contract_test.go` pin both sides of the bundle fields, the bucket separators, and the span attribute read path.

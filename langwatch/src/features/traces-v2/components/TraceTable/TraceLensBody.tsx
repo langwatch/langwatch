@@ -87,7 +87,6 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   const sortFromStore = useViewStore((s) => s.sort);
   const setSortInStore = useViewStore((s) => s.setSort);
   const setVisibleColumns = useViewStore((s) => s.setVisibleColumns);
-  const resetPagination = useFilterStore((s) => s.resetPagination);
 
   const sizingKey = getColumnSizingKey(lens.id, "trace");
   const persistedSizing = useColumnSizingStore(
@@ -117,6 +116,9 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     [sortFromStore],
   );
 
+  // Dropping the keyset cursors is `setSort`'s own job — a cursor is only
+  // valid for the column that minted it, and that invariant has to hold for
+  // every path into a new sort, not just this header click.
   const handleSortingChange = useCallback(
     (updater: Updater<SortingState>) => {
       const next = typeof updater === "function" ? updater(sorting) : updater;
@@ -126,9 +128,8 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
         columnId: first.id,
         direction: first.desc ? "desc" : "asc",
       });
-      resetPagination();
     },
-    [sorting, setSortInStore, resetPagination],
+    [sorting, setSortInStore],
   );
 
   // Surface `columnOrder` as explicit Tanstack state. Without it,

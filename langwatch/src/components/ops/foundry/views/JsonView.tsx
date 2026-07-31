@@ -1,12 +1,12 @@
 import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
 import type { Monaco } from "@monaco-editor/react";
-import dynamic from "~/utils/compat/next-dynamic";
+import { Check, Copy, RotateCcw, WrapText } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { Copy, Check, RotateCcw, WrapText } from "lucide-react";
-import { useTraceStore } from "../traceStore";
 import { useColorMode } from "~/components/ui/color-mode";
-import { traceConfigJsonSchema } from "./traceConfigSchema";
+import dynamic from "~/utils/compat/next-dynamic";
+import { useTraceStore } from "../traceStore";
 import type { SpanConfig } from "../types";
+import { traceConfigJsonSchema } from "./traceConfigSchema";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -30,10 +30,7 @@ export function JsonView() {
   const [parseError, setParseError] = useState<string | null>(null);
   const editorRef = useRef<{ getValue: () => string } | null>(null);
 
-  const jsonString = useMemo(
-    () => JSON.stringify(trace, null, 2),
-    [trace],
-  );
+  const jsonString = useMemo(() => JSON.stringify(trace, null, 2), [trace]);
 
   const spanCount = useMemo(() => countSpans(trace.spans), [trace.spans]);
   const lineCount = jsonString.split("\n").length;
@@ -98,13 +95,23 @@ export function JsonView() {
           )}
         </HStack>
         <HStack gap={1}>
-          <Button size="2xs" variant="ghost" onClick={handleFormat} title="Format">
+          <Button
+            size="2xs"
+            variant="ghost"
+            onClick={handleFormat}
+            title="Format"
+          >
             <WrapText size={12} />
           </Button>
           <Button size="2xs" variant="ghost" onClick={handleCopy} title="Copy">
             {copied ? <Check size={12} /> : <Copy size={12} />}
           </Button>
-          <Button size="2xs" variant="ghost" onClick={resetTrace} title="Reset to default">
+          <Button
+            size="2xs"
+            variant="ghost"
+            onClick={resetTrace}
+            title="Reset to default"
+          >
             <RotateCcw size={12} />
           </Button>
         </HStack>

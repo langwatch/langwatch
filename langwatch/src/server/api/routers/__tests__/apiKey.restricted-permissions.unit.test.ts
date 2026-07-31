@@ -33,9 +33,10 @@ vi.mock("~/server/rbac/role-binding-resolver", () => ({
 }));
 
 vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("~/server/rbac/custom-role-permissions")
-  >();
+  const actual =
+    await importOriginal<
+      typeof import("~/server/rbac/custom-role-permissions")
+    >();
   return {
     ...actual,
     parseCustomRolePermissions: vi
@@ -102,8 +103,8 @@ function buildMockPrisma() {
   };
 
   return {
-    $transaction: vi.fn(
-      (fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx),
+    $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) =>
+      fn(mockTx),
     ),
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),

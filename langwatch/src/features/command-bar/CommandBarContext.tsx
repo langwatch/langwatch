@@ -17,7 +17,7 @@ interface CommandBarContextValue {
 }
 
 export const CommandBarContext = createContext<CommandBarContextValue | null>(
-  null
+  null,
 );
 
 export function useCommandBar() {

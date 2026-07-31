@@ -23,11 +23,12 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
-import {
-  S3PollingPullerAdapter,
-  type S3PollingConfig,
-} from "./s3PollingPullerAdapter";
+
 import type { PullResult, PullRunOptions } from "./pullerAdapter";
+import {
+  type S3PollingConfig,
+  S3PollingPullerAdapter,
+} from "./s3PollingPullerAdapter";
 
 /**
  * Locked reference config for OpenAI's enterprise compliance dump.

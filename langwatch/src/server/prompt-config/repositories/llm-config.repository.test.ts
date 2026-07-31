@@ -39,7 +39,7 @@ describe("LlmConfigRepository", () => {
   });
 
   describe("getAllWithLatestVersion", () => {
-    it("should return valid configs with latest versions", async () => {
+    it("returns valid configs with latest versions", async () => {
       // Arrange
       const projectId = "test-project";
       const organizationId = "test-organization";
@@ -68,7 +68,7 @@ describe("LlmConfigRepository", () => {
       expect(result[0]?.latestVersion).toBeDefined();
     });
 
-    it("should filter out configs with invalid versions", async () => {
+    it("filters out configs with invalid versions", async () => {
       // Arrange
       const projectId = "test-project";
       const organizationId = "test-organization";
@@ -103,7 +103,7 @@ describe("LlmConfigRepository", () => {
       expect(result[0]?.id).toBe(mockConfigs[1]?.id);
     });
 
-    it("should filter out configs with no versions", async () => {
+    it("filters out configs with no versions", async () => {
       // Arrange
       const projectId = "test-project";
       const organizationId = "test-organization";

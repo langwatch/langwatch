@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DestinationTeamNotFoundError,
   ProjectNotFoundError,
@@ -44,7 +44,9 @@ describe("ProjectService.update", () => {
       /** @scenario ProjectService.update changes teamId with same-org validation */
       /** @scenario tRPC project.update accepts optional teamId */
       it("updates the project with new teamId", async () => {
-        vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({ id: "t2" });
+        vi.mocked(repo.findActiveTeamInOrganization).mockResolvedValue({
+          id: "t2",
+        });
         const fakeProject = { id: "p1", name: "Bot", teamId: "t2" };
         vi.mocked(repo.update).mockResolvedValue(fakeProject as any);
 

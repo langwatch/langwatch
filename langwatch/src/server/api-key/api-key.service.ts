@@ -13,9 +13,15 @@ import {
   permissionFormatSchema,
 } from "~/server/rbac/custom-role-permissions";
 import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
-import { CUSTOM_ROLE_KIND, RoleRepository } from "~/server/role/repositories/role.repository";
+import {
+  CUSTOM_ROLE_KIND,
+  RoleRepository,
+} from "~/server/role/repositories/role.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { ApiKeyRepository, type ApiKeyWithBindings } from "./api-key.repository";
+import {
+  ApiKeyRepository,
+  type ApiKeyWithBindings,
+} from "./api-key.repository";
 import {
   generateApiKeyToken,
   hashSecret,
@@ -56,10 +62,6 @@ type RoleBindingBase = {
 type RoleBindingInput =
   | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
   | (RoleBindingBase & { role: "CUSTOM"; customRoleId?: string });
-
-type ResolvedRoleBinding =
-  | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
-  | (RoleBindingBase & { role: "CUSTOM"; customRoleId: string });
 
 type CreatorScope =
   | { type: "org"; id: string }
@@ -146,7 +148,9 @@ export class ApiKeyService {
       throw new ApiKeyReservedNameError(name);
     }
 
-    const hasCustomBinding = bindings.some((b) => b.role === TeamUserRole.CUSTOM);
+    const hasCustomBinding = bindings.some(
+      (b) => b.role === TeamUserRole.CUSTOM,
+    );
     const hasPermissions = !!permissions && permissions.length > 0;
     const isRestricted = permissionMode === "restricted";
 
@@ -189,11 +193,13 @@ export class ApiKeyService {
     // headless automation keys that need full org access.
     let effectiveBindings = bindings;
     if (!userId && effectiveBindings.length === 0) {
-      effectiveBindings = [{
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: organizationId,
-      }];
+      effectiveBindings = [
+        {
+          role: "ADMIN",
+          scopeType: "ORGANIZATION",
+          scopeId: organizationId,
+        },
+      ];
     }
 
     // Ingestion-only keys (identified by ingestSourceType) carry the ik-lw-
@@ -314,7 +320,8 @@ export class ApiKeyService {
 
     if (existing.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
-    const updateHasCustomBinding = bindings?.some((b) => b.role === TeamUserRole.CUSTOM) ?? false;
+    const updateHasCustomBinding =
+      bindings?.some((b) => b.role === TeamUserRole.CUSTOM) ?? false;
     const updateHasPermissions = !!permissions && permissions.length > 0;
     const updateIsRestricted = permissionMode === "restricted";
 
@@ -422,7 +429,10 @@ export class ApiKeyService {
 
         const newCustomRoleIds = new Set(
           effectiveBindings
-            .filter((b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> => b.role === "CUSTOM")
+            .filter(
+              (b): b is Extract<RoleBindingInput, { role: "CUSTOM" }> =>
+                b.role === "CUSTOM",
+            )
             .map((b) => b.customRoleId)
             .filter((cid): cid is string => !!cid),
         );
@@ -453,7 +463,10 @@ export class ApiKeyService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const orgUser = await this.repo.findOrgMembership({ userId, organizationId });
+    const orgUser = await this.repo.findOrgMembership({
+      userId,
+      organizationId,
+    });
     if (!orgUser) {
       throw new ApiKeyScopeViolationError("Not a member of this organization", {
         meta: { userId, organizationId },
@@ -503,7 +516,9 @@ export class ApiKeyService {
             customRoleId: binding.customRoleId,
           });
         } else {
-          throw new ApiKeyScopeViolationError("CUSTOM role requires a customRoleId");
+          throw new ApiKeyScopeViolationError(
+            "CUSTOM role requires a customRoleId",
+          );
         }
       } else {
         await this.assertBuiltinRoleWithinCeiling({
@@ -579,7 +594,10 @@ export class ApiKeyService {
     scope: CreatorScope;
     customRoleId: string;
   }): Promise<void> {
-    const customRole = await this.roleRepo.findByIdInOrg(customRoleId, organizationId);
+    const customRole = await this.roleRepo.findByIdInOrg(
+      customRoleId,
+      organizationId,
+    );
     if (!customRole) {
       throw new ApiKeyScopeViolationError(
         `Custom role ${customRoleId} not found`,
@@ -750,9 +768,13 @@ export class ApiKeyService {
     const isOrgScope = scope.type === "org";
     const representativePermission: Permission =
       role === TeamUserRole.ADMIN
-        ? (isOrgScope ? "organization:manage" : "project:manage")
+        ? isOrgScope
+          ? "organization:manage"
+          : "project:manage"
         : role === TeamUserRole.MEMBER
-          ? (isOrgScope ? "organization:view" : "project:update")
+          ? isOrgScope
+            ? "organization:view"
+            : "project:update"
           : "project:view";
 
     const userHasPermission = await checkRoleBindingPermission({
@@ -813,12 +835,14 @@ export class ApiKeyService {
     // Auto-upgrade legacy SHA-256 hashes to HMAC-SHA256 (fire-and-forget)
     if (result === "match_legacy") {
       const upgraded = hashSecret(parts.secret);
-      this.repo.upgradeHash({ id: apiKey.id, hashedSecret: upgraded }).catch((err: unknown) => {
-        logger.warn(
-          { err, apiKeyId: apiKey.id },
-          "failed to upgrade legacy hash to HMAC (fire-and-forget)",
-        );
-      });
+      this.repo
+        .upgradeHash({ id: apiKey.id, hashedSecret: upgraded })
+        .catch((err: unknown) => {
+          logger.warn(
+            { err, apiKeyId: apiKey.id },
+            "failed to upgrade legacy hash to HMAC (fire-and-forget)",
+          );
+        });
     }
 
     return apiKey;
@@ -924,7 +948,10 @@ export class ApiKeyService {
     userId: string;
     organizationId: string;
   }): Promise<boolean> {
-    const binding = await this.repo.findOrgAdminBinding({ userId, organizationId });
+    const binding = await this.repo.findOrgAdminBinding({
+      userId,
+      organizationId,
+    });
     return !!binding;
   }
 
@@ -933,6 +960,26 @@ export class ApiKeyService {
    */
   async getById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.repo.findById({ id });
+  }
+
+  /**
+   * Resolve one key id to its display name, within an organization. Returns
+   * null for an id that belongs to another organization or does not exist, so
+   * the two are indistinguishable to the caller.
+   *
+   * A revoked key still resolves: the trace it authorized is still readable,
+   * and naming the key that produced it is the whole point.
+   */
+  async getNameByIdInOrg({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ name: string; revoked: boolean } | null> {
+    const row = await this.repo.findNameByIdInOrg({ id, organizationId });
+    if (!row) return null;
+    return { name: row.name, revoked: row.revokedAt !== null };
   }
 
   async getUserBindings({
@@ -1002,11 +1049,7 @@ export class ApiKeyService {
     };
   }
 
-  async enrichApiKeyList({
-    apiKeys,
-  }: {
-    apiKeys: ApiKeyWithBindings[];
-  }) {
+  async enrichApiKeyList({ apiKeys }: { apiKeys: ApiKeyWithBindings[] }) {
     const customRoleIds = new Set<string>();
     const userIds = new Set<string>();
     for (const k of apiKeys) {

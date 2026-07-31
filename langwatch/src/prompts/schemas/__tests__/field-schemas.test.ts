@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  responseFormatSchema,
-  outputsSchema,
   deriveResponseFormatFromOutputs,
+  outputsSchema,
+  responseFormatSchema,
 } from "../field-schemas";
 
 describe("responseFormatSchema", () => {
@@ -180,18 +180,14 @@ describe("deriveResponseFormatFromOutputs", () => {
   });
 
   it("returns undefined when no output has json_schema type", () => {
-    const outputs = [
-      { identifier: "output", type: "str" as const },
-    ];
+    const outputs = [{ identifier: "output", type: "str" as const }];
 
     const result = deriveResponseFormatFromOutputs(outputs);
     expect(result).toBeUndefined();
   });
 
   it("returns undefined when json_schema output has no json_schema field", () => {
-    const outputs = [
-      { identifier: "output", type: "json_schema" as const },
-    ];
+    const outputs = [{ identifier: "output", type: "json_schema" as const }];
 
     const result = deriveResponseFormatFromOutputs(outputs);
     expect(result).toBeUndefined();

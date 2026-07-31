@@ -2,14 +2,14 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import {
-  RequestValidationError,
-  validator as zValidator,
-} from "~/server/api/validation";
 import { z } from "zod";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
+import {
+  RequestValidationError,
+  validator as zValidator,
+} from "~/server/api/validation";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,

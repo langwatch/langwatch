@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
   ScheduledJobRecord,
@@ -263,7 +265,11 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     });
   }
 
-  async listForOps({ limit }: { limit: number }): Promise<ScheduledJobRecord[]> {
+  async listForOps({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<ScheduledJobRecord[]> {
     // Cross-tenant operator read (all projects): active jobs first, then by
     // soonest next fire. The `-- @tenancy:` marker is the guard's sanctioned
     // opt-out for a system-owned cross-tenant view (read-only, never fires).

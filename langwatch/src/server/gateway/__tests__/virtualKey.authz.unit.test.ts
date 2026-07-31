@@ -8,7 +8,11 @@ import {
   type Scope,
 } from "../virtualKey.authz";
 
-vi.mock("~/server/api/rbac", () => ({
+// Partial mock: the authz module also (transitively) pulls in the
+// role-binding resolver for API-key actors, which reads real exports like
+// `Resources` from this module at init time.
+vi.mock("~/server/api/rbac", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/api/rbac")>()),
   hasOrganizationPermission: vi.fn(),
   hasTeamPermission: vi.fn(),
   hasProjectPermission: vi.fn(),
@@ -61,7 +65,9 @@ describe("assertCanManageAllScopes", () => {
   describe("when the caller lacks manage on one of the requested scopes", () => {
     it("throws FORBIDDEN naming the unauthorized scope", async () => {
       // manage on platform, not on data-sci
-      teamPerm.mockImplementation(async (_ctx, scopeId) => scopeId === "team_platform");
+      teamPerm.mockImplementation(
+        async (_ctx, scopeId) => scopeId === "team_platform",
+      );
       await expect(
         assertCanManageAllScopes(ctx, [TEAM_PLATFORM, TEAM_DATA_SCI]),
       ).rejects.toMatchObject({
@@ -88,9 +94,9 @@ describe("assertCanManageAllScopes", () => {
   describe("when there is no session", () => {
     it("throws FORBIDDEN without consulting the rbac helpers", async () => {
       const anon = { prisma: ctx.prisma, session: null };
-      await expect(
-        assertCanManageAllScopes(anon, [ORG]),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(assertCanManageAllScopes(anon, [ORG])).rejects.toMatchObject(
+        { code: "FORBIDDEN" },
+      );
       expect(orgPerm).not.toHaveBeenCalled();
     });
   });

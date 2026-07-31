@@ -48,9 +48,12 @@ describe("<ScenarioTabConnectedBadge/>", () => {
 
   /** @scenario "A connected tab quietly shows that it is linked to local runs" */
   it("renders nothing for a tab the user opened themselves", () => {
-    const { container } = render(<ScenarioTabConnectedBadge visible={false} />, {
-      wrapper: Wrapper,
-    });
+    const { container } = render(
+      <ScenarioTabConnectedBadge visible={false} />,
+      {
+        wrapper: Wrapper,
+      },
+    );
 
     expect(container).toBeEmptyDOMElement();
   });

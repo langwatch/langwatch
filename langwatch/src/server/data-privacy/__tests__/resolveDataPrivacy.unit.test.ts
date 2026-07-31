@@ -315,3 +315,29 @@ describe("resolveDataPrivacy", () => {
     });
   });
 });
+
+describe("resolveDataPrivacy PII exception patterns", () => {
+  /** @scenario Exception patterns union down the cascade */
+  it("unions exceptions across the chain while the level stays first-set-wins", () => {
+    const resolved = resolveDataPrivacy({
+      rows: [
+        rule("ORGANIZATION", "acme", {
+          pii: { level: "essential", exceptPatterns: ["00\\d{12}"] },
+        }),
+        rule("PROJECT", "web-app", {
+          pii: { level: "strict", exceptPatterns: ["orders@acme\\.example"] },
+        }),
+      ],
+      facts: teamProject,
+    });
+    expect(resolved.pii.level).toBe("strict");
+    expect(resolved.pii.exceptPatterns.sort()).toEqual(
+      ["00\\d{12}", "orders@acme\\.example"].sort(),
+    );
+  });
+
+  it("resolves to no exceptions when no rule sets any", () => {
+    const resolved = resolveDataPrivacy({ rows: [], facts: teamProject });
+    expect(resolved.pii.exceptPatterns).toEqual([]);
+  });
+});

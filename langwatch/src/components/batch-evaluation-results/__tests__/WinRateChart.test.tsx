@@ -19,9 +19,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { WinRateChart } from "../WinRateChart";
 import type { BatchComparisonColumn } from "../types";
+import { WinRateChart } from "../WinRateChart";
 
 vi.mock("recharts", () => {
   const MockComponent = ({ children }: { children?: React.ReactNode }) =>

@@ -27,11 +27,11 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../types";
+import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
 import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../utils/fieldMappingConverters";
-import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
 import { toComparisonConfig } from "../utils/normalizeComparison";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
@@ -419,7 +419,8 @@ export const useOpenTargetEditor = () => {
         // onMappingChange is registered here (durable) instead of inside mappingsConfig
         // (ephemeral complexProps) so it survives in-app drawer navigation and
         // ErrorBoundary remounts (not hard browser reloads — those clear all state).
-        setFlowCallbacks("evaluatorEditor",
+        setFlowCallbacks(
+          "evaluatorEditor",
           createEvaluatorEditorCallbacks({
             targetId: target.id,
             updateTarget,

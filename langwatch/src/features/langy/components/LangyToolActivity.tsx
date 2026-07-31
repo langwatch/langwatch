@@ -34,6 +34,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { parseCliJson, readCliErrorDocument } from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
@@ -61,7 +62,6 @@ import {
   resolveCapability,
   resolveCapabilityProgress,
 } from "./capabilities/capabilityRegistry";
-import { collectionOf } from "./capabilities/cliResultDocument";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import {
   type CapabilityToolCall,
@@ -217,23 +217,144 @@ function partToCall(part: ToolPartLike, name: string): CapabilityToolCall {
 }
 
 /**
- * Some CLI adapters finish a shell call with `output-available` even when the
- * command itself reported a handled failure. Treat the rendered CLI failure as
- * the source of truth: it must never receive the green capability receipt.
+ * A line that ANNOUNCES a failure — anchored to the start of one on purpose.
+ *
+ * The markers used to be matched anywhere in the payload, which made the phrase
+ * enough: a SUCCESSFUL `bash` whose stdout merely mentioned it — `grep -rn
+ * "failed to" src/`, a tailed log, a test-runner summary — drew a red error
+ * card AND was dropped from the activity groups, so a step that worked was
+ * reported broken and never appeared in the completed receipt. The CLI prints
+ * its own failures at the head of a line; a line that only QUOTES one does not.
+ *
+ * Anchoring narrowed that; it did not close it, because a tailed log prints its
+ * own lines at the head of a line too. So this only ever runs against the CLI's
+ * own console — see {@link cliConsoleTextOf}.
+ */
+const CLI_FAILURE_LINE =
+  /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)/im;
+
+/** The raw text an output carries, bare or in the `{ text }` envelope. */
+function outputText(output: unknown): string | undefined {
+  if (typeof output === "string") return output;
+  if (!output || typeof output !== "object" || !("text" in output)) {
+    return undefined;
+  }
+  const text = (output as { text?: unknown }).text;
+  return typeof text === "string" ? text : undefined;
+}
+
+/**
+ * The CONSOLE of a call that came through the CLI ENVELOPE — the
+ * `{ kind: "text", text }` result. `null` for anything else, and that is the
+ * whole point of the function.
+ *
+ * Takes the ALREADY-PARSED document rather than the part: the envelope travels
+ * as a JSON string, and the caller has to parse that string anyway to look for
+ * a handled-failure document. Re-parsing it here meant a second full
+ * balanced-brace scan of every multi-KB CLI result, per failing part, on every
+ * uncached read.
+ *
+ * Unwrapping is what makes line anchoring mean anything: inside that JSON
+ * string every newline is an escaped `\n`, so the whole console reads as one
+ * line and no marker is ever at the start of it.
+ *
+ * Returning `null` rather than the raw string is what keeps prose sniffing off
+ * an ordinary shell call. `bash("tail -n 20 /var/log/app.log")` exits 0, its
+ * stdout is not JSON, and the server's envelope passes a non-LangWatch command
+ * through untouched (`langy-cli-envelope.service.ts` — it only wraps output as
+ * `{kind:"text"}` for a parsed `langwatch …` invocation). So the only thing
+ * behind that call is a wall of somebody else's log lines, and "failed to
+ * connect to redis, retrying" in it is a fact ABOUT the log, never a report
+ * about the command. Reading it drew a red error card for a step that worked
+ * and dropped that step from the completed receipt.
+ */
+function cliConsoleTextOf(document: unknown): string | null {
+  if (!document || typeof document !== "object" || Array.isArray(document)) {
+    return null;
+  }
+  const envelope = document as { kind?: unknown; text?: unknown };
+  return envelope.kind === "text" && typeof envelope.text === "string"
+    ? envelope.text
+    : null;
+}
+
+/**
+ * Some CLI adapters finish a call with `output-available` even when the command
+ * itself reported a handled failure. Treat the rendered CLI failure as the
+ * source of truth: it must never receive the green capability receipt.
+ *
+ * Structure first, prose second, and prose ONLY inside the CLI envelope.
+ * `ok: false` is the CLI contract's own discriminant (see
+ * `readCliErrorDocument`), so a handled failure document settles the question
+ * whatever the console noise around it says. When there is no such document we
+ * read the console a line at a time — but only for a call whose console the CLI
+ * actually wrote (see {@link cliConsoleTextOf}); a bare shell call's stdout
+ * belongs to whatever it ran, and gets no vote on whether it succeeded.
  */
 function renderedToolFailure(part: ToolPartLike): boolean {
   if (FAILED_STATES.has(part.state ?? "")) return true;
-  const value = part.output;
-  const text =
-    typeof value === "string"
-      ? value
-      : value && typeof value === "object" && "text" in value
-        ? (value as { text?: unknown }).text
-        : undefined;
-  return (
-    typeof text === "string" &&
-    /(?:✖|failed to|request failed|self_signed_cert_in_chain)/i.test(text)
-  );
+
+  const raw = part.output;
+  const text = outputText(raw);
+  const document = text !== undefined ? parseCliJson(text) : raw;
+  if (readCliErrorDocument(document)) return true;
+
+  // ONE parse, read twice. An output that IS the JSON string has already been
+  // parsed into `document`, and that parse is the envelope the console read
+  // wants; an output that is already an object IS the envelope, and `document`
+  // is the parse of the text it carries — which is where a nested handled
+  // failure hides, and not the envelope at all.
+  const envelope = typeof raw === "string" ? document : raw;
+  const consoleText = cliConsoleTextOf(envelope);
+  if (consoleText === null) return false;
+  return CLI_FAILURE_LINE.test(consoleText);
+}
+
+/**
+ * Memoise a parts reader on the array it read.
+ *
+ * The four readers below are most of the cost of drawing a turn, and every one
+ * of them walks the SAME parts at least twice per render: MessageContent asks
+ * `hasLangyActivity` whether there is anything to draw, then LangyActivityParts
+ * asks each reader again to draw it. Per walk, `hasCapabilityCard` JSON-parses
+ * and schema-validates each CLI document, so a turn carrying a dozen multi-KB
+ * results paid for dozens of parse-and-validate cycles per render — at streaming
+ * rates, dozens per token.
+ *
+ * Keyed by IDENTITY, which is exactly right here: @ai-sdk/react snapshots the
+ * message (`structuredClone`) on every update, so a parts array never changes
+ * after we have seen it — a new token is a new array, and a new array is a fresh
+ * read. A WeakMap so a conversation's arrays are collected with the messages
+ * that own them.
+ *
+ * INVARIANT: no parts array may be mutated in place. Every producer builds a new
+ * one — the engine's history hydration, the time-travel view, and LangyPlanCard's
+ * per-step subsets alike.
+ *
+ * That invariant is only PARTLY enforceable, and it is worth being honest about
+ * which part. `PartsView.parts` is `readonly unknown[]`, so nothing reached
+ * through this seam — these readers, the components they feed — can push into an
+ * array it has already answered for. What the type cannot reach is a producer
+ * still holding the array as a mutable `unknown[]` before it hands it over; if
+ * one ever pushed there, the WeakMap would keep serving the pre-push answer for
+ * as long as the array lives. The risk is accepted rather than designed away
+ * because the producer set is small, closed and listed above, and because the
+ * one that generates the churn — @ai-sdk/react — cannot mutate by construction:
+ * it `structuredClone`s the message on every update, so each token arrives as a
+ * fresh array. A cache keyed on a deep hash instead would re-walk and re-parse
+ * every CLI document per render, which is the exact cost this exists to remove.
+ */
+function memoizeOnParts<T>(
+  read: (message: PartsView) => T,
+): (message: PartsView) => T {
+  const cache = new WeakMap<readonly unknown[], T>();
+  return (message) => {
+    const cached = cache.get(message.parts);
+    if (cached !== undefined || cache.has(message.parts)) return cached as T;
+    const value = read(message);
+    cache.set(message.parts, value);
+    return value;
+  };
 }
 
 /**
@@ -241,7 +362,9 @@ function renderedToolFailure(part: ToolPartLike): boolean {
  * cards (task #12), in first-seen order. The complement of the activity groups:
  * a call is EITHER a capability card OR an activity line, never both.
  */
-export function toCapabilityCalls(
+export const toCapabilityCalls = memoizeOnParts(readCapabilityCalls);
+
+function readCapabilityCalls(
   message: PartsView,
 ): Array<{ id: string; call: CapabilityToolCall } & Sequenced> {
   const result: Array<{ id: string; call: CapabilityToolCall } & Sequenced> =
@@ -341,7 +464,9 @@ export type PendingCapability = {
  * whole life — pending shell while it runs, settled card once output lands —
  * so it is never demoted to a generic activity line on the way.
  */
-export function toPendingCapabilities(message: PartsView): PendingCapability[] {
+export const toPendingCapabilities = memoizeOnParts(readPendingCapabilities);
+
+function readPendingCapabilities(message: PartsView): PendingCapability[] {
   const pending: PendingCapability[] = [];
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
@@ -377,7 +502,9 @@ export function hasLangyActivity(message: PartsView): boolean {
 }
 
 /** Failed calls are errors, never green "completed" activity rows. */
-export function toFailedToolCalls(message: PartsView): FailedToolCall[] {
+export const toFailedToolCalls = memoizeOnParts(readFailedToolCalls);
+
+function readFailedToolCalls(message: PartsView): FailedToolCall[] {
   const failures: FailedToolCall[] = [];
   message.parts.forEach((rawPart, index) => {
     const part = rawPart as ToolPartLike;
@@ -411,7 +538,9 @@ export function toFailedToolCalls(message: PartsView): FailedToolCall[] {
  * order is preserved; a group is `done` only once every tool call in it has
  * settled, so a group with any in-flight call still reads as pending.
  */
-export function toActivityGroups(message: PartsView): ActivityGroup[] {
+export const toActivityGroups = memoizeOnParts(readActivityGroups);
+
+function readActivityGroups(message: PartsView): ActivityGroup[] {
   const order: string[] = [];
   const byKey = new Map<string, ActivityGroup>();
 
@@ -560,12 +689,12 @@ export function LangyActivityParts({
       order: group.order,
       node: (
         <VStack align="stretch" gap={2} role="list">
-          <ActivityCard group={group} devMode={devMode} />
+          <RunningActivityCard group={group} devMode={devMode} />
         </VStack>
       ),
     })),
     // Finished work has ONE shape, whatever the count. It used to render as a
-    // bare ActivityCard while there was exactly one of it and as the receipt
+    // bare activity card while there was exactly one of it and as the receipt
     // from two onward — so the moment a second action finished, the block the
     // reader was looking at was torn down and replaced by a differently-shaped
     // one. Within a single turn that read as the answer flickering between
@@ -612,7 +741,28 @@ export function LangyActivityParts({
   ].sort((left, right) => left.order - right.order);
 
   return (
-    <VStack align="stretch" gap={2} aria-label="Langy activity">
+    // `role="log"` is what makes this column readable to assistive tech. A
+    // VStack is a plain div, whose implicit role is `generic` — and `aria-label`
+    // is prohibited there, so without a role the name is dropped and the column
+    // is an anonymous stack: a reader who lands on the running indicator or on
+    // the red failure card gets the line but nothing saying what region it came
+    // from, and appended entries go unannounced. `log` (polite by default) is
+    // the right role for a running record whose entries are appended at the
+    // end, which is exactly what a turn's activity is.
+    //
+    // The settled rows below — CompletedActivityBatch, CapabilityBatchRow,
+    // FailedToolCallRow — deliberately carry no live-region attributes: `log`
+    // already announces an appended entry politely, and a nested `role="status"`
+    // on a row that only ever arrives by being appended would make some screen
+    // readers say it twice. So the rule for anything nested in here is: add a
+    // live region only when it earns one independently — because it updates IN
+    // PLACE rather than being appended (LangyCapabilityPendingCard's running
+    // headline, which is also rendered outside this column), or because it is
+    // assertive and announces wherever it sits (LangyToolErrorCard's
+    // `role="alert"`). The status lines beside this column
+    // (StreamingStatusLine, LangyThinkingLine, LangyRecoveringLine) sit OUTSIDE
+    // it, which is why each of those owns its own `role="status"`.
+    <VStack align="stretch" gap={2} role="log" aria-label="Langy activity">
       {rows.map((row) => (
         <Fragment key={row.key}>{row.node}</Fragment>
       ))}
@@ -881,15 +1031,24 @@ function CapabilityBatchRow({
   batch: CapabilityBatch;
   devMode: boolean;
 }) {
+  const isBatched = batch.entries.length > 1;
   const [open, setOpen] = useState(true);
   const userToggled = useRef(false);
+  // Only arm the auto-collapse once this row actually renders the batch UI.
+  // Running it unconditionally drove `open` to false while the row was still a
+  // single card, so the moment a second entry arrived the batch rendered
+  // ALREADY collapsed — hiding both cards the reader was looking at behind a
+  // summary header they never clicked. Keying on `isBatched` also restarts the
+  // timer at the instant the batch appears, which is when the 2.2s reading
+  // window is supposed to begin.
   useEffect(() => {
+    if (!isBatched) return;
     const timer = window.setTimeout(() => {
       if (!userToggled.current) setOpen(false);
     }, 2200);
     return () => window.clearTimeout(timer);
-  }, []);
-  if (batch.entries.length === 1) {
+  }, [isBatched]);
+  if (!isBatched) {
     const entry = batch.entries[0]!;
     return <CapabilityCardRow call={entry.call} devMode={devMode} />;
   }
@@ -1086,7 +1245,7 @@ function groupCategory(group: ActivityGroup): string {
 }
 
 /**
- * One activity group, as a CARD.
+ * One RUNNING activity group, as a CARD.
  *
  * It used to be naked text — a bare word ("Coding") floating in the message
  * column with a `{}` blob of raw tool JSON hanging off it, shown to everyone.
@@ -1094,11 +1253,20 @@ function groupCategory(group: ActivityGroup): string {
  * on the overline, the activity as the title, and the concrete thing being done
  * (the command, the path, the pattern) underneath in mono.
  *
+ * IN-FLIGHT ONLY, and the type cannot say so: its one call site renders it from
+ * `groups.filter((group) => !group.done)`, and the instant a group settles it
+ * moves to the completed receipt under a different key, so this card unmounts.
+ * It used to carry a whole second life as its own settled/collapsed card —
+ * `useState(group.done)`, a 2.2s auto-collapse, a collapsed summary button —
+ * none of which any mounted instance could ever reach, because `group.done` is
+ * false for every group that gets here. Finished work has exactly one shape
+ * ({@link CompletedActivityBatch}); that is the whole point of the receipt.
+ *
  * The raw payload is DEVELOPER MODE ONLY — there is no `{}` affordance at all
  * for a normal user, whichever tool it is. An unmapped tool is not a licence to
  * dump JSON in someone's chat; its name and its input are the honest answer.
  */
-function ActivityCard({
+function RunningActivityCard({
   group,
   devMode,
 }: {
@@ -1106,85 +1274,14 @@ function ActivityCard({
   devMode: boolean;
 }) {
   const reduce = useReducedMotion();
-  // Show the completed receipt long enough to read, then return the transcript
-  // to a compact state. A deliberate click cancels the automatic collapse.
-  const [open, setOpen] = useState(group.done);
-  // The raw payload has its OWN toggle, never the card's expansion. It used to
-  // ride `open`, which meant developer mode showed the JSON on every expanded
-  // card — including the auto-opened completion receipt — without the `{}`
-  // ever being clicked. Closed until asked, every time.
+  // The raw payload has its OWN toggle. It used to ride a card-expansion state,
+  // which meant developer mode showed the JSON on every expanded card without
+  // the `{}` ever being clicked. Closed until asked, every time.
   const [jsonOpen, setJsonOpen] = useState(false);
-  const userToggled = useRef(false);
-  useEffect(() => {
-    if (!group.done) return;
-    const timer = window.setTimeout(() => {
-      if (!userToggled.current) setOpen(false);
-    }, 2200);
-    return () => window.clearTimeout(timer);
-  }, [group.done]);
   const detail = group.detail;
   const shimmer = reduce
     ? { ...langyThinkingShimmerStyles, animation: "none" }
     : langyThinkingShimmerStyles;
-
-  if (group.done && !open) {
-    return (
-      <chakra.button
-        type="button"
-        width="full"
-        paddingX={3}
-        paddingY={2.5}
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="langyCard"
-        background="bg.subtle"
-        textAlign="left"
-        cursor="pointer"
-        aria-expanded="false"
-        onClick={() => {
-          userToggled.current = true;
-          setOpen(true);
-        }}
-        _hover={{ borderColor: "border.emphasized" }}
-      >
-        <HStack gap={2}>
-          <Box color="green.fg" display="flex" flexShrink={0}>
-            <Check size={11} />
-          </Box>
-          {/* Both halves clip on one line, so the full text lives in the
-              NATIVE tooltip rather than in more rows. A card that grows to fit
-              its longest label stops being a glanceable row — and these labels
-              are a skill name plus a sentence of its description. Hovering is
-              free; a second line costs every card in the transcript. */}
-          <Text
-            textStyle="xs"
-            fontWeight="560"
-            color="fg"
-            flex={1}
-            truncate
-            title={completedActivityLabel(group.label)}
-          >
-            {completedActivityLabel(group.label)}
-          </Text>
-          {group.detail ? (
-            <Text
-              textStyle="2xs"
-              fontFamily="mono"
-              color="fg.subtle"
-              maxWidth="42%"
-              truncate
-              title={group.detail}
-            >
-              {group.detail}
-            </Text>
-          ) : null}
-          <Box color="fg.subtle" display="flex">
-            <ChevronRight size={12} />
-          </Box>
-        </HStack>
-      </chakra.button>
-    );
-  }
 
   return (
     <VStack
@@ -1200,37 +1297,19 @@ function ActivityCard({
       paddingX="15px"
       paddingY="12px"
     >
-      <HStack
-        gap={1.5}
-        align="center"
-        cursor={group.done ? "pointer" : undefined}
-        onClick={
-          group.done
-            ? () => {
-                userToggled.current = true;
-                setOpen(false);
-              }
-            : undefined
-        }
-      >
-        {group.done ? (
-          <Box color="green.fg" display="flex" flexShrink={0}>
-            <Check size={11} />
-          </Box>
-        ) : (
-          <Box
-            width="6px"
-            height="6px"
-            borderRadius="full"
-            background="orange.solid"
-            flexShrink={0}
-            css={
-              reduce
-                ? undefined
-                : { animation: `${dotPulse} 1.4s ease-in-out infinite` }
-            }
-          />
-        )}
+      <HStack gap={1.5} align="center">
+        <Box
+          width="6px"
+          height="6px"
+          borderRadius="full"
+          background="orange.solid"
+          flexShrink={0}
+          css={
+            reduce
+              ? undefined
+              : { animation: `${dotPulse} 1.4s ease-in-out infinite` }
+          }
+        />
         <Text
           textStyle="2xs"
           fontWeight="500"
@@ -1254,13 +1333,7 @@ function ActivityCard({
               color={jsonOpen ? "orange.solid" : "fg.subtle"}
               aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
               aria-expanded={jsonOpen}
-              onClick={(event) => {
-                // The header row's own click collapses the card; inspecting
-                // the payload must not dismiss the card it belongs to.
-                event.stopPropagation();
-                userToggled.current = true;
-                setJsonOpen((v) => !v);
-              }}
+              onClick={() => setJsonOpen((v) => !v)}
             >
               <Braces size={12} />
             </IconButton>
@@ -1268,14 +1341,8 @@ function ActivityCard({
         ) : null}
       </HStack>
 
-      <Box
-        textStyle="sm"
-        fontWeight="640"
-        lineHeight="1.3"
-        color={group.done ? "fg" : undefined}
-        css={group.done ? undefined : shimmer}
-      >
-        {group.done ? group.label : `${group.label}…`}
+      <Box textStyle="sm" fontWeight="640" lineHeight="1.3" css={shimmer}>
+        {`${group.label}…`}
       </Box>
 
       {detail ? (

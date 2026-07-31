@@ -21,19 +21,19 @@
  * @see https://github.com/langwatch/langwatch/issues/2668
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import {
-  getTestClickHouseClient,
   cleanupTestData,
+  getTestClickHouseClient,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { buildTimeseriesQuery } from "../aggregation-builder";
-import { resetParamCounter } from "../filter-translator";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
-import { seedSpans } from "./test-utils/clickhouse-fixtures";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { buildTimeseriesQuery } from "../aggregation-builder";
+import { resetParamCounter } from "../filter-translator";
 import { deleteEvaluationRunsByTenant } from "./test-utils/clickhouse-cleanup";
+import { seedSpans } from "./test-utils/clickhouse-fixtures";
 
 const TENANT_ID = "test-cross-eval-2668";
 
@@ -60,93 +60,90 @@ const EVALUATOR_B_ID = "cross-eval-2668-evaluatorB";
 describe("cross-evaluator-groupby", () => {
   let ch: ClickHouseClient;
 
-  beforeAll(
-    async () => {
-      const rawClient = getTestClickHouseClient();
-      if (!rawClient) throw new Error("ClickHouse client not available");
-      ch = wrapWithDefaultSettings(rawClient);
+  beforeAll(async () => {
+    const rawClient = getTestClickHouseClient();
+    if (!rawClient) throw new Error("ClickHouse client not available");
+    ch = wrapWithDefaultSettings(rawClient);
 
-      await seedSpans(ch, {
-        tenantId: TENANT_ID,
-        count: 4,
-        attributeKeys: 2,
-        traceCount: 2,
-      });
+    await seedSpans(ch, {
+      tenantId: TENANT_ID,
+      count: 4,
+      attributeKeys: 2,
+      traceCount: 2,
+    });
 
-      await ch.insert({
-        table: "evaluation_runs",
-        values: [
-          // evaluatorA trace 0: label "good", score 0.8
-          {
-            ProjectionId: "proj-cross-2668-a0",
-            TenantId: TENANT_ID,
-            EvaluationId: "eval-cross-2668-a0",
-            Version: "1",
-            EvaluatorId: EVALUATOR_A_ID,
-            EvaluatorType: "custom",
-            TraceId: TRACE_ID_0,
-            Status: "processed",
-            Score: 0.8,
-            Passed: 1,
-            Label: "good",
-            LastProcessedEventId: "evt-cross-2668-a0",
-            UpdatedAt: new Date().toISOString(),
-          },
-          // evaluatorA trace 1: label "bad", score 0.2
-          {
-            ProjectionId: "proj-cross-2668-a1",
-            TenantId: TENANT_ID,
-            EvaluationId: "eval-cross-2668-a1",
-            Version: "1",
-            EvaluatorId: EVALUATOR_A_ID,
-            EvaluatorType: "custom",
-            TraceId: TRACE_ID_1,
-            Status: "processed",
-            Score: 0.2,
-            Passed: 0,
-            Label: "bad",
-            LastProcessedEventId: "evt-cross-2668-a1",
-            UpdatedAt: new Date().toISOString(),
-          },
-          // evaluatorB trace 0: score 0.9 (no label)
-          {
-            ProjectionId: "proj-cross-2668-b0",
-            TenantId: TENANT_ID,
-            EvaluationId: "eval-cross-2668-b0",
-            Version: "1",
-            EvaluatorId: EVALUATOR_B_ID,
-            EvaluatorType: "custom",
-            TraceId: TRACE_ID_0,
-            Status: "processed",
-            Score: 0.9,
-            Passed: 1,
-            Label: null,
-            LastProcessedEventId: "evt-cross-2668-b0",
-            UpdatedAt: new Date().toISOString(),
-          },
-          // evaluatorB trace 1: score 0.3 (no label)
-          {
-            ProjectionId: "proj-cross-2668-b1",
-            TenantId: TENANT_ID,
-            EvaluationId: "eval-cross-2668-b1",
-            Version: "1",
-            EvaluatorId: EVALUATOR_B_ID,
-            EvaluatorType: "custom",
-            TraceId: TRACE_ID_1,
-            Status: "processed",
-            Score: 0.3,
-            Passed: 0,
-            Label: null,
-            LastProcessedEventId: "evt-cross-2668-b1",
-            UpdatedAt: new Date().toISOString(),
-          },
-        ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-      });
-    },
-    60_000,
-  );
+    await ch.insert({
+      table: "evaluation_runs",
+      values: [
+        // evaluatorA trace 0: label "good", score 0.8
+        {
+          ProjectionId: "proj-cross-2668-a0",
+          TenantId: TENANT_ID,
+          EvaluationId: "eval-cross-2668-a0",
+          Version: "1",
+          EvaluatorId: EVALUATOR_A_ID,
+          EvaluatorType: "custom",
+          TraceId: TRACE_ID_0,
+          Status: "processed",
+          Score: 0.8,
+          Passed: 1,
+          Label: "good",
+          LastProcessedEventId: "evt-cross-2668-a0",
+          UpdatedAt: new Date().toISOString(),
+        },
+        // evaluatorA trace 1: label "bad", score 0.2
+        {
+          ProjectionId: "proj-cross-2668-a1",
+          TenantId: TENANT_ID,
+          EvaluationId: "eval-cross-2668-a1",
+          Version: "1",
+          EvaluatorId: EVALUATOR_A_ID,
+          EvaluatorType: "custom",
+          TraceId: TRACE_ID_1,
+          Status: "processed",
+          Score: 0.2,
+          Passed: 0,
+          Label: "bad",
+          LastProcessedEventId: "evt-cross-2668-a1",
+          UpdatedAt: new Date().toISOString(),
+        },
+        // evaluatorB trace 0: score 0.9 (no label)
+        {
+          ProjectionId: "proj-cross-2668-b0",
+          TenantId: TENANT_ID,
+          EvaluationId: "eval-cross-2668-b0",
+          Version: "1",
+          EvaluatorId: EVALUATOR_B_ID,
+          EvaluatorType: "custom",
+          TraceId: TRACE_ID_0,
+          Status: "processed",
+          Score: 0.9,
+          Passed: 1,
+          Label: null,
+          LastProcessedEventId: "evt-cross-2668-b0",
+          UpdatedAt: new Date().toISOString(),
+        },
+        // evaluatorB trace 1: score 0.3 (no label)
+        {
+          ProjectionId: "proj-cross-2668-b1",
+          TenantId: TENANT_ID,
+          EvaluationId: "eval-cross-2668-b1",
+          Version: "1",
+          EvaluatorId: EVALUATOR_B_ID,
+          EvaluatorType: "custom",
+          TraceId: TRACE_ID_1,
+          Status: "processed",
+          Score: 0.3,
+          Passed: 0,
+          Label: null,
+          LastProcessedEventId: "evt-cross-2668-b1",
+          UpdatedAt: new Date().toISOString(),
+        },
+      ],
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+    });
+  }, 60_000);
 
   afterAll(async () => {
     await cleanupTestData(TENANT_ID);
@@ -186,10 +183,10 @@ describe("cross-evaluator-groupby", () => {
 
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
-        const goodRows = currentRows.filter((r) => r["group_key"] === "good");
-        const badRows = currentRows.filter((r) => r["group_key"] === "bad");
+        const goodRows = currentRows.filter((r) => r.group_key === "good");
+        const badRows = currentRows.filter((r) => r.group_key === "bad");
 
         expect(goodRows.length).toBeGreaterThan(0);
         expect(badRows.length).toBeGreaterThan(0);
@@ -239,14 +236,10 @@ describe("cross-evaluator-groupby", () => {
 
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
-        const passedRows = currentRows.filter(
-          (r) => r["group_key"] === "passed",
-        );
-        const failedRows = currentRows.filter(
-          (r) => r["group_key"] === "failed",
-        );
+        const passedRows = currentRows.filter((r) => r.group_key === "passed");
+        const failedRows = currentRows.filter((r) => r.group_key === "failed");
 
         expect(passedRows.length).toBeGreaterThan(0);
         expect(failedRows.length).toBeGreaterThan(0);
@@ -295,10 +288,10 @@ describe("cross-evaluator-groupby", () => {
 
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
         // Labels "good" and "bad" come from evaluatorA
-        const groupKeys = currentRows.map((r) => r["group_key"]);
+        const groupKeys = currentRows.map((r) => r.group_key);
         expect(groupKeys).toContain("good");
         expect(groupKeys).toContain("bad");
 
@@ -308,8 +301,8 @@ describe("cross-evaluator-groupby", () => {
         );
         expect(metricKey).toBeDefined();
 
-        const goodRow = currentRows.find((r) => r["group_key"] === "good");
-        const badRow = currentRows.find((r) => r["group_key"] === "bad");
+        const goodRow = currentRows.find((r) => r.group_key === "good");
+        const badRow = currentRows.find((r) => r.group_key === "bad");
 
         expect(goodRow).toBeDefined();
         expect(badRow).toBeDefined();
@@ -361,10 +354,10 @@ describe("cross-evaluator-groupby", () => {
         // Query must not crash
         expect(Array.isArray(rows)).toBe(true);
 
-        const currentRows = rows.filter((r) => r["period"] === "current");
+        const currentRows = rows.filter((r) => r.period === "current");
 
         // Label groups must appear — the fix preserves the groupBy behaviour
-        const groupKeys = currentRows.map((r) => r["group_key"]);
+        const groupKeys = currentRows.map((r) => r.group_key);
         expect(groupKeys).toContain("good");
         expect(groupKeys).toContain("bad");
 

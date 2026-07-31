@@ -65,9 +65,7 @@ export function PromptEditorHeader({
           {configId && onVersionRestore && (
             <VersionHistoryButton
               configId={configId}
-              currentVersionId={
-                formMethods.watch("versionMetadata")?.versionId
-              }
+              currentVersionId={formMethods.watch("versionMetadata")?.versionId}
               onRestoreSuccess={onVersionRestore}
               hasUnsavedChanges={hasUnsavedChanges}
               initialOpen={openHistoryOnLoad}
@@ -75,11 +73,7 @@ export function PromptEditorHeader({
           )}
           {configId && handle && project?.id && (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={deployDialog.onOpen}
-              >
+              <Button variant="outline" size="sm" onClick={deployDialog.onOpen}>
                 Deploy
               </Button>
               <DeployPromptDialog

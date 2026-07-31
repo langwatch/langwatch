@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-
-import type { LangyTurnHandoff } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
+import type { LangyTurnHandoff } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import { createLangyEffectPorts } from "../langyEffectPorts";
 
 const PROJECT = "project-1";

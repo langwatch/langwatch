@@ -35,7 +35,12 @@ export function parsePromptShorthand(input: string): PromptShorthand {
   const colonIndex = input.lastIndexOf(":");
 
   if (colonIndex === -1) {
-    return { slug: input, tag: undefined, version: undefined, hadSuffix: false };
+    return {
+      slug: input,
+      tag: undefined,
+      version: undefined,
+      hadSuffix: false,
+    };
   }
 
   const slug = input.substring(0, colonIndex);

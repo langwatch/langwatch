@@ -9,11 +9,10 @@
  * @see specs/scenarios/internal-set-namespace.feature
  */
 import { describe, expect, it } from "vitest";
-import { sortScenarioSets } from "../sort-scenario-sets";
 import type { ScenarioSetData } from "~/server/scenarios/scenario-event.types";
+import { sortScenarioSets } from "../sort-scenario-sets";
 
 describe("sortScenarioSets()", () => {
-
   describe("given a mix of internal and user sets", () => {
     const testSets: ScenarioSetData[] = [
       {
@@ -38,7 +37,7 @@ describe("sortScenarioSets()", () => {
         const sorted = sortScenarioSets(testSets);
 
         expect(sorted[0]?.scenarioSetId).toBe(
-          "__internal__proj_abc123__on-platform-scenarios"
+          "__internal__proj_abc123__on-platform-scenarios",
         );
       });
 
@@ -95,10 +94,10 @@ describe("sortScenarioSets()", () => {
         const sorted = sortScenarioSets(testSets);
 
         expect(sorted[0]?.scenarioSetId).toBe(
-          "__internal__proj_xyz__on-platform-scenarios"
+          "__internal__proj_xyz__on-platform-scenarios",
         );
         expect(sorted[1]?.scenarioSetId).toBe(
-          "__internal__proj_abc123__on-platform-scenarios"
+          "__internal__proj_abc123__on-platform-scenarios",
         );
       });
     });

@@ -46,6 +46,7 @@ func workerBatch() (ptrace.Traces, pcommon.SpanID, pcommon.SpanID) {
 }
 
 func TestReparentTraces(t *testing.T) {
+	// @scenario "Worker spans are re-parented under the turn's trace"
 	t.Run("when a turn trace context is known", func(t *testing.T) {
 		td, rootID, childID := workerBatch()
 
@@ -118,6 +119,7 @@ func TestReparentTraces(t *testing.T) {
 		}
 	})
 
+	// @scenario "A span batch with no turn in flight still reaches the project"
 	t.Run("when no turn context has been recorded yet", func(t *testing.T) {
 		td, rootID, _ := workerBatch()
 		originalTrace := td.ResourceSpans().At(0).ScopeSpans().At(0).Spans().At(0).TraceID()

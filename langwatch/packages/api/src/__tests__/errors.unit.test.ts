@@ -1,6 +1,6 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { describe, it, expect } from "vitest";
-import { ZodError, z } from "zod";
+import { describe, expect, it } from "vitest";
+import { type ZodError, z } from "zod";
 
 import { createErrorHandler, formatError } from "../errors.js";
 
@@ -129,7 +129,10 @@ describe("formatError", () => {
         serialize: () => ({ code: "not_found", httpStatus: 404, reasons: [] }),
       });
 
-      const { status, body } = formatError({ err: impostor, isVersioned: true });
+      const { status, body } = formatError({
+        err: impostor,
+        isVersioned: true,
+      });
 
       expect(status).toBe(500);
       expect(body.code).toBe("internal_error");
@@ -149,7 +152,10 @@ describe("formatError", () => {
           .parse({ name: "", age: "not-a-number" }),
       );
 
-      const { status, body } = formatError({ err: zodError, isVersioned: true });
+      const { status, body } = formatError({
+        err: zodError,
+        isVersioned: true,
+      });
 
       expect(status).toBe(422);
       expect(body.code).toBe("validation_error");
@@ -215,23 +221,23 @@ describe("formatError", () => {
   // -------------------------------------------------------------------------
 
   describe("when given an unknown error", () => {
-    it.each(["production", "development"])(
-      "returns 500 with a sanitized message in %s",
-      (nodeEnv) => {
-        const originalEnv = process.env["NODE_ENV"];
-        process.env["NODE_ENV"] = nodeEnv;
-        try {
-          const err = new Error("secret internal details");
-          const { status, body } = formatError({ err, isVersioned: true });
+    it.each([
+      "production",
+      "development",
+    ])("returns 500 with a sanitized message in %s", (nodeEnv) => {
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = nodeEnv;
+      try {
+        const err = new Error("secret internal details");
+        const { status, body } = formatError({ err, isVersioned: true });
 
-          expect(status).toBe(500);
-          expect(body.code).toBe("internal_error");
-          expect(body.message).toBe("An unknown error occurred");
-        } finally {
-          process.env["NODE_ENV"] = originalEnv;
-        }
-      },
-    );
+        expect(status).toBe(500);
+        expect(body.code).toBe("internal_error");
+        expect(body.message).toBe("An unknown error occurred");
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
+    });
 
     describe("when the request is unversioned", () => {
       it("includes the error field", () => {

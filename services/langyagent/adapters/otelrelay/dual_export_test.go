@@ -148,6 +148,7 @@ func TestDualExport(t *testing.T) {
 			t.Fatalf("relay answered %d", resp.StatusCode)
 		}
 
+		// @scenario "Worker telemetry remains complete for the customer"
 		t.Run("the customer's project receives the content", func(t *testing.T) {
 			body := customer.await(t)
 			for _, content := range []string{workerPrompt, workerCompletion, workerToolOutput} {
@@ -316,6 +317,7 @@ func TestDualExport(t *testing.T) {
 			"the customer forward must not wait on the mirror")
 	})
 
+	// @scenario "Customer telemetry is unaffected when operational recording is unavailable"
 	t.Run("when no internal collector is configured", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		relay := relayWithInternal(t, "")
@@ -350,6 +352,8 @@ func TestDualExport(t *testing.T) {
 // its OTLP resource, it must not be able to brand its spans with LangWatch's
 // provenance marker in the customer's project — ingest-side enforcement keyed
 // on langwatch.origin must never trust a worker-supplied value.
+//
+// @scenario "A worker cannot claim its telemetry is LangWatch's own"
 func TestCustomerForwardStripsForgedOriginMarker(t *testing.T) {
 	customer := startSignallingIngest(t)
 	relay := relayWithInternal(t, "")
@@ -640,6 +644,7 @@ func TestMirrorTiersEndToEnd(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 	}
 
+	// @scenario "The mirror receives the turn at the customer's tier"
 	t.Run("content tier mirrors the bodies and the source tenant", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		mirror := startSignallingIngest(t)
@@ -658,6 +663,7 @@ func TestMirrorTiersEndToEnd(t *testing.T) {
 			"the source project must never ride the customer's own forward")
 	})
 
+	// @scenario "A restricted customer's mirror carries structure and never content"
 	t.Run("structural tier mirrors the shape and tenant but no content", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		mirror := startSignallingIngest(t)
@@ -672,6 +678,7 @@ func TestMirrorTiersEndToEnd(t *testing.T) {
 		assert.Contains(t, body, "gpt-5-mini", "structural still carries the operational model")
 	})
 
+	// @scenario "A skipped customer produces no mirror at all"
 	t.Run("skip tier mirrors nothing while the customer forward is unaffected", func(t *testing.T) {
 		customer := startSignallingIngest(t)
 		mirror := startSignallingIngest(t)

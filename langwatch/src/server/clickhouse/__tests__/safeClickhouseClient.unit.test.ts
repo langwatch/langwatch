@@ -1,10 +1,11 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, it, vi } from "vitest";
+
 import type { ClickHouseClient } from "@clickhouse/client";
-import { wrapWithDefaultSettings } from "../safeClickhouseClient";
+import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "../queryDefaults";
+import { wrapWithDefaultSettings } from "../safeClickhouseClient";
 
 function createMockClient(
   queryResult?: unknown,

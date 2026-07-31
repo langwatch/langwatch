@@ -43,6 +43,26 @@
  * same keys minus the dropped ones plus any truncated values. Caller owns the
  * input map; mutation is intentionally avoided to keep the trim auditable in
  * isolation.
+ *
+ * BEST-EFFORT ABOVE THE CAPS (recorded, not fixed). Under ADR-066 the trimmed
+ * map is read back as the fold's next state, so the caps are not purely a
+ * storage bound any more — past them the accumulation semantics degrade, in two
+ * known ways, both requiring one key to be re-sent by a LATER span at lengths
+ * straddling a cap:
+ *
+ *   * An over-cap `metadata.*` OBJECT value is truncated, which makes it
+ *     unparseable, so the deep-merge in TraceAttributeAccumulationService falls
+ *     into its catch and keeps first-wins — the later span's subkeys are
+ *     dropped rather than merged in.
+ *   * An over-256 ARBITRARY key is dropped entirely, so after a read-back a
+ *     later span's short value claims a key an earlier span's long value owned.
+ *     First-wins on that key was arbitrary to begin with, and the blast radius
+ *     is one non-dimension attribute.
+ *
+ * Both are accepted as best-effort: a value that big is a payload artefact, not
+ * an analytics dimension. Fixing them properly means typed columns with element
+ * caps rather than a JSON-in-a-string map, which is the ADR-066 follow-up, not a
+ * change to the merge semantics here.
  */
 
 /** Hard cap on a `metadata.*` value's length (chars, not bytes). */
@@ -120,6 +140,36 @@ export const PAYLOAD_BLOCKLIST_PREFIXES: readonly string[] = [
 const METADATA_PREFIX = "metadata.";
 const RESERVED_PREFIX = "langwatch.reserved.";
 
+/**
+ * Keys the fold accumulates across spans by read-modify-write on its OWN
+ * previous value, rather than deriving fresh from each event.
+ *
+ * These must survive the trim. Under ADR-066 the trimmed map is read back as
+ * fold state, so dropping one does not merely shrink the stored row — it resets
+ * the accumulator, and the union silently restarts from the next span. Every
+ * other accumulator already sits under `langwatch.reserved.` and is kept for
+ * that reason; `langwatch.prompt_ids` is the one that does not, and at ~8
+ * prompt-bearing spans its JSON crosses the arbitrary-key cap and vanishes.
+ *
+ * A cap still bounds these — an unbounded accumulator would grow the row
+ * without limit — but at the metadata cap, not the much tighter arbitrary one.
+ *
+ * Past that ceiling the value is truncated mid-array, and the union restarts
+ * from the next span. That reset is not a property of truncation on its own —
+ * it is enforced by `parseJsonStringArray`, which returns `[]` rather than its
+ * lenient `[raw]` for a value that opens with `[` and does not close with `]`.
+ * Without that guard the fragment came back as a single fake element and was
+ * re-escaped into a fresh array on the next write, nesting one level deeper on
+ * every read-back cycle. The durable fix for the cap itself is still a typed
+ * column with an element cap. No column in this row has one yet —
+ * `AnnotationIds` is an uncapped `Array(String)` and the fold appends to it
+ * unbounded — so there is no precedent here to copy, only the same debt in a
+ * second place.
+ */
+const FOLD_ACCUMULATOR_KEYS: ReadonlySet<string> = new Set([
+  "langwatch.prompt_ids",
+]);
+
 function isBlocklisted(key: string): boolean {
   if (PAYLOAD_BLOCKLIST_EXACT.has(key)) return true;
   for (const prefix of PAYLOAD_BLOCKLIST_PREFIXES) {
@@ -150,7 +200,7 @@ export function trimAttributesForAnalytics(
       out[key] = truncateWithEllipsis(value, ANALYTICS_METADATA_VALUE_CAP);
       continue;
     }
-    if (key.startsWith(RESERVED_PREFIX)) {
+    if (key.startsWith(RESERVED_PREFIX) || FOLD_ACCUMULATOR_KEYS.has(key)) {
       out[key] = truncateWithEllipsis(value, ANALYTICS_METADATA_VALUE_CAP);
       continue;
     }

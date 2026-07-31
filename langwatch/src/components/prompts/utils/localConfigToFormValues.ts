@@ -22,7 +22,8 @@ const normalizeOutputs = (
     ) {
       return {
         ...rest,
-        json_schema: json_schema as ConfigData["outputs"][number]["json_schema"],
+        json_schema:
+          json_schema as ConfigData["outputs"][number]["json_schema"],
       };
     }
     return rest;

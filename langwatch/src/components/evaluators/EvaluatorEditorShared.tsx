@@ -19,7 +19,6 @@ import { z } from "zod";
 
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import type {
   AvailableSource,
@@ -37,6 +36,11 @@ import {
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
 import {
+  applyHandledErrorToForm,
+  FormServerError,
+  showErrorToast,
+} from "~/features/errors";
+import {
   getComplexProps,
   getDrawerStack,
   getFlowCallbacks,
@@ -53,7 +57,6 @@ import {
 } from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
-import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
@@ -79,7 +82,9 @@ const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
  * config is normalized to the comparison shape on load, so the only thing its
  * evaluatorType still selects is which judge endpoint runs it.
  */
-const isComparisonEvaluatorType = (evaluatorType: string | undefined): boolean =>
+const isComparisonEvaluatorType = (
+  evaluatorType: string | undefined,
+): boolean =>
   evaluatorType === COMPARISON_EVALUATOR_TYPE ||
   evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
@@ -181,9 +186,7 @@ export type EvaluatorEditorController = {
   expectsComparisonContext: boolean;
   /** The live comparison draft, mirrored from ComparisonConfigForm. */
   comparison: ComparisonEvaluatorConfig;
-  onComparisonChange:
-    | ((config: ComparisonEvaluatorConfig) => void)
-    | undefined;
+  onComparisonChange: ((config: ComparisonEvaluatorConfig) => void) | undefined;
   onLocalConfigChange:
     | ((config: LocalEvaluatorConfig | undefined) => void)
     | undefined;
@@ -488,12 +491,9 @@ export function useEvaluatorEditorController(
       }
     },
     onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error creating evaluator",
-        description: error.message,
-        type: "error",
-      });
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" });
     },
   });
 
@@ -526,12 +526,9 @@ export function useEvaluatorEditorController(
       }
     },
     onError: (error) => {
-      if (isHandledByGlobalHandler(error)) return;
-      toaster.create({
-        title: "Error saving evaluator",
-        description: error.message,
-        type: "error",
-      });
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't save evaluator" });
     },
   });
 
@@ -809,19 +806,24 @@ export function EvaluatorEditorBody({
         paddingY={4}
         overflowY="auto"
       >
+        <FormServerError form={form} />
+
         {evaluatorDef?.description && (
           <Text fontSize="sm" color="fg.muted">
             {evaluatorDef.description}
           </Text>
         )}
 
-        <Field.Root required>
+        <Field.Root required invalid={!!form.formState.errors.name}>
           <Field.Label>Evaluator Name</Field.Label>
           <Input
             {...form.register("name")}
             placeholder="Enter evaluator name"
             data-testid="evaluator-name-input"
           />
+          <Field.ErrorText>
+            {form.formState.errors.name?.message}
+          </Field.ErrorText>
         </Field.Root>
 
         {hasSettings && evaluatorType && settingsSchema && (

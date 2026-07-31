@@ -1,6 +1,6 @@
-import { buildExponentialHistogramRow } from "./rollup/exponentialHistogram";
 import { buildHistogramRow } from "./rollup/explicitHistogram";
-import { baseRow, type BucketEntry } from "./rollup/row";
+import { buildExponentialHistogramRow } from "./rollup/exponentialHistogram";
+import { type BucketEntry, baseRow } from "./rollup/row";
 import { buildGaugeRow, buildSumRow } from "./rollup/scalar";
 import { comparePoints, floorBucket, usesPredecessor } from "./rollup/sequence";
 import { buildSummaryRow } from "./rollup/summary";

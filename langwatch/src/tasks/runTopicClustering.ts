@@ -1,6 +1,6 @@
 import {
-  clusterTopicsForProject,
   type ClusteringPageOutcome,
+  clusterTopicsForProject,
 } from "../server/app-layer/topic-clustering/clustering";
 
 export default async function execute(projectId: string) {

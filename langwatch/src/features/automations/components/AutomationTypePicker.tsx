@@ -4,7 +4,7 @@ import { Calendar, TrendingUp, Zap } from "lucide-react";
 import type { ConditionSource } from "../logic/draftReducer";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-import { FacetSection, type FacetAccordionProps } from "./FacetSection";
+import { type FacetAccordionProps, FacetSection } from "./FacetSection";
 import { SourceCard } from "./SourceCard";
 
 /** The three presets, in ADR-043 order, each with its list-page accent. */

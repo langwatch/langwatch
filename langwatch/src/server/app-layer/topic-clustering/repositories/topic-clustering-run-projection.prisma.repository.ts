@@ -1,12 +1,12 @@
 import { generate } from "@langwatch/ksuid";
 import type { Prisma } from "@prisma/client";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import type { TopicClusteringRunStatusData } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
-import type { TopicClusteringRunStatusData } from "~/server/event-sourcing/pipelines/topic-clustering-processing/projections/topicClusteringRunStatus.foldProjection";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 type Row = Prisma.TopicClusteringRunProjectionGetPayload<object>;
 

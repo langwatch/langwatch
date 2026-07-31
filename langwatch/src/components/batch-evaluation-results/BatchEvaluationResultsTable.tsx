@@ -7,7 +7,7 @@
  *
  * The actual table implementations are in separate files for better maintainability.
  */
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text } from "@chakra-ui/react";
 import { Columns3 } from "lucide-react";
 import { Checkbox } from "~/components/ui/checkbox";
 import {

@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { ApiKeysApiService } from "@/client-sdk/services/api-keys/api-keys-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -26,7 +26,7 @@ export interface CreateApiKeyOptions {
 export const createApiKeyCommand = async (
   options: CreateApiKeyOptions,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   if (!options.name) {
     console.error(chalk.red("Error: --name is required"));

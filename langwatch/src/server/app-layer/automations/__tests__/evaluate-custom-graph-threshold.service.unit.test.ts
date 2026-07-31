@@ -188,9 +188,7 @@ describe("isNoDataPredicate", () => {
     it("matches lt with a threshold above 1 — 'count < 10' fires on total silence, exactly as the cron did", () => {
       expect(isNoDataPredicate({ operator: "lt", threshold: 2 })).toBe(true);
       expect(isNoDataPredicate({ operator: "lt", threshold: 10 })).toBe(true);
-      expect(isNoDataPredicate({ operator: "lte", threshold: 100 })).toBe(
-        true,
-      );
+      expect(isNoDataPredicate({ operator: "lte", threshold: 100 })).toBe(true);
     });
 
     it("matches lte with threshold 1", () => {

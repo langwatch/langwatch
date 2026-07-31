@@ -1,6 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@prisma/client";
 import type { ILicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import { USAGE_UNKNOWN, type UsageCount } from "~/server/traces/usage-count";
 import { getApp } from "../../src/server/app-layer/app";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
@@ -10,7 +11,12 @@ import { FREE_PLAN, PUBLIC_KEY } from "./constants";
 import { resolvePlanDefaults } from "./defaults";
 import { OrganizationNotFoundError } from "./errors";
 import type { PlanInfo } from "./planInfo";
-import type { LicensePlanLimits, LicenseStatus, RemoveLicenseResult, StoreLicenseResult } from "./types";
+import type {
+  LicensePlanLimits,
+  LicenseStatus,
+  RemoveLicenseResult,
+  StoreLicenseResult,
+} from "./types";
 import { parseLicenseKey, validateLicense } from "./validation";
 
 const logger = createLogger("langwatch:licensing:licenseHandler");
@@ -20,7 +26,9 @@ const logger = createLogger("langwatch:licensing:licenseHandler");
  * Follows Interface Segregation Principle - only what we need.
  */
 export interface ITraceUsageService {
-  getCurrentMonthCount(params: { organizationId: string }): Promise<number | "unlimited">;
+  getCurrentMonthCount(params: {
+    organizationId: string;
+  }): Promise<UsageCount | "unlimited">;
 }
 
 interface LicenseHandlerConfig {
@@ -61,7 +69,6 @@ export class LicenseHandler {
     this.repository = config.repository;
     this.traceUsageService = config.traceUsageService ?? null;
   }
-
 
   /**
    * Gets the active plan for an organization based on its stored license.
@@ -105,7 +112,7 @@ export class LicenseHandler {
    */
   async validateAndStoreLicense(
     organizationId: string,
-    licenseKey: string
+    licenseKey: string,
   ): Promise<StoreLicenseResult> {
     // Validate the license before storing
     const result = validateLicense({ licenseKey, publicKey: this.publicKey });
@@ -221,7 +228,10 @@ export class LicenseHandler {
     // For valid licenses, use data from validationResult (avoids second parse)
     if (validationResult.valid) {
       const { licenseData } = validationResult;
-      const resourceCounts = await this.getResourceCounts(organizationId, licenseData.plan);
+      const resourceCounts = await this.getResourceCounts(
+        organizationId,
+        licenseData.plan,
+      );
       return {
         hasLicense: true,
         valid: true,
@@ -240,7 +250,10 @@ export class LicenseHandler {
     }
 
     const { data: licenseData } = signedLicense;
-    const resourceCounts = await this.getResourceCounts(organizationId, licenseData.plan);
+    const resourceCounts = await this.getResourceCounts(
+      organizationId,
+      licenseData.plan,
+    );
     return {
       hasLicense: true,
       valid: false,
@@ -255,17 +268,30 @@ export class LicenseHandler {
   /**
    * Fetches all resource counts for an organization and combines with plan limits.
    */
-  private async getResourceCounts(organizationId: string, plan: LicensePlanLimits) {
+  private async getResourceCounts(
+    organizationId: string,
+    plan: LicensePlanLimits,
+  ) {
     // Resolve defaults for optional plan fields
     const resolved = resolvePlanDefaults(plan);
 
     // Get message count via the app-layer UsageService (meter policy selects
     // traces vs events, counted in ClickHouse).
     // Returns 0 if service not provided (e.g., in tests).
-    // "unlimited" is resolved to 0 since license display needs a numeric value.
+    //
+    // Both "unlimited" and "unknown" resolve to 0 because this figure feeds a
+    // numeric license-usage display, but they are not the same claim and the
+    // second one is worth being explicit about: it means the count could not
+    // be taken, and rendering it as 0 understates usage until the counting
+    // store recovers. It does not gate anything on its own — enforcement is
+    // UsageService.checkLimit, which handles unknown deliberately — so this
+    // stays a display value rather than becoming a reason to fail a license.
     const messagesCountPromise = this.traceUsageService
-      ? this.traceUsageService.getCurrentMonthCount({ organizationId })
-          .then((count) => (count === "unlimited" ? 0 : count))
+      ? this.traceUsageService
+          .getCurrentMonthCount({ organizationId })
+          .then((count) =>
+            count === "unlimited" || count === USAGE_UNKNOWN ? 0 : count,
+          )
       : Promise.resolve(0);
 
     const [

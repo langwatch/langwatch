@@ -12,18 +12,21 @@ import type {
   GatewayBudget,
   GatewayCacheRule,
   ModelProvider,
-  Prisma,
   PrismaClient,
   VirtualKey,
 } from "@prisma/client";
 
 import { decrypt } from "../../utils/encryption";
 import {
-  resolveLangyMirrorTier,
   type LangyMirrorTier,
+  resolveLangyMirrorTier,
 } from "../app-layer/langy/LangyCredentialService";
 import { modelProviders } from "../modelProviders/registry";
 import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
+import {
+  type ResolvedBudget,
+  resolveApplicableBudgets,
+} from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import {
   eligibleModelProvidersForVk,
@@ -99,6 +102,22 @@ export type GatewayConfigPayload = {
   };
   model_aliases: Record<string, string>;
   models_allowed: string[] | null;
+  /**
+   * Explicit provider allowlist. `null` means every provider the key can
+   * reach through its scope graph, now and in the future, the semantic a
+   * key gets when its creator ticks "All providers", so a provider added
+   * next month is usable without editing the key. A list narrows to those
+   * ModelProvider ids; `providers[]` is already filtered to match, and the
+   * field ships so the gateway can surface WHY a model is unavailable.
+   */
+  providers_allowed: string[] | null;
+  /**
+   * How the key behaves when its provider fails. "none" = no failover
+   * (the default for keys created after the routing-mode split);
+   * "fallback_all" = walk every eligible provider; "policy" = the linked
+   * RoutingPolicy decides.
+   */
+  routing_mode: "none" | "fallback_all" | "policy";
   cache: { mode: "respect" | "force" | "disable"; ttl_s: number };
   // Flat per-project guardrail catalog the VK is allowed to reference.
   // The Go dispatcher looks up entries by id from guardrail_attachments
@@ -118,8 +137,28 @@ export type GatewayConfigPayload = {
   };
   budgets: Array<{
     id: string;
-    scope: "organization" | "team" | "project" | "virtual_key" | "principal";
+    scope:
+      | "organization"
+      | "team"
+      | "project"
+      | "virtual_key"
+      | "principal"
+      | "group";
+    /**
+     * The bucket spend accumulates under. Equal to the budget's target for
+     * every scope except "group", where it is `<groupId>:<userId>` so each
+     * member of a group gets their own allowance.
+     */
     scope_id: string;
+    /** Only set for "group": the member this bucket belongs to. */
+    principal_id?: string;
+    /**
+     * Provider filter. Null = the budget counts every dispatch; set = it
+     * counts and constrains only dispatches to that ModelProvider id, so a
+     * breach removes that provider from the chain instead of blocking the
+     * whole request.
+     */
+    provider_key: string | null;
     window: string;
     limit_micro_usd: number;
     spent_micro_usd: number;
@@ -164,12 +203,23 @@ export class GatewayConfigMaterialiser {
   ) {}
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
-    const providers = await eligibleModelProvidersForVk(this.prisma, vk);
+    const eligibleProviders = await eligibleModelProvidersForVk(
+      this.prisma,
+      vk,
+    );
     const traceProject = await resolveTraceProject(this.prisma, vk);
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
+    // An explicit allowlist narrows what the key can reach; absence means
+    // "all current and future providers in scope", which is why the filter
+    // runs here rather than being frozen into stored scope rows.
+    const providers = config.providersAllowed
+      ? eligibleProviders.filter((mp) =>
+          config.providersAllowed!.includes(mp.id),
+        )
+      : eligibleProviders;
     const policySides = resolvePolicySideOfBundle(vk, config);
     const guardrailSides = await this.resolveGuardrailSideOfBundle(
       vk,
@@ -200,10 +250,17 @@ export class GatewayConfigMaterialiser {
         on: config.fallback.on,
         chain: providers.map((mp) => mp.id),
         timeout_ms: config.fallback.timeoutMs,
-        max_attempts: config.fallback.maxAttempts,
+        // routing_mode NONE means the request never leaves the provider
+        // that serves the model, so the attempt budget is one. Pinning it
+        // here makes no-fallback real for gateways that predate the
+        // routing_mode field instead of promising it in the UI only.
+        max_attempts:
+          vk.routingMode === "NONE" ? 1 : config.fallback.maxAttempts,
       },
       model_aliases: policySides.modelAliases,
       models_allowed: config.modelsAllowed,
+      providers_allowed: config.providersAllowed,
+      routing_mode: routingModeToWire(vk.routingMode),
       cache: { mode: config.cache.mode, ttl_s: config.cache.ttlS },
       guardrails: guardrailSides.guardrails,
       guardrail_attachments: guardrailSides.attachments,
@@ -213,10 +270,12 @@ export class GatewayConfigMaterialiser {
         tpm: config.rateLimits.tpm,
         rpd: config.rateLimits.rpd,
       },
-      budgets: budgets.map((b) => ({
+      budgets: budgets.map(({ budget: b, bucketScopeId, principalUserId }) => ({
         id: b.id,
         scope: scopeToWire(b.scopeType),
-        scope_id: b.scopeId,
+        scope_id: bucketScopeId,
+        ...(principalUserId ? { principal_id: principalUserId } : {}),
+        provider_key: b.providerKey,
         window: b.window.toLowerCase(),
         limit_micro_usd: decimalToMicroUSD(b.limitUsd),
         spent_micro_usd: spendByBudgetId.has(b.id)
@@ -296,7 +355,7 @@ export class GatewayConfigMaterialiser {
    */
   private async loadCurrentSpend(
     vk: VirtualKey,
-    budgets: GatewayBudget[],
+    budgets: ResolvedBudget[],
   ): Promise<Map<string, string>> {
     if (this.chRepo === null || budgets.length === 0) {
       return new Map();
@@ -308,9 +367,20 @@ export class GatewayConfigMaterialiser {
       });
       const tenantIds = orgProjects.map((p) => p.id);
       if (tenantIds.length === 0) return new Map();
+      // Read each budget's spend from its RESOLVED bucket, exactly. The
+      // bundle enforces this key's buckets, so the figure must be the
+      // bucket's own: a GROUP budget read from the raw row would prefix-sum
+      // every member's bucket, and the gateway would then cap each member
+      // at what the whole group spent together.
       const spends = await this.chRepo.getSpendForBudgetsAcrossTenants(
         tenantIds,
-        budgets,
+        budgets.map((r) => ({
+          budgetId: r.budget.id,
+          scope: r.budget.scopeType,
+          scopeId: r.bucketScopeId,
+          window: r.budget.window,
+          match: "exact" as const,
+        })),
       );
       const out = new Map<string, string>();
       for (const s of spends) {
@@ -324,30 +394,23 @@ export class GatewayConfigMaterialiser {
 
   /**
    * Every budget that applies to this VK. ORG-scope + VK-scope always
-   * apply. TEAM/PROJECT-scope apply only when a trace project resolves
-   * (single-project-scope VK or governance fallback).
+   * apply; TEAM/PROJECT-scope only when a trace project resolves
+   * (single-project-scope VK or governance fallback); PRINCIPAL and
+   * per-member GROUP only when the key carries a principal. The scope
+   * semantics live in the shared resolver, which the request-time check
+   * and the trace fold also call, so the bundle can never disagree with
+   * what they pick.
    */
   private async applicableBudgets(
     vk: VirtualKey,
     traceProject: { id: string; teamId: string } | null,
-  ): Promise<GatewayBudget[]> {
-    const ors: NonNullable<Prisma.GatewayBudgetWhereInput["OR"]> = [
-      { scopeType: "ORGANIZATION", scopeId: vk.organizationId },
-      { scopeType: "VIRTUAL_KEY", scopeId: vk.id },
-    ];
-    if (traceProject) {
-      ors.push({ scopeType: "TEAM", scopeId: traceProject.teamId });
-      ors.push({ scopeType: "PROJECT", scopeId: traceProject.id });
-    }
-    if (vk.principalUserId) {
-      ors.push({ scopeType: "PRINCIPAL", scopeId: vk.principalUserId });
-    }
-    return this.prisma.gatewayBudget.findMany({
-      where: {
-        organizationId: vk.organizationId,
-        archivedAt: null,
-        OR: ors,
-      },
+  ): Promise<ResolvedBudget[]> {
+    return resolveApplicableBudgets(this.prisma, {
+      organizationId: vk.organizationId,
+      virtualKeyId: vk.id,
+      teamId: traceProject?.teamId ?? null,
+      projectId: traceProject?.id ?? null,
+      principalUserId: vk.principalUserId,
     });
   }
 }
@@ -504,6 +567,25 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
     case "gemini":
     case "google_gemini":
       return { api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY") };
+    // Agent Platform serves Gemini models from a path that names the project
+    // and location, so both travel with the key rather than being derived.
+    // Routing this type to an upstream is `mapProvider`'s job in the Go
+    // gateway (services/aigateway); until that lands the credential
+    // materialises but no traffic is dispatched. Validation does not go
+    // through here — see providerValidation.ts.
+    case "google_agent_platform":
+      return {
+        api_key: pick("GOOGLE_AGENT_PLATFORM_API_KEY"),
+        project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT"),
+        // `region`, not `location`: `buildProviderSlot` below lifts a
+        // slot-level region by looking up exactly that key
+        // (`pickString(credentials, "region")`), the convention every
+        // other regional provider's credentials already follow. Naming it
+        // `location` here — Google's own term, kept as the customer-facing
+        // env var name — would silently leave this provider without a
+        // slot-level region once something reads it.
+        region: pick("GOOGLE_AGENT_PLATFORM_LOCATION"),
+      };
     case "openai":
       return { api_key: pick("OPENAI_API_KEY") };
     case "deepseek":
@@ -594,8 +676,8 @@ function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
 }
 
 function scopeToWire(
-  scope: "ORGANIZATION" | "TEAM" | "PROJECT" | "VIRTUAL_KEY" | "PRINCIPAL",
-): "organization" | "team" | "project" | "virtual_key" | "principal" {
+  scope: GatewayBudget["scopeType"],
+): GatewayConfigPayload["budgets"][number]["scope"] {
   switch (scope) {
     case "ORGANIZATION":
       return "organization";
@@ -607,6 +689,21 @@ function scopeToWire(
       return "virtual_key";
     case "PRINCIPAL":
       return "principal";
+    case "GROUP":
+      return "group";
+  }
+}
+
+function routingModeToWire(
+  mode: VirtualKey["routingMode"],
+): GatewayConfigPayload["routing_mode"] {
+  switch (mode) {
+    case "NONE":
+      return "none";
+    case "FALLBACK_ALL":
+      return "fallback_all";
+    case "POLICY":
+      return "policy";
   }
 }
 

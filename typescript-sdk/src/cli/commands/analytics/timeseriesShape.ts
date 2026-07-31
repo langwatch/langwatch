@@ -10,7 +10,7 @@
  * key is the measure and what to call it, and a card that guesses its own axis
  * label is a card that will eventually mislabel someone's bill.
  *
- * Emitting the shape here also means card selection stays what ADR-059 says it
+ * Emitting the shape here also means card selection stays what ADR-079 says it
  * is: a payload is promoted because of what it demonstrably IS, not because a
  * model asserted a chart into existence.
  *

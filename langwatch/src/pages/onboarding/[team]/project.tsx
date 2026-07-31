@@ -10,8 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import ErrorPage from "~/utils/compat/next-error";
-import { useRouter } from "~/utils/compat/next-router";
 import { forwardRef, useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { SetupLayout } from "~/components/SetupLayout";
@@ -19,6 +17,8 @@ import {
   type ProjectFormData,
   TechStackSelector,
 } from "~/components/TechStack";
+import ErrorPage from "~/utils/compat/next-error";
+import { useRouter } from "~/utils/compat/next-router";
 import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";

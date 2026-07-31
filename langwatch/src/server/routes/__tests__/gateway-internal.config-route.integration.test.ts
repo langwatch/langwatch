@@ -36,7 +36,9 @@ function signedRequest(path: string) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const bodyHash = createHash("sha256").update("").digest("hex");
   const canonical = `GET\n${path}\n${timestamp}\n${bodyHash}`;
-  const signature = createHmac("sha256", SECRET).update(canonical).digest("hex");
+  const signature = createHmac("sha256", SECRET)
+    .update(canonical)
+    .digest("hex");
   return new Request(`http://localhost${path}`, {
     method: "GET",
     headers: {
@@ -55,10 +57,18 @@ describe("GET /api/internal/gateway/config/:vk_id", () => {
     process.env.LW_GATEWAY_INTERNAL_SECRET = SECRET;
 
     await prisma.organization.create({
-      data: { id: ORG_ID, name: `Cfg Org ${suffix}`, slug: `cfgroute-${suffix}` },
+      data: {
+        id: ORG_ID,
+        name: `Cfg Org ${suffix}`,
+        slug: `cfgroute-${suffix}`,
+      },
     });
     await prisma.user.create({
-      data: { id: USER_ID, name: "Cfg Route", email: `cfgroute-${suffix}@acme.test` },
+      data: {
+        id: USER_ID,
+        name: "Cfg Route",
+        email: `cfgroute-${suffix}@acme.test`,
+      },
     });
     await prisma.routingPolicy.create({
       data: {

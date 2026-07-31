@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { checkProjectPermission } from "../rbac";
 import { getApp } from "~/server/app-layer/app";
 import { PinnedToActiveShareError } from "~/server/data-retention/pinning/pinnedTrace.service";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const pinnedTraceRouter = createTRPCRouter({
   pin: protectedProcedure

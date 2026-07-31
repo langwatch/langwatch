@@ -8,10 +8,10 @@
  * functions from the shared mappingSerialization module.
  */
 import { describe, expect, it } from "vitest";
-import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import { serializeMappingsToMappingState } from "../utils/serializeMappingsToMappingState";
+import type { MappingState } from "~/server/tracer/tracesMapping";
 import { deserializeMappingStateToUI } from "../utils/deserializeMappingStateToUI";
+import { serializeMappingsToMappingState } from "../utils/serializeMappingsToMappingState";
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -35,12 +35,10 @@ describe("Feature: Thread variables available in trace-level evaluator input map
 
           const conversationMapping = result.mapping.conversation!;
           expect("type" in conversationMapping).toBe(true);
-          expect(
-            (conversationMapping as { type: string }).type,
-          ).toBe("thread");
-          expect(
-            (conversationMapping as { source: string }).source,
-          ).toBe("formatted_traces");
+          expect((conversationMapping as { type: string }).type).toBe("thread");
+          expect((conversationMapping as { source: string }).source).toBe(
+            "formatted_traces",
+          );
         });
       });
     });
@@ -98,9 +96,9 @@ describe("Feature: Thread variables available in trace-level evaluator input map
           const result = deserializeMappingStateToUI(savedMappings, "trace");
 
           expect(result.conversation!.type).toBe("source");
-          expect(
-            (result.conversation as { sourceId: string }).sourceId,
-          ).toBe("thread");
+          expect((result.conversation as { sourceId: string }).sourceId).toBe(
+            "thread",
+          );
         });
 
         it("correctly reconstructs the thread source and selectedFields in the path", () => {
@@ -138,9 +136,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
 
           const result = deserializeMappingStateToUI(savedMappings, "trace");
 
-          expect(
-            (result.input as { sourceId: string }).sourceId,
-          ).toBe("trace");
+          expect((result.input as { sourceId: string }).sourceId).toBe("trace");
         });
       });
     });

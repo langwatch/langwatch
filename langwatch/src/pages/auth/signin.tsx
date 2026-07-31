@@ -11,12 +11,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import Link from "~/utils/compat/next-link";
-import { useSearchParams } from "~/utils/compat/next-navigation";
-import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
+import Link from "~/utils/compat/next-link";
+import { useSearchParams } from "~/utils/compat/next-navigation";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { toaster } from "../../components/ui/toaster";
@@ -36,8 +36,7 @@ export default function SignIn() {
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
-  const isSocialProvider =
-    isAuthProvider && isAuthProvider !== "email";
+  const isSocialProvider = isAuthProvider && isAuthProvider !== "email";
 
   useEffect(() => {
     if (!publicEnv.data) return;
@@ -63,7 +62,14 @@ export default function SignIn() {
         error ? 2000 : 0,
       );
     }
-  }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error]);
+  }, [
+    publicEnv.data,
+    session,
+    callbackUrl,
+    isAuthProvider,
+    isSocialProvider,
+    error,
+  ]);
 
   if (error) {
     return <SignInError error={error} />;

@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { SimpleSlider } from "~/components/ui/slider";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useFacetLensStore } from "../../stores/facetLensStore";

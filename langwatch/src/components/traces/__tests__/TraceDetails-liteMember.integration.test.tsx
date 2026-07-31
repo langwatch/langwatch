@@ -4,10 +4,11 @@
  * Integration tests for TraceDetails tab visibility based on lite member status.
  * Verifies that EXTERNAL users do not see "Trace Details" or "Sequence" tabs.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
+import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Stubs — child components that aren't under test
@@ -15,9 +16,7 @@ import { OrganizationUserRole } from "@prisma/client";
 // ---------------------------------------------------------------------------
 
 const { Stub, NullStub } = vi.hoisted(() => ({
-  Stub: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  Stub: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   NullStub: () => null,
 }));
 
@@ -61,10 +60,20 @@ vi.mock("~/hooks/useAnnotationCommentStore", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    traces: { getEvaluations: { useQuery: () => ({ data: [], isLoading: false }) } },
-    annotation: { createQueueItem: { useMutation: () => ({ mutate: vi.fn() }) } },
-    pinnedTrace: { getPin: { useQuery: () => ({ data: null, isLoading: false }) } },
-    ops: { getScope: { useQuery: () => ({ data: null, isLoading: false, isSuccess: false }) } },
+    traces: {
+      getEvaluations: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+    annotation: {
+      createQueueItem: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    pinnedTrace: {
+      getPin: { useQuery: () => ({ data: null, isLoading: false }) },
+    },
+    ops: {
+      getScope: {
+        useQuery: () => ({ data: null, isLoading: false, isSuccess: false }),
+      },
+    },
     useContext: () => ({
       annotation: {
         getPendingItemsCount: { invalidate: vi.fn() },
@@ -75,25 +84,53 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/messages/Conversation", () => ({ Conversation: () => <div>Conversation</div> }));
-vi.mock("~/components/traces/Evaluations", () => ({ Evaluations: () => <div>Evaluations</div>, EvaluationsCount: NullStub, Guardrails: NullStub, Blocked: NullStub }));
-vi.mock("~/components/traces/Events", () => ({ Events: () => <div>Events</div> }));
-vi.mock("~/components/traces/SequenceDiagram", () => ({ SequenceDiagramContainer: () => <div>Sequence</div> }));
-vi.mock("~/components/traces/SpanTree", () => ({ SpanTree: () => <div>SpanTree</div> }));
-vi.mock("~/components/traces/Summary", () => ({ TraceSummary: () => <div>Summary</div> }));
+vi.mock("~/components/messages/Conversation", () => ({
+  Conversation: () => <div>Conversation</div>,
+}));
+vi.mock("~/components/traces/Evaluations", () => ({
+  Evaluations: () => <div>Evaluations</div>,
+  EvaluationsCount: NullStub,
+  Guardrails: NullStub,
+  Blocked: NullStub,
+}));
+vi.mock("~/components/traces/Events", () => ({
+  Events: () => <div>Events</div>,
+}));
+vi.mock("~/components/traces/SequenceDiagram", () => ({
+  SequenceDiagramContainer: () => <div>Sequence</div>,
+}));
+vi.mock("~/components/traces/SpanTree", () => ({
+  SpanTree: () => <div>SpanTree</div>,
+}));
+vi.mock("~/components/traces/Summary", () => ({
+  TraceSummary: () => <div>Summary</div>,
+}));
 vi.mock("~/components/traces/PinButton", () => ({ PinButton: NullStub }));
-vi.mock("~/components/traces/AddParticipants", () => ({ AddParticipants: NullStub }));
-vi.mock("~/components/AddAnnotationQueueDrawer", () => ({ AddAnnotationQueueDrawer: NullStub }));
-vi.mock("~/components/ui/drawer", () => ({ Drawer: { CloseTrigger: NullStub } }));
+vi.mock("~/components/traces/AddParticipants", () => ({
+  AddParticipants: NullStub,
+}));
+vi.mock("~/components/AddAnnotationQueueDrawer", () => ({
+  AddAnnotationQueueDrawer: NullStub,
+}));
+vi.mock("~/components/ui/drawer", () => ({
+  Drawer: { CloseTrigger: NullStub },
+}));
 vi.mock("~/components/ui/link", () => ({ Link: Stub }));
 vi.mock("~/components/ui/toaster", () => ({ toaster: { create: vi.fn() } }));
 vi.mock("~/components/ui/popover", () => ({
-  Popover: { Root: Stub, Trigger: Stub, Content: Stub, Arrow: NullStub, CloseTrigger: NullStub, Body: Stub },
+  Popover: {
+    Root: Stub,
+    Trigger: Stub,
+    Content: Stub,
+    Arrow: NullStub,
+    CloseTrigger: NullStub,
+    Body: Stub,
+  },
 }));
 
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { TraceDetails } from "~/components/traces/TraceDetails";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 // ---------------------------------------------------------------------------
 // Helpers

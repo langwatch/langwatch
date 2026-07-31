@@ -13,7 +13,6 @@
  * @see specs/api-keys/token-created-snippets.feature
  */
 
-import type React from "react";
 import {
   Alert,
   Box,
@@ -22,7 +21,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type React from "react";
 import { useMemo, useState } from "react";
+import type { ShikiCommandBoxProps } from "~/components/code/ShikiCommandBox";
+import dynamic from "~/utils/compat/next-dynamic";
 import { Dialog } from "../../../components/ui/dialog";
 import { Select } from "../../../components/ui/select";
 import { maskApiKey } from "../../../features/onboarding/components/sections/shared/api-key-utils";
@@ -31,12 +33,10 @@ import {
   CLOUD_ENDPOINT,
   findLangwatchEnvLines,
 } from "../../../features/onboarding/components/sections/shared/build-mcp-config";
+import { copyToClipboard } from "../../../features/onboarding/components/sections/shared/copy-to-clipboard";
 import { InlineCopyButton } from "../../../features/onboarding/components/sections/shared/InlineCopyButton";
 import { JsonHighlight } from "../../../features/onboarding/components/sections/shared/JsonHighlight";
 import { TabButton } from "../../../features/onboarding/components/sections/shared/TabButton";
-import { copyToClipboard } from "../../../features/onboarding/components/sections/shared/copy-to-clipboard";
-import dynamic from "~/utils/compat/next-dynamic";
-import type { ShikiCommandBoxProps } from "~/components/code/ShikiCommandBox";
 import { formatEnvLines, maskSecret } from "./utils";
 
 // Lazy-load ShikiCommandBox so /settings/api-keys/index.tsx never statically
@@ -77,7 +77,9 @@ export function TokenCreatedDialog({
 }) {
   const [assistantTab, setAssistantTab] = useState<AssistantTab>("claude-code");
   const [codeTab, setCodeTab] = useState<CodeTab>("env");
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId ?? "");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(
+    projectId ?? "",
+  );
 
   const activeProjectId = selectedProjectId || projectId;
   const maskedKey = maskApiKey(newToken ?? "");
@@ -124,7 +126,10 @@ export function TokenCreatedDialog({
     () =>
       formatEnvLines([
         { key: "LANGWATCH_API_KEY", value: newToken ?? "", mask: true },
-        { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+        {
+          key: "LANGWATCH_PROJECT_ID",
+          value: activeProjectId ?? "<your-project-id>",
+        },
         { key: "LANGWATCH_ENDPOINT", value: endpoint },
       ]),
     [newToken, activeProjectId, endpoint],
@@ -133,7 +138,10 @@ export function TokenCreatedDialog({
     () =>
       formatEnvLines([
         { key: "LANGWATCH_API_KEY", value: newToken ?? "" },
-        { key: "LANGWATCH_PROJECT_ID", value: activeProjectId ?? "<your-project-id>" },
+        {
+          key: "LANGWATCH_PROJECT_ID",
+          value: activeProjectId ?? "<your-project-id>",
+        },
         { key: "LANGWATCH_ENDPOINT", value: endpoint },
       ]),
     [newToken, activeProjectId, endpoint],

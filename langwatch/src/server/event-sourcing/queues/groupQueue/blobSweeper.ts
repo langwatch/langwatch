@@ -3,11 +3,15 @@ import type { Cluster, Redis as IORedis } from "ioredis";
 
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 
-import { blobHolderSetKey, blobLeaseSetKey, redisBlobKeyPrefix } from "./blobKeys";
+import {
+  blobHolderSetKey,
+  blobLeaseSetKey,
+  redisBlobKeyPrefix,
+} from "./blobKeys";
 import {
   BLOB_SWEEP_LUA,
-  type BlobSweepOutcome,
   BLOB_SWEEP_OUTCOMES,
+  type BlobSweepOutcome,
 } from "./blobSweepLua";
 import { CachedLuaScript } from "./cachedLuaScript";
 import { gqBlobSweepTotal } from "./metrics";
@@ -74,7 +78,8 @@ async function scanNode(
     );
     cursor = nextCursor;
     keys.push(...batch);
-    if (keys.length >= limit) return { keys: keys.slice(0, limit), truncated: true };
+    if (keys.length >= limit)
+      return { keys: keys.slice(0, limit), truncated: true };
   } while (cursor !== "0");
   return { keys, truncated: false };
 }
@@ -218,7 +223,11 @@ export class BlobSweeper {
     return tally;
   }
 
-  async sweep({ dryRun = false }: { dryRun?: boolean } = {}): Promise<BlobSweepReport> {
+  async sweep({
+    dryRun = false,
+  }: {
+    dryRun?: boolean;
+  } = {}): Promise<BlobSweepReport> {
     const startedAt = Date.now();
     const totals = emptyTally();
     const queues: BlobSweepReport["queues"] = [];

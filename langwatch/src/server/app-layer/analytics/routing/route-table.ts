@@ -304,14 +304,6 @@ const SLIM_ELIGIBLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
  * model and span type merge into one row — that is a storage concern, not a
  * read contract. Grouping on those keys is not parity-safe:
  *
- *   - **Attribution flips from per-trace to per-span.** Legacy attributes a
- *     trace's WHOLE metric to every model the trace used
- *     (`arrayJoin(if(empty(Models), ['unknown'], Models))` over trace-level
- *     `TotalCost` — see `aggregation-builder.ts`, whose comment records this
- *     as a deliberate anti-double-counting choice). The rollup instead splits
- *     the metric across each span's own model. Both are defensible; they are
- *     not the same number, and `sum` over all buckets differs too (legacy
- *     over-counts multi-model traces; the rollup totals exactly).
  *   - **Root-only columns collapse into one bucket.** `DurationSum`,
  *     `TraceCount` and `ErrorCount` are recorded on the ROOT span only. A root
  *     span is usually a workflow/agent span carrying no model, so grouping
@@ -320,12 +312,20 @@ const SLIM_ELIGIBLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
  *     happens depends on whether the customer wraps their LLM call in a parent
  *     span — i.e. the same query returns different shapes for different SDK
  *     usage.
+ *   - **No zero-contribution suppression.** The legacy builder's span-model
+ *     partition join (see `buildSpanModelPartitionJoin`) suppresses the
+ *     spurious `'unknown'` bucket a trace's model-less workflow spans would
+ *     otherwise mint; the rollup's per-(Model, SpanType) rows can't tell a
+ *     zero-contribution root apart from a genuinely model-less trace.
  *
- * `metadata.model` therefore routes to slim, which is one row per trace with a
- * `Models Array(String)` and trace-level metric columns — structurally the
- * same shape `trace_summaries` has, so it reproduces legacy exactly.
+ * `metadata.model` therefore routes to the legacy `trace_summaries` builder,
+ * whose span-model partition join attributes each additive metric (cost,
+ * tokens) to the SPAN's own model so per-model buckets sum exactly to the
+ * ungrouped totals. (It used to route to slim, whose whole-trace
+ * `arrayJoin(Models)` attribution counted a multi-model trace's FULL totals
+ * once per model, the double-count this partition join fixed.)
  * `metadata.span_type` has no slim column at all (span type is per-span; slim
- * is per-trace) and so falls back to `trace_summaries`.
+ * is per-trace) and so falls back to `trace_summaries` as well.
  *
  * INVARIANT: this set must stay a subset of `SLIM_TRACE_GROUP_BY_KEYS` —
  * anything the rollup can group by, slim must also be able to group by, since
@@ -352,14 +352,14 @@ const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
 /**
  * Group-by keys the slim trace table carries (typed columns + Attributes reads).
  *
- * `metadata.model` belongs HERE, not on the rollup. Slim's `Models` is a
- * per-trace deduplicated array and its metric columns are trace-level, so
- * `arrayJoin(if(empty(Models), ['unknown'], Models))` reproduces the legacy
- * expression character-for-character (`aggregation-builder.ts`) — same
- * buckets, same `'unknown'` label, same whole-trace attribution to every model
- * the trace used. Routing model group-bys to slim is therefore parity-safe AND
- * still a fast path. The rollup's per-span `Model` is the odd one out; see
- * `ROLLUP_TRACE_GROUP_BY_KEYS`.
+ * `metadata.model` is DELIBERATELY absent. Model group-bys attribute additive
+ * metrics (cost, tokens) per SPAN via the legacy builder's span-model
+ * partition join, so per-model buckets sum exactly to the ungrouped totals.
+ * Slim is one row per trace with no span-level data, so it can only reproduce
+ * the old whole-trace `arrayJoin(Models)` attribution, the very shape that
+ * counted a multi-model trace's FULL totals once per model (~2.9x observed on
+ * a real multi-agent session). Model group-bys therefore fall back to
+ * `trace_summaries`.
  *
  * `metadata.span_type` requires a stored_spans join (not on slim).
  */
@@ -370,7 +370,6 @@ const SLIM_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
   "metadata.thread_id",
   "metadata.customer_id",
   "metadata.labels",
-  "metadata.model",
 ]);
 
 /**

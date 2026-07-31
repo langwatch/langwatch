@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"strings"
 	"time"
 )
@@ -86,6 +87,39 @@ type BundleConfig struct {
 	// stamped on customer spans as langwatch.labels so the Trace Explorer
 	// can filter gateway traffic by tag.
 	VKTags []string
+
+	// ProvidersAllowed is the key's explicit provider allowlist, as
+	// ModelProvider row ids (the same ids Credentials carry). Empty means
+	// every provider in the bundle: that is what the control plane sends for
+	// "All providers" keys, whose bundles already contain only eligible
+	// providers. A non-empty list is enforced at dispatch too, so a stale or
+	// hand-crafted credential chain cannot reach a provider the key was
+	// narrowed away from. Contract §4.2 providers_allowed.
+	ProvidersAllowed []string
+
+	// RoutingMode is how the key behaves when its provider fails: no
+	// failover, walk every eligible provider, or follow a routing policy.
+	// Enforcement rides Fallback.MaxAttempts (pinned to 1 for
+	// RoutingModeNone by the control plane AND at wire decode, so a drifted
+	// control plane cannot silently re-arm fallback on a no-fallback key).
+	RoutingMode string
+}
+
+// Routing modes carried on the bundle wire (contract §4.2 routing_mode).
+const (
+	RoutingModeNone        = "none"
+	RoutingModeFallbackAll = "fallback_all"
+	RoutingModePolicy      = "policy"
+)
+
+// AllowsProvider reports whether a ModelProvider row id is inside the key's
+// provider allowlist. An empty allowlist allows every provider (the "All
+// providers, current and future" persistence per contract §4.2).
+func (c BundleConfig) AllowsProvider(id string) bool {
+	if len(c.ProvidersAllowed) == 0 {
+		return true
+	}
+	return slices.Contains(c.ProvidersAllowed, id)
 }
 
 // AllowsModel reports whether a model ID satisfies models_allowed. An
@@ -185,7 +219,24 @@ type BudgetConfig struct {
 
 // BudgetScope is a single budget limit with its current spend (microdollars).
 type BudgetScope struct {
-	Scope         string `json:"scope"`
+	// ID is the control-plane GatewayBudget row id, carried so a block can
+	// name the budget that caused it.
+	ID    string `json:"id"`
+	Scope string `json:"scope"`
+	// ScopeID is the bucket spend accumulates under. Equal to the budget's
+	// target for every scope except "group", where it is "<groupId>:<userId>"
+	// so each group member gets their own allowance; provider-filtered
+	// budgets additionally suffix "|provider:<modelProviderId>". The control
+	// plane computes it; the gateway only reports it back.
+	ScopeID string `json:"scope_id"`
+	// PrincipalID names the member a "group" bucket belongs to. Empty for
+	// every other scope.
+	PrincipalID string `json:"principal_id"`
+	// ProviderKey is the ModelProvider row id this budget is filtered to.
+	// Empty means the budget counts and constrains every dispatch; set means
+	// it counts only dispatches to that provider, so a breach removes the
+	// provider from the candidate chain instead of blocking the request.
+	ProviderKey   string `json:"provider_key"`
 	Window        string `json:"window"`
 	LimitMicroUSD int64  `json:"limit_micro_usd"`
 	SpentMicroUSD int64  `json:"spent_micro_usd"`

@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
-import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import type { StateProjectionDefinition } from "../../projections/stateProjection.types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   createMockFoldProjectionDefinition,
   createMockMapProjectionDefinition,
 } from "../../services/__tests__/testHelpers";
+import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types";
 import { definePipeline } from "../staticBuilder";
 
 function createMockStateProjectionDefinition<E extends Event>(
@@ -115,8 +115,7 @@ describe("StaticPipelineBuilder validations", () => {
         .build();
 
       const deduplication =
-        pipeline.foldReactors.get("settle")?.definition.options
-          ?.deduplication;
+        pipeline.foldReactors.get("settle")?.definition.options?.deduplication;
       expect(deduplication).toMatchObject({
         ttlMs: 12_000,
         extend: false,
@@ -308,6 +307,4 @@ describe("StaticPipelineBuilder validations", () => {
       ).toThrow(/already exists/);
     });
   });
-
-
 });

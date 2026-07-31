@@ -11,7 +11,7 @@
  * healthy hit on another instance, but a no-hit-with-failures result must
  * surface as a transient error rather than a false null.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   resolveStoredObjectOwner,
   StoredObjectOwnerLookupUnavailableError,
@@ -55,7 +55,10 @@ describe("resolveStoredObjectOwner", () => {
   describe("when only the shared instance is configured", () => {
     it("finds the row in the shared instance", async () => {
       mockGetAllInstances.mockResolvedValue([
-        { target: "shared", client: makeMockClient([{ project_id: "proj_a" }]) },
+        {
+          target: "shared",
+          client: makeMockClient([{ project_id: "proj_a" }]),
+        },
       ]);
 
       const owner = await resolveStoredObjectOwner({ id: "obj-1" });
@@ -79,7 +82,10 @@ describe("resolveStoredObjectOwner", () => {
     it("finds the row in the private instance even though shared has no match", async () => {
       mockGetAllInstances.mockResolvedValue([
         { target: "shared", client: makeMockClient([]) },
-        { target: "org_byoc", client: makeMockClient([{ project_id: "proj_byoc" }]) },
+        {
+          target: "org_byoc",
+          client: makeMockClient([{ project_id: "proj_byoc" }]),
+        },
       ]);
 
       const owner = await resolveStoredObjectOwner({ id: "obj-byoc" });
@@ -159,9 +165,9 @@ describe("resolveStoredObjectOwner", () => {
         throw new Error("expected throw");
       } catch (err) {
         expect(err).toBeInstanceOf(StoredObjectOwnerLookupUnavailableError);
-        expect((err as StoredObjectOwnerLookupUnavailableError).failedTargets).toEqual([
-          "org_byoc_down",
-        ]);
+        expect(
+          (err as StoredObjectOwnerLookupUnavailableError).failedTargets,
+        ).toEqual(["org_byoc_down"]);
       }
     });
   });
@@ -170,9 +176,9 @@ describe("resolveStoredObjectOwner", () => {
     it("throws a descriptive error", async () => {
       mockGetAllInstances.mockResolvedValue([]);
 
-      await expect(
-        resolveStoredObjectOwner({ id: "obj-1" }),
-      ).rejects.toThrow(/ClickHouse is not configured/);
+      await expect(resolveStoredObjectOwner({ id: "obj-1" })).rejects.toThrow(
+        /ClickHouse is not configured/,
+      );
     });
   });
 });

@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import {
   type LiqeQuery,
   type LogicalExpressionToken,
@@ -6,7 +7,6 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "liqe";
-import { createLogger } from "@langwatch/observability";
 import {
   MAX_NODE_COUNT,
   normalizeQuery,
@@ -215,17 +215,39 @@ function evaluateFreeText(
   trace: InMemoryTrace,
 ): boolean {
   // Mirrors `translateFreeText`'s `(ComputedInput ILIKE %v% OR ComputedOutput
-  // ILIKE %v%)` — including ClickHouse's three-valued logic over the
-  // Nullable(String) columns: `NULL ILIKE …` is NULL, `NULL OR true` is true,
-  // `NULL OR false` is NULL, `NOT NULL` is NULL, and a NULL predicate excludes
-  // the row. So a match on one column counts even when the other is NULL, but
-  // a negated free-text filter never matches a trace whose non-matching side
-  // includes a NULL column.
+  // ILIKE %v% OR ifNull(TraceName,'') ILIKE %v% OR <span-name subquery>)`,
+  // including ClickHouse's three-valued logic over the Nullable(String) I/O
+  // columns: `NULL ILIKE …` is NULL, `NULL OR true` is true, `NULL OR false` is
+  // NULL, `NOT NULL` is NULL, and a NULL predicate excludes the row. So a match
+  // on one column counts even when the other is NULL, but a negated free-text
+  // filter never matches a trace whose non-matching side includes a NULL column.
+  //
+  // `traceName` mirrors the SQL side's `ifNull(...)` wrapper: a definite
+  // true/false, never a NULL that propagates.
+  //
+  // Span names are the one branch that needs rows the dispatcher may not have
+  // loaded (`queryNeeds` asks for them; today's callers still pass none). When
+  // they are absent this mirror is deliberately NARROWER than the SQL clause:
+  // it can miss a span-name-only match. The alternative, treating unloaded
+  // spans as unknown and failing the tag closed, would make every negated
+  // free-text filter stop matching, which is a live dispatch behaviour. Missing
+  // the narrow span-name-only case costs less than breaking that, and a
+  // dispatcher that starts loading spans becomes exact with no change here.
   const value = extractStringValue(tag).toLowerCase();
   const inputMatch = ilikeContains(trace.summary.computedInput, value);
   const outputMatch = ilikeContains(trace.summary.computedOutput, value);
+  // `?? ""` rather than a bare deref: the type says string, but the only place
+  // that coalesce actually happens is the analytics repository's row mapping, so
+  // a summary built from a fold state that predates the field would throw here
+  // and take the whole evaluation (including trigger dispatch) down with it.
+  const nameMatch = (trace.summary.traceName ?? "")
+    .toLowerCase()
+    .includes(value);
+  const spanMatch =
+    trace.spans?.some((s) => s.name.toLowerCase().includes(value)) ?? false;
+
   const matched =
-    inputMatch === true || outputMatch === true
+    inputMatch === true || outputMatch === true || nameMatch || spanMatch
       ? true
       : inputMatch === null || outputMatch === null
         ? null
@@ -311,7 +333,12 @@ function collectNeeds(node: LiqeQuery, needs: Set<FieldNeeds>): void {
 }
 
 function collectTagNeeds(tag: TagToken, needs: Set<FieldNeeds>): void {
-  if (tag.field.type === "ImplicitField") return;
+  // Free text reaches span names through a `stored_spans` subquery, so the
+  // in-memory mirror needs the span rows to answer it without failing closed.
+  if (tag.field.type === "ImplicitField") {
+    needs.add("spans");
+    return;
+  }
   const fieldName = tag.field.name;
 
   if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) return;

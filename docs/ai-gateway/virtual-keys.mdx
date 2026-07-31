@@ -37,23 +37,57 @@ Server-side, the secret is stored as `hex(hmac_sha256(server_pepper, secret))`. 
 
 ## Creating a VK
 
-Under **AI Gateway → Virtual Keys** click **New virtual key** and fill:
+Under **AI Gateway → Virtual Keys** click **New virtual key**. The drawer walks four decisions, top to bottom: where the key lives, what it may spend, which providers it may reach, and whether it fails over.
 
-| Field | Meaning |
-|---|---|
-| Name | Human label. Used in the UI and in `langwatch.vk.name` trace attribute. |
-| Environment | `live` (default) or `test`. Reflected in the key prefix. |
-| Scopes | One or more rows selecting where the VK is valid (ORGANIZATION / TEAM / PROJECT). The picker shows every scope the caller holds `virtualKeys:manage` on. Cross-scope VKs (e.g. TEAM "platform" AND TEAM "data-sci") require manage on every named scope. |
-| Routing policy | Optional. If unset, the VK falls back to the org's default policy, ordered by `fallbackPriorityGlobal` then `createdAt` across every ModelProvider visible in the VK's scope cascade. Pin a specific policy to override the default fallback order. |
-| Models allowed | Optional allowlist. Blank = "any model the eligible ModelProviders support." |
-| Model aliases | Map of client-friendly names → `provider/model`. E.g. `gpt-4o: azure/my-deployment`. |
-| Cache policy | `respect` (default), `force`, or `disable`. |
-| Guardrails | Attach existing LangWatch evaluators as `pre`, `post`, `stream_chunk` hooks, the drawer has a dedicated picker section listing every project evaluator with `executionMode = AS_GUARDRAIL`. Fail-open toggles on pre and post directions surface the concrete `403`, 50 ms, terminal-SSE enforcement shape so operators know what the toggle actually does. See [Guardrails → Attaching guardrails to a VK](/ai-gateway/guardrails#attaching-guardrails-to-a-vk). |
-| Blocked patterns | Regex allow/deny for tool names, MCP servers, URLs. |
-| Initial budget | Optionally attach a budget on creation. Budgets can always be added later. |
-| Personal (principal) | Optional. Mark the VK as personal by setting `principalUserId`. Personal VKs cascade budgets through the principal first. The CLI device-flow self-mints a personal VK at ORG scope without requiring an explicit `virtualKeys:manage` grant. |
+<Frame caption="The create drawer: ownership with the trace destination stated inline, the budget field with the budgets the draft already inherits, provider access and routing below.">
+  ![New virtual key drawer](/images/ai-gateway/vk-create-drawer.png)
+</Frame>
 
-Click **Create**. The full secret is revealed inline with a **Copy** button and a **I've saved it, close** confirmation that must be checked before dismissing. After dismiss, the secret is gone for good.
+### Ownership
+
+Who can see and manage the key, and where its traces and costs land:
+
+- **Project** (default): the key belongs to one project, and the drawer states the consequence inline: "Traces and costs land in `<project>`".
+- **Personal**: your own key. Traces and costs land in your personal workspace, and your per-member and principal budgets apply to it.
+- **Team** / **Organization** (for roles that can create shared keys): shared keys valid across the team or the whole org. A shared key still needs one project for its traces and costs to land in, and the drawer requires that choice before it lets you create the key: spend that lands nowhere could not be capped by any budget. The destination is stored as the key's `trace_project_id`, not as a scope: it decides where traces land and nothing else, so administering that project grants no visibility into the key and no right to change it. The drawer always requires the choice; the API additionally accepts omission, in which case traces land in the org's governance project, and refuses creation only when no destination resolves at all.
+
+Ownership decides which budgets the key inherits and which providers it can reach; changing it re-resolves both live in the drawer.
+
+### Budget
+
+A dollar amount and a period (`per day`, `per week`, `per month`). Leave it empty for no cap on the key itself. The annotation states exactly what a filled budget does, for example "Max $30/day, resets 00:00 UTC" (resets are computed in UTC; see [Budgets → Windows](/ai-gateway/budgets#windows)).
+
+Creating the key with a budget creates both in one transaction, so the key never exists without the cap its creator asked for. Clearing the field later, or revoking the key, archives the budget instead of deleting it: its ledger stays as the audit trail of what the key cost.
+
+Under the field, **Inherited budgets** lists every budget that already constrains the draft key, each with its limit, period, and current spend. A provider-filtered budget is badged with which provider it counts ("OpenAI only") and a per-member group budget is badged "per member". The list is resolved by the same code the gateway enforces from, so it cannot promise a constraint that will not apply or miss one that will. Group budgets appear only when the draft key carries a principal, the person behind the key; personal ownership is the usual way a draft gains one, but any key with a principal qualifies. A shared service key has no member to charge a per-member allowance to.
+
+### Provider access
+
+A checkbox list of every provider the key's ownership can reach, each with a chip naming where the provider is configured.
+
+- **All providers** (default) persists as the absence of a list: providers added to the key's scope later become reachable **without editing the key**. This is what keeps a long-lived key current.
+- An explicit selection stays exactly as picked: a provider added later is not reachable until someone edits the key. At least one provider must stay selected.
+- Expanding a provider row shows its models; checking models restricts the key to exactly those. The restriction is per **vendor**, not per provider row: two providers of the same vendor (say, two Anthropic accounts) share one model list, and the drawer mirrors a change made under either row in both. A per-row restriction for same-vendor providers is not supported yet.
+
+<Frame caption="Provider access with a model accordion expanded: every provider carries a chip naming where it is configured, and the routing decision sits directly below.">
+  ![Provider access section](/images/ai-gateway/vk-provider-access.png)
+</Frame>
+
+### Routing
+
+What happens when the provider serving a request fails:
+
+- **Default: no fallback** (new keys): the error surfaces to the caller. No silent retry on a different vendor.
+- **Fall back to all eligible providers**: the request retries on the next eligible provider, ordered by `fallbackPriorityGlobal` then `createdAt`. Keys created before routing became an explicit choice keep this behavior.
+- **A routing policy**: pins an explicit ordered provider list.
+
+Click **Create**. The full secret is revealed exactly once with a **Copy** button and a confirmation checkbox that must be checked before dismissing. After dismiss, the secret is gone for good.
+
+The keys list shows a **Spent this month** column for every key, read from the same cost data the Usage tab reports. Clicking it opens Usage on its **This month** preset, pre-filtered to that key: the same UTC month-to-date window the column is computed over, so the number you click and the page you land on agree.
+
+<Frame caption="Spent this month on the keys list. The figures come from the cost path, so uncapped keys report real spend too.">
+  ![Spend column](/images/ai-gateway/vk-spend-column.png)
+</Frame>
 
 ## VK detail page
 
@@ -107,7 +141,7 @@ Trace attribution on every request:
 
 - `langwatch.virtual_key_id`
 - `langwatch.organization_id` (always present)
-- `langwatch.project_id` — resolution order: (a) the VK's unique PROJECT-scope row, if it has exactly one; otherwise (b) the org's `internal_governance` project, where TEAM- and ORG-scoped VK spans land so all governance traffic surfaces in one filter view. If neither exists (older self-hosted deployments without governance), the attribute is omitted rather than 500ing the bundle.
+- `langwatch.project_id`, resolution order: (a) the VK's unique PROJECT-scope row, if it has exactly one; otherwise (b) the org's `internal_governance` project, where TEAM- and ORG-scoped VK spans land so all governance traffic surfaces in one filter view. The create drawer requires org- and team-owned keys to pick their trace project explicitly (spend that lands nowhere could not be capped by any budget); the governance fallback remains for API callers and pre-existing keys.
 - `langwatch.team_id` (present when the VK has a TEAM scope, or a unique team containing the resolved project)
 - `langwatch.principal_id` (present when `principalUserId` is set on the VK)
 

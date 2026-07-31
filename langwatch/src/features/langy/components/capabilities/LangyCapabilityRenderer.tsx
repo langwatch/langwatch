@@ -20,23 +20,24 @@
  * such calls in the generic activity collapser (so a settled search never shows
  * both a "Analysing traces" line AND a traces card).
  */
+
+import { VStack } from "@chakra-ui/react";
 import {
   asJsonDocument,
+  type CliToolResult,
   namesCreatedResource,
   parseCliToolResult,
   toCliToolResult,
-  type CliToolResult,
 } from "@langwatch/langy";
-import { VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { digestOfToolCall } from "../../logic/langyCapabilityDigest";
 import { LangyCardBoundary } from "../LangyCardBoundary";
 import {
+  type CapabilityCardInput,
+  type CapabilityDescriptor,
   isProposalOutput,
   resolveCapability,
   withDecidedCard,
-  type CapabilityCardInput,
-  type CapabilityDescriptor,
 } from "./capabilityRegistry";
 import { deriveFollowUpChips } from "./followUpChips";
 import { LangyDatasetCard } from "./LangyDatasetCard";
@@ -44,8 +45,8 @@ import { LangyDeclarativeCard } from "./LangyDeclarativeCard";
 import { LangyEvalRunCard } from "./LangyEvalRunCard";
 import { LangyFollowUpChips } from "./LangyFollowUpChips";
 import { LangyMetricsCard } from "./LangyMetricsCard";
-import { LangyTimeseriesCard } from "./LangyTimeseriesCard";
 import { LangyScenarioCard } from "./LangyScenarioCard";
+import { LangyTimeseriesCard } from "./LangyTimeseriesCard";
 import { LangyTraceSampleCard } from "./LangyTraceSampleCard";
 import { LangyTracesCard } from "./LangyTracesCard";
 
@@ -123,7 +124,7 @@ function claimsNothing(result: CliToolResult): boolean {
  * required the envelope's card to equal it. A promotion's defining property is
  * that the two differ, so every promotion failed the check and the call
  * dropped out of the capability stream entirely — the mechanism could only
- * ever remove a card, never improve one. See ADR-059 §1, and the spec rule
+ * ever remove a card, never improve one. See ADR-079 §1, and the spec rule
  * "The card a result was stamped with is the card that renders".
  */
 export function capabilityRenderFor(call: CapabilityToolCall): {

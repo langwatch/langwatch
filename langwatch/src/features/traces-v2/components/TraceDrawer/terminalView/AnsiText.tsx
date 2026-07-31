@@ -5,7 +5,11 @@ import {
   type AnsiStyle,
   parseAnsi,
 } from "../../../utils/ansi/ansi";
-import { ansiColorToken, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./palette";
+import {
+  ansiColorToken,
+  TERMINAL_FONT_STACK,
+  TERMINAL_TOKENS,
+} from "./palette";
 
 /**
  * Render a raw string that may contain ANSI escape codes as selectable,
@@ -28,7 +32,9 @@ export const AnsiText = memo(function AnsiText({ text }: { text: string }) {
       // Selectable so operators can drag-select and copy, exactly like a
       // terminal. The selection highlight uses a semantic token.
       userSelect="text"
-      css={{ "&::selection, & ::selection": { bg: `${TERMINAL_TOKENS.blue}55` } }}
+      css={{
+        "&::selection, & ::selection": { bg: `${TERMINAL_TOKENS.blue}55` },
+      }}
     >
       {lines.map((line, lineIndex) => (
         <Fragment key={lineIndex}>

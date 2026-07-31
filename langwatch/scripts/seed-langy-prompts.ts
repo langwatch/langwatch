@@ -32,12 +32,12 @@
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { prisma } from "~/server/db";
 import {
   LANGY_PROMPT_DEFAULT_TAG,
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "~/server/app-layer/langy/langyPromptRegistry";
+import { prisma } from "~/server/db";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -87,7 +87,10 @@ async function upsertPrompt(params: {
 }): Promise<{ configId: string; versionId: string } | null> {
   const { service, projectId, organizationId, handle, prompt, dryRun } = params;
 
-  const existing = await service.getPromptByIdOrHandle({ idOrHandle: handle, projectId });
+  const existing = await service.getPromptByIdOrHandle({
+    idOrHandle: handle,
+    projectId,
+  });
 
   if (existing && existing.prompt.trim() === prompt.trim()) {
     console.log(`  = ${handle}: unchanged (v${existing.version}) — skipping`);
@@ -134,7 +137,11 @@ async function main() {
 
   const project = await prisma.project.findUnique({
     where: { id: args.projectId },
-    select: { id: true, name: true, team: { select: { organizationId: true } } },
+    select: {
+      id: true,
+      name: true,
+      team: { select: { organizationId: true } },
+    },
   });
   if (!project) {
     throw new Error(`Project not found: ${args.projectId}`);
@@ -152,7 +159,10 @@ async function main() {
 
   const targets: Array<{ handle: string; prompt: string }> = [
     { handle: LANGY_PROMPT_HANDLES.agentDefinition, prompt: agentDefinition },
-    { handle: LANGY_PROMPT_HANDLES.turnOverride, prompt: LANGY_TURN_OVERRIDE_FALLBACK },
+    {
+      handle: LANGY_PROMPT_HANDLES.turnOverride,
+      prompt: LANGY_TURN_OVERRIDE_FALLBACK,
+    },
   ];
 
   for (const { handle, prompt } of targets) {

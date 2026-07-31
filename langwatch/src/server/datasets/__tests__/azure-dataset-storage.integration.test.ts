@@ -17,7 +17,15 @@
  * `.integration.test.ts` runs in CI under testcontainers; locally without
  * Docker the integration runner won't start — that's expected.
  */
-import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const { mockEnv } = vi.hoisted(() => ({
   mockEnv: {} as Record<string, string | undefined>,
@@ -31,13 +39,13 @@ vi.mock("~/server/stored-objects/project-storage-destination", () => ({
 }));
 
 import { nanoid } from "nanoid";
-import { AzureDatasetStorage } from "../azure-dataset-storage";
 import {
   ensureAzuriteContainer,
+  type StartedAzurite,
   startAzurite,
   stopAzurite,
-  type StartedAzurite,
 } from "../../stored-objects/__tests__/azurite-test-support";
+import { AzureDatasetStorage } from "../azure-dataset-storage";
 
 const CONTAINER = "datasets";
 
@@ -75,7 +83,11 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
         const datasetId = `d-${nanoid(6)}`;
         const records = [{ a: 1 }, { a: 2 }, { a: 3 }];
 
-        const chunks = await storage.writeChunks({ projectId, datasetId, records });
+        const chunks = await storage.writeChunks({
+          projectId,
+          datasetId,
+          records,
+        });
         const rows = await storage.readChunks({
           projectId,
           datasetId,
@@ -117,18 +129,26 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
   describe("rewriteChunk()", () => {
     describe("when a chunk is rewritten in place", () => {
       it("returns the replacement rows on the next read", async () => {
-      const projectId = `p-${nanoid(6)}`;
-      const datasetId = `d-${nanoid(6)}`;
-      await storage.writeChunks({ projectId, datasetId, records: [{ a: 1 }] });
+        const projectId = `p-${nanoid(6)}`;
+        const datasetId = `d-${nanoid(6)}`;
+        await storage.writeChunks({
+          projectId,
+          datasetId,
+          records: [{ a: 1 }],
+        });
 
-      await storage.rewriteChunk({
-        projectId,
-        datasetId,
-        index: 0,
-        records: [{ a: 99 }],
-      });
+        await storage.rewriteChunk({
+          projectId,
+          datasetId,
+          index: 0,
+          records: [{ a: 99 }],
+        });
 
-        const rows = await storage.readChunk({ projectId, datasetId, index: 0 });
+        const rows = await storage.readChunk({
+          projectId,
+          datasetId,
+          index: 0,
+        });
         expect(rows).toEqual([{ a: 99 }]);
       });
     });
@@ -137,27 +157,31 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
   describe("deleteChunksFrom()", () => {
     describe("when deleting from a non-zero index", () => {
       it("removes the tail and leaves earlier chunks readable", async () => {
-      const projectId = `p-${nanoid(6)}`;
-      const datasetId = `d-${nanoid(6)}`;
-      await storage.writeChunks({
-        projectId,
-        datasetId,
-        records: [{ a: 1 }],
-      });
-      await storage.writeChunks({
-        projectId,
-        datasetId,
-        records: [{ a: 2 }],
-        fromIndex: 1,
-      });
+        const projectId = `p-${nanoid(6)}`;
+        const datasetId = `d-${nanoid(6)}`;
+        await storage.writeChunks({
+          projectId,
+          datasetId,
+          records: [{ a: 1 }],
+        });
+        await storage.writeChunks({
+          projectId,
+          datasetId,
+          records: [{ a: 2 }],
+          fromIndex: 1,
+        });
 
-      await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 1 });
+        await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 1 });
 
-      await expect(
-        storage.readChunk({ projectId, datasetId, index: 1 }),
-      ).rejects.toThrow();
-      // Chunk 0 still readable — only the tail was deleted.
-        const rows = await storage.readChunk({ projectId, datasetId, index: 0 });
+        await expect(
+          storage.readChunk({ projectId, datasetId, index: 1 }),
+        ).rejects.toThrow();
+        // Chunk 0 still readable — only the tail was deleted.
+        const rows = await storage.readChunk({
+          projectId,
+          datasetId,
+          index: 0,
+        });
         expect(rows).toEqual([{ a: 1 }]);
       });
     });
@@ -166,26 +190,28 @@ describe("AzureDatasetStorage against a real Azurite emulator", () => {
   describe("putStaged() / streamStaged() / headStagedObjectSize()", () => {
     describe("when a staged upload is deposited server-side", () => {
       it("round-trips the bytes and reports the size before deletion", async () => {
-      const { Readable } = await import("node:stream");
-      const projectId = `p-${nanoid(6)}`;
-      const key = `staging/${projectId}/${nanoid(6)}`;
+        const { Readable } = await import("node:stream");
+        const projectId = `p-${nanoid(6)}`;
+        const key = `staging/${projectId}/${nanoid(6)}`;
 
-      await storage.putStaged({
-        projectId,
-        key,
-        body: Readable.from([Buffer.from("staged bytes", "utf-8")]),
-      });
+        await storage.putStaged({
+          projectId,
+          key,
+          body: Readable.from([Buffer.from("staged bytes", "utf-8")]),
+        });
 
-      const size = await storage.headStagedObjectSize({ projectId, key });
-      expect(size).toBe(Buffer.byteLength("staged bytes"));
+        const size = await storage.headStagedObjectSize({ projectId, key });
+        expect(size).toBe(Buffer.byteLength("staged bytes"));
 
-      const stream = await storage.streamStaged({ projectId, key });
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks).toString("utf-8")).toBe("staged bytes");
+        const stream = await storage.streamStaged({ projectId, key });
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        expect(Buffer.concat(chunks).toString("utf-8")).toBe("staged bytes");
 
         await storage.deleteStaged({ projectId, key });
-        await expect(storage.streamStaged({ projectId, key })).rejects.toThrow();
+        await expect(
+          storage.streamStaged({ projectId, key }),
+        ).rejects.toThrow();
       });
     });
   });

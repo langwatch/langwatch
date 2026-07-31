@@ -133,9 +133,7 @@ describe("<PromptEditorFooter/>", () => {
         </TestWrapper>,
       );
 
-      expect(
-        screen.getByRole("button", { name: "Apply" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
     });
   });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { filterDiscoveredByAggregateIds } from "../replayDiscovery";
 import type { DiscoveredAggregate } from "../replayEventLoader";
 
@@ -23,7 +23,11 @@ describe("filterDiscoveredByAggregateIds", () => {
       it("returns only the matching aggregates", () => {
         const { allAggregates, byTenant } = buildDiscovery();
 
-        const filtered = filterDiscoveredByAggregateIds({ allAggregates, byTenant, aggregateIds: ["agg-1", "agg-3"] });
+        const filtered = filterDiscoveredByAggregateIds({
+          allAggregates,
+          byTenant,
+          aggregateIds: ["agg-1", "agg-3"],
+        });
 
         expect(filtered.map((a) => a.aggregateId)).toEqual(["agg-1", "agg-3"]);
       });
@@ -31,7 +35,11 @@ describe("filterDiscoveredByAggregateIds", () => {
       it("mutates byTenant in place to keep only matching aggregates", () => {
         const { allAggregates, byTenant } = buildDiscovery();
 
-        filterDiscoveredByAggregateIds({ allAggregates, byTenant, aggregateIds: ["agg-1", "agg-3"] });
+        filterDiscoveredByAggregateIds({
+          allAggregates,
+          byTenant,
+          aggregateIds: ["agg-1", "agg-3"],
+        });
 
         expect(byTenant.get("tenant-a")?.map((a) => a.aggregateId)).toEqual([
           "agg-1",
@@ -46,7 +54,11 @@ describe("filterDiscoveredByAggregateIds", () => {
       it("deletes that tenant from the byTenant map", () => {
         const { allAggregates, byTenant } = buildDiscovery();
 
-        const filtered = filterDiscoveredByAggregateIds({ allAggregates, byTenant, aggregateIds: ["agg-3"] });
+        const filtered = filterDiscoveredByAggregateIds({
+          allAggregates,
+          byTenant,
+          aggregateIds: ["agg-3"],
+        });
 
         expect(byTenant.has("tenant-a")).toBe(false);
         expect(byTenant.get("tenant-b")?.map((a) => a.aggregateId)).toEqual([
@@ -60,7 +72,11 @@ describe("filterDiscoveredByAggregateIds", () => {
       it("returns no aggregates and empties the byTenant map", () => {
         const { allAggregates, byTenant } = buildDiscovery();
 
-        const filtered = filterDiscoveredByAggregateIds({ allAggregates, byTenant, aggregateIds: ["agg-nope"] });
+        const filtered = filterDiscoveredByAggregateIds({
+          allAggregates,
+          byTenant,
+          aggregateIds: ["agg-nope"],
+        });
 
         expect(filtered).toEqual([]);
         expect(byTenant.size).toBe(0);
@@ -71,7 +87,11 @@ describe("filterDiscoveredByAggregateIds", () => {
       it("returns the input unchanged and leaves byTenant untouched", () => {
         const { allAggregates, byTenant } = buildDiscovery();
 
-        const filtered = filterDiscoveredByAggregateIds({ allAggregates, byTenant, aggregateIds: undefined });
+        const filtered = filterDiscoveredByAggregateIds({
+          allAggregates,
+          byTenant,
+          aggregateIds: undefined,
+        });
 
         expect(filtered).toBe(allAggregates);
         expect(byTenant.size).toBe(2);
@@ -84,7 +104,11 @@ describe("filterDiscoveredByAggregateIds", () => {
       it("returns the input unchanged and leaves byTenant untouched", () => {
         const { allAggregates, byTenant } = buildDiscovery();
 
-        const filtered = filterDiscoveredByAggregateIds({ allAggregates, byTenant, aggregateIds: [] });
+        const filtered = filterDiscoveredByAggregateIds({
+          allAggregates,
+          byTenant,
+          aggregateIds: [],
+        });
 
         expect(filtered).toBe(allAggregates);
         expect(byTenant.size).toBe(2);

@@ -9,10 +9,18 @@
  * appropriate SSE event format for the frontend.
  */
 
+import { HandledError } from "@langwatch/handled-error";
+import { trace as otelTrace } from "@opentelemetry/api";
+
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import { EvaluatorExecutionError } from "~/server/app-layer/evaluations/errors";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
-import type { EvaluationV3Event } from "./types";
+import {
+  type EvaluationV3EvaluatorResult,
+  type EvaluationV3Event,
+  UNNAMED_FAILURE,
+} from "./types";
 
 /**
  * Configuration for result mapping.
@@ -167,6 +175,8 @@ export const mapTargetResult = (
     timestamps?: { started_at?: number; finished_at?: number };
     trace_id?: string;
     error?: string;
+    error_type?: string;
+    upstream_status?: number;
   },
   options?: { isEvaluatorAsTarget?: boolean },
 ): EvaluationV3Event => {
@@ -180,6 +190,18 @@ export const mapTargetResult = (
         executionState.timestamps.started_at
       : undefined;
 
+  // A coded engine failure travels the handled channel; the raw `error`
+  // string is kept only as a legacy fallback for engines that don't send a
+  // code. See `nodeErrorToDomainError`.
+  const domainError = executionState.error_type
+    ? nodeErrorToDomainError({
+        errorType: executionState.error_type,
+        message: executionState.error,
+        upstreamStatus: executionState.upstream_status,
+        traceId: executionState.trace_id,
+      })
+    : undefined;
+
   return {
     type: "target_result",
     rowIndex,
@@ -191,6 +213,7 @@ export const mapTargetResult = (
     duration,
     traceId: executionState.trace_id,
     error: executionState.error,
+    ...(domainError ? { domainError } : {}),
   };
 };
 
@@ -361,6 +384,8 @@ export const mapNlpEvent = ({
         timestamps: execution_state.timestamps,
         trace_id: execution_state.trace_id,
         error: isError ? execution_state.error : undefined,
+        error_type: isError ? execution_state.error_type : undefined,
+        upstream_status: isError ? execution_state.upstream_status : undefined,
       },
       { isEvaluatorAsTarget },
     );
@@ -390,17 +415,50 @@ export const mapNlpEvent = ({
 };
 
 /**
- * Maps an error event to an error SSE event.
+ * Maps a *thrown* failure to an error SSE event.
+ *
+ * A handled error travels as its code on `domainError`, and the client renders
+ * the registry's copy for it. An unhandled one has nothing safe to say — its
+ * `message` can carry a Prisma string, a hostname or a Go net error — so the
+ * frame carries {@link UNNAMED_FAILURE}, a marker, and the client's own
+ * fallback copy owns the words. See ADR-045.
+ *
+ * The failure's own message is neither sent nor stored. It goes to the log
+ * line at the catch site, beside the trace id this frame carries, which is
+ * what ties "it broke" to what actually broke. Storing it instead put a
+ * `connect ECONNREFUSED 10.0.0.5:5432` into the customer's cell every time
+ * they reloaded the run.
  */
-export const mapErrorEvent = (
-  message: string,
-  rowIndex?: number,
-  targetId?: string,
-  evaluatorId?: string,
-): EvaluationV3Event => {
+export const mapThrownErrorEvent = ({
+  error,
+  rowIndex,
+  targetId,
+  evaluatorId,
+}: {
+  error: unknown;
+  rowIndex?: number;
+  targetId?: string;
+  evaluatorId?: string;
+}): EvaluationV3Event => {
+  const activeTraceId = otelTrace.getActiveSpan()?.spanContext().traceId;
+
+  if (HandledError.isHandled(error)) {
+    return {
+      type: "error",
+      // The wire message for a handled error is its code (#5984).
+      message: error.code,
+      domainError: error.serialize(),
+      traceId: error.traceId ?? activeTraceId,
+      rowIndex,
+      targetId,
+      evaluatorId,
+    };
+  }
+
   return {
     type: "error",
-    message,
+    message: UNNAMED_FAILURE,
+    traceId: activeTraceId,
     rowIndex,
     targetId,
     evaluatorId,
@@ -427,6 +485,17 @@ export const mapWorkflowEvaluatorResult = (
     outputs?: Record<string, unknown>;
     cost?: number;
     error?: string;
+    /**
+     * The engine's stable code for the failure (`NodeError.Type`).
+     *
+     * Named apart from the result's own `error_type` below, which is a
+     * free-text display label ("EvaluatorError") on `SingleEvaluationResult`.
+     * One identifier meaning both a stable code and a display string, twelve
+     * lines apart, is how a code ends up rendered as a label.
+     */
+    nodeErrorCode?: string;
+    upstream_status?: number;
+    trace_id?: string;
   },
 ): EvaluationV3Event => {
   const hasExecutionError = !!executionState.error;
@@ -434,7 +503,20 @@ export const mapWorkflowEvaluatorResult = (
     executionState.status === "error" ||
     executionState.outputs?.status === "error";
 
-  const result: SingleEvaluationResult =
+  // A coded engine failure travels the handled channel, exactly as on the
+  // target side (`mapTargetResult`): the client renders registry copy for the
+  // code and keeps `details` for the raw-text popover. See
+  // `nodeErrorToDomainError`.
+  const domainError = executionState.nodeErrorCode
+    ? nodeErrorToDomainError({
+        errorType: executionState.nodeErrorCode,
+        message: executionState.error,
+        upstreamStatus: executionState.upstream_status,
+        traceId: executionState.trace_id,
+      })
+    : undefined;
+
+  const result: EvaluationV3EvaluatorResult =
     hasExecutionError || hasEvaluatorError
       ? {
           status: "error",
@@ -446,6 +528,7 @@ export const mapWorkflowEvaluatorResult = (
               : undefined) ??
             "Unknown evaluator error",
           traceback: [],
+          ...(domainError ? { domainError } : {}),
         }
       : {
           status: "processed",

@@ -6,10 +6,7 @@ import {
   stableStringify,
 } from "../metric-processing/canonical/serialization";
 import type { PIIRedactionLevel } from "../trace-processing/schemas/commands";
-import type {
-  OtlpAnyValue,
-  OtlpKeyValue,
-} from "../trace-processing/schemas/otlp";
+import type { OtlpKeyValue } from "../trace-processing/schemas/otlp";
 import {
   normalizeOtlpAttributeMap,
   TraceRequestUtils,

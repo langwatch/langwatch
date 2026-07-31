@@ -14,7 +14,6 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { ExecutionCell } from "../types";
 import {
   buildCellWorkflow,
-  buildCodeNodeFromAgent,
   buildEvaluatorNode,
   buildEvaluatorTargetNode,
   buildHttpNodeFromAgent,

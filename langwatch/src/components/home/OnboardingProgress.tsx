@@ -1,11 +1,4 @@
-import {
-  Box,
-  Grid,
-  HStack,
-  Progress,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Grid, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { useAnalytics } from "react-contextual-analytics";
 import type { IconType } from "react-icons";

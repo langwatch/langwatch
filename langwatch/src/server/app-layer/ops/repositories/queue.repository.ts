@@ -1,8 +1,6 @@
-import type {
-  GroupInfo,
-  QueueInfo,
-  ErrorCluster,
-} from "../types";
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
+
+import type { ErrorCluster, QueueInfo } from "../types";
 
 export interface BlockedSummary {
   totalBlocked: number;
@@ -58,9 +56,7 @@ export interface QueueRepository {
     pageSize: number;
   }): Promise<{ jobs: JobEntry[]; total: number }>;
 
-  getBlockedSummary(params: {
-    queueNames: string[];
-  }): Promise<BlockedSummary>;
+  getBlockedSummary(params: { queueNames: string[] }): Promise<BlockedSummary>;
 
   unblockGroup(params: {
     queueName: string;
@@ -76,15 +72,9 @@ export interface QueueRepository {
     groupId: string;
   }): Promise<{ jobsRemoved: number }>;
 
-  pausePipeline(params: {
-    queueName: string;
-    key: string;
-  }): Promise<void>;
+  pausePipeline(params: { queueName: string; key: string }): Promise<void>;
 
-  unpausePipeline(params: {
-    queueName: string;
-    key: string;
-  }): Promise<void>;
+  unpausePipeline(params: { queueName: string; key: string }): Promise<void>;
 
   retryBlocked(params: {
     queueName: string;
@@ -92,23 +82,13 @@ export interface QueueRepository {
     jobId: string;
   }): Promise<{ wasBlocked: boolean }>;
 
-  listPausedKeys(params: {
-    queueName: string;
-  }): Promise<string[]>;
+  listPausedKeys(params: { queueName: string }): Promise<string[]>;
 
-  pauseTenant(params: {
-    queueName: string;
-    tenantId: string;
-  }): Promise<void>;
+  pauseTenant(params: { queueName: string; tenantId: string }): Promise<void>;
 
-  unpauseTenant(params: {
-    queueName: string;
-    tenantId: string;
-  }): Promise<void>;
+  unpauseTenant(params: { queueName: string; tenantId: string }): Promise<void>;
 
-  listPausedTenants(params: {
-    queueName: string;
-  }): Promise<string[]>;
+  listPausedTenants(params: { queueName: string }): Promise<string[]>;
 
   drainTenant(params: {
     queueName: string;
@@ -150,9 +130,7 @@ export interface QueueRepository {
     pipelineFilter?: string;
   }): Promise<{ unblockedCount: number; groupIds: string[] }>;
 
-  listDlqGroups(params: {
-    queueName: string;
-  }): Promise<DlqGroupInfo[]>;
+  listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]>;
 
   drainAllBlockedPreview(params: {
     queueName: string;
@@ -160,9 +138,7 @@ export interface QueueRepository {
     errorFilter?: string;
   }): Promise<DrainPreview>;
 
-  reconcileTotalPending(
-    queueName: string,
-  ): Promise<ReconcileResult | null>;
+  reconcileTotalPending(queueName: string): Promise<ReconcileResult | null>;
 }
 
 export class NullQueueRepository implements QueueRepository {

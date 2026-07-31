@@ -10,6 +10,7 @@
  */
 export const ASSISTANT_KINDS = [
   "claude_code",
+  "claude_cowork",
   "codex",
   "gemini",
   "opencode",
@@ -38,6 +39,13 @@ export const ASSISTANT_PRESETS: Record<
 > = {
   claude_code: {
     label: "Claude Code",
+    iconUrl: "/images/external-icons/claude-code.svg",
+    darkModeInvert: false,
+  },
+  // Same brand mark as Claude Code — Cowork is the desktop runtime of the
+  // same product family, and no separate icon asset exists for it.
+  claude_cowork: {
+    label: "Claude Cowork",
     iconUrl: "/images/external-icons/claude-code.svg",
     darkModeInvert: false,
   },
@@ -72,9 +80,10 @@ export const ASSISTANT_OPTIONS: Array<{
   value: AssistantKind;
   label: string;
 }> = [
-  ...(Object.entries(ASSISTANT_PRESETS) as Array<[
-    Exclude<AssistantKind, "custom">,
-    AssistantPreset,
-  ]>).map(([value, p]) => ({ value, label: p.label })),
+  ...(
+    Object.entries(ASSISTANT_PRESETS) as Array<
+      [Exclude<AssistantKind, "custom">, AssistantPreset]
+    >
+  ).map(([value, p]) => ({ value, label: p.label })),
   { value: "custom" as const, label: "Custom" },
 ];

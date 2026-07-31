@@ -1,9 +1,12 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
-import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { applySpanToSummary } from "../traceSummary.foldProjection";
+import {
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 const PARTIAL_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_PARTIAL_SPAN_IDS;
 const SKIPPED_KEY = ATTR_KEYS.LANGWATCH_RESERVED_PII_REDACTION_SKIPPED_SPAN_IDS;
@@ -42,7 +45,10 @@ describe("applySpanToSummary PII redaction status tracking", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(getPartialSpanIds(result)).toEqual(["partial-span-1"]);
       expect(getSkippedSpanIds(result)).toEqual([]);
@@ -58,7 +64,10 @@ describe("applySpanToSummary PII redaction status tracking", () => {
         },
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(getSkippedSpanIds(result)).toEqual(["skipped-span-1"]);
       expect(getPartialSpanIds(result)).toEqual([]);
@@ -72,7 +81,10 @@ describe("applySpanToSummary PII redaction status tracking", () => {
         spanAttributes: {},
       });
 
-      const result = applySpanToSummary({ state: createInitState(), span: span });
+      const result = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(result.attributes[PARTIAL_KEY]).toBeUndefined();
       expect(result.attributes[SKIPPED_KEY]).toBeUndefined();

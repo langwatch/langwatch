@@ -27,14 +27,14 @@ import {
   truncateLabel,
 } from "./chartAxisLabels";
 import { ComparisonLeaderboardChart } from "./ComparisonLeaderboardChart";
-import { WinRateChart } from "./WinRateChart";
 import type {
-  BatchEvaluationData,
   BatchComparisonColumn,
+  BatchEvaluationData,
   BatchResultRow,
   ComparisonRunData,
 } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
+import { WinRateChart } from "./WinRateChart";
 
 /** Metric types that can be displayed */
 type MetricType =

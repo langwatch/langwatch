@@ -22,7 +22,7 @@ import * as semconv from "../../semconv";
 describe("Tracer Provider Configuration E2E", () => {
   const setup = setupE2ETest();
 
-  it("should work with standard tracer provider", async () => {
+  it("works with standard tracer provider", async () => {
     const tracer = createTestTracer("standard-provider");
     const testIds = generateTestIds();
     let traceId: string;
@@ -61,7 +61,7 @@ describe("Tracer Provider Configuration E2E", () => {
     expect(span!.metrics).toBeTruthy();
   }, E2E_CONFIG.timeout);
 
-  it("should handle multiple tracer instances", async () => {
+  it("handles multiple tracer instances", async () => {
     const tracer1 = createTestTracer("service-1");
     const tracer2 = createTestTracer("service-2");
     const testIds = generateTestIds();
@@ -117,7 +117,7 @@ describe("Tracer Provider Configuration E2E", () => {
     expectSpanAttribute(span2!, "tracer.service", "service-2");
   }, E2E_CONFIG.timeout);
 
-  it("should handle nested spans with context", async () => {
+  it("handles nested spans with context", async () => {
     const tracer = createTestTracer("context-propagation");
     const testIds = generateTestIds();
     let traceId: string;

@@ -18,7 +18,7 @@
  * deeply, because the shape is the contract — the SDK does the actual
  * resolution from there.
  */
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createS3Client } from "../storage";
 
 const s3ClientConstructorCalls: any[] = [];
@@ -279,7 +279,6 @@ describe("given the resolved destination is azure", () => {
         /azure/i,
       );
       expect(s3ClientConstructorCalls).toHaveLength(0);
-
     });
   });
 
@@ -299,7 +298,6 @@ describe("given the resolved destination is azure", () => {
       expect(s3ClientConstructorCalls).toHaveLength(1);
       // The hardcoded "langwatch" fallback is still never invented for azure.
       expect(s3Bucket).not.toBe("langwatch");
-
     });
   });
 });

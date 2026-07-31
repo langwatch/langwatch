@@ -196,6 +196,9 @@ const registry = {
       "Wait for the current response to finish before sending another message",
     ],
   },
+  langy_rate_limited: {
+    tips: ["Wait a few seconds before sending another message"],
+  },
   langy_turn_not_stoppable: {
     tips: [
       "Read the conversation to find the turn it currently has in flight, and stop that one",
@@ -262,6 +265,24 @@ const registry = {
   },
   langy_worker_restarting: {
     tips: ["An update interrupted this reply — resend the message"],
+  },
+
+  // ---- licensing ----
+  license_signing_key_not_pem: {
+    tips: [
+      "Provide the whole private key, including its BEGIN and END lines (PRIVATE KEY, RSA PRIVATE KEY and EC PRIVATE KEY are all accepted)",
+      "A public key cannot sign — check that this is the private half of the license signing pair",
+    ],
+  },
+  license_signing_key_encrypted: {
+    tips: [
+      "Provide an unencrypted private key — a passphrase-protected key cannot be used for signing",
+    ],
+  },
+  license_signing_failed: {
+    tips: [
+      "Check that this is the license signing key and that it was copied in full",
+    ],
   },
 } as const satisfies Record<string, RemediationEntry>;
 

@@ -12,12 +12,10 @@ interface FoundryProjectStore {
   setSelectedProject(projectId: string, apiKey: string): void;
 }
 
-export const useFoundryProjectStore = create<FoundryProjectStore>(
-  (set) => ({
-    selectedProjectId: null,
-    selectedApiKey: null,
-    setSelectedProject(projectId, apiKey) {
-      set({ selectedProjectId: projectId, selectedApiKey: apiKey });
-    },
-  })
-);
+export const useFoundryProjectStore = create<FoundryProjectStore>((set) => ({
+  selectedProjectId: null,
+  selectedApiKey: null,
+  setSelectedProject(projectId, apiKey) {
+    set({ selectedProjectId: projectId, selectedApiKey: apiKey });
+  },
+}));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AnalyticsComparator } from "../analytics-comparator";
-import type { TimeseriesResult, FilterDataResult } from "../types";
+import type { FilterDataResult, TimeseriesResult } from "../types";
 
 describe("AnalyticsComparator", () => {
   describe("findDiscrepancies", () => {
@@ -296,7 +296,12 @@ describe("AnalyticsComparator", () => {
 
       // Does not throw
       expect(() => {
-        comparator.compare("getTimeseries", { projectId: "test" }, esResult, chResult);
+        comparator.compare(
+          "getTimeseries",
+          { projectId: "test" },
+          esResult,
+          chResult,
+        );
       }).not.toThrow();
     });
 
@@ -308,7 +313,12 @@ describe("AnalyticsComparator", () => {
       };
 
       expect(() => {
-        comparator.compare("getTimeseries", { projectId: "test" }, result, result);
+        comparator.compare(
+          "getTimeseries",
+          { projectId: "test" },
+          result,
+          result,
+        );
       }).not.toThrow();
     });
   });
@@ -316,7 +326,7 @@ describe("AnalyticsComparator", () => {
   describe("custom tolerance", () => {
     it("respects custom tolerance percentage", () => {
       const strictComparator = new AnalyticsComparator(0.01); // 1%
-      const lenientComparator = new AnalyticsComparator(0.10); // 10%
+      const lenientComparator = new AnalyticsComparator(0.1); // 10%
 
       const esResult: TimeseriesResult = {
         currentPeriod: [{ date: "2024-01-01", count: 100 }],
@@ -327,8 +337,14 @@ describe("AnalyticsComparator", () => {
         previousPeriod: [],
       };
 
-      const strictDiscrepancies = strictComparator.findDiscrepancies(esResult, chResult);
-      const lenientDiscrepancies = lenientComparator.findDiscrepancies(esResult, chResult);
+      const strictDiscrepancies = strictComparator.findDiscrepancies(
+        esResult,
+        chResult,
+      );
+      const lenientDiscrepancies = lenientComparator.findDiscrepancies(
+        esResult,
+        chResult,
+      );
 
       expect(strictDiscrepancies.length).toBeGreaterThan(0);
       expect(lenientDiscrepancies).toEqual([]);

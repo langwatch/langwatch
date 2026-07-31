@@ -97,7 +97,7 @@ function triggerBarrelRoll() {
   if (dialog) {
     dialog.animate(
       [{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }],
-      { duration: 1000, easing: "ease-in-out" }
+      { duration: 1000, easing: "ease-in-out" },
     );
   }
 }

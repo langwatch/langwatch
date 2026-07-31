@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { LoadingScreen } from "../components/LoadingScreen";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 

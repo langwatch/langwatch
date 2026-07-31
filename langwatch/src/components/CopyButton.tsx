@@ -2,10 +2,8 @@ import { Button, type ButtonProps } from "@chakra-ui/react";
 import { CopyIcon } from "lucide-react";
 import { toaster } from "./ui/toaster";
 
-interface CopyButtonProps extends Omit<
-  ButtonProps,
-  "value" | "label" | "onClick"
-> {
+interface CopyButtonProps
+  extends Omit<ButtonProps, "value" | "label" | "onClick"> {
   value: string;
   label: string;
 }

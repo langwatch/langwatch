@@ -461,7 +461,7 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
     // Idempotent re-drive guard (I-IDEM): only a `processing` dataset is
     // normalizable. A re-enqueue after success (ready) or a concurrent finalize
     // race is a no-op.
-    if (!dataset || dataset.status !== "processing") return;
+    if (dataset?.status !== "processing") return;
 
     const storage = await deps.getStorage(projectId);
 

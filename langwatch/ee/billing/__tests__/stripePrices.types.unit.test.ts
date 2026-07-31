@@ -14,7 +14,9 @@ describe("stripePrices.types", () => {
       "ACCELERATE_TRACES_100K",
     ];
 
-    expect(STRIPE_PRICE_NAMES.length).toBeGreaterThanOrEqual(requiredKeys.length);
+    expect(STRIPE_PRICE_NAMES.length).toBeGreaterThanOrEqual(
+      requiredKeys.length,
+    );
 
     for (const key of requiredKeys) {
       expect(STRIPE_PRICE_NAMES).toContain(key);

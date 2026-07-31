@@ -10,7 +10,7 @@ import { useSession } from "~/utils/auth-client";
 export const getGreetingName = (
   name: string | null | undefined,
 ): string | null => {
-  if (!name || !name.trim()) {
+  if (!name?.trim()) {
     return null;
   }
 

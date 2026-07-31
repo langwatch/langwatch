@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { LATEST_SPEC_VERSION, type HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import {
+  type HttpComponentConfig,
+  LATEST_SPEC_VERSION,
+} from "~/optimization_studio/types/dsl";
 import {
   createInitialState,
   DEFAULT_TEST_DATA_ID,

@@ -25,7 +25,7 @@ Feature: Resource caps — shared services can't take the machine
 
   @integration @unimplemented
   Scenario: The doctor shows each service's memory footprint
-    When I run "haven doctor"
+    When I run "haven status"
     Then the ClickHouse line includes its current memory use against its cap
     And the Redis line includes its current memory use against its ceiling
     And the running stacks line includes their combined memory footprint

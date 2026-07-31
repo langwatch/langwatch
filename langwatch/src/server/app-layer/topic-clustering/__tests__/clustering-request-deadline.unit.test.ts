@@ -58,20 +58,22 @@ vi.mock("../../../langevals/stagedFetch", () => ({
 
 import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import {
+  fetchTopicsBatchClustering,
+  fetchTopicsIncrementalClustering,
+  TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
+} from "../clustering";
+import {
   CLUSTERING_ERROR_CODES,
   classifyClusteringError,
 } from "../clustering-error";
-import {
-  TOPIC_CLUSTERING_REQUEST_DEADLINE_MS,
-  fetchTopicsBatchClustering,
-  fetchTopicsIncrementalClustering,
-} from "../clustering";
 
 const batchParams = {
   project_id: "proj-1",
   litellm_params: { model: "gpt-5-mini" },
   embeddings_litellm_params: { model: "text-embedding-3-small" },
-  traces: [{ trace_id: "t-1", input: "hello", topic_id: null, subtopic_id: null }],
+  traces: [
+    { trace_id: "t-1", input: "hello", topic_id: null, subtopic_id: null },
+  ],
 } as any;
 
 const incrementalParams = { ...batchParams, topics: [], subtopics: [] } as any;

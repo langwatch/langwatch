@@ -11,6 +11,7 @@ import type { BlobStore } from "./blob-store.service";
 import type {
   ModelSpanSampleRow,
   ModelUsageStatsRow,
+  NormalizedSpanByIdParams,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
   SpanResourceInfo,
@@ -131,6 +132,24 @@ export class SpanStorageService {
   }
 
   /**
+   * Claim-check resolution read (ADR-069): one canonical span by identity for
+   * internal derivation consumers (the coding-agent facts lift). Deliberately
+   * ungated and unresolved: the consumers lift scalar span attributes only —
+   * never offloaded bodies — and run server-side, so neither the visibility
+   * gate nor blob resolution applies. A `null` means "not readable yet";
+   * callers on a queue retry into it rather than treating it as absence.
+   *
+   * The partition hint is required rather than optional: the repository read
+   * behind this has no unbounded fallback, so a hintless call would widen into
+   * a full-table scan instead of staying the cheap point-read it promises.
+   */
+  async getNormalizedSpanById(
+    params: NormalizedSpanByIdParams,
+  ): Promise<NormalizedSpan | null> {
+    return this.repository.findNormalizedSpanById(params);
+  }
+
+  /**
    * Returns a single span by its ID, resolving any ADR-022 offloaded eventref
    * pointers when `blobResolutionDeps` were supplied at construction.
    *
@@ -217,9 +236,7 @@ export class SpanStorageService {
     return this.repository.findSpanSummariesPage(params);
   }
 
-  async getSpanSummariesSince(
-    params: SinceUpdated,
-  ): Promise<SpanSummaryRow[]> {
+  async getSpanSummariesSince(params: SinceUpdated): Promise<SpanSummaryRow[]> {
     return this.repository.findSpanSummariesSince(params);
   }
 

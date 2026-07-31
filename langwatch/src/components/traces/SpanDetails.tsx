@@ -13,16 +13,16 @@ import numeral from "numeral";
 import { useMemo } from "react";
 import { ChevronDown, Clock, Play, Settings } from "react-feather";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
-import {
-  findPromptReferenceInAncestors,
-  flattenParamsToPromptAttributes,
-  type PromptLookupSpan,
-} from "../../server/traces/findPromptReferenceInAncestors";
 import type {
   ErrorCapture,
   EvaluationResult,
   Span,
 } from "../../server/tracer/types";
+import {
+  findPromptReferenceInAncestors,
+  flattenParamsToPromptAttributes,
+  type PromptLookupSpan,
+} from "../../server/traces/findPromptReferenceInAncestors";
 import { durationColor } from "../../utils/durationColor";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import {
@@ -94,7 +94,10 @@ export function SpanDetails({
         spans: lookupSpans,
       });
 
-      if (ref?.promptHandle && (ref.promptVersionNumber != null || ref.promptTag)) {
+      if (
+        ref?.promptHandle &&
+        (ref.promptVersionNumber != null || ref.promptTag)
+      ) {
         const suffix = ref.promptTag ?? String(ref.promptVersionNumber);
         return `${ref.promptHandle}:${suffix}`;
       }
@@ -126,10 +129,7 @@ export function SpanDetails({
               buildUrl={buildUrl}
             />
           ) : canOpenSpanInPromptStudio ? (
-            <Link
-              href={buildUrl(span.span_id)?.toString() ?? ""}
-              isExternal
-            >
+            <Link href={buildUrl(span.span_id)?.toString() ?? ""} isExternal>
               <Button size="sm" colorPalette="orange">
                 <Play size={16} />
                 Open in Prompts

@@ -23,9 +23,12 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/server/app-layer/automations/graph-trigger-evaluation.service", () => ({
-  evaluateGraphTrigger: evaluateGraphTriggerMock,
-}));
+vi.mock(
+  "~/server/app-layer/automations/graph-trigger-evaluation.service",
+  () => ({
+    evaluateGraphTrigger: evaluateGraphTriggerMock,
+  }),
+);
 
 vi.mock("~/server/app-layer/automations/graph-trigger-heartbeat", () => ({
   decideGraphTriggerHeartbeat: decideGraphTriggerHeartbeatMock,

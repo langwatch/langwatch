@@ -10,19 +10,19 @@
  * @see https://github.com/langwatch/langwatch/issues/2660
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import {
-  getTestClickHouseClient,
   cleanupTestData,
+  getTestClickHouseClient,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { buildTimeseriesQuery } from "../aggregation-builder";
-import { resetParamCounter } from "../filter-translator";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
-import { seedSpans } from "./test-utils/clickhouse-fixtures";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { buildTimeseriesQuery } from "../aggregation-builder";
+import { resetParamCounter } from "../filter-translator";
 import { deleteEvaluationRunsByTenant } from "./test-utils/clickhouse-cleanup";
+import { seedSpans } from "./test-utils/clickhouse-fixtures";
 
 const TENANT_ID = "test-filter-eval-2660";
 
@@ -45,61 +45,58 @@ const TRACE_ID_1 = `${TENANT_ID}-trace-1`;
 describe("filter-evaluation-queries", () => {
   let ch: ClickHouseClient;
 
-  beforeAll(
-    async () => {
-      const rawClient = getTestClickHouseClient();
-      if (!rawClient) throw new Error("ClickHouse client not available");
-      ch = wrapWithDefaultSettings(rawClient);
+  beforeAll(async () => {
+    const rawClient = getTestClickHouseClient();
+    if (!rawClient) throw new Error("ClickHouse client not available");
+    ch = wrapWithDefaultSettings(rawClient);
 
-      // Seed a small number of traces — just enough to exercise the query paths
-      await seedSpans(ch, {
-        tenantId: TENANT_ID,
-        count: 10,
-        attributeKeys: 3,
-        traceCount: 5,
-      });
+    // Seed a small number of traces — just enough to exercise the query paths
+    await seedSpans(ch, {
+      tenantId: TENANT_ID,
+      count: 10,
+      attributeKeys: 3,
+      traceCount: 5,
+    });
 
-      // Seed evaluation_runs rows referencing the seeded traces
-      await ch.insert({
-        table: "evaluation_runs",
-        values: [
-          {
-            ProjectionId: "proj-eval-2660-1",
-            TenantId: TENANT_ID,
-            EvaluationId: "eval-2660-1",
-            Version: "1",
-            EvaluatorId: "test-evaluator-2660",
-            EvaluatorType: "custom",
-            TraceId: TRACE_ID_0,
-            Status: "processed",
-            Score: 0.8,
-            Passed: 1,
-            Label: "PASS",
-            LastProcessedEventId: "evt-2660-1",
-            UpdatedAt: new Date().toISOString(),
-          },
-          {
-            ProjectionId: "proj-eval-2660-2",
-            TenantId: TENANT_ID,
-            EvaluationId: "eval-2660-2",
-            Version: "1",
-            EvaluatorId: "test-evaluator-2660",
-            EvaluatorType: "custom",
-            TraceId: TRACE_ID_1,
-            Status: "processed",
-            Score: 0.2,
-            Passed: 0,
-            Label: "FAIL",
-            LastProcessedEventId: "evt-2660-2",
-            UpdatedAt: new Date().toISOString(),
-          },
-        ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-      });
-    },
-    60_000,
-  );
+    // Seed evaluation_runs rows referencing the seeded traces
+    await ch.insert({
+      table: "evaluation_runs",
+      values: [
+        {
+          ProjectionId: "proj-eval-2660-1",
+          TenantId: TENANT_ID,
+          EvaluationId: "eval-2660-1",
+          Version: "1",
+          EvaluatorId: "test-evaluator-2660",
+          EvaluatorType: "custom",
+          TraceId: TRACE_ID_0,
+          Status: "processed",
+          Score: 0.8,
+          Passed: 1,
+          Label: "PASS",
+          LastProcessedEventId: "evt-2660-1",
+          UpdatedAt: new Date().toISOString(),
+        },
+        {
+          ProjectionId: "proj-eval-2660-2",
+          TenantId: TENANT_ID,
+          EvaluationId: "eval-2660-2",
+          Version: "1",
+          EvaluatorId: "test-evaluator-2660",
+          EvaluatorType: "custom",
+          TraceId: TRACE_ID_1,
+          Status: "processed",
+          Score: 0.2,
+          Passed: 0,
+          Label: "FAIL",
+          LastProcessedEventId: "evt-2660-2",
+          UpdatedAt: new Date().toISOString(),
+        },
+      ],
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+    });
+  }, 60_000);
 
   afterAll(async () => {
     await cleanupTestData(TENANT_ID);

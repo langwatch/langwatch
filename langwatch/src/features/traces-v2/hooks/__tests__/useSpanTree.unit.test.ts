@@ -90,9 +90,9 @@ vi.mock("~/utils/api", () => ({
 const QUERY_FN_MARKER = () => Promise.resolve([]);
 
 vi.mock("../spanTreePagedQuery", async () => {
-  const actual = await vi.importActual<
-    typeof import("../spanTreePagedQuery")
-  >("../spanTreePagedQuery");
+  const actual = await vi.importActual<typeof import("../spanTreePagedQuery")>(
+    "../spanTreePagedQuery",
+  );
   return {
     spanTreeQueryKey: (input: unknown) => ["spanTree", input],
     spanTreeQueryFn: () => QUERY_FN_MARKER,

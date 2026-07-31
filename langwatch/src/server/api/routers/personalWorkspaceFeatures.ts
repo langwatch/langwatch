@@ -13,8 +13,6 @@
  *
  * Spec: specs/ai-gateway/governance/personal-workspace-features.feature
  */
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
 
 import {
   PERSONAL_FEATURES,
@@ -22,6 +20,8 @@ import {
   PersonalProjectOwnerMismatchError,
   PersonalWorkspaceFeaturesService,
 } from "@ee/governance/services/personalWorkspaceFeatures.service";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import { skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

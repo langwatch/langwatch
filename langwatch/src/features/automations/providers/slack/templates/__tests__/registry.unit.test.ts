@@ -244,7 +244,9 @@ describe("slack Block Kit template registry", () => {
 
     describe("when the draft is a report", () => {
       it("picks the layout that fits what the report sends", () => {
-        const pick = (reportSource: "traceQuery" | "customGraph" | "dashboard") =>
+        const pick = (
+          reportSource: "traceQuery" | "customGraph" | "dashboard",
+        ) =>
           pickDefaultSlackBlockKitTemplateId({
             cadence: "digest",
             hasEvaluationFilter: false,
@@ -264,7 +266,11 @@ describe("slack Block Kit template registry", () => {
         { cadence: "immediate", kind: "trace", hasEvaluationFilter: false },
         { cadence: "immediate", kind: "trace", hasEvaluationFilter: true },
         { cadence: "digest", kind: "trace", hasEvaluationFilter: false },
-        { cadence: "immediate", kind: "graphAlert", hasEvaluationFilter: false },
+        {
+          cadence: "immediate",
+          kind: "graphAlert",
+          hasEvaluationFilter: false,
+        },
       ] as const;
       for (const c of cases) {
         const id = pickDefaultSlackBlockKitTemplateId(c);

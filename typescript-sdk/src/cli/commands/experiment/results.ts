@@ -10,7 +10,7 @@ import {
   deriveRunStatus,
   isTerminalStatus,
 } from "@/client-sdk/services/experiments/run-status";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
@@ -73,7 +73,7 @@ export const experimentResultsCommand = async ({
   experimentSlug: string;
   options?: ExperimentResultsOptions;
 }): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const filter: ExperimentResultsFilter =
     options.filter === "failed" ? "failed" : "all";

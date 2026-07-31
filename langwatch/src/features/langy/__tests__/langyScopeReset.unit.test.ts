@@ -151,7 +151,10 @@ describe("Langy state across a change of scope", () => {
       it("empties the tape, so one project's wire is not readable from another", () => {
         langy().resetForScope(scopeA);
         devLog().setRecording(true);
-        devLog().record({ type: "delta", text: "secret prompt text" }, "turn-1");
+        devLog().record(
+          { type: "delta", text: "secret prompt text" },
+          "turn-1",
+        );
         expect(devLog().records).toHaveLength(1);
 
         langy().resetForScope({ ...scopeA, projectId: "project-b" });
@@ -230,7 +233,11 @@ describe("the scope reset's coverage", () => {
         langy().setDraft("half a question");
         langy().setModelOverride("openai/gpt-5-mini");
         langy().chooseChip("trace:abc123");
-        langy().attachContext({ type: "trace", id: "abc123", label: "a trace" });
+        langy().attachContext({
+          type: "trace",
+          id: "abc123",
+          label: "a trace",
+        });
         langy().addSkillChip({ id: "github", label: "GitHub" });
         langy().discardProposal("proposal-1");
         langy().markProposalApplying("proposal-2");

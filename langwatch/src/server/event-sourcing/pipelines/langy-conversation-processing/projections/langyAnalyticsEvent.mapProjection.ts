@@ -1,3 +1,4 @@
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
@@ -5,40 +6,39 @@ import {
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import {
   type LangyAgentRespondedEvent,
+  LangyAgentRespondedEventSchema,
   type LangyAgentResponseFailedEvent,
+  LangyAgentResponseFailedEventSchema,
   type LangyAgentTurnAcceptedEvent,
+  LangyAgentTurnAcceptedEventSchema,
   type LangyConversationArchivedEvent,
-  type LangyMessageRecordedEvent,
+  LangyConversationArchivedEventSchema,
   type LangyConversationForkedEvent,
+  LangyConversationForkedEventSchema,
   type LangyConversationHandoffConsumedEvent,
+  LangyConversationHandoffConsumedEventSchema,
   type LangyConversationHandoffPendingEvent,
+  LangyConversationHandoffPendingEventSchema,
   type LangyConversationMetadataUpdatedEvent,
+  LangyConversationMetadataUpdatedEventSchema,
   type LangyConversationProcessingEvent,
   type LangyConversationStartedEvent,
-  type LangyConversationTitleGeneratedEvent,
-  type LangyMessageImportedEvent,
-  type LangyPlanUpdatedEvent,
-  type LangyToolCallFailedEvent,
-  type LangyToolCallInitiatedEvent,
-  type LangyToolCallSucceededEvent,
-  LangyAgentRespondedEventSchema,
-  LangyAgentResponseFailedEventSchema,
-  LangyAgentTurnAcceptedEventSchema,
-  LangyConversationArchivedEventSchema,
-  LangyMessageRecordedEventSchema,
-  LangyConversationForkedEventSchema,
-  LangyConversationHandoffConsumedEventSchema,
-  LangyConversationHandoffPendingEventSchema,
-  LangyConversationMetadataUpdatedEventSchema,
   LangyConversationStartedEventSchema,
+  type LangyConversationTitleGeneratedEvent,
   LangyConversationTitleGeneratedEventSchema,
+  type LangyMessageImportedEvent,
   LangyMessageImportedEventSchema,
+  type LangyMessageRecordedEvent,
+  LangyMessageRecordedEventSchema,
+  type LangyPlanUpdatedEvent,
   LangyPlanUpdatedEventSchema,
+  type LangyToolCallFailedEvent,
   LangyToolCallFailedEventSchema,
+  type LangyToolCallInitiatedEvent,
   LangyToolCallInitiatedEventSchema,
+  type LangyToolCallSucceededEvent,
   LangyToolCallSucceededEventSchema,
 } from "../schemas/events";
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
 
 export interface LangyAnalyticsEventProjectionRecord {
   eventId: string;
@@ -101,13 +101,13 @@ export class LangyAnalyticsEventMapProjection
     this.store = deps.store;
   }
 
-  mapLangyConversationConversationStarted(event: LangyConversationStartedEvent) {
+  mapLangyConversationConversationStarted(
+    event: LangyConversationStartedEvent,
+  ) {
     return this.record(event);
   }
 
-  mapLangyConversationMessageRecorded(
-    event: LangyMessageRecordedEvent,
-  ) {
+  mapLangyConversationMessageRecorded(event: LangyMessageRecordedEvent) {
     return this.record(event);
   }
 
@@ -119,9 +119,7 @@ export class LangyAnalyticsEventMapProjection
     return this.record(event);
   }
 
-  mapLangyConversationAgentTurnAccepted(
-    event: LangyAgentTurnAcceptedEvent,
-  ) {
+  mapLangyConversationAgentTurnAccepted(event: LangyAgentTurnAcceptedEvent) {
     return this.record(event);
   }
 
@@ -141,7 +139,9 @@ export class LangyAnalyticsEventMapProjection
     return this.record(event);
   }
 
-  mapLangyConversationAgentResponseFailed(event: LangyAgentResponseFailedEvent) {
+  mapLangyConversationAgentResponseFailed(
+    event: LangyAgentResponseFailedEvent,
+  ) {
     return this.record(event);
   }
 

@@ -28,7 +28,9 @@ export function wrapWithDefaultSettings<T extends ClickHouseClient>(
           ...params,
           clickhouse_settings: {
             ...DEFAULT_CLICKHOUSE_SETTINGS,
-            ...(params.clickhouse_settings as Record<string, unknown> | undefined),
+            ...(params.clickhouse_settings as
+              | Record<string, unknown>
+              | undefined),
           },
         };
         return target.query(merged as Parameters<typeof target.query>[0]);

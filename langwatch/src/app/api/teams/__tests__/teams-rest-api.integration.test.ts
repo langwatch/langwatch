@@ -1,15 +1,15 @@
+import { generate } from "@langwatch/ksuid";
 import {
+  type Organization,
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
-  type Organization,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { prisma } from "~/server/db";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import { prisma } from "~/server/db";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Teams REST API", () => {
@@ -26,8 +26,7 @@ describe("Feature: Teams REST API", () => {
       "Content-Type": "application/json",
     });
     return {
-      get: (path: string) =>
-        app.request(path, { headers: headers() }),
+      get: (path: string) => app.request(path, { headers: headers() }),
       post: (path: string, body: unknown) =>
         app.request(path, {
           method: "POST",
@@ -105,21 +104,35 @@ describe("Feature: Teams REST API", () => {
   });
 
   afterAll(async () => {
-    await prisma.team.deleteMany({
-      where: { organizationId: { in: [testOrganization.id, otherOrganization.id] } },
-    }).catch(() => {});
-    await prisma.roleBinding.deleteMany({
-      where: { organizationId: { in: [testOrganization.id, otherOrganization.id] } },
-    }).catch(() => {});
-    await prisma.apiKey.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.organizationUser.deleteMany({
-      where: { organizationId: testOrganization.id },
-    }).catch(() => {});
-    await prisma.organization.deleteMany({
-      where: { id: { in: [testOrganization.id, otherOrganization.id] } },
-    }).catch(() => {});
+    await prisma.team
+      .deleteMany({
+        where: {
+          organizationId: { in: [testOrganization.id, otherOrganization.id] },
+        },
+      })
+      .catch(() => {});
+    await prisma.roleBinding
+      .deleteMany({
+        where: {
+          organizationId: { in: [testOrganization.id, otherOrganization.id] },
+        },
+      })
+      .catch(() => {});
+    await prisma.apiKey
+      .deleteMany({
+        where: { organizationId: testOrganization.id },
+      })
+      .catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({
+        where: { organizationId: testOrganization.id },
+      })
+      .catch(() => {});
+    await prisma.organization
+      .deleteMany({
+        where: { id: { in: [testOrganization.id, otherOrganization.id] } },
+      })
+      .catch(() => {});
   });
 
   describe("Authentication", () => {

@@ -11,9 +11,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type PersonaResolverInput,
   resolvePersonaHome,
   resolvePersonaHomeSafe,
-  type PersonaResolverInput,
 } from "../personaResolver.service";
 
 const baseInput: PersonaResolverInput = {
@@ -352,7 +352,12 @@ describe("resolvePersonaHome", () => {
       expect(mixed.destination).toBe("/me");
       expect(projectOnly.destination).toBe("/team-prod");
       expect(governanceAdmin.destination).toBe("/governance");
-      for (const result of [personalOnly, mixed, projectOnly, governanceAdmin]) {
+      for (const result of [
+        personalOnly,
+        mixed,
+        projectOnly,
+        governanceAdmin,
+      ]) {
         expect(result.intentPinned).toBe(false);
       }
     });

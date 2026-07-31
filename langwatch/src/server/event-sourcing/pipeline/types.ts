@@ -1,21 +1,21 @@
 import type { ProcessRole } from "../../app-layer/config";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../projections/mapProjection.types";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
+import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
+import type { StateProjectionDefinition } from "../projections/stateProjection.types";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
-import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 import type { CommandHandlerOptions } from "../services/commands/commandDispatcher";
 import type { EventSourcingService } from "../services/eventSourcingService";
 import type { JobRegistryEntry } from "../services/queues/queueManager";
-import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
-import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { EventStore } from "../stores/eventStore.types";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types";
 
 /**
  * Static metadata about a pipeline for tooling and introspection.
@@ -49,7 +49,10 @@ export interface PipelineMetadata {
 
 export interface EventSourcingPipelineDefinition<
   EventType extends Event = Event,
-  _ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
+  _ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
 > {
   name: string;
   aggregateType: AggregateType;
@@ -57,8 +60,14 @@ export interface EventSourcingPipelineDefinition<
   foldProjections?: FoldProjectionDefinition<any, EventType>[];
   stateProjections?: StateProjectionDefinition<any, EventType>[];
   mapProjections?: MapProjectionDefinition<any, EventType>[];
-  reactors?: Array<{ foldName: string; definition: ReactorDefinition<EventType> }>;
-  mapReactors?: Array<{ mapName: string; definition: ReactorDefinition<EventType> }>;
+  reactors?: Array<{
+    foldName: string;
+    definition: ReactorDefinition<EventType>;
+  }>;
+  mapReactors?: Array<{
+    mapName: string;
+    definition: ReactorDefinition<EventType>;
+  }>;
   subscribers?: EventSubscriberDefinition<EventType>[];
   globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   globalJobRegistry?: Map<string, JobRegistryEntry>;

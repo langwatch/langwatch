@@ -186,9 +186,9 @@ describe("clusterTopicsForProject", () => {
       );
       vi.mocked(getClickHouseClientForProject).mockResolvedValue(null);
 
-      await expect(
-        clusterTopicsForProject("proj-1"),
-      ).rejects.toThrow("ClickHouse client not available for project proj-1");
+      await expect(clusterTopicsForProject("proj-1")).rejects.toThrow(
+        "ClickHouse client not available for project proj-1",
+      );
     });
   });
 

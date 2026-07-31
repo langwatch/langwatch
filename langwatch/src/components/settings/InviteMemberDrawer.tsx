@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import { Heading } from "@chakra-ui/react";
 import type React from "react";
 import { useDrawer } from "../../hooks/useDrawer";

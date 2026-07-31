@@ -1,29 +1,55 @@
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOrganizationPermission } from "../rbac";
-import {
-  type LicenseStatus,
-  OrganizationNotFoundError,
-  getPlanTemplate,
-} from "../../../../ee/licensing";
-import type { LicenseData } from "../../../../ee/licensing";
-import { signLicense, encodeLicenseKey, generateLicenseId } from "../../../../ee/licensing/signing";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
+import type { LicenseData } from "../../../../ee/licensing";
+import { getPlanTemplate, type LicenseStatus } from "../../../../ee/licensing";
+import { licenseValidationError } from "../../../../ee/licensing/errors";
+import {
+  encodeLicenseKey,
+  generateLicenseId,
+  signLicense,
+} from "../../../../ee/licensing/signing";
+import { checkOrganizationPermission } from "../rbac";
+
+const logger = createLogger("langwatch:api:licenseRouter");
 
 /** Schema for plan limits input */
 const planLimitsSchema = z.object({
   maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMembersLite: z.number().int().positive("Plan limits must be positive numbers"),
+  maxMembersLite: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
   maxTeams: z.number().int().positive("Plan limits must be positive numbers"),
-  maxProjects: z.number().int().positive("Plan limits must be positive numbers"),
-  maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
-  maxWorkflows: z.number().int().positive("Plan limits must be positive numbers"),
+  maxProjects: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
+  maxMessagesPerMonth: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
+  maxWorkflows: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
   maxPrompts: z.number().int().positive("Plan limits must be positive numbers"),
-  maxEvaluators: z.number().int().positive("Plan limits must be positive numbers"),
-  maxScenarios: z.number().int().positive("Plan limits must be positive numbers"),
+  maxEvaluators: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
+  maxScenarios: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
   maxAgents: z.number().int().positive("Plan limits must be positive numbers"),
-  maxExperiments: z.number().int().positive("Plan limits must be positive numbers"),
+  maxExperiments: z
+    .number()
+    .int()
+    .positive("Plan limits must be positive numbers"),
   canPublish: z.boolean(),
   usageUnit: z.enum(["traces", "events"]),
 });
@@ -46,18 +72,14 @@ export const licenseRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string().min(1),
-      })
+      }),
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input }): Promise<LicenseStatus> => {
-      try {
-        return await getLicenseHandler().getLicenseStatus(input.organizationId);
-      } catch (error) {
-        if (error instanceof OrganizationNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-        }
-        throw error;
-      }
+      // No catch: `OrganizationNotFoundError` is a `HandledError`, so the
+      // shared middleware maps it to NOT_FOUND and keeps it as the cause.
+      // Re-wrapping it here threw away the code and the trace id.
+      return await getLicenseHandler().getLicenseStatus(input.organizationId);
     }),
 
   /**
@@ -68,33 +90,26 @@ export const licenseRouter = createTRPCRouter({
       z.object({
         organizationId: z.string().min(1),
         licenseKey: z.string().min(1, "License key is required"),
-      })
+      }),
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      try {
-        const result = await getLicenseHandler().validateAndStoreLicense(
-          input.organizationId,
-          input.licenseKey
-        );
+      const result = await getLicenseHandler().validateAndStoreLicense(
+        input.organizationId,
+        input.licenseKey,
+      );
 
-        if (!result.success) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: result.error,
-          });
-        }
-
-        return {
-          success: true,
-          planInfo: result.planInfo,
-        };
-      } catch (error) {
-        if (error instanceof OrganizationNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-        }
-        throw error;
+      if (!result.success) {
+        // The handler reports its verdict as a `LICENSE_ERRORS` literal, which
+        // is a server discriminant and not copy. Map it to the code the
+        // presentation registry writes customer copy against.
+        throw licenseValidationError(result.error);
       }
+
+      return {
+        success: true,
+        planInfo: result.planInfo,
+      };
     }),
 
   /**
@@ -104,23 +119,18 @@ export const licenseRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string().min(1),
-      })
+      }),
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      try {
-        const result = await getLicenseHandler().removeLicense(input.organizationId);
+      const result = await getLicenseHandler().removeLicense(
+        input.organizationId,
+      );
 
-        return {
-          success: true,
-          removed: result.removed,
-        };
-      } catch (error) {
-        if (error instanceof OrganizationNotFoundError) {
-          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
-        }
-        throw error;
-      }
+      return {
+        success: true,
+        removed: result.removed,
+      };
     }),
 
   /**
@@ -129,13 +139,16 @@ export const licenseRouter = createTRPCRouter({
    */
   generate: protectedProcedure
     .input(
-      z.object({
-        organizationId: z.string().min(1),
-      }).merge(generateLicenseSchema)
+      z
+        .object({
+          organizationId: z.string().min(1),
+        })
+        .merge(generateLicenseSchema),
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input }) => {
-      const { privateKey, organizationName, email, expiresAt, planType, plan } = input;
+      const { privateKey, organizationName, email, expiresAt, planType, plan } =
+        input;
 
       // Validate expiration is in the future
       if (expiresAt <= new Date()) {
@@ -187,9 +200,22 @@ export const licenseRouter = createTRPCRouter({
 
         return { licenseKey };
       } catch (error) {
+        logger.error(
+          { organizationId: input.organizationId, error },
+          "[license] Failed to sign license",
+        );
+        // A signing-key failure already says which of the three things went
+        // wrong, and the handled-error middleware maps it to a 400 with that
+        // code intact. Re-wrapping would flatten all three into one message
+        // the UI cannot key off.
+        if (HandledError.isHandled(error)) throw error;
+        // Real copy on a 4xx, so the authored-prose channel renders it as-is;
+        // the cause rides along for the logs rather than being discarded, and
+        // is never shown (its message would be a crypto diagnostic).
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Failed to sign license. Please check your private key.",
+          cause: error,
         });
       }
     }),

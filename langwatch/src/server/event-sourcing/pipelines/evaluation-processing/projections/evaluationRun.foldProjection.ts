@@ -7,16 +7,16 @@ import {
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import { EVALUATION_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
-  EvaluationScheduledEvent,
-  EvaluationStartedEvent,
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
+  EvaluationScheduledEvent,
+  EvaluationStartedEvent,
 } from "../schemas/events";
 import {
-  evaluationScheduledEventSchema,
-  evaluationStartedEventSchema,
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
 } from "../schemas/events";
 
 export type { EvaluationRunData };

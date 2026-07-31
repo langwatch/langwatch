@@ -15,9 +15,7 @@
  * Checks if the output is an object with exactly one key named "output".
  * This is the special case where we unwrap to show just the content.
  */
-const isSingleOutputKey = (
-  output: unknown,
-): output is { output: unknown } => {
+const isSingleOutputKey = (output: unknown): output is { output: unknown } => {
   if (output === null || output === undefined) return false;
   if (typeof output !== "object") return false;
   if (Array.isArray(output)) return false;

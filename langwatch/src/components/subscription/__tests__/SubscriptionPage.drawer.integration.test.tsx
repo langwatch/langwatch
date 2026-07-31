@@ -12,20 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubscriptionPage } from "../SubscriptionPage";
 import {
   createMockPlan,
-  mockCreateInvites,
   mockCreateInvitesMutate,
-  mockCreateSubscription,
-  mockDetectCurrency,
   mockGetActivePlan,
-  mockGetOrganizationWithMembers,
   mockGetPendingInvites,
-  mockAddTeamMemberOrEvents,
-  mockListInvoices,
-  mockManageSubscription,
-  mockOpenSeats,
-  mockUpdateUsers,
   mockUpgradeWithInvites,
-  mockOrganizationMembers,
   resetMocks,
 } from "./subscription-test-setup";
 
@@ -64,8 +54,9 @@ vi.mock("~/components/ui/toaster", () => ({
 vi.mock("../../../stores/upgradeModalStore", async () => {
   const setup = await import("./subscription-test-setup");
   return {
-    useUpgradeModalStore: (selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown) =>
-      selector({ openSeats: setup.mockOpenSeats }),
+    useUpgradeModalStore: (
+      selector: (state: { openSeats: typeof setup.mockOpenSeats }) => unknown,
+    ) => selector({ openSeats: setup.mockOpenSeats }),
   };
 });
 
@@ -83,7 +74,10 @@ vi.mock("~/utils/api", async () => {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
         getOrganizationPendingInvites: {
-          useQuery: () => ({ ...setup.mockGetPendingInvites(), refetch: vi.fn() }),
+          useQuery: () => ({
+            ...setup.mockGetPendingInvites(),
+            refetch: vi.fn(),
+          }),
         },
         createInvites: {
           useMutation: () => setup.mockCreateInvites(),
@@ -91,7 +85,10 @@ vi.mock("~/utils/api", async () => {
       },
       currency: {
         detectCurrency: {
-          useQuery: (_input: Record<string, never>, opts: { enabled: boolean }) =>
+          useQuery: (
+            _input: Record<string, never>,
+            opts: { enabled: boolean },
+          ) =>
             opts.enabled ? setup.mockDetectCurrency() : { data: undefined },
         },
       },
@@ -167,7 +164,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Show members/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /Show members/i }),
+        ).toBeInTheDocument();
         expect(screen.getByText("Seats available")).toBeInTheDocument();
       });
     });
@@ -212,7 +211,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /Add Seat/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -230,7 +231,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /Add Seat/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -261,7 +264,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /Add Seat/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -282,7 +287,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /Add Seat/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -312,7 +319,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /Add Seat/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -335,7 +344,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByTestId("user-count-link"));
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /Add Seat/i })).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /Add Seat/i }),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole("button", { name: /Add Seat/i }));
@@ -424,8 +435,18 @@ describe("<SubscriptionPage/>", () => {
       beforeEach(() => {
         mockGetPendingInvites.mockReturnValue({
           data: [
-            { id: "inv-1", email: "inv1@example.com", role: "MEMBER", status: "PENDING" },
-            { id: "inv-2", email: "inv2@example.com", role: "ADMIN", status: "PENDING" },
+            {
+              id: "inv-1",
+              email: "inv1@example.com",
+              role: "MEMBER",
+              status: "PENDING",
+            },
+            {
+              id: "inv-2",
+              email: "inv2@example.com",
+              role: "ADMIN",
+              status: "PENDING",
+            },
           ],
           isLoading: false,
         });
@@ -440,7 +461,9 @@ describe("<SubscriptionPage/>", () => {
         await waitFor(() => {
           expect(screen.getByTestId("pending-seat-0")).toBeInTheDocument();
           expect(screen.getByTestId("pending-seat-1")).toBeInTheDocument();
-          expect(screen.queryByTestId("pending-seat-2")).not.toBeInTheDocument();
+          expect(
+            screen.queryByTestId("pending-seat-2"),
+          ).not.toBeInTheDocument();
         });
       });
     });
@@ -455,7 +478,9 @@ describe("<SubscriptionPage/>", () => {
         await waitFor(() => {
           expect(screen.getByTestId("current-plan-block")).toBeInTheDocument();
         });
-        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("update-seats-block"),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -465,7 +490,9 @@ describe("<SubscriptionPage/>", () => {
         renderSubscriptionPage();
         await user.click(screen.getByTestId("user-count-link"));
 
-        const emailInput = screen.getByTestId("seat-email-0") as HTMLInputElement;
+        const emailInput = screen.getByTestId(
+          "seat-email-0",
+        ) as HTMLInputElement;
         await user.type(emailInput, "newuser@example.com");
         await user.click(screen.getByRole("button", { name: /Done/i }));
 
@@ -483,7 +510,9 @@ describe("<SubscriptionPage/>", () => {
         });
 
         // No update-seats block should appear (invite only, no billing change)
-        expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("update-seats-block"),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -554,7 +583,7 @@ describe("<SubscriptionPage/>", () => {
                 role: "MEMBER",
               }),
             ]),
-          })
+          }),
         );
       });
     });
@@ -608,7 +637,9 @@ describe("<SubscriptionPage/>", () => {
       await user.click(screen.getByRole("button", { name: /Done/i }));
 
       expect(mockCreateInvitesMutate).not.toHaveBeenCalled();
-      expect(screen.queryByTestId("update-seats-block")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("update-seats-block"),
+      ).not.toBeInTheDocument();
     });
 
     it("sends invite and shows downgrade when filling email and deleting a row", async () => {

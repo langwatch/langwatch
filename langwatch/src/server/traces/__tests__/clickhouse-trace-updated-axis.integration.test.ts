@@ -26,7 +26,6 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
-import type { Protections } from "../../traces/protections";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import type {
   GetAllTracesForProjectInput,

@@ -1,25 +1,26 @@
+import {
+  LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
+  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
+} from "@langwatch/langy";
 import { describe, expect, it, vi } from "vitest";
-
-import type { AppendStore } from "../../../projections/mapProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
-import type { StateProjectionStore } from "../../../projections/stateProjection.types";
-import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
-import { createStubLangyEffectPorts } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
+import {
+  createStubLangyEffectPorts,
+  LANGY_CONVERSATION_PROCESS_NAME,
+} from "~/server/event-sourcing/pipelines/langy-conversation-processing/process-manager";
 import {
   agentRespondedEvent,
   CONVERSATION_ID,
   PROJECT_ID,
 } from "../../../../event-sourcing/pipelines/langy-conversation-processing/process-manager/__tests__/helpers/langyEventFixtures";
+import type { AppendStore } from "../../../projections/mapProjection.types";
+import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import type { StateProjectionStore } from "../../../projections/stateProjection.types";
+import type { EventSubscriberDefinition } from "../../../subscribers/eventSubscriber.types";
 import {
   createLangyConversationProcessingPipeline,
   type LangyConversationProcessingPipelineDeps,
 } from "../pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "../projections/langyAnalyticsEvent.mapProjection";
-import {
-  LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
-  LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
-} from "@langwatch/langy";
 import type { LangyConversationProcessingEvent } from "../schemas/events";
 
 /**
@@ -120,7 +121,9 @@ describe("langy-conversation-processing pipeline shape", () => {
           "langyMessageOperational",
         ]);
         // The analytics map is a distinct registration from the message map.
-        expect(pipeline.mapProjections.get("langyAnalyticsEvent")?.definition).not.toBe(
+        expect(
+          pipeline.mapProjections.get("langyAnalyticsEvent")?.definition,
+        ).not.toBe(
           pipeline.mapProjections.get("langyMessageOperational")?.definition,
         );
       });
@@ -228,7 +231,9 @@ describe("langy-conversation-processing pipeline shape", () => {
         };
 
         // The framework's per-event step: pure map -> append. No prior read.
-        const record = definition.map(event as LangyConversationProcessingEvent);
+        const record = definition.map(
+          event as LangyConversationProcessingEvent,
+        );
         expect(record).not.toBeNull();
         await definition.store.append(record!, context);
 

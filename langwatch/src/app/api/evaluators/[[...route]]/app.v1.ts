@@ -3,11 +3,11 @@ import type { Prisma } from "@prisma/client";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { validator as zValidator } from "~/server/api/validation";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
@@ -56,38 +56,48 @@ export function registerEvaluatorRoutes(
     organizationMiddleware,
     evaluatorServiceMiddleware,
     describeRoute({
-    description: "Get all evaluators for a project",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(z.array(apiResponseEvaluatorWithPlatformUrlSchema)),
+      description: "Get all evaluators for a project",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.array(apiResponseEvaluatorWithPlatformUrlSchema),
+              ),
+            },
           },
         },
       },
+    }),
+    async (c) => {
+      const service = c.get("evaluatorService");
+      const project = c.get("project");
+
+      logger.info(
+        { projectId: project.id },
+        "Getting all evaluators for project",
+      );
+
+      const evaluators = await service.getAllWithFields({
+        projectId: project.id,
+      });
+
+      return c.json(
+        apiResponseEvaluatorSchema
+          .array()
+          .parse(evaluators)
+          .map((e) => ({
+            ...e,
+            platformUrl: platformUrl({
+              projectSlug: project.slug,
+              path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${e.id}`,
+            }),
+          })),
+      );
     },
-  }),
-  async (c) => {
-    const service = c.get("evaluatorService");
-    const project = c.get("project");
-
-    logger.info({ projectId: project.id }, "Getting all evaluators for project");
-
-    const evaluators = await service.getAllWithFields({
-      projectId: project.id,
-    });
-
-    return c.json(apiResponseEvaluatorSchema.array().parse(evaluators).map((e) => ({
-      ...e,
-      platformUrl: platformUrl({
-        projectSlug: project.slug,
-        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${e.id}`,
-      }),
-    })));
-  },
-);
+  );
 
   // Get evaluator by ID or slug
   secured.access(requires("evaluations:view")).get(
@@ -95,64 +105,64 @@ export function registerEvaluatorRoutes(
     organizationMiddleware,
     evaluatorServiceMiddleware,
     describeRoute({
-    description: "Get a specific evaluator by ID or slug",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+      description: "Get a specific evaluator by ID or slug",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+            },
+          },
+        },
+        404: {
+          description: "Evaluator not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      404: {
-        description: "Evaluator not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  async (c) => {
-    const service = c.get("evaluatorService");
-    const project = c.get("project");
-    const { idOrSlug } = c.req.param();
+    }),
+    async (c) => {
+      const service = c.get("evaluatorService");
+      const project = c.get("project");
+      const { idOrSlug } = c.req.param();
 
-    logger.info({ projectId: project.id, idOrSlug }, "Getting evaluator");
+      logger.info({ projectId: project.id, idOrSlug }, "Getting evaluator");
 
-    // Try by ID first, then by slug
-    let evaluator = await service.getByIdWithFields({
-      id: idOrSlug,
-      projectId: project.id,
-    });
-
-    if (!evaluator) {
-      const bySlug = await service.getBySlug({
-        slug: idOrSlug,
+      // Try by ID first, then by slug
+      let evaluator = await service.getByIdWithFields({
+        id: idOrSlug,
         projectId: project.id,
       });
-      if (bySlug) {
-        evaluator = await service.enrichWithFields(bySlug);
+
+      if (!evaluator) {
+        const bySlug = await service.getBySlug({
+          slug: idOrSlug,
+          projectId: project.id,
+        });
+        if (bySlug) {
+          evaluator = await service.enrichWithFields(bySlug);
+        }
       }
-    }
 
-    if (!evaluator) {
-      throw new HTTPException(404, {
-        message: "Evaluator not found",
+      if (!evaluator) {
+        throw new HTTPException(404, {
+          message: "Evaluator not found",
+        });
+      }
+
+      const parsed = apiResponseEvaluatorSchema.parse(evaluator);
+      return c.json({
+        ...parsed,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsed.id}`,
+        }),
       });
-    }
-
-    const parsed = apiResponseEvaluatorSchema.parse(evaluator);
-    return c.json({
-      ...parsed,
-      platformUrl: platformUrl({
-        projectSlug: project.slug,
-        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsed.id}`,
-      }),
-    });
-  },
-);
+    },
+  );
 
   // Create evaluator
   // Creating asks for `evaluations:create`; `:manage` still implies it, so no
@@ -163,81 +173,81 @@ export function registerEvaluatorRoutes(
     evaluatorServiceMiddleware,
     resourceLimitMiddleware("evaluators"),
     describeRoute({
-    description: "Create a new evaluator",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+      description: "Create a new evaluator",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+            },
           },
         },
       },
+    }),
+    zValidator("json", createEvaluatorInputSchema),
+    async (c) => {
+      const service = c.get("evaluatorService");
+      const project = c.get("project");
+      const data = c.req.valid("json");
+
+      logger.info(
+        { projectId: project.id, name: data.name },
+        "Creating evaluator",
+      );
+
+      // Resolve the project's DEFAULT and EMBEDDINGS models via the
+      // cascade. ModelNotConfiguredError propagates so the global
+      // domain-error middleware can surface the typed missing-model
+      // response — the PR's "no global system fallback" contract bars
+      // falling back to a hardcoded OpenAI constant when nothing is
+      // configured. Only unrelated resolver-internal errors (DB, race)
+      // become null and let createWithDefaults render with placeholders.
+      const swallowNonMissingConfig = (err: unknown): null => {
+        if (err instanceof ModelNotConfiguredError) throw err;
+        return null;
+      };
+      const [resolvedDefault, resolvedEmbedding] = await Promise.all([
+        resolveModelForFeature("evaluator.create_default", {
+          prisma,
+          projectId: project.id,
+        }).catch(swallowNonMissingConfig),
+        resolveModelForFeature("analytics.topic_clustering_embeddings", {
+          prisma,
+          projectId: project.id,
+        }).catch(swallowNonMissingConfig),
+      ]);
+
+      const evaluator = await service.createWithDefaults({
+        id: `evaluator_${nanoid()}`,
+        projectId: project.id,
+        name: data.name,
+        type: "evaluator",
+        config: data.config as Prisma.InputJsonValue,
+        resolved: {
+          defaultModel: resolvedDefault?.model ?? null,
+          embeddingsModel: resolvedEmbedding?.model ?? null,
+        },
+      });
+
+      const enriched = await service.enrichWithFields(evaluator);
+
+      logger.info(
+        { projectId: project.id, evaluatorId: enriched.id },
+        "Successfully created evaluator",
+      );
+
+      const parsedCreated = apiResponseEvaluatorSchema.parse(enriched);
+      return c.json({
+        ...parsedCreated,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedCreated.id}`,
+        }),
+      });
     },
-  }),
-  zValidator("json", createEvaluatorInputSchema),
-  async (c) => {
-    const service = c.get("evaluatorService");
-    const project = c.get("project");
-    const data = c.req.valid("json");
-
-    logger.info(
-      { projectId: project.id, name: data.name },
-      "Creating evaluator",
-    );
-
-    // Resolve the project's DEFAULT and EMBEDDINGS models via the
-    // cascade. ModelNotConfiguredError propagates so the global
-    // domain-error middleware can surface the typed missing-model
-    // response — the PR's "no global system fallback" contract bars
-    // falling back to a hardcoded OpenAI constant when nothing is
-    // configured. Only unrelated resolver-internal errors (DB, race)
-    // become null and let createWithDefaults render with placeholders.
-    const swallowNonMissingConfig = (err: unknown): null => {
-      if (err instanceof ModelNotConfiguredError) throw err;
-      return null;
-    };
-    const [resolvedDefault, resolvedEmbedding] = await Promise.all([
-      resolveModelForFeature("evaluator.create_default", {
-        prisma,
-        projectId: project.id,
-      }).catch(swallowNonMissingConfig),
-      resolveModelForFeature("analytics.topic_clustering_embeddings", {
-        prisma,
-        projectId: project.id,
-      }).catch(swallowNonMissingConfig),
-    ]);
-
-    const evaluator = await service.createWithDefaults({
-      id: `evaluator_${nanoid()}`,
-      projectId: project.id,
-      name: data.name,
-      type: "evaluator",
-      config: data.config as Prisma.InputJsonValue,
-      resolved: {
-        defaultModel: resolvedDefault?.model ?? null,
-        embeddingsModel: resolvedEmbedding?.model ?? null,
-      },
-    });
-
-    const enriched = await service.enrichWithFields(evaluator);
-
-    logger.info(
-      { projectId: project.id, evaluatorId: enriched.id },
-      "Successfully created evaluator",
-    );
-
-    const parsedCreated = apiResponseEvaluatorSchema.parse(enriched);
-    return c.json({
-      ...parsedCreated,
-      platformUrl: platformUrl({
-        projectSlug: project.slug,
-        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedCreated.id}`,
-      }),
-    });
-  },
-);
+  );
 
   // Update evaluator
   secured.access(requires("evaluations:update")).put(
@@ -245,103 +255,109 @@ export function registerEvaluatorRoutes(
     organizationMiddleware,
     evaluatorServiceMiddleware,
     describeRoute({
-    description: "Update an existing evaluator",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+      description: "Update an existing evaluator",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
+            },
+          },
+        },
+        400: {
+          description: "Bad request (e.g. attempting to change evaluatorType)",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
+          },
+        },
+        404: {
+          description: "Evaluator not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      400: {
-        description: "Bad request (e.g. attempting to change evaluatorType)",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-      404: {
-        description: "Evaluator not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  zValidator("json", updateEvaluatorInputSchema),
-  async (c) => {
-    const service = c.get("evaluatorService");
-    const project = c.get("project");
-    const { id } = c.req.param();
-    const data = c.req.valid("json");
+    }),
+    zValidator("json", updateEvaluatorInputSchema),
+    async (c) => {
+      const service = c.get("evaluatorService");
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const data = c.req.valid("json");
 
-    logger.info(
-      { projectId: project.id, evaluatorId: id },
-      "Updating evaluator",
-    );
+      logger.info(
+        { projectId: project.id, evaluatorId: id },
+        "Updating evaluator",
+      );
 
-    // Verify evaluator exists
-    const existing = await service.getById({
-      id,
-      projectId: project.id,
-    });
-
-    if (!existing) {
-      throw new HTTPException(404, {
-        message: "Evaluator not found",
+      // Verify evaluator exists
+      const existing = await service.getById({
+        id,
+        projectId: project.id,
       });
-    }
 
-    // Enforce evaluatorType immutability
-    if (data.config?.evaluatorType !== undefined) {
-      const existingConfig = existing.config as { evaluatorType?: string } | null;
-      const existingType = existingConfig?.evaluatorType;
-      if (
-        existingType !== undefined &&
-        data.config.evaluatorType !== existingType
-      ) {
-        throw new HTTPException(400, {
-          message: `evaluatorType cannot be changed after creation. Current type: "${existingType}"`,
+      if (!existing) {
+        throw new HTTPException(404, {
+          message: "Evaluator not found",
         });
       }
-    }
 
-    // Build update data
-    const updateData: Record<string, unknown> = {};
-    if (data.name !== undefined) {
-      updateData.name = data.name;
-    }
-    if (data.config !== undefined) {
-      // Merge config: keep existing config values, override with provided ones
-      const existingConfig = (existing.config as Record<string, unknown>) ?? {};
-      updateData.config = { ...existingConfig, ...data.config } as Prisma.InputJsonValue;
-    }
+      // Enforce evaluatorType immutability
+      if (data.config?.evaluatorType !== undefined) {
+        const existingConfig = existing.config as {
+          evaluatorType?: string;
+        } | null;
+        const existingType = existingConfig?.evaluatorType;
+        if (
+          existingType !== undefined &&
+          data.config.evaluatorType !== existingType
+        ) {
+          throw new HTTPException(400, {
+            message: `evaluatorType cannot be changed after creation. Current type: "${existingType}"`,
+          });
+        }
+      }
 
-    const updated = await service.update({
-      id,
-      projectId: project.id,
-      data: updateData,
-    });
+      // Build update data
+      const updateData: Record<string, unknown> = {};
+      if (data.name !== undefined) {
+        updateData.name = data.name;
+      }
+      if (data.config !== undefined) {
+        // Merge config: keep existing config values, override with provided ones
+        const existingConfig =
+          (existing.config as Record<string, unknown>) ?? {};
+        updateData.config = {
+          ...existingConfig,
+          ...data.config,
+        } as Prisma.InputJsonValue;
+      }
 
-    const enriched = await service.enrichWithFields(updated);
+      const updated = await service.update({
+        id,
+        projectId: project.id,
+        data: updateData,
+      });
 
-    logger.info(
-      { projectId: project.id, evaluatorId: enriched.id },
-      "Successfully updated evaluator",
-    );
+      const enriched = await service.enrichWithFields(updated);
 
-    const parsedUpdated = apiResponseEvaluatorSchema.parse(enriched);
-    return c.json({
-      ...parsedUpdated,
-      platformUrl: platformUrl({
-        projectSlug: project.slug,
-        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedUpdated.id}`,
-      }),
-    });
-  },
-);
+      logger.info(
+        { projectId: project.id, evaluatorId: enriched.id },
+        "Successfully updated evaluator",
+      );
+
+      const parsedUpdated = apiResponseEvaluatorSchema.parse(enriched);
+      return c.json({
+        ...parsedUpdated,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedUpdated.id}`,
+        }),
+      });
+    },
+  );
 
   // Delete (archive) evaluator
   // Archiving deliberately stays at `:manage`.
@@ -350,60 +366,58 @@ export function registerEvaluatorRoutes(
     organizationMiddleware,
     evaluatorServiceMiddleware,
     describeRoute({
-    description: "Archive (soft-delete) an evaluator",
-    responses: {
-      ...baseResponses,
-      200: {
-        description: "Success",
-        content: {
-          "application/json": {
-            schema: resolver(
-              z.object({ success: z.boolean() }),
-            ),
+      description: "Archive (soft-delete) an evaluator",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ success: z.boolean() })),
+            },
+          },
+        },
+        404: {
+          description: "Evaluator not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
           },
         },
       },
-      404: {
-        description: "Evaluator not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  async (c) => {
-    const service = c.get("evaluatorService");
-    const project = c.get("project");
-    const { id } = c.req.param();
+    }),
+    async (c) => {
+      const service = c.get("evaluatorService");
+      const project = c.get("project");
+      const { id } = c.req.param();
 
-    logger.info(
-      { projectId: project.id, evaluatorId: id },
-      "Archiving evaluator",
-    );
+      logger.info(
+        { projectId: project.id, evaluatorId: id },
+        "Archiving evaluator",
+      );
 
-    // Verify evaluator exists
-    const existing = await service.getById({
-      id,
-      projectId: project.id,
-    });
-
-    if (!existing) {
-      throw new HTTPException(404, {
-        message: "Evaluator not found",
+      // Verify evaluator exists
+      const existing = await service.getById({
+        id,
+        projectId: project.id,
       });
-    }
 
-    await service.softDelete({
-      id,
-      projectId: project.id,
-    });
+      if (!existing) {
+        throw new HTTPException(404, {
+          message: "Evaluator not found",
+        });
+      }
 
-    logger.info(
-      { projectId: project.id, evaluatorId: id },
-      "Successfully archived evaluator",
-    );
+      await service.softDelete({
+        id,
+        projectId: project.id,
+      });
 
-    return c.json({ success: true });
-  },
+      logger.info(
+        { projectId: project.id, evaluatorId: id },
+        "Successfully archived evaluator",
+      );
+
+      return c.json({ success: true });
+    },
   );
 }

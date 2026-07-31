@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  TraceReadDerivationService,
   type NormalizedSpanReader,
+  TraceReadDerivationService,
 } from "../trace-read-derivation.service";
 
 /**
@@ -98,8 +98,16 @@ describe("TraceReadDerivationService", () => {
         const reader = new CountingReader();
         const service = new TraceReadDerivationService(reader);
 
-        await service.deriveEvents({ ...BATCH_PARAMS, occurredAtMs: 1000, foldVersion: 5 });
-        await service.deriveEvents({ ...BATCH_PARAMS, occurredAtMs: 1000, foldVersion: 7 });
+        await service.deriveEvents({
+          ...BATCH_PARAMS,
+          occurredAtMs: 1000,
+          foldVersion: 5,
+        });
+        await service.deriveEvents({
+          ...BATCH_PARAMS,
+          occurredAtMs: 1000,
+          foldVersion: 7,
+        });
 
         expect(reader.eventReads).toBe(2);
       });

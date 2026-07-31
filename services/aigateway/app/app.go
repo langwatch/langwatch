@@ -124,6 +124,7 @@ func (discardMetrics) RecordFallback(_, _ string)                         {}
 func (discardMetrics) SetCircuitState(_ string, _ int)                    {}
 func (discardMetrics) RecordCacheOutcome(_ domain.Usage)                  {}
 func (discardMetrics) RecordCacheRuleHit(_, _ string)                     {}
+func (discardMetrics) RecordBudgetBlock(_ string)                         {}
 func (discardMetrics) SetRequestLabels(_ context.Context, _, _ string)    {}
 func (discardMetrics) ModelLabel(_ domain.BundleConfig, model string) string {
 	return model
@@ -136,11 +137,18 @@ func (discardMetrics) WrapStream(iter domain.StreamIterator, _, _ string) domain
 // ListModels returns models available to the bundle's virtual key:
 // alias names, plus either the configured allowlist (authoritative when
 // set, anything outside it is blocked at dispatch, so upstream endpoints
-// are not queried) or models discovered from self-hosted endpoints in the
-// credential chain. Models matching a deny policy rule are filtered out.
-func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.Model, error) {
+// are not queried) or models discovered from the credential chain's
+// catalogs. Models matching a deny policy rule are filtered out.
+//
+// The second return reports discovery gaps: providers that dispatch can
+// route to but that contributed nothing to the list (catalog probe
+// failed, or the provider's models cannot be enumerated). Empty whenever discovery did
+// not run — a literal allowlist is authoritative, so there is no gap to
+// report.
+func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.Model, []domain.ModelDiscoveryGap, error) {
 	cfg := bundle.Config
 	var models []domain.Model
+	var gaps []domain.ModelDiscoveryGap
 	seen := make(map[string]bool)
 	add := func(m domain.Model) {
 		if m.ID == "" || seen[m.ID] {
@@ -176,31 +184,38 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 			add(domain.Model{ID: id, Name: id, ProviderID: providerID})
 		}
 		if hasWildcards {
-			if err := a.addDiscovered(ctx, bundle, cfg, add); err != nil {
-				return nil, err
+			discoveredGaps, err := a.addDiscovered(ctx, bundle, cfg, add)
+			if err != nil {
+				return nil, nil, err
 			}
+			gaps = discoveredGaps
 		}
-	} else if err := a.addDiscovered(ctx, bundle, cfg, add); err != nil {
-		return nil, err
+	} else {
+		discoveredGaps, err := a.addDiscovered(ctx, bundle, cfg, add)
+		if err != nil {
+			return nil, nil, err
+		}
+		gaps = discoveredGaps
 	}
 
 	models = filterModelsByPolicy(models, cfg.PolicyRules, a.logger)
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
-	return models, nil
+	return models, gaps, nil
 }
 
-// addDiscovered asks the credential chain's endpoints for their catalogs
-// and feeds the models the VK may actually request into add. Discovery
-// answers with whatever the endpoint serves, so the allowlist is applied
-// here too: dispatch rejects anything outside it, and listing a model
-// the VK cannot call is worse than omitting it.
-func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg domain.BundleConfig, add func(domain.Model)) error {
+// addDiscovered asks the credential chain's catalogs for their models and
+// feeds the ones the VK may actually request into add, passing the
+// chain's discovery gaps through. Discovery answers with whatever the
+// endpoint serves, so the allowlist is applied here too: dispatch rejects
+// anything outside it, and listing a model the VK cannot call is worse
+// than omitting it.
+func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg domain.BundleConfig, add func(domain.Model)) ([]domain.ModelDiscoveryGap, error) {
 	if a.providers == nil {
-		return nil
+		return nil, nil
 	}
-	discovered, err := a.providers.ListModels(ctx, bundle.Credentials)
+	discovered, gaps, err := a.providers.ListModels(ctx, bundle.Credentials)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, m := range discovered {
 		if !cfg.AllowsModel(m.ID) {
@@ -208,7 +223,7 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, cfg doma
 		}
 		add(m)
 	}
-	return nil
+	return gaps, nil
 }
 
 // soleCredentialProviderID returns the credential chain's provider when

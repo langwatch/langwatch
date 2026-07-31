@@ -11,8 +11,8 @@ import {
   type ModelProviderScopeEntry,
   type OrgModelProvider,
   resolveEligible,
+  type VirtualKeyScopeEntry,
 } from "./eligibleModelProviders";
-import type { VirtualKeyScopeEntry } from "./VirtualKeyScopePicker";
 
 type ScopeNames = {
   organizationName?: string;
@@ -148,9 +148,7 @@ export function EligibleModelProvidersPreview({
       {eligible.map((mp) => {
         const icon =
           mp.provider in modelProviderIcons
-            ? modelProviderIcons[
-                mp.provider as keyof typeof modelProviderIcons
-              ]
+            ? modelProviderIcons[mp.provider as keyof typeof modelProviderIcons]
             : null;
         const isSelected = selectedModel === mp.defaultModel;
         return (
@@ -174,7 +172,11 @@ export function EligibleModelProvidersPreview({
                 ? () => onSelectProviderModel?.(mp.defaultModel)
                 : undefined
             }
-            title={interactive ? `Use ${mp.defaultModel} in the snippet above` : undefined}
+            title={
+              interactive
+                ? `Use ${mp.defaultModel} in the snippet above`
+                : undefined
+            }
           >
             <Box
               width="16px"

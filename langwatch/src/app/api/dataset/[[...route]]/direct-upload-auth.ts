@@ -68,7 +68,17 @@ function isCrossSiteRequest(c: Context): boolean {
 
 export type DirectUploadAuthResult =
   | { ok: true; projectId: string; teamId: string }
-  | { ok: false; status: 401 | 403; error: string };
+  | {
+      ok: false;
+      status: 401 | 403;
+      error: string;
+      /**
+       * The full handled body for failures that have one (currently only the
+       * API-key ceiling denial: code, permission, tips, docsUrl). Routes should
+       * answer with this in preference to `error`, which is only a sentence.
+       */
+      body?: object;
+    };
 
 /**
  * Authorize a direct-upload request for `projectId` via session cookie OR API
@@ -137,7 +147,14 @@ export async function authorizeDirectUpload(
     await enforceApiKeyCeiling({ prisma, resolved, permission: PERMISSION });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
-    return { ok: false, status: denial.status, error: denial.message };
+    // The ceiling only ever denies with 403; narrowed here so the result keeps
+    // its `401 | 403` contract with the routes.
+    return {
+      ok: false,
+      status: 403,
+      error: denial.message,
+      body: denial.body,
+    };
   }
 
   // Telemetry parity with the rest of the API-key surface: fire-and-forget

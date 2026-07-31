@@ -56,7 +56,11 @@ describe("<SuiteContextMenu/>", () => {
       const onClose = vi.fn();
 
       render(
-        <SuiteContextMenu {...defaultProps} onEdit={onEdit} onClose={onClose} />,
+        <SuiteContextMenu
+          {...defaultProps}
+          onEdit={onEdit}
+          onClose={onClose}
+        />,
         { wrapper: Wrapper },
       );
 

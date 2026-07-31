@@ -1,8 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { filterRunsByTimestamp } from "../scenario-events.router";
-import type { BatchRunDataResult } from "~/server/scenarios/scenario-event.types";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import type {
+  BatchRunDataResult,
+  ScenarioRunData,
+} from "~/server/scenarios/scenario-event.types";
+import { filterRunsByTimestamp } from "../scenario-events.router";
 
 function createRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
@@ -33,7 +35,11 @@ describe("filterRunsByTimestamp()", () => {
   describe("when runTimestamps is not provided", () => {
     it("returns the original result unchanged (backward compatible)", () => {
       const runs = [createRun({ scenarioRunId: "run-1", timestamp: 1000 })];
-      const result: BatchRunDataResult = { changed: true, lastUpdatedAt: 1000, runs };
+      const result: BatchRunDataResult = {
+        changed: true,
+        lastUpdatedAt: 1000,
+        runs,
+      };
       const out = filterRunsByTimestamp(result, undefined);
       expect(out).toEqual(result);
     });
@@ -45,9 +51,16 @@ describe("filterRunsByTimestamp()", () => {
         createRun({ scenarioRunId: "run-1", timestamp: 2000 }),
         createRun({ scenarioRunId: "run-2", timestamp: 1000 }),
       ];
-      const result: BatchRunDataResult = { changed: true, lastUpdatedAt: 2000, runs };
+      const result: BatchRunDataResult = {
+        changed: true,
+        lastUpdatedAt: 2000,
+        runs,
+      };
 
-      const out = filterRunsByTimestamp(result, { "run-1": 1000, "run-2": 1000 });
+      const out = filterRunsByTimestamp(result, {
+        "run-1": 1000,
+        "run-2": 1000,
+      });
 
       expect(out.changed).toBe(true);
       if (out.changed) {
@@ -63,7 +76,11 @@ describe("filterRunsByTimestamp()", () => {
         createRun({ scenarioRunId: "run-1", timestamp: 1000 }),
         createRun({ scenarioRunId: "run-2", timestamp: 1000 }),
       ];
-      const result: BatchRunDataResult = { changed: true, lastUpdatedAt: 1000, runs };
+      const result: BatchRunDataResult = {
+        changed: true,
+        lastUpdatedAt: 1000,
+        runs,
+      };
 
       // Client only knows about run-1
       const out = filterRunsByTimestamp(result, { "run-1": 1000 });
@@ -82,9 +99,16 @@ describe("filterRunsByTimestamp()", () => {
         createRun({ scenarioRunId: "run-1", timestamp: 1000 }),
         createRun({ scenarioRunId: "run-2", timestamp: 2000 }),
       ];
-      const result: BatchRunDataResult = { changed: true, lastUpdatedAt: 2000, runs };
+      const result: BatchRunDataResult = {
+        changed: true,
+        lastUpdatedAt: 2000,
+        runs,
+      };
 
-      const out = filterRunsByTimestamp(result, { "run-1": 1000, "run-2": 2000 });
+      const out = filterRunsByTimestamp(result, {
+        "run-1": 1000,
+        "run-2": 2000,
+      });
 
       expect(out.changed).toBe(false);
       expect(out.lastUpdatedAt).toBe(2000);

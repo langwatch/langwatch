@@ -43,7 +43,16 @@ const secured = createServiceApp({ basePath: "/api" });
 
 // POST /api/collector
 secured
-  .access(handlerManagedAuth("ingestion API key resolved in-handler"))
+  .access(
+    handlerManagedAuth({
+      reason: "ingestion API key resolved in-handler",
+      // Declared because this is the route it took a colleague "ages" to work
+      // out from the code: trace collection is gated by `traces:create`, which
+      // was previously discoverable only by reading the handler.
+      permissions: ["traces:create"],
+      credential: "apiKey",
+    }),
+  )
   .post(
     "/collector",
     bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
@@ -119,7 +128,8 @@ secured
           },
           "collector request denied by API key ceiling",
         );
-        return c.json({ message: denial.message }, denial.status);
+        // The full handled body — code, permission, tips — not just a sentence.
+        return c.json(denial.body, denial.status);
       }
 
       const project = resolved.project;

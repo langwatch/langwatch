@@ -1,8 +1,8 @@
 import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle, Calendar, CheckCircle, Zap } from "lucide-react";
 import { useMemo } from "react";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import type { RouterOutputs } from "~/utils/api";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type TriggerFire = RouterOutputs["automation"]["getRecentActivity"][number];
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];

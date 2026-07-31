@@ -1,18 +1,22 @@
 import { prisma } from "../../src/server/db";
+import { createCurrencyRouter } from "./currencyRouter";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
 import { createSeatSyncService } from "./services/seatSyncService";
-import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
 import { EESubscriptionService } from "./services/subscription.service";
+import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
 import { createStripeClient } from "./stripe/stripeClient";
-import { createCurrencyRouter } from "./currencyRouter";
 import { createSubscriptionRouterFactory } from "./subscriptionRouter";
 
-export { PlanTypes, SubscriptionStatus } from "./planTypes";
 export { PLAN_LIMITS } from "./planLimits";
+export { PlanTypes, SubscriptionStatus } from "./planTypes";
 export { prices } from "./services/subscriptionItemCalculator";
-export type { UsageReportingService, MeterEventResult, UsageSummary } from "./services/usageReportingService";
+export type {
+  MeterEventResult,
+  UsageReportingService,
+  UsageSummary,
+} from "./services/usageReportingService";
 export type {
   BillingPlanProvider,
   PlanLimitNotificationContext,
@@ -34,23 +38,36 @@ export { createCurrencyRouter };
 export const createSubscriptionRouter = () => {
   const s = getStripe();
   const customerService = createCustomerService({ stripe: s, db: prisma });
-  const seatEventFns = createSeatEventSubscriptionFns({ stripe: s, db: prisma });
+  const seatEventFns = createSeatEventSubscriptionFns({
+    stripe: s,
+    db: prisma,
+  });
   const subscriptionService = EESubscriptionService.create({
     stripe: s,
     db: prisma,
     itemCalculator: subscriptionItemCalculator,
     seatEventFns,
   });
-  return createSubscriptionRouterFactory({ customerService, subscriptionService });
+  return createSubscriptionRouterFactory({
+    customerService,
+    subscriptionService,
+  });
 };
 
-let seatSyncServiceInstance: ReturnType<typeof createSeatSyncService> | null = null;
+let seatSyncServiceInstance: ReturnType<typeof createSeatSyncService> | null =
+  null;
 
 export const getSeatSyncService = () => {
   if (!seatSyncServiceInstance) {
     const s = getStripe();
-    const seatEventFns = createSeatEventSubscriptionFns({ stripe: s, db: prisma });
-    seatSyncServiceInstance = createSeatSyncService({ seatEventFns, db: prisma });
+    const seatEventFns = createSeatEventSubscriptionFns({
+      stripe: s,
+      db: prisma,
+    });
+    seatSyncServiceInstance = createSeatSyncService({
+      seatEventFns,
+      db: prisma,
+    });
   }
   return seatSyncServiceInstance;
 };
@@ -64,4 +81,3 @@ export const getSaaSPlanProvider = () => {
 
   return saasPlanProvider;
 };
-

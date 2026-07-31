@@ -23,14 +23,14 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { projectFactory } from "~/factories/project.factory";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
 
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
@@ -96,16 +96,14 @@ describe("Feature: Governance REST API", () => {
 
     // Fishery's generic-inference is brittle on partial overrides; the
     // existing dashboards-rest-api integration test has the same cast.
-    const projectInput = (projectFactory.build as unknown as (
-      override: Partial<Project>,
-    ) => Project)({ slug: nanoid() });
+    const projectInput = (
+      projectFactory.build as unknown as (override: Partial<Project>) => Project
+    )({ slug: nanoid() });
     testProject = await prisma.project.create({
       data: {
         ...projectInput,
         teamId: testTeam.id,
-      } as unknown as Parameters<
-        typeof prisma.project.create
-      >[0]["data"],
+      } as unknown as Parameters<typeof prisma.project.create>[0]["data"],
     });
 
     testApiKey = testProject.apiKey;
@@ -217,7 +215,9 @@ describe("Feature: Governance REST API", () => {
     }
     userIds.length = 0;
     for (const id of orgIds) {
-      await prisma.organization.delete({ where: { id } }).catch(() => undefined);
+      await prisma.organization
+        .delete({ where: { id } })
+        .catch(() => undefined);
     }
     orgIds.length = 0;
   });
@@ -297,7 +297,9 @@ describe("Feature: Governance REST API", () => {
       it("returns the platform row in the user-facing shape with empty ottl_rules", async () => {
         const res = await api.get("/api/governance/ingestion-templates");
         expect(res.status).toBe(200);
-        const body = (await res.json()) as { data: Array<Record<string, unknown>> };
+        const body = (await res.json()) as {
+          data: Array<Record<string, unknown>>;
+        };
         const platform = body.data.find(
           (r) => (r.id as string) === platformIds[0],
         );
@@ -333,11 +335,11 @@ describe("Feature: Governance REST API", () => {
       });
 
       it("returns full ottl_rules in the admin shape", async () => {
-        const res = await api.get(
-          "/api/governance/ingestion-templates/admin",
-        );
+        const res = await api.get("/api/governance/ingestion-templates/admin");
         expect(res.status).toBe(200);
-        const body = (await res.json()) as { data: Array<Record<string, unknown>> };
+        const body = (await res.json()) as {
+          data: Array<Record<string, unknown>>;
+        };
         const platform = body.data.find(
           (r) => (r.id as string) === platformIds[0],
         );
@@ -373,9 +375,9 @@ describe("Feature: Governance REST API", () => {
           targetId: created.id as string,
         },
       });
-      expect(
-        (audit?.metadata as { surface?: string } | null)?.surface,
-      ).toBe("hono");
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
+        "hono",
+      );
     });
 
     it("returns 400 for an invalid source_type", async () => {
@@ -429,9 +431,9 @@ describe("Feature: Governance REST API", () => {
           targetId: created.ingestion_template.id,
         },
       });
-      expect(
-        (audit?.metadata as { surface?: string } | null)?.surface,
-      ).toBe("hono");
+      expect((audit?.metadata as { surface?: string } | null)?.surface).toBe(
+        "hono",
+      );
     });
 
     it("returns 403 when targeting a platform-published row (immutability guard)", async () => {
@@ -527,9 +529,7 @@ describe("Feature: Governance REST API", () => {
       const body = (await archive.json()) as { archived: boolean };
       expect(body.archived).toBe(true);
 
-      const list = await api.get(
-        "/api/governance/ingestion-templates/admin",
-      );
+      const list = await api.get("/api/governance/ingestion-templates/admin");
       const visible = (await list.json()) as { data: Array<{ id: string }> };
       expect(
         visible.data.find((r) => r.id === created.ingestion_template.id),

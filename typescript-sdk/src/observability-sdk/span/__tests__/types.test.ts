@@ -9,7 +9,7 @@ import {
 } from "../types";
 
 describe("spanTypes", () => {
-  it("should include all expected span types", () => {
+  it("includes all expected span types", () => {
     const expectedTypes = [
       "span",
       "llm",
@@ -34,19 +34,19 @@ describe("spanTypes", () => {
     expect(spanTypes).toEqual(expectedTypes);
   });
 
-  it("should be a readonly array", () => {
+  it("is a readonly array", () => {
     // This test ensures the type system enforces readonly behavior
     const types: readonly string[] = spanTypes;
     expect(types).toBe(spanTypes);
   });
 
-  it("should have correct length", () => {
+  it("has correct length", () => {
     expect(spanTypes).toHaveLength(18);
   });
 });
 
 describe("SpanType", () => {
-  it("should accept valid span types", () => {
+  it("accepts valid span types", () => {
     const validTypes: SpanType[] = [
       "span",
       "llm",
@@ -75,7 +75,7 @@ describe("SpanType", () => {
 });
 
 describe("JsonSerializable", () => {
-  it("should accept primitive types", () => {
+  it("accepts primitive types", () => {
     const stringValue: JsonSerializable = "test";
     const numberValue: JsonSerializable = 42;
     const booleanValue: JsonSerializable = true;
@@ -87,12 +87,12 @@ describe("JsonSerializable", () => {
     expect(nullValue).toBe(null);
   });
 
-  it("should accept arrays", () => {
+  it("accepts arrays", () => {
     const arrayValue: JsonSerializable = ["test", 42, true, null];
     expect(Array.isArray(arrayValue)).toBe(true);
   });
 
-  it("should accept objects", () => {
+  it("accepts objects", () => {
     const objectValue: JsonSerializable = {
       string: "test",
       number: 42,
@@ -108,7 +108,7 @@ describe("JsonSerializable", () => {
     expect(objectValue).not.toBe(null);
   });
 
-  it("should accept nested structures", () => {
+  it("accepts nested structures", () => {
     const complexValue: JsonSerializable = {
       users: [
         { id: 1, name: "Alice", active: true },
@@ -126,7 +126,7 @@ describe("JsonSerializable", () => {
 });
 
 describe("LangWatchSpanRAGContext", () => {
-  it("should accept valid RAG context", () => {
+  it("accepts valid RAG context", () => {
     const ragContext: LangWatchSpanRAGContext = {
       document_id: "doc-123",
       chunk_id: "chunk-456",
@@ -138,7 +138,7 @@ describe("LangWatchSpanRAGContext", () => {
     expect(ragContext.content).toBe("Relevant passage from the document.");
   });
 
-  it("should require all fields", () => {
+  it("requires all fields", () => {
     // This test verifies the TypeScript interface requirements
     const ragContext: LangWatchSpanRAGContext = {
       document_id: "",
@@ -151,7 +151,7 @@ describe("LangWatchSpanRAGContext", () => {
     expect(ragContext).toHaveProperty("content");
   });
 
-  it("should accept string values", () => {
+  it("accepts string values", () => {
     const ragContext: LangWatchSpanRAGContext = {
       document_id: "document-with-special-chars-123!@#",
       chunk_id: "chunk_with_underscores_456",
@@ -165,7 +165,7 @@ describe("LangWatchSpanRAGContext", () => {
 });
 
 describe("LangWatchSpanMetrics", () => {
-  it("should accept all optional metrics", () => {
+  it("accepts all optional metrics", () => {
     const metrics: LangWatchSpanMetrics = {
       promptTokens: 100,
       completionTokens: 50,
@@ -177,7 +177,7 @@ describe("LangWatchSpanMetrics", () => {
     expect(metrics.cost).toBe(0.002);
   });
 
-  it("should accept partial metrics", () => {
+  it("accepts partial metrics", () => {
     const metrics1: LangWatchSpanMetrics = {
       promptTokens: 100
     };
@@ -203,7 +203,7 @@ describe("LangWatchSpanMetrics", () => {
     expect(metrics3.cost).toBeUndefined();
   });
 
-  it("should accept empty metrics object", () => {
+  it("accepts empty metrics object", () => {
     const metrics: LangWatchSpanMetrics = {};
 
     expect(metrics.promptTokens).toBeUndefined();
@@ -211,7 +211,7 @@ describe("LangWatchSpanMetrics", () => {
     expect(metrics.cost).toBeUndefined();
   });
 
-  it("should accept zero values", () => {
+  it("accepts zero values", () => {
     const metrics: LangWatchSpanMetrics = {
       promptTokens: 0,
       completionTokens: 0,
@@ -223,7 +223,7 @@ describe("LangWatchSpanMetrics", () => {
     expect(metrics.cost).toBe(0);
   });
 
-  it("should accept decimal values", () => {
+  it("accepts decimal values", () => {
     const metrics: LangWatchSpanMetrics = {
       promptTokens: 123.45, // Even though typically integers, type allows numbers
       completionTokens: 67.89,
@@ -237,7 +237,7 @@ describe("LangWatchSpanMetrics", () => {
 });
 
 describe("LangWatchSpanOptions", () => {
-  it("should extend SpanOptions", () => {
+  it("extends SpanOptions", () => {
     // Test that LangWatchSpanOptions can include standard OpenTelemetry SpanOptions
     const options: LangWatchSpanOptions = {
       kind: 1, // SpanKind.CLIENT from OpenTelemetry
@@ -253,7 +253,7 @@ describe("LangWatchSpanOptions", () => {
     expect(options.attributes).toBeDefined();
   });
 
-  it("should accept custom attributes", () => {
+  it("accepts custom attributes", () => {
     const options: LangWatchSpanOptions = {
       attributes: {
         "custom.attribute": "value",
@@ -267,13 +267,13 @@ describe("LangWatchSpanOptions", () => {
     expect(options.attributes).toHaveProperty("gen_ai.request.model");
   });
 
-  it("should accept empty options", () => {
+  it("accepts empty options", () => {
     const options: LangWatchSpanOptions = {};
 
     expect(options.attributes).toBeUndefined();
   });
 
-  it("should accept undefined attributes", () => {
+  it("accepts undefined attributes", () => {
     const options: LangWatchSpanOptions = {
       attributes: undefined
     };

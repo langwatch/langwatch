@@ -12,7 +12,10 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { TimeseriesBucket, TimeseriesResult } from "~/server/analytics/types";
+import type {
+  TimeseriesBucket,
+  TimeseriesResult,
+} from "~/server/analytics/types";
 import type { AnalyticsTable } from "../routing/route-table";
 
 /**
@@ -109,7 +112,10 @@ export function compareForTripwire(input: CompareForTripwireInput): void {
       // its own right — a routed query that drops a whole date (or invents one)
       // is exactly the failure the tripwire exists to catch, and the old
       // `if (!l) continue` silently tolerated it.
-      const allDates = new Set([...routedByDate.keys(), ...legacyByDate.keys()]);
+      const allDates = new Set([
+        ...routedByDate.keys(),
+        ...legacyByDate.keys(),
+      ]);
 
       for (const date of allDates) {
         const r = routedByDate.get(date);
@@ -129,7 +135,10 @@ export function compareForTripwire(input: CompareForTripwireInput): void {
 
         const routedFlat = flattenBucketMetrics(r);
         const legacyFlat = flattenBucketMetrics(l);
-        const allMetrics = new Set([...routedFlat.keys(), ...legacyFlat.keys()]);
+        const allMetrics = new Set([
+          ...routedFlat.keys(),
+          ...legacyFlat.keys(),
+        ]);
 
         for (const metric of allMetrics) {
           const rv = routedFlat.get(metric);

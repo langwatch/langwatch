@@ -14,12 +14,14 @@ import {
   isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../hooks/useAllModelProvidersList";
+import { useCredentialProbeGate } from "../../hooks/useCredentialProbeGate";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderForm } from "../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
@@ -29,7 +31,6 @@ import {
   hasUserEnteredNewApiKey,
   hasUserModifiedNonApiKeyFields,
 } from "../../utils/modelProviderHelpers";
-import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
@@ -320,6 +321,14 @@ export const EditModelProviderForm = ({
     state.scopes,
   );
 
+  // Shared with onboarding and the Langy model gate, so a refusal is not the
+  // end of the road on one surface and a hard block on the next.
+  const { probeRequired, recordRefusal, clearRefusal, saveLabel } =
+    useCredentialProbeGate({
+      customKeys: state.customKeys,
+      resetKey: providerId,
+    });
+
   const handleSave = useCallback(async () => {
     // Clear previous errors
     setFieldErrors({});
@@ -384,13 +393,25 @@ export const EditModelProviderForm = ({
     // console, hit a temporary 401, etc.). Safety providers like
     // azure_safety also skip this — their endpoints can't answer the
     // OpenAI-compatible probe at all.
-    if (isLlmProvider && !isOAuthDeviceProvider && userEnteredNewApiKey) {
+    if (
+      isLlmProvider &&
+      !isOAuthDeviceProvider &&
+      userEnteredNewApiKey &&
+      probeRequired
+    ) {
       const isValid = await validateApiKey();
-      if (!isValid) return;
+      if (!isValid) {
+        recordRefusal();
+        return;
+      }
+      clearRefusal();
     }
 
     void actions.submit();
   }, [
+    probeRequired,
+    recordRefusal,
+    clearRefusal,
     isLlmProvider,
     isOAuthDeviceProvider,
     isUsingEnvVars,
@@ -563,7 +584,7 @@ export const EditModelProviderForm = ({
             }
             onClick={handleSave}
           >
-            Save
+            {saveLabel}
           </Button>
         </HStack>
       </VStack>

@@ -26,6 +26,8 @@
  *   - typescript-sdk/src/cli/utils/governance/__tests__ (CLI consumer
  *     side renders the wire shape returned here)
  */
+
+import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -34,15 +36,13 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
-
 import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 describe("user.cliBootstrap integration", () => {
   const ns = `cliboot-${nanoid(8)}`;
@@ -58,7 +58,11 @@ describe("user.cliBootstrap integration", () => {
     await prisma.organization.createMany({
       data: [
         { id: ORG_ID, name: "CliBoot Org", slug: `cliboot-${ns}` },
-        { id: OTHER_ORG_ID, name: "CliBoot Other Org", slug: `cliboot-other-${ns}` },
+        {
+          id: OTHER_ORG_ID,
+          name: "CliBoot Other Org",
+          slug: `cliboot-other-${ns}`,
+        },
       ],
     });
     await prisma.user.create({
@@ -182,9 +186,7 @@ describe("user.cliBootstrap integration", () => {
         { name: "anthropic", displayName: "Anthropic", configured: false },
       ]);
       // The env-fed openai provider the legacy path leaked is absent.
-      expect(
-        result.providers.find((p) => p.name === "openai"),
-      ).toBeUndefined();
+      expect(result.providers.find((p) => p.name === "openai")).toBeUndefined();
       // gatewayProviders reflects CONFIGURED credentials, not catalog tiles:
       // the anthropic tile is published but no credential is configured, so
       // the gateway has nothing to route through.

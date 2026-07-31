@@ -76,7 +76,10 @@ void (async () => {
   });
 
   await step(results, "click-ingestion-templates-tab", async () => {
-    await page.locator('button:has-text("Ingestion Templates")').first().click();
+    await page
+      .locator('button:has-text("Ingestion Templates")')
+      .first()
+      .click();
     // Wait for the table to render with at least one row, OR the empty state.
     await page.waitForFunction(
       () =>
@@ -93,7 +96,7 @@ void (async () => {
     await viewBtn.waitFor({ state: "visible", timeout: 5_000 });
     await viewBtn.click();
     await page
-      .locator('text=/clone the row.*to customise/i')
+      .locator("text=/clone the row.*to customise/i")
       .first()
       .waitFor({ state: "visible", timeout: 5_000 });
     await shoot(page, "03-platform-view-ottl-readonly");
@@ -113,16 +116,14 @@ void (async () => {
     await cloneBtn.click();
     // Edit drawer opens after the mutation resolves
     await page
-      .locator('text=/Edit OTTL —/i')
+      .locator("text=/Edit OTTL —/i")
       .first()
       .waitFor({ state: "visible", timeout: 10_000 });
     await shoot(page, "04-clone-edit-drawer-open");
   });
 
   await step(results, "modify-and-save-ottl", async () => {
-    const ta = page
-      .locator('textarea, [contenteditable="true"]')
-      .first();
+    const ta = page.locator('textarea, [contenteditable="true"]').first();
     if (!(await ta.count())) throw new Error("OTTL textarea not found");
     const probe = `# dogfood-ariana-${Date.now()}\n`;
     await ta.click();
@@ -132,9 +133,7 @@ void (async () => {
     });
     await page.keyboard.type(probe);
     await page.waitForTimeout(300);
-    const saveBtn = page
-      .locator('button:has-text("Save OTTL")')
-      .first();
+    const saveBtn = page.locator('button:has-text("Save OTTL")').first();
     await saveBtn.click();
     await page.waitForTimeout(1500);
     await shoot(page, "05-after-save-ottl");
@@ -162,15 +161,6 @@ void (async () => {
   });
 
   await step(results, "archive-org-authored-row", async () => {
-    const trashBtn = page
-      .locator('button[aria-label*="rash"], button:has(svg)')
-      .filter({ has: page.locator('svg') })
-      .last(); // Last action button — the archive trash icon
-    // Better: use the colorPalette=red button shape
-    const redArchive = page
-      .locator('button.css-')
-      .filter({ hasText: "" });
-    // Fallback: last button in the org row Actions column
     const archiveCandidates = page.locator(
       'tr:has(span:has-text("Org-authored")) button',
     );

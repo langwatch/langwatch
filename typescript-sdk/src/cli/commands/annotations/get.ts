@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -10,7 +10,7 @@ import type { CommandResult } from "../../utils/output";
  * whatever format the caller asked for (utils/output.ts).
  */
 export const getAnnotationCommand = async (id: string): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new AnnotationsApiService();
   const spinner = createSpinner(`Fetching annotation "${id}"...`).start();

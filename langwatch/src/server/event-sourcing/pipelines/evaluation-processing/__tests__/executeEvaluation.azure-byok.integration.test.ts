@@ -10,11 +10,10 @@
  * - "Configured Azure provider passes keys to langevals at runtime"
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { Command } from "../../..";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
 import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import type { Command } from "../../..";
 import { createTenantId } from "../../../domain/tenantId";
 import { ExecuteEvaluationCommand } from "../commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
@@ -106,17 +105,15 @@ function buildCommandWithMocks({
     recordCost: vi.fn(),
   } as unknown as EvaluationCostRecorder;
 
-  const azureSafetyEnvResolver = vi
-    .fn()
-    .mockResolvedValue(
-      azureConfigured
-        ? {
-            AZURE_CONTENT_SAFETY_ENDPOINT:
-              "https://byok.cognitiveservices.azure.com/",
-            AZURE_CONTENT_SAFETY_KEY: "byok-key",
-          }
-        : null,
-    );
+  const azureSafetyEnvResolver = vi.fn().mockResolvedValue(
+    azureConfigured
+      ? {
+          AZURE_CONTENT_SAFETY_ENDPOINT:
+            "https://byok.cognitiveservices.azure.com/",
+          AZURE_CONTENT_SAFETY_KEY: "byok-key",
+        }
+      : null,
+  );
 
   const command = new ExecuteEvaluationCommand({
     monitors,
@@ -140,76 +137,69 @@ describe("Feature: ExecuteEvaluationCommand — Azure Safety BYOK gate", () => {
     vi.clearAllMocks();
   });
 
-  describe.each(AZURE_EVALUATOR_TYPES)(
-    "given a monitor for %s",
-    (evaluatorType) => {
-      describe("and the project has NO azure_safety provider configured", () => {
-        describe("when the command handles the evaluation", () => {
-          it("emits a skipped event with the configure message", async () => {
-            const { command } = buildCommandWithMocks({
-              azureConfigured: false,
-              checkType: evaluatorType,
-            });
-
-            const events = await command.handle(buildCommand(evaluatorType));
-
-            expect(events).toHaveLength(1);
-            const eventData = events[0]?.data as unknown as {
-              status: string;
-              details?: string;
-            };
-            expect(eventData.status).toBe("skipped");
-            expect(eventData.details).toMatch(/not configured/i);
-            expect(eventData.details).toMatch(/Model Providers/i);
+  describe.each(
+    AZURE_EVALUATOR_TYPES,
+  )("given a monitor for %s", (evaluatorType) => {
+    describe("and the project has NO azure_safety provider configured", () => {
+      describe("when the command handles the evaluation", () => {
+        it("emits a skipped event with the configure message", async () => {
+          const { command } = buildCommandWithMocks({
+            azureConfigured: false,
+            checkType: evaluatorType,
           });
 
-          it("does not call evaluationExecution.executeForTrace", async () => {
-            const { command, evaluationExecution } = buildCommandWithMocks({
-              azureConfigured: false,
-              checkType: evaluatorType,
-            });
+          const events = await command.handle(buildCommand(evaluatorType));
 
-            await command.handle(buildCommand(evaluatorType));
+          expect(events).toHaveLength(1);
+          const eventData = events[0]?.data as unknown as {
+            status: string;
+            details?: string;
+          };
+          expect(eventData.status).toBe("skipped");
+          expect(eventData.details).toMatch(/not configured/i);
+          expect(eventData.details).toMatch(/Model Providers/i);
+        });
 
-            expect(
-              evaluationExecution.executeForTrace,
-            ).not.toHaveBeenCalled();
+        it("does not call evaluationExecution.executeForTrace", async () => {
+          const { command, evaluationExecution } = buildCommandWithMocks({
+            azureConfigured: false,
+            checkType: evaluatorType,
           });
 
-          it("resolves azure safety env only once", async () => {
-            const { command, azureSafetyEnvResolver } = buildCommandWithMocks({
-              azureConfigured: false,
-              checkType: evaluatorType,
-            });
+          await command.handle(buildCommand(evaluatorType));
 
-            await command.handle(buildCommand(evaluatorType));
+          expect(evaluationExecution.executeForTrace).not.toHaveBeenCalled();
+        });
 
-            expect(azureSafetyEnvResolver).toHaveBeenCalledTimes(1);
-            expect(azureSafetyEnvResolver).toHaveBeenCalledWith(
-              "proj-byok-1",
-            );
+        it("resolves azure safety env only once", async () => {
+          const { command, azureSafetyEnvResolver } = buildCommandWithMocks({
+            azureConfigured: false,
+            checkType: evaluatorType,
           });
+
+          await command.handle(buildCommand(evaluatorType));
+
+          expect(azureSafetyEnvResolver).toHaveBeenCalledTimes(1);
+          expect(azureSafetyEnvResolver).toHaveBeenCalledWith("proj-byok-1");
         });
       });
+    });
 
-      describe("and the project has azure_safety configured", () => {
-        describe("when the command handles the evaluation", () => {
-          it("calls evaluationExecution.executeForTrace", async () => {
-            const { command, evaluationExecution } = buildCommandWithMocks({
-              azureConfigured: true,
-              checkType: evaluatorType,
-            });
-
-            await command.handle(buildCommand(evaluatorType));
-
-            expect(evaluationExecution.executeForTrace).toHaveBeenCalledTimes(
-              1,
-            );
+    describe("and the project has azure_safety configured", () => {
+      describe("when the command handles the evaluation", () => {
+        it("calls evaluationExecution.executeForTrace", async () => {
+          const { command, evaluationExecution } = buildCommandWithMocks({
+            azureConfigured: true,
+            checkType: evaluatorType,
           });
+
+          await command.handle(buildCommand(evaluatorType));
+
+          expect(evaluationExecution.executeForTrace).toHaveBeenCalledTimes(1);
         });
       });
-    },
-  );
+    });
+  });
 
   describe("given a non-azure monitor", () => {
     describe("when the command handles the evaluation", () => {

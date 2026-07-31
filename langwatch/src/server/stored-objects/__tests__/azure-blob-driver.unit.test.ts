@@ -9,14 +9,16 @@
  *   - 404s from Azure surface as ObjectNotFoundError on GET
  */
 import crypto from "node:crypto";
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AzureBlobDriver } from "../azure-blob-driver";
 import { ObjectNotFoundError } from "../errors";
 
 const ACCOUNT_NAME = "lwtestacct";
 // Base64-encoded 256-bit key — arbitrary fixed value for deterministic signature tests.
-const ACCOUNT_KEY = Buffer.from("01234567890123456789012345678901").toString("base64");
+const ACCOUNT_KEY = Buffer.from("01234567890123456789012345678901").toString(
+  "base64",
+);
 const CONTAINER = "stored-objects";
 const BLOB_PATH = "proj-1/abc123";
 const URI = `azure-blob://${ACCOUNT_NAME}/${CONTAINER}/${BLOB_PATH}`;
@@ -57,7 +59,9 @@ describe("AzureBlobDriver", () => {
       // Import lazily to keep the registry construction local to this test.
       const { StorageRegistry } = await import("../storage-registry");
       const { getUriScheme, mintAzureBlobUri } = await import("../uri");
-      const { LocalFilesystemDriver } = await import("../local-filesystem-driver");
+      const { LocalFilesystemDriver } = await import(
+        "../local-filesystem-driver"
+      );
       const { S3Driver } = await import("../s3-driver");
 
       // Scheme is in the supported set and is NOT s3/file.
@@ -121,9 +125,7 @@ describe("AzureBlobDriver", () => {
     it("hits the public-cloud endpoint with a SharedKey Authorization header and returns the bytes as a stream", async () => {
       const driver = newDriver();
       const body = Buffer.from("hello azure", "utf8");
-      fetchSpy.mockResolvedValueOnce(
-        new Response(body, { status: 200 }),
-      );
+      fetchSpy.mockResolvedValueOnce(new Response(body, { status: 200 }));
 
       const stream = await driver.get(URI);
 
@@ -166,7 +168,9 @@ describe("AzureBlobDriver", () => {
       fetchSpy.mockResolvedValueOnce(new Response("oops", { status: 503 }));
 
       await expect(driver.get(URI)).rejects.toThrow(/503/);
-      await expect(driver.get(URI)).rejects.not.toBeInstanceOf(ObjectNotFoundError);
+      await expect(driver.get(URI)).rejects.not.toBeInstanceOf(
+        ObjectNotFoundError,
+      );
     });
   });
 
@@ -201,7 +205,10 @@ describe("AzureBlobDriver", () => {
     it("throws a descriptive error when Azure rejects the PUT", async () => {
       const driver = newDriver();
       fetchSpy.mockResolvedValueOnce(
-        new Response("AuthenticationFailed", { status: 403, statusText: "Forbidden" }),
+        new Response("AuthenticationFailed", {
+          status: 403,
+          statusText: "Forbidden",
+        }),
       );
 
       await expect(
@@ -355,7 +362,6 @@ describe("AzureBlobDriver", () => {
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
       await driver.put(KAT_URI, KAT_BODY, "application/octet-stream");
 
-
       const [, init] = fetchSpy.mock.calls[0]!;
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toBe(KAT_EXPECTED_AUTH);
@@ -391,7 +397,9 @@ describe("AzureBlobDriver", () => {
         .update(stringToSign, "utf8")
         .digest("base64");
 
-      expect(`SharedKey ${KAT_ACCOUNT_NAME}:${signature}`).toBe(KAT_EXPECTED_AUTH);
+      expect(`SharedKey ${KAT_ACCOUNT_NAME}:${signature}`).toBe(
+        KAT_EXPECTED_AUTH,
+      );
     });
   });
 
@@ -445,7 +453,6 @@ describe("AzureBlobDriver", () => {
       const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
       await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
 
-
       const stringToSign = [
         "PUT",
         "",
@@ -494,7 +501,6 @@ describe("AzureBlobDriver", () => {
 
       const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
       await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
-
 
       const wrongStringToSign = [
         "PUT",

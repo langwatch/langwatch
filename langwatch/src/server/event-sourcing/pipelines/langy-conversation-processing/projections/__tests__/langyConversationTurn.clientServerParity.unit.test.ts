@@ -14,15 +14,15 @@
  * Spec: specs/langy/langy-event-sourced-frontend.feature
  */
 import {
+  applyLangyTurnEvents,
+  initialLangyTurnProjection,
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_TURN_STATUS,
   LANGY_TURN_TOOL_CALL_STATUS,
-  applyLangyTurnEvents,
-  initialLangyTurnProjection,
-  langyConversationTurnEventSchema,
   type LangyConversationTurnData,
   type LangyConversationTurnFoldState,
+  langyConversationTurnEventSchema,
 } from "@langwatch/langy";
 import { describe, expect, it } from "vitest";
 
@@ -176,7 +176,9 @@ describe("given the recorded steps of a completed turn", () => {
 
     it("folds a whole turn on both sides — the comparison is not of two empties", () => {
       // Guards the assertion above: two blank documents would also be equal.
-      expect(backendState.Status).toBe(LANGY_CONVERSATION_TURN_STATUS.COMPLETED);
+      expect(backendState.Status).toBe(
+        LANGY_CONVERSATION_TURN_STATUS.COMPLETED,
+      );
       expect(backendState.ToolCalls).toHaveLength(1);
       expect(backendState.ToolCalls[0]?.status).toBe(
         LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,

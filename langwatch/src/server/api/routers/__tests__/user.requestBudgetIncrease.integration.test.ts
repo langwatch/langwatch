@@ -20,19 +20,28 @@ import {
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 vi.mock("../../../mailer/emailSender", () => ({
   sendEmail: vi.fn(),
 }));
+
 import { sendEmail } from "../../../mailer/emailSender";
 
 describe("user.requestBudgetIncrease integration", () => {
@@ -63,7 +72,11 @@ describe("user.requestBudgetIncrease integration", () => {
     await prisma.user.createMany({
       data: [
         { id: ADMIN_USER_ID, email: ADMIN_EMAIL, name: "The Admin" },
-        { id: REQUESTER_USER_ID, email: REQUESTER_EMAIL, name: "The Requester" },
+        {
+          id: REQUESTER_USER_ID,
+          email: REQUESTER_EMAIL,
+          name: "The Requester",
+        },
       ],
     });
     // Admin org: ADMIN + MEMBER
@@ -182,7 +195,7 @@ describe("user.requestBudgetIncrease integration", () => {
   });
 
   describe("when the org has zero ADMIN role-members", () => {
-    it("throws PRECONDITION_FAILED with code 'no_admin_found' and never calls sendEmail", async () => {
+    it("throws the no_admin_configured handled error and never calls sendEmail", async () => {
       await expect(
         noAdminCaller.user.requestBudgetIncrease({
           organizationId: ORG_NO_ADMIN_ID,
@@ -191,9 +204,15 @@ describe("user.requestBudgetIncrease integration", () => {
           limitUsd: "10.00",
           spentUsd: "12.50",
         }),
+        // On `code`, not prose. Both halves of the contract are asserted
+        // because they are separate promises: `PRECONDITION_FAILED` is the
+        // wire code (an unmapped 412 falls back to INTERNAL_SERVER_ERROR and
+        // books this as a server fault), and `cause.code` is the handled code
+        // the client's presentation registry is keyed by. The old assertion
+        // pinned a hand-written slug in `message`.
       ).rejects.toMatchObject({
         code: "PRECONDITION_FAILED",
-        message: "no_admin_found",
+        cause: { code: "no_admin_configured" },
       });
       expect(sendEmail).not.toHaveBeenCalled();
     });

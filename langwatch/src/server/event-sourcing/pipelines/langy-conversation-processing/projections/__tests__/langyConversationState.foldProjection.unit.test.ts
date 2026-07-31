@@ -1,6 +1,3 @@
-import { describe, expect, it } from "vitest";
-import { createTenantId } from "../../../../domain/tenantId";
-import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
@@ -8,6 +5,9 @@ import {
   LANGY_TITLE_SOURCE,
   type LangyConversationStateData,
 } from "@langwatch/langy";
+import { describe, expect, it } from "vitest";
+import { createTenantId } from "../../../../domain/tenantId";
+import type { StateProjectionStore } from "../../../../projections/stateProjection.types";
 import type { LangyConversationProcessingEvent } from "../../schemas/events";
 import { LangyConversationStateFoldProjection } from "../langyConversationState.foldProjection";
 
@@ -227,7 +227,7 @@ describe("LangyConversationStateFoldProjection", () => {
         // The conversation spine reads a stop as a non-failed terminal: the
         // partial counts as a message, the turn clears, and it lands IDLE so the
         // next message just works — the stopped-ness lives on the turn doc, not
-        // here (ADR-058).
+        // here (ADR-078).
         expect(state.MessageCount).toBe(2);
         expect(state.Status).toBe(LANGY_CONVERSATION_STATUS.IDLE);
         expect(state.CurrentTurnId).toBeNull();
@@ -336,12 +336,7 @@ describe("LangyConversationStateFoldProjection", () => {
   describe("given an archived conversation", () => {
     const archived = fold.apply(
       fold.apply(fold.init(), messageSent({}, 1000)),
-      event(
-        "ARCHIVED",
-        LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED,
-        {},
-        3000,
-      ),
+      event("ARCHIVED", LANGY_CONVERSATION_EVENT_VERSIONS.ARCHIVED, {}, 3000),
     );
 
     it("flips status to archived and stamps ArchivedAt", () => {
@@ -389,7 +384,12 @@ describe("LangyConversationStateFoldProjection", () => {
       event(
         "TITLE_GENERATED",
         LANGY_CONVERSATION_EVENT_VERSIONS.TITLE_GENERATED,
-        { title: "Generated Title", source: "auto", model: "openai/gpt-5-mini", ...data },
+        {
+          title: "Generated Title",
+          source: "auto",
+          model: "openai/gpt-5-mini",
+          ...data,
+        },
         occurredAt,
       );
 

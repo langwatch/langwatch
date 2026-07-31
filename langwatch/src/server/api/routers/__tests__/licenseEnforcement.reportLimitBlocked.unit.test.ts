@@ -86,7 +86,7 @@ vi.mock("~/server/app-layer/app", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 // Mock RBAC to allow all permission checks (unit test, not testing auth)
@@ -150,7 +150,7 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
       expect(mockCheckLimit).toHaveBeenCalledWith(
         "org-123",
         "workflows",
-        expect.objectContaining({ id: "user-1" })
+        expect.objectContaining({ id: "user-1" }),
       );
       expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith({
         organizationId: "org-123",
@@ -178,7 +178,7 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
       expect(mockCheckLimit).toHaveBeenCalledWith(
         "org-123",
         "workflows",
-        expect.objectContaining({ id: "user-1" })
+        expect.objectContaining({ id: "user-1" }),
       );
       expect(mockNotifyResourceLimitReached).not.toHaveBeenCalled();
     });
@@ -224,10 +224,10 @@ describe("licenseEnforcement.reportLimitBlocked", () => {
       expect(mockCheckLimit).toHaveBeenCalledWith(
         "org-456",
         "prompts",
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(mockNotifyResourceLimitReached).toHaveBeenCalledWith(
-        expect.objectContaining({ limitType: "prompts" })
+        expect.objectContaining({ limitType: "prompts" }),
       );
     });
   });

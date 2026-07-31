@@ -20,7 +20,10 @@ export function resolveCurrentComparisonPlan(
     return "free";
   }
 
-  if (normalizedType === "GROWTH" || (normalizedType && isGrowthSeatEventPlan(normalizedType))) {
+  if (
+    normalizedType === "GROWTH" ||
+    (normalizedType && isGrowthSeatEventPlan(normalizedType))
+  ) {
     return "growth";
   }
 

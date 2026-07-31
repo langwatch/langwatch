@@ -2,25 +2,20 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
 import { env } from "../../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
-import { getApp } from "../app";
-import { seedProjectTopicModel } from "./seedTopicModel";
-import {
-  CLUSTERING_ERROR_CODES,
-  ClusteringError,
-} from "./clustering-error";
 import { getClickHouseClientForProject } from "../../clickhouse/clickhouseClient";
 import { prisma } from "../../db";
 import { getProjectEmbeddingsModel } from "../../embeddings";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import { getPayloadSizeHistogram } from "../../metrics";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "~/server/event-sourcing/pipelines/topic-clustering-processing/process-manager/topicClusteringIntentHandlers";
+import { getApp } from "../app";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -29,6 +24,8 @@ import type {
   TopicClusteringTopic,
   TopicClusteringTrace,
 } from "./clustering.types";
+import { CLUSTERING_ERROR_CODES, ClusteringError } from "./clustering-error";
+import { seedProjectTopicModel } from "./seedTopicModel";
 
 const logger = createLogger("langwatch:topicClustering");
 
@@ -227,8 +224,7 @@ export const clusterTopicsForProject = async (
   // of empty-input (or already-clustered) traces, and stopping on the
   // usable count would strand them. Worst case of the loose threshold is
   // one extra near-empty page before the walk ends.
-  const nextSearchAfter =
-    returnedCount > 10 && lastSort ? lastSort : undefined;
+  const nextSearchAfter = returnedCount > 10 && lastSort ? lastSort : undefined;
 
   if (traces.length < minimumTraces) {
     logger.info(
@@ -739,12 +735,7 @@ export const storeResults = async (
     return null;
   }
 
-  const {
-    topics,
-    subtopics,
-    traces: tracesToAssign,
-    cost,
-  } = clusteringResult;
+  const { topics, subtopics, traces: tracesToAssign, cost } = clusteringResult;
 
   logger.info(
     {

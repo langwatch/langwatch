@@ -2,10 +2,7 @@ import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { TargetConfig } from "../types";
-import {
-  pickTargetName,
-  type NamedEntity,
-} from "../utils/targetDisplayName";
+import { type NamedEntity, pickTargetName } from "../utils/targetDisplayName";
 
 /**
  * Hook to fetch the display name for a target from the database.
@@ -103,7 +100,8 @@ export const useTargetNames = (
       t.agents.getById(
         { id: target?.dbAgentId ?? "", projectId },
         {
-          enabled: target?.type === "agent" && !!target.dbAgentId && !!projectId,
+          enabled:
+            target?.type === "agent" && !!target.dbAgentId && !!projectId,
           staleTime: 60_000,
         },
       ),

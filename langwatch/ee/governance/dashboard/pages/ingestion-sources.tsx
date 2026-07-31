@@ -14,6 +14,9 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
+import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
+import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 import {
   CircleCheck,
   CircleDashed,
@@ -26,14 +29,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
-import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
-import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
-
-import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -46,6 +42,9 @@ import {
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -123,8 +122,7 @@ const SOURCE_TYPE_OPTIONS: Array<{
     value: "claude_compliance",
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
-    blurb:
-      "Polls Anthropic's compliance API with a workspace API key.",
+    blurb: "Polls Anthropic's compliance API with a workspace API key.",
   },
   {
     value: "s3_custom",
@@ -271,11 +269,7 @@ function IngestionSourcesPage() {
       });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to create source",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
   });
 
   const rotateMutation = api.ingestionSources.rotateSecret.useMutation({
@@ -290,11 +284,7 @@ function IngestionSourcesPage() {
       });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to rotate secret",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
 
   const updateMutation = api.ingestionSources.update.useMutation({
@@ -304,11 +294,7 @@ function IngestionSourcesPage() {
       toaster.create({ title: "Source updated", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to update source",
-        description: e.message,
-        type: "error",
-      }),
+      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
   });
 
   const archiveMutation = api.ingestionSources.archive.useMutation({
@@ -317,10 +303,9 @@ function IngestionSourcesPage() {
       toaster.create({ title: "Source archived", type: "success" });
     },
     onError: (e) =>
-      toaster.create({
-        title: "Failed to archive",
-        description: e.message,
-        type: "error",
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't archive the source",
       }),
   });
 
@@ -377,7 +362,6 @@ function IngestionSourcesPage() {
     return out;
   }, [sourcesQuery.data]);
 
-
   return (
     <GovernanceLayout pageTitle="Ingestion Sources · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
@@ -390,10 +374,9 @@ function IngestionSourcesPage() {
               </Badge>
             </HStack>
             <Text color="fg.muted" fontSize="sm" maxW="3xl">
-              Configure cross-platform feeds for the activity monitor.
-              Each source maps an external AI platform into the
-              normalised activity stream via OTel push, webhook, or
-              S3 audit drops.{" "}
+              Configure cross-platform feeds for the activity monitor. Each
+              source maps an external AI platform into the normalised activity
+              stream via OTel push, webhook, or S3 audit drops.{" "}
               <Link href="/governance" color="blue.600">
                 Back to governance
               </Link>
@@ -442,6 +425,15 @@ function IngestionSourcesPage() {
 
         {sourcesQuery.isLoading && <Spinner size="sm" />}
 
+        {/* The list is the page. Without this the three mode sections below
+            render "No push-mode sources configured." off an empty `?? []`,
+            which tells an admin their entire ingest fleet is gone when all
+            that actually happened was a 403 or a DB blip. */}
+        <HandledErrorAlert
+          error={sourcesQuery.error}
+          fallbackTitle="Couldn't load ingestion sources"
+        />
+
         {(["push", "pull", "s3"] as const).map((mode) => (
           <Box
             key={mode}
@@ -470,7 +462,10 @@ function IngestionSourcesPage() {
               <Spacer />
             </HStack>
             <VStack align="stretch" gap={2}>
-              {grouped[mode].length === 0 && (
+              {/* "None configured" is a claim about the fleet, and we can
+                  only make it when we actually know. The alert above says
+                  what went wrong instead. */}
+              {grouped[mode].length === 0 && !sourcesQuery.error && (
                 <Text fontSize="sm" color="fg.muted">
                   No {mode}-mode sources configured.
                 </Text>
@@ -507,16 +502,13 @@ function IngestionSourcesPage() {
         ))}
       </VStack>
 
-      <SecretModal
-        details={secretModal}
-        onClose={() => setSecretModal(null)}
-      />
+      <SecretModal details={secretModal} onClose={() => setSecretModal(null)} />
 
       <SourceEditDrawer
         organizationId={orgId}
         source={
           editingSourceId
-            ? sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null
+            ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null)
             : null
         }
         onClose={() => setEditingSourceId(null)}
@@ -542,7 +534,8 @@ function SourceRow({
   onRotate: () => void;
   onArchive: () => void;
 }) {
-  const status = STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
+  const status =
+    STATUS_META[source.status] ?? STATUS_META.awaiting_first_event!;
   const StatusIcon = status.icon;
   const typeLabel =
     SOURCE_TYPE_LABEL[source.sourceType as SourceType] ?? source.sourceType;
@@ -664,98 +657,101 @@ function SourceComposerDrawer({
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
             <HStack gap={3}>
-          <VStack align="stretch" gap={1} flex={1}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Source type
-            </Text>
-            <select
-              value={composer.sourceType}
-              onChange={(e) =>
-                setComposer({
-                  ...composer,
-                  sourceType: e.target.value as SourceType,
-                  parserConfig: {},
-                  ottlStatements: [],
-                })
-              }
-              style={{
-                padding: "8px",
-                border: "1px solid var(--chakra-colors-border-muted)",
-                borderRadius: "var(--chakra-radii-sm)",
-                background: "white",
-                fontSize: "14px",
-              }}
-            >
-              {sourceTypeOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label} · {o.mode}
-                </option>
-              ))}
-            </select>
-            {!isEnterprise && (
+              <VStack align="stretch" gap={1} flex={1}>
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Source type
+                </Text>
+                <select
+                  value={composer.sourceType}
+                  onChange={(e) =>
+                    setComposer({
+                      ...composer,
+                      sourceType: e.target.value as SourceType,
+                      parserConfig: {},
+                      ottlStatements: [],
+                    })
+                  }
+                  style={{
+                    padding: "8px",
+                    border: "1px solid var(--chakra-colors-border-muted)",
+                    borderRadius: "var(--chakra-radii-sm)",
+                    background: "white",
+                    fontSize: "14px",
+                  }}
+                >
+                  {sourceTypeOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label} · {o.mode}
+                    </option>
+                  ))}
+                </select>
+                {!isEnterprise && (
+                  <Text fontSize="xs" color="fg.muted">
+                    Other source types are available on Enterprise plans.
+                  </Text>
+                )}
+              </VStack>
+              <VStack align="stretch" gap={1} flex={2}>
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Display name
+                </Text>
+                <Input
+                  size="sm"
+                  backgroundColor="white"
+                  value={composer.name}
+                  onChange={(e) =>
+                    setComposer({ ...composer, name: e.target.value })
+                  }
+                  placeholder="Display name for this source"
+                />
+              </VStack>
+            </HStack>
+            {meta && (
               <Text fontSize="xs" color="fg.muted">
-                Other source types are available on Enterprise plans.
+                {meta.blurb}
               </Text>
             )}
-          </VStack>
-          <VStack align="stretch" gap={1} flex={2}>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-              Display name
-            </Text>
-            <Input
-              size="sm"
-              backgroundColor="white"
-              value={composer.name}
-              onChange={(e) =>
-                setComposer({ ...composer, name: e.target.value })
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Description (optional)
+              </Text>
+              <Textarea
+                size="sm"
+                backgroundColor="white"
+                rows={2}
+                value={composer.description}
+                onChange={(e) =>
+                  setComposer({ ...composer, description: e.target.value })
+                }
+                placeholder="What this fleet covers + who owns it"
+              />
+            </VStack>
+
+            <ParserConfigFields
+              sourceType={composer.sourceType}
+              values={composer.parserConfig}
+              onChange={(parserConfig) =>
+                setComposer({ ...composer, parserConfig })
               }
-              placeholder="Display name for this source"
             />
-          </VStack>
-        </HStack>
-        {meta && (
-          <Text fontSize="xs" color="fg.muted">
-            {meta.blurb}
-          </Text>
-        )}
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Description (optional)
-          </Text>
-          <Textarea
-            size="sm"
-            backgroundColor="white"
-            rows={2}
-            value={composer.description}
-            onChange={(e) =>
-              setComposer({ ...composer, description: e.target.value })
-            }
-            placeholder="What this fleet covers + who owns it"
-          />
-        </VStack>
 
-        <ParserConfigFields
-          sourceType={composer.sourceType}
-          values={composer.parserConfig}
-          onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
-        />
+            <OttlEditor
+              organizationId={organizationId}
+              sourceType={composer.sourceType}
+              statements={composer.ottlStatements}
+              onChange={(ottlStatements) =>
+                setComposer({ ...composer, ottlStatements })
+              }
+              enabled={isOttlEnabledSourceType(composer.sourceType)}
+            />
 
-        <OttlEditor
-          organizationId={organizationId}
-          sourceType={composer.sourceType}
-          statements={composer.ottlStatements}
-          onChange={(ottlStatements) =>
-            setComposer({ ...composer, ottlStatements })
-          }
-          enabled={isOttlEnabledSourceType(composer.sourceType)}
-        />
-
-        <PullScheduleField
-          sourceType={composer.sourceType}
-          value={composer.pullSchedule}
-          onChange={(pullSchedule) => setComposer({ ...composer, pullSchedule })}
-        />
-
+            <PullScheduleField
+              sourceType={composer.sourceType}
+              value={composer.pullSchedule}
+              onChange={(pullSchedule) =>
+                setComposer({ ...composer, pullSchedule })
+              }
+            />
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -910,9 +906,9 @@ function SourceEditDrawer({
             />
 
             <Text fontSize="xs" color="fg.muted">
-              Source type and ingest secret are immutable after create.
-              Use “Rotate secret” for the secret; archive + recreate to
-              change source type.
+              Source type and ingest secret are immutable after create. Use
+              “Rotate secret” for the secret; archive + recreate to change
+              source type.
             </Text>
           </VStack>
         </Drawer.Body>
@@ -1187,7 +1183,9 @@ function buildHttpCustomPullConfig(
     cursorQueryParam: cursorParam,
     eventsJsonPath: eventsPath,
     schedule:
-      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.http_polling || "*/15 * * * *",
+      c.pullSchedule.trim() ||
+      PULL_SCHEDULE_DEFAULTS.http_polling ||
+      "*/15 * * * *",
     eventMapping,
     // Per HttpPollingPullerAdapter contract: caller-supplied secrets land
     // on `pullConfig.credentials.*` and the adapter substitutes them into
@@ -1216,7 +1214,11 @@ function ParserConfigFields({
         <VStack key={f.key} align="stretch" gap={1}>
           <Text fontSize="xs" fontWeight="medium">
             {f.label}
-            {f.required && <Text as="span" color="red.500" marginLeft={1}>*</Text>}
+            {f.required && (
+              <Text as="span" color="red.500" marginLeft={1}>
+                *
+              </Text>
+            )}
           </Text>
           {f.key === "parserDsl" || f.key === "eventMappingDsl" ? (
             <Textarea
@@ -1281,9 +1283,9 @@ function PullScheduleField({
         fontFamily="mono"
       />
       <Text fontSize="xs" color="fg.muted">
-        Standard 5-field cron. Leave blank to use the adapter default
-        (<code>{defaultSchedule}</code>). The puller worker honors this on
-        the next BullMQ tick after save.
+        Standard 5-field cron. Leave blank to use the adapter default (
+        <code>{defaultSchedule}</code>). The puller worker honors this on the
+        next BullMQ tick after save.
       </Text>
     </VStack>
   );
@@ -1327,7 +1329,9 @@ function SecretModal({
 }) {
   const [copied, setCopied] = useState(false);
   const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://langwatch.invalid";
   const otlpUrl = details
     ? `${baseUrl}/api/ingest/otel/${details.sourceId}`
     : "";
@@ -1414,7 +1418,10 @@ function SecretModal({
                         key: "gen_ai.usage.cost_usd",
                         value: { doubleValue: 0.025 },
                       },
-                      { key: "user.email", value: { stringValue: "you@your.org" } },
+                      {
+                        key: "user.email",
+                        value: { stringValue: "you@your.org" },
+                      },
                       {
                         key: "gen_ai.request.model",
                         value: { stringValue: "claude-sonnet-4" },
@@ -1537,12 +1544,11 @@ function SecretModal({
                 </HStack>
                 <Text fontSize="xs" color="fg.muted">
                   Spans push into the LangWatch trace store with this
-                  source&apos;s origin tag and become viewable in the
-                  trace viewer. If you are sending agent traces from
-                  your own LangWatch SDK, use{" "}
-                  <Code fontSize="xs">/api/otel/v1/traces</Code> with
-                  your project API key - different auth, same trace
-                  store. See{" "}
+                  source&apos;s origin tag and become viewable in the trace
+                  viewer. If you are sending agent traces from your own
+                  LangWatch SDK, use{" "}
+                  <Code fontSize="xs">/api/otel/v1/traces</Code> with your
+                  project API key - different auth, same trace store. See{" "}
                   <Link
                     href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
                     color="blue.600"
@@ -1608,12 +1614,12 @@ function SecretModal({
                   <Code fontSize="xs" backgroundColor="transparent">
                     /v1/metrics
                   </Code>{" "}
-                  itself off the base endpoint. To attribute spend to a
-                  specific team or department, also export{" "}
+                  itself off the base endpoint. To attribute spend to a specific
+                  team or department, also export{" "}
                   <Code fontSize="xs" backgroundColor="transparent">
                     OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
-                  </Code>
-                  {" "}- those land as resource attributes and slot into
+                  </Code>{" "}
+                  - those land as resource attributes and slot into
                   /governance&apos;s spendByTeam without further config.
                 </Text>
               </VStack>
@@ -1645,10 +1651,9 @@ function SecretModal({
                   </Button>
                 </Box>
                 <Text fontSize="xs" color="fg.muted">
-                  Returns HTTP 202 with{" "}
-                  <Code fontSize="xs">events: 1</Code> on success. If you
-                  get <Code fontSize="xs">events: 0</Code> with a hint,
-                  the body shape didn&apos;t parse - check the docs.
+                  Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on
+                  success. If you get <Code fontSize="xs">events: 0</Code> with
+                  a hint, the body shape didn&apos;t parse - check the docs.
                 </Text>
               </VStack>
             )}
@@ -1660,10 +1665,10 @@ function SecretModal({
               borderRadius="sm"
             >
               <Text fontSize="xs" color="amber.900">
-                <strong>Important:</strong> the secret above will not be
-                shown again. We retained the prior secret&apos;s hash for a
-                24h grace window if you&apos;re rotating, so you have time
-                to roll the new value through every upstream client.
+                <strong>Important:</strong> the secret above will not be shown
+                again. We retained the prior secret&apos;s hash for a 24h grace
+                window if you&apos;re rotating, so you have time to roll the new
+                value through every upstream client.
               </Text>
             </Box>
           </VStack>
@@ -1686,7 +1691,7 @@ function SecretModal({
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
   bypassOnboardingRedirect: true,
 })(
-  withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
-    IngestionSourcesPage,
-  ),
+  withPermissionGuard("organization:manage", {
+    bypassOnboardingRedirect: true,
+  })(IngestionSourcesPage),
 );

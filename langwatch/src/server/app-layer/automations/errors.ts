@@ -118,18 +118,51 @@ export class MissingSlackWebhookError extends HandledError {
 
 /**
  * A test-fire reached the provider but delivery was rejected — a Slack
- * `not_in_channel` / `channel_not_found`, a dead webhook, a bad bot token. The
- * underlying `DispatchError` already carries an actionable, provider-specific
- * message (see `explainSlackPostError`); this lifts it onto the typed
- * `HandledError` channel so the drawer renders it as a clear 4xx instead of a
- * generic 500. `field` targets the channel input, the most common fix.
+ * `not_in_channel` / `channel_not_found`, a dead webhook, a bad bot token.
+ *
+ * Some of those rejections come with real remediation (see
+ * `explainSlackPostError`: "the bot isn't in that channel. Invite it with
+ * `/invite @LangWatch`…") and that sentence is the entire value of this error —
+ * a generic "check the destination" tells the user nothing they didn't know.
+ * It travels in `meta.message`, the sanctioned opt-in channel for
+ * server-authored prose (ADR-045), because since #5984 an error's own
+ * `message` never crosses the wire.
+ *
+ * But only SOME of them. The `DispatchError` this is built from is also thrown
+ * for transport failures, and those messages are assembled from an undici
+ * string, a DNS result, and a context label naming how the feature is built
+ * ("Slack Web API dispatch for trigger …"). Relaying the whole message
+ * verbatim — which this class did — published all of it: the registry entry
+ * for this code renders `meta.message` as-is.
+ *
+ * So the caller states which it is. `customerMessage` is prose WRITTEN for a
+ * customer; without it the code travels alone and the registry falls back to
+ * its own copy, which is calm and true rather than leaky and precise. `message`
+ * stays the full diagnostic for the log line.
+ *
+ * `field` targets the channel input, the most common fix.
  */
 export class NotificationDeliveryError extends HandledError {
   declare readonly code: "notification_delivery_error";
 
-  constructor(message: string) {
+  constructor(
+    message: string,
+    options: {
+      /**
+       * The remediation sentence, unprefixed, as a person would write it.
+       * Omit for a transport failure — there is nothing customer-safe to say
+       * about a socket.
+       */
+      customerMessage?: string;
+    } = {},
+  ) {
     super("notification_delivery_error", message, {
-      meta: { field: "slackChannelId" },
+      meta: {
+        field: "slackChannelId",
+        ...(options.customerMessage
+          ? { message: options.customerMessage }
+          : {}),
+      },
       httpStatus: 422,
     });
     this.name = "NotificationDeliveryError";

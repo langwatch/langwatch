@@ -37,10 +37,7 @@
  */
 import { timingSafeEqual } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import {
-  createServiceApp,
-  handlerManagedAuth,
-} from "~/server/api/security";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
 import {
   buildExplainQuery,
@@ -53,7 +50,10 @@ import {
 
 const logger = createLogger("langwatch:ops:clickhouse:explain");
 
-function bearerTokenMatches(headerValue: string | undefined, expected: string): boolean {
+function bearerTokenMatches(
+  headerValue: string | undefined,
+  expected: string,
+): boolean {
   if (!headerValue) return false;
   const m = /^Bearer\s+(.+)$/i.exec(headerValue.trim());
   if (!m?.[1]) return false;
@@ -68,9 +68,13 @@ const secured = createServiceApp({ basePath: "/api" });
 
 secured
   .access(
-    handlerManagedAuth(
-      "Bearer LANGWATCH_OPS_API_KEY constant-time compared; missing or wrong key returns 401. Operator-only endpoint for the clickhouse-optimizer agent.",
-    ),
+    handlerManagedAuth({
+      reason:
+        "Bearer LANGWATCH_OPS_API_KEY constant-time compared; missing or wrong key returns 401. Operator-only endpoint for the clickhouse-optimizer agent.",
+      // Operator secret, not an RBAC permission.
+      permissions: [],
+      credential: "internal",
+    }),
   )
   .post("/ops/clickhouse/explain", async (c) => {
     const expected = process.env.LANGWATCH_OPS_API_KEY;
@@ -92,7 +96,10 @@ secured
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
       const path = issue?.path?.length ? `${issue.path.join(".")}: ` : "";
-      return c.json({ message: `${path}${issue?.message ?? "invalid body"}` }, 400);
+      return c.json(
+        { message: `${path}${issue?.message ?? "invalid body"}` },
+        400,
+      );
     }
 
     const built = buildExplainQuery(parsed.data.query, parsed.data.type);
@@ -131,11 +138,18 @@ secured
       client = getSharedClickHouseClient();
     }
     if (!client) {
-      return c.json({ message: "ClickHouse is not configured on this instance" }, 503);
+      return c.json(
+        { message: "ClickHouse is not configured on this instance" },
+        503,
+      );
     }
 
     logger.info(
-      { type: built.type, usingFallback, ...redactQueryForAudit(parsed.data.query) },
+      {
+        type: built.type,
+        usingFallback,
+        ...redactQueryForAudit(parsed.data.query),
+      },
       "ops explain",
     );
 
@@ -148,7 +162,9 @@ secured
       const result = await client.query({
         query: built.wrapped!,
         format: "JSONEachRow",
-        ...(usingFallback ? { clickhouse_settings: CLICKHOUSE_GUARDRAILS } : {}),
+        ...(usingFallback
+          ? { clickhouse_settings: CLICKHOUSE_GUARDRAILS }
+          : {}),
       });
       const rows = await result.json();
       return c.json({ type: built.type, rows });

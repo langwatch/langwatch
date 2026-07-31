@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
-  VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH,
-  VirtualKeyCryptoError,
   hashVirtualKeySecret,
   mintUlid,
   mintVirtualKeySecret,
   parseVirtualKey,
+  VIRTUAL_KEY_DISPLAY_PREFIX_LENGTH,
+  VirtualKeyCryptoError,
   verifyVirtualKeySecret,
 } from "../virtualKey.crypto";
 
@@ -120,9 +120,7 @@ describe("virtual key crypto", () => {
 
     it("returns false for a non-matching secret", () => {
       const hash = hashVirtualKeySecret(mintVirtualKeySecret());
-      expect(
-        verifyVirtualKeySecret(mintVirtualKeySecret(), hash),
-      ).toBe(false);
+      expect(verifyVirtualKeySecret(mintVirtualKeySecret(), hash)).toBe(false);
     });
 
     it("returns false for a mismatched hex length", () => {

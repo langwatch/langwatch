@@ -20,7 +20,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockGetServerAuthSession = vi.fn();
 vi.mock("~/server/auth", async (importOriginal) => ({
   ...(await importOriginal<typeof import("~/server/auth")>()),
-  getServerAuthSession: (...args: unknown[]) => mockGetServerAuthSession(...args),
+  getServerAuthSession: (...args: unknown[]) =>
+    mockGetServerAuthSession(...args),
 }));
 
 const mockHasProjectPermission = vi.fn();

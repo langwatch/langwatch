@@ -206,8 +206,20 @@ describe("detecting comparison columns", () => {
       // the third variant.
       it("does not collapse to a hardcoded 2 variants", () => {
         const run = createRun([
-          { evaluator: "cmp-1", status: "processed", index: 0, label: "tie", inputs: {} },
-          { evaluator: "cmp-1", status: "processed", index: 1, label: "tie", inputs: {} },
+          {
+            evaluator: "cmp-1",
+            status: "processed",
+            index: 0,
+            label: "tie",
+            inputs: {},
+          },
+          {
+            evaluator: "cmp-1",
+            status: "processed",
+            index: 1,
+            label: "tie",
+            inputs: {},
+          },
         ]);
 
         const column = transformBatchEvaluationData(run).comparisonColumns![0]!;
@@ -236,14 +248,20 @@ describe("detecting comparison columns", () => {
               status: "processed",
               index: 0,
               label: "A",
-              inputs: { candidate_a_id: "target-a", candidate_b_id: "target-b" },
+              inputs: {
+                candidate_a_id: "target-a",
+                candidate_b_id: "target-b",
+              },
             },
             {
               evaluator: "pw-1",
               status: "processed",
               index: 1,
               label: "B",
-              inputs: { candidate_a_id: "target-a", candidate_b_id: "target-b" },
+              inputs: {
+                candidate_a_id: "target-a",
+                candidate_b_id: "target-b",
+              },
             },
           ],
           { targets: TWO_VARIANT_TARGETS, rowCount: 2 },
@@ -269,7 +287,10 @@ describe("detecting comparison columns", () => {
               status: "processed",
               index: 0,
               label: "A",
-              inputs: { candidate_a_id: "target-a", candidate_b_id: "target-b" },
+              inputs: {
+                candidate_a_id: "target-a",
+                candidate_b_id: "target-b",
+              },
             },
           ],
           { targets: TWO_VARIANT_TARGETS, rowCount: 1 },

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+import {
+  GROUP_QUEUE_REGISTRY_KEY,
+  GroupStagingScripts,
+} from "~/server/event-sourcing/queues/groupQueue/scripts";
 import { QueueRedisRepository } from "../repositories/queue.redis.repository";
-import { GroupStagingScripts, GROUP_QUEUE_REGISTRY_KEY } from "~/server/event-sourcing/queues/groupQueue/scripts";
 
 type ScanPage = [cursor: string, keys: string[]];
 
@@ -18,7 +21,10 @@ describe("group queue discovery", () => {
     /** @scenario A starting producer advertises its queue name in the registry */
     it("adds its queue name to the registry set", async () => {
       const redis = createRedis();
-      const scripts = new GroupStagingScripts(redis as never, "{event-sourcing/jobs}");
+      const scripts = new GroupStagingScripts(
+        redis as never,
+        "{event-sourcing/jobs}",
+      );
 
       await scripts.registerQueue();
 

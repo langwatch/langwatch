@@ -1,6 +1,6 @@
+import { MODULES } from "~/optimization_studio/registry";
 import type { Component } from "~/optimization_studio/types/dsl";
 import type { NodeWithOptionalPosition } from "~/types";
-import { MODULES } from "~/optimization_studio/registry";
 import { NodeDraggable } from "./NodeDraggable";
 
 type EvaluatorNodeDraggableProps = {

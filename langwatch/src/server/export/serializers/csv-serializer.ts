@@ -9,15 +9,31 @@
 
 import Parse from "papaparse";
 import type {
-  Trace,
-  Span,
+  ErrorCapture,
+  Evaluation,
   LLMSpan,
   RAGSpan,
-  Evaluation,
+  Span,
   SpanInputOutput,
-  ErrorCapture,
+  Trace,
 } from "~/server/tracer/types";
 import { RESERVED_METADATA_KEYS } from "./constants";
+
+/**
+ * RFC 4180 line ending, stated explicitly rather than relying on PapaParse's
+ * default.
+ *
+ * Every chunk must both use this internally AND end with it. A streamed export
+ * concatenates chunks straight into one file, so a chunk with no trailing
+ * newline glues its last row onto the next chunk's first row — and a chunk
+ * that terminates rows with a different sequence than the one PapaParse wrote
+ * inside it makes the whole remainder of the file parse as a single row.
+ * Neither shows up until an export exceeds one batch.
+ *
+ * Exported so export.service.ts strips the header on the same sequence it was
+ * written with.
+ */
+export const CSV_NEWLINE = "\r\n";
 
 // ---------------------------------------------------------------------------
 // Summary CSV
@@ -58,7 +74,10 @@ export function serializeTracesToSummaryCsv({
     buildSummaryRow({ trace, evaluatorNames }),
   );
 
-  return Parse.unparse({ fields: headers, data: rows });
+  return (
+    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) +
+    CSV_NEWLINE
+  );
 }
 
 function buildSummaryHeaders({
@@ -103,7 +122,12 @@ function buildSummaryRow({
     trace.metadata.subtopic_id ?? "",
   ];
 
-  row.push(...buildEvaluationColumns({ evaluations: trace.evaluations, evaluatorNames }));
+  row.push(
+    ...buildEvaluationColumns({
+      evaluations: trace.evaluations,
+      evaluatorNames,
+    }),
+  );
 
   return row;
 }
@@ -173,7 +197,10 @@ export function serializeTracesToFullCsv({
     }
   }
 
-  return Parse.unparse({ fields: headers, data: rows });
+  return (
+    Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) +
+    CSV_NEWLINE
+  );
 }
 
 function buildFullHeaders({
@@ -181,10 +208,7 @@ function buildFullHeaders({
 }: {
   evaluatorNames: string[];
 }): string[] {
-  const headers: string[] = [
-    ...FULL_TRACE_COLUMNS,
-    ...FULL_SPAN_COLUMNS,
-  ];
+  const headers: string[] = [...FULL_TRACE_COLUMNS, ...FULL_SPAN_COLUMNS];
   for (const name of evaluatorNames) {
     headers.push(`${name}_score`);
     headers.push(`${name}_passed`);
@@ -253,9 +277,11 @@ function buildFullRow({
 
   // Include trace-level evaluations (no span_id) and span-specific evaluations
   const spanEvaluations = (trace.evaluations ?? []).filter(
-    (e) => !e.span_id || e.span_id === span.span_id
+    (e) => !e.span_id || e.span_id === span.span_id,
   );
-  row.push(...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }));
+  row.push(
+    ...buildEvaluationColumns({ evaluations: spanEvaluations, evaluatorNames }),
+  );
 
   return row;
 }
@@ -299,9 +325,7 @@ function nullableNumber(value: number | null | undefined): string {
  * Serialize a span input or output to a string for CSV export.
  * Structured types (chat_messages, json, list) are stringified as JSON.
  */
-function serializeSpanIO(
-  io: SpanInputOutput | null | undefined,
-): string {
+function serializeSpanIO(io: SpanInputOutput | null | undefined): string {
   if (!io) return "";
   if (io.type === "chat_messages") {
     return JSON.stringify(io.value);
@@ -326,7 +350,11 @@ function serializeError(error: ErrorCapture | null | undefined): string {
 function extractCustomMetadata(trace: Trace): Record<string, unknown> {
   const custom: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(trace.metadata)) {
-    if (!RESERVED_METADATA_KEYS.has(key) && value !== null && value !== undefined) {
+    if (
+      !RESERVED_METADATA_KEYS.has(key) &&
+      value !== null &&
+      value !== undefined
+    ) {
       custom[key] = value;
     }
   }

@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import { createCompositePlanProvider } from "../composite-plan-provider";
 import type { PlanProvider } from "../plan-provider";
-import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 
 vi.mock("~/env.mjs", () => ({
   env: { ADMIN_EMAILS: "admin@langwatch.ai" },

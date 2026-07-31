@@ -111,9 +111,7 @@ describe("ViewAutomationDrawer conditions section", () => {
       it("shows the search query as the conditions", () => {
         renderDrawer();
 
-        expect(
-          screen.getByText("status:error model:gpt-5-mini"),
-        ).toBeDefined();
+        expect(screen.getByText("status:error model:gpt-5-mini")).toBeDefined();
         expect(screen.queryByTestId("filter-display")).toBeNull();
         expect(screen.queryByText("No conditions")).toBeNull();
       });

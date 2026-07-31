@@ -113,7 +113,15 @@ terminationGracePeriodSeconds: 30
 
 # emptyDir for /workspace. Bump sizeLimit if many concurrent sessions write
 # large per-worker homes; leave {} for the cluster default.
-workspaceVolume: {}
+workspaceVolume:
+  # Bounded by default: the workspace is node ephemeral storage, and a
+  # runaway session filling it evicts every pod on the node, not just this
+  # one. Override with a larger cap, or replace wholesale with another
+  # emptyDir spec (e.g. medium: Memory).
+  sizeLimit: 2Gi
+
+## @param scratchSizeLimit [string, default: 1Gi] Size cap for the writable /tmp emptyDir required under readOnlyRootFilesystem.
+scratchSizeLimit: 1Gi
 
 ## SecurityContext.
 ##
@@ -265,7 +273,7 @@ networkPolicy:
   # operators who actually need PR-opening / git-clone must opt in
   # explicitly here. Sergio's 2026-06-30 review round 3.
   #
-  # ADR-043 rung 4: this `0.0.0.0/0:443` rule is the L3/L4 backstop. FQDN
+  # ADR-076 rung 4: this `0.0.0.0/0:443` rule is the L3/L4 backstop. FQDN
   # bounding ("only github/npm/…") is NOT expressible at L3/L4 and is instead
   # enforced at L7 by the per-worker egress adapter (see `egress` below), which
   # is now the SOLE egress path for workers (their tools egress via HTTPS_PROXY).
@@ -317,7 +325,7 @@ networkPolicy:
     - fd00::/8            # unique-local (incl. IPv6 metadata fd00:ec2::254)
     - fe80::/10           # link-local
 
-# Egress enforcement (ADR-043) — the per-worker L7 egress adapter. Monitor
+# Egress enforcement (ADR-076) — the per-worker L7 egress adapter. Monitor
 # first, enforce last: the default posture is monitor-only. These map to the
 # manager's LANGY_EGRESS_* env via the ConfigMap.
 egress:
@@ -346,7 +354,7 @@ egress:
   # Optional bypass-proof upgrade: a Cilium CiliumNetworkPolicy with `toFQDNs`
   # enforces the SAME floor at the datapath, which a worker cannot bypass by
   # ignoring HTTPS_PROXY. Requires the Cilium CNI. The stock default is the
-  # cooperative adapter + monitored bypass (ADR-043 "honest limit"); this is the
+  # cooperative adapter + monitored bypass (ADR-076 "honest limit"); this is the
   # opt-in mandatory-enforcement path. The non-Cilium equivalent is the ADR-033
   # Fix B per-worker netns.
   cilium:

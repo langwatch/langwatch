@@ -5,9 +5,10 @@ import { UserAvatar } from "~/components/UserAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useSession } from "~/utils/auth-client";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { AvatarImageError, processAvatarImage } from "./processAvatarImage";
+import { useSession } from "~/utils/auth-client";
+import { processAvatarImage } from "./processAvatarImage";
 
 const FORMAT_HINT = "PNG, JPG, WEBP or GIF, up to 8 MB. Cropped to a square.";
 
@@ -198,12 +199,8 @@ export function AvatarUploadControl({
       setIsOpen(false);
       toaster.create({ title: "Photo updated", type: "success" });
     },
-    onError: (err) =>
-      toaster.create({
-        title: "Couldn't update photo",
-        description: err.message,
-        type: "error",
-      }),
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't update photo" }),
   });
 
   const removeAvatar = api.user.removeAvatar.useMutation({
@@ -212,16 +209,11 @@ export function AvatarUploadControl({
       setPreview(null);
       toaster.create({ title: "Photo removed", type: "success" });
     },
-    onError: (err) =>
-      toaster.create({
-        title: "Couldn't remove photo",
-        description: err.message,
-        type: "error",
-      }),
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't remove photo" }),
   });
 
-  const isBusy =
-    isProcessing || setAvatar.isPending || removeAvatar.isPending;
+  const isBusy = isProcessing || setAvatar.isPending || removeAvatar.isPending;
 
   const onFilePicked = async (file: File | undefined) => {
     // Allow re-selecting the same file later by clearing the input value.
@@ -231,13 +223,9 @@ export function AvatarUploadControl({
     try {
       setPreview(await processAvatarImage(file));
     } catch (err) {
-      toaster.create({
-        title: "Couldn't read that image",
-        description:
-          err instanceof AvatarImageError
-            ? err.message
-            : "Please try another file.",
-        type: "error",
+      showErrorToast({
+        error: err,
+        fallbackTitle: "Couldn't read that image",
       });
     } finally {
       setIsProcessing(false);
@@ -255,11 +243,7 @@ export function AvatarUploadControl({
           onOpen={() => setIsOpen(true)}
         />
         <Tooltip content={FORMAT_HINT} positioning={{ placement: "right" }}>
-          <Box
-            display="inline-flex"
-            color="fg.muted"
-            aria-label={FORMAT_HINT}
-          >
+          <Box display="inline-flex" color="fg.muted" aria-label={FORMAT_HINT}>
             <Info size={16} />
           </Box>
         </Tooltip>
@@ -290,7 +274,8 @@ export function AvatarUploadControl({
         onChange={() => fileInputRef.current?.click()}
         onRemove={() => removeAvatar.mutate({})}
         onSave={() => {
-          if (preview) setAvatar.mutate({ organizationId, imageDataUrl: preview });
+          if (preview)
+            setAvatar.mutate({ organizationId, imageDataUrl: preview });
         }}
         onCancel={() => setPreview(null)}
       />

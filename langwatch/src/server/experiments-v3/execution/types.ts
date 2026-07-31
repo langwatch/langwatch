@@ -1,14 +1,13 @@
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import {
   type DatasetReference,
   type EvaluatorConfig,
   evaluatorConfigSchema,
-  type FieldMapping,
   type TargetConfig,
   targetConfigSchema,
 } from "~/experiments-v3/types";
 import type { Workflow } from "~/optimization_studio/types/dsl";
-import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================
@@ -206,6 +205,20 @@ export type EvaluationV3EvaluatorResult = SingleEvaluationResult & {
 };
 
 /**
+ * The `message` an error frame carries when the failure has no code.
+ *
+ * A marker, deliberately not a sentence. An unhandled failure has nothing safe
+ * to say — its own message can carry a hostname, a Prisma string or a Go net
+ * error — and the generic line that replaced it was still SERVER-authored copy,
+ * which then got persisted and painted into a cell on read-back. The words for
+ * an unnamed failure belong in the client's presentation registry with every
+ * other error's words (ADR-045); this only says "there were none".
+ *
+ * The failure's own words go to the log line, beside the trace id.
+ */
+export const UNNAMED_FAILURE = "lw.unnamed_failure";
+
+/**
  * All SSE events emitted during evaluation execution.
  */
 export type EvaluationV3Event =
@@ -219,7 +232,19 @@ export type EvaluationV3Event =
       cost?: number;
       duration?: number;
       traceId?: string;
+      /**
+       * Raw engineer-facing message — a legacy fallback the client renders
+       * only when there is no `domainError`. Since the node-error code now
+       * travels, this is for older engines and un-coded failures.
+       */
       error?: string;
+      /**
+       * The coded failure, mirroring the evaluator side
+       * (`EvaluationV3EvaluatorResult.domainError`). Built from the engine's
+       * `NodeError.Type`; the client renders customer copy from the
+       * presentation registry rather than the raw `error` string.
+       */
+      domainError?: SerializedHandledError;
     }
   | {
       type: "evaluator_result";
@@ -242,7 +267,29 @@ export type EvaluationV3Event =
   | { type: "progress"; completed: number; total: number }
   | {
       type: "error";
+      /**
+       * Wire message. For a coded failure this is the code itself (#5984); for
+       * an unhandled one it is {@link UNNAMED_FAILURE} — a marker, not copy.
+       *
+       * Never a thrown error's own `message`: that is server prose naming
+       * internal services, and it is not the app's UI copy either. The words a
+       * customer reads are written in the client's presentation registry,
+       * keyed by code.
+       */
       message: string;
+      /**
+       * The coded failure, when we knew what went wrong. The client presents
+       * from this via the registry, exactly as it does for `target_result`.
+       */
+      domainError?: SerializedHandledError;
+      /**
+       * The trace to hand support. An unhandled failure deliberately tells the
+       * client nothing about what went wrong, which leaves the id as the only
+       * thing that ties "it broke" to the log line — the same reasoning as
+       * `data.traceId` on the tRPC boundary. A handled failure also carries it
+       * inside `domainError`; this is the field a caller can read either way.
+       */
+      traceId?: string;
       rowIndex?: number;
       targetId?: string;
       evaluatorId?: string;

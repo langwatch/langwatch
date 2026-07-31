@@ -11,11 +11,11 @@
  * - RoleBinding is authoritative: TeamUser is ignored even when both exist
  */
 import {
-  RoleBindingScopeType,
-  TeamUserRole,
   type Organization,
   type Project,
+  RoleBindingScopeType,
   type Team,
+  TeamUserRole,
   type User,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -708,7 +708,6 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
 describe("checkRoleBindingPermission() integration", () => {
   let org: Organization;
   let team: Team;
-  let project: Project;
   let alice: User;
 
   beforeAll(async () => {
@@ -722,7 +721,7 @@ describe("checkRoleBindingPermission() integration", () => {
         organizationId: org.id,
       },
     });
-    project = await prisma.project.create({
+    await prisma.project.create({
       data: {
         name: `${NS}-perm-proj`,
         slug: `${NS}-perm-proj`,

@@ -1,4 +1,8 @@
+import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
+import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 import type { TenantId } from "../domain/tenantId";
+import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
 import type {
   BulkAppendContext,
@@ -11,10 +15,6 @@ import type {
 } from "../projections/stateProjection.types";
 import { applyStateEvent } from "../projections/stateProjectionExecutor";
 import type { ReplayEvent } from "./replayEventLoader";
-import type { Event } from "../domain/types";
-import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
-import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
-import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 
 /** Default number of projection entries per ClickHouse INSERT batch. */
 const DEFAULT_WRITE_BATCH_SIZE = 5000;
@@ -99,7 +99,9 @@ export class FoldAccumulator {
     // ADR-022: Apply leanForProjection before the projection handler — same utility
     // as the live dispatch interposition, ensuring replay and live produce
     // byte-identical projection state.
-    const leanedEvent = leanForProjection(event as unknown as Event) as unknown as ReplayEvent;
+    const leanedEvent = leanForProjection(
+      event as unknown as Event,
+    ) as unknown as ReplayEvent;
 
     const state = this.keyStates.get(scopedKey) ?? this.projection.init();
     const newState = this.projection.apply(state, leanedEvent);
@@ -115,7 +117,10 @@ export class FoldAccumulator {
     if (writeBatchSize <= 0) throw new Error("writeBatchSize must be > 0");
 
     // Group by tenant so each CH INSERT targets a single tenant
-    const byTenant = new Map<string, Array<{ state: any; context: ProjectionStoreContext }>>();
+    const byTenant = new Map<
+      string,
+      Array<{ state: any; context: ProjectionStoreContext }>
+    >();
 
     for (const scopedKey of this.touchedKeys) {
       const tenantId = this.keyTenantIds.get(scopedKey)!;
@@ -192,7 +197,10 @@ export class MapAccumulator {
 
   constructor(
     private readonly projection: MapProjectionDefinition<any, any>,
-    opts?: { writeBatchSize?: number; retentionResolver?: RetentionPolicyResolver },
+    opts?: {
+      writeBatchSize?: number;
+      retentionResolver?: RetentionPolicyResolver;
+    },
   ) {
     this.eventTypeSet = new Set(projection.eventTypes);
     this.writeBatchSize = opts?.writeBatchSize ?? DEFAULT_WRITE_BATCH_SIZE;
@@ -271,14 +279,19 @@ export class MapAccumulator {
           retentionPolicy,
         };
         for (let i = 0; i < entries.length; i += writeBatchSize) {
-          const chunk = entries.slice(i, i + writeBatchSize).map((e) => e.record);
+          const chunk = entries
+            .slice(i, i + writeBatchSize)
+            .map((e) => e.record);
           await store.bulkAppend(chunk, context);
         }
       } else {
         // Sequential fallback: pass each record's original per-event context
         // so stores that key off `context.aggregateId` get the real value.
         for (const entry of entries) {
-          await store.append(entry.record, { ...entry.context, retentionPolicy });
+          await store.append(entry.record, {
+            ...entry.context,
+            retentionPolicy,
+          });
         }
       }
     }
@@ -336,7 +349,8 @@ export class StateAccumulator {
   apply(event: ReplayEvent): void {
     // Drop events this projection does not declare — an accumulator may be fed
     // the union of event types when it shares a load with sibling projections.
-    if (this.eventTypeSet.size > 0 && !this.eventTypeSet.has(event.type)) return;
+    if (this.eventTypeSet.size > 0 && !this.eventTypeSet.has(event.type))
+      return;
 
     // ADR-022: lean before the reducer, exactly as live dispatch and the fold
     // accumulator do, so a rebuilt row matches the live-folded one.
@@ -345,7 +359,8 @@ export class StateAccumulator {
     ) as unknown as ReplayEvent;
 
     const domainEvent = leanedEvent as unknown as Event;
-    const projectionKey = this.projection.key?.(domainEvent) ?? event.aggregateId;
+    const projectionKey =
+      this.projection.key?.(domainEvent) ?? event.aggregateId;
     const scopedKey = tenantScopedKey(event.tenantId, projectionKey);
 
     const existing = this.entries.get(scopedKey);

@@ -216,5 +216,4 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
       });
     });
   });
-
 });

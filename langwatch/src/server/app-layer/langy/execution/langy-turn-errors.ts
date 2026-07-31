@@ -18,13 +18,13 @@
  * @see app-layer/langyagent/app/app.go (the error frames the manager emits)
  */
 
-import { trace } from "@opentelemetry/api";
 import {
   HandledError,
   type SerializedHandledError,
 } from "@langwatch/handled-error";
-import { remediation } from "../../error-remediation";
+import { trace } from "@opentelemetry/api";
 import { LangyModelNotConfiguredError } from "~/server/app-layer/langy/errors";
+import { remediation } from "../../error-remediation";
 
 /** How long we give the manager to answer one turn before we give up. */
 export const AGENT_CHAT_TIMEOUT_MS = 120_000;

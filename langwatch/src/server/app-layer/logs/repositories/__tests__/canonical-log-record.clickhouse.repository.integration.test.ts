@@ -22,8 +22,8 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  prepareCanonicalLogRecords,
   type LogRedactionService,
+  prepareCanonicalLogRecords,
 } from "~/server/event-sourcing/pipelines/log-processing/canonicalLog";
 import type { CanonicalLogRecord } from "~/server/event-sourcing/pipelines/log-processing/schemas/logRecord";
 import {
@@ -173,7 +173,11 @@ describe("given canonical log records ensured for one trace", () => {
 
       // All three share the trace; time order is A (-10s), C (-7.5s), B (-5s).
       expect(rows.map((row) => row.spanId)).toEqual([spanA, spanC, spanB]);
-      expect(rows.map((row) => row.traceId)).toEqual([traceId, traceId, traceId]);
+      expect(rows.map((row) => row.traceId)).toEqual([
+        traceId,
+        traceId,
+        traceId,
+      ]);
       expect(rows[0]!.scopeName).toBe(CLAUDE_CODE_EVENT_SCOPE);
     });
   });

@@ -42,7 +42,6 @@ import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useDrawerStore } from "../../../stores/drawerStore";
 import { useFilterStore } from "../../../stores/filterStore";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
-import type { PinnedAttribute } from "../../../stores/pinnedAttributesStore";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import {
   formatAbsoluteTime,
@@ -50,13 +49,11 @@ import {
   formatDuration,
   formatRelativeTimeAgo,
   formatTokens,
-  SPAN_TYPE_COLORS,
   STATUS_COLORS,
 } from "../../../utils/formatters";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
-import { TooltipRow } from "../../shared/TooltipRow";
 import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
 import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
@@ -1188,17 +1185,12 @@ export const DrawerHeader = memo(function DrawerHeader({
               <Box display="inline-flex">
                 <MetricPill
                   label="Models"
-                  value={`${(trace.models[0]!)}  +${
-                    trace.models.length - 1
-                  }`}
+                  value={`${trace.models[0]!}  +${trace.models.length - 1}`}
                 />
               </Box>
             </ModelsTooltip>
           ) : (
-            <MetricPill
-              label="Model"
-              value={(trace.models[0]!)}
-            />
+            <MetricPill label="Model" value={trace.models[0]!} />
           ))}
         {reasoningEffort && (
           <MetricPill label="Reasoning effort" value={reasoningEffort} />

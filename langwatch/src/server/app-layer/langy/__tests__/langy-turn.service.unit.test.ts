@@ -1,6 +1,7 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  LangyAgentUnavailableError,
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
@@ -8,11 +9,13 @@ import {
   LangyTurnNotStoppableError,
 } from "../errors";
 import {
+  __resetLangyTurnOverrideCacheForTests,
   LangyTurnService,
   type LangyTurnServiceDeps,
   langyTurnIdentity,
   type StartConversationTurnInput,
 } from "../langy-turn.service";
+import { LANGY_TURN_OVERRIDE_FALLBACK } from "../langyPromptRegistry";
 import type { LangyMessageRow } from "../repositories/langy-message.repository";
 import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
 
@@ -71,7 +74,9 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       status: LANGY_CONVERSATION_STATUS.IDLE,
     })),
     getPendingHandoff: vi.fn(async () => null),
-    getRunToken: vi.fn(async () => "rt-existing"),
+    // Typed to the real signature (Promise<string | null>) so the
+    // cannot-be-signed cases below can drive the null and empty branches.
+    getRunToken: vi.fn(async (): Promise<string | null> => "rt-existing"),
     acceptTurn,
     createConversation,
     consumeHandoff: vi.fn(async () => {}),
@@ -127,6 +132,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       commit,
       abort,
       findAllByConversation,
+      getRunToken: conversations.getRunToken,
     },
   };
 }
@@ -704,6 +710,50 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
   });
 });
 
+/**
+ * The runToken is the HMAC key the worker signs every frame with, and the relay
+ * verifies against. It must never degrade to a sentinel: an empty key is
+ * publicly computable, and the relay maps "no token" to a rejection, so a turn
+ * signed with "" emits nothing and never terminates — a silent hang.
+ */
+describe("when the conversation's runToken cannot be resolved", () => {
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
+  it("refuses the turn when the runToken read fails", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.getRunToken.mockRejectedValue(new Error("postgres unavailable"));
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(input()),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
+  it("refuses the turn when the conversation carries no runToken", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.getRunToken.mockResolvedValue(null);
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(input()),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+
+  /** @scenario Langy reports the agent unavailable instead of hanging the turn */
+  it("never dispatches a turn with a falsy runToken", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.getRunToken.mockResolvedValue("");
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(input()),
+    ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
+
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+});
+
 describe("langyTurnIdentity", () => {
   const base = {
     userId: "user-1",
@@ -979,5 +1029,151 @@ describe("LangyTurnService.stopTurn", () => {
         outcome: "stopped",
       });
     });
+  });
+});
+
+/**
+ * ADR-050. The registry seam shipped with no caller: seeding a prompt and
+ * promoting it to `production` changed nothing at runtime. These pin both
+ * halves — that it is consulted when configured, and that an unconfigured
+ * install is byte-identical to the in-repo constant.
+ */
+/** The `system` string the worker was dispatched with. */
+const systemOf = (dispatch: ReturnType<typeof vi.fn>): string =>
+  (dispatch.mock.calls[0]?.[0] as { system?: string } | undefined)?.system ??
+  "";
+
+describe("when the project holding Langy's versioned prompts is configured", () => {
+  const PROJECT_ENV = "LANGY_PROMPT_PROJECT_ID";
+
+  beforeEach(() => {
+    // The resolver holds the last text it read from the registry for the life
+    // of the PROCESS, deliberately (see below). Clear it between tests so one
+    // test's successful read cannot decide another test's outcome.
+    __resetLangyTurnOverrideCacheForTests();
+  });
+
+  afterEach(() => {
+    delete process.env[PROJECT_ENV];
+  });
+
+  /** @scenario "A production-tagged registry version is used when present" */
+  it("sends the promoted registry text as the system override", async () => {
+    process.env[PROJECT_ENV] = "project-system";
+    const getPromptByIdOrHandle = vi.fn(async () => ({
+      prompt: "REGISTRY OVERRIDE TEXT",
+    }));
+    const { deps, mocks } = makeDeps({
+      prompts: { getPromptByIdOrHandle },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(getPromptByIdOrHandle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project-system",
+        tag: "production",
+      }),
+    );
+    expect(systemOf(mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
+  });
+
+  /** @scenario "A registry read failure falls back to the in-repo copy" */
+  it("falls back to the in-repo text when the registry read throws", async () => {
+    process.env[PROJECT_ENV] = "project-system";
+    const { deps, mocks } = makeDeps({
+      prompts: {
+        getPromptByIdOrHandle: vi.fn(async () => {
+          throw new Error("registry down");
+        }),
+      },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(mocks.dispatch).toHaveBeenCalledOnce();
+    // Not merely "the registry text is absent" — that also passes for an
+    // EMPTY system block, which is the failure the never-throws-always-falls-
+    // back invariant exists to prevent.
+    expect(systemOf(mocks.dispatch)).toContain(LANGY_TURN_OVERRIDE_FALLBACK);
+  });
+
+  // @scenario "A read failure after a successful read keeps the text already in use"
+  it("reuses the last text it read when a later read fails, not the constant", async () => {
+    process.env[PROJECT_ENV] = "project-system";
+    let readCount = 0;
+    const getPromptByIdOrHandle = vi.fn(async () => {
+      readCount += 1;
+      if (readCount === 1) return { prompt: "REGISTRY OVERRIDE TEXT" };
+      throw new Error("registry down");
+    });
+
+    const first = makeDeps({
+      prompts: { getPromptByIdOrHandle },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+    await LangyTurnService.create(first.deps).startConversationTurn(input());
+    expect(systemOf(first.mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
+
+    const second = makeDeps({
+      prompts: { getPromptByIdOrHandle },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+    await LangyTurnService.create(second.deps).startConversationTurn(input());
+
+    // A Prisma blip on turn 2 must NOT swap the system block. That lane is the
+    // provider's cache prefix, so a swap changes the model's instructions
+    // mid-conversation AND pays a full prefix rewrite at the write premium.
+    expect(systemOf(second.mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
+    expect(systemOf(second.mocks.dispatch)).not.toContain(
+      LANGY_TURN_OVERRIDE_FALLBACK,
+    );
+  });
+
+  // @scenario "Withdrawing a promoted version is not undone by a later read failure"
+  it("does not resurrect a demoted row when a later read fails", async () => {
+    process.env[PROJECT_ENV] = "project-system";
+    let readCount = 0;
+    // Read 1 hits a promoted row; read 2 is a GENUINE miss (the operator
+    // demoted or deleted it); read 3 is a transient failure. The blip must
+    // fall back to the in-repo constant — the text from read 1 is gone on
+    // purpose, and a cache that outlives the miss would serve it back on every
+    // failure for the rest of the process's life.
+    const getPromptByIdOrHandle = vi.fn(async () => {
+      readCount += 1;
+      if (readCount === 1) return { prompt: "REGISTRY OVERRIDE TEXT" };
+      if (readCount === 2) return null;
+      throw new Error("registry down");
+    });
+    const startTurn = async () => {
+      const { deps, mocks } = makeDeps({
+        prompts: { getPromptByIdOrHandle },
+      } as unknown as Partial<LangyTurnServiceDeps>);
+      await LangyTurnService.create(deps).startConversationTurn(input());
+      return systemOf(mocks.dispatch);
+    };
+
+    expect(await startTurn()).toContain("REGISTRY OVERRIDE TEXT");
+    // The turn that observes the miss already fell through correctly before
+    // this fix; it is the one AFTER it that regressed.
+    expect(await startTurn()).toContain(LANGY_TURN_OVERRIDE_FALLBACK);
+
+    const afterBlip = await startTurn();
+
+    expect(afterBlip).not.toContain("REGISTRY OVERRIDE TEXT");
+    expect(afterBlip).toContain(LANGY_TURN_OVERRIDE_FALLBACK);
+  });
+});
+
+describe("when no prompt project is configured", () => {
+  /** @scenario "A turn runs from the in-repo copy when no registry row exists" */
+  it("never consults the registry", async () => {
+    delete process.env.LANGY_PROMPT_PROJECT_ID;
+    const getPromptByIdOrHandle = vi.fn();
+    const { deps } = makeDeps({
+      prompts: { getPromptByIdOrHandle },
+    } as unknown as Partial<LangyTurnServiceDeps>);
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(getPromptByIdOrHandle).not.toHaveBeenCalled();
   });
 });

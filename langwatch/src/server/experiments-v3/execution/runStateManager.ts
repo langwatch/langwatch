@@ -8,6 +8,7 @@
  * Run state is stored in Redis with TTL for automatic cleanup.
  */
 
+import type { SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { connection } from "~/server/redis";
 import type { EvaluationV3Event, ExecutionSummary } from "./types";
@@ -61,7 +62,17 @@ export type RunState = {
     totalCost?: number;
     runUrl?: string;
   };
+  /**
+   * The failure's stable code — a handled error's own, or the unnamed-failure
+   * marker. Never the thrown error's message: `GET /runs/:runId` hands this
+   * straight to any API consumer, and a raw message there is the same leak the
+   * live stream stopped shipping (ADR-045).
+   */
   error?: string;
+  /** The serialised handled error, when the failure had one. */
+  domainError?: SerializedHandledError;
+  /** The trace to hand support — all an unnamed failure gives a caller. */
+  traceId?: string;
   /** Recent events for debugging (last 50) */
   recentEvents?: EvaluationV3Event[];
 };
@@ -189,8 +200,19 @@ export const runStateManager = {
 
   /**
    * Mark run as failed.
+   *
+   * Takes the CODE, not the thrown message — the caller maps the failure
+   * through `mapThrownErrorEvent` first, so what is stored (and later served
+   * by the run API) is what the customer is allowed to read.
    */
-  async failRun(runId: string, error: string): Promise<void> {
+  async failRun(
+    runId: string,
+    failure: {
+      code: string;
+      domainError?: SerializedHandledError;
+      traceId?: string;
+    },
+  ): Promise<void> {
     if (!connection) return;
 
     const state = await this.getRunState(runId);
@@ -198,7 +220,9 @@ export const runStateManager = {
 
     state.status = "failed";
     state.finishedAt = Date.now();
-    state.error = error;
+    state.error = failure.code;
+    state.domainError = failure.domainError;
+    state.traceId = failure.traceId;
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
     await connection.set(
@@ -207,7 +231,10 @@ export const runStateManager = {
       "EX",
       RUN_STATE_TTL_SECONDS,
     );
-    logger.error({ runId, error }, "Run failed");
+    logger.error(
+      { runId, errorCode: failure.code, traceId: failure.traceId },
+      "Run failed",
+    );
   },
 
   /**

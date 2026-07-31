@@ -18,12 +18,12 @@ vi.mock("../../../server/api/routers/modelProviders.utils", () => ({
   prepareLitellmParams: vi.fn(),
 }));
 
-import { prisma } from "../../../server/db";
-import { decrypt } from "../../../utils/encryption";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../../../server/api/routers/modelProviders.utils";
+import { prisma } from "../../../server/db";
+import { decrypt } from "../../../utils/encryption";
 import { addEnvs, LlmModelNotSetError } from "../addEnvs";
 
 const PROJECT_ID = "project-123";
@@ -74,7 +74,10 @@ describe("addEnvs", () => {
     beforeEach(() => {
       vi.mocked(prisma.projectSecret.findMany).mockResolvedValue([
         { name: "OPENAI_API_KEY", encryptedValue: "encrypted:sk-abc123" },
-        { name: "DATABASE_URL", encryptedValue: "encrypted:postgres://localhost" },
+        {
+          name: "DATABASE_URL",
+          encryptedValue: "encrypted:postgres://localhost",
+        },
       ] as any);
     });
 

@@ -423,7 +423,11 @@ describe("VersionHistoryListPopover", () => {
       describe("when displaying the version history", () => {
         /** @scenario "Author without a display name falls back to their email" */
         it("shows the author's email instead", async () => {
-          renderWithAuthor({ id: "u1", name: null, email: "grace@example.com" });
+          renderWithAuthor({
+            id: "u1",
+            name: null,
+            email: "grace@example.com",
+          });
           await openPopover();
 
           expect(screen.getByText("grace@example.com")).toBeInTheDocument();

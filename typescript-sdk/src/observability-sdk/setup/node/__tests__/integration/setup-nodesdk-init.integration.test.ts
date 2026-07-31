@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe('setupObservability Integration - NodeSDK Initialization', () => {
-  it('should initialize NodeSDK when no global provider exists', async () => {
+  it('initializes NodeSDK when no global provider exists', async () => {
     const logger = createMockLogger();
     const handle = setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
     expect(typeof handle.shutdown).toBe('function');

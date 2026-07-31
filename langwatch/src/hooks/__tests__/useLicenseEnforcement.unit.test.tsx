@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { renderHook, act, cleanup } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -32,8 +32,9 @@ vi.mock("~/utils/api", () => ({
 // Mock the upgrade modal store
 const mockOpenUpgradeModal = vi.fn();
 vi.mock("~/stores/upgradeModalStore", () => ({
-  useUpgradeModalStore: (selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown) =>
-    selector({ open: mockOpenUpgradeModal }),
+  useUpgradeModalStore: (
+    selector: (state: { open: typeof mockOpenUpgradeModal }) => unknown,
+  ) => selector({ open: mockOpenUpgradeModal }),
 }));
 
 describe("useLicenseEnforcement", () => {
@@ -244,7 +245,7 @@ describe("useLicenseEnforcement", () => {
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         { organizationId: "org-123", limitType: "prompts" },
-        { enabled: true }
+        { enabled: true },
       );
     });
 

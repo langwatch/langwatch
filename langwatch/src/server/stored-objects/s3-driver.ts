@@ -5,13 +5,14 @@
  * `createS3Client`. URI scheme must be "s3"; the bucket and key are extracted
  * directly from the URI and passed through to S3 commands.
  */
+
+import type { Readable } from "node:stream";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
-import type { Readable } from "node:stream";
 import { createS3Client } from "~/server/storage";
 import { ObjectNotFoundError } from "./errors";
 import type { StorageDriver } from "./storage-driver";
@@ -103,9 +104,7 @@ export class S3Driver implements StorageDriver {
     const { bucket, key } = parseS3Uri(uri);
     const { s3Client } = await createS3Client(this.projectId);
 
-    await s3Client.send(
-      new DeleteObjectCommand({ Bucket: bucket, Key: key }),
-    );
+    await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
   }
 
   /**
@@ -118,9 +117,7 @@ export class S3Driver implements StorageDriver {
     const { s3Client } = await createS3Client(this.projectId);
 
     try {
-      await s3Client.send(
-        new HeadObjectCommand({ Bucket: bucket, Key: key }),
-      );
+      await s3Client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
       return true;
     } catch (error: unknown) {
       if (isNotFoundError(error)) {

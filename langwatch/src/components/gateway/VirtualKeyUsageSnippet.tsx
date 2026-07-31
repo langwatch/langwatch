@@ -153,10 +153,34 @@ func main() {
   }'`;
 
     return [
-      { key: "python", title: "Python", code: pythonSnippet, language: "python", highlightLines: [4 + pythonHighlightShift, 5 + pythonHighlightShift] },
-      { key: "typescript", title: "TypeScript", code: typescriptSnippet, language: "typescript", highlightLines: [4 + tsHighlightShift, 5 + tsHighlightShift] },
-      { key: "go", title: "Go", code: goSnippet, language: "go", highlightLines: [13 + goHighlightShift, 14 + goHighlightShift] },
-      { key: "bash", title: "cURL", code: curlSnippet, language: "bash", highlightLines: [1 + curlHighlightShift, 2 + curlHighlightShift] },
+      {
+        key: "python",
+        title: "Python",
+        code: pythonSnippet,
+        language: "python",
+        highlightLines: [4 + pythonHighlightShift, 5 + pythonHighlightShift],
+      },
+      {
+        key: "typescript",
+        title: "TypeScript",
+        code: typescriptSnippet,
+        language: "typescript",
+        highlightLines: [4 + tsHighlightShift, 5 + tsHighlightShift],
+      },
+      {
+        key: "go",
+        title: "Go",
+        code: goSnippet,
+        language: "go",
+        highlightLines: [13 + goHighlightShift, 14 + goHighlightShift],
+      },
+      {
+        key: "bash",
+        title: "cURL",
+        code: curlSnippet,
+        language: "bash",
+        highlightLines: [1 + curlHighlightShift, 2 + curlHighlightShift],
+      },
     ];
   }, [resolvedBaseUrl, credential, showRetrievalHint, model]);
 
@@ -181,8 +205,8 @@ func main() {
     <VStack align="stretch" gap={2}>
       <Text fontWeight="medium">{title}</Text>
       <Text textStyle="xs" color="fg.muted">
-        Works with any OpenAI-compatible SDK or coding assistant (Claude
-        Code, Codex, Cursor, Aider).{" "}
+        Works with any OpenAI-compatible SDK or coding assistant (Claude Code,
+        Codex, Cursor, Aider).{" "}
         <Link
           href="https://langwatch.ai/docs/ai-gateway/quickstart"
           color="orange.600"
@@ -200,7 +224,10 @@ func main() {
                 code={activeTab.code}
                 language={activeTab.language}
                 size="sm"
-                meta={{ highlightLines: activeTab.highlightLines, colorScheme: colorMode }}
+                meta={{
+                  highlightLines: activeTab.highlightLines,
+                  colorScheme: colorMode,
+                }}
                 transition="all 0.3s ease"
                 bg="bg.panel/60"
                 borderRadius="xl"

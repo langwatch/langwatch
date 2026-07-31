@@ -1,15 +1,20 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
+import {
+  BookText,
+  ChevronDown,
+  Code,
+  Globe,
+  Play,
+  Plus,
+  Save,
+} from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
 import { api } from "../../utils/api";
 import { Popover } from "../ui/popover";
 import type { TargetValue } from "./TargetSelector";
-import {
-  isAgentTarget,
-  useFilteredAgents,
-} from "./useFilteredScenarioTargets";
+import { isAgentTarget, useFilteredAgents } from "./useFilteredScenarioTargets";
 
 interface SaveAndRunMenuProps {
   selectedTarget: TargetValue;
@@ -36,13 +41,16 @@ export function SaveAndRunMenu({
 }: SaveAndRunMenuProps) {
   const { project } = useOrganizationTeamProject();
   const { data: prompts } = useAllPromptsForProject();
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
 
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
+
+  // Agents are only shown inside the popover, and the trigger is static —
+  // don't fetch them until the menu is opened.
+  const { data: agents } = api.agents.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: open && !!project?.id },
+  );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 

@@ -11,6 +11,7 @@ dotenv.config({
   override: true,
   quiet: process.env.NODE_ENV !== "development" || !existsSync(".env.portless"),
 });
+
 // OTel instrumentation MUST load before any module that creates spans —
 // without it the worker process has no registered tracer provider and every
 // BullMQOtel adapter / getLangWatchTracer span becomes a non-recording no-op.

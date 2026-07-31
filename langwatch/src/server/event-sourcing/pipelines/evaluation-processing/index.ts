@@ -1,10 +1,15 @@
 // Pipeline definition
-export { createEvaluationProcessingPipeline } from "./pipeline";
-export type { EvaluationProcessingPipelineDeps } from "./pipeline";
+
+export {
+  CompleteEvaluationCommand,
+  ReportEvaluationCommand,
+  StartEvaluationCommand,
+} from "./commands";
+export type { ExecuteEvaluationCommandDeps } from "./commands/executeEvaluation.command";
 // Command handlers
 export { ExecuteEvaluationCommand } from "./commands/executeEvaluation.command";
-export type { ExecuteEvaluationCommandDeps } from "./commands/executeEvaluation.command";
-export { StartEvaluationCommand, CompleteEvaluationCommand, ReportEvaluationCommand } from "./commands";
+export type { EvaluationProcessingPipelineDeps } from "./pipeline";
+export { createEvaluationProcessingPipeline } from "./pipeline";
 // Projections
 export * from "./projections";
 // Repositories

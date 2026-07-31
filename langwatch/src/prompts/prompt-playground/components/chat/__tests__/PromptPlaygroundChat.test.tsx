@@ -5,7 +5,6 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
@@ -231,9 +230,13 @@ describe("PromptPlaygroundChat ref methods", () => {
         </ChakraProvider>,
       );
 
-      const AssistantMessageProp = captured.chatProps?.[
-        "AssistantMessage"
-      ] as unknown as React.ComponentType<Record<string, unknown>>;
+      // Re-widen: the `= null` above narrows the property to `null`, and the
+      // render that repopulates it is opaque to control-flow analysis.
+      const chatProps = captured.chatProps as Record<string, any> | null;
+      const AssistantMessageProp =
+        chatProps?.AssistantMessage as unknown as React.ComponentType<
+          Record<string, unknown>
+        >;
       expect(AssistantMessageProp).toBeDefined();
 
       render(
@@ -248,13 +251,32 @@ describe("PromptPlaygroundChat ref methods", () => {
     };
 
     describe("when the message content starts with [ERROR]", () => {
-      it("renders the error alert without a trace link", () => {
+      it("renders the error alert without reciting the provider's message", () => {
+        // `api_error` is the PROVIDER's discriminant, not one of ours, and
+        // "boom" is its own sentence. This asserted that "boom" rendered,
+        // which is how a provider's prose — and anything it quotes, including
+        // the API key it just rejected — reached the playground. The type is
+        // narrowed to `unknown` at the parse boundary now and the customer
+        // reads the registry's copy.
         renderAssistantMessage({
           content: '[ERROR]{"type":"api_error","message":"boom"}',
         });
 
-        expect(screen.getByText("boom")).toBeInTheDocument();
+        expect(screen.queryByText("boom")).not.toBeInTheDocument();
+        expect(screen.getByText(/We've been notified/i)).toBeInTheDocument();
         expect(screen.queryByTestId("trace-message")).not.toBeInTheDocument();
+      });
+
+      it("renders our own copy for a failure class it recognises", () => {
+        renderAssistantMessage({
+          content:
+            '[ERROR]{"type":"auth","message":"Incorrect API key provided: sk-proj-NOT-A-REAL-KEY"}',
+        });
+
+        expect(
+          screen.getByText(/rejected our credentials/i),
+        ).toBeInTheDocument();
+        expect(document.body.textContent).not.toContain("sk-proj-");
       });
     });
 

@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary attribute forwarding", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
@@ -26,7 +29,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["gen_ai.agent.name"]).toBe("weather-agent");
     });
@@ -40,7 +46,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["gen_ai.agent.id"]).toBe("agent-123");
     });
@@ -54,7 +63,10 @@ describe("applySpanToSummary attribute forwarding", () => {
         },
       });
 
-      const state = applySpanToSummary({ state: createInitState(), span: span });
+      const state = applySpanToSummary({
+        state: createInitState(),
+        span: span,
+      });
 
       expect(state.attributes["gen_ai.provider.name"]).toBe("openai");
     });

@@ -1,8 +1,8 @@
+import type { LangyMessageProjectionRecord } from "@langwatch/langy";
 import type { LangyMessageProjection } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
-import type { LangyMessageProjectionRecord } from "@langwatch/langy";
 import { PrismaLangyMessageProjectionRepository } from "../langy-message-projection.prisma.repository";
 
 type Row = LangyMessageProjection;

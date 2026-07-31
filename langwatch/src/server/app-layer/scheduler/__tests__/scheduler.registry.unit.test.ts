@@ -18,7 +18,10 @@ describe("SchedulerRegistry", () => {
     describe("when getting an unregistered targetType", () => {
       it("returns undefined", () => {
         const registry = new SchedulerRegistry();
-        registry.register({ targetType: "reportTrigger", handler: noopHandler });
+        registry.register({
+          targetType: "reportTrigger",
+          handler: noopHandler,
+        });
         expect(registry.get("weeklyRollup")).toBeUndefined();
       });
     });
@@ -28,7 +31,10 @@ describe("SchedulerRegistry", () => {
     describe("when registering the same targetType again", () => {
       it("throws so a double-registration is loud, not a silent shadow", () => {
         const registry = new SchedulerRegistry();
-        registry.register({ targetType: "reportTrigger", handler: noopHandler });
+        registry.register({
+          targetType: "reportTrigger",
+          handler: noopHandler,
+        });
         expect(() =>
           registry.register({
             targetType: "reportTrigger",
@@ -43,7 +49,10 @@ describe("SchedulerRegistry", () => {
     describe("when cleared", () => {
       it("drops every registration so a fresh App can re-register", () => {
         const registry = new SchedulerRegistry();
-        registry.register({ targetType: "reportTrigger", handler: noopHandler });
+        registry.register({
+          targetType: "reportTrigger",
+          handler: noopHandler,
+        });
         registry.clear();
         expect(registry.get("reportTrigger")).toBeUndefined();
       });

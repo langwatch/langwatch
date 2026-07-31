@@ -121,6 +121,48 @@ Feature: Model → provider routing via VK config
       When I GET /v1/models
       Then "gpt-4o" is absent from the response
 
+  Rule: Discovery and dispatch agree on what the key can do
+
+    Any provider the materialised chain can dispatch to contributes its
+    models to GET /v1/models, or the response says why it cannot. A key
+    that completes fine against two providers while listing zero models is
+    a displayed guarantee contradicting reality: the production canary key
+    (openai + anthropic + bedrock, plain API keys) answered {"data": []}
+    while both chat lanes returned 200, because discovery only probed
+    base-URL credentials and silently skipped every hosted one.
+
+    @unit
+    Scenario: GET /v1/models lists hosted provider catalogs for API-key credentials
+      Given the VK's chain holds openai and anthropic credentials with API keys and no base_url
+      And no models_allowed is configured
+      When I GET /v1/models
+      Then the gateway asks each provider's public models endpoint with that credential's key
+      And the anthropic probe carries the required anthropic-version header
+      And models from both providers appear in the response with correct attribution
+
+    @unit
+    Scenario: GET /v1/models lists deployment-mapped models without probing
+      Given a bedrock credential whose deployment map holds "claude-haiku-4-5"
+      When I GET /v1/models
+      Then "claude-haiku-4-5" is listed without any outbound call
+      # The map's keys are the ids dispatch routes onto the provider's
+      # deployments, so they are the catalog for deployment-routed
+      # providers (Azure, Bedrock, Vertex).
+
+    @unit
+    Scenario: GET /v1/models says so when a provider's catalog cannot be enumerated
+      Given the VK's chain holds a bedrock credential with no deployment map
+      When I GET /v1/models
+      Then the response carries header X-Langwatch-Models-Discovery-Incomplete containing "bedrock:not-enumerable"
+      And the body stays exactly the OpenAI list shape
+
+    @unit
+    Scenario: a failed catalog probe surfaces as a gap, not a silent empty list
+      Given an openai credential whose catalog endpoint answers 500
+      When I GET /v1/models
+      Then the response carries header X-Langwatch-Models-Discovery-Incomplete containing "openai:probe-failed"
+      And other providers' models still appear
+
   Rule: Model discovery cannot be turned into a probe of the gateway's network
 
     Discovery is the one place the gateway itself fetches a
@@ -142,3 +184,43 @@ Feature: Model → provider routing via VK config
       When I GET /v1/models
       Then the gateway does not connect
       And the endpoint contributes no models
+
+  Rule: A key can be narrowed to specific providers, or left open to all
+
+    Which providers a key may reach is a list on the key, not an abstract
+    scope. Leaving it open is stored as the absence of a list, which is what
+    makes "all" mean all current and future providers rather than a snapshot
+    of the ones that happened to exist on the day the key was made.
+
+    @integration
+    Scenario: A key left open reaches providers added after it was created
+      Given a key created with every provider allowed
+      When a provider is added to the organization afterwards
+      Then the key can reach it without being edited
+
+    @integration
+    Scenario: A key narrowed to one provider reaches only that provider
+      Given a key allowed to use exactly one provider
+      When its configuration is read
+      Then only that provider is offered to the gateway
+      And a provider added afterwards is not
+
+    @integration
+    Scenario: A key cannot name a provider outside its reach
+      When a key is saved naming a provider its ownership does not reach
+      Then the save is refused
+
+    @integration
+    Scenario: A key cannot be saved with no providers at all
+      When a key is saved allowing no providers
+      Then the save is refused
+
+    @integration
+    Scenario: A provider outside the key's allowlist is refused even if a stale chain offers it
+      Given a key allowed to use exactly one provider
+      But a configuration bundle whose credential chain still carries another provider
+      When a request arrives that would fall back onto the other provider
+      Then the gateway does not dispatch to it
+      # The materialised chain already respects the allowlist; this is the
+      # dispatch-side check that keeps a stale or hand-crafted bundle from
+      # turning a narrowing the UI displays as active into a decoration.

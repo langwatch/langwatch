@@ -1,5 +1,5 @@
-import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
 /**
  * Redirect page for the legacy /[project]/messages/[trace] deep link.

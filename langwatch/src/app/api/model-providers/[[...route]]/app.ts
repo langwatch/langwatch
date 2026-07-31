@@ -1,7 +1,7 @@
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createProjectApp } from "~/server/api/security";
-import type { OrganizationMiddlewareVariables } from "../../middleware/organization";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ModelProviderServiceMiddlewareVariables } from "../../middleware/model-provider-service";
+import type { OrganizationMiddlewareVariables } from "../../middleware/organization";
 import { registerModelProviderRoutes } from "./app.v1";
 
 patchZodOpenapi();

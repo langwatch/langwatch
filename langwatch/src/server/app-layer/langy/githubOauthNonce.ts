@@ -23,7 +23,12 @@ export async function registerGithubInstallNonce(
   try {
     await (
       connection as {
-        set: (k: string, v: string, mode: string, ttl: number) => Promise<string>;
+        set: (
+          k: string,
+          v: string,
+          mode: string,
+          ttl: number,
+        ) => Promise<string>;
       }
     ).set(nonceKey(nonce), "1", "EX", ttlSec);
     return true;

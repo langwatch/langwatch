@@ -13,12 +13,8 @@ import {
 } from "./processManagerDefinition";
 
 type EventTypeOf<E extends Event> = E["type"] & string;
-type EventData<E extends Event, Type extends string> = Extract<
-  E,
-  { type: Type }
-> extends Event<infer Data>
-  ? Data
-  : never;
+type EventData<E extends Event, Type extends string> =
+  Extract<E, { type: Type }> extends Event<infer Data> ? Data : never;
 
 type OutboxOptions = NonNullable<
   ProcessManagerConfig<any, Record<string, IntentSpec<any>>>["outbox"]
@@ -34,7 +30,9 @@ export interface ProcessManagerStateStage<E extends Event, State> {
     schema: Schema,
     run: IntentSpec<Schema>["run"],
   ): ProcessManagerIntentStage<E, State, Record<Name, IntentSpec<Schema>>>;
-  schedule(options: { everyMs: number }): ProcessManagerScheduledStage<E, State>;
+  schedule(options: {
+    everyMs: number;
+  }): ProcessManagerScheduledStage<E, State>;
 }
 
 export interface ProcessManagerScheduledStage<E extends Event, State>
@@ -115,10 +113,7 @@ class ProcessManagerBuilder<E extends Event> {
   private stateValue: unknown;
   private hasState = false;
   private readonly intents: Record<string, IntentSpec<any>> = {};
-  private readonly handlers: Record<
-    string,
-    EventHandler<any, any, any>
-  > = {};
+  private readonly handlers: Record<string, EventHandler<any, any, any>> = {};
   private wakeHandler: WakeHandler<any, any> | undefined;
   private outboxOptions: OutboxOptions | undefined;
   private scheduleOptions: { everyMs: number } | undefined;
@@ -146,10 +141,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  on(
-    eventType: string,
-    handle: EventHandler<any, any, any>,
-  ): this {
+  on(eventType: string, handle: EventHandler<any, any, any>): this {
     if (this.handlers[eventType]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",

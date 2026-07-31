@@ -39,15 +39,19 @@ describe("given a destination that is LangWatch's own", () => {
   describe("when the app is served from a self-hosted origin", () => {
     it("treats that origin as inside LangWatch", () => {
       expect(
-        classify("https://langwatch.acme.internal/p/traces", "https://langwatch.acme.internal")
-          .kind,
+        classify(
+          "https://langwatch.acme.internal/p/traces",
+          "https://langwatch.acme.internal",
+        ).kind,
       ).toBe("internal");
     });
 
     it("still treats the LangWatch documentation as inside LangWatch", () => {
       expect(
-        classify("https://docs.langwatch.ai/introduction", "https://langwatch.acme.internal")
-          .kind,
+        classify(
+          "https://docs.langwatch.ai/introduction",
+          "https://langwatch.acme.internal",
+        ).kind,
       ).toBe("internal");
     });
   });
@@ -56,14 +60,26 @@ describe("given a destination that is LangWatch's own", () => {
 describe("given a destination dressed up to look like LangWatch", () => {
   /** @scenario Reading the true destination */
   it.each([
-    ["userinfo before the real host", "https://langwatch.ai@evil.example/login"],
+    [
+      "userinfo before the real host",
+      "https://langwatch.ai@evil.example/login",
+    ],
     ["a password-shaped userinfo", "https://langwatch.ai:x@evil.example/login"],
-    ["our name as a subdomain of theirs", "https://langwatch.ai.evil.com/login"],
+    [
+      "our name as a subdomain of theirs",
+      "https://langwatch.ai.evil.com/login",
+    ],
     ["our name glued onto theirs", "https://notlangwatch.ai/login"],
     ["our name as a suffix without the dot", "https://evillangwatch.ai/login"],
     ["our name in the path only", "https://evil.example/langwatch.ai/login"],
-    ["our name in the query only", "https://evil.example/?next=https://langwatch.ai"],
-    ["our name in the fragment only", "https://evil.example/#https://docs.langwatch.ai"],
+    [
+      "our name in the query only",
+      "https://evil.example/?next=https://langwatch.ai",
+    ],
+    [
+      "our name in the fragment only",
+      "https://evil.example/#https://docs.langwatch.ai",
+    ],
     ["a protocol-relative jump off-site", "//evil.com/login"],
     ["a bare off-site host", "https://example.com/pricing"],
   ])("treats %s as outside LangWatch", (_case, href) => {

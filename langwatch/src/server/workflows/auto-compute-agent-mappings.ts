@@ -5,10 +5,10 @@
  * so that the workflow save is never blocked.
  */
 
-import type { PrismaClient, Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import type { Edge, Node } from "@xyflow/react";
-import { computeBestMatchMappings } from "../scenarios/execution/resolve-field-mappings";
 import { getMappingSurfaceInputs } from "../../optimization_studio/utils/nodeUtils";
+import { computeBestMatchMappings } from "../scenarios/execution/resolve-field-mappings";
 
 /** Minimal DSL shape needed for I/O extraction — avoids importing the full Workflow type. */
 interface WorkflowDSL {
@@ -43,7 +43,7 @@ function extractVariablesFromDSL({ dsl }: { dsl: WorkflowDSL }): {
   const rawOutputs: unknown[] = Array.isArray(
     (endNodeData as { inputs?: unknown } | undefined)?.inputs,
   )
-    ? ((endNodeData as { inputs: unknown[] }).inputs)
+    ? (endNodeData as { inputs: unknown[] }).inputs
     : [];
 
   const outputs = rawOutputs.flatMap(
@@ -136,7 +136,7 @@ export async function autoComputeAgentMappings({
           ? (agent.config as Record<string, unknown>)
           : {};
 
-      const existingMappings = config["scenarioMappings"];
+      const existingMappings = config.scenarioMappings;
       const currentMappings =
         existingMappings !== null &&
         typeof existingMappings === "object" &&
@@ -178,7 +178,7 @@ export async function autoComputeAgentMappings({
       // that no longer exists. Initialize on first auto-compute (no existing
       // mappings + new output available). Don't clobber an intentionally-unset
       // field on agents that already have mappings configured.
-      const existingOutputField = config["scenarioOutputField"];
+      const existingOutputField = config.scenarioOutputField;
       const outputFieldIsStale =
         typeof existingOutputField === "string" &&
         !outputIdentifiers.has(existingOutputField);
@@ -211,7 +211,7 @@ export async function autoComputeAgentMappings({
 
       const updatedConfig: Record<string, unknown> = {
         ...baseConfig,
-        ...((mappingsChanged || needsInitialMappings)
+        ...(mappingsChanged || needsInitialMappings
           ? { scenarioMappings: nextMappings }
           : {}),
         ...(shouldUpdateOutputField ? { scenarioOutputField } : {}),

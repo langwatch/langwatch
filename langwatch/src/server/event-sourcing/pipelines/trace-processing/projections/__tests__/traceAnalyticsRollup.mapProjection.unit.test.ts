@@ -10,72 +10,20 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { OtlpSpan } from "../../schemas/otlp";
-import type { SpanReceivedEvent } from "../../schemas/events";
-import { TraceAnalyticsRollupMapProjection } from "../traceAnalyticsRollup.mapProjection";
 import type { TraceAnalyticsRollupRow } from "../traceAnalyticsRollup.mapProjection";
+import { TraceAnalyticsRollupMapProjection } from "../traceAnalyticsRollup.mapProjection";
+import {
+  createSpanReceivedEvent,
+  type TestSpanReceivedEventOptions,
+} from "./fixtures/trace-summary-test.fixtures";
 
-interface SpanOptions {
-  parentSpanId?: string | null;
-  attributes?: Record<string, string | number | boolean>;
-  statusCode?: number | null;
-  startTimeUnixNano?: string;
-  endTimeUnixNano?: string;
-}
-
-function otlpAttr(key: string, value: string | number | boolean) {
-  if (typeof value === "number") {
-    return Number.isInteger(value)
-      ? { key, value: { intValue: String(value) } }
-      : { key, value: { doubleValue: value } };
-  }
-  if (typeof value === "boolean") return { key, value: { boolValue: value } };
-  return { key, value: { stringValue: value } };
-}
-
-function makeSpanReceivedEvent(options: SpanOptions = {}): SpanReceivedEvent {
-  const span = {
-    traceId: "aaaa0000000000000000000000000001",
-    spanId: "bbbb000000000001",
-    parentSpanId: options.parentSpanId ?? null,
-    name: "llm-call",
-    kind: 1,
-    // 1_700_000_000_000 ms → floors to the 1_700_000_000_000 minute boundary
-    // only if already aligned; use an offset so the flooring is observable.
-    startTimeUnixNano: options.startTimeUnixNano ?? "1700000000500000000",
-    endTimeUnixNano: options.endTimeUnixNano ?? "1700000002500000000",
-    attributes: Object.entries(options.attributes ?? {}).map(([k, v]) =>
-      otlpAttr(k, v),
-    ),
-    events: [],
-    links: [],
-    status: { code: options.statusCode ?? null, message: null },
-    flags: null,
-    droppedAttributesCount: 0,
-    droppedEventsCount: 0,
-    droppedLinksCount: 0,
-  } as unknown as OtlpSpan;
-
-  return {
-    id: "evt-1",
-    type: "span.received",
-    tenantId: "tenant-1",
-    aggregateId: "aaaa0000000000000000000000000001",
-    data: {
-      span,
-      resource: null,
-      instrumentationScope: null,
-      piiRedactionLevel: "DISABLED",
-    },
-    metadata: { spanId: "bbbb000000000001", traceId: "trace-1" },
-  } as unknown as SpanReceivedEvent;
-}
+type SpanOptions = TestSpanReceivedEventOptions;
 
 function mapRow(options: SpanOptions = {}): TraceAnalyticsRollupRow {
   const projection = new TraceAnalyticsRollupMapProjection({
     store: { append: async () => {}, appendBatch: async () => {} } as never,
   });
-  return projection.mapTraceSpanReceived(makeSpanReceivedEvent(options));
+  return projection.mapTraceSpanReceived(createSpanReceivedEvent(options));
 }
 
 describe("TraceAnalyticsRollupMapProjection.mapTraceSpanReceived", () => {
@@ -93,7 +41,9 @@ describe("TraceAnalyticsRollupMapProjection.mapTraceSpanReceived", () => {
 
   describe("given a span carrying only a request model", () => {
     it("falls back to the request model", () => {
-      const row = mapRow({ attributes: { "gen_ai.request.model": "claude-3" } });
+      const row = mapRow({
+        attributes: { "gen_ai.request.model": "claude-3" },
+      });
       expect(row.model).toBe("claude-3");
     });
   });

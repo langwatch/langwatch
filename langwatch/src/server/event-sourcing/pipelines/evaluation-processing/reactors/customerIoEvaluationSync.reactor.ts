@@ -1,12 +1,21 @@
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { NurturingService } from "../../../../../../ee/billing/nurturing/nurturing.service";
-import { captureException, toError } from "../../../../../utils/posthogErrorCapture";
+import {
+  captureException,
+  toError,
+} from "../../../../../utils/posthogErrorCapture";
 import type { ProjectService } from "../../../../app-layer/projects/project.service";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "../../../reactors/reactor.types";
 import { CIO_REACTOR_DEBOUNCE_TTL_MS } from "../../trace-processing/reactors/customerIoTraceSync.reactor";
 import type { EvaluationProcessingEvent } from "../schemas/events";
-import { isEvaluationCompletedEvent, isEvaluationReportedEvent } from "../schemas/events";
+import {
+  isEvaluationCompletedEvent,
+  isEvaluationReportedEvent,
+} from "../schemas/events";
 
 const logger = createLogger(
   "langwatch:evaluation-processing:customer-io-evaluation-sync-reactor",
@@ -55,14 +64,18 @@ export function createCustomerIoEvaluationSyncReactor(
       context: ReactorContext<EvaluationRunData>,
     ): Promise<void> {
       // Only sync on terminal events
-      if (!isEvaluationCompletedEvent(event) && !isEvaluationReportedEvent(event)) {
+      if (
+        !isEvaluationCompletedEvent(event) &&
+        !isEvaluationReportedEvent(event)
+      ) {
         return;
       }
 
       const { tenantId: projectId, foldState } = context;
 
       try {
-        const { userId, organizationId } = await deps.projects.resolveOrgAdmin(projectId);
+        const { userId, organizationId } =
+          await deps.projects.resolveOrgAdmin(projectId);
 
         if (!userId || !organizationId) {
           logger.warn(
@@ -90,47 +103,73 @@ export function createCustomerIoEvaluationSyncReactor(
         if (isFirstEvaluation) {
           // Fire-and-forget: do not block reactor processing
           void deps.nurturing
-            .identifyUser({ userId, traits: {
-              has_evaluations: true,
-              evaluation_count: 1,
-              first_evaluation_at: now,
-            }})
+            .identifyUser({
+              userId,
+              traits: {
+                has_evaluations: true,
+                evaluation_count: 1,
+                first_evaluation_at: now,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to identify user for first evaluation");
+              logger.error(
+                { projectId, error },
+                "Failed to identify user for first evaluation",
+              );
               captureException(toError(error));
             });
           void deps.nurturing
-            .trackEvent({ userId, event: "first_evaluation_created", properties: {
-              evaluation_type: foldState.evaluatorType,
-              project_id: projectId,
-            }})
+            .trackEvent({
+              userId,
+              event: "first_evaluation_created",
+              properties: {
+                evaluation_type: foldState.evaluatorType,
+                project_id: projectId,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to track first_evaluation_created event");
+              logger.error(
+                { projectId, error },
+                "Failed to track first_evaluation_created event",
+              );
               captureException(toError(error));
             });
         } else {
           const newCount = existingCount + 1;
           // Fire-and-forget: do not block reactor processing
           void deps.nurturing
-            .identifyUser({ userId, traits: {
-              evaluation_count: newCount,
-              last_evaluation_at: now,
-            }})
+            .identifyUser({
+              userId,
+              traits: {
+                evaluation_count: newCount,
+                last_evaluation_at: now,
+              },
+            })
             .catch((error) => {
-              logger.error({ projectId, error }, "Failed to identify user for evaluation update");
+              logger.error(
+                { projectId, error },
+                "Failed to identify user for evaluation update",
+              );
               captureException(toError(error));
             });
         }
 
         // Track evaluation_ran for every evaluation (first and subsequent)
         void deps.nurturing
-          .trackEvent({ userId, event: "evaluation_ran", properties: {
-            evaluation_id: foldState.evaluationId,
-            score: foldState.score,
-            passed: foldState.passed,
-          }})
+          .trackEvent({
+            userId,
+            event: "evaluation_ran",
+            properties: {
+              evaluation_id: foldState.evaluationId,
+              score: foldState.score,
+              passed: foldState.passed,
+            },
+          })
           .catch((error) => {
-            logger.error({ projectId, error }, "Failed to track evaluation_ran event");
+            logger.error(
+              { projectId, error },
+              "Failed to track evaluation_ran event",
+            );
             captureException(toError(error));
           });
       } catch (error) {

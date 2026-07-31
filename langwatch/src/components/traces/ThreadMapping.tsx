@@ -12,8 +12,8 @@ import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
-import type { Workflow } from "../../optimization_studio/types/dsl";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
   SERVER_ONLY_THREAD_SOURCES,
@@ -188,9 +188,8 @@ export const ThreadMapping = ({
   // Check if any column uses a server-only source (e.g. formatted_traces)
   const needsFormattedDigest = useMemo(
     () =>
-      Object.values(mapping).some(
-        (m) =>
-          (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(m.source),
+      Object.values(mapping).some((m) =>
+        (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(m.source),
       ),
     [mapping],
   );

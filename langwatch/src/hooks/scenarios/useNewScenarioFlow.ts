@@ -34,13 +34,17 @@ function setWelcomeSeen(): void {
  * Once the user proceeds from either surface, `welcomeSeen` is persisted in
  * localStorage and neither surface appears again.
  */
-export function useNewScenarioFlow({ scenarioCount, isLoading }: UseNewScenarioFlowParams) {
+export function useNewScenarioFlow({
+  scenarioCount,
+  isLoading,
+}: UseNewScenarioFlowParams) {
   const [welcomeDismissed, setWelcomeDismissed] = useState(getWelcomeSeen);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Inline welcome is visible when: no scenarios, not loading, not yet dismissed
-  const showInlineWelcome = !isLoading && scenarioCount === 0 && !welcomeDismissed;
+  const showInlineWelcome =
+    !isLoading && scenarioCount === 0 && !welcomeDismissed;
 
   const dismissWelcome = useCallback(() => {
     setWelcomeSeen();
@@ -61,12 +65,15 @@ export function useNewScenarioFlow({ scenarioCount, isLoading }: UseNewScenarioF
     setShowCreateModal(true);
   }, [dismissWelcome]);
 
-  const handleWelcomeModalOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      dismissWelcome();
-      setShowWelcomeModal(false);
-    }
-  }, [dismissWelcome]);
+  const handleWelcomeModalOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        dismissWelcome();
+        setShowWelcomeModal(false);
+      }
+    },
+    [dismissWelcome],
+  );
 
   const handleCloseCreateModal = useCallback(() => {
     setShowCreateModal(false);

@@ -178,7 +178,12 @@ clickhouse:
     # its password key.
     existingSecret: langwatch-clickhouse-creds
 
-# Ingress with TLS
+# Ingress with TLS.
+#
+# `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
+# so the private control plane is never internet-reachable. Blocked requests
+# answer 503 on ingress-nginx. See the Security guide for the opt-out, the
+# AWS/GKE caveat, and what the block does not cover.
 ingress:
   enabled: true
   className: nginx

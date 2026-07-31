@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   ATTRIBUTE_KEYS,
-  buildTraceSummariesConditions,
-  buildStoredSpansConditions,
   buildEvaluationRunsConditions,
   buildQueryFilter,
+  buildStoredSpansConditions,
+  buildTraceSummariesConditions,
   extractStandardResults,
 } from "../clickhouse/query-helpers";
 import type { ClickHouseFilterQueryParams } from "../clickhouse/types";
 
 describe("ATTRIBUTE_KEYS", () => {
   it("defines thread_id attribute key", () => {
-    expect(ATTRIBUTE_KEYS.thread_id).toBe("Attributes['gen_ai.conversation.id']");
+    expect(ATTRIBUTE_KEYS.thread_id).toBe(
+      "Attributes['gen_ai.conversation.id']",
+    );
   });
 
   it("defines user_id attribute key", () => {
@@ -19,7 +21,9 @@ describe("ATTRIBUTE_KEYS", () => {
   });
 
   it("defines customer_id attribute key", () => {
-    expect(ATTRIBUTE_KEYS.customer_id).toBe("Attributes['langwatch.customer_id']");
+    expect(ATTRIBUTE_KEYS.customer_id).toBe(
+      "Attributes['langwatch.customer_id']",
+    );
   });
 });
 
@@ -38,10 +42,10 @@ describe("buildTraceSummariesConditions", () => {
   it("returns OccurredAt conditions for partition pruning", () => {
     const result = buildTraceSummariesConditions(baseParams);
     expect(result).toContain(
-      "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+      "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     );
     expect(result).toContain(
-      "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
+      "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
     );
   });
 
@@ -71,10 +75,10 @@ describe("buildStoredSpansConditions", () => {
   it("uses StartTime instead of CreatedAt", () => {
     const result = buildStoredSpansConditions(baseParams);
     expect(result).toContain(
-      "StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})"
+      "StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
     );
     expect(result).toContain(
-      "StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})"
+      "StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})",
     );
   });
 });
@@ -94,10 +98,10 @@ describe("buildEvaluationRunsConditions", () => {
   it("uses ScheduledAt for date filtering", () => {
     const result = buildEvaluationRunsConditions(baseParams);
     expect(result).toContain(
-      "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+      "ScheduledAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     );
     expect(result).toContain(
-      "ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
+      "ScheduledAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
     );
   });
 });
@@ -133,7 +137,7 @@ describe("buildQueryFilter", () => {
     };
     const result = buildQueryFilter("my_column", params);
     expect(result).toBe(
-      "AND lower(my_column) LIKE lower(concat({query:String}, '%'))"
+      "AND lower(my_column) LIKE lower(concat({query:String}, '%'))",
     );
   });
 });

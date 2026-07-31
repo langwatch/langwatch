@@ -15,17 +15,13 @@
  * @see specs/features/suites/trace-role-cost-accumulation.feature
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { SpanCostService } from "../trace-processing/projections/services/span-cost.service";
-import { deriveScenarioRoleMetricsFromSpans } from "../trace-processing/projections/services/scenario-role-metrics.derivation";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
 import type { AggregateType } from "../../";
 import { definePipeline } from "../../";
-import {
-  getTestClickHouseClient,
-} from "../../__tests__/integration/testContainers";
+import { getTestClickHouseClient } from "../../__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
   createTestTenantId,
@@ -34,15 +30,16 @@ import {
 import { EventSourcing } from "../../eventSourcing";
 import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../stores/repositories/eventRepositoryClickHouse";
-import { RecordSpanCommand } from "../trace-processing/commands/recordSpanCommand";
 import { AssignTopicCommand } from "../trace-processing/commands/assignTopicCommand";
+import { RecordSpanCommand } from "../trace-processing/commands/recordSpanCommand";
+import { deriveScenarioRoleMetricsFromSpans } from "../trace-processing/projections/services/scenario-role-metrics.derivation";
+import { SpanCostService } from "../trace-processing/projections/services/span-cost.service";
 import { SpanStorageMapProjection } from "../trace-processing/projections/spanStorage.mapProjection";
+import { SpanAppendStore } from "../trace-processing/projections/spanStorage.store";
 import { TraceSummaryFoldProjection } from "../trace-processing/projections/traceSummary.foldProjection";
+import { TraceSummaryStore } from "../trace-processing/projections/traceSummary.store";
 import type { TraceProcessingEvent } from "../trace-processing/schemas/events";
 import type { OtlpSpan } from "../trace-processing/schemas/otlp";
-import { SpanAppendStore } from "../trace-processing/projections/spanStorage.store";
-import { TraceSummaryStore } from "../trace-processing/projections/traceSummary.store";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
@@ -82,7 +79,10 @@ function buildOtlpSpan({
   spanId: string;
   parentSpanId: string | null;
   name: string;
-  attributes: Array<{ key: string; value: { stringValue?: string; intValue?: string } }>;
+  attributes: Array<{
+    key: string;
+    value: { stringValue?: string; intValue?: string };
+  }>;
   durationMs?: number;
 }): OtlpSpan {
   const startNano = BigInt(Date.now()) * 1_000_000n;
@@ -163,7 +163,11 @@ describe.skipIf(!hasTestcontainers)(
         .withReactor("traceSummary", "evaluationTrigger", noopReactor as any)
         .withReactor("traceSummary", "customEvaluationSync", noopReactor as any)
         .withReactor("traceSummary", "traceUpdateBroadcast", noopReactor as any)
-        .withReactor("traceSummary", "simulationMetricsSync", noopReactor as any)
+        .withReactor(
+          "traceSummary",
+          "simulationMetricsSync",
+          noopReactor as any,
+        )
         .withReactor("traceSummary", "projectMetadata", noopReactor as any)
         .withReactor("spanStorage", "spanStorageBroadcast", noopReactor as any)
         .withCommand("recordSpan", TestRecordSpanCommand as any)
@@ -212,7 +216,10 @@ describe.skipIf(!hasTestcontainers)(
             name: "Scenario Turn",
             attributes: [
               { key: "langwatch.span.type", value: { stringValue: "span" } },
-              { key: "scenario.run_id", value: { stringValue: "scenariorun_test123" } },
+              {
+                key: "scenario.run_id",
+                value: { stringValue: "scenariorun_test123" },
+              },
               { key: "langwatch.origin", value: { stringValue: "simulation" } },
             ],
             durationMs: 5000,
@@ -253,7 +260,10 @@ describe.skipIf(!hasTestcontainers)(
             name: "llm",
             attributes: [
               { key: "langwatch.span.type", value: { stringValue: "llm" } },
-              { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
+              {
+                key: "gen_ai.request.model",
+                value: { stringValue: "gpt-5-mini" },
+              },
               { key: "gen_ai.usage.input_tokens", value: { intValue: "100" } },
               { key: "gen_ai.usage.output_tokens", value: { intValue: "50" } },
             ],
@@ -275,7 +285,10 @@ describe.skipIf(!hasTestcontainers)(
             name: "llm",
             attributes: [
               { key: "langwatch.span.type", value: { stringValue: "llm" } },
-              { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
+              {
+                key: "gen_ai.request.model",
+                value: { stringValue: "gpt-5-mini" },
+              },
               { key: "gen_ai.usage.input_tokens", value: { intValue: "80" } },
               { key: "gen_ai.usage.output_tokens", value: { intValue: "40" } },
             ],
@@ -298,7 +311,10 @@ describe.skipIf(!hasTestcontainers)(
           clickhouse_settings: { select_sequential_consistency: "1" },
         });
         const eventRows = await eventResult.json();
-        console.log("[TEST] Events in event_log for this trace:", (eventRows[0] as any)?.cnt);
+        console.log(
+          "[TEST] Events in event_log for this trace:",
+          (eventRows[0] as any)?.cnt,
+        );
 
         console.log("[TEST] Polling trace_summaries...");
         const clickHouseClient = getTestClickHouseClient()!;
@@ -321,8 +337,12 @@ describe.skipIf(!hasTestcontainers)(
           });
           const rows = await result.json();
           if (rows.length > 0) {
-            console.log("[TEST] Found row, SpanCount:", (rows[0] as any).SpanCount,
-              "Attrs:", JSON.stringify((rows[0] as any).Attributes));
+            console.log(
+              "[TEST] Found row, SpanCount:",
+              (rows[0] as any).SpanCount,
+              "Attrs:",
+              JSON.stringify((rows[0] as any).Attributes),
+            );
             if ((rows[0] as any).SpanCount >= 4) {
               row = rows[0];
               break;
@@ -354,8 +374,8 @@ describe.skipIf(!hasTestcontainers)(
             spanCostService: new SpanCostService(),
           });
 
-        expect(scenarioRoleCosts["Agent"]).toBeGreaterThan(0);
-        expect(scenarioRoleLatencies["Agent"]).toBe(4000);
+        expect(scenarioRoleCosts.Agent).toBeGreaterThan(0);
+        expect(scenarioRoleLatencies.Agent).toBe(4000);
       }, 60_000);
     });
   },

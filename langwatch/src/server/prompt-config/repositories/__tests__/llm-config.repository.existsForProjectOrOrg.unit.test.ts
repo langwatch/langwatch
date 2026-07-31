@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { LlmConfigRepository } from "../llm-config.repository";
 import type { PrismaClient } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { LlmConfigRepository } from "../llm-config.repository";
 
 function makeMockPrisma(findFirstResult: unknown = null) {
   return {

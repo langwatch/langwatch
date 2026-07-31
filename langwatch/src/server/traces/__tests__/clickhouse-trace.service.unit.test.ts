@@ -530,6 +530,131 @@ describe("ClickHouseTraceService", () => {
           "%100\\% success\\_rate%",
         );
       });
+
+      // Issue #6356: a tool or agent identifier usually lives on the span
+      // name, not in the captured I/O, so free text has to reach the trace
+      // name and the span names as well.
+      it.each([
+        ["count", 0],
+        ["data", 1],
+      ])("searches the trace name in the %s query", async (_label, callIdx) => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        const call = mockClickHouseQuery.mock.calls[callIdx as number]!;
+        expect(call[0].query).toContain(
+          "lower(ifNull(ts.TraceName, '')) LIKE {searchQuery:String}",
+        );
+      });
+
+      it.each([
+        ["count", 0],
+        ["data", 1],
+      ])("searches span names in the %s query", async (_label, callIdx) => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        const sql = mockClickHouseQuery.mock.calls[callIdx as number]![0].query;
+        expect(sql).toContain("FROM stored_spans sp");
+        expect(sql).toContain("lower(sp.SpanName) LIKE {searchQuery:String}");
+        // Correlated on the outer row and bounded, so it prunes partitions
+        // instead of cold-scanning every weekly partition.
+        expect(sql).toContain("sp.TraceId = ts.TraceId");
+        expect(sql).toContain(
+          "sp.StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})",
+        );
+      });
+
+      it("ORs the name branches with the IO branches rather than replacing them", async () => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        const sql = mockClickHouseQuery.mock.calls[0]![0].query;
+        expect(sql).toContain("lower(ifNull(ts.ComputedInput, ''))");
+        expect(sql).toContain("lower(ifNull(ts.ComputedOutput, ''))");
+        expect(sql).toContain("lower(ifNull(ts.TraceName, ''))");
+        expect(sql).toContain("lower(sp.SpanName)");
+
+        // Presence alone would pass just as happily if the branches were
+        // AND-joined, which is the actual regression to fear: an AND of four
+        // substring tests matches nothing. Pin the join operator. The slice
+        // stops at EXISTS so the span subquery's own internal ANDs (its tenant,
+        // trace and time predicates) stay out of the assertion.
+        const columnBranches = sql.slice(
+          sql.indexOf("lower(ifNull(ts.ComputedInput, ''))"),
+          sql.indexOf("EXISTS ("),
+        );
+        expect(columnBranches).toContain(" OR ");
+        expect(columnBranches).not.toContain(" AND ");
+        // ...and the span branch is OR-ed onto them, not AND-ed.
+        expect(sql).toContain("OR EXISTS (");
+      });
+
+      // The 3-char floor exists because the ngrambf_v1 skip indexes are
+      // n=3; adding name branches must not start issuing queries below it.
+      it("still no-ops below the three-character floor", async () => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "co" } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        const call = mockClickHouseQuery.mock.calls[0]!;
+        expect(call[0].query_params.searchQuery).toBeUndefined();
+        expect(call[0].query).not.toContain("lower(sp.SpanName)");
+      });
+
+      // The privacy-relevant asymmetry in this change: the two Computed*
+      // branches stay gated on the I/O protections, while trace and span names
+      // are operation names already visible in the list and so are searched
+      // either way. Pin it so neither half drifts.
+      it("drops a redacted IO column but keeps the name branches", async () => {
+        setupMocksForQueryTest();
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getAllTracesForProject(
+          { ...baseInput, query: "codex" } as GetAllTracesForProjectInput,
+          { ...protections, canSeeCapturedOutput: false },
+        );
+
+        const sql = mockClickHouseQuery.mock.calls[0]![0].query;
+        expect(sql).not.toContain("lower(ifNull(ts.ComputedOutput, ''))");
+        expect(sql).toContain("lower(ifNull(ts.ComputedInput, ''))");
+        expect(sql).toContain("lower(ifNull(ts.TraceName, ''))");
+        expect(sql).toContain("lower(sp.SpanName)");
+      });
     });
 
     describe("when user cannot see input or output", () => {
@@ -1006,9 +1131,7 @@ describe("ClickHouseTraceService", () => {
           summaryCall.query.match(/OccurredAt <= fromUnixTimestamp64Milli/g) ??
             [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.fromMs).toBe(
-          1_000_000 - TWO_DAYS_MS,
-        );
+        expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
         expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
       });
     });
@@ -1045,9 +1168,7 @@ describe("ClickHouseTraceService", () => {
           summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
             [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.fromMs).toBe(
-          1_000_000 - TWO_DAYS_MS,
-        );
+        expect(summaryCall.query_params.fromMs).toBe(1_000_000 - TWO_DAYS_MS);
         expect(summaryCall.query_params.toMs).toBe(2_000_000 + TWO_DAYS_MS);
       });
 
@@ -1134,7 +1255,9 @@ describe("isClickHouseMemoryLimitError", () => {
     );
 
     const wrapped = new ClickHouseUnavailableError({
-      reasons: [new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)")],
+      reasons: [
+        new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)"),
+      ],
     });
     expect(isClickHouseMemoryLimitError(wrapped)).toBe(true);
   });

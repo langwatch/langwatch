@@ -56,9 +56,9 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => ({ enabled: false }),
 }));
 
-import { SeriesFiltersDrawer } from "../SeriesFilterDrawer";
 import type { FilterParam } from "../../hooks/useFilterParams";
 import type { FilterField } from "../../server/filters/types";
+import { SeriesFiltersDrawer } from "../SeriesFilterDrawer";
 
 function renderDrawer(
   props: Partial<Parameters<typeof SeriesFiltersDrawer>[0]> = {},

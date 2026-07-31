@@ -1,4 +1,5 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
@@ -22,12 +23,12 @@ import {
 import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import type { Unpacked } from "../../../utils/types";
 import { DatasetService } from "../../datasets/dataset.service";
+import { pMapLimited } from "../../event-sourcing/replay/pMapLimited";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
-import { pMapLimited } from "../../event-sourcing/replay/pMapLimited";
 import { materializeNodeLlmConfigs } from "../../workflows/materializeNodeLlmConfigs";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -156,7 +157,7 @@ export const workflowRouter = createTRPCRouter({
         },
       });
 
-      if (!workflow || !workflow.latestVersion?.dsl) {
+      if (!workflow?.latestVersion?.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Workflow not found",
@@ -431,11 +432,19 @@ export const workflowRouter = createTRPCRouter({
         include: { currentVersion: true },
       });
 
+      // Handled, like the same failure already is in `runWorkflow.ts`. As a
+      // bare `TRPCError` this crossed the boundary as prose, so the client had
+      // no code to key copy off: the studio's error card fell back to the
+      // caller's generic headline, printed the humanised slug underneath it,
+      // and — because an unrecognised code is not something the reader can be
+      // told how to fix — offered them an error id for a workflow that had
+      // simply been deleted.
       if (!workflow) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
+        throw new NotFoundError(
+          "workflow_not_found",
+          "Workflow",
+          input.workflowId,
+        );
       }
 
       if (workflow.currentVersion) {
@@ -562,7 +571,7 @@ export const workflowRouter = createTRPCRouter({
         where: { id: input.versionId, projectId: input.projectId },
       });
 
-      if (!version || !version.dsl) {
+      if (!version?.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Workflow version not found",
@@ -735,7 +744,7 @@ export const workflowRouter = createTRPCRouter({
 
       const sourceWorkflow = workflow.copiedFrom;
 
-      if (!sourceWorkflow || !sourceWorkflow.latestVersion?.dsl) {
+      if (!sourceWorkflow?.latestVersion?.dsl) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Source workflow or its latest version not found",
@@ -1117,17 +1126,21 @@ export const workflowRouter = createTRPCRouter({
           message: "workflows.commit_message feature is not registered",
         });
       }
-      const commitMessage = await wrapAiCall(commitFeature, async () => generateText({
-        model: await getVercelAIModel({ projectId: input.projectId, featureKey: "workflows.commit_message" }),
-        providerOptions: {
-          openai: {
-            reasoningEffort: "low",
-          } satisfies OpenAIResponsesProviderOptions,
-        },
-        messages: [
-          {
-            role: "system",
-            content: `
+      const commitMessage = await wrapAiCall(commitFeature, async () =>
+        generateText({
+          model: await getVercelAIModel({
+            projectId: input.projectId,
+            featureKey: "workflows.commit_message",
+          }),
+          providerOptions: {
+            openai: {
+              reasoningEffort: "low",
+            } satisfies OpenAIResponsesProviderOptions,
+          },
+          messages: [
+            {
+              role: "system",
+              content: `
 You are a diff generator for the LLM Workflow builder from LangWatch Optimization Studio.
 Generate very short, concise commit messages for the changes in the diff. From 1 to 5 words max, all lowercase.
 If changing the model, just say the short new model name, like "gpt-4o", nothing else.
@@ -1139,10 +1152,10 @@ but the actual change that was made inside the fields with as few words as possi
 - When changing the evaluator, it's not just the name the changes, it means the workflow is actually now using a different evaluator.
 - Do not use the word "edge", the user doesn't know the internal structure of the DSL, understand what is going on instead.
             `,
-          },
-          {
-            role: "user",
-            content: `
+            },
+            {
+              role: "user",
+              content: `
 Original File:
 \`\`\`json
 ${prevDsl_}
@@ -1153,9 +1166,10 @@ Diff:
 ${diff}
 \`\`\`
             `,
-          },
-        ],
-      }));
+            },
+          ],
+        }),
+      );
 
       // A commit message is one short string: a plain-text completion, not a
       // function-tool round-trip. Function tools combined with reasoning_effort

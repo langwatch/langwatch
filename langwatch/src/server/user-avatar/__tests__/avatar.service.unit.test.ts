@@ -9,7 +9,10 @@ const PNG_1x1_DATA_URL =
 function makeService({
   storeId = "so_generated",
   projectId = "proj_personal",
-}: { storeId?: string; projectId?: string } = {}) {
+}: {
+  storeId?: string;
+  projectId?: string;
+} = {}) {
   const userUpdate = vi.fn().mockResolvedValue({});
   const prisma = { user: { update: userUpdate } } as unknown as PrismaClient;
   const ensureWorkspaceProject = vi.fn().mockResolvedValue({ projectId });
@@ -35,7 +38,10 @@ describe("UserAvatarService", () => {
         });
 
         expect(ensureWorkspaceProject).toHaveBeenCalledWith(
-          expect.objectContaining({ userId: "user_1", organizationId: "org_1" }),
+          expect.objectContaining({
+            userId: "user_1",
+            organizationId: "org_1",
+          }),
         );
         expect(storeAvatarBytes).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -69,16 +75,27 @@ describe("UserAvatarService", () => {
     describe("when the payload is not a valid image", () => {
       beforeEach(() => vi.clearAllMocks());
 
+      /** @scenario A refused upload never reaches storage or the account record */
       it("rejects before touching storage or the database", async () => {
         const { service, storeAvatarBytes, userUpdate } = makeService();
 
+        // `.is()` is a plain `instanceof` with the narrowing written once —
+        // it holds only within a single module graph, which is exactly the
+        // situation here: the service is imported directly and nothing
+        // crosses a process or serialisation boundary. (Across one, the
+        // questions are `HandledError.isHandled` and `code` equality; `.is`
+        // would quietly miss a duplicated copy of the class.) Asking for the
+        // abstract parent asserts the whole family without pinning which
+        // member "not-an-image" happens to trip.
         await expect(
           service.setAvatar({
             userId: "user_1",
             organizationId: "org_1",
             imageDataUrl: "not-an-image",
           }),
-        ).rejects.toBeInstanceOf(AvatarValidationError);
+          // Wrapped rather than passed bare: `.is` resolves the class off
+          // `this`, so `toSatisfy(AvatarValidationError.is)` throws.
+        ).rejects.toSatisfy((err) => AvatarValidationError.is(err));
 
         expect(storeAvatarBytes).not.toHaveBeenCalled();
         expect(userUpdate).not.toHaveBeenCalled();

@@ -49,15 +49,25 @@ export const ColumnTypeIcon = ({ type, size = 12 }: ColumnTypeIconProps) => {
     case "number":
       return <Hash {...iconProps} color="var(--chakra-colors-green-500)" />;
     case "boolean":
-      return <ToggleLeft size={size + 2} strokeWidth={2.5} color="var(--chakra-colors-teal-500)" />;
+      return (
+        <ToggleLeft
+          size={size + 2}
+          strokeWidth={2.5}
+          color="var(--chakra-colors-teal-500)"
+        />
+      );
     case "json":
       return <Braces {...iconProps} color="var(--chakra-colors-purple-500)" />;
     case "chat_messages":
-      return <MessageSquare {...iconProps} color="var(--chakra-colors-orange-500)" />;
+      return (
+        <MessageSquare {...iconProps} color="var(--chakra-colors-orange-500)" />
+      );
     case "image":
       return <ImageIcon {...iconProps} color="var(--chakra-colors-gray-400)" />;
     case "date":
-      return <Calendar {...iconProps} color="var(--chakra-colors-yellow-600)" />;
+      return (
+        <Calendar {...iconProps} color="var(--chakra-colors-yellow-600)" />
+      );
     case "list":
       return <List {...iconProps} color="var(--chakra-colors-purple-400)" />;
     case "rag_contexts":
@@ -67,7 +77,9 @@ export const ColumnTypeIcon = ({ type, size = 12 }: ColumnTypeIconProps) => {
     case "annotations":
       return <PenLine {...iconProps} color="var(--chakra-colors-yellow-500)" />;
     case "evaluations":
-      return <ClipboardCheck {...iconProps} color="var(--chakra-colors-green-600)" />;
+      return (
+        <ClipboardCheck {...iconProps} color="var(--chakra-colors-green-600)" />
+      );
     default:
       return <Type {...iconProps} color="var(--chakra-colors-gray-400)" />;
   }

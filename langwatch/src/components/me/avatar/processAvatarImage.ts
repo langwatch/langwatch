@@ -10,6 +10,8 @@
  * Spec: specs/settings/user-avatar.feature
  */
 
+import { HandledError } from "@langwatch/handled-error";
+
 /** Output avatar edge length in px. Retina-crisp at every size we render. */
 export const AVATAR_OUTPUT_SIZE = 256;
 
@@ -21,10 +23,72 @@ export const AVATAR_OUTPUT_SIZE = 256;
  */
 export const AVATAR_MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 
-export class AvatarImageError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "AvatarImageError";
+/**
+ * The avatar processing failures, as handled errors.
+ *
+ * These never cross a network boundary — the whole crop/resize runs in the
+ * browser — but they are handled errors all the same, because the reason this
+ * codebase types a failure is the same either way: the cause is known, the
+ * user can act on it, and the words they read belong in the code-keyed
+ * registry rather than at the throw site (ADR-045).
+ *
+ * Three codes, because they ask for three different things: pick a real image,
+ * pick a smaller one, or try elsewhere. `message` stays server-style — short,
+ * for a log line — and never reaches the screen; `presentation.ts` owns the
+ * copy.
+ */
+export abstract class AvatarImageError extends HandledError {}
+
+/** Not an image, or the decoder could not make sense of it. */
+export class AvatarImageUnreadableError extends AvatarImageError {
+  declare readonly code: "avatar_image_unreadable";
+
+  constructor(reason: "not_an_image" | "decode_failed" | "empty") {
+    super("avatar_image_unreadable", "Avatar file is not a readable image", {
+      meta: { reason },
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "AvatarImageUnreadableError";
+  }
+}
+
+/** Over {@link AVATAR_MAX_SOURCE_BYTES}. `meta.maxBytes` is the ceiling. */
+export class AvatarImageTooLargeError extends AvatarImageError {
+  declare readonly code: "avatar_image_too_large";
+
+  constructor(maxBytes: number) {
+    super("avatar_image_too_large", "Avatar source file is over the ceiling", {
+      meta: { maxBytes },
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "AvatarImageTooLargeError";
+  }
+}
+
+/**
+ * The browser's canvas could not process or encode the image. Not the file's
+ * fault and not something a different file reliably fixes, so it gets its own
+ * code and its own advice.
+ *
+ * `fault: "customer"` — not because anyone did anything wrong, but because
+ * `fault` names who can act, and it is what decides whether a failure logs as
+ * routine or pages someone. This whole function runs inside the visitor's own
+ * browser; a canvas that will not hand back a 2d context is that browser's
+ * quirk, and no deploy of ours changes it. Booking it as `platform` filed a
+ * browser quirk as a platform incident.
+ */
+export class AvatarImageProcessingFailedError extends AvatarImageError {
+  declare readonly code: "avatar_image_processing_failed";
+
+  constructor() {
+    super(
+      "avatar_image_processing_failed",
+      "Browser canvas could not process or encode the avatar",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "AvatarImageProcessingFailedError";
   }
 }
 
@@ -32,8 +96,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () =>
-      reject(new AvatarImageError("That file could not be read as an image."));
+    img.onerror = () => reject(new AvatarImageUnreadableError("decode_failed"));
     img.src = src;
   });
 }
@@ -42,16 +105,15 @@ function loadImage(src: string): Promise<HTMLImageElement> {
  * Processes a selected file into a square, downscaled data URL.
  *
  * @throws {AvatarImageError} for a non-image, an oversized source file, or a
- *   decode/encoding failure — messages are safe to show to the user.
+ *   decode/encoding failure. Render it with `showErrorToast` — the words come
+ *   from the code's registry entry, not from `message`.
  */
 export async function processAvatarImage(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
-    throw new AvatarImageError("Please choose an image file.");
+    throw new AvatarImageUnreadableError("not_an_image");
   }
   if (file.size > AVATAR_MAX_SOURCE_BYTES) {
-    throw new AvatarImageError(
-      `Image is too large (max ${Math.round(AVATAR_MAX_SOURCE_BYTES / 1024 / 1024)} MB).`,
-    );
+    throw new AvatarImageTooLargeError(AVATAR_MAX_SOURCE_BYTES);
   }
 
   const objectUrl = URL.createObjectURL(file);
@@ -61,7 +123,7 @@ export async function processAvatarImage(file: File): Promise<string> {
     // Center-crop to the largest square that fits the source.
     const edge = Math.min(img.naturalWidth, img.naturalHeight);
     if (edge === 0) {
-      throw new AvatarImageError("That image appears to be empty.");
+      throw new AvatarImageUnreadableError("empty");
     }
     const sx = (img.naturalWidth - edge) / 2;
     const sy = (img.naturalHeight - edge) / 2;
@@ -71,7 +133,7 @@ export async function processAvatarImage(file: File): Promise<string> {
     canvas.height = AVATAR_OUTPUT_SIZE;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      throw new AvatarImageError("Your browser could not process the image.");
+      throw new AvatarImageProcessingFailedError();
     }
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(
@@ -90,7 +152,7 @@ export async function processAvatarImage(file: File): Promise<string> {
     // to PNG here, which the server also accepts.
     const dataUrl = canvas.toDataURL("image/webp", 0.9);
     if (!dataUrl.startsWith("data:image/")) {
-      throw new AvatarImageError("Could not encode the image.");
+      throw new AvatarImageProcessingFailedError();
     }
     return dataUrl;
   } finally {

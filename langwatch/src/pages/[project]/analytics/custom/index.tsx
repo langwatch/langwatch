@@ -8,7 +8,6 @@ import {
   createListCollection,
   Field,
   Grid,
-  Heading,
   HStack,
   Input,
   NativeSelect,
@@ -36,7 +35,6 @@ import {
   BarChart2,
   Bell,
   Check,
-  CheckSquare,
   ChevronDown,
   GitBranch,
   Info,
@@ -63,7 +61,6 @@ import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
-import { Popover } from "~/components/ui/popover";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -413,8 +410,7 @@ function AnalyticsCustomGraphContent({
                             cursor="pointer"
                             onClick={() =>
                               openDrawer("automation", {
-                                automationId:
-                                  form.getValues("alert.triggerId"),
+                                automationId: form.getValues("alert.triggerId"),
                                 prefilledGraphId: customId,
                                 prefilledSeriesName: deriveSeriesIdentifier(
                                   graph,
@@ -700,7 +696,7 @@ function CustomGraphForm({
 
   const addNewGraph = api.graphs.create.useMutation();
   const updateGraphById = api.graphs.updateById.useMutation();
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const trpc = api.useContext();
   const { checkAndProceed } = useLicenseEnforcement("customGraphs");

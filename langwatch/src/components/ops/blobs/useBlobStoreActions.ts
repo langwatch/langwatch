@@ -1,4 +1,5 @@
 import { toaster } from "~/components/ui/toaster";
+import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 
 interface CleanupVariables {
@@ -46,11 +47,7 @@ export function useBlobStoreActions({
       void utils.ops.invalidate();
     },
     onError: (error) => {
-      toaster.create({
-        title: "Cleanup failed",
-        description: error.message,
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't run the cleanup" });
     },
   });
 
@@ -66,11 +63,7 @@ export function useBlobStoreActions({
       void utils.ops.invalidate();
     },
     onError: (error) => {
-      toaster.create({
-        title: "Delete failed",
-        description: error.message,
-        type: "error",
-      });
+      showErrorToast({ error, fallbackTitle: "Couldn't delete this payload" });
     },
   });
 

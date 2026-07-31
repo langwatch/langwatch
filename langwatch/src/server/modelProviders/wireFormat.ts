@@ -19,10 +19,7 @@ import type { MaybeStoredModelProvider } from "./registry";
  * rewritten, and day-one behavior is unchanged for single-instance
  * providers (which is 100% of current production data).
  */
-export type WireMp = Pick<
-  MaybeStoredModelProvider,
-  "id" | "name" | "provider"
->;
+export type WireMp = Pick<MaybeStoredModelProvider, "id" | "name" | "provider">;
 
 export type ParsedWireValue =
   | { kind: "mp-id"; mpId: string; model: string }

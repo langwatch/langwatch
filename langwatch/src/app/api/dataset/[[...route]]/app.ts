@@ -2,13 +2,13 @@ import { Readable } from "node:stream";
 import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
-import { validator as zValidator } from "~/server/api/validation";
 import { z } from "zod";
 import {
   createProjectApp,
   handlerManagedAuth,
   requires,
 } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type {
@@ -140,9 +140,14 @@ secured.hono.onError(handleDatasetError);
 // The browser→S3 direct-upload routes authenticate the in-app upload UI by
 // NextAuth session cookie (or API key), resolved in-handler — the rest of the
 // surface is API-key-only `requires(...)`, which would 401 a cookie request.
-const directUploadSessionAuth = handlerManagedAuth(
-  "upload UI authenticated in-handler via authorizeDirectUpload (session cookie or API key)",
-);
+const directUploadSessionAuth = handlerManagedAuth({
+  reason:
+    "upload UI authenticated in-handler via authorizeDirectUpload (session cookie or API key)",
+  // authorizeDirectUpload resolves the caller and the target dataset; it does
+  // not gate on a standalone RBAC permission.
+  permissions: [],
+  credential: "both",
+});
 
 // datasetServiceMiddleware runs AFTER the access chain (which authenticates and
 // sets `project`), so it is applied per-route rather than app-wide.
@@ -332,7 +337,10 @@ secured.access(directUploadSessionAuth).post(
     // `authMiddleware` to set `c.get("project")` for this route.
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
 
     // Resource-limit enforcement runs inline here (not via
@@ -454,7 +462,10 @@ secured.access(directUploadSessionAuth).put(
     }
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
     const body = c.req.raw.body;
     if (!body) {
@@ -493,7 +504,10 @@ secured.access(directUploadSessionAuth).post(
     }
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
     const service = c.get("datasetService");
 
@@ -524,7 +538,10 @@ secured.access(directUploadSessionAuth).post(
     }
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
     const service = c.get("datasetService");
 
@@ -555,7 +572,10 @@ secured.access(directUploadSessionAuth).delete(
     }
     const auth = await authorizeDirectUpload(c, projectId.trim());
     if (!auth.ok) {
-      return c.json({ error: auth.error }, auth.status);
+      // `auth.body` is the full handled payload (code, meta, tips). Falling
+      // back to `{ error }` keeps the shape for the failures that have no
+      // handled error behind them.
+      return c.json(auth.body ?? { error: auth.error }, auth.status);
     }
     const service = c.get("datasetService");
 

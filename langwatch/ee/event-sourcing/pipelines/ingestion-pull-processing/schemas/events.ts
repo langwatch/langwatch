@@ -35,14 +35,16 @@ export const pullScheduleSchema = z
     }
   });
 
-/** The imperative faces of pullScheduleSchema — one validator, three shapes. */
-export function assertValidPullSchedule(cron: string): void {
-  const parsed = pullScheduleSchema.safeParse(cron);
-  if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? "invalid pull schedule");
-  }
-}
-
+/**
+ * The imperative face of pullScheduleSchema — one validator, two shapes.
+ *
+ * There is no `assert` variant here. The one that existed threw the zod
+ * issues away and rethrew a plain `Error`, so an admin's cron typo arrived as
+ * an unnamed 500; its only caller now raises a `ValidationError` that keeps
+ * the issues (`ingestionSource.service.ts::assertPullSchedule`). The process
+ * manager reads the boolean, because a cron already committed to the log has
+ * to be skipped, not thrown over.
+ */
 export function isValidPullSchedule(cron: string): boolean {
   return pullScheduleSchema.safeParse(cron).success;
 }

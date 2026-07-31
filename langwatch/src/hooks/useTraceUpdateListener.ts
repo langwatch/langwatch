@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "~/utils/api";
-import type { ConnectionState } from "./useSSESubscription";
 import { useSSESubscription } from "./useSSESubscription";
 
 interface UseTraceUpdateListenerOptions {
@@ -55,13 +54,21 @@ export function useTraceUpdateListener({
   onTraceSummaryUpdatedRef.current = onTraceSummaryUpdated;
 
   // Debounce/throttle state for span events
-  const spanDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const spanMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spanDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const spanMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const spanTraceIdsRef = useRef<Set<string>>(new Set());
 
   // Debounce/throttle state for summary events
-  const summaryDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const summaryMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const summaryDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const summaryMaxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const summaryTraceIdsRef = useRef<Set<string>>(new Set());
 
   const flushSpanUpdate = useCallback(() => {
@@ -126,11 +133,17 @@ export function useTraceUpdateListener({
       if (summaryDebounceTimerRef.current) {
         clearTimeout(summaryDebounceTimerRef.current);
       }
-      summaryDebounceTimerRef.current = setTimeout(flushSummaryUpdate, debounceMs);
+      summaryDebounceTimerRef.current = setTimeout(
+        flushSummaryUpdate,
+        debounceMs,
+      );
 
       // Start maxWait timer on first event in this cycle (if maxWaitMs is set)
       if (maxWaitMs != null && !summaryMaxWaitTimerRef.current) {
-        summaryMaxWaitTimerRef.current = setTimeout(flushSummaryUpdate, maxWaitMs);
+        summaryMaxWaitTimerRef.current = setTimeout(
+          flushSummaryUpdate,
+          maxWaitMs,
+        );
       }
     },
     [debounceMs, maxWaitMs, flushSummaryUpdate],
@@ -139,10 +152,14 @@ export function useTraceUpdateListener({
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      if (spanDebounceTimerRef.current) clearTimeout(spanDebounceTimerRef.current);
-      if (spanMaxWaitTimerRef.current) clearTimeout(spanMaxWaitTimerRef.current);
-      if (summaryDebounceTimerRef.current) clearTimeout(summaryDebounceTimerRef.current);
-      if (summaryMaxWaitTimerRef.current) clearTimeout(summaryMaxWaitTimerRef.current);
+      if (spanDebounceTimerRef.current)
+        clearTimeout(spanDebounceTimerRef.current);
+      if (spanMaxWaitTimerRef.current)
+        clearTimeout(spanMaxWaitTimerRef.current);
+      if (summaryDebounceTimerRef.current)
+        clearTimeout(summaryDebounceTimerRef.current);
+      if (summaryMaxWaitTimerRef.current)
+        clearTimeout(summaryMaxWaitTimerRef.current);
     };
   }, []);
 

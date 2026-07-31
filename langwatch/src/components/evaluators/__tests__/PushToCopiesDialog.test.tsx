@@ -108,10 +108,9 @@ describe("PushToCopiesDialog", () => {
   it("Push button shows count and calls pushToCopies with selected copy ids", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    render(
-      <PushToCopiesDialog {...defaultProps} onClose={onClose} />,
-      { wrapper: Wrapper },
-    );
+    render(<PushToCopiesDialog {...defaultProps} onClose={onClose} />, {
+      wrapper: Wrapper,
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Replica A")).toBeInTheDocument();
@@ -133,10 +132,9 @@ describe("PushToCopiesDialog", () => {
   it("Cancel button calls onClose", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    render(
-      <PushToCopiesDialog {...defaultProps} onClose={onClose} />,
-      { wrapper: Wrapper },
-    );
+    render(<PushToCopiesDialog {...defaultProps} onClose={onClose} />, {
+      wrapper: Wrapper,
+    });
     await user.click(screen.getByRole("button", { name: /cancel/i }));
     expect(onClose).toHaveBeenCalled();
   });

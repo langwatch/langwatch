@@ -37,9 +37,11 @@ describe("<ExportProgress/>", () => {
       });
 
       expect(
-        screen.getByText((_, el) =>
+        screen.getByText(
+          (_, el) =>
             el?.tagName.toLowerCase() === "p" &&
-            el.textContent === "Exported 0 of 500 traces…")
+            el.textContent === "Exported 0 of 500 traces…",
+        ),
       ).toBeInTheDocument();
     });
 
@@ -57,55 +59,48 @@ describe("<ExportProgress/>", () => {
     it("updates the text to reflect new exported count", () => {
       const { rerender } = render(
         <ExportProgress {...defaultProps} exported={100} total={500} />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       expect(
         screen.getByText(
           (_, el) =>
             el?.tagName.toLowerCase() === "p" &&
-            el.textContent === "Exported 100 of 500 traces…"
-        )
+            el.textContent === "Exported 100 of 500 traces…",
+        ),
       ).toBeInTheDocument();
 
       rerender(
         <Wrapper>
           <ExportProgress {...defaultProps} exported={300} total={500} />
-        </Wrapper>
+        </Wrapper>,
       );
 
       expect(
         screen.getByText(
           (_, el) =>
             el?.tagName.toLowerCase() === "p" &&
-            el.textContent === "Exported 300 of 500 traces…"
-        )
+            el.textContent === "Exported 300 of 500 traces…",
+        ),
       ).toBeInTheDocument();
     });
   });
 
   describe("when export completes", () => {
     it("shows completion text", () => {
-      render(
-        <ExportProgress {...defaultProps} exported={500} total={500} />,
-        { wrapper: Wrapper }
-      );
+      render(<ExportProgress {...defaultProps} exported={500} total={500} />, {
+        wrapper: Wrapper,
+      });
 
-      expect(
-        screen.getByText("Exported 500 traces")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Exported 500 traces")).toBeInTheDocument();
     });
   });
 
   describe("when isExporting is false", () => {
     it("renders nothing", () => {
       const { container } = render(
-        <ExportProgress
-          exported={0}
-          total={500}
-          isExporting={false}
-        />,
-        { wrapper: Wrapper }
+        <ExportProgress exported={0} total={500} isExporting={false} />,
+        { wrapper: Wrapper },
       );
 
       expect(container.textContent).toBe("");
@@ -114,10 +109,9 @@ describe("<ExportProgress/>", () => {
 
   describe("when onCancel is provided", () => {
     it("shows a cancel button", () => {
-      render(
-        <ExportProgress {...defaultProps} onCancel={vi.fn()} />,
-        { wrapper: Wrapper }
-      );
+      render(<ExportProgress {...defaultProps} onCancel={vi.fn()} />, {
+        wrapper: Wrapper,
+      });
 
       expect(screen.getByText("Cancel")).toBeInTheDocument();
     });
@@ -126,10 +120,9 @@ describe("<ExportProgress/>", () => {
       const user = userEvent.setup();
       const onCancel = vi.fn();
 
-      render(
-        <ExportProgress {...defaultProps} onCancel={onCancel} />,
-        { wrapper: Wrapper }
-      );
+      render(<ExportProgress {...defaultProps} onCancel={onCancel} />, {
+        wrapper: Wrapper,
+      });
 
       await user.click(screen.getByText("Cancel"));
       expect(onCancel).toHaveBeenCalledOnce();

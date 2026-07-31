@@ -1,16 +1,15 @@
 import { createLogger } from "@langwatch/observability";
 import {
+  incrementEsFoldAbsentMissTrustedTotal,
   incrementEsFoldDuplicateEventsSkipped,
   incrementEsFoldReadWindowFallbackTotal,
+  incrementEsFoldRefoldOnMissTotal,
   incrementEsFoldRefoldTotal,
   observeEsFoldBlindReapplyEvents,
 } from "~/server/metrics";
 import type { Event } from "../domain/types";
 import { mergeAppliedEventIds } from "./foldCache/foldCacheEntry";
-import type {
-  FoldProjectionDefinition,
-  FoldProjectionStore,
-} from "./foldProjection.types";
+import type { FoldProjectionDefinition } from "./foldProjection.types";
 import {
   type ProjectionStoreContext,
   readWindowAround,
@@ -164,32 +163,64 @@ export class FoldProjectionExecutor {
    * `init()` permanently overwrites the complete row. The retry is the
    * declared-window contract's correctness net; the windowed read is only the
    * partition-pruning fast path.
+   *
+   * A fold that declared `trustAbsentMiss` has replaced that net with a
+   * stronger claim — its store always writes a row and its window provably
+   * covers every live one — so for it an absent windowed read IS the answer
+   * and the retry is skipped (see the option's docstring for the measured
+   * basis and the `HasSignal` prerequisite). An `undecodable` miss is outside
+   * the claim and keeps its own no-retry reasoning below.
    */
-  private async loadWithApplied<State>({
-    projectionName,
-    store,
+  private async loadWithApplied<State, E extends Event>({
+    projection,
     key,
     context,
   }: {
-    projectionName: string;
-    store: FoldProjectionStore<State>;
+    projection: FoldProjectionDefinition<State, E>;
     key: string;
     context: ProjectionStoreContext;
-  }): Promise<{ state: State | null; appliedEventIds: string[] }> {
+  }): Promise<{
+    state: State | null;
+    appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
+  }> {
+    const projectionName = projection.name;
+    const store = projection.store;
     const read = async (
       readContext: ProjectionStoreContext,
-    ): Promise<{ state: State | null; appliedEventIds: string[] }> => {
+    ): Promise<{
+      state: State | null;
+      appliedEventIds: string[];
+      miss?: "absent" | "undecodable";
+    }> => {
       if (store.getWithApplied) {
         return await store.getWithApplied(key, readContext);
       }
+      // A get()-only store has no way to say "found but refused", so its null
+      // is always an absent miss; stamping it keeps the miss kind uniform for
+      // the refold gate and `trustAbsentMiss` downstream.
+      const state = await store.get(key, readContext);
       return {
-        state: await store.get(key, readContext),
+        state,
         appliedEventIds: [],
+        ...(state === null ? { miss: "absent" as const } : {}),
       };
     };
 
     const windowed = await read(context);
     if (windowed.state !== null || context.readWindow === undefined) {
+      return windowed;
+    }
+    // An undecodable row was FOUND and refused, so widening the scope re-reads
+    // the same row to refuse it again. Skipping the retry saves an unpruned
+    // scan per event per stale aggregate, and keeps the fallback counter
+    // meaning "the window missed a live aggregate" rather than absorbing a
+    // schema condition that has nothing to do with the window.
+    if (windowed.miss === "undecodable") {
+      return windowed;
+    }
+    if (this.trustsAbsentMiss(projection)) {
+      incrementEsFoldAbsentMissTrustedTotal(projectionName, "fallback_read");
       return windowed;
     }
 
@@ -321,18 +352,46 @@ export class FoldProjectionExecutor {
     // a read window gets its backing read bounded to occurredAt ± widthMs, with
     // the executor retrying unwindowed on a miss (see loadWithApplied).
     const loadContext = withReadHints({ context, event, projection });
-    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
-      projectionName: projection.name,
-      store: projection.store,
+    const {
+      state: loaded,
+      appliedEventIds,
+      miss,
+    } = await this.loadWithApplied({
+      projection,
       key,
       context: loadContext,
     });
+    if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
 
-    if (loaded === null && this.shouldRefoldOnMiss(projection)) {
+    // A trusted absent miss folds from init() WITHOUT replaying event_log:
+    // the store always writes a row (see trustAbsentMiss's docstring), so no row
+    // means nothing was ever committed and there is no history worth reading
+    // — the measured steady state was 93% of these re-folds returning exactly
+    // the delivered batch. `undecodable` deliberately does not take this
+    // shortcut: there a complete row EXISTS and the re-fold is what makes
+    // refusing it safe.
+    const absentTrusted =
+      loaded === null && miss === "absent" && this.trustsAbsentMiss(projection);
+    if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
+    }
+
+    if (
+      loaded === null &&
+      !absentTrusted &&
+      this.shouldRefoldOnMiss(projection)
+    ) {
       const refolded = await this.refoldUpToDelivered(
         projection,
         [event],
         context,
+      );
+      // The ADR-066 transitional net, made observable: its deletion condition is
+      // "it stopped firing", which is otherwise indistinguishable from a
+      // regression to the pre-ADR-066 steady state of refolding on every miss.
+      incrementEsFoldRefoldOnMissTotal(
+        projection.name,
+        refolded === null ? "absent" : "performed",
       );
       if (refolded !== null) {
         await projection.store.store(
@@ -348,6 +407,7 @@ export class FoldProjectionExecutor {
         );
         return refolded;
       }
+      this.assertUndecodableWasRebuilt(projection, miss);
     }
 
     // A redelivery of an event already folded into the loaded state: the state
@@ -387,7 +447,7 @@ export class FoldProjectionExecutor {
       eventOccurredAt < prevLastOccurred &&
       canRefold(projection, context)
     ) {
-      // biome-ignore lint/style/noNonNullAssertion: canRefold returns false without an eventLoader.
+      // CanRefold returns false without an eventLoader.
       const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
@@ -468,24 +528,44 @@ export class FoldProjectionExecutor {
     // Anchor the read to the batch's earliest event (any event in the batch is
     // for the same aggregate, so it anchors the same partition window; the
     // unwindowed retry covers a batch that somehow spans wider than widthMs).
-    // biome-ignore lint/style/noNonNullAssertion: the empty/single-event batches returned above, so ordered has at least two events.
+    // The empty/single-event batches returned above, so ordered has at least two events.
     const loadContext = withReadHints({
       context,
       event: ordered[0]!,
       projection,
     });
-    const { state: loaded, appliedEventIds } = await this.loadWithApplied({
-      projectionName: projection.name,
-      store: projection.store,
+    const {
+      state: loaded,
+      appliedEventIds,
+      miss,
+    } = await this.loadWithApplied({
+      projection,
       key,
       context: loadContext,
     });
+    if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
 
-    if (loaded === null && this.shouldRefoldOnMiss(projection)) {
+    // Same trusted-absent shortcut as the single-event path above.
+    const absentTrusted =
+      loaded === null && miss === "absent" && this.trustsAbsentMiss(projection);
+    if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
+      incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
+    }
+
+    if (
+      loaded === null &&
+      !absentTrusted &&
+      this.shouldRefoldOnMiss(projection)
+    ) {
       const refolded = await this.refoldUpToDelivered(
         projection,
         ordered,
         context,
+      );
+      // Counted as on the single-event path above.
+      incrementEsFoldRefoldOnMissTotal(
+        projection.name,
+        refolded === null ? "absent" : "performed",
       );
       if (refolded !== null) {
         await projection.store.store(
@@ -501,6 +581,7 @@ export class FoldProjectionExecutor {
         );
         return refolded;
       }
+      this.assertUndecodableWasRebuilt(projection, miss);
     }
 
     const fresh = this.dropAlreadyApplied({
@@ -521,8 +602,7 @@ export class FoldProjectionExecutor {
       (loadedState as Record<string, unknown>)[
         projection.LastEventOccurredAtKey
       ] ?? 0;
-    const earliestOccurredAt = (fresh[0] as Record<string, unknown>)
-      .occurredAt;
+    const earliestOccurredAt = (fresh[0] as Record<string, unknown>).occurredAt;
 
     // Out-of-order vs the persisted checkpoint: the batch starts earlier than
     // what we've already folded. Re-fold from scratch when we can load the full
@@ -538,7 +618,7 @@ export class FoldProjectionExecutor {
 
     let state = loadedState;
     if (isOutOfOrder && canRefold(projection, context)) {
-      // biome-ignore lint/style/noNonNullAssertion: canRefold returns false without an eventLoader.
+      // CanRefold returns false without an eventLoader.
       const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
@@ -600,6 +680,86 @@ export class FoldProjectionExecutor {
     return (
       projection.options?.refoldOnStoreMiss === true &&
       projection.eventLoaderUpTo !== undefined
+    );
+  }
+
+  /**
+   * Whether this fold declared an absent store read authoritative — see
+   * `FoldProjectionOptions.trustAbsentMiss` for the two-part claim that
+   * declaration makes. `ES_FOLD_TRUST_ABSENT_MISS=0` is the operational
+   * kill-switch: it restores the unwindowed fallback read and the store-miss
+   * re-fold for every fold at once, without a code change, read per call so
+   * flipping it needs no restart of anything that re-reads env (and a plain
+   * string compare costs nothing at these rates).
+   */
+  private trustsAbsentMiss<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+  ): boolean {
+    if (projection.options?.trustAbsentMiss !== true) return false;
+    const env = process.env.ES_FOLD_TRUST_ABSENT_MISS;
+    return env !== "0" && env !== "false";
+  }
+
+  /**
+   * Refuse to fold onto `init()` when the store FOUND a row and rejected it.
+   *
+   * `absent` and `undecodable` are both "no state", but they must not be
+   * handled alike. An absent row means this batch is the aggregate's first, so
+   * folding from `init()` is exactly right. An undecodable row means a complete
+   * state exists and this build cannot read it — folding from `init()` would
+   * write a PARTIAL state stamped at the CURRENT version, which the gate that
+   * just rejected the row would then accept forever. The corruption launders
+   * itself and the original is gone.
+   *
+   * Refolding from `event_log` is what makes a rejection safe, so without it
+   * the only correct move is to stop. Throwing puts the job on its retry
+   * budget and surfaces to an operator; the alternative is silent, permanent,
+   * and undetectable after the fact.
+   *
+   * This pairing is easy to break from a distance: `refoldOnStoreMiss` is
+   * documented for deletion once its population ages out, and `eventLoaderUpTo`
+   * is auto-wired only when the service has an event store.
+   *
+   * This proves only that a rebuild is POSSIBLE, not that it happened — the
+   * refold can still come back empty. {@link assertUndecodableWasRebuilt}
+   * closes that half, and both are needed.
+   */
+  private assertUndecodableIsRecoverable<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    miss: "absent" | "undecodable" | undefined,
+  ): void {
+    if (miss !== "undecodable" || this.shouldRefoldOnMiss(projection)) return;
+    throw new Error(
+      `Fold projection "${projection.name}" read back a row it cannot decode and has no re-fold path ` +
+        `(refoldOnStoreMiss=${String(projection.options?.refoldOnStoreMiss)}, ` +
+        `eventLoaderUpTo=${projection.eventLoaderUpTo === undefined ? "unwired" : "wired"}). ` +
+        `Refusing to fold onto an empty state, which would overwrite the committed row with a partial ` +
+        `one stamped at the current version.`,
+    );
+  }
+
+  /**
+   * The second half of the undecodable guard: the rebuild must have PRODUCED
+   * something.
+   *
+   * `refoldUpToDelivered` returns null when the aggregate's history reads back
+   * empty — a truncated log, a retention sweep, an event store that answered
+   * nothing. For an `absent` miss that is ordinary and folding from `init()` is
+   * right. For an `undecodable` one it is the corruption case again by another
+   * route: a complete row exists, this build cannot read it, and the rebuild
+   * that was supposed to make refusing it safe came back with nothing. Falling
+   * through would commit a partial state at the current version and launder it
+   * past the gate exactly as if no refold had been configured at all.
+   */
+  private assertUndecodableWasRebuilt<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    miss: "absent" | "undecodable" | undefined,
+  ): void {
+    if (miss !== "undecodable") return;
+    throw new Error(
+      `Fold projection "${projection.name}" read back a row it cannot decode, and re-folding it from the event log ` +
+        `produced no state (empty or unavailable history). Refusing to fold onto an empty state, which would ` +
+        `overwrite the committed row with a partial one stamped at the current version.`,
     );
   }
 
@@ -721,7 +881,7 @@ export class FoldProjectionExecutor {
           `streamRefoldUpToDelivered exceeded ${MAX_PAGES} pages for aggregate ${context.aggregateId} — possible non-advancing cursor`,
         );
       }
-      // biome-ignore lint/style/noNonNullAssertion: caller guards eventLoaderUpToPaged is set.
+      // Caller guards eventLoaderUpToPaged is set.
       const page = await projection.eventLoaderUpToPaged!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,

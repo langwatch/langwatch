@@ -37,6 +37,41 @@ pg_query() {
     | tr -d ' \n'
 }
 
+# ─── in-cluster HTTP probe ───────────────────────────────────────────────────
+# Asks a workload the same question a scraper (or the kubelet) would, from
+# inside its own pod, and echoes "<status> <samples|no-samples>".
+#
+# Reporting the status AND whether the body actually carried metric samples in
+# one value is deliberate: "can metrics be collected" is not answered by a 200
+# alone. A gate that let the caller through but returned an empty body would
+# pass a status-only assertion while collecting nothing.
+#
+# `node -e` rather than curl/wget — the app image is a Node image and is not
+# guaranteed to ship either. `process_cpu_user_seconds_total` is the sentinel
+# because prom-client's default-metrics collector always registers it, so its
+# presence means the registry was really serialized to the caller.
+#
+#   http_probe <target> <port> <path> [bearer-token]
+http_probe() {
+  local target="$1" port="$2" path="$3" token="${4:-}"
+  kc exec "$target" -- node -e '
+const [port, path, token] = process.argv.slice(1);
+const opts = { host: "127.0.0.1", port: Number(port), path, headers: {} };
+if (token) opts.headers.authorization = "Bearer " + token;
+require("http")
+  .get(opts, (r) => {
+    let body = "";
+    r.setEncoding("utf8");
+    r.on("data", (chunk) => { body += chunk; });
+    r.on("end", () => {
+      const hasSamples = /(^|\n)process_cpu_user_seconds_total/.test(body);
+      console.log(r.statusCode + " " + (hasSamples ? "samples" : "no-samples"));
+    });
+  })
+  .on("error", () => console.log("ERR ERR"));
+' "$port" "$path" "$token" 2>/dev/null | tr -d '\r' | tail -1
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: chart install
 # ─────────────────────────────────────────────────────────────────────────────
@@ -367,7 +402,9 @@ test_app() {
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Workers health check
 # Upgrades the release to enable workers and verifies the pod reaches Ready.
-# Workers have no HTTP endpoint — reaching Running state is the health signal.
+# The worker serves one HTTP listener (the metrics port, 2999): /metrics behind
+# the bearer gate, and the unauthenticated /healthz the kubelet probes. Reaching
+# Ready therefore proves the startupProbe passed, not merely that PID 1 exists.
 # ─────────────────────────────────────────────────────────────────────────────
 test_workers() {
   sep; info "Suite: workers health check"
@@ -380,9 +417,153 @@ test_workers() {
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade (workers deployed)"
 
-  # Workers pod should be ready
+  # Workers pod should be ready. This is now a real assertion about the probe:
+  # the pod only goes Ready once the startupProbe's HTTP GET succeeds.
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
   pass "Workers pod ready"
+
+  # ── the liveness probe contract ─────────────────────────────────────────
+  # Regression guard for the CrashLoopBackOff class: probing /metrics instead
+  # of /healthz crash-loops BOTH a stock install (production + no
+  # METRICS_API_KEY ⇒ the endpoint fails closed with 500) and a secretKeyRef
+  # install (an httpGet probe cannot read a Secret ⇒ 401). Assert the live
+  # Deployment probes the unauthenticated liveness path and carries no
+  # credentials, then prove the endpoint really answers that way in-cluster.
+  local startup_path liveness_path
+  startup_path=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].startupProbe.httpGet.path}')
+  liveness_path=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].livenessProbe.httpGet.path}')
+  assert_eq "Workers startupProbe path is /healthz" "$startup_path" "/healthz"
+  assert_eq "Workers livenessProbe path is /healthz" "$liveness_path" "/healthz"
+
+  # No bearer token copied out of the Secret into the podspec, where anyone
+  # with `get deploy` could read it.
+  local probe_headers
+  probe_headers=$(kc get deploy "${RELEASE}-workers" \
+    -o jsonpath='{.spec.template.spec.containers[0].startupProbe.httpGet.httpHeaders}')
+  assert_eq "Workers startupProbe sends no auth header" "$probe_headers" ""
+
+  # Ask the worker the same question the kubelet asks: unauthenticated GET on
+  # the liveness path. Asserting "no-samples" alongside the status also pins
+  # that the liveness body carries no telemetry.
+  assert_eq "Worker /healthz answers 200 unauthenticated, with no telemetry" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
+
+  # …and confirm WHY the probe cannot use /metrics in this configuration: the
+  # e2e release sets no metrics API key, so the bearer gate fails closed. If
+  # this ever stops being 500, the constraint that forced /healthz has changed
+  # and the probe design should be revisited.
+  assert_eq "Worker /metrics fails closed without a key" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "500 no-samples"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: metrics collection
+# Everything above runs in the chart's DEFAULT metrics configuration, where no
+# key is configured — so every live assertion about /metrics so far describes
+# the fail-closed branch. The branch an operator actually runs in production
+# (a key IS set, and Prometheus scrapes with a bearer) had no live coverage.
+#
+# This suite installs the two configurations that were only ever template-
+# tested and asks, in a real cluster: do both tiers come up, and can metrics
+# actually be collected?
+#
+# See specs/server/metrics-collection.feature.
+# ─────────────────────────────────────────────────────────────────────────────
+METRICS_KEY="e2e-metrics-key"
+METRICS_SECRET="lw-metrics-key"
+
+test_metrics_collection() {
+  sep; info "Suite: metrics collection (key configured)"
+
+  # ── the key as a plain chart value ──────────────────────────────────────
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set workers.enabled=true \
+    --set workers.replicaCount=1 \
+    --set app.telemetry.metrics.enabled=true \
+    --set-string "app.telemetry.metrics.apiKey.value=${METRICS_KEY}" \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade (metrics enabled, key as plain value)"
+
+  # Both tiers must still converge. Turning the gate on must not cost the
+  # workers their startupProbe — the whole point of a credential-free
+  # liveness path.
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  pass "App pod ready with metrics enabled"
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
+  pass "Workers pod ready with metrics enabled"
+
+  # Liveness must stay credential-free now that a key exists. If configuring a
+  # key ever started requiring one from the kubelet, every keyed install would
+  # crash-loop — the exact regression this PR exists to prevent.
+  assert_eq "Worker /healthz stays unauthenticated once a key is set" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
+
+  # The gate: no credential and a wrong credential are both refused, and
+  # neither leaks samples.
+  assert_eq "Worker /metrics rejects an unauthenticated scrape" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "401 no-samples"
+  assert_eq "Worker /metrics rejects the wrong key" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics wrong-key)" \
+    "401 no-samples"
+
+  # …and the path Prometheus actually uses: an authenticated scrape really
+  # collects samples. This is the assertion the suite exists for.
+  assert_eq "Worker /metrics serves samples to an authenticated scrape" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics "$METRICS_KEY")" \
+    "200 samples"
+
+  # The app tier carries the same gate on its own registry.
+  assert_eq "App /metrics rejects an unauthenticated scrape" \
+    "$(http_probe "deploy/${RELEASE}-app" 5560 /metrics)" "401 no-samples"
+  assert_eq "App /metrics serves samples to an authenticated scrape" \
+    "$(http_probe "deploy/${RELEASE}-app" 5560 /metrics "$METRICS_KEY")" \
+    "200 samples"
+
+  # ── the same key delivered from a Secret ────────────────────────────────
+  # Rendering a secretKeyRef correctly is not the same as the value arriving
+  # in the process. e2e-overlays.sh proves the reference renders; only a live
+  # install proves the container can actually authenticate with it.
+  sep; info "Suite: metrics collection (key from a Secret)"
+
+  kc delete secret "$METRICS_SECRET" 2>/dev/null || true
+  kc create secret generic "$METRICS_SECRET" \
+    --from-literal="apiKey=${METRICS_KEY}"
+  pass "Metrics key Secret created"
+
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set workers.enabled=true \
+    --set workers.replicaCount=1 \
+    --set app.telemetry.metrics.enabled=true \
+    --set "app.telemetry.metrics.apiKey.secretKeyRef.name=${METRICS_SECRET}" \
+    --set app.telemetry.metrics.apiKey.secretKeyRef.key=apiKey \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade (metrics enabled, key from secretKeyRef)"
+
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
+  pass "Workers pod ready with the key delivered from a Secret"
+
+  # The probe still carries nothing — a kubelet httpGet cannot read a Secret,
+  # which is precisely why the liveness path must not be gated.
+  assert_eq "Worker /healthz stays unauthenticated under secretKeyRef delivery" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
+
+  # The value really made it out of the Secret and into the auth gate.
+  assert_eq "Worker /metrics serves samples using the Secret-delivered key" \
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics "$METRICS_KEY")" \
+    "200 samples"
+
+  # The Secret is deliberately left in place. Deleting it here would leave the
+  # live release referencing a Secret that no longer exists, and any pod that
+  # restarted before the next suite's upgrade would wedge in
+  # CreateContainerConfigError. The next suite re-applies values-e2e.yaml
+  # (metrics off), which drops the reference; the namespace teardown reclaims
+  # the Secret itself.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -593,6 +774,7 @@ main() {
   test_resources
   test_app
   test_workers
+  test_metrics_collection
   test_upgrade_strategy_boundary
   test_upgrade
   test_external_clickhouse

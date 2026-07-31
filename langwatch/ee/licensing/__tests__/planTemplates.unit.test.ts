@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { GROWTH_TEMPLATE, PRO_TEMPLATE, ENTERPRISE_TEMPLATE, getPlanTemplate } from "../planTemplates";
 import { DEFAULT_LIMIT } from "../constants";
+import {
+  ENTERPRISE_TEMPLATE,
+  GROWTH_TEMPLATE,
+  getPlanTemplate,
+  PRO_TEMPLATE,
+} from "../planTemplates";
 
 describe("PRO_TEMPLATE", () => {
   it("has type PRO", () => {
@@ -142,7 +147,7 @@ describe("GROWTH_TEMPLATE", () => {
 
       for (const field of unlimitedFields) {
         expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(
-          DEFAULT_LIMIT
+          DEFAULT_LIMIT,
         );
       }
     });

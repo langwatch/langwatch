@@ -68,6 +68,22 @@ const MAX_SOCKET_PATH_BYTES = 100;
  */
 const SOCKET_FILE_BYTES = 1 + 16 + ".sock".length;
 
+/**
+ * How much LONGER the name a daemon actually binds can be than the shared one.
+ *
+ * A daemon never binds the shared path: it binds a pid-scoped staging name in
+ * the same directory and publishes the result (server.ts `stagingSocketPath`,
+ * `publishSocket`). That name replaces `.sock` with `.<pid>`, and the widest
+ * pid any supported platform issues is 7 digits — three bytes more than the
+ * suffix it stands in for.
+ *
+ * Budgeting only the shared path therefore approves paths no daemon can ever
+ * exist on. A socket directory of 76-78 bytes yields a shared path of 98-100:
+ * inside the limit, so the client kept judging the daemon viable and spawning
+ * one every second miss, and every one of them died at `bind()`.
+ */
+export const MAX_STAGING_OVERHEAD_BYTES = 3;
+
 export interface DaemonIdentity {
   /** Full sha256 hex of the identity tuple. Presented in the handshake. */
   fingerprint: string;
@@ -128,8 +144,14 @@ export function daemonSocketDir(): string {
     // A very long $HOME would push the socket past sockaddr_un and disable the
     // daemon outright. The temp dir is shorter; a daemon whose directory we
     // validate on every connect beats no daemon at all.
+    //
+    // Budgeted against the STAGING name, which is the one bind() sees and the
+    // longer of the two — a directory that fits the shared path but not the
+    // staging path is a directory no daemon can start in.
     if (
-      Buffer.byteLength(underHome, "utf8") + SOCKET_FILE_BYTES <=
+      Buffer.byteLength(underHome, "utf8") +
+        SOCKET_FILE_BYTES +
+        MAX_STAGING_OVERHEAD_BYTES <=
       MAX_SOCKET_PATH_BYTES
     ) {
       return underHome;
@@ -226,9 +248,25 @@ export function identityEnv(
   };
 }
 
-/** Whether the resolved socket path fits inside sockaddr_un. */
+/** Whether THIS path — exactly as written — fits inside sockaddr_un. */
 export function isSocketPathUsable(socketPath: string): boolean {
   return Buffer.byteLength(socketPath, "utf8") <= MAX_SOCKET_PATH_BYTES;
+}
+
+/**
+ * Whether a daemon could actually be RUN on this shared socket path.
+ *
+ * The stricter question, and the one every caller deciding whether the daemon
+ * is worth reaching for must ask: a daemon binds the pid-scoped staging name
+ * beside the shared one, so the shared path has to leave room for that too.
+ * `isSocketPathUsable` answers the narrower question about a concrete path, and
+ * is what `listen()` applies to the two real paths it is about to use.
+ */
+export function isDaemonSocketPathUsable(socketPath: string): boolean {
+  return (
+    Buffer.byteLength(socketPath, "utf8") + MAX_STAGING_OVERHEAD_BYTES <=
+    MAX_SOCKET_PATH_BYTES
+  );
 }
 
 /**

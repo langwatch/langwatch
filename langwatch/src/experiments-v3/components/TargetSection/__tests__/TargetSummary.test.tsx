@@ -49,9 +49,12 @@ describe("TargetSummary", () => {
 
   it("renders nothing when no results and not running", () => {
     const aggregates = createAggregate({ completedRows: 0 });
-    const { container } = render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
-      wrapper: Wrapper,
-    });
+    const { container } = render(
+      <TargetSummary aggregates={aggregates} evaluators={[]} />,
+      {
+        wrapper: Wrapper,
+      },
+    );
     // The wrapper is there but the component itself returns null
     expect(
       container.querySelector('[data-testid="target-summary"]'),
@@ -60,15 +63,20 @@ describe("TargetSummary", () => {
 
   it("renders when there are completed rows", () => {
     const aggregates = createAggregate({ completedRows: 5 });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
     expect(screen.getByTestId("target-summary")).toBeInTheDocument();
   });
 
   it("renders progress when running", () => {
     const aggregates = createAggregate({ completedRows: 3, totalRows: 10 });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} isRunning />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <TargetSummary aggregates={aggregates} evaluators={[]} isRunning />,
+      {
+        wrapper: Wrapper,
+      },
+    );
     // May appear in both inline and popover content
     expect(screen.getAllByText("3/10").length).toBeGreaterThanOrEqual(1);
   });
@@ -78,7 +86,9 @@ describe("TargetSummary", () => {
       completedRows: 10,
       overallPassRate: 75,
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
     // May appear in both inline and popover content
     expect(screen.getAllByText("75%").length).toBeGreaterThanOrEqual(1);
   });
@@ -88,7 +98,9 @@ describe("TargetSummary", () => {
       completedRows: 10,
       overallPassRate: 30,
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
     // May appear in both inline and popover content
     expect(screen.getAllByText("30%").length).toBeGreaterThanOrEqual(1);
   });
@@ -98,7 +110,9 @@ describe("TargetSummary", () => {
       completedRows: 5,
       overallAverageScore: 0.75,
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
     // May appear in both inline and popover content
     expect(screen.getAllByText("0.75").length).toBeGreaterThanOrEqual(1);
   });
@@ -108,7 +122,9 @@ describe("TargetSummary", () => {
       completedRows: 5,
       averageLatency: 1500,
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
     // May appear in both inline and popover content
     expect(screen.getAllByText("1.5s").length).toBeGreaterThanOrEqual(1);
   });
@@ -119,9 +135,12 @@ describe("TargetSummary", () => {
       totalRows: 10,
       averageLatency: 1500,
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} isRunning />, {
-      wrapper: Wrapper,
-    });
+    render(
+      <TargetSummary aggregates={aggregates} evaluators={[]} isRunning />,
+      {
+        wrapper: Wrapper,
+      },
+    );
     // When running, the progress indicator should be visible
     expect(screen.getAllByText("5/10").length).toBeGreaterThanOrEqual(1);
   });
@@ -131,7 +150,9 @@ describe("TargetSummary", () => {
       completedRows: 10,
       errorRows: 3,
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
     // May appear in both inline and popover content
     expect(screen.getAllByText("3 errors").length).toBeGreaterThanOrEqual(1);
   });
@@ -161,7 +182,9 @@ describe("TargetSummary", () => {
       ],
     });
 
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
 
     // Should show pass rate and score - may appear in both inline and tooltip
     expect(screen.getAllByText("75%").length).toBeGreaterThanOrEqual(1);
@@ -224,7 +247,9 @@ describe("TargetSummary", () => {
       overallPassRate: 60,
       overallAverageScore: 0.65,
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
 
     // May appear in both inline and popover content
     expect(screen.getAllByText("60%").length).toBeGreaterThanOrEqual(1);
@@ -251,7 +276,9 @@ describe("TargetSummary", () => {
         count: 5,
       },
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
 
     // Hover to open tooltip
     const summary = screen.getByTestId("target-summary");
@@ -285,7 +312,9 @@ describe("TargetSummary", () => {
         count: 3,
       },
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
 
     // Hover to open tooltip
     const summary = screen.getByTestId("target-summary");
@@ -321,7 +350,9 @@ describe("TargetSummary", () => {
         count: 3,
       },
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
 
     // The inline summary should show the latency value with a caret
     expect(screen.getByText("500ms")).toBeInTheDocument();
@@ -346,7 +377,9 @@ describe("TargetSummary", () => {
         count: 3,
       },
     });
-    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, { wrapper: Wrapper });
+    render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
+      wrapper: Wrapper,
+    });
 
     // Hover to open tooltip
     const summary = screen.getByTestId("target-summary");

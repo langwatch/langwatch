@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { checkApiKey } from "../../utils/apiKey";
+import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatScope, virtualKeyDetailUrl } from "./_shared";
 import type { CommandResult } from "../../utils/output";
@@ -9,13 +9,13 @@ import type { CommandResult } from "../../utils/output";
 /**
  * Returns the virtual key rather than printing it: the output port renders it
  * in whatever format the caller asked for (utils/output.ts). The read model
- * carries no secret — only `prefix`/`last_four`, exactly what the human view
+ * carries no secret — only `display_prefix`, exactly what the human view
  * shows — so the raw record is safe to hand to a machine caller.
  */
 export const getVirtualKeyCommand = async (
   id: string,
 ): Promise<CommandResult | void> => {
-  checkApiKey();
+  await resolveCredentials();
 
   const service = new VirtualKeysApiService();
   const spinner = createSpinner(`Fetching virtual key "${id}"...`).start();
@@ -34,12 +34,16 @@ export const getVirtualKeyCommand = async (
         if (vk.description) {
           console.log(`${chalk.bold("Description:")}  ${vk.description}`);
         }
-        console.log(`${chalk.bold("Environment:")}  ${vk.environment === "live" ? chalk.yellow("live") : chalk.gray("test")}`);
-        console.log(`${chalk.bold("Status:")}       ${vk.status === "ACTIVE" ? chalk.green("active") : chalk.red("revoked")}`);
-        console.log(`${chalk.bold("Prefix:")}       ${vk.prefix}...${vk.last_four}`);
+        console.log(`${chalk.bold("Status:")}       ${vk.status === "active" ? chalk.green("active") : chalk.red("revoked")}`);
+        console.log(`${chalk.bold("Purpose:")}      ${vk.purpose}`);
+        console.log(`${chalk.bold("Prefix:")}       ${vk.display_prefix}...`);
         console.log(`${chalk.bold("Principal:")}    ${vk.principal_user_id ?? chalk.gray("—")}`);
         console.log(`${chalk.bold("Scopes:")}       ${vk.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
-        console.log(`${chalk.bold("Routing pol.:")} ${vk.routing_policy_id ?? chalk.gray("(default)")}`);
+        if (vk.trace_project_id) {
+          console.log(`${chalk.bold("Trace proj.:")}  ${vk.trace_project_id}`);
+        }
+        console.log(`${chalk.bold("Routing mode:")} ${vk.routing_mode.toLowerCase()}`);
+        console.log(`${chalk.bold("Routing pol.:")} ${vk.routing_policy_id ?? chalk.gray("(none)")}`);
         console.log(`${chalk.bold("Created:")}      ${new Date(vk.created_at).toLocaleString()}`);
         if (vk.last_used_at) {
           console.log(`${chalk.bold("Last used:")}    ${new Date(vk.last_used_at).toLocaleString()}`);

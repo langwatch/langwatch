@@ -86,7 +86,9 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
 /**
  * Creates a mock FoldProjectionStore with default implementations.
  */
-export function createMockFoldProjectionStore<State>(): FoldProjectionStore<State> {
+export function createMockFoldProjectionStore<
+  State,
+>(): FoldProjectionStore<State> {
   return {
     get: vi.fn().mockResolvedValue(null),
     store: vi.fn().mockResolvedValue(void 0),
@@ -128,7 +130,8 @@ export function createMockFoldProjectionDefinition<
     LastEventOccurredAtKey: "LastEventOccurredAt",
     eventTypes: overrides?.eventTypes ?? EVENT_TYPES,
     init: overrides?.init ?? vi.fn().mockReturnValue({}),
-    apply: overrides?.apply ?? vi.fn().mockImplementation((state: any) => state),
+    apply:
+      overrides?.apply ?? vi.fn().mockImplementation((state: any) => state),
     store,
     options: overrides?.options,
   };
@@ -140,9 +143,7 @@ export function createMockFoldProjectionDefinition<
  * The map function returns the event by default (pass-through).
  * Tests can override map behavior by mocking the returned definition's map function.
  */
-export function createMockMapProjectionDefinition<
-  TEvent extends Event = Event,
->(
+export function createMockMapProjectionDefinition<TEvent extends Event = Event>(
   name: string,
   overrides?: {
     store?: AppendStore<any>;

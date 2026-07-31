@@ -13,7 +13,8 @@ export const coerceEvaluatorScalar = (value: unknown): unknown => {
   if (value === null || value === undefined) return value;
   if (typeof value === "string") return value;
   if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
+  if (typeof value === "number")
+    return Number.isFinite(value) ? String(value) : null;
   if (typeof value === "bigint") return value.toString();
   try {
     return JSON.stringify(value);

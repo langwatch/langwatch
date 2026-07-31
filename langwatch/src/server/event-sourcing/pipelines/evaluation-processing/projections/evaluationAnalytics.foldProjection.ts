@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { trimAttributesForAnalytics } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
 import {
   AbstractFoldProjection,
@@ -68,6 +69,10 @@ import {
  * truncate, no settle, no signs.
  */
 
+const logger = createLogger(
+  "langwatch:event-sourcing:evaluation-processing:evaluation-analytics-fold",
+);
+
 const evaluationAnalyticsEvents = [
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
@@ -77,9 +82,45 @@ const evaluationAnalyticsEvents = [
 
 /** Schema-snapshot version (calendar date). Bump when the slim fold's
  *  derivation rules or trim service contract change so older versions can
- *  be replaced via re-fold. */
+ *  be replaced via re-fold.
+ *
+ *  2026-07-27 — the read-back columns of migration 00056 (the StartedAt /
+ *  CompletedAt lifecycle operands) joined the projected row shape. That shape
+ *  change is exactly what this stamp records (ADR-021/022), and the store's
+ *  read-back path uses it as the discriminator: a row carrying an OLDER version
+ *  predates those columns, so its nulls cannot be told apart from a genuinely
+ *  unstarted evaluation and it is treated as a store miss (see
+ *  `EvaluationAnalyticsStore.getWithApplied`). */
 export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
-  "2026-06-20" as const;
+  "2026-07-27" as const;
+
+/**
+ * How far an evaluation's OccurredAt (the partition column) may sit from the
+ * business time a read is anchored on. The scheduled→started→completed
+ * lifecycle is usually seconds-minutes, but a late report can trail, so the
+ * read-back window is ±7 days. Declared once, on the fold; the executor derives
+ * `context.readWindow` from it and retries a windowed miss unwindowed.
+ */
+export const EVALUATION_ANALYTICS_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * How many same-evaluation events one load/apply/store cycle may coalesce.
+ *
+ * Lower than the platform default (500) because this fold persists the
+ * applied-event-id watermark INTO its ClickHouse row: on a fresh delivery the
+ * stored set is exactly the batch's ids, so the coalesce ceiling IS the per-row
+ * watermark size, and `evaluation_analytics` keeps superseded ReplacingMergeTree
+ * versions — each with its own watermark — until TTL. The ceiling is generous
+ * here for a different reason than the trace fold: one evaluation emits a
+ * handful of lifecycle events, so 128 already exceeds any real batch and simply
+ * bounds what a pathological producer can write per row. Matched to the trace
+ * fold so the two slim folds are tuned alike.
+ *
+ * Must stay below MAX_APPLIED_EVENT_IDS (the Redis cache trims the set at that
+ * cap; a batch at or above it would break redelivery dedup — the projection
+ * router rejects such a config at registration).
+ */
+export const EVALUATION_ANALYTICS_COALESCE_MAX_BATCH = 128;
 
 /**
  * The slim row that lands in `evaluation_analytics`. Field names align
@@ -98,7 +139,9 @@ export const EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST =
 export interface EvaluationAnalyticsRow {
   tenantId: string;
   evaluationId: string;
-  /** Schema-snapshot version (the LWW dedup key). */
+  /** Schema-snapshot version. NOT the LWW dedup key — `evaluation_analytics` is
+   *  a ReplacingMergeTree(UpdatedAt) (migration 00041). This stamp gates
+   *  read-back instead: the store decodes a row only at the current version. */
   version: string;
   /** The eval's occurred-at (partition column + lead sort key). */
   occurredAtMs: number;
@@ -127,6 +170,14 @@ export interface EvaluationAnalyticsRow {
 
   // Trimmed Attributes map (post-trimAttributesForAnalytics).
   attributes: Record<string, string>;
+
+  // ── Read-back state (ADR-066, migration 00056) ─────────────────────────
+  // Not analytics columns — the lifecycle operands DurationMs was derived
+  // from. The row persisted the derived DurationMs but not startedAt/completedAt
+  // themselves, so a `completed` event arriving after a cache miss could not
+  // recompute a non-zero duration. Epoch ms; null (0 on the wire) = "not yet".
+  startedAtMs: number | null;
+  completedAtMs: number | null;
 }
 
 /**
@@ -227,8 +278,104 @@ export function projectEvaluationAnalyticsStateToRow({
     nonBilledCost: null,
 
     attributes: trimAttributesForAnalytics(attrs),
+
+    // Read-back state (ADR-066) — the operands DurationMs is derived from.
+    startedAtMs: state.startedAt,
+    completedAtMs: state.completedAt,
   };
 }
+
+/**
+ * Decode the fold's working state from its persisted `evaluation_analytics`
+ * row — the `fromRow` inverse of {@link projectEvaluationAnalyticsStateToRow}
+ * (ADR-066).
+ *
+ * This is a deserialize, NOT a rebuild. A rebuild replays the evaluation's
+ * lifecycle events from `event_log`; this only maps the last committed slim
+ * row's columns back into state, so `store.get()` returns the state Redis (or,
+ * on a miss, ClickHouse) already holds. It derives nothing.
+ *
+ * The trimmed Attributes map is a faithful read-back for this fold: unlike the
+ * trace fold, the eval fold never READS `state.attributes` — its handlers only
+ * merge fresh event metadata IN (`mergeEventMetadata`) — so no derived value
+ * depends on a key the trim might drop.
+ *
+ * Three state fields carry no persisted column and default here with no
+ * correctness loss: `evaluatorId` (feeds no projected column; `evaluationId`,
+ * always present as the key, drives the store's persistable-signal),
+ * `scheduledAt` (never read for a derived value), and `costId` (future
+ * plumbing; TotalCost/NonBilledCost stay null this phase). `LastEventOccurredAt`
+ * reconstructs from OccurredAt — for this fold the partition column IS the
+ * latest event time (`occurredAtMs: state.LastEventOccurredAt` on write).
+ *
+ * This decoder is TOTAL: handed a row whose read-back columns are absent it
+ * still answers, with StartedAt/CompletedAt null and an empty applied set. Those
+ * nulls are indistinguishable from a genuinely unstarted evaluation, so deciding
+ * WHETHER a row may be decoded is the store's job, not this function's:
+ * `getWithApplied` refuses any row not stamped with the current projection
+ * version and reports a store miss, and the fold's `refoldOnStoreMiss` rebuilds
+ * that aggregate from `event_log` once.
+ */
+export function evaluationAnalyticsStateFromRow(
+  row: EvaluationAnalyticsRow,
+): EvaluationAnalyticsData {
+  // A newer node can persist a status this build does not know yet. Via the
+  // store that is now unreachable — such a row carries the newer node's version
+  // stamp, so the version gate refuses it and the aggregate is refolded from
+  // event_log rather than decoded. The coercion stays because this decoder is
+  // total by contract (a direct caller must never make it throw) and because a
+  // status could in principle be retired without a version bump. Log it: this
+  // line firing means something reached the decoder past the gate.
+  const isKnownStatus = EVALUATION_STATUS_VALUES.has(
+    row.status as EvaluationAnalyticsData["status"],
+  );
+  if (!isKnownStatus) {
+    logger.warn(
+      {
+        tenantId: row.tenantId,
+        evaluationId: row.evaluationId,
+        status: row.status,
+      },
+      "evaluation_analytics read-back saw an unknown status; coercing to scheduled",
+    );
+  }
+  const status: EvaluationAnalyticsData["status"] = isKnownStatus
+    ? (row.status as EvaluationAnalyticsData["status"])
+    : "scheduled";
+
+  return {
+    evaluationId: row.evaluationId,
+    // Not persisted — feeds no projected column; re-populated by later events.
+    evaluatorId: "",
+
+    evaluatorType: row.evaluatorType,
+    evaluatorName: row.evaluatorName,
+    status,
+    isGuardrail: row.isGuardrail,
+    passed: row.passed,
+    score: row.score,
+    label: row.label,
+    model: row.model,
+    traceId: row.traceId,
+
+    // Not read for any derived value — defaults, documented above.
+    scheduledAt: null,
+    startedAt: row.startedAtMs,
+    completedAt: row.completedAtMs,
+
+    costId: null,
+
+    attributes: row.attributes,
+
+    createdAt: row.createdAtMs,
+    updatedAt: row.updatedAtMs,
+    LastEventOccurredAt: row.occurredAtMs,
+  };
+}
+
+/** The valid `status` union values, for the read-back guard. */
+const EVALUATION_STATUS_VALUES: ReadonlySet<EvaluationAnalyticsData["status"]> =
+  new Set(["scheduled", "in_progress", "processed", "error", "skipped"]);
 
 /**
  * Merge a passthrough event metadata bag into the slim attributes map.
@@ -290,16 +437,44 @@ export class EvaluationAnalyticsFoldProjection
   protected readonly events = evaluationAnalyticsEvents;
 
   /**
-   * The eval slim row has no read-back (lossy, like the trace slim), so
-   * `store.get()` only ever serves from the Redis cache in front of it. On
-   * a cache miss the executor rebuilds state from the event log — without
-   * this option a miss folds ONLY the delivered events, so the terminal
-   * event of a scheduled→completed pair arriving after cache expiry would
-   * overwrite the row with a state missing the scheduled-time fields.
+   * The store reads its own last committed state back (ADR-066): the row now
+   * round-trips the lifecycle timestamps DurationMs is derived from (StartedAt /
+   * CompletedAt, migration 00056), so `store.get()` returns the state and
+   * nothing on the delivery path reads `event_log`.
+   *
+   * `refoldOnStoreMiss: true` — a version-gated TRANSITIONAL net, not the old
+   * continuity mechanism. The store reads back only rows stamped with the
+   * CURRENT projection version; a row written before the 00056 read-back columns
+   * existed decodes StartedAt/CompletedAt as nulls indistinguishable from a
+   * genuinely unstarted evaluation, so the store reports a miss and this option
+   * rebuilds that aggregate from `event_log` — once. The rebuild is rewritten at
+   * the current version, so the row hits from then on and the population
+   * self-heals with no backfill migration. In steady state every row is
+   * current-version, `store.get()` hits, and nothing refolds.
+   *
+   * `trustAbsentMiss: true` — the store always writes (its old gate refused
+   * only a state with no identity at all, which the aggregate-id stamp made
+   * unreachable anyway), so an absent read proves the evaluation is new and
+   * the executor folds from `init()` without the unwindowed fallback scan
+   * (79,861 in 30 days, 0 recoveries) or the store-miss re-fold. The
+   * `undecodable` transitional net above is not affected.
+   *
+   * `coalesceMaxBatch` — see below.
+   *
+   * `refoldOnOutOfOrder: false` — the derivation is order-insensitive: identity
+   * and terminal fields are last-write-wins, lifecycle timestamps are set once
+   * by their own stage, and DurationMs is computed from the loaded operands. A
+   * late lifecycle event folds onto the loaded state in place; no history replay
+   * derives anything. `eventOrdering: "acceptedAt"` keeps the accepted
+   * transition order authoritative for LWW even under a backdated business time.
    */
   override options: FoldProjectionOptions = {
     eventOrdering: "acceptedAt",
     refoldOnStoreMiss: true,
+    trustAbsentMiss: true,
+    refoldOnOutOfOrder: false,
+    readWindow: { widthMs: EVALUATION_ANALYTICS_READ_WINDOW_MS },
+    coalesceMaxBatch: EVALUATION_ANALYTICS_COALESCE_MAX_BATCH,
   };
 
   constructor(deps: { store: FoldProjectionStore<EvaluationAnalyticsData> }) {

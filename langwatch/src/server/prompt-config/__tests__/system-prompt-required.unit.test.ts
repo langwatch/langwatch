@@ -19,9 +19,9 @@
  * regression signal is fast and atomic. The integration coverage that
  * follows verifies the BAD_REQUEST mapping end-to-end via `appRouter`.
  */
-import { describe, expect, it, vi } from "vitest";
 
 import { HandledError } from "@langwatch/handled-error";
+import { describe, expect, it, vi } from "vitest";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptVersionService } from "~/server/prompt-config/prompt-version.service";
 

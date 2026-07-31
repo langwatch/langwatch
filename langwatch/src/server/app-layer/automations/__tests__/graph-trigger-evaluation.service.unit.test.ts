@@ -9,8 +9,8 @@ import {
   type GraphTriggerEvaluationDeps,
 } from "../graph-trigger-evaluation.service";
 import {
-  graphAlertIncidentKey,
   type GraphTriggerSentRepository,
+  graphAlertIncidentKey,
   type OpenGraphTriggerSent,
 } from "../repositories/trigger.repository";
 
@@ -163,7 +163,10 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
     return row;
   }
 
-  async deleteOpenClaim(params: { id: string; projectId: string }): Promise<void> {
+  async deleteOpenClaim(params: {
+    id: string;
+    projectId: string;
+  }): Promise<void> {
     this.deleteCalls.push(params);
     // A real delete removes the row entirely — from the open set AND the fire
     // generation, so a rolled-back claim never advances `findLatestForGraphAlert`.
@@ -383,9 +386,9 @@ describe("evaluateGraphTrigger", () => {
       // Graph data for templates: the buckets the threshold read, plus the
       // prebuilt sparkline; previousValue is null (harness has no previous
       // period).
-      expect(
-        (arg.context as unknown as { history: unknown }).history,
-      ).toEqual([{ timestamp: "2026-06-20T11:00:00Z", value: 15 }]);
+      expect((arg.context as unknown as { history: unknown }).history).toEqual([
+        { timestamp: "2026-06-20T11:00:00Z", value: 15 },
+      ]);
       expect(
         (arg.context as unknown as { sparkline: string }).sparkline,
       ).toHaveLength(1);

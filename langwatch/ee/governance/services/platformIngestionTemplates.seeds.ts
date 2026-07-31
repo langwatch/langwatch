@@ -3,8 +3,9 @@
 /**
  * Platform-published default IngestionTemplate rows.
  *
- * v1 ships ONE real template (claude_cowork), `organizationId IS NULL`
- * so it appears in every org's catalog. The /me Trace Ingest tile
+ * The platform currently ships NO default templates: claude_cowork was
+ * the last one and is retired (archived on existing installs via
+ * RETIRED_PLATFORM_TEMPLATE_SLUGS below). The /me Trace Ingest tile
  * `raw_otlp_advanced` is a client-side discovery card — it deep-links to the personal OTLP endpoint panel
  * and does NOT mint an ingestion key, so it intentionally has no
  * IngestionTemplate row (see Andre PM call at 348936e4f).
@@ -20,9 +21,8 @@
  *
  * `ottlRules` is empty for v1 — the receiver applies no OTTL transform
  * for otlp_token templates v1; canonical gen_ai shaping is done by the
- * upstream tool's exporter (claude_cowork is already gen_ai-compliant).
- * The OTTL slot is wired so v2 templates can land per-template
- * normalization without a service refactor.
+ * upstream tool's exporter. The OTTL slot is wired so v2 templates can
+ * land per-template normalization without a service refactor.
  *
  * Spec:
  *   specs/ai-gateway/governance/ingestion-templates-catalog.feature
@@ -41,18 +41,11 @@ export interface PlatformTemplateSeed {
   ottlRules: string;
 }
 
-export const PLATFORM_INGESTION_TEMPLATES: readonly PlatformTemplateSeed[] = [
-  {
-    slug: "claude_cowork",
-    sourceType: "claude_cowork",
-    displayName: "Claude cowork",
-    description:
-      "Connect Claude cowork session telemetry. Spans land at /me/traces with gen_ai.usage.* + cost.usd populated automatically by the receiver.",
-    iconAsset: "preset:claude_cowork",
-    credentialSchema: null,
-    ottlRules: "",
-  },
-] as const;
+/// Platform templates currently ship no defaults. Org-authored templates
+/// and the client-side raw_otlp_advanced discovery card are the only
+/// tiles the /me Trace Ingest grid can render.
+export const PLATFORM_INGESTION_TEMPLATES: readonly PlatformTemplateSeed[] =
+  [] as const;
 
 /**
  * Slugs that previously had platform rows (e.g. during contract debate)
@@ -68,14 +61,19 @@ export const RETIRED_PLATFORM_TEMPLATE_SLUGS: readonly string[] = [
   "raw_otlp_advanced",
   // Platform coding assistants are owned by `langwatch <tool>` + receiver
   // log-to-span conversion, not ingestion templates. Earlier seed runs
-  // published them as rows; archive those so dev DBs converge to the v1
-  // catalog (claude_cowork only). They are surfaced as AiToolsPortal
-  // coding-assistant tiles instead.
+  // published them as rows; archive those so dev DBs converge to the
+  // locked catalog. They are surfaced as AiToolsPortal coding-assistant
+  // tiles instead.
   "claude_code",
   "codex",
   "cursor",
   "gemini",
   "opencode",
+  // Retired from the default set: platform templates currently ship no
+  // defaults at all. Existing installs get their platform cowork row
+  // archived; installed cowork IngestionSources keep ingesting (the
+  // receiver keys on the source, not the template).
+  "claude_cowork",
 ];
 
 /**
@@ -139,20 +137,18 @@ export async function seedPlatformIngestionTemplates(
     }
   }
 
-  // Archive retired slugs (idempotent — already-archived rows stay
-  // archived; missing rows skip cleanly).
+  // Archive retired slugs (idempotent: already-archived rows stay
+  // archived; missing rows skip cleanly). updateMany sweeps EVERY
+  // unarchived platform row for the slug in one pass: (organizationId,
+  // slug) has no unique backing when organizationId is NULL (Postgres
+  // treats NULL as not-equal-to-NULL), so duplicate platform rows can
+  // exist and all of them must retire together.
   for (const slug of RETIRED_PLATFORM_TEMPLATE_SLUGS) {
-    const stale = await prisma.ingestionTemplate.findFirst({
+    const stale = await prisma.ingestionTemplate.updateMany({
       where: { organizationId: null, slug, archivedAt: null },
-      select: { id: true },
+      data: { archivedAt: new Date(), enabled: false },
     });
-    if (stale) {
-      await prisma.ingestionTemplate.update({
-        where: { id: stale.id },
-        data: { archivedAt: new Date(), enabled: false },
-      });
-      archived++;
-    }
+    archived += stale.count;
   }
 
   return { created, updated, archived };

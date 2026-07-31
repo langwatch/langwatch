@@ -27,6 +27,8 @@ import {
   createDaemonServer,
   DaemonAlreadyRunningError,
   isSocketAlive,
+  publishSocket,
+  stagingSocketPath,
   type DaemonServer,
 } from "../server";
 import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
@@ -131,6 +133,37 @@ describe("daemon over a unix socket", () => {
     return { outcome, stdout: out.text(), stderr: err.text() };
   };
 
+  /** A real listening unix socket at `at`, secured the way a daemon secures its own. */
+  const bindSocket = async (at: string): Promise<net.Server> => {
+    const bound = net.createServer();
+    await new Promise<void>((resolve, reject) => {
+      // Without this listener an EADDRINUSE or ENAMETOOLONG from listen()
+      // neither resolves nor rejects, and the test dies on the vitest timeout
+      // with the actual cause reported nowhere.
+      bound.once("error", reject);
+      bound.listen(at, () => {
+        bound.removeListener("error", reject);
+        resolve();
+      });
+    });
+    secureSocketFile(at);
+    return bound;
+  };
+
+  /** Whether anything actually answers on this path right now. */
+  const dial = (at: string): Promise<boolean> =>
+    new Promise((resolve) => {
+      const socket = net.connect(at);
+      const done = (answered: boolean): void => {
+        socket.removeAllListeners();
+        socket.destroy();
+        resolve(answered);
+      };
+      socket.once("connect", () => done(true));
+      socket.once("error", () => done(false));
+      socket.setTimeout(1_000, () => done(false));
+    });
+
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-d-"));
     socketPath = path.join(dir, "test.sock");
@@ -186,6 +219,39 @@ describe("daemon over a unix socket", () => {
     });
   });
 
+  /**
+   * A symlink is the shape of debris the trust check deliberately lets through
+   * — `socket-not-a-socket` is NOT a squat, because inside our own 0700
+   * directory nobody else could have put it there. So it has to be cleanable,
+   * and a DANGLING one is the case that is invisible to `stat`: nothing exists
+   * to stat, yet the name is taken as far as `link(2)` is concerned. Every
+   * daemon then died at publish time with EEXIST, which `daemon.ts` reads as a
+   * lost start race and swallows — a permanent wedge with no output anywhere.
+   */
+  describe("given a dangling symlink where the socket should be", () => {
+    beforeEach(() => {
+      fs.symlinkSync(path.join(dir, "gone.sock"), socketPath);
+    });
+
+    describe("when the stale socket is cleaned", () => {
+      it("removes the link itself, which is what unlink(2) does anyway", async () => {
+        expect(await cleanStaleSocket(socketPath)).toBe(true);
+        expect(fs.existsSync(path.dirname(socketPath))).toBe(true);
+        expect(fs.readdirSync(dir)).toEqual([]);
+      });
+    });
+
+    describe("when a daemon starts", () => {
+      it("starts and serves, rather than wedging every future invocation", async () => {
+        await startDaemon();
+
+        const { outcome, stdout } = await exec(["trace", "search"]);
+        expect(outcome).toEqual({ served: true, exitCode: 0 });
+        expect(stdout).toBe("ok\n");
+      });
+    });
+  });
+
   describe("given a live daemon", () => {
     describe("when it binds its socket", () => {
       it("creates it 0600, so no other local user can drive our credentials", async () => {
@@ -209,6 +275,126 @@ describe("daemon over a unix socket", () => {
         await expect(second.listen()).rejects.toBeInstanceOf(
           DaemonAlreadyRunningError,
         );
+      });
+
+      it("leaves nothing behind but the socket clients dial", async () => {
+        await startDaemon();
+
+        // The daemon binds a private, pid-scoped path and publishes the result
+        // under the shared name; the private one must not survive that.
+        expect(fs.readdirSync(dir)).toEqual([path.basename(socketPath)]);
+      });
+    });
+
+    /**
+     * `publishSocket`'s EEXIST branch, against the thing it actually guards: a
+     * real, listening socket that a real winner already published.
+     *
+     * Nothing else reaches it. `server.unit.test.ts` publishes regular files,
+     * and `listen()`'s own second-daemon case is answered by the `isSocketAlive`
+     * pre-check long before `linkSync` is called. So the one call whose
+     * fail-CLOSED behaviour the whole publish design rests on was never
+     * exercised on a socket at all.
+     */
+    describe("when a real socket already answers to the shared name", () => {
+      it("refuses to publish over it and leaves the winner dialable", async () => {
+        const winnerStaging = stagingSocketPath(socketPath, 1);
+        const winner = await bindSocket(winnerStaging);
+        publishSocket(winnerStaging, socketPath);
+        const published = fs.statSync(socketPath);
+
+        // A second daemon, bound to its own private name, reaching the same
+        // publish. link() is what tells it that it lost.
+        const loserStaging = stagingSocketPath(socketPath, 2);
+        const loser = await bindSocket(loserStaging);
+
+        // In a `finally`: these are raw servers the suite-level teardown knows
+        // nothing about, so a failing assertion would otherwise leave two
+        // listening handles behind and turn a clean failure into a worker that
+        // never settles.
+        try {
+          expect(() => publishSocket(loserStaging, socketPath)).toThrow(
+            DaemonAlreadyRunningError,
+          );
+
+          // The winner is untouched and still answering — a rename here would
+          // have left it alive on an inode no client can dial.
+          expect(fs.statSync(socketPath).ino).toBe(published.ino);
+          expect(await dial(socketPath)).toBe(true);
+          // And the loser still holds only its own private name, which libuv
+          // takes with the handle when `listen()` closes it.
+          expect(fs.existsSync(loserStaging)).toBe(true);
+        } finally {
+          await new Promise<void>((resolve) => winner.close(() => resolve()));
+          await new Promise<void>((resolve) => loser.close(() => resolve()));
+        }
+      });
+    });
+
+    describe("when its socket has been taken over by a successor", () => {
+      it("leaves the live socket alone on the way out", async () => {
+        // The state a crash sweep plus a concurrent auto-spawn produces: this
+        // daemon is still running, but its name now leads to somebody else's
+        // socket. (recordMissAndDecideToSpawn permits concurrent spawns by
+        // design, and a SIGKILLed or `process.exit(70)`-ed daemon leaves a
+        // corpse for them to clean.)
+        const orphan = await startDaemon({
+          executor: scriptedExecutor(() => ({ stdout: "orphan\n" })),
+        });
+
+        fs.unlinkSync(socketPath);
+        await startDaemon({
+          executor: scriptedExecutor(() => ({ stdout: "successor\n" })),
+        });
+
+        await orphan.stop("idle");
+
+        // Unlinking by path here used to delete the successor's socket,
+        // orphaning a live daemon on an unreachable inode and making every
+        // later invocation cold-start.
+        expect(fs.existsSync(socketPath)).toBe(true);
+
+        const { outcome, stdout } = await exec(["trace", "search"]);
+        expect(outcome).toEqual({ served: true, exitCode: 0 });
+        expect(stdout).toBe("successor\n");
+      });
+    });
+
+    describe("when it shuts down", () => {
+      it("unlinks its name while its socket is still bound, so the identity it matched cannot have been reused", async () => {
+        // The ORDER is the whole point, and it is invisible to an
+        // inode-comparison test: an orphan whose name is unlinked while it is
+        // still bound keeps its inode allocated, so a successor is handed a
+        // different number and the guard is right by luck rather than by rule.
+        // What the rule is actually for is the moment AFTER `close()`: the last
+        // reference is gone, the ino is free for immediate reuse (Linux reuses
+        // it readily), and a successor landing on it would be deleted by this
+        // daemon's own cleanup.
+        const running = await startDaemon();
+        expect(fs.statSync(socketPath).isSocket()).toBe(true);
+
+        const nameAtClose: boolean[] = [];
+        // Captured only to delegate back to; the .call below supplies `this`.
+        // eslint-disable-next-line @typescript-eslint/unbound-method
+        const realClose = net.Server.prototype.close;
+        vi.spyOn(net.Server.prototype, "close").mockImplementation(function (
+          this: net.Server,
+          callback?: (error?: Error) => void,
+        ) {
+          nameAtClose.push(fs.existsSync(socketPath));
+          return realClose.call(this, callback);
+        });
+
+        await running.stop("stop-requested");
+        server = undefined;
+
+        // Gone by the time the handle closed. `unlinkIfSameFile` removes
+        // nothing unless the path still leads to the identity it was given, so
+        // this says both halves at once: it matched, and it matched while the
+        // socket was still bound and the inode still referenced — the only
+        // window in which (dev, ino) identifies anything at all.
+        expect(nameAtClose).toEqual([false]);
+        expect(fs.existsSync(socketPath)).toBe(false);
       });
     });
 

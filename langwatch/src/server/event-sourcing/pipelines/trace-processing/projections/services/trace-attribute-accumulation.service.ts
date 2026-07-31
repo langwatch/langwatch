@@ -39,6 +39,11 @@ export const SPAN_ATTR_MAPPINGS = [
   // gateway_budget_ledger_events stays empty.
   ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
   ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
+  // The provider the request was actually dispatched to (a ModelProvider
+  // row id). Provider-filtered budgets ("$50/month, OpenAI only") can only
+  // accrue their own spend if the fold knows which vendor served the call;
+  // without this key they never accrue at all.
+  ["langwatch.model_provider_id", "langwatch.model_provider_id"],
   // Governance ingest markers — stamped on every span by the
   // /api/ingest/otel/:sourceId receiver (langwatch/src/server/routes/ingest/ingestionRoutes.ts).
   // Hoisted into trace_summaries so the ActivityMonitorService dashboard
@@ -126,6 +131,29 @@ export const STANDARD_RESOURCE_PREFIXES = [
   "faas.",
   "webengine.",
 ] as const;
+
+/**
+ * Trace-level model metadata stamped by the fold from the models its spans
+ * (or log turns) actually used. Semantic:
+ *
+ *   - `metadata.model`  is the trace's PRIMARY model: `models[0]`, i.e. the
+ *     model of the most recently folded LLM span / log turn (the same
+ *     "primary model" every `models[0]` consumer in the UI shows). Single
+ *     value for single-value consumers (filters, dataset mappings,
+ *     `trace.metadata.model` on the API).
+ *   - `metadata.models` is a JSON array of ALL models seen on the trace,
+ *     most-recently-used first (same order as the `Models` column).
+ *
+ * Stamped keys live in the `metadata.*` namespace so they surface through the
+ * regular metadata read path and stay filterable. USER-PROVIDED values win:
+ * the fold only stamps when the keys are absent, or when the reserved marker
+ * says a previous fold stamped them (so the stamp can track new models as
+ * later spans arrive without ever clobbering explicit user metadata).
+ */
+export const STAMPED_MODEL_ATTRIBUTE = "metadata.model";
+export const STAMPED_MODELS_ATTRIBUTE = "metadata.models";
+export const MODEL_METADATA_STAMPED_MARKER =
+  "langwatch.reserved.model_metadata_stamped";
 
 /**
  * Extracts per-span attributes and merges them into trace-level attributes,
@@ -314,6 +342,30 @@ export class TraceAttributeAccumulationService {
       }
     }
 
+    // User-provided model metadata wins over an earlier fold's stamp. The
+    // existing-wins merge above keeps the STAMPED values when a later span
+    // carries user `metadata.model` / `metadata.models`, which would silently
+    // drop the user's value. Apply the incoming user keys and clear the
+    // marker so stamping stops for good. (Our own stamp never appears in
+    // spanAttrs: extractAttributes reads the span, the stamp lives on state.)
+    if (merged[MODEL_METADATA_STAMPED_MARKER] === "true") {
+      const incomingModel = spanAttrs[STAMPED_MODEL_ATTRIBUTE];
+      const incomingModels = spanAttrs[STAMPED_MODELS_ATTRIBUTE];
+      if (incomingModel !== undefined || incomingModels !== undefined) {
+        delete merged[MODEL_METADATA_STAMPED_MARKER];
+        if (incomingModel !== undefined) {
+          merged[STAMPED_MODEL_ATTRIBUTE] = incomingModel;
+        } else {
+          delete merged[STAMPED_MODEL_ATTRIBUTE];
+        }
+        if (incomingModels !== undefined) {
+          merged[STAMPED_MODELS_ATTRIBUTE] = incomingModels;
+        } else {
+          delete merged[STAMPED_MODELS_ATTRIBUTE];
+        }
+      }
+    }
+
     this.traceOriginService.stripLegacyMarkers(merged);
     this.traceOriginService.hoistOrigin({
       state,
@@ -366,5 +418,38 @@ export class TraceAttributeAccumulationService {
     }
 
     return merged;
+  }
+
+  /**
+   * Stamp the trace-level model metadata (`metadata.model` primary +
+   * `metadata.models` set) from the models accumulated so far. See
+   * {@link STAMPED_MODEL_ATTRIBUTE} for the exact semantic. Mutates the map.
+   *
+   * The fold calls this AFTER attribute accumulation with the merged models
+   * list, so the stamp tracks each newly seen model. User-provided
+   * `metadata.model` / `metadata.models` (span or resource metadata) win: the
+   * reserved marker records that WE stamped the current values, and without
+   * it a present value is treated as the user's and left untouched. A user
+   * value arriving only on a LATER span, after a fold has already stamped,
+   * also wins: `accumulateAttributes` detects the incoming user key, applies
+   * it over the stamp, and clears the marker so stamping stops for good.
+   */
+  stampModelMetadata({
+    attributes,
+    models,
+  }: {
+    attributes: Record<string, string>;
+    models: string[];
+  }): void {
+    if (models.length === 0) return;
+    const stampedByUs = attributes[MODEL_METADATA_STAMPED_MARKER] === "true";
+    const userProvided =
+      !stampedByUs &&
+      (attributes[STAMPED_MODEL_ATTRIBUTE] !== undefined ||
+        attributes[STAMPED_MODELS_ATTRIBUTE] !== undefined);
+    if (userProvided) return;
+    attributes[STAMPED_MODEL_ATTRIBUTE] = models[0]!;
+    attributes[STAMPED_MODELS_ATTRIBUTE] = JSON.stringify(models);
+    attributes[MODEL_METADATA_STAMPED_MARKER] = "true";
   }
 }

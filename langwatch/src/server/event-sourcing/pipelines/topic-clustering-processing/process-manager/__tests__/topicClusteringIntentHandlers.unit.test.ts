@@ -15,15 +15,14 @@ async function metricValue(
   );
 }
 
-import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
-
-import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import {
   CLUSTERING_ERROR_CODES,
   ClusteringError,
 } from "~/server/app-layer/topic-clustering/clustering-error";
-import type { TopicClusteringRunIntent } from "../topicClusteringProcess.types";
+import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { createTopicClusteringRunHandler } from "../topicClusteringIntentHandlers";
+import type { TopicClusteringRunIntent } from "../topicClusteringProcess.types";
 
 function makePayload(
   overrides: Partial<TopicClusteringRunIntent> = {},
@@ -191,9 +190,7 @@ describe("createTopicClusteringRunHandler", () => {
         clock: () => 999,
       });
 
-      await expect(
-        run(makePayload(), makeContext()),
-      ).resolves.toBeUndefined();
+      await expect(run(makePayload(), makeContext())).resolves.toBeUndefined();
 
       expect(runClusteringPage).toHaveBeenCalledTimes(1);
       // Recording the run as failed would be a lie — the clustering worked.

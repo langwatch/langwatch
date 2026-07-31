@@ -8,8 +8,8 @@
  */
 
 import { useCallback } from "react";
-import { api } from "~/utils/api";
 import { isCancellableStatus } from "~/server/scenarios/scenario-event.enums";
+import { api } from "~/utils/api";
 
 export { isCancellableStatus };
 
@@ -51,7 +51,9 @@ export function useCancelScenarioRun({
       if (result.cancelled) {
         onCancelJobSuccess?.();
       } else {
-        onCancelJobError?.({ message: "Job could not be cancelled — it may have already completed" });
+        onCancelJobError?.({
+          message: "Job could not be cancelled — it may have already completed",
+        });
       }
     },
     onError: (error) => {

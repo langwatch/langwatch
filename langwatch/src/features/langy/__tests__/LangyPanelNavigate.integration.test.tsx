@@ -112,7 +112,9 @@ vi.mock("~/utils/api", () => ({
         list: { invalidate: () => Promise.resolve() },
         messages: { invalidate: () => Promise.resolve() },
       },
-      langyGithub: { getInstallStatus: { invalidate: () => Promise.resolve() } },
+      langyGithub: {
+        getInstallStatus: { invalidate: () => Promise.resolve() },
+      },
     }),
     useContext: () => ({
       langy: {
@@ -130,7 +132,9 @@ vi.mock("~/utils/api", () => ({
       getInstallStatus: {
         useQuery: () => ({ data: undefined, isLoading: false, isError: true }),
       },
-      disconnect: { useMutation: () => ({ mutate: () => undefined, isPending: false }) },
+      disconnect: {
+        useMutation: () => ({ mutate: () => undefined, isPending: false }),
+      },
     },
     langy: {
       messages: {
@@ -156,10 +160,16 @@ vi.mock("~/utils/api", () => ({
           isPending: false,
         }),
       },
-      deleteConversation: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
-      renameConversation: { useMutation: () => ({ mutateAsync: () => Promise.resolve() }) },
+      deleteConversation: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
+      renameConversation: {
+        useMutation: () => ({ mutateAsync: () => Promise.resolve() }),
+      },
       forkConversation: {
-        useMutation: () => ({ mutateAsync: () => Promise.resolve({ id: "forked" }) }),
+        useMutation: () => ({
+          mutateAsync: () => Promise.resolve({ id: "forked" }),
+        }),
       },
       list: {
         useInfiniteQuery: () => ({
@@ -179,13 +189,18 @@ vi.mock("~/utils/api", () => ({
     },
     modelProvider: {
       getResolvedDefault: {
-        useQuery: () => ({ data: { model: "openai/gpt-5-mini" }, isLoading: false }),
+        useQuery: () => ({
+          data: { model: "openai/gpt-5-mini" },
+          isLoading: false,
+        }),
       },
       listAllForProjectForFrontend: {
         useQuery: () => ({ data: { providers: [] }, isLoading: false }),
       },
     },
-    virtualKeys: { list: { useQuery: () => ({ data: undefined, isLoading: false }) } },
+    virtualKeys: {
+      list: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
     // useProjectReach (mounted by LangySidecar) reads the onboarding checks.
     integrationsChecks: {
       getCheckStatus: {
@@ -202,7 +217,10 @@ vi.mock("~/utils/api", () => ({
     },
     ops: {
       getScope: {
-        useQuery: () => ({ data: { scope: { kind: "none" } }, isLoading: false }),
+        useQuery: () => ({
+          data: { scope: { kind: "none" } },
+          isLoading: false,
+        }),
       },
     },
   },
@@ -224,7 +242,11 @@ function renderPanel() {
 
 const sendOptions = {
   messages: [
-    { id: "message-1", role: "user", parts: [{ type: "text", text: "show me a run" }] },
+    {
+      id: "message-1",
+      role: "user",
+      parts: [{ type: "text", text: "show me a run" }],
+    },
   ],
 } as unknown as Parameters<ChatTransport<UIMessage>["sendMessages"]>[0];
 
@@ -418,7 +440,10 @@ describe("Feature: Langy opens the resource it surfaced in the browser", () => {
         });
         expect(pushMock).toHaveBeenCalledTimes(1);
 
-        mutation.mockResolvedValueOnce({ conversationId: "conv-1", turnId: "turn-2" });
+        mutation.mockResolvedValueOnce({
+          conversationId: "conv-1",
+          turnId: "turn-2",
+        });
         await act(async () => {
           await transportRef.current!.sendMessages(sendOptions);
         });

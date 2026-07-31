@@ -82,88 +82,97 @@ afterAll(async () => {
   await Promise.allSettled(writtenUris.map((uri) => driver.delete(uri)));
 });
 
-describeRealAzure("AzureBlobDriver against real Azure Blob Storage (host-style addressing)", () => {
-  describe("given a host-style production endpoint", () => {
-    it("signs the request correctly for the single-account canonicalised resource form", async () => {
-      const bytes = Buffer.from(`real-azure round-trip ${RUN_ID}`, "utf8");
-      const uri = uriFor(bytes);
+describeRealAzure(
+  "AzureBlobDriver against real Azure Blob Storage (host-style addressing)",
+  () => {
+    describe("given a host-style production endpoint", () => {
+      it("signs the request correctly for the single-account canonicalised resource form", async () => {
+        const bytes = Buffer.from(`real-azure round-trip ${RUN_ID}`, "utf8");
+        const uri = uriFor(bytes);
 
-      // A signing regression on the host-style branch surfaces here as a 403
-      // AuthorizationFailure — the Azurite suite cannot catch it.
-      await driver.put(uri, bytes, "text/plain");
-      expect(await driver.exists(uri)).toBe(true);
+        // A signing regression on the host-style branch surfaces here as a 403
+        // AuthorizationFailure — the Azurite suite cannot catch it.
+        await driver.put(uri, bytes, "text/plain");
+        expect(await driver.exists(uri)).toBe(true);
 
-      const stream = await driver.get(uri);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.toString("utf8"));
-    });
-
-    it("reports the blob size from a signed HEAD without transferring the body", async () => {
-      const bytes = Buffer.from(`sized payload ${RUN_ID}`, "utf8");
-      const uri = uriFor(bytes);
-
-      await driver.put(uri, bytes, "application/octet-stream");
-
-      expect(await driver.head(uri)).toBe(bytes.length);
-    });
-  });
-
-  describe("given a zero-byte body", () => {
-    /**
-     * The P1 regression (empty-string Content-Length in the string-to-sign)
-     * was only ever proven against Azurite. Real Azure enforces the same
-     * shared-key rule, so this is the authoritative check.
-     */
-    it("stores and reads back an empty blob instead of failing authorization", async () => {
-      const bytes = Buffer.alloc(0);
-      const uri = uriFor(bytes);
-
-      await driver.put(uri, bytes, "application/octet-stream");
-
-      expect(await driver.exists(uri)).toBe(true);
-      expect(await driver.head(uri)).toBe(0);
-
-      // The name promises a read, so actually perform one: a signed GET of a
-      // zero-length blob is its own case, not implied by exists() or head().
-      const stream = await driver.get(uri);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks)).toHaveLength(0);
-    });
-  });
-
-  describe("given a blob that was deleted", () => {
-    it("reports it as absent and raises ObjectNotFoundError on read", async () => {
-      const bytes = Buffer.from(`transient ${RUN_ID}`, "utf8");
-      const uri = uriFor(bytes);
-
-      await driver.put(uri, bytes, "text/plain");
-      await driver.delete(uri);
-
-      expect(await driver.exists(uri)).toBe(false);
-      await expect(driver.get(uri)).rejects.toBeInstanceOf(ObjectNotFoundError);
-    });
-  });
-
-  describe("when dispatched through the storage registry", () => {
-    it("routes an azure-blob URI to the Azure driver on read", async () => {
-      const bytes = Buffer.from(`registry dispatch ${RUN_ID}`, "utf8");
-      const uri = uriFor(bytes);
-      await driver.put(uri, bytes, "text/plain");
-
-      const registry = new StorageRegistry({
-        // s3/file are mandatory on the registry but unused here — any
-        // StorageDriver satisfies the type; azure-blob does the real work.
-        s3: driver,
-        file: driver,
-        "azure-blob": driver,
+        const stream = await driver.get(uri);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        expect(Buffer.concat(chunks).toString("utf8")).toBe(
+          bytes.toString("utf8"),
+        );
       });
 
-      const stream = await registry.get(uri);
-      const chunks: Buffer[] = [];
-      for await (const chunk of stream) chunks.push(chunk as Buffer);
-      expect(Buffer.concat(chunks).toString("utf8")).toBe(bytes.toString("utf8"));
+      it("reports the blob size from a signed HEAD without transferring the body", async () => {
+        const bytes = Buffer.from(`sized payload ${RUN_ID}`, "utf8");
+        const uri = uriFor(bytes);
+
+        await driver.put(uri, bytes, "application/octet-stream");
+
+        expect(await driver.head(uri)).toBe(bytes.length);
+      });
     });
-  });
-});
+
+    describe("given a zero-byte body", () => {
+      /**
+       * The P1 regression (empty-string Content-Length in the string-to-sign)
+       * was only ever proven against Azurite. Real Azure enforces the same
+       * shared-key rule, so this is the authoritative check.
+       */
+      it("stores and reads back an empty blob instead of failing authorization", async () => {
+        const bytes = Buffer.alloc(0);
+        const uri = uriFor(bytes);
+
+        await driver.put(uri, bytes, "application/octet-stream");
+
+        expect(await driver.exists(uri)).toBe(true);
+        expect(await driver.head(uri)).toBe(0);
+
+        // The name promises a read, so actually perform one: a signed GET of a
+        // zero-length blob is its own case, not implied by exists() or head().
+        const stream = await driver.get(uri);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        expect(Buffer.concat(chunks)).toHaveLength(0);
+      });
+    });
+
+    describe("given a blob that was deleted", () => {
+      it("reports it as absent and raises ObjectNotFoundError on read", async () => {
+        const bytes = Buffer.from(`transient ${RUN_ID}`, "utf8");
+        const uri = uriFor(bytes);
+
+        await driver.put(uri, bytes, "text/plain");
+        await driver.delete(uri);
+
+        expect(await driver.exists(uri)).toBe(false);
+        await expect(driver.get(uri)).rejects.toBeInstanceOf(
+          ObjectNotFoundError,
+        );
+      });
+    });
+
+    describe("when dispatched through the storage registry", () => {
+      it("routes an azure-blob URI to the Azure driver on read", async () => {
+        const bytes = Buffer.from(`registry dispatch ${RUN_ID}`, "utf8");
+        const uri = uriFor(bytes);
+        await driver.put(uri, bytes, "text/plain");
+
+        const registry = new StorageRegistry({
+          // s3/file are mandatory on the registry but unused here — any
+          // StorageDriver satisfies the type; azure-blob does the real work.
+          s3: driver,
+          file: driver,
+          "azure-blob": driver,
+        });
+
+        const stream = await registry.get(uri);
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(chunk as Buffer);
+        expect(Buffer.concat(chunks).toString("utf8")).toBe(
+          bytes.toString("utf8"),
+        );
+      });
+    });
+  },
+);

@@ -53,7 +53,7 @@ function persist(cache: Cache): void {
   }
 }
 
-let memory: Cache = load();
+const memory: Cache = load();
 
 function isValidEntry(entry: unknown): entry is Entry {
   // Persisted via JSON.parse → could be anything if a sibling tab or a

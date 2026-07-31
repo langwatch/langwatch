@@ -60,7 +60,8 @@ export class TenantRateTracker {
    * unbounded before trimming existed). Bounds the hash at ~one field per
    * active minute over the window.
    */
-  private static readonly RETENTION_MINUTES = TenantRateTracker.TTL_SECONDS / 60;
+  private static readonly RETENTION_MINUTES =
+    TenantRateTracker.TTL_SECONDS / 60;
   /**
    * Batch size for the on-read orphan trim. A hash that predates trimming can
    * hold hundreds of thousands of fields; delete them in chunks so a single

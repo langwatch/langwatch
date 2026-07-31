@@ -60,10 +60,17 @@ export interface CodingAgentSessionRepository {
    * range is required — it is the partition filter, and usage is always
    * asked about a period.
    *
-   * `userId` narrows to sessions the AGENT reported under that id
-   * (`user.id`/`user.email` on the telemetry, which is the agent's identity
-   * space, not the LangWatch account). Omit it for personal-workspace usage,
-   * where the personal project already isolates the user's sessions.
+   * `userId` narrows to sessions the AGENT reported under that id — an opaque
+   * provider id only (`user.id`, `user.account_uuid`, `user.account_id`),
+   * which is the agent's identity space rather than the LangWatch account.
+   * Deliberately NOT `user.email`: it rides the same events but is raw human
+   * identity, and this value lands verbatim in a durable row, so the fold
+   * never reads it. Omit for personal-workspace usage, where the personal
+   * project already isolates the user's sessions.
+   *
+   * Narrowing is applied outside the dedup scope, so a session whose newest
+   * version reports no user leaves the filtered list rather than answering
+   * from a superseded version — see the ClickHouse repository's docblock.
    */
   findManyRecent(params: {
     tenantId: string;

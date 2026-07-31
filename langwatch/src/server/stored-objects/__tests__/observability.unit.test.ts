@@ -10,15 +10,16 @@
  * the underlying counters / histograms are registered in prom-client's global
  * register with the expected metric names and labelNames.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+
 import { register } from "prom-client";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
-  getStoredObjectExtractCounter,
   getStoredObjectDedupHitCounter,
+  getStoredObjectExtractCounter,
+  getStoredObjectSizeBytesHistogram,
   getStoredObjectWriteFailureCounter,
   storedObjectReadFailureCounter,
-  getStoredObjectSizeBytesHistogram,
 } from "~/server/metrics";
 
 describe("stored_object metrics are registered", () => {
@@ -30,13 +31,17 @@ describe("stored_object metrics are registered", () => {
   it("registers stored_object_extract_total counter", () => {
     const metric = register.getSingleMetric("stored_object_extract_total");
     expect(metric).toBeDefined();
-    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_extract_total");
+    expect((metric as { name: string } | undefined)?.name).toBe(
+      "stored_object_extract_total",
+    );
   });
 
   it("registers stored_object_dedup_hit_total counter", () => {
     const metric = register.getSingleMetric("stored_object_dedup_hit_total");
     expect(metric).toBeDefined();
-    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_dedup_hit_total");
+    expect((metric as { name: string } | undefined)?.name).toBe(
+      "stored_object_dedup_hit_total",
+    );
   });
 
   it("registers stored_object_write_failures_total counter", () => {
@@ -44,7 +49,9 @@ describe("stored_object metrics are registered", () => {
       "stored_object_write_failures_total",
     );
     expect(metric).toBeDefined();
-    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_write_failures_total");
+    expect((metric as { name: string } | undefined)?.name).toBe(
+      "stored_object_write_failures_total",
+    );
   });
 
   it("registers stored_object_read_failures_total counter", () => {
@@ -52,13 +59,17 @@ describe("stored_object metrics are registered", () => {
       "stored_object_read_failures_total",
     );
     expect(metric).toBeDefined();
-    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_read_failures_total");
+    expect((metric as { name: string } | undefined)?.name).toBe(
+      "stored_object_read_failures_total",
+    );
   });
 
   it("registers stored_object_size_bytes histogram", () => {
     const metric = register.getSingleMetric("stored_object_size_bytes");
     expect(metric).toBeDefined();
-    expect((metric as { name: string } | undefined)?.name).toBe("stored_object_size_bytes");
+    expect((metric as { name: string } | undefined)?.name).toBe(
+      "stored_object_size_bytes",
+    );
   });
 
   describe("when purpose-labelled metrics are recorded", () => {

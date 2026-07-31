@@ -22,12 +22,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import {
-  localEvaluatorConfigSchema,
-  targetConfigSchema,
-} from "../types";
-import type { LocalEvaluatorConfig } from "../types";
 import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
+import type { LocalEvaluatorConfig } from "../types";
+import { localEvaluatorConfigSchema, targetConfigSchema } from "../types";
 
 // ============================================================================
 // Mocks for EvaluatorEditorDrawer
@@ -307,9 +304,8 @@ describe("<EvaluatorEditorDrawer />", () => {
           const calls = mockOnLocalConfigChange.mock.calls as Array<
             [LocalEvaluatorConfig | undefined]
           >;
-          const callsWithConfig = calls.filter(
-            (call) =>
-              call[0] !== undefined && call[0]?.name?.includes("Modified"),
+          const callsWithConfig = calls.filter((call) =>
+            call[0]?.name?.includes("Modified"),
           );
           expect(callsWithConfig.length).toBeGreaterThan(0);
         },
@@ -321,10 +317,7 @@ describe("<EvaluatorEditorDrawer />", () => {
         [LocalEvaluatorConfig | undefined]
       >;
       const lastCallWithConfig = calls
-        .filter(
-          (call) =>
-            call[0] !== undefined && call[0]?.name?.includes("Modified"),
-        )
+        .filter((call) => call[0]?.name?.includes("Modified"))
         .pop();
       expect(lastCallWithConfig?.[0]?.name).toBe("Exact Match Modified");
     }, 15000);

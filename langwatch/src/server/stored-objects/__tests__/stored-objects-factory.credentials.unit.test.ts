@@ -32,7 +32,9 @@ vi.mock("../azure-blob-driver", () => ({
 }));
 
 vi.mock("../s3-driver", () => ({ S3Driver: class {} }));
-vi.mock("../local-filesystem-driver", () => ({ LocalFilesystemDriver: class {} }));
+vi.mock("../local-filesystem-driver", () => ({
+  LocalFilesystemDriver: class {},
+}));
 
 import { createStorageRegistry } from "../stored-objects-factory";
 

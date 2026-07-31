@@ -7,22 +7,38 @@
  * Requires: PostgreSQL database (Prisma)
  */
 import { EvaluationExecutionMode } from "@prisma/client";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
+import { UNLIMITED_PLAN } from "../../../../../ee/licensing/constants";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
-// Skip when running with testcontainers only (no PostgreSQL)
-// TEST_CLICKHOUSE_URL indicates testcontainers mode without full infrastructure
-const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
-
-describe.skipIf(isTestcontainersOnly)("Monitor-Evaluator Integration", () => {
+describe("Monitor-Evaluator Integration", () => {
   const projectId = "test-project-id";
   let caller: ReturnType<typeof appRouter.createCaller>;
   let testEvaluatorId: string;
 
   beforeAll(async () => {
+    // `evaluators.create` and `monitors.create` both run the
+    // license-enforcement middleware, which reads `getApp().planProvider`.
+    // Without an app in place the first call in this hook throws "App not
+    // initialized" and the whole file fails during setup.
+    //
+    // UNLIMITED_PLAN because this suite is about the monitor↔evaluator
+    // relation, not about quotas: the fixed `test-project-id` accumulates
+    // monitors across runs, so any finite `maxOnlineEvaluations` makes the
+    // suite fail based on how often it has been run before.
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: async () => UNLIMITED_PLAN,
+      }),
+    });
+
     // Clean up any existing test monitors before running tests
     await prisma.monitor.deleteMany({
       where: { projectId },
@@ -231,5 +247,9 @@ describe.skipIf(isTestcontainersOnly)("Monitor-Evaluator Integration", () => {
         monitorWithEvaluator?.evaluatorId,
       );
     });
+  });
+
+  afterAll(async () => {
+    await resetApp();
   });
 });

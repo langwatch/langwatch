@@ -111,7 +111,8 @@ export class PromptVersionService {
     return await prisma.llmPromptConfigVersion.create({
       data: {
         ...validatedData,
-        runtimeParameters: (data.runtimeParameters ?? {}) as Prisma.InputJsonValue,
+        runtimeParameters: (data.runtimeParameters ??
+          {}) as Prisma.InputJsonValue,
       },
     });
   }

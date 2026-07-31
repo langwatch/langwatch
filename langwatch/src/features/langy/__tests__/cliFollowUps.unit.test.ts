@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { FEATURES } from "~/shared/langy/featureMap";
 import {
   deriveFollowUps,
   followUpsForResult,
-  SUGGESTION_LABEL,
   type SettledToolResult,
+  SUGGESTION_LABEL,
 } from "../components/capabilities/cliFollowUps";
-import { FEATURES } from "~/shared/langy/featureMap";
 
 const traceSearch = (
   overrides: Partial<SettledToolResult> = {},

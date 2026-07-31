@@ -12,7 +12,9 @@
  *   - 0.01 ≤ n < 1     → "$0.12345"       (5 decimals, drops trailing zeros)
  *   - n ≥ 1            → "$1.23"          (2 decimals)
  */
-export function formatBudgetUsd(raw: string | number | null | undefined): string {
+export function formatBudgetUsd(
+  raw: string | number | null | undefined,
+): string {
   if (raw === null || raw === undefined) return "—";
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isFinite(n)) return "—";

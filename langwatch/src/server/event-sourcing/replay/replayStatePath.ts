@@ -1,30 +1,30 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type {
-  RegisteredStateProjection,
-  ReplayProgress,
-  ReplayResult,
-  BatchCompleteInfo,
-  ReplayContext,
-} from "./types";
 import { isAtOrBeforeCutoff } from "./replayConstants";
+import {
+  discoverProjectionAggregates,
+  filterDiscoveredByAggregateIds,
+} from "./replayDiscovery";
+import {
+  pauseProjection,
+  unpauseProjection,
+  waitForActiveJobs,
+} from "./replayDrain";
 import type { DiscoveredAggregate } from "./replayEventLoader";
 import {
   batchLoadAggregateEvents,
   getBoundedCutoffs,
   maxEventPosition,
 } from "./replayEventLoader";
-import { aggregateKey } from "./replayMarkers";
 import { StateAccumulator } from "./replayExecutor";
 import type { ReplayLogWriter } from "./replayLog";
-import {
-  pauseProjection,
-  unpauseProjection,
-  waitForActiveJobs,
-} from "./replayDrain";
-import {
-  discoverProjectionAggregates,
-  filterDiscoveredByAggregateIds,
-} from "./replayDiscovery";
+import { aggregateKey } from "./replayMarkers";
+import type {
+  BatchCompleteInfo,
+  RegisteredStateProjection,
+  ReplayContext,
+  ReplayProgress,
+  ReplayResult,
+} from "./types";
 
 /**
  * Replays a single `.withProjection()` operational state projection into its

@@ -111,7 +111,11 @@ function channelPage({
 }) {
   return {
     ok: true,
-    channels: ids.map((id) => ({ id, name: id.toLowerCase(), is_private: false })),
+    channels: ids.map((id) => ({
+      id,
+      name: id.toLowerCase(),
+      is_private: false,
+    })),
     response_metadata: nextCursor ? { next_cursor: nextCursor } : {},
   };
 }
@@ -208,6 +212,11 @@ describe("listSlackChannels", () => {
       expect(bodyParams(1).get("cursor")).toBe("dGVhbTpDMDYx");
     });
 
+    // Slack returns "fewer than the requested number of items ... even if the
+    // end of the list hasn't been reached", so a workspace exhausts the page
+    // budget long before it exhausts its channels. This mock takes that to its
+    // extreme — one channel per page, a cursor that never ends — so the cap is
+    // the only thing that can stop the walk.
     it("stops at the page cap rather than spinning on an endless cursor", async () => {
       mockedSend.mockResolvedValue({
         responseHeaders: {},
@@ -221,6 +230,36 @@ describe("listSlackChannels", () => {
 
       expect(mockedSend.mock.calls.length).toBeLessThanOrEqual(10);
       expect(result.channels.length).toBe(mockedSend.mock.calls.length);
+    });
+
+    it("reports the listing as capped so the caller can say the list is short", async () => {
+      mockedSend.mockResolvedValue({
+        responseHeaders: {},
+        status: 200,
+        body: JSON.stringify(
+          channelPage({ ids: ["C1"], nextCursor: "never-ends" }),
+        ),
+      });
+
+      const result = await listSlackChannels("xoxb-test");
+
+      // Not an error — the call succeeded. It is just not the whole workspace,
+      // and that difference has to survive the return trip.
+      expect(result.error).toBeNull();
+      expect(result.gaps).toContain("page_cap");
+    });
+
+    it("reports no gaps when the walk reaches the end of the workspace", async () => {
+      mockedSend.mockResolvedValueOnce({
+        responseHeaders: {},
+        status: 200,
+        body: JSON.stringify(channelPage({ ids: ["C1", "C2"] })),
+      });
+
+      const result = await listSlackChannels("xoxb-test");
+
+      expect(result.error).toBeNull();
+      expect(result.gaps).toEqual([]);
     });
 
     it("keeps the pages it already gathered when a later page fails", async () => {
@@ -250,7 +289,7 @@ describe("listSlackChannels", () => {
 
       const result = await listSlackChannels("xoxb-test");
 
-      expect(result).toEqual({ channels: [], error: "bad_response" });
+      expect(result).toEqual({ channels: [], error: "bad_response", gaps: [] });
     });
   });
 
@@ -260,7 +299,11 @@ describe("listSlackChannels", () => {
       // the app is missing channels:read entirely.
       respond(200, { ok: false, error: "missing_scope" });
       const result = await listSlackChannels("xoxb-test");
-      expect(result).toEqual({ channels: [], error: "missing_scope" });
+      expect(result).toEqual({
+        channels: [],
+        error: "missing_scope",
+        gaps: [],
+      });
     });
 
     it("falls back to public channels when only groups:read is missing", async () => {
@@ -283,11 +326,12 @@ describe("listSlackChannels", () => {
 
       const result = await listSlackChannels("xoxb-test");
 
+      // The retry succeeds, so there is no error to report — but the listing is
+      // missing every private channel and the caller has to be able to say so.
       expect(result.error).toBeNull();
+      expect(result.gaps).toContain("private_channels_hidden");
       expect(result.channels.map((c) => c.id)).toEqual(["C1"]);
-      expect(bodyParams(0).get("types")).toBe(
-        "public_channel,private_channel",
-      );
+      expect(bodyParams(0).get("types")).toBe("public_channel,private_channel");
       expect(bodyParams(1).get("types")).toBe("public_channel");
     });
   });
@@ -300,6 +344,7 @@ describe("listSlackChannels", () => {
       expect(await listSlackChannels("xoxb-test")).toEqual({
         channels: [],
         error: "request_failed",
+        gaps: [],
       });
     });
   });

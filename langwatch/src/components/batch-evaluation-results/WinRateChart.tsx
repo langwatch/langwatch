@@ -120,7 +120,9 @@ export function WinRateChart({
   // axis stays elided so it can't eat the chart, and the full name is one
   // hover away. Disambiguated the same way so "(1)"/"(2)" still identify the
   // same bar in both places.
-  const variantFullNames = disambiguateNames(column.variants.map((v) => v.name));
+  const variantFullNames = disambiguateNames(
+    column.variants.map((v) => v.name),
+  );
 
   const chartData = [
     ...column.variants.map((variant, index) => ({

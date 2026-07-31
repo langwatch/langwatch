@@ -1,5 +1,5 @@
 /**
- * The wire shapes the Langy relay ingests (LANGY_WORKER_REDESIGN_PLAN §0/§0a).
+ * The wire shapes the Langy relay ingests (see `langyTurnRelay.ts`).
  *
  * The worker streams one ndjson line per frame. Each line is a
  * `LangyFrameEnvelope`: the authenticated identity + nonce + an opaque `payload`
@@ -14,13 +14,13 @@
 // zod/v4, not the default v3 entrypoint: `cliToolResultSchema` below is authored
 // against zod/v4, and a v4 schema embedded in a v3 `z.object()` blows up at parse
 // time (`keyValidator._parse is not a function`) rather than at construction.
-import * as z from "zod/v4";
-import { cliToolResultSchema } from "@langwatch/langy";
 
 import {
-  handledErrorFromHerr,
   type HerrEnvelope,
+  handledErrorFromHerr,
 } from "@langwatch/handled-error";
+import { cliToolResultSchema } from "@langwatch/langy";
+import * as z from "zod/v4";
 
 /**
  * The signed envelope — mirrors frameauth's construction. `payload` is the exact
@@ -63,9 +63,68 @@ const receivedDomainErrorSchema = herrEnvelopeWireSchema.transform((body) =>
   handledErrorFromHerr(body),
 );
 
+/**
+ * The separator a model provider's round-trip blob is stapled onto a tool call
+ * id with. Gemini's thought signature is the one that reached us: the agent
+ * runtime has nowhere else to carry it, so it emits `<real id>_ts_<blob>`.
+ */
+const TOOL_CALL_ID_SIGNATURE_SEPARATOR = "_ts_";
+
+/**
+ * The shortest suffix we will treat as a stapled blob rather than as part of a
+ * name. A real signature is kilobytes of base64; this only has to be past
+ * anything a provider would plausibly put after an underscore.
+ */
+const TOOL_CALL_ID_SIGNATURE_MIN_LENGTH = 64;
+
+/** base64url — what a stapled blob is encoded as, and what a name is not. */
+const TOOL_CALL_ID_SIGNATURE_SHAPE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Past this, the value is not an identifier and we do not want it in the event
+ * log, the message parts, or a composed idempotency key. Real ids are well
+ * under a hundred characters.
+ */
+const TOOL_CALL_ID_MAX_LENGTH = 256;
+
+/**
+ * Strip a model provider's round-trip payload off a tool call id.
+ *
+ * The blob is not identity — it is state the provider requires back on the
+ * next request, and the agent runtime has no other field to put it in. Left
+ * alone it rode into the durable event data and, because the tool commands
+ * compose their idempotency key out of the id, into the process manager's
+ * inbox key, where it was long enough to exceed Postgres's btree index limit
+ * and park the conversation's queue group for good
+ * (specs/langy/langy-tool-call-identity.feature).
+ *
+ * Normalising HERE rather than at each use is what makes start and end frames,
+ * live cards, durable events and the final's tool list agree on one id.
+ */
+export function normalizeToolCallId(id: string): string {
+  const separator = id.indexOf(TOOL_CALL_ID_SIGNATURE_SEPARATOR);
+  if (separator <= 0) return id;
+  const suffix = id.slice(separator + TOOL_CALL_ID_SIGNATURE_SEPARATOR.length);
+  if (suffix.length < TOOL_CALL_ID_SIGNATURE_MIN_LENGTH) return id;
+  if (!TOOL_CALL_ID_SIGNATURE_SHAPE.test(suffix)) return id;
+  return id.slice(0, separator);
+}
+
+/**
+ * A tool call's id, normalised at the boundary. The length bound applies AFTER
+ * stripping — a legitimate id wearing a signature must not be rejected for the
+ * blob's length — and a value still over it is REJECTED as an invalid payload
+ * rather than truncated, the same way plan items are below.
+ */
+export const langyToolCallIdSchema = z
+  .string()
+  .min(1)
+  .transform(normalizeToolCallId)
+  .pipe(z.string().min(1).max(TOOL_CALL_ID_MAX_LENGTH));
+
 /** A tool call the agent ran, in the compact shape the durable final carries. */
 export const langyRelayToolCallSchema = z.object({
-  id: z.string().min(1),
+  id: langyToolCallIdSchema,
   name: z.string().min(1),
   input: z.unknown().optional(),
   output: z.string().optional(),
@@ -142,7 +201,7 @@ export const langyRelayFrameSchema = z.discriminatedUnion("type", [
   /** Tool-call lifecycle — a live card AND a durable milestone event. */
   z.object({
     type: z.literal("tool"),
-    id: z.string().min(1),
+    id: langyToolCallIdSchema,
     name: z.string().min(1),
     phase: z.enum(["start", "end"]),
     title: z.string().optional(),

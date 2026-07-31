@@ -43,15 +43,14 @@ export const ROLE_LABELS: Record<string, string> = {
 export function rolesAtOrBelow(
   role: string,
 ): Array<{ label: string; value: string }> {
-  const idx = STANDARD_ROLES.indexOf(
-    role as (typeof STANDARD_ROLES)[number],
-  );
+  const idx = STANDARD_ROLES.indexOf(role as (typeof STANDARD_ROLES)[number]);
   if (idx === -1) return [];
-  const roles: Array<{ label: string; value: string }> =
-    STANDARD_ROLES.slice(idx).map((r) => ({
-      label: ROLE_LABELS[r] ?? r,
-      value: r,
-    }));
+  const roles: Array<{ label: string; value: string }> = STANDARD_ROLES.slice(
+    idx,
+  ).map((r) => ({
+    label: ROLE_LABELS[r] ?? r,
+    value: r,
+  }));
   roles.push({ label: "None", value: "NONE" });
   return roles;
 }
@@ -198,10 +197,7 @@ export function findBindingAtScope<
   return (
     find(scopeType, scopeId) ??
     (scopeType === "PROJECT"
-      ? find(
-          "TEAM",
-          orgProjects.find((p) => p.id === scopeId)?.teamId ?? "",
-        )
+      ? find("TEAM", orgProjects.find((p) => p.id === scopeId)?.teamId ?? "")
       : undefined) ??
     (scopeType !== "ORGANIZATION"
       ? find("ORGANIZATION", organizationId)
@@ -221,7 +217,9 @@ export function deriveBindingRole({
   permissionMode: string;
   scopeType: string;
   scopeId: string;
-  myBindings: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
+  myBindings:
+    | Array<{ scopeType: string; scopeId: string; role: string }>
+    | undefined;
   organizationId: string;
   orgProjects: Array<{ id: string; teamId: string }>;
   isServiceKey: boolean;
@@ -262,12 +260,10 @@ export function bindingsToScopes(
   }));
 }
 
-export function bindingsToPermissionMode(
-  apiKey: {
-    permissionMode: string;
-    roleBindings: Array<{ role: string }>;
-  },
-): "all" | "restricted" {
+export function bindingsToPermissionMode(apiKey: {
+  permissionMode: string;
+  roleBindings: Array<{ role: string }>;
+}): "all" | "restricted" {
   const mode = apiKey.permissionMode as PermissionMode;
   if (mode === "readonly" || mode === "restricted") return "restricted";
   if (
@@ -347,7 +343,9 @@ export function getUserPermissionsAtScope({
   isServiceKey,
   getTeamRolePermissions: getRolePerms,
 }: {
-  myBindings: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
+  myBindings:
+    | Array<{ scopeType: string; scopeId: string; role: string }>
+    | undefined;
   scopeType: string;
   scopeId: string;
   organizationId: string;
@@ -357,7 +355,13 @@ export function getUserPermissionsAtScope({
 }): string[] {
   if (isServiceKey) return getRolePerms("ADMIN");
 
-  const binding = findBindingAtScope({ bindings: myBindings, scopeType, scopeId, organizationId, orgProjects });
+  const binding = findBindingAtScope({
+    bindings: myBindings,
+    scopeType,
+    scopeId,
+    organizationId,
+    orgProjects,
+  });
   if (!binding) return [];
   return getRolePerms(binding.role);
 }

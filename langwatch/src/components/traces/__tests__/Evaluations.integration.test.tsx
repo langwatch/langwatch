@@ -14,7 +14,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ElasticSearchEvaluation } from "../../../server/tracer/types";
-import { Evaluations, Guardrails, EvaluationsCount } from "../Evaluations";
+import { Evaluations, EvaluationsCount, Guardrails } from "../Evaluations";
 
 // Mock next/router used by EvaluationStatusItem
 vi.mock("~/utils/compat/next-router", () => ({
@@ -465,7 +465,11 @@ describe("<Evaluations/>", () => {
         evaluator_id: "toxicity",
         name: "Toxicity Check",
         status: "error",
-        error: { has_error: true as const, message: "Timeout occurred", stacktrace: [] },
+        error: {
+          has_error: true as const,
+          message: "Timeout occurred",
+          stacktrace: [],
+        },
         timestamps: { finished_at: 2000 },
       }),
     ];
@@ -528,10 +532,9 @@ describe("<Guardrails/>", () => {
     ];
 
     it("shows a single grouped entry with history indicator", () => {
-      render(
-        <Guardrails {...traceBase} evaluations={evaluations} />,
-        { wrapper: Wrapper },
-      );
+      render(<Guardrails {...traceBase} evaluations={evaluations} />, {
+        wrapper: Wrapper,
+      });
 
       const nameElements = screen.getAllByText("Content Filter");
       expect(nameElements).toHaveLength(1);
@@ -582,10 +585,9 @@ describe("<EvaluationsCount/>", () => {
     ];
 
     it("counts unique evaluators not individual runs", () => {
-      render(
-        <EvaluationsCount {...traceBase} evaluations={evaluations} />,
-        { wrapper: Wrapper },
-      );
+      render(<EvaluationsCount {...traceBase} evaluations={evaluations} />, {
+        wrapper: Wrapper,
+      });
 
       // 2 unique evaluators (toxicity + faithfulness), not 4 individual runs
       expect(screen.getByText("2")).toBeInTheDocument();
@@ -613,10 +615,9 @@ describe("<EvaluationsCount/>", () => {
     ];
 
     it("counts based on the latest run status", () => {
-      render(
-        <EvaluationsCount {...traceBase} evaluations={evaluations} />,
-        { wrapper: Wrapper },
-      );
+      render(<EvaluationsCount {...traceBase} evaluations={evaluations} />, {
+        wrapper: Wrapper,
+      });
 
       // The latest run failed, so count is "1 failed"
       expect(screen.getByText("1 failed")).toBeInTheDocument();
@@ -644,10 +645,9 @@ describe("<EvaluationsCount/>", () => {
     ];
 
     it("does not count as failed since the latest run passed", () => {
-      render(
-        <EvaluationsCount {...traceBase} evaluations={evaluations} />,
-        { wrapper: Wrapper },
-      );
+      render(<EvaluationsCount {...traceBase} evaluations={evaluations} />, {
+        wrapper: Wrapper,
+      });
 
       // Latest run passed, so should show green count "1", not "1 failed"
       expect(screen.queryByText(/failed/)).not.toBeInTheDocument();

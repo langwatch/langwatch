@@ -16,7 +16,12 @@ describe("reportSchedule", () => {
     describe("when the frequency is daily", () => {
       it("drops the day fields to wildcards", () => {
         expect(
-          cronFromParts({ ...DEFAULT_PARTS, frequency: "daily", hour: 7, minute: 30 }),
+          cronFromParts({
+            ...DEFAULT_PARTS,
+            frequency: "daily",
+            hour: 7,
+            minute: 30,
+          }),
         ).toBe("30 7 * * *");
       });
     });
@@ -58,15 +63,29 @@ describe("reportSchedule", () => {
       ],
       [
         "30 8 * * 5",
-        { frequency: "weekly", hour: 8, minute: 30, dayOfWeek: 5, dayOfMonth: 1 },
+        {
+          frequency: "weekly",
+          hour: 8,
+          minute: 30,
+          dayOfWeek: 5,
+          dayOfMonth: 1,
+        },
       ],
       [
         "0 9 15 * *",
-        { frequency: "monthly", hour: 9, minute: 0, dayOfWeek: 1, dayOfMonth: 15 },
+        {
+          frequency: "monthly",
+          hour: 9,
+          minute: 0,
+          dayOfWeek: 1,
+          dayOfMonth: 15,
+        },
       ],
     ];
 
-    it.each(roundTrips)("parses %s back to the friendly parts", (cron, parts) => {
+    it.each(
+      roundTrips,
+    )("parses %s back to the friendly parts", (cron, parts) => {
       expect(partsFromCron(cron)).toEqual(parts);
     });
 
@@ -112,7 +131,13 @@ describe("reportSchedule", () => {
     it("describes a weekly schedule in plain English", () => {
       expect(
         summarizeSchedule(
-          { frequency: "weekly", hour: 9, minute: 0, dayOfWeek: 1, dayOfMonth: 1 },
+          {
+            frequency: "weekly",
+            hour: 9,
+            minute: 0,
+            dayOfWeek: 1,
+            dayOfMonth: 1,
+          },
           "Europe/Amsterdam",
         ),
       ).toBe("Sends every Monday at 09:00 (Europe/Amsterdam)");
@@ -120,14 +145,23 @@ describe("reportSchedule", () => {
 
     it("describes a daily schedule", () => {
       expect(
-        summarizeSchedule({ ...DEFAULT_PARTS, frequency: "daily", hour: 7, minute: 5 }, "UTC"),
+        summarizeSchedule(
+          { ...DEFAULT_PARTS, frequency: "daily", hour: 7, minute: 5 },
+          "UTC",
+        ),
       ).toBe("Sends every day at 07:05 (UTC)");
     });
 
     it("describes a monthly schedule with an ordinal day", () => {
       expect(
         summarizeSchedule(
-          { frequency: "monthly", hour: 8, minute: 0, dayOfWeek: 1, dayOfMonth: 3 },
+          {
+            frequency: "monthly",
+            hour: 8,
+            minute: 0,
+            dayOfWeek: 1,
+            dayOfMonth: 3,
+          },
           "UTC",
         ),
       ).toBe("Sends on the 3rd of each month at 08:00 (UTC)");
@@ -148,7 +182,9 @@ describe("reportSchedule", () => {
     it("reads the resolved Intl timezone", () => {
       vi.spyOn(Intl, "DateTimeFormat").mockReturnValue({
         resolvedOptions: () =>
-          ({ timeZone: "Europe/Amsterdam" }) as Intl.ResolvedDateTimeFormatOptions,
+          ({
+            timeZone: "Europe/Amsterdam",
+          }) as Intl.ResolvedDateTimeFormatOptions,
       } as Intl.DateTimeFormat);
 
       expect(defaultTimezone()).toBe("Europe/Amsterdam");

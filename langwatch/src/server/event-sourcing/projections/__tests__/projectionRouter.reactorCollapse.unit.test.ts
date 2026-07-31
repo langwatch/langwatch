@@ -131,7 +131,8 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
       const reactor: ReactorDefinition<Event> = {
         name: "customEvaluationSync",
         options: {
-          makeJobId: ({ event }) => `custom-eval:${event.aggregateId}:${event.id}`,
+          makeJobId: ({ event }) =>
+            `custom-eval:${event.aggregateId}:${event.id}`,
         },
         handle: vi.fn().mockResolvedValue(undefined),
       };
@@ -215,7 +216,7 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
       const reactor: ReactorDefinition<Event> = {
         name: "two-lane",
         options: {
-          // biome-ignore lint/style/noNonNullAssertion: every id is in the map.
+          // Every id is in the map.
           makeJobId: ({ event }) => jobFor[event.id]!,
         },
         handle: vi.fn().mockResolvedValue(undefined),

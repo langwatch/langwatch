@@ -39,7 +39,9 @@ export class PrismaEvaluationCostRecorder implements EvaluationCostRecorder {
       data: {
         id: costId,
         projectId: params.projectId,
-        costType: params.isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
+        costType: params.isGuardrail
+          ? CostType.GUARDRAIL
+          : CostType.TRACE_CHECK,
         costName: params.evaluatorName,
         referenceType: CostReferenceType.CHECK,
         referenceId: params.evaluatorId,

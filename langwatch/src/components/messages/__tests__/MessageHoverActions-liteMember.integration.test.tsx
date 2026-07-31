@@ -5,9 +5,10 @@
  * Verifies that EXTERNAL users do not see the "View Trace" button
  * but can still see Translate, Annotate, and Suggest.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -69,11 +70,11 @@ vi.mock("../../ui/tooltip", () => ({
 }));
 
 import { useLiteMemberGuard } from "../../../hooks/useLiteMemberGuard";
+import type { Trace } from "../../../server/tracer/types";
 import {
   MessageHoverActions,
   useTranslationState,
 } from "../MessageHoverActions";
-import type { Trace } from "../../../server/tracer/types";
 
 const mockUseLiteMemberGuard = vi.mocked(useLiteMemberGuard);
 
@@ -110,9 +111,7 @@ describe("MessageHoverActions", () => {
   describe("when user is a lite member", () => {
     /** @scenario Lite member does not see the "View Trace" hover action on messages */
     it("does not render the View Trace button", () => {
-      const { container } = render(
-        <TranslationWrapper isLiteMember={true} />,
-      );
+      const { container } = render(<TranslationWrapper isLiteMember={true} />);
 
       const tooltips = container.querySelectorAll("[data-tooltip]");
       const labels = Array.from(tooltips).map((el) =>
@@ -123,9 +122,7 @@ describe("MessageHoverActions", () => {
     });
 
     it("renders the Translate button", () => {
-      const { container } = render(
-        <TranslationWrapper isLiteMember={true} />,
-      );
+      const { container } = render(<TranslationWrapper isLiteMember={true} />);
 
       const tooltips = container.querySelectorAll("[data-tooltip]");
       const labels = Array.from(tooltips).map((el) =>
@@ -136,9 +133,7 @@ describe("MessageHoverActions", () => {
     });
 
     it("renders the Annotate button", () => {
-      const { container } = render(
-        <TranslationWrapper isLiteMember={true} />,
-      );
+      const { container } = render(<TranslationWrapper isLiteMember={true} />);
 
       const tooltips = container.querySelectorAll("[data-tooltip]");
       const labels = Array.from(tooltips).map((el) =>
@@ -149,9 +144,7 @@ describe("MessageHoverActions", () => {
     });
 
     it("renders the Suggest button", () => {
-      const { container } = render(
-        <TranslationWrapper isLiteMember={true} />,
-      );
+      const { container } = render(<TranslationWrapper isLiteMember={true} />);
 
       const tooltips = container.querySelectorAll("[data-tooltip]");
       const labels = Array.from(tooltips).map((el) =>
@@ -164,9 +157,7 @@ describe("MessageHoverActions", () => {
 
   describe("when user is a full member", () => {
     it("renders the View Trace button", () => {
-      const { container } = render(
-        <TranslationWrapper isLiteMember={false} />,
-      );
+      const { container } = render(<TranslationWrapper isLiteMember={false} />);
 
       const tooltips = container.querySelectorAll("[data-tooltip]");
       const labels = Array.from(tooltips).map((el) =>
@@ -177,9 +168,7 @@ describe("MessageHoverActions", () => {
     });
 
     it("renders all four action buttons", () => {
-      const { container } = render(
-        <TranslationWrapper isLiteMember={false} />,
-      );
+      const { container } = render(<TranslationWrapper isLiteMember={false} />);
 
       const tooltips = container.querySelectorAll("[data-tooltip]");
       expect(tooltips.length).toBe(4);

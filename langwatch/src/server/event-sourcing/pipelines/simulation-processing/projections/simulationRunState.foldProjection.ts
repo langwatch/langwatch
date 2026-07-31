@@ -143,7 +143,14 @@ export interface SimulationRunStateData {
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
   RoleLatencies: Record<string, number[]>;
-  TraceMetrics: Record<string, { totalCost: number; roleCosts: Record<string, number>; roleLatencies: Record<string, number> }>;
+  TraceMetrics: Record<
+    string,
+    {
+      totalCost: number;
+      roleCosts: Record<string, number>;
+      roleLatencies: Record<string, number>;
+    }
+  >;
   StartedAt: number | null;
   QueuedAt: number | null;
   CreatedAt: number;
@@ -234,8 +241,12 @@ const simulationRunEvents = [
  * - `UpdatedAt` is auto-managed by the base class after each handler call
  */
 export class SimulationRunStateFoldProjection
-  extends AbstractFoldProjection<SimulationRunStateData, typeof simulationRunEvents>
-  implements FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
+  extends AbstractFoldProjection<
+    SimulationRunStateData,
+    typeof simulationRunEvents
+  >
+  implements
+    FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
 {
   readonly name = "simulationRunState";
   readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
@@ -292,7 +303,9 @@ export class SimulationRunStateFoldProjection
       Name: event.data.name ?? null,
       Status: statusAfter({ state, candidate: "QUEUED" }),
       Description: event.data.description ?? null,
-      Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
+      Metadata: event.data.metadata
+        ? JSON.stringify(event.data.metadata)
+        : null,
       QueuedAt: event.occurredAt,
     };
   }
@@ -309,7 +322,9 @@ export class SimulationRunStateFoldProjection
       ScenarioSetId: state.ScenarioSetId || event.data.scenarioSetId,
       Name: state.Name ?? event.data.name ?? null,
       Description: state.Description ?? event.data.description ?? null,
-      Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
+      Metadata:
+        state.Metadata ??
+        (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
       Status: statusAfter({ state, candidate: "IN_PROGRESS" }),
       StartedAt: event.occurredAt,
     };
@@ -330,7 +345,9 @@ export class SimulationRunStateFoldProjection
       LastSnapshotOccurredAt: event.occurredAt,
       Messages: event.data.messages.map((m, i) => {
         if (!isRecord(m)) {
-          throw new ValidationError(`Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`);
+          throw new ValidationError(
+            `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
+          );
         }
 
         // Content can be either:
@@ -451,7 +468,9 @@ export class SimulationRunStateFoldProjection
       }),
       TraceId: event.data.traceId ?? "",
       Rest: capOversizedString({
-        value: buildMessageRestJson((event.data.message ?? {}) as Record<string, unknown>),
+        value: buildMessageRestJson(
+          (event.data.message ?? {}) as Record<string, unknown>,
+        ),
         maxBytes: MAX_MESSAGE_REST_BYTES,
         field: "Rest",
         ctx,

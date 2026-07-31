@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
+
 import {
   Badge,
   Box,
@@ -12,22 +14,25 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import {
+  type OrganizationUserRole,
+  RoleBindingScopeType,
+} from "@prisma/client";
 import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useEffect, useMemo, useState } from "react";
+import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { OverflownTextWithTooltip } from "~/components/OverflownText";
+import { useDrawer } from "~/hooks/useDrawer";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
-import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
-import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
+import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { CopyInput } from "../../components/CopyInput";
 import { InvitesTable } from "../../components/members/InvitesTable";
 import SettingsLayout from "../../components/SettingsLayout";
+import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
+import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
+import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { Dialog } from "../../components/ui/dialog";
-import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
@@ -39,10 +44,8 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
 } from "../../server/app-layer/organizations/repositories/organization.repository";
-import type { PlanInfo } from "../../../ee/licensing/planInfo";
-import { api } from "../../utils/api";
 import type { RouterOutputs } from "../../utils/api";
-import { OrganizationUserRole, RoleBindingScopeType } from "@prisma/client";
+import { api } from "../../utils/api";
 
 type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 

@@ -40,9 +40,8 @@ vi.mock("~/features/langy/stores/langyStore", () => {
     openPanel: () => undefined,
     attachContext: () => undefined,
   });
-  const useLangyStore = (
-    selector: (s: ReturnType<typeof state>) => unknown,
-  ) => selector(state());
+  const useLangyStore = (selector: (s: ReturnType<typeof state>) => unknown) =>
+    selector(state());
   useLangyStore.getState = state;
   return { useLangyStore };
 });

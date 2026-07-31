@@ -4,15 +4,15 @@ import {
   migrateLegacyMappings,
 } from "~/server/evaluations/evaluationMappings";
 import {
-  evaluatorUnavailability,
-  unavailableEvaluatorMessage,
-} from "~/server/evaluations/installedEvaluators";
-import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
 import { isNativeEvaluatorType } from "~/server/evaluations/evaluators.native";
+import {
+  evaluatorUnavailability,
+  unavailableEvaluatorMessage,
+} from "~/server/evaluations/installedEvaluators";
 import {
   augmentEvaluationResult,
   executeNativeEvaluation,
@@ -420,9 +420,12 @@ export class EvaluationExecutionService {
     // service with no route for it and come back as a bare 404.
     const unavailable = evaluatorUnavailability({ evaluatorType });
     if (unavailable) {
-      throw new EvaluatorConfigError(unavailableEvaluatorMessage({ unavailability: unavailable }), {
-        meta: { evaluatorType },
-      });
+      throw new EvaluatorConfigError(
+        unavailableEvaluatorMessage({ unavailability: unavailable }),
+        {
+          meta: { evaluatorType },
+        },
+      );
     }
 
     const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];

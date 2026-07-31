@@ -43,7 +43,8 @@ const tenantId = `test-router-${generate("tenant").toString()}`;
 // with PLATFORM_DEFAULT_RETENTION_DAYS (49) and the tables TTL-delete rows
 // `_retention_days` after BucketStart/OccurredAt, so a fixed date eventually
 // ages past the horizon and the fixtures silently vanish before the reads.
-const bucketMs = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
+const bucketMs =
+  Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 60_000) * 60_000;
 const bucketStart = new Date(bucketMs);
 
 let ch: ClickHouseClient;
@@ -80,6 +81,7 @@ function makeSlimRow(
     tenantId,
     traceId: `slim-trace-${generate("trace").toString()}`,
     version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+    hasSignal: true,
     occurredAtMs: bucketMs,
     createdAtMs: bucketMs,
     updatedAtMs: bucketMs,
@@ -104,6 +106,14 @@ function makeSlimRow(
     reasoningTokens: null,
     hasError: false,
     hasAnnotation: null,
+    spanCount: 1,
+    annotationIds: [],
+    rootSpanStartTimeMs: 0,
+    traceNameFromFallback: false,
+    rootMetadataFromFallback: false,
+    traceNameUserOverridden: false,
+    lastEventOccurredAt: bucketMs,
+    earliestSpanStartMs: bucketMs,
     attributes: {},
     ...overrides,
   };

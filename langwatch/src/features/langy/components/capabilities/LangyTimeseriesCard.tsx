@@ -18,6 +18,8 @@
  * definition — the panel never invents one, because a graph it guessed at would
  * silently disagree with the plot above it the moment the dashboard refetched.
  */
+
+import { useChart } from "@chakra-ui/charts";
 import {
   Box,
   Button,
@@ -27,8 +29,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useChart } from "@chakra-ui/charts";
-import { ArrowUpRight, LayoutDashboard, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  ArrowUpRight,
+  LayoutDashboard,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -43,9 +49,9 @@ import {
 import type { ValueType } from "recharts/types/component/DefaultTooltipContent";
 
 import { toaster } from "~/components/ui/toaster";
-import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 
 import { formatMoneyShort, Money } from "../Money";
 import type { CapabilityCardInput } from "./capabilityRegistry";
@@ -98,7 +104,8 @@ function valueFormatter(unit: TimeseriesPayload["unit"]) {
     case "usd":
       return (v: number) => formatMoneyShort(v);
     case "ms":
-      return (v: number) => (v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(1)}s`);
+      return (v: number) =>
+        v < 1000 ? `${Math.round(v)}ms` : `${(v / 1000).toFixed(1)}s`;
     case "percent":
       return (v: number) => `${v.toFixed(1)}%`;
     default:
@@ -160,7 +167,10 @@ export function isPlottable(payload: unknown): payload is TimeseriesPayload {
   );
 }
 
-export function LangyTimeseriesCard({ output, projectSlug }: CapabilityCardInput) {
+export function LangyTimeseriesCard({
+  output,
+  projectSlug,
+}: CapabilityCardInput) {
   const payload = output as TimeseriesPayload | undefined;
   // Read before the guard: the guard narrows an unplottable payload away, and
   // an empty range still deserves the title it was asked under.
@@ -227,16 +237,30 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
 
       <Box height="140px" width="full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chart.data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <AreaChart
+            data={chart.data}
+            margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+          >
             <defs>
               {chart.series.map((s, index) => (
                 <linearGradient
                   key={String(s.name)}
                   id={`langy-ts-${chart.id}-${index}`}
-                  x1="0" y1="0" x2="0" y2="1"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
                 >
-                  <stop offset="0%" stopColor={chart.color(s.color)} stopOpacity={0.28} />
-                  <stop offset="100%" stopColor={chart.color(s.color)} stopOpacity={0.02} />
+                  <stop
+                    offset="0%"
+                    stopColor={chart.color(s.color)}
+                    stopOpacity={0.28}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={chart.color(s.color)}
+                    stopOpacity={0.02}
+                  />
                 </linearGradient>
               ))}
             </defs>
@@ -264,7 +288,9 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
               // Value only: recharts already prints the series name beside
               // it, and returning the pair form fights v3's Formatter type
               // for a label we would be duplicating anyway.
-              formatter={(value: ValueType | undefined) => format(Number(value ?? 0))}
+              formatter={(value: ValueType | undefined) =>
+                format(Number(value ?? 0))
+              }
               contentStyle={{
                 background: chart.color("bg.panel"),
                 border: `1px solid ${chart.color("border.muted")}`,
@@ -329,7 +355,11 @@ function ComparisonHeadline({
   const Icon = up ? TrendingUp : TrendingDown;
 
   const render = (value: number) =>
-    unit === "usd" ? <Money amount={value} /> : <>{valueFormatter(unit)(value)}</>;
+    unit === "usd" ? (
+      <Money amount={value} />
+    ) : (
+      <>{valueFormatter(unit)(value)}</>
+    );
 
   return (
     <HStack gap={4} align="baseline" flexWrap="wrap">
@@ -354,7 +384,11 @@ function ComparisonHeadline({
         // bad depends on why it rose, and the card does not know.
         <HStack gap={1} color="fg.muted">
           <Icon size={13} />
-          <Text textStyle="xs" fontWeight="560" fontVariantNumeric="tabular-nums">
+          <Text
+            textStyle="xs"
+            fontWeight="560"
+            fontVariantNumeric="tabular-nums"
+          >
             {up ? "+" : ""}
             {change.toFixed(1)}%
           </Text>

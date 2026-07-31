@@ -155,96 +155,13 @@ function safeQueryMeta(params: unknown): {
   return meta;
 }
 
-/** Default threshold for slow query warnings. */
-const DEFAULT_SLOW_QUERY_MS = 1000;
-const DEFAULT_MAX_READ_BYTES = 3 * 1024 * 1024; // 3MB
-
-/**
- * Per-query performance expectations, passed via `clickhouse_settings`.
- * The resilient client reads and strips these before forwarding to ClickHouse.
- *
- * Usage in repositories:
- * ```ts
- * client.query({
- *   query: "SELECT ...",
- *   clickhouse_settings: {
- *     langwatch_expected_max_duration_ms: 5000,    // allow up to 5s
- *     langwatch_expected_max_read_bytes: 5000000, // allow up to 5MB response
- *   },
- * });
- * ```
- */
-const LANGWATCH_SETTING_KEYS = [
-  "langwatch_expected_max_duration_ms",
-  "langwatch_expected_max_read_bytes",
-] as const;
-
-interface QueryExpectations {
-  maxDurationMs: number;
-  maxReadBytes?: number;
-}
-
-const DEFAULT_EXPECTATIONS: QueryExpectations = {
-  maxDurationMs: DEFAULT_SLOW_QUERY_MS,
-  maxReadBytes: DEFAULT_MAX_READ_BYTES,
-};
-
-function extractExpectations(params: unknown): QueryExpectations {
-  if (!params || typeof params !== "object") return DEFAULT_EXPECTATIONS;
-  const settings = (params as Record<string, unknown>).clickhouse_settings;
-  if (!settings || typeof settings !== "object") return DEFAULT_EXPECTATIONS;
-
-  const s = settings as Record<string, unknown>;
-  return {
-    maxDurationMs: typeof s.langwatch_expected_max_duration_ms === "number"
-      ? s.langwatch_expected_max_duration_ms
-      : DEFAULT_SLOW_QUERY_MS,
-    maxReadBytes: typeof s.langwatch_expected_max_read_bytes === "number"
-      ? s.langwatch_expected_max_read_bytes
-      : DEFAULT_MAX_READ_BYTES,
-  };
-}
-
-/** Remove langwatch_* keys from clickhouse_settings before forwarding to ClickHouse. */
-function stripLangwatchSettings(params: Record<string, unknown>): Record<string, unknown> {
-  const settings = params.clickhouse_settings;
-  if (!settings || typeof settings !== "object") return params;
-
-  const s = settings as Record<string, unknown>;
-  const hasLangwatchKeys = LANGWATCH_SETTING_KEYS.some((k) => k in s);
-  if (!hasLangwatchKeys) return params;
-
-  const cleaned = { ...s };
-  for (const key of LANGWATCH_SETTING_KEYS) {
-    delete cleaned[key];
-  }
-  return { ...params, clickhouse_settings: cleaned };
-}
-
-/**
- * Extracts read_bytes from the X-ClickHouse-Summary response header.
- * This measures how many bytes ClickHouse read from disk to answer the query —
- * a proxy for query weight. Available in all ClickHouse versions.
- * (read_bytes is always 0 for streaming formats like JSONEachRow.)
- */
-function extractReadBytes(result: unknown): number | undefined {
-  try {
-    const headers = (result as { response_headers?: Record<string, string | string[] | undefined> })?.response_headers;
-    const summary = headers?.["x-clickhouse-summary"];
-    if (typeof summary !== "string") return undefined;
-    const parsed = JSON.parse(summary) as { read_bytes?: string };
-    return parsed.read_bytes ? Number(parsed.read_bytes) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function extractQueryType(params: unknown): "SELECT" | "INSERT" | "OTHER" {
   if (!params || typeof params !== "object") return "OTHER";
   const p = params as Record<string, unknown>;
   if (typeof p.query !== "string") return "OTHER";
   const trimmed = p.query.trimStart().toUpperCase();
-  if (trimmed.startsWith("SELECT") || trimmed.startsWith("WITH")) return "SELECT";
+  if (trimmed.startsWith("SELECT") || trimmed.startsWith("WITH"))
+    return "SELECT";
   if (trimmed.startsWith("INSERT")) return "INSERT";
   return "OTHER";
 }
@@ -291,7 +208,7 @@ function logFailure({
         paramKeys: meta.paramKeys,
         error,
       },
-      `ClickHouse ${operation} failed`
+      `ClickHouse ${operation} failed`,
     );
   } catch (loggingError) {
     logger.error({ loggingError }, "Failed to log ClickHouse query failure");
@@ -302,54 +219,36 @@ function logSuccess({
   operation,
   durationMs,
   params,
-  readBytes,
 }: {
   operation: "query" | "insert";
   durationMs: number;
   params: unknown;
-  readBytes?: number;
 }): void {
   try {
     const roundedMs = Math.round(durationMs);
     const meta = safeQueryMeta(params);
-    const expectations = extractExpectations(params);
-
-    const isSlow = roundedMs >= expectations.maxDurationMs;
-    const isTooHeavy = expectations.maxReadBytes !== undefined
-      && readBytes !== undefined
-      && readBytes > expectations.maxReadBytes;
 
     // A SELECT against a time-partitioned table with no predicate on its time
     // column cannot prune partitions, so it walks the whole history including
     // the cold tier on S3 - a burst of S3 GET requests per call. Worth warning
     // even when fast, because the cost is request count, not latency.
-    const coldScanTable = operation === "query"
-      ? detectColdScan(extractRawQuery(params))
-      : null;
-    const isColdScan = coldScanTable !== null;
+    const coldScanTable =
+      operation === "query" ? detectColdScan(extractRawQuery(params)) : null;
 
-    if (isSlow || isTooHeavy || isColdScan) {
-      const reasons: string[] = [];
-      if (isSlow) reasons.push(`${roundedMs}ms > ${expectations.maxDurationMs}ms`);
-      if (isTooHeavy) reasons.push(`${formatBytes(readBytes!)} > ${formatBytes(expectations.maxReadBytes!)} expected`);
-      if (isColdScan) reasons.push(`cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`);
-
+    if (coldScanTable !== null) {
       queryLogger.warn(
         {
           source: "clickhouse",
           operation,
           durationMs: roundedMs,
-          readBytes,
-          expectedMaxDurationMs: expectations.maxDurationMs,
-          expectedMaxReadBytes: expectations.maxReadBytes,
           queryId: meta.queryId,
           table: meta.table,
           paramKeys: meta.paramKeys,
           query: extractQueryPreview(params),
-          coldScan: isColdScan,
-          ...(coldScanTable ? { coldScanTable } : {}),
+          coldScan: true,
+          coldScanTable,
         },
-        `ClickHouse ${isColdScan && !isSlow && !isTooHeavy ? "cold-scan" : "slow"} ${operation}: ${reasons.join(", ")}`
+        `ClickHouse cold-scan ${operation}: cold scan of ${coldScanTable} (no time filter, walks S3 partitions)`,
       );
     } else {
       queryLogger.debug(
@@ -359,18 +258,12 @@ function logSuccess({
           durationMs: roundedMs,
           queryId: meta.queryId,
         },
-        `ClickHouse ${operation} succeeded`
+        `ClickHouse ${operation} succeeded`,
       );
     }
   } catch (loggingError) {
     logger.error({ loggingError }, "Failed to log ClickHouse query success");
   }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 /**
@@ -390,20 +283,16 @@ export function createResilientClickHouseClient({
   const wrapper = Object.create(client) as ResilientClickHouseClient;
 
   wrapper.query = async (params) => {
-    const cleanedParams = stripLangwatchSettings(params as Record<string, unknown>);
     const queryType = extractQueryType(params);
     const table = extractTableName(params);
     const start = performance.now();
     try {
       const result = await withTransientRetry(
-        () =>
-          client.query(cleanedParams as Parameters<typeof client.query>[0]),
+        () => client.query(params as Parameters<typeof client.query>[0]),
         { operation: "query", maxRetries, baseDelayMs, maxDelayMs },
       );
       const durationMs = performance.now() - start;
-      const readBytes = extractReadBytes(result);
-      // params (not cleanedParams) so extractExpectations can read langwatch_* keys
-      logSuccess({ operation: "query", durationMs, params, readBytes });
+      logSuccess({ operation: "query", durationMs, params });
       observeClickHouseQueryDuration(queryType, table, durationMs / 1000);
       incrementClickHouseQueryCount(queryType, "success");
       return result;
@@ -422,7 +311,9 @@ export function createResilientClickHouseClient({
   };
 
   wrapper.insert = async (params) => {
-    const insertTable = (params as unknown as Record<string, unknown>).table as string ?? "unknown";
+    const insertTable =
+      ((params as unknown as Record<string, unknown>).table as string) ??
+      "unknown";
     const start = performance.now();
     try {
       const result = await withTransientRetry(() => client.insert(params), {

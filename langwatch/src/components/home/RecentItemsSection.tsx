@@ -7,19 +7,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
 import type { ReactNode } from "react";
 import { LuCircleX } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RecentItem, RecentItemType } from "~/server/home/types";
-import {
-  HOME_SECTION_GAP,
-  HomeSectionHeader,
-} from "./HomeSectionHeader";
 import { api } from "~/utils/api";
+import NextLink from "~/utils/compat/next-link";
 import { featureIcons, recentItemTypeToFeature } from "~/utils/featureIcons";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { HomeCard } from "./HomeCard";
+import { HOME_SECTION_GAP, HomeSectionHeader } from "./HomeSectionHeader";
 
 /**
  * Get icon for entity type using shared featureIcons config
