@@ -24,15 +24,12 @@ import type { PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
 import {
-  getClickHouseClientForProject,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
+  type BudgetOverviewForUser,
+  BudgetOverviewService,
+} from "~/server/gateway/budgetOverview.service";
+import { chRepoOrUndefined } from "~/server/gateway/clickhouseRepos";
 import { AiToolEntryService } from "./aiToolEntry.service";
 import { resolveGatewayBaseUrl } from "./gatewayUrl";
-import { PersonalVirtualKeyService } from "./personalVirtualKey.service";
-import { PersonalWorkspaceService } from "./personalWorkspace.service";
 import {
   PLATFORM_TOOL_POLICY_DEFAULTS,
   PLATFORM_TOOL_SLUGS,
@@ -73,6 +70,15 @@ export interface CliBootstrapResult {
    * Membership-scoped via `listConfiguredProvidersForUser`.
    */
   gatewayProviders: string[];
+  /**
+   * @deprecated The single-number collapse the login ceremony used to
+   * print. It keeps the top-ranked applicable budget's figures so old
+   * CLI versions still render a line, but it cannot say WHICH budget
+   * the number belongs to. New consumers read the full per-budget
+   * overview from `GET /api/auth/cli/budget-overview` /
+   * `api.user.budgetOverview`; this field is populated FROM that same
+   * overview so the two can never disagree.
+   */
   budget: {
     monthlyLimitUsd: number | null;
     monthlyUsedUsd: number;
@@ -112,14 +118,6 @@ function resolveGatewayUrl(): string {
   });
 }
 
-const SCOPE_RANK: Record<string, number> = {
-  PRINCIPAL: 0,
-  VIRTUAL_KEY: 1,
-  PROJECT: 2,
-  TEAM: 3,
-  ORGANIZATION: 4,
-};
-
 export class CliBootstrapService {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -156,19 +154,17 @@ export class CliBootstrapService {
     }));
     const adminEmail = await this.resolveAdminEmail(input.organizationId);
 
-    const workspaceService = new PersonalWorkspaceService(this.prisma);
-    const workspace = await workspaceService.findExisting({
+    // One computation: the deprecated collapsed field is derived from the
+    // same overview the CLI's budget-overview endpoint serves, so the
+    // legacy line and the labelled list can never disagree.
+    const overview = await BudgetOverviewService.create(
+      this.prisma,
+      chRepoOrUndefined(),
+    ).overviewForUser({
       userId: input.userId,
       organizationId: input.organizationId,
     });
-    const budget = workspace
-      ? await this.resolveBudget({
-          userId: input.userId,
-          organizationId: input.organizationId,
-          teamId: workspace.team.id,
-          projectId: workspace.project.id,
-        })
-      : { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
+    const budget = collapseOverviewToLegacyBudget(overview);
 
     return {
       tools: catalog.tools,
@@ -218,61 +214,23 @@ export class CliBootstrapService {
     });
     return admin?.user.email ?? null;
   }
+}
 
-  private async resolveBudget(input: {
-    userId: string;
-    organizationId: string;
-    teamId: string;
-    projectId: string;
-  }): Promise<CliBootstrapResult["budget"]> {
-    const vkService = PersonalVirtualKeyService.create(this.prisma);
-    const vks = await vkService.list({
-      userId: input.userId,
-      organizationId: input.organizationId,
-    });
-    const personalVk = vks[0];
-
-    if (!personalVk || !isClickHouseEnabled()) {
-      return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
-    }
-
-    const chRepo = new GatewayBudgetClickHouseRepository(async (projectId) => {
-      const client = await getClickHouseClientForProject(projectId);
-      if (!client) {
-        throw new Error(
-          `ClickHouse enabled but no client for project ${projectId}`,
-        );
-      }
-      return client;
-    });
-    const budgetService = GatewayBudgetService.create(this.prisma, chRepo);
-    const decision = await budgetService.check({
-      organizationId: input.organizationId,
-      teamId: input.teamId,
-      projectId: input.projectId,
-      virtualKeyId: personalVk.id,
-      principalUserId: input.userId,
-      projectedCostUsd: 0,
-    });
-
-    const ranked = decision.scopes
-      .map((s) => ({
-        scope: s.scope,
-        spent: Number.parseFloat(s.spentUsd) || 0,
-        limit: Number.parseFloat(s.limitUsd) || 0,
-        window: s.window,
-        rank: SCOPE_RANK[s.scope] ?? 99,
-      }))
-      .filter((s) => s.limit > 0)
-      .sort((a, b) => a.rank - b.rank);
-    const chosen = ranked[0];
-    if (!chosen) {
-      return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
-    }
-    return {
-      monthlyLimitUsd: chosen.limit,
-      monthlyUsedUsd: chosen.spent,
-      period: chosen.window,
-    };
+/**
+ * Old CLIs render one budget line, so they get the most binding item
+ * (the overview is already ordered most-binding first). No access or
+ * no budgets collapses to the shape's long-standing empty state.
+ */
+function collapseOverviewToLegacyBudget(
+  overview: BudgetOverviewForUser,
+): CliBootstrapResult["budget"] {
+  const top = overview.gatewayAccess ? overview.budgets[0] : undefined;
+  if (!top) {
+    return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
   }
+  return {
+    monthlyLimitUsd: Number.parseFloat(top.limitUsd) || 0,
+    monthlyUsedUsd: Number.parseFloat(top.spentUsd) || 0,
+    period: top.window,
+  };
 }

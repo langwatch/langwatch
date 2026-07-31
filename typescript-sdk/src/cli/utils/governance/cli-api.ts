@@ -349,6 +349,61 @@ export async function getCliBootstrap(
   }
 }
 
+/**
+ * One budget that binds the user's key, labelled with its scope. Wire
+ * shape of `GET /api/auth/cli/budget-overview` items (which mirrors the
+ * tRPC `api.user.budgetOverview` procedure byte-for-byte).
+ */
+export interface BudgetOverviewItem {
+  id: string;
+  name: string;
+  /** e.g. "whole organization budget", "personal budget". */
+  scopePhrase: string;
+  /** "MONTH" | "WEEK" | "DAY" | "HOUR" | "MINUTE" | "TOTAL". */
+  window: string;
+  limitUsd: string;
+  spentUsd: string;
+  /** Display name when the budget counts a single provider only. */
+  providerLabel: string | null;
+  /** ISO timestamp of the next reset; null for TOTAL windows. */
+  resetsAt: string | null;
+  isPerMember: boolean;
+}
+
+export interface BudgetOverviewResponse {
+  /**
+   * False when the org gives this user no member-facing gateway path
+   * (governance flag off / not a member): render nothing budget-related.
+   */
+  gatewayAccess: boolean;
+  reason?: string;
+  /** Most binding first; empty when no budget applies. */
+  budgets: BudgetOverviewItem[];
+}
+
+/**
+ * Fetch every budget that binds the user's key for the login epilogue.
+ * Returns null on 404 (older server without the endpoint) so the caller
+ * can fall back to the /bootstrap collapsed budget line.
+ */
+export async function getBudgetOverview(
+  cfg: GovernanceConfig,
+  options: CliApiOptions = {},
+): Promise<BudgetOverviewResponse | null> {
+  try {
+    return await getJSON<BudgetOverviewResponse>(
+      cfg,
+      `/api/auth/cli/budget-overview`,
+      options,
+    );
+  } catch (err) {
+    if (err instanceof GovernanceCliError && err.status === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+
 // ── Public REST: /api/governance/* ─────────────────────────────────────────
 //
 // IngestionTemplate CRUD Hono routes. Wire shape is snake_case in/out.

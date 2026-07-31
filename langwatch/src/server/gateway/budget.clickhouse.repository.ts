@@ -411,13 +411,29 @@ export class GatewayBudgetClickHouseRepository {
    * descending. Used by the budget detail page to render the recent-activity
    * panel (post-cutover replacement for `prisma.gatewayBudgetLedger.findMany`
    * in budget.service.ts:getDetail).
+   *
+   * Takes the full tenant fan-out because the ledger is sharded on
+   * TenantId = the project the trace landed in: an org, team, principal,
+   * or per-member group budget accrues rows under every project that
+   * emitted a matching trace, so reading a single tenant would render
+   * "No usage yet" on a budget that is actively debiting.
    */
   async recentEventsForBudget(
-    tenantId: string,
+    tenantIds: string[],
     budgetId: string,
     limit = 20,
   ): Promise<LedgerEventRow[]> {
-    const client = await this.resolveClient(tenantId);
+    if (tenantIds.length === 0) return [];
+    const params: Record<string, string | number> = { budgetId, limit };
+    const tenantPlaceholders = tenantIds
+      .map((id, i) => {
+        params[`tenant${i}`] = id;
+        return `{tenant${i}:String}`;
+      })
+      .join(",");
+    // Any tenant resolves the client — the events table is a single
+    // physical table; `resolveClient` only differs by project for routing.
+    const client = await this.resolveClient(tenantIds[0]!);
     const result = await client.query({
       query: `
         SELECT
@@ -433,12 +449,12 @@ export class GatewayBudgetClickHouseRepository {
           Status AS status,
           toUnixTimestamp64Milli(OccurredAt) AS occurredAtMs
         FROM ${EVENTS_TABLE}
-        WHERE TenantId = {tenantId:String}
+        WHERE TenantId IN (${tenantPlaceholders})
           AND BudgetId = {budgetId:String}
         ORDER BY OccurredAt DESC
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantId, budgetId, limit },
+      query_params: params,
       format: "JSONEachRow",
     });
     type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {

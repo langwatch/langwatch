@@ -12,6 +12,7 @@ import {
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
 import { useState } from "react";
 import { AvatarUploadControl } from "~/components/me/avatar/AvatarUploadControl";
+import { BudgetOverviewList } from "~/components/me/BudgetOverviewList";
 import { HomePagePicker } from "~/components/me/HomePagePicker";
 import MyLayout from "~/components/me/MyLayout";
 import { PersonalOtlpEndpointPanel } from "~/components/me/PersonalOtlpEndpointPanel";
@@ -39,11 +40,6 @@ const fmtRelative = (iso: string | null): string => {
   if (day < 30) return `${day}d ago`;
   return new Date(iso).toLocaleDateString();
 };
-
-const fmtUsd = (amount: number): string =>
-  amount === 0
-    ? "$0.00"
-    : `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function MySettingsPage() {
   const ctx = usePersonalContext();
@@ -357,30 +353,22 @@ function MySettingsPage() {
           </SectionCard>
         ) : null}
 
-        <SectionCard title="Personal budget">
-          {ctx.summary.budgetUsd === null ? (
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" color="fg.muted">
-                No personal budget set by your admin.
-              </Text>
-              <Text fontSize="xs" color="fg.muted">
-                If you'd like one, ask your admin.
-              </Text>
-            </VStack>
-          ) : (
-            <VStack align="stretch" gap={3}>
-              <Field
-                label="Monthly limit"
-                value={fmtUsd(ctx.summary.budgetUsd)}
-                hint={`Set by your ${ctx.organizationName} admin · cannot edit`}
-              />
-              <Field
-                label="Current spend"
-                value={fmtUsd(ctx.summary.spentThisMonthUsd)}
-              />
-            </VStack>
-          )}
-        </SectionCard>
+        {ctx.budgetOverview.gatewayAccess && (
+          <SectionCard title="Budgets that apply to you">
+            {ctx.budgetOverview.budgets.length === 0 ? (
+              <VStack align="start" gap={1}>
+                <Text fontSize="sm" color="fg.muted">
+                  No budgets apply to your usage yet.
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  If you'd like one, ask your admin.
+                </Text>
+              </VStack>
+            ) : (
+              <BudgetOverviewList items={ctx.budgetOverview.budgets} />
+            )}
+          </SectionCard>
+        )}
       </VStack>
     </MyLayout>
   );

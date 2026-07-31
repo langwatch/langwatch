@@ -23,8 +23,10 @@ import * as path from "node:path";
 import chalk from "chalk";
 import { createSpinner } from "../spinner";
 import {
+	type BudgetOverviewResponse,
 	type CliBootstrapResponse,
 	extractLookupIdFromToken,
+	getBudgetOverview,
 	getCliBootstrap,
 	listIngestionKeys,
 } from "./cli-api";
@@ -196,6 +198,13 @@ export async function runUnifiedLoginFlow(
 				// Wiring refresh is best-effort; the session itself is already saved.
 			}
 
+			// Per-budget epilogue data. Every budget that binds this key,
+			// labelled with its scope, so the ceremony never presents the
+			// whole organization's cap as if it were personal. Null on older
+			// servers without the endpoint; the ceremony then falls back to
+			// the /bootstrap collapsed line.
+			const budgetOverview = await fetchBudgetOverviewSafely(cfg);
+
 			console.log();
 			const ceremonyLines = formatLoginCeremony({
 				email: cfg.user?.email ?? result.user.email,
@@ -210,6 +219,21 @@ export async function runUnifiedLoginFlow(
 								usedUsd: bootstrap.budget.monthlyUsedUsd,
 							}
 						: undefined,
+				// gatewayAccess false renders nothing budget-related at all:
+				// pass an empty list so the legacy line cannot resurface it.
+				budgets: budgetOverview
+					? budgetOverview.gatewayAccess
+						? budgetOverview.budgets.map((b) => ({
+								spentUsd: Number.parseFloat(b.spentUsd) || 0,
+								limitUsd: Number.parseFloat(b.limitUsd) || 0,
+								window: b.window,
+								scopePhrase: b.scopePhrase,
+								providerLabel: b.providerLabel,
+								resetsAt: b.resetsAt,
+							}))
+						: []
+					: undefined,
+				budgetsUrl: `${cfg.control_plane_url.replace(/\/+$/, "")}/settings/gateway/budgets`,
 			});
 			for (const line of ceremonyLines) {
 				console.log(line);
@@ -365,6 +389,17 @@ async function fetchBootstrapSafely(
 	try {
 		return await getCliBootstrap(cfg);
 	} catch {
+		return null;
+	}
+}
+
+async function fetchBudgetOverviewSafely(
+	cfg: GovernanceConfig,
+): Promise<BudgetOverviewResponse | null> {
+	try {
+		return await getBudgetOverview(cfg);
+	} catch {
+		// The epilogue is decoration on a login that already succeeded.
 		return null;
 	}
 }

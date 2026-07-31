@@ -14,7 +14,9 @@
  *     • anthropic   Claude
  *     • openai      (not configured yet)
  *
- *   Monthly budget: $500   |   Used: $0.00
+ *   Budgets that apply to your key:
+ *     $2.43 used of $100.00 this month (whole organization budget), resets Aug 1
+ *     $0.00 used of $25.00 this month (personal budget), resets Aug 1
  *
  *   Or open the app in your browser:
  *     $ langwatch open
@@ -58,6 +60,26 @@ export interface LoginCeremonyBudget {
   usedUsd: number;
 }
 
+/**
+ * One budget that binds the user's key, as served by
+ * `GET /api/auth/cli/budget-overview`. Unlike the collapsed
+ * {@link LoginCeremonyBudget} it says WHICH budget the numbers belong to.
+ */
+export interface LoginCeremonyBudgetLine {
+  /** Used so far in USD. */
+  spentUsd: number;
+  /** Spend ceiling in USD. */
+  limitUsd: number;
+  /** Budget window ("MONTH", "WEEK", "DAY", "HOUR", "MINUTE", "TOTAL"). */
+  window: string;
+  /** Scope parenthetical, e.g. "whole organization budget". */
+  scopePhrase: string;
+  /** Display name when the budget counts a single provider only. */
+  providerLabel?: string | null;
+  /** ISO timestamp of the next reset; null/omitted for TOTAL windows. */
+  resetsAt?: string | null;
+}
+
 export interface LoginCeremonyInput {
   email: string;
   organizationName?: string;
@@ -69,7 +91,22 @@ export interface LoginCeremonyInput {
   tools?: LoginCeremonyTool[];
   /** Model providers the user can mint their own virtual key for. */
   providers?: LoginCeremonyProvider[];
+  /**
+   * Legacy single-number budget from /bootstrap. Only rendered when
+   * `budgets` is undefined (older server without the overview endpoint):
+   * the collapsed number cannot say which budget it is, which is the
+   * mislabel the overview replaced.
+   */
   budget?: LoginCeremonyBudget;
+  /**
+   * Budgets that bind the user's key, most binding first. When present
+   * it supersedes `budget`; an empty array renders nothing at all (the
+   * user has gateway access but no budget applies). Undefined means the
+   * server predates the overview endpoint.
+   */
+  budgets?: LoginCeremonyBudgetLine[];
+  /** Where "…and N more" points when more than three budgets apply. */
+  budgetsUrl?: string;
   /** Whether the `langwatch open` browser-launch command is available. */
   openCommand?: boolean;
 }
@@ -94,6 +131,46 @@ function formatUsd(n: number): string {
 
 function formatUsedUsd(n: number): string {
   return `$${n.toFixed(2)}`;
+}
+
+/** Cap the epilogue at a glanceable height; the rest goes behind a link. */
+const MAX_BUDGET_LINES = 3;
+
+const WINDOW_PHRASE: Record<string, string> = {
+  MINUTE: "this minute",
+  HOUR: "this hour",
+  DAY: "today",
+  WEEK: "this week",
+  MONTH: "this month",
+  TOTAL: "all time",
+};
+
+function windowPhrase(window: string): string {
+  return WINDOW_PHRASE[window.toUpperCase()] ?? window.toLowerCase();
+}
+
+function formatResetDay(resetsAt: string | null | undefined): string | null {
+  if (!resetsAt) return null;
+  const date = new Date(resetsAt);
+  if (Number.isNaN(date.getTime())) return null;
+  // Reset boundaries are computed in UTC on the server, so format the
+  // promised day on the same clock instead of the terminal's zone.
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/**
+ * One budget as one line, always naming its scope:
+ *   "$2.43 used of $100.00 this month (whole organization budget), resets Aug 1"
+ */
+function formatBudgetLine(line: LoginCeremonyBudgetLine): string {
+  const provider = line.providerLabel ? `, ${line.providerLabel} only` : "";
+  const resetDay = formatResetDay(line.resetsAt);
+  const resets = resetDay ? `, resets ${resetDay}` : "";
+  return `${formatUsedUsd(line.spentUsd)} used of ${formatUsedUsd(line.limitUsd)} ${windowPhrase(line.window)} (${line.scopePhrase}${provider})${resets}`;
 }
 
 export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
@@ -135,7 +212,22 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
     }
   }
 
-  if (input.budget) {
+  if (input.budgets !== undefined) {
+    if (input.budgets.length > 0) {
+      lines.push("");
+      lines.push("Budgets that apply to your key:");
+      for (const line of input.budgets.slice(0, MAX_BUDGET_LINES)) {
+        lines.push(`  ${formatBudgetLine(line)}`);
+      }
+      const overflow = input.budgets.length - MAX_BUDGET_LINES;
+      if (overflow > 0) {
+        const suffix = input.budgetsUrl ? `: ${input.budgetsUrl}` : "";
+        lines.push(`  ...and ${overflow} more${suffix}`);
+      }
+    }
+  } else if (input.budget) {
+    // Legacy server without /budget-overview: the old collapsed line is
+    // still better than silence, even though it cannot name its scope.
     lines.push("");
     const period =
       input.budget.period.charAt(0).toUpperCase() +

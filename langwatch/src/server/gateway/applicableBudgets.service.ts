@@ -17,9 +17,13 @@ import type {
   BudgetSpendTarget,
   GatewayBudgetClickHouseRepository,
 } from "./budget.clickhouse.repository";
-import { resolveApplicableBudgets } from "./budgetResolution.service";
+import {
+  type BudgetResolutionTarget,
+  resolveApplicableBudgets,
+} from "./budgetResolution.service";
 import { resolveProviderLabels } from "./providerLabels";
 import { resolveTraceProject } from "./scopeResolver";
+import { resolveScopeTargetsBatch, scopeTargetKey } from "./scopeTargets";
 import type { ScopeInput } from "./virtualKey.repository";
 
 export type DraftVirtualKey = {
@@ -79,19 +83,41 @@ export async function resolveApplicableBudgetsForDraftKey(
     traceProjectId: draft.traceProjectId,
   });
 
-  const resolved = await resolveApplicableBudgets(prisma, {
-    organizationId: draft.organizationId,
-    virtualKeyId: draft.virtualKeyId,
-    teamId: traceProject?.teamId ?? null,
-    projectId: traceProject?.id ?? null,
-    principalUserId: draft.principalUserId,
-  });
+  return await resolveApplicableBudgetsForTarget(
+    prisma,
+    {
+      organizationId: draft.organizationId,
+      virtualKeyId: draft.virtualKeyId,
+      teamId: traceProject?.teamId ?? null,
+      projectId: traceProject?.id ?? null,
+      principalUserId: draft.principalUserId,
+    },
+    chRepo,
+  );
+}
+
+/**
+ * Same decoration for a caller that already knows the exact resolution
+ * target (team, project, key, principal) and does not need the draft's
+ * trace-project inference. The budget-overview service reads this with
+ * the user's personal workspace as the target.
+ */
+export async function resolveApplicableBudgetsForTarget(
+  prisma: PrismaClient,
+  target: BudgetResolutionTarget,
+  chRepo?: GatewayBudgetClickHouseRepository,
+): Promise<ApplicableBudget[]> {
+  const resolved = await resolveApplicableBudgets(prisma, target);
   if (resolved.length === 0) return [];
 
   // Independent lookups on an interactive path: run them together.
-  const [spentByBudgetId, labels, providerLabels] = await Promise.all([
-    loadSpend(prisma, draft, resolved, chRepo),
-    loadScopeLabels(prisma, resolved),
+  const [spentByBudgetId, targets, providerLabels] = await Promise.all([
+    loadSpend(prisma, target.organizationId, resolved, chRepo),
+    resolveScopeTargetsBatch(
+      prisma,
+      resolved.map((r) => r.budget),
+      target.organizationId,
+    ),
     resolveProviderLabels({
       prisma,
       budgets: resolved.map((r) => r.budget),
@@ -106,7 +132,8 @@ export async function resolveApplicableBudgetsForDraftKey(
     scopeType: budget.scopeType,
     scopeId: budget.scopeId,
     scopeLabel:
-      labels.get(`${budget.scopeType}:${budget.scopeId}`) ?? budget.scopeId,
+      targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ??
+      budget.scopeId,
     window: budget.window,
     limitUsd: budget.limitUsd.toFixed(6),
     spentUsd: spentByBudgetId.get(budget.id) ?? "0",
@@ -123,13 +150,13 @@ export async function resolveApplicableBudgetsForDraftKey(
 
 async function loadSpend(
   prisma: PrismaClient,
-  draft: DraftVirtualKey,
+  organizationId: string,
   resolved: Awaited<ReturnType<typeof resolveApplicableBudgets>>,
   chRepo?: GatewayBudgetClickHouseRepository,
 ): Promise<Map<string, string>> {
   if (!chRepo) return new Map();
   const projects = await prisma.project.findMany({
-    where: { team: { organizationId: draft.organizationId } },
+    where: { team: { organizationId } },
     select: { id: true },
   });
   if (projects.length === 0) return new Map();
@@ -151,71 +178,4 @@ async function loadSpend(
     // answer. A rollup outage must not blank the drawer.
     return new Map();
   }
-}
-
-async function loadScopeLabels(
-  prisma: PrismaClient,
-  resolved: Awaited<ReturnType<typeof resolveApplicableBudgets>>,
-): Promise<Map<string, string>> {
-  const idsByType = new Map<string, string[]>();
-  for (const { budget } of resolved) {
-    const list = idsByType.get(budget.scopeType) ?? [];
-    list.push(budget.scopeId);
-    idsByType.set(budget.scopeType, list);
-  }
-  const labels = new Map<string, string>();
-  const put = (type: string, id: string, label: string) =>
-    labels.set(`${type}:${id}`, label);
-
-  const orgIds = idsByType.get("ORGANIZATION") ?? [];
-  if (orgIds.length > 0) {
-    const rows = await prisma.organization.findMany({
-      where: { id: { in: orgIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("ORGANIZATION", r.id, r.name);
-  }
-  const teamIds = idsByType.get("TEAM") ?? [];
-  if (teamIds.length > 0) {
-    const rows = await prisma.team.findMany({
-      where: { id: { in: teamIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("TEAM", r.id, r.name);
-  }
-  const projectIds = idsByType.get("PROJECT") ?? [];
-  if (projectIds.length > 0) {
-    const rows = await prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("PROJECT", r.id, r.name);
-  }
-  const groupIds = idsByType.get("GROUP") ?? [];
-  if (groupIds.length > 0) {
-    const rows = await prisma.group.findMany({
-      where: { id: { in: groupIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("GROUP", r.id, r.name);
-  }
-  const userIds = idsByType.get("PRINCIPAL") ?? [];
-  if (userIds.length > 0) {
-    const rows = await prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true },
-    });
-    for (const r of rows) {
-      put("PRINCIPAL", r.id, r.name ?? r.email ?? r.id);
-    }
-  }
-  const vkIds = idsByType.get("VIRTUAL_KEY") ?? [];
-  if (vkIds.length > 0) {
-    const rows = await prisma.virtualKey.findMany({
-      where: { id: { in: vkIds } },
-      select: { id: true, name: true },
-    });
-    for (const r of rows) put("VIRTUAL_KEY", r.id, r.name);
-  }
-  return labels;
 }
