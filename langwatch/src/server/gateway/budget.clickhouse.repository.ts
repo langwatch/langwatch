@@ -177,6 +177,28 @@ export class GatewayBudgetClickHouseRepository {
    * trace = one batch covering every applicable budget) so a single
    * existence probe covers the whole batch.
    */
+  /**
+   * Probe-then-insert is not atomic, and that is survivable here for
+   * structural reasons, not luck. The rollup MV aggregates at INSERT time
+   * (a duplicate row double-counts it forever; the ReplacingMergeTree only
+   * collapses the raw rows), so what actually prevents doubles:
+   *
+   *   1. One writer per (budget, request) pair: the trace reactor owns
+   *      non-template budgets, the attributed-debits process owns
+   *      templates. The two never write the same pair, so cross-writer
+   *      interleaving cannot double any bucket.
+   *   2. Within a writer, execution is serialized per aggregate (reactor
+   *      GroupQueue / process-manager streams are per-aggregate FIFO), so
+   *      two fires for the same request never run concurrently; retries
+   *      run after the failed attempt.
+   *   3. Inserts wait for durability (wait_for_async_insert: 1), so a
+   *      retry's probe sees the rows a crashed-after-insert attempt wrote.
+   *
+   * Residual window, accepted and named: replaying the same aggregate
+   * concurrently from TWO operator sessions can land between another
+   * session's probe and insert. Replay is an ops action; run one at a
+   * time per aggregate.
+   */
   async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
     const tenantId = rows[0]!.tenantId;
@@ -254,102 +276,15 @@ export class GatewayBudgetClickHouseRepository {
   }
 
   /**
-   * Multi-request sibling of insertDebit for the per-request debit grain:
-   * one reactor fire can now carry rows for SEVERAL gateway_request_ids
-   * (one per gateway span on the trace). One probe covers every id in the
-   * batch, and only rows for ids the ledger has never seen are inserted,
-   * for the same MV-double-count reason insertDebit documents.
-   */
-  async insertDebits(rows: BudgetDebitRow[]): Promise<void> {
-    if (rows.length === 0) return;
-    const tenantId = rows[0]!.tenantId;
-    if (rows.some((r) => r.tenantId !== tenantId)) {
-      throw new Error(
-        "GatewayBudgetClickHouseRepository.insertDebits: rows span multiple tenants",
-      );
-    }
-
-    const requestIds = [...new Set(rows.map((r) => r.gatewayRequestId))];
-    const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT DISTINCT GatewayRequestId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId IN {requestIds:Array(String)}`,
-      query_params: { tenantId, requestIds },
-      format: "JSONEachRow",
-    });
-    const seen = new Set(
-      ((await probe.json()) as Array<{ GatewayRequestId: string }>).map(
-        (r) => r.GatewayRequestId,
-      ),
-    );
-    const fresh = rows.filter((r) => !seen.has(r.gatewayRequestId));
-    if (fresh.length === 0) {
-      logger.debug(
-        { tenantId, requestIds: requestIds.length },
-        "skipping replay — every gateway_request_id already in ledger",
-      );
-      return;
-    }
-
-    for (const requestId of [
-      ...new Set(fresh.map((r) => r.gatewayRequestId)),
-    ]) {
-      await this.insertDebitUnchecked(
-        fresh.filter((r) => r.gatewayRequestId === requestId),
-      );
-    }
-  }
-
-  /** Insert rows for one gateway_request_id without the existence probe. */
-  private async insertDebitUnchecked(rows: BudgetDebitRow[]): Promise<void> {
-    if (rows.length === 0) return;
-    const tenantId = rows[0]!.tenantId;
-    const client = await this.resolveClient(tenantId);
-    const records = rows.map((r) => ({
-      TenantId: r.tenantId,
-      BudgetId: r.budgetId,
-      Scope: scopeToClickHouse(r.scope),
-      ScopeId: r.scopeId,
-      Window: windowToClickHouse(r.window),
-      VirtualKeyId: r.virtualKeyId,
-      ProviderCredentialId: r.providerCredentialId ?? "",
-      ProviderKey: r.providerKey ?? "",
-      GatewayRequestId: r.gatewayRequestId,
-      AmountUSD: r.amountUsd,
-      TokensInput: r.tokensInput,
-      TokensOutput: r.tokensOutput,
-      TokensCacheRead: r.tokensCacheRead,
-      TokensCacheWrite: r.tokensCacheWrite,
-      Model: r.model,
-      ProviderSlot: r.providerSlot ?? "",
-      DurationMS: r.durationMs ?? 0,
-      Status: r.status.toLowerCase(),
-      OccurredAt: r.occurredAt.getTime(),
-      EventTimestamp: Date.now(),
-    }));
-    try {
-      await client.insert({
-        table: EVENTS_TABLE,
-        values: records,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      logger.error(
-        { tenantId, count: rows.length, error },
-        "failed to insert gateway budget ledger events",
-      );
-      throw error;
-    }
-  }
-
-  /**
    * Debit insert for a writer that owns specific BUDGETS on a request,
    * next to another writer owning the request's other budgets. The
    * whole-request probe insertDebit uses would make two independent
    * writers mutually exclusive (whoever lands second sees the request id
    * present and skips); this probes per (BudgetId, GatewayRequestId), so
    * replays of THIS writer dedup while the other writer's rows never
-   * suppress it.
+   * suppress it. The probe-then-insert race analysis on insertDebit
+   * applies verbatim; the ownership split there is what makes the two
+   * probes composable.
    */
   async insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
