@@ -53,8 +53,14 @@ function boundedTable(
   return knownTables.has(qualifier) ? qualifier : null;
 }
 
+interface RangeBound {
+  table: string;
+  column: string;
+  qualified: boolean;
+}
+
 /**
- * Range bounds in `sql`, grouped by the table they bound.
+ * Every range bound in `sql`, attributed to the table it bounds, deduped.
  *
  * A bare identifier belongs to the nearest preceding `FROM <table>` — that is
  * the scope ClickHouse would resolve it in, or fail to. A qualified one belongs
@@ -62,38 +68,63 @@ function boundedTable(
  * reference to that table's own column; any other qualifier is an alias of the
  * outer query and is skipped.
  */
-function rangeBoundColumnsByTable(sql: string): Map<string, Set<string>> {
+function boundOf(
+  match: RegExpExecArray,
+  enclosingTable: string | null,
+  knownTables: ReadonlySet<string>,
+): RangeBound | null {
+  const [, fromTable, qualifier, column] = match;
+  if (fromTable || !column) return null;
+
+  const table = boundedTable(qualifier, enclosingTable, knownTables);
+  if (!table) return null;
+
+  return { table, column, qualified: Boolean(qualifier) };
+}
+
+function rangeBounds(sql: string): RangeBound[] {
   const knownTables = new Set(Object.keys(TIME_PARTITIONED_TABLES));
-  const byTable = new Map<string, Set<string>>();
+  const bounds = new Map<string, RangeBound>();
   let enclosingTable: string | null = null;
 
   RANGE_BOUND_OR_TABLE.lastIndex = 0;
   let match: RegExpExecArray | null = RANGE_BOUND_OR_TABLE.exec(sql);
   while (match !== null) {
-    const [, fromTable, qualifier, column] = match;
-    if (fromTable) {
-      enclosingTable = fromTable;
-    }
-    const table =
-      fromTable || !column
-        ? null
-        : boundedTable(qualifier, enclosingTable, knownTables);
-    if (table && column) {
-      const columns = byTable.get(table) ?? new Set<string>();
-      columns.add(column);
-      byTable.set(table, columns);
+    enclosingTable = match[1] ?? enclosingTable;
+    const bound = boundOf(match, enclosingTable, knownTables);
+    if (bound) {
+      bounds.set(`${bound.table}.${bound.column}.${bound.qualified}`, bound);
     }
     match = RANGE_BOUND_OR_TABLE.exec(sql);
+  }
+
+  return [...bounds.values()];
+}
+
+/** Bound columns per table, for assertions that only care about which. */
+function rangeBoundColumnsByTable(sql: string): Map<string, Set<string>> {
+  const byTable = new Map<string, Set<string>>();
+
+  for (const { table, column } of rangeBounds(sql)) {
+    const columns = byTable.get(table) ?? new Set<string>();
+    columns.add(column);
+    byTable.set(table, columns);
   }
 
   return byTable;
 }
 
-/** One message per bound that names a column the table cannot prune on. */
+/**
+ * One message per bound that names a column the table cannot prune on, saying
+ * which of the two failures it is. A bare name the table lacks is the dangerous
+ * one: ClickHouse resolves it outward and the query dies at runtime. A
+ * qualified one cannot be captured by the outer scope, so it costs only the
+ * pruning it was written to buy.
+ */
 function partitionBoundViolations(sql: string): string[] {
   const violations: string[] = [];
 
-  for (const [table, columns] of rangeBoundColumnsByTable(sql)) {
+  for (const { table, column, qualified } of rangeBounds(sql)) {
     const partitionColumns = (
       TIME_PARTITIONED_TABLES as Record<string, readonly string[] | undefined>
     )[table];
@@ -103,13 +134,14 @@ function partitionBoundViolations(sql: string): string[] {
       ...partitionColumns,
       ...(LEGACY_PARTITION_COLUMNS[table] ?? []),
     ];
+    if (prunable.includes(column)) continue;
 
-    for (const column of columns) {
-      if (prunable.includes(column)) continue;
-      violations.push(
-        `${table} is bounded on ${column}, which is none of the columns it can prune on (${prunable.join(", ")}); unqualified, ClickHouse resolves it against the outer trace_summaries scope instead of failing, and qualified it prunes nothing`,
-      );
-    }
+    const consequence = qualified
+      ? `${table}.${column} is pinned to ${table}, so the bound prunes nothing`
+      : `ClickHouse resolves the bare ${column} against the outer trace_summaries scope instead of failing`;
+    violations.push(
+      `${table} is bounded on ${column}, which is none of the columns it can prune on (${prunable.join(", ")}); ${consequence}`,
+    );
   }
 
   return violations;
@@ -219,11 +251,23 @@ describe("analytics JOIN time bounds", () => {
     });
 
     /** @scenario A qualified bound on a column the table cannot prune on is still reported */
-    it("reports a qualified bound on a non-partition column", () => {
+    it("reports a qualified bound on a non-partition column, as a lost prune", () => {
       const sql =
         "SELECT 1 FROM evaluation_runs WHERE evaluation_runs.CreatedAt >= {startDate:DateTime64(3)}";
 
-      expect(partitionBoundViolations(sql)).toHaveLength(1);
+      expect(partitionBoundViolations(sql)).toEqual([
+        "evaluation_runs is bounded on CreatedAt, which is none of the columns it can prune on (ScheduledAt, UpdatedAt); evaluation_runs.CreatedAt is pinned to evaluation_runs, so the bound prunes nothing",
+      ]);
+    });
+
+    /** @scenario A bare bound on a column the table lacks is reported as an outward resolution */
+    it("reports a bare bound on a non-partition column, as an outward resolution", () => {
+      const sql =
+        "SELECT 1 FROM evaluation_runs WHERE OccurredAt >= {startDate:DateTime64(3)}";
+
+      expect(partitionBoundViolations(sql)).toEqual([
+        "evaluation_runs is bounded on OccurredAt, which is none of the columns it can prune on (ScheduledAt, UpdatedAt); ClickHouse resolves the bare OccurredAt against the outer trace_summaries scope instead of failing",
+      ]);
     });
 
     /** @scenario A bound qualified with the outer query's alias stays out of the inner table's bounds */

@@ -78,7 +78,13 @@ Feature: The evaluation_runs JOIN is bounded below, and only below
   Scenario: A qualified bound on a column the table cannot prune on is still reported
     Given a bound qualified with its table's name, naming a column that cannot prune
     When the generated SQL is checked for bounds on non-prunable columns
-    Then the bound is reported
+    Then the bound is reported as a prune the query does not get
+
+  @unit
+  Scenario: A bare bound on a column the table lacks is reported as an outward resolution
+    Given a bare bound naming a column the bounded table has not got
+    When the generated SQL is checked for bounds on non-prunable columns
+    Then the bound is reported as resolving against the outer scope
 
   @unit
   Scenario: A bound qualified with the outer query's alias stays out of the inner table's bounds
