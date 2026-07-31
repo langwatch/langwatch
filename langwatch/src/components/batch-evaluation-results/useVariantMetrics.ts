@@ -12,10 +12,18 @@
  * paid the whole cost a second time to arrive at a value already in memory.
  * `useMemo` cannot fix that — they are siblings with separate memo caches.
  *
- * Keyed by the row array's IDENTITY (WeakMap) rather than a hash of its
- * contents: the rows are large, hashing them would cost a slice of what the
- * cache saves, and the array is already stable for as long as the run's
- * results are. When it is replaced the entry becomes unreachable with it.
+ * ── Keyed on CONTENT, not on the row array ──
+ *
+ * This was keyed on the array's identity (a WeakMap), which is free but wrong
+ * while a run is live: the results page polls every second and rebuilds the
+ * transformed rows from each response, so every poll produced a new array and
+ * missed the cache even when no row had changed. The whole O(variants squared)
+ * bootstrap then ran once a second on the render thread.
+ *
+ * Only the two numbers this reads are folded into the signature — cost and
+ * duration per target. The outputs, which are what make a row large, are left
+ * out, so the fold is integer work proportional to rows × targets rather than
+ * to the size of the payload.
  */
 
 import { useMemo } from "react";
@@ -26,10 +34,33 @@ import {
 } from "./computeVariantMetrics";
 import type { BatchResultRow } from "./types";
 
-const cache = new WeakMap<
-  BatchResultRow[],
-  Map<string, Record<string, VariantMetrics>>
->();
+/** Bounded, because a content key has nothing to collect it. */
+const MAX_CACHED_METRICS = 16;
+
+const cache = new Map<string, Record<string, VariantMetrics>>();
+
+/** FNV-1a, folded over the fields these statistics actually read. */
+const hashInto = (hash: number, text: string): number => {
+  let h = hash;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+
+const signatureOf = (rows: BatchResultRow[]): string => {
+  let h = 2166136261;
+  for (const row of rows) {
+    h = hashInto(h, String(row.index));
+    for (const [targetId, target] of Object.entries(row.targets)) {
+      h = hashInto(h, targetId);
+      h = hashInto(h, String(target.cost ?? "-"));
+      h = hashInto(h, String(target.duration ?? "-"));
+    }
+  }
+  return `${rows.length}:${h}`;
+};
 
 /** Exported for tests: the memoised computation, without the React binding. */
 export const variantMetricsFor = ({
@@ -41,19 +72,18 @@ export const variantMetricsFor = ({
 }): Record<string, VariantMetrics> => {
   // Which variants are asked for changes the pairwise intervals, so it
   // belongs in the key.
-  const key = variantIds.join(" ");
+  const key = `${signatureOf(rows)}|${variantIds.join(" ")}`;
 
-  let byKey = cache.get(rows);
-  if (!byKey) {
-    byKey = new Map();
-    cache.set(rows, byKey);
-  }
-
-  const hit = byKey.get(key);
+  const hit = cache.get(key);
   if (hit) return hit;
 
   const computed = computeVariantMetrics({ variantIds, rows });
-  byKey.set(key, computed);
+
+  if (cache.size >= MAX_CACHED_METRICS) {
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  cache.set(key, computed);
   return computed;
 };
 
