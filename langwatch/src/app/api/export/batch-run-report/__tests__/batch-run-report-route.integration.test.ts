@@ -9,6 +9,7 @@
  * @see specs/scenarios/scenario-run-report.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReportModel } from "~/server/export/batch-run-report/report.types";
 
 const getServerAuthSession = vi.fn();
 const hasProjectPermission = vi.fn();
@@ -39,7 +40,15 @@ const BODY = {
   batchRunId: "batch_1",
 };
 
-function reportModel(overrides: Record<string, unknown> = {}) {
+/**
+ * Typed as `ReportModel` on purpose.
+ *
+ * As an untyped literal this drifted silently when `summary` was added to the
+ * model: typecheck stayed green and the gap only surfaced as a 500 from the
+ * renderer in CI. Annotated, the next field added to `ReportModel` breaks the
+ * build here instead.
+ */
+function reportModel(overrides: Partial<ReportModel> = {}): ReportModel {
   return {
     meta: {
       projectId: "project_1",
@@ -48,9 +57,23 @@ function reportModel(overrides: Record<string, unknown> = {}) {
       generatedAt: "2026-07-29T12:00:00.000Z",
       withAnalysis: true,
     },
+    summary: {
+      verdict: "One of two scenarios failed.",
+      tone: "warn",
+      movement: null,
+      facts: [{ label: "Scenarios", value: "2" }],
+      topProblem: null,
+      caveat: null,
+    },
     tier: "figures_only",
     headline: {
-      passRate: { value: 50, ci95: null, settled: 2, tooFewToConclude: true },
+      passRate: {
+        value: 50,
+        ci95: null,
+        settled: 2,
+        tooFewToConclude: true,
+        inconclusiveReason: "too_few_runs",
+      },
       counts: {
         passedCount: 1,
         failedCount: 1,

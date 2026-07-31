@@ -79,13 +79,28 @@ function installFetchMock() {
   return fetchMock;
 }
 
+/**
+ * The endpoint answers with NDJSON: a line per stage while the report is being
+ * built, then one final line carrying the document. Faking that shape rather
+ * than a plain body is what makes these tests exercise the reader the hook
+ * actually runs — a blob-shaped fake passes through it without ever
+ * downloading anything.
+ */
 function reportResponse({
   tier = "verified",
   filename = "checkout-suite-report.html",
+  stages = ["reading", "measuring"],
 }: {
   tier?: string;
   filename?: string;
+  stages?: string[];
 } = {}) {
+  const lines = [
+    ...stages.map((stage) => JSON.stringify({ stage })),
+    JSON.stringify({ done: true, tier, filename, html: "<html></html>" }),
+  ];
+  const encoded = new TextEncoder().encode(`${lines.join("\n")}\n`);
+
   return {
     ok: true,
     status: 200,
@@ -93,8 +108,19 @@ function reportResponse({
       "Content-Disposition": `attachment; filename="${filename}"`,
       "X-Report-Tier": tier,
     }),
-    blob: () =>
-      Promise.resolve(new Blob(["<html></html>"], { type: "text/html" })),
+    body: {
+      getReader: () => {
+        let sent = false;
+        return {
+          read: () =>
+            Promise.resolve(
+              sent
+                ? { done: true, value: undefined }
+                : ((sent = true), { done: false, value: encoded }),
+            ),
+        };
+      },
+    },
   };
 }
 
@@ -138,6 +164,15 @@ function ReportRows({
               batchRunId,
               scenarioSetId: "set_1",
               suiteName: `Suite ${batchRunId}`,
+              withAnalysis: false,
+            })
+          }
+          onExportReportWithLangy={() =>
+            startReport({
+              batchRunId,
+              scenarioSetId: "set_1",
+              suiteName: `Suite ${batchRunId}`,
+              withAnalysis: true,
             })
           }
           onCancelReport={() => cancelReport({ batchRunId })}
@@ -207,12 +242,16 @@ afterEach(() => {
 describe("run report action on a run history row", () => {
   describe("given a run in the history", () => {
     /** @scenario "Every run offers a report" */
-    it("offers an export report action on the row", async () => {
+    it("offers both an instant export and one with Langy", async () => {
       const user = userEvent.setup();
       render(<ReportRows batchRunIds={["batch_a"]} />, { wrapper: Wrapper });
 
       const item = await openReportMenu({ user, batchRunId: "batch_a" });
-      expect(item).toHaveTextContent("Export report");
+
+      expect(item).toHaveTextContent("Instant export");
+      expect(
+        screen.getByTestId("export-report-langy-menu-item"),
+      ).toHaveTextContent("Export with Langy");
     });
 
     /** @scenario "I am told what the report will cover before I wait for it" */
@@ -270,12 +309,13 @@ describe("run report action on a run history row", () => {
 
       await waitFor(() => expect(pendingRequests).toHaveLength(1));
       expect(pendingRequests[0]!.url).toBe(
-        "/api/export/batch-run-report/download",
+        "/api/export/batch-run-report/download?stream=1",
       );
       expect(pendingRequests[0]!.body).toEqual({
         projectId: "project_1",
         scenarioSetId: "set_1",
         batchRunId: "batch_b",
+        withAnalysis: false,
       });
     });
   });

@@ -104,6 +104,14 @@ describe("codexRestrictions", () => {
         "translate.text",
         "workflows.commit_message",
         "scenarios.generator",
+        // The run report's second pass. It is FAST so it runs on a different
+        // model from the pass that wrote the report — a model checking its own
+        // output agrees with itself. Being FAST makes it codex-allowed by the
+        // rule above; that is intended, it reads a computed evidence block and
+        // returns supported/unsupported per sentence, which is the "light AI
+        // assist" the terms cover. The report's *writing* pass is DEFAULT and
+        // stays out.
+        "scenarios.run_report_check",
         "datasets.generator",
         "analytics.topic_clustering_llm",
       ].sort(),

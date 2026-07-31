@@ -911,7 +911,10 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
-    const runs = await this.findRunOutcomesForBatchIds({ projectId, batchRunIds });
+    const runs = await this.findRunOutcomesForBatchIds({
+      projectId,
+      batchRunIds,
+    });
     const lastUpdatedAt = runs.reduce(
       (max, r) => Math.max(max, r.timestamp),
       0,
