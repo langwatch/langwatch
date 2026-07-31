@@ -5,6 +5,7 @@ import {
   resolveMetricCommandShardCount,
 } from "../canonical/shards";
 import { createMetricProcessingPipeline } from "../pipeline";
+import { METRIC_COMMAND_COALESCE_MAX_BATCH } from "../schemas/constants";
 
 describe("metric command lanes", () => {
   describe("when the shard count comes from configuration", () => {
@@ -82,6 +83,26 @@ describe("metric command lanes", () => {
       for (const group of groups) {
         expect(group).toMatch(/^metric:[0-7]$/);
       }
+    });
+
+    // ADR-066 pillar 2: the coalesce behavior itself (N points → one insert)
+    // is proven at the GroupQueue layer; this pins the adopter's opt-in so a
+    // regression to per-point inserts fails a test, not production.
+    it("registers recordDataPoint with append coalescing enabled", () => {
+      const store = {} as never;
+      const pipeline = createMetricProcessingPipeline({
+        metricDataPointAppendStore: store,
+        metricSeriesCatalogAppendStore: store,
+        metricTimeRollupAppendStore: store,
+        metricCommandShardCount: 8,
+      });
+      const command = pipeline.commands.find(
+        (candidate) => candidate.name === "recordDataPoint",
+      );
+      expect(command?.options?.coalesceMaxBatch).toBe(
+        METRIC_COMMAND_COALESCE_MAX_BATCH,
+      );
+      expect(command?.options?.coalesceMaxBatch).toBeGreaterThan(1);
     });
   });
 });

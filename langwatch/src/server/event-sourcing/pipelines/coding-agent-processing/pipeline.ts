@@ -16,6 +16,7 @@ import {
   SessionMetricSeriesMapProjection,
   type SessionMetricSeriesRecord,
 } from "./projections/sessionMetricSeries.mapProjection";
+import { FACTS_COMMAND_COALESCE_MAX_BATCH } from "./schemas/constants";
 import type { CodingAgentProcessingEvent } from "./schemas/events";
 
 export interface CodingAgentProcessingPipelineDeps {
@@ -53,29 +54,41 @@ export interface CodingAgentProcessingPipelineDeps {
 export function createCodingAgentProcessingPipeline(
   deps: CodingAgentProcessingPipelineDeps,
 ) {
-  return definePipeline<CodingAgentProcessingEvent>()
-    .withName("coding_agent_processing")
-    .withAggregateType("coding_agent_session")
-    .withFoldProjection(
-      "codingAgentSession",
-      new CodingAgentSessionFoldProjection({
-        store: deps.codingAgentSessionStore,
-      }),
-    )
-    .withMapProjection(
-      "codingAgentTraceSessions",
-      new CodingAgentTraceSessionsMapProjection({
-        store: deps.codingAgentTraceSessionAppendStore,
-      }),
-    )
-    .withMapProjection(
-      "sessionMetricSeries",
-      new SessionMetricSeriesMapProjection({
-        store: deps.sessionMetricSeriesAppendStore,
-      }),
-    )
-    .withCommand("contributeSpanFacts", ContributeSpanFactsCommand)
-    .withCommand("contributeLogFacts", ContributeLogFactsCommand)
-    .withCommand("contributeMetricFacts", ContributeMetricFactsCommand)
-    .build();
+  return (
+    definePipeline<CodingAgentProcessingEvent>()
+      .withName("coding_agent_processing")
+      .withAggregateType("coding_agent_session")
+      .withFoldProjection(
+        "codingAgentSession",
+        new CodingAgentSessionFoldProjection({
+          store: deps.codingAgentSessionStore,
+        }),
+      )
+      .withMapProjection(
+        "codingAgentTraceSessions",
+        new CodingAgentTraceSessionsMapProjection({
+          store: deps.codingAgentTraceSessionAppendStore,
+        }),
+      )
+      .withMapProjection(
+        "sessionMetricSeries",
+        new SessionMetricSeriesMapProjection({
+          store: deps.sessionMetricSeriesAppendStore,
+        }),
+      )
+      // ADR-066 pillar 2: a hot session contributes one command per span, log
+      // record, and data point. Coalesce a backed-up session's contributions
+      // into one multi-row event-log insert; drain order is preserved, so the
+      // session's contributions still apply in order.
+      .withCommand("contributeSpanFacts", ContributeSpanFactsCommand, {
+        coalesceMaxBatch: FACTS_COMMAND_COALESCE_MAX_BATCH,
+      })
+      .withCommand("contributeLogFacts", ContributeLogFactsCommand, {
+        coalesceMaxBatch: FACTS_COMMAND_COALESCE_MAX_BATCH,
+      })
+      .withCommand("contributeMetricFacts", ContributeMetricFactsCommand, {
+        coalesceMaxBatch: FACTS_COMMAND_COALESCE_MAX_BATCH,
+      })
+      .build()
+  );
 }

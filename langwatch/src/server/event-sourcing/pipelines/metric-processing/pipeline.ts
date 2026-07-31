@@ -6,6 +6,7 @@ import { RecordMetricDataPointCommand } from "./commands/recordMetricDataPointCo
 import { MetricDataPointStorageMapProjection } from "./projections/metricDataPointStorage.mapProjection";
 import { MetricSeriesCatalogMapProjection } from "./projections/metricSeriesCatalog.mapProjection";
 import { MetricTimeRollupMapProjection } from "./projections/metricTimeRollup.mapProjection";
+import { METRIC_COMMAND_COALESCE_MAX_BATCH } from "./schemas/constants";
 import type { MetricProcessingEvent } from "./schemas/events";
 import type { CanonicalMetricDataPoint } from "./schemas/metricDataPoint";
 
@@ -57,6 +58,9 @@ export function createMetricProcessingPipeline(
           pointId: payload.pointId,
           shardCount: deps.metricCommandShardCount,
         }),
+      // ADR-066 pillar 2: one command per OTLP data point — coalesce a
+      // backed-up lane's points into one multi-row event-log insert.
+      coalesceMaxBatch: METRIC_COMMAND_COALESCE_MAX_BATCH,
     })
     .build();
 }

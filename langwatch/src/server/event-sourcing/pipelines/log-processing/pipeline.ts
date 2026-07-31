@@ -4,6 +4,7 @@ import type { EventSubscriberDefinition } from "../../subscribers/eventSubscribe
 import { logCommandGroupKey } from "./canonicalLog";
 import { RecordCanonicalLogCommand } from "./commands/recordCanonicalLogCommand";
 import { CanonicalLogStorageMapProjection } from "./projections/canonicalLogStorage.mapProjection";
+import { LOG_COMMAND_COALESCE_MAX_BATCH } from "./schemas/constants";
 import type { LogProcessingEvent } from "./schemas/events";
 import type { CanonicalLogRecord } from "./schemas/logRecord";
 
@@ -34,6 +35,10 @@ export function createLogProcessingPipeline(deps: LogProcessingPipelineDeps) {
     .withCommand("recordLogRecord", RecordCanonicalLogCommand, {
       getGroupKey: (payload) =>
         logCommandGroupKey(payload.recordId, deps.logCommandShardCount),
+      // ADR-066 pillar 2: one command per OTLP log record is the definition of
+      // high fan-in — coalesce a backed-up lane's records into one multi-row
+      // event-log insert instead of one tiny insert per record.
+      coalesceMaxBatch: LOG_COMMAND_COALESCE_MAX_BATCH,
     })
     .build();
 }
