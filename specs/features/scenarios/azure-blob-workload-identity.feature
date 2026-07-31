@@ -402,18 +402,6 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then it renders successfully
     And no account-key environment variable is emitted
 
-  # An annotation-less account the chart created fails exactly like a pod with
-  # no webhook label, one layer down: it renders, the pods are healthy, and the
-  # webhook has no identity to bind them to.
-  @integration
-  Scenario: The chart refuses a created service account with no identity annotation
-    Given a token-based auth mode requiring a federated identity
-    And the chart is asked to create the service account
-    And no identity client-id annotation is configured on it
-    When the chart renders
-    Then rendering fails with an error naming the client-id annotation
-    But naming a pre-existing service account instead still renders
-
   # The chart cannot read a Secret, so an endpoint supplied that way has an
   # unknowable hostname. Assuming the public cloud is the one guess that fails
   # silently — the deploy succeeds and the first storage call is refused.

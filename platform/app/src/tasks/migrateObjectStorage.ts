@@ -371,13 +371,56 @@ async function auditQueuesForCutover() {
       "Redis is required to audit GroupQueue before migration finalization",
     );
   }
-  return auditGroupQueuesForStorageMigration(
-    connection as unknown as QueueAuditRedis,
-    Date.now(),
-    connection instanceof Cluster
-      ? (connection.nodes("master") as unknown as QueueAuditRedis[])
-      : [connection as unknown as QueueAuditRedis],
-  );
+  const { redis, scanNodes, cleanup } =
+    await createCutoverAuditRedis(connection);
+  try {
+    return await auditGroupQueuesForStorageMigration(
+      redis,
+      Date.now(),
+      scanNodes,
+    );
+  } finally {
+    cleanup();
+  }
+}
+
+/**
+ * The app's shared cluster client runs `scaleReads: "all"`, so its read
+ * commands (GET/SMEMBERS/ZCOUNT/ZCARD/SCARD/HVALS) may be served by a
+ * lagging replica. A stale replica can under-count pending work or miss a
+ * staged durable reference, hand finalization a false clean audit, and
+ * strand that payload after cutover. The audit therefore reads through a
+ * master-only duplicate of the connection; single-node Redis has no
+ * replicas to mis-route to and is used as-is.
+ */
+export async function createCutoverAuditRedis(
+  sharedConnection: unknown,
+): Promise<{
+  redis: QueueAuditRedis;
+  scanNodes: QueueAuditRedis[];
+  cleanup: () => void;
+}> {
+  if (!(sharedConnection instanceof Cluster)) {
+    const redis = sharedConnection as QueueAuditRedis;
+    return { redis, scanNodes: [redis], cleanup: () => void 0 };
+  }
+  const masterOnly = sharedConnection.duplicate([], {
+    scaleReads: "master",
+  });
+  // nodes() reflects discovered topology, which is empty until the duplicate
+  // finishes its own cluster handshake — reading it earlier would hand the
+  // audit zero scan targets and silently audit nothing.
+  if (masterOnly.status !== "ready") {
+    await new Promise<void>((resolve, reject) => {
+      masterOnly.once("ready", () => resolve());
+      masterOnly.once("error", (error) => reject(error));
+    });
+  }
+  return {
+    redis: masterOnly as unknown as QueueAuditRedis,
+    scanNodes: masterOnly.nodes("master") as unknown as QueueAuditRedis[],
+    cleanup: () => masterOnly.disconnect(),
+  };
 }
 
 async function runMigrationPhase(

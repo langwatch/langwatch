@@ -1,9 +1,11 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, it } from "vitest";
+import { Cluster } from "ioredis";
+import { describe, expect, it, vi } from "vitest";
 import {
   assertMigrationPhaseMatchesActiveProvider,
+  createCutoverAuditRedis,
   parseMigrationTaskConfig,
   parseMigrationTaskPhase,
   resolveMigrationS3Region,
@@ -207,5 +209,68 @@ describe("migrateObjectStorage task configuration", () => {
         endpoint: "https://s3.cn-north-1.amazonaws.com.cn",
       }),
     ).toBeUndefined();
+  });
+});
+
+describe("createCutoverAuditRedis", () => {
+  /**
+   * The shared app cluster client runs scaleReads: "all", so its read
+   * commands can be served by a lagging replica — which can under-count
+   * pending work, miss a staged durable reference, and hand finalization a
+   * false clean audit. The audit must read through a master-only duplicate.
+   */
+  it("audits a Redis Cluster through a master-only duplicate, never the replica-scaled shared client", async () => {
+    const masterNode = { id: "master-1" };
+    const duplicated = {
+      status: "ready",
+      nodes: vi.fn(() => [masterNode]),
+      disconnect: vi.fn(),
+      once: vi.fn(),
+    };
+    const shared = Object.create(Cluster.prototype) as Cluster;
+    Object.assign(shared, { duplicate: vi.fn(() => duplicated) });
+
+    const audit = await createCutoverAuditRedis(shared);
+
+    expect(shared.duplicate).toHaveBeenCalledWith([], {
+      scaleReads: "master",
+    });
+    expect(audit.redis).toBe(duplicated);
+    expect(duplicated.nodes).toHaveBeenCalledWith("master");
+    expect(audit.scanNodes).toEqual([masterNode]);
+    audit.cleanup();
+    expect(duplicated.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it("waits for the duplicate's cluster handshake before reading its topology", async () => {
+    const events = new Map<string, (value?: unknown) => void>();
+    const duplicated = {
+      status: "connecting",
+      nodes: vi.fn(() => [{ id: "master-1" }]),
+      disconnect: vi.fn(),
+      once: vi.fn((event: string, handler: () => void) => {
+        events.set(event, handler);
+      }),
+    };
+    const shared = Object.create(Cluster.prototype) as Cluster;
+    Object.assign(shared, { duplicate: vi.fn(() => duplicated) });
+
+    const pending = createCutoverAuditRedis(shared);
+    // Topology must not be read while the handshake is still in flight.
+    expect(duplicated.nodes).not.toHaveBeenCalled();
+    events.get("ready")?.();
+    const audit = await pending;
+
+    expect(audit.scanNodes).toHaveLength(1);
+  });
+
+  it("uses a single-node connection as-is (no replicas to mis-route to)", async () => {
+    const single = { get: vi.fn() };
+
+    const audit = await createCutoverAuditRedis(single);
+
+    expect(audit.redis).toBe(single);
+    expect(audit.scanNodes).toEqual([single]);
+    expect(() => audit.cleanup()).not.toThrow();
   });
 });
